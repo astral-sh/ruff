@@ -45,7 +45,7 @@ def f(x: int) -> int:
 reveal_type(f)  # revealed: def f(x: int) -> int
 
 f: int = 1
-reveal_type(f)  # revealed: Literal[1]
+reveal_type(f)  # revealed: int
 
 def f(): ...
 

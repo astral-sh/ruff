@@ -751,7 +751,7 @@ class Foo(TypedDict):
     foo: int
 
 x1: Foo | None = {"foo": 1}
-reveal_type(x1)  # revealed: Foo
+reveal_type(x1)  # revealed: Foo | None
 
 # A union with no dict-compatible fallback should still validate eagerly against the
 # TypedDict arm.
@@ -764,13 +764,13 @@ class Bar(TypedDict):
     bar: int
 
 x2: Foo | Bar = {"foo": 1}
-reveal_type(x2)  # revealed: Foo
+reveal_type(x2)  # revealed: Foo | Bar
 
 x3: Foo | Bar = {"bar": 1}
-reveal_type(x3)  # revealed: Bar
+reveal_type(x3)  # revealed: Foo | Bar
 
 x4: Foo | Bar | None = {"bar": 1}
-reveal_type(x4)  # revealed: Bar
+reveal_type(x4)  # revealed: Foo | Bar | None
 
 # error: [invalid-assignment]
 x5: Foo | Bar = {"baz": 1}
@@ -796,7 +796,7 @@ x7: FooBar1 | FooBar3 = {"foo": 1, "bar": 1}
 reveal_type(x7)  # revealed: FooBar1 | FooBar3
 
 x8: FooBar1 | FooBar2 | FooBar3 | None = {"foo": 1, "bar": 1}
-reveal_type(x8)  # revealed: FooBar1 | FooBar2 | FooBar3
+reveal_type(x8)  # revealed: FooBar1 | FooBar2 | FooBar3 | None
 ```
 
 In doing so, may have to infer the same type with multiple distinct type contexts:

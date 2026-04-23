@@ -172,7 +172,7 @@ x1: list[int] = [x for x in [1, 2, 3]]
 reveal_type(x1)  # revealed: list[int]
 
 x2: Sequence[int] = [x for x in [1, 2, 3]]
-reveal_type(x2)  # revealed: list[int]
+reveal_type(x2)  # revealed: Sequence[int]
 
 x3: dict[int, str] = {x: str(x) for x in [1, 2, 3]}
 reveal_type(x3)  # revealed: dict[int, str]

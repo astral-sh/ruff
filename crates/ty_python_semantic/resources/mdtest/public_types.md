@@ -287,7 +287,7 @@ if flag():
 else:
     A = None
 
-reveal_type(A)  # revealed: Literal[""] | None
+reveal_type(A)  # revealed: str | None
 
 def _():
     reveal_type(A)  # revealed: str | None

@@ -12,7 +12,7 @@ def _(flag: bool) -> None:
         chr: int = 1
 
     reveal_type(abs)  # revealed: Literal[1] | (def abs[_T](x: SupportsAbs[_T], /) -> _T)
-    reveal_type(chr)  # revealed: Literal[1] | (def chr(i: SupportsIndex, /) -> str)
+    reveal_type(chr)  # revealed: int | (def chr(i: SupportsIndex, /) -> str)
 ```
 
 ## Conditionally global override of builtin

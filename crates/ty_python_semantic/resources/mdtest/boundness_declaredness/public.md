@@ -154,7 +154,7 @@ class Public:
         b: str
 
 # error: [possibly-missing-attribute]
-reveal_type(Public.a)  # revealed: Literal[1] | Any
+reveal_type(Public.a)  # revealed: Any
 # error: [possibly-missing-attribute]
 reveal_type(Public.b)  # revealed: Literal[2] | str
 

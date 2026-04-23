@@ -217,8 +217,8 @@ if returns_bool():
     # error: [invalid-declaration] "Cannot shadow implicit global attribute `__name__` with declaration of type `int`"
     __name__: int = 1
 
-reveal_type(__file__)  # revealed: Literal[42]
-reveal_type(__name__)  # revealed: Literal[1] | str
+reveal_type(__file__)  # revealed: int
+reveal_type(__name__)  # revealed: int | str
 ```
 
 ## Implicit global attributes in the current module override implicit globals from builtins

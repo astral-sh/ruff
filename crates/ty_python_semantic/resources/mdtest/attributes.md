@@ -783,8 +783,8 @@ class Subclass(C):
 reveal_type(Subclass.pure_class_variable1)  # revealed: str
 ```
 
-If a class variable is additionally qualified as `Final`, we do not union with `Unknown` for bare
-`ClassVar`s:
+If a class variable is additionally qualified as `Final`, bare `ClassVar`s still reflect the
+inferred binding, while explicitly typed `ClassVar`s preserve their declared type:
 
 ```py
 from typing import Final

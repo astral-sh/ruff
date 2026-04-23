@@ -17,7 +17,7 @@ reveal_type(IntOrStr.__name__)  # revealed: Literal["IntOrStr"]
 
 x: IntOrStr = 1
 
-reveal_type(x)  # revealed: Literal[1]
+reveal_type(x)  # revealed: int | str
 
 def f() -> None:
     reveal_type(x)  # revealed: int | str

@@ -148,6 +148,12 @@ enum DeclaredAndInferredType<'db> {
         declared_ty: TypeAndQualifiers<'db>,
         inferred_ty: Type<'db>,
     },
+    /// Declared and inferred types might be different, but the binding should keep the declared
+    /// type if the inferred type is assignable to it.
+    ValidateAndBindDeclared {
+        declared_ty: TypeAndQualifiers<'db>,
+        inferred_ty: Type<'db>,
+    },
 }
 
 impl<'db> DeclaredAndInferredType<'db> {
@@ -1180,57 +1186,70 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .is_declaration()
         );
 
-        let (declared_ty, inferred_ty) = match *declared_and_inferred_ty {
+        let (declared_ty, inferred_ty, bind_declared_on_success) = match *declared_and_inferred_ty {
             DeclaredAndInferredType::AreTheSame(type_and_qualifiers) => {
-                (type_and_qualifiers, type_and_qualifiers.inner_type())
+                (type_and_qualifiers, type_and_qualifiers.inner_type(), false)
             }
             DeclaredAndInferredType::MightBeDifferent {
                 declared_ty,
                 inferred_ty,
-            } => {
-                let file_scope_id = self.scope().file_scope_id(self.db());
-                if file_scope_id.is_global() {
-                    let place_table = self.index.place_table(file_scope_id);
-                    let place = place_table.place(definition.place(self.db()));
-                    if let Some(module_type_implicit_declaration) = place
-                        .as_symbol()
-                        .map(|symbol| module_type_implicit_global_symbol(self.db(), symbol.name()))
-                        .and_then(|place| place.place.ignore_possibly_undefined())
+            } => (declared_ty, inferred_ty, false),
+            DeclaredAndInferredType::ValidateAndBindDeclared {
+                declared_ty,
+                inferred_ty,
+            } => (declared_ty, inferred_ty, true),
+        };
+
+        if !matches!(
+            declared_and_inferred_ty,
+            DeclaredAndInferredType::AreTheSame(_)
+        ) {
+            let file_scope_id = self.scope().file_scope_id(self.db());
+            if file_scope_id.is_global() {
+                let place_table = self.index.place_table(file_scope_id);
+                let place = place_table.place(definition.place(self.db()));
+                if let Some(module_type_implicit_declaration) = place
+                    .as_symbol()
+                    .map(|symbol| module_type_implicit_global_symbol(self.db(), symbol.name()))
+                    .and_then(|place| place.place.ignore_possibly_undefined())
+                {
+                    let declared_type = declared_ty.inner_type();
+                    if !declared_type.is_assignable_to(self.db(), module_type_implicit_declaration)
                     {
-                        let declared_type = declared_ty.inner_type();
-                        if !declared_type
-                            .is_assignable_to(self.db(), module_type_implicit_declaration)
+                        if let Some(builder) = self.context.report_lint(&INVALID_DECLARATION, node)
                         {
-                            if let Some(builder) =
-                                self.context.report_lint(&INVALID_DECLARATION, node)
-                            {
-                                let mut diagnostic = builder.into_diagnostic(format_args!(
-                                    "Cannot shadow implicit global attribute `{place}` with declaration of type `{}`",
-                                    declared_type.display(self.db())
-                                ));
-                                diagnostic.info(format_args!("The global symbol `{}` must always have a type assignable to `{}`",
-                                    place,
-                                    module_type_implicit_declaration.display(self.db())
-                                ));
-                            }
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Cannot shadow implicit global attribute `{place}` with declaration of type `{}`",
+                                declared_type.display(self.db())
+                            ));
+                            diagnostic.info(format_args!(
+                                "The global symbol `{}` must always have a type assignable to `{}`",
+                                place,
+                                module_type_implicit_declaration.display(self.db())
+                            ));
                         }
                     }
                 }
-                if inferred_ty.is_assignable_to(self.db(), declared_ty.inner_type()) {
-                    (declared_ty, inferred_ty)
-                } else {
-                    report_invalid_assignment(
-                        &self.context,
-                        node,
-                        definition,
-                        declared_ty.inner_type(),
-                        inferred_ty,
-                    );
-
-                    // if the assignment is invalid, fall back to assuming the annotation is correct
-                    (declared_ty, declared_ty.inner_type())
-                }
             }
+        }
+
+        let inferred_ty = if inferred_ty.is_assignable_to(self.db(), declared_ty.inner_type()) {
+            if bind_declared_on_success {
+                declared_ty.inner_type()
+            } else {
+                inferred_ty
+            }
+        } else {
+            report_invalid_assignment(
+                &self.context,
+                node,
+                definition,
+                declared_ty.inner_type(),
+                inferred_ty,
+            );
+
+            // If the assignment is invalid, fall back to assuming the annotation is correct.
+            declared_ty.inner_type()
         };
 
         self.declarations.insert(definition, declared_ty);
@@ -3740,10 +3759,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // But here we explicitly overwrite the type for the overall `self.attr` node.
             // We do not use `store_expression_type` here, because it checks that no type
-            // has been stored for the expression before. When there's a value, use the
-            // inferred type (matching the name-target definition path); otherwise fall
-            // back to the annotated type. If the value is not assignable to the declared
-            // type, report an error and fall back to the annotated type.
+            // has been stored for the expression before. When there's a value, keep the
+            // inferred value type for the target expression itself; if the value is not
+            // assignable to the declared type, report an error and fall back to the
+            // annotated type.
             let target_ty = if let Some(value_ty) = value_ty {
                 let declared_ty = annotated.inner_type();
                 if value_ty.is_assignable_to(self.db(), declared_ty) {
@@ -4085,13 +4104,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
 
+                let declared_and_inferred = if !declared.qualifiers().is_empty()
+                    && matches!(declared.inner_type(), Type::Dynamic(DynamicType::Unknown))
+                {
+                    // Bare qualifiers like `Final` and `ClassVar` do not contribute an inner
+                    // declared type, so keep the inferred value type for later uses.
+                    DeclaredAndInferredType::MightBeDifferent {
+                        declared_ty: declared,
+                        inferred_ty,
+                    }
+                } else {
+                    DeclaredAndInferredType::ValidateAndBindDeclared {
+                        declared_ty: declared,
+                        inferred_ty,
+                    }
+                };
                 self.add_declaration_with_binding(
                     target.into(),
                     definition,
-                    &DeclaredAndInferredType::MightBeDifferent {
-                        declared_ty: declared,
-                        inferred_ty,
-                    },
+                    &declared_and_inferred,
                 );
             }
 

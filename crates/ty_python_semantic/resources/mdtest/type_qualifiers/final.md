@@ -7,8 +7,8 @@ any scope. Final names declared in class scopes cannot be overridden in subclass
 
 ### `Final` with type
 
-Declared symbols that are additionally qualified with `Final` use the declared type when accessed
-from another scope. Local uses of the symbol will use the inferred type, which may be more specific:
+Declared symbols that are additionally qualified with `Final` use the declared type when accessed,
+including within the same scope:
 
 `mod.py`:
 
@@ -22,11 +22,11 @@ FINAL_D: "Final[int]" = 1
 FINAL_F: Final[int]
 FINAL_F = 1
 
-reveal_type(FINAL_A)  # revealed: Literal[1]
-reveal_type(FINAL_B)  # revealed: Literal[1]
-reveal_type(FINAL_C)  # revealed: Literal[1]
-reveal_type(FINAL_D)  # revealed: Literal[1]
-reveal_type(FINAL_D)  # revealed: Literal[1]
+reveal_type(FINAL_A)  # revealed: int
+reveal_type(FINAL_B)  # revealed: int
+reveal_type(FINAL_C)  # revealed: int
+reveal_type(FINAL_D)  # revealed: int
+reveal_type(FINAL_F)  # revealed: Literal[1]
 
 def nonlocal_uses():
     reveal_type(FINAL_A)  # revealed: int

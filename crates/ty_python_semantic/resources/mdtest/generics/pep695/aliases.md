@@ -467,9 +467,9 @@ type MaybeList[T] = list[T] | T
 def test[X: int](items: list[X]) -> list[X]:
     # The annotation MaybeList[str | int] expands to `list[str | int] | str | int`.
     # Bidirectional inference should infer list[str | int] from the list() call.
+    # The binding still keeps the declared union type.
     a: MaybeList[str | int] = list(items)
-    # The revealed type is list[str | int] because that's what list() returns.
-    reveal_type(a)  # revealed: list[str | int]
+    reveal_type(a)  # revealed: list[str | int] | str | int
     return items
 ```
 
@@ -483,8 +483,7 @@ def copy_list[T](items: list[T]) -> list[T]:
 
 def _(values: list[int]) -> OptionalList[int]:
     result: OptionalList[int] = copy_list(values)
-    # The revealed type is list[int] because that's what copy_list returns.
-    reveal_type(result)  # revealed: list[int]
+    reveal_type(result)  # revealed: list[int] | None
     return result
 ```
 
@@ -500,9 +499,10 @@ class Person(TypedDict):
 type MaybePerson = Person | None
 
 def _(p: MaybePerson):
-    # Dict literal should be inferred as Person, not dict[str, str | int]
+    # Dict literal should be inferred as Person, not dict[str, str | int],
+    # but the binding still keeps the declared union type.
     x: MaybePerson = {"name": "Alice", "age": 30}
-    reveal_type(x)  # revealed: Person
+    reveal_type(x)  # revealed: Person | None
 ```
 
 And with `dict()` calls in TypedDict context:
@@ -517,9 +517,10 @@ class Dog(TypedDict):
 type MaybeDog = Dog | None
 
 def _():
-    # dict() call with keyword args should be inferred as Dog
+    # dict() call with keyword args should be inferred as Dog,
+    # but the binding still keeps the declared union type.
     animal: MaybeDog = dict(name="Buddy", breed="Labrador")
-    reveal_type(animal)  # revealed: Dog
+    reveal_type(animal)  # revealed: Dog | None
 ```
 
 And with set literal inference:
@@ -528,9 +529,10 @@ And with set literal inference:
 type MaybeSet[T] = set[T] | T
 
 def _():
-    # Set literal should be inferred as set[int]
+    # Set literal should be inferred as set[int],
+    # but the binding still keeps the declared union type.
     x: MaybeSet[int] = {1, 2, 3}
-    reveal_type(x)  # revealed: set[int]
+    reveal_type(x)  # revealed: set[int] | int
 ```
 
 ## Fully qualified type alias names in error messages

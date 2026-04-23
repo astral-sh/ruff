@@ -28,7 +28,7 @@ l2 = list1(1)
 reveal_type(l2)  # revealed: list[int]
 
 l3: list[int | str] | None = list1(1)
-reveal_type(l3)  # revealed: list[int | str]
+reveal_type(l3)  # revealed: list[int | str] | None
 
 def _(l: list[int] | None = None):
     l1 = l or list()
@@ -36,7 +36,7 @@ def _(l: list[int] | None = None):
 
     l2: list[int] = l or list()
     # it would be better if this were `list[int]`? (https://github.com/astral-sh/ty/issues/136)
-    reveal_type(l2)  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
+    reveal_type(l2)  # revealed: list[int]
 
 def f[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
@@ -478,7 +478,7 @@ f1 = lambda x: {"bar": 1}
 reveal_type(f1)  # revealed: (x) -> dict[str, int]
 
 f2: Callable[[int], Bar] = lambda x: {"bar": 1}
-reveal_type(f2)  # revealed: (x: int) -> Bar
+reveal_type(f2)  # revealed: (int, /) -> Bar
 
 # error: [missing-typed-dict-key] "Missing required key 'bar' in TypedDict `Bar` constructor"
 # error: [invalid-assignment] "Object of type `(x: int) -> dict[Unknown, Unknown]` is not assignable to `(int, /) -> Bar`"
@@ -487,7 +487,7 @@ reveal_type(f3)  # revealed: (int, /) -> Bar
 
 # TODO: This should reveal `str`.
 f4: Callable[[str], str] = lambda x: reveal_type(x)  # revealed: Unknown
-reveal_type(f4)  # revealed: (x: str) -> Unknown
+reveal_type(f4)  # revealed: (str, /) -> str
 
 # TODO: This should not error once we support `Unpack`.
 # error: [invalid-assignment]
@@ -495,7 +495,7 @@ f5: Callable[[*tuple[int, ...]], None] = lambda x, y, z: None
 reveal_type(f5)  # revealed: (tuple[int, ...], /) -> None
 
 f6: Callable[[int, str], None] = lambda *args: None
-reveal_type(f6)  # revealed: (*args) -> None
+reveal_type(f6)  # revealed: (int, str, /) -> None
 
 # N.B. `Callable` annotations only support positional parameters.
 # error: [invalid-assignment]
@@ -504,7 +504,7 @@ reveal_type(f7)  # revealed: (int, /) -> None
 
 # TODO: This should reveal `(*args: int, *, x=1) -> None` once we support `Unpack`.
 f8: Callable[[*tuple[int, ...], int], None] = lambda *args, x=1: None
-reveal_type(f8)  # revealed: (*args, *, x=1) -> None
+reveal_type(f8)  # revealed: (tuple[int, ...], int, /) -> None
 
 def _(x: bool):
     signatures = {
@@ -679,14 +679,14 @@ def _(flag: bool):
 
     # error: [possibly-unresolved-reference]
     x1: int | str = g(x, [1])
-    reveal_type(x1)  # revealed: int
+    reveal_type(x1)  # revealed: int | str
 
     if flag:
         y = "1"
 
     # error: [possibly-unresolved-reference]
     x2: list[int | None] | list[str | None] = [y]
-    reveal_type(x2)  # revealed: list[str | None]
+    reveal_type(x2)  # revealed: list[int | None] | list[str | None]
 ```
 
 ```py

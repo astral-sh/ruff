@@ -42,10 +42,10 @@ if coinflip():
 
 x = y  # error: [possibly-unresolved-reference]
 
-# revealed: Literal[3]
+# revealed: int
 reveal_type(x)
 
-# revealed: Literal[3]
+# revealed: int
 # error: [possibly-unresolved-reference]
 reveal_type(y)
 ```
@@ -56,7 +56,7 @@ Importing an annotated name prefers the declared type over the inferred type:
 # error: [possibly-missing-import] "Member `y` of module `maybe_unbound_annotated` may be missing"
 from maybe_unbound_annotated import x, y
 
-reveal_type(x)  # revealed: Literal[3]
+reveal_type(x)  # revealed: int
 reveal_type(y)  # revealed: int
 ```
 

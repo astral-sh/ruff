@@ -717,8 +717,8 @@ reveal_type(Y)  # revealed: Unknown
 # of the global variable `Z` in this module, as the symbol in
 # the `exporter` module is in a branch that is statically known
 # to be dead code given the `python-version` configuration.
-# Thus this still reveals `Literal[True]`.
-reveal_type(Z)  # revealed: Literal[True]
+# Thus this still reveals `bool`.
+reveal_type(Z)  # revealed: bool
 
 # Make sure that reachability constraints are also correctly applied
 # for nonlocal lookups:

@@ -1750,6 +1750,7 @@ impl<'db> StaticClassLiteral<'db> {
         let mut attributes = FxIndexMap::default();
 
         let class_body_scope = self.body_scope(db);
+        let module = parsed_module(db, self.file(db)).load(db);
         let table = place_table(db, class_body_scope);
 
         let use_def = use_def_map(db, class_body_scope);
@@ -1788,10 +1789,19 @@ impl<'db> StaticClassLiteral<'db> {
             }
 
             if let Some(attr_ty) = attr.place.ignore_possibly_undefined() {
-                let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                let mut default_ty = place_from_bindings(db, bindings)
-                    .place
-                    .ignore_possibly_undefined();
+                let mut default_ty = first_declaration
+                    .and_then(|first_declaration| match first_declaration.kind(db) {
+                        DefinitionKind::AnnotatedAssignment(assignment) => assignment
+                            .value(&module)
+                            .map(|value| definition_expression_type(db, first_declaration, value)),
+                        _ => None,
+                    })
+                    .or_else(|| {
+                        let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
+                        place_from_bindings(db, bindings)
+                            .place
+                            .ignore_possibly_undefined()
+                    });
 
                 default_ty =
                     default_ty.map(|ty| ty.apply_optional_specialization(db, specialization));

@@ -16,6 +16,17 @@ reveal_type(y)  # revealed: Literal[1]
 x: int = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
 ```
 
+## Annotated assignments bind the declared type
+
+```py
+x: int | None = 1
+reveal_type(x)  # revealed: int | None
+
+def f() -> None:
+    y: int | str = 1
+    reveal_type(y)  # revealed: int | str
+```
+
 ## Numbers special case
 
 ```py
@@ -145,7 +156,7 @@ k: list[tuple[list[int], ...]] = [([],), ([1, 2], [3, 4]), ([5], [6], [7])]
 reveal_type(k)  # revealed: list[tuple[list[int], ...]]
 
 l: tuple[list[int], *tuple[list[typing.Any], ...], list[str]] = ([1, 2, 3], [4, 5, 6], [7, 8, 9], ["10", "11", "12"])
-reveal_type(l)  # revealed: tuple[list[int], list[Any], list[Any], list[str]]
+reveal_type(l)  # revealed: tuple[list[int], *tuple[list[Any], ...], list[str]]
 
 type IntList = list[int]
 
@@ -185,60 +196,60 @@ python-version = "3.12"
 import typing
 
 a: list[int] | None = [1, 2, 3]
-reveal_type(a)  # revealed: list[int]
+reveal_type(a)  # revealed: list[int] | None
 
 b: list[int | str] | None = [1, 2, 3]
-reveal_type(b)  # revealed: list[int | str]
+reveal_type(b)  # revealed: list[int | str] | None
 
 c: typing.List[int] | None = [1, 2, 3]
-reveal_type(c)  # revealed: list[int]
+reveal_type(c)  # revealed: list[int] | None
 
 d: list[typing.Any] | None = []
-reveal_type(d)  # revealed: list[Any]
+reveal_type(d)  # revealed: list[Any] | None
 
 e: set[int] | None = {1, 2, 3}
-reveal_type(e)  # revealed: set[int]
+reveal_type(e)  # revealed: set[int] | None
 
 f: set[int | str] | None = {1, 2, 3}
-reveal_type(f)  # revealed: set[int | str]
+reveal_type(f)  # revealed: set[int | str] | None
 
 g: typing.Set[int] | None = {1, 2, 3}
-reveal_type(g)  # revealed: set[int]
+reveal_type(g)  # revealed: set[int] | None
 
 h: list[list[int]] | None = [[], [42]]
-reveal_type(h)  # revealed: list[list[int]]
+reveal_type(h)  # revealed: list[list[int]] | None
 
 i: list[typing.Any] | None = [1, 2, "3", ([4],)]
-reveal_type(i)  # revealed: list[Any]
+reveal_type(i)  # revealed: list[Any] | None
 
 j: list[tuple[str | int, ...]] | None = [(1, 2), ("foo", "bar"), ()]
-reveal_type(j)  # revealed: list[tuple[str | int, ...]]
+reveal_type(j)  # revealed: list[tuple[str | int, ...]] | None
 
 k: list[tuple[list[int], ...]] | None = [([],), ([1, 2], [3, 4]), ([5], [6], [7])]
-reveal_type(k)  # revealed: list[tuple[list[int], ...]]
+reveal_type(k)  # revealed: list[tuple[list[int], ...]] | None
 
 l: tuple[list[int], *tuple[list[typing.Any], ...], list[str]] | None = ([1, 2, 3], [4, 5, 6], [7, 8, 9], ["10", "11", "12"])
-reveal_type(l)  # revealed: tuple[list[int], list[Any], list[Any], list[str]]
+reveal_type(l)  # revealed: tuple[list[int], *tuple[list[Any], ...], list[str]] | None
 
 type IntList = list[int]
 
 m: IntList | None = [1, 2, 3]
-reveal_type(m)  # revealed: list[int]
+reveal_type(m)  # revealed: list[int] | None
 
 n: list[typing.Literal[1, 2, 3]] | None = [1, 2, 3]
-reveal_type(n)  # revealed: list[Literal[1, 2, 3]]
+reveal_type(n)  # revealed: list[Literal[1, 2, 3]] | None
 
 o: list[typing.LiteralString] | None = ["a", "b", "c"]
-reveal_type(o)  # revealed: list[LiteralString]
+reveal_type(o)  # revealed: list[LiteralString] | None
 
 p: dict[int, int] | None = {}
-reveal_type(p)  # revealed: dict[int, int]
+reveal_type(p)  # revealed: dict[int, int] | None
 
 q: dict[int | str, int] | None = {1: 1, 2: 2, 3: 3}
-reveal_type(q)  # revealed: dict[int | str, int]
+reveal_type(q)  # revealed: dict[int | str, int] | None
 
 r: dict[int | str, int | str] | None = {1: 1, 2: 2, 3: 3}
-reveal_type(r)  # revealed: dict[int | str, int | str]
+reveal_type(r)  # revealed: dict[int | str, int | str] | None
 ```
 
 ## Incorrect collection literal assignments are complained about
@@ -272,7 +283,7 @@ x2: X[int | None] = X(1)
 reveal_type(x2)  # revealed: X[int | None]
 
 x3: X[int | None] | None = X(1)
-reveal_type(x3)  # revealed: X[int | None]
+reveal_type(x3)  # revealed: X[int | None] | None
 
 def _[T](x1: X[T]):
     x2: X[T | int] = X(x1.value)
@@ -419,11 +430,11 @@ x = Foo()
 reveal_type(x)  # revealed: Foo
 ```
 
-## Annotated assignments in stub files are inferred correctly
+## Annotated assignments in stub files bind the declared type
 
 ```pyi
 x: int = 1
-reveal_type(x)  # revealed: Literal[1]
+reveal_type(x)  # revealed: int
 ```
 
 ## Annotations influence generic call inference
@@ -464,22 +475,22 @@ def f2[T: int](x: T) -> T:
     return x
 
 x8: int = f2(True)
-reveal_type(x8)  # revealed: Literal[True]
+reveal_type(x8)  # revealed: int
 
 x9: int | str = f2(True)
-reveal_type(x9)  # revealed: Literal[True]
+reveal_type(x9)  # revealed: int | str
 
 x10: list[int | str] | list[int | None] = [1, 2, 3]
-reveal_type(x10)  # revealed: list[int | str]
+reveal_type(x10)  # revealed: list[int | str] | list[int | None]
 
 x11: Sequence[int | str] | Sequence[int | None] = [1, 2, 3]
-reveal_type(x11)  # revealed: list[int]
+reveal_type(x11)  # revealed: Sequence[int | str] | Sequence[int | None]
 
 x12: list[int] | list[int | None] | list[str | None] = ["1", "2"]
-reveal_type(x12)  # revealed: list[str | None]
+reveal_type(x12)  # revealed: list[int] | list[int | None] | list[str | None]
 
 x13: dict[str, list[int | None]] | dict[str, list[str | None]] = {"a": ["b"]}
-reveal_type(x13)  # revealed: dict[str, list[str | None]]
+reveal_type(x13)  # revealed: dict[str, list[int | None]] | dict[str, list[str | None]]
 
 x14 = [{"a": [1], "b": 1}, {"a": [1]}]
 x14.append(reveal_type({"b": 1}))  # revealed: dict[str, list[int] | int]
@@ -508,7 +519,7 @@ x1: TD = first([{"x": 0}, {"x": 1}])
 reveal_type(x1)  # revealed: TD
 
 x2: TD | None = first([{"x": 0}, {"x": 1}])
-reveal_type(x2)  # revealed: TD
+reveal_type(x2)  # revealed: TD | None
 
 # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
 # error: [invalid-key] "Unknown key "y" for TypedDict `TD`"
@@ -531,28 +542,28 @@ class TD2(TypedDict):
 
 def _(dt: dict[str, Any], key: str):
     x1: TD = dt.get(key, {})
-    reveal_type(x1)  # revealed: Any
+    reveal_type(x1)  # revealed: TD
 
     x2: TD = dt.get(key, {"x": 0})
-    reveal_type(x2)  # revealed: Any
+    reveal_type(x2)  # revealed: TD
 
     x3: TD | None = dt.get(key, {})
-    reveal_type(x3)  # revealed: Any
+    reveal_type(x3)  # revealed: TD | None
 
     x4: TD | None = dt.get(key, {"x": 0})
-    reveal_type(x4)  # revealed: Any
+    reveal_type(x4)  # revealed: TD | None
 
     x5: TD2 = dt.get(key, {})
-    reveal_type(x5)  # revealed: Any
+    reveal_type(x5)  # revealed: TD2
 
     x6: TD2 = dt.get(key, {"x": 0})
-    reveal_type(x6)  # revealed: Any
+    reveal_type(x6)  # revealed: TD2
 
     x7: TD2 | None = dt.get(key, {})
-    reveal_type(x7)  # revealed: Any
+    reveal_type(x7)  # revealed: TD2 | None
 
     x8: TD2 | None = dt.get(key, {"x": 0})
-    reveal_type(x8)  # revealed: Any
+    reveal_type(x8)  # revealed: TD2 | None
 ```
 
 Partially specialized type context is not ignored:
@@ -604,7 +615,7 @@ def _():
     reveal_type(x4)  # revealed: X
 ```
 
-## Prefer the declared type of generic classes and callables
+## Annotated assignments keep the declared type for generic classes and callables
 
 ```toml
 [environment]
@@ -633,20 +644,20 @@ c: list[Any] = [1]
 reveal_type(c)  # revealed: list[Any]
 
 d: list[Any] | None = f(1)
-reveal_type(d)  # revealed: list[Any]
+reveal_type(d)  # revealed: list[Any] | None
 
 e: list[Any] | None = [1]
-reveal_type(e)  # revealed: list[Any]
+reveal_type(e)  # revealed: list[Any] | None
 
 f: list[Any] | None = f2(1)
 reveal_type(f)  # revealed: list[Any] | None
 
 g: list[Any] | dict[Any, Any] = f3(1)
 # TODO: Better constraint solver.
-reveal_type(g)  # revealed: list[int] | dict[int, int]
+reveal_type(g)  # revealed: list[Any] | dict[Any, Any]
 ```
 
-We only prefer the declared type if it is in non-covariant position.
+This also applies when the inferred generic instantiation is more specific than the declaration.
 
 ```py
 class Bivariant[T]:
@@ -690,8 +701,8 @@ x6: Covariant[Any] = covariant(1)
 x7: Contravariant[Any] = contravariant(1)
 x8: Invariant[Any] = invariant(1)
 
-reveal_type(x5)  # revealed: Bivariant[Literal[1]]
-reveal_type(x6)  # revealed: Covariant[Literal[1]]
+reveal_type(x5)  # revealed: Bivariant[Any]
+reveal_type(x6)  # revealed: Covariant[Any]
 reveal_type(x7)  # revealed: Contravariant[Any]
 reveal_type(x8)  # revealed: Invariant[Any]
 ```
@@ -703,10 +714,10 @@ class X[T]:
         raise NotImplementedError
 
 x1: X[int | None] = X()
-reveal_type(x1)  # revealed: X[None]
+reveal_type(x1)  # revealed: X[int | None]
 ```
 
-We also prefer the declared type of `Callable` parameters, which are in contravariant position:
+The same applies to declared callable types:
 
 ```py
 from typing import Callable
@@ -738,55 +749,55 @@ x5: Callable[[Any], bool] | None = maybe_make_callable(0)
 reveal_type(x5)  # revealed: ((Any, /) -> bool) | None
 ```
 
-## Declared type preference sees through subtyping
+## Declared type binding sees through subtyping
 
 ```toml
 [environment]
 python-version = "3.12"
 ```
 
-Similarly, if the inferred type is a subtype of the declared type, we prefer declared type
-assignments that are in non-covariant position.
+Similarly, if the inferred type is a subtype of the declared type, the binding still keeps the
+declared type.
 
 ```py
 from collections import defaultdict
 from typing import Any, Iterable, Literal, MutableSequence, Sequence
 
 x1: Sequence[Any] = [1, 2, 3]
-reveal_type(x1)  # revealed: list[int]
+reveal_type(x1)  # revealed: Sequence[Any]
 
 x2: MutableSequence[Any] = [1, 2, 3]
-reveal_type(x2)  # revealed: list[Any]
+reveal_type(x2)  # revealed: MutableSequence[Any]
 
 x3: Iterable[Any] = [1, 2, 3]
-reveal_type(x3)  # revealed: list[int]
+reveal_type(x3)  # revealed: Iterable[Any]
 
 x4: Iterable[Iterable[Any]] = [[1, 2, 3]]
-reveal_type(x4)  # revealed: list[list[int]]
+reveal_type(x4)  # revealed: Iterable[Iterable[Any]]
 
 x5: list[Iterable[Any]] = [[1, 2, 3]]
 reveal_type(x5)  # revealed: list[Iterable[Any]]
 
 x6: Iterable[list[Any]] = [[1, 2, 3]]
-reveal_type(x6)  # revealed: list[list[Any]]
+reveal_type(x6)  # revealed: Iterable[list[Any]]
 
 x7: Sequence[Any] = [i for i in [1, 2, 3]]
-reveal_type(x7)  # revealed: list[int]
+reveal_type(x7)  # revealed: Sequence[Any]
 
 x8: MutableSequence[Any] = [i for i in [1, 2, 3]]
-reveal_type(x8)  # revealed: list[Any]
+reveal_type(x8)  # revealed: MutableSequence[Any]
 
 x9: Iterable[Any] = [i for i in [1, 2, 3]]
-reveal_type(x9)  # revealed: list[int]
+reveal_type(x9)  # revealed: Iterable[Any]
 
 x10: Iterable[Iterable[Any]] = [[i] for i in [1, 2, 3]]
-reveal_type(x10)  # revealed: list[list[int]]
+reveal_type(x10)  # revealed: Iterable[Iterable[Any]]
 
 x11: list[Iterable[Any]] = [[i] for i in [1, 2, 3]]
 reveal_type(x11)  # revealed: list[Iterable[Any]]
 
 x12: Iterable[list[Any]] = [[i] for i in [1, 2, 3]]
-reveal_type(x12)  # revealed: list[list[Any]]
+reveal_type(x12)  # revealed: Iterable[list[Any]]
 
 class X[T]:
     value: T
@@ -802,25 +813,25 @@ x13: A[object] = A(1)
 reveal_type(x13)  # revealed: A[object]
 
 x14: X[object] = A(1)
-reveal_type(x14)  # revealed: A[object]
+reveal_type(x14)  # revealed: X[object]
 
 x15: X[object] | None = A(1)
-reveal_type(x15)  # revealed: A[object]
+reveal_type(x15)  # revealed: X[object] | None
 
 x16: X[object] | None = a(1)
-reveal_type(x16)  # revealed: A[object]
+reveal_type(x16)  # revealed: X[object] | None
 
 def f[T](x: T) -> list[list[T]]:
     return [[x]]
 
 x17: Sequence[Sequence[Any]] = f(1)
-reveal_type(x17)  # revealed: list[list[int]]
+reveal_type(x17)  # revealed: Sequence[Sequence[Any]]
 
 x18: Sequence[list[Any]] = f(1)
-reveal_type(x18)  # revealed: list[list[Any]]
+reveal_type(x18)  # revealed: Sequence[list[Any]]
 
 x19: dict[int, dict[str, int]] = defaultdict(dict)
-reveal_type(x19)  # revealed: defaultdict[int, dict[str, int]]
+reveal_type(x19)  # revealed: dict[int, dict[str, int]]
 ```
 
 ## Narrow generic unions
@@ -875,7 +886,7 @@ def _(target: TargetWithTD):
     reveal_type(target)  # revealed: (TD, /) -> None
 ```
 
-## Prefer the inferred type of non-generic classes
+## Declared type binding for non-generic cases
 
 ```toml
 [environment]
@@ -893,30 +904,30 @@ def _(i: int):
     a: int | None = i
     b: int | None = identity(i)
     c: int | str | None = identity(i)
-    reveal_type(a)  # revealed: int
-    reveal_type(b)  # revealed: int
-    reveal_type(c)  # revealed: int
+    reveal_type(a)  # revealed: int | None
+    reveal_type(b)  # revealed: int | None
+    reveal_type(c)  # revealed: int | str | None
 
     a: list[int | None] | None = [i]
     b: list[int | None] | None = identity([i])
     c: list[int | None] | int | None = identity([i])
-    reveal_type(a)  # revealed: list[int | None]
-    reveal_type(b)  # revealed: list[int | None]
-    reveal_type(c)  # revealed: list[int | None]
+    reveal_type(a)  # revealed: list[int | None] | None
+    reveal_type(b)  # revealed: list[int | None] | None
+    reveal_type(c)  # revealed: list[int | None] | int | None
 
     a: list[int | None] | None = [i]
     b: list[int | None] | None = lst(i)
     c: list[int | None] | int | None = lst(i)
-    reveal_type(a)  # revealed: list[int | None]
-    reveal_type(b)  # revealed: list[int | None]
-    reveal_type(c)  # revealed: list[int | None]
+    reveal_type(a)  # revealed: list[int | None] | None
+    reveal_type(b)  # revealed: list[int | None] | None
+    reveal_type(c)  # revealed: list[int | None] | int | None
 
     a: list | None = []
     b: list | None = identity([])
     c: list | int | None = identity([])
-    reveal_type(a)  # revealed: list[Unknown]
-    reveal_type(b)  # revealed: list[Unknown]
-    reveal_type(c)  # revealed: list[Unknown]
+    reveal_type(a)  # revealed: list[Unknown] | None
+    reveal_type(b)  # revealed: list[Unknown] | None
+    reveal_type(c)  # revealed: list[Unknown] | int | None
 
 def f[T](x: list[T]) -> T:
     return x[0]
@@ -926,22 +937,22 @@ def _(a: int, b: str, c: int | str):
     reveal_type(x1)  # revealed: int
 
     x2: int | str = f(lst(a))
-    reveal_type(x2)  # revealed: int
+    reveal_type(x2)  # revealed: int | str
 
     x3: int | None = f(lst(a))
-    reveal_type(x3)  # revealed: int
+    reveal_type(x3)  # revealed: int | None
 
     x4: str = f(lst(b))
     reveal_type(x4)  # revealed: str
 
     x5: int | str = f(lst(b))
-    reveal_type(x5)  # revealed: str
+    reveal_type(x5)  # revealed: int | str
 
     x6: str | int = f(lst(b))
-    reveal_type(x6)  # revealed: str
+    reveal_type(x6)  # revealed: str | int
 
     x7: str | None = f(lst(b))
-    reveal_type(x7)  # revealed: str
+    reveal_type(x7)  # revealed: str | None
 
     x8: int | str = f(lst(c))
     reveal_type(x8)  # revealed: int | str

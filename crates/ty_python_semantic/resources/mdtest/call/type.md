@@ -946,8 +946,8 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
   |
 ```
 
-When the bases are not a tuple literal (e.g., a variable), the diagnostic is emitted without
-per-base annotations:
+When the bases are not a tuple literal (e.g., a variable), ty falls back to
+`unsupported-dynamic-base` diagnostics for the individual base entries:
 
 ```py
 class C:
@@ -957,7 +957,8 @@ class D:
     __slots__ = ("y",)
 
 bases: tuple[type[C], type[D]] = (C, D)
-# error: [instance-layout-conflict]
+# error: [unsupported-dynamic-base] "Unsupported class base"
+# error: [unsupported-dynamic-base] "Unsupported class base"
 Y = type("Y", bases, {})
 ```
 
@@ -1149,15 +1150,17 @@ def f(*args, **kwargs):
 When an explicit type annotation is provided, the inferred type is checked against it:
 
 ```py
-# The annotation `type` is compatible with the inferred class literal type
+# The annotation `type` is compatible with the inferred class literal type, but later uses see the
+# declared type.
 T: type = type("T", (), {})
-reveal_type(T)  # revealed: <class 'T'>
+reveal_type(T)  # revealed: type
 
-# The annotation `type[Base]` is compatible with the inferred type
+# The annotation `type[Base]` is compatible with the inferred type, and later uses see the
+# declared type.
 class Base: ...
 
 Derived: type[Base] = type("Derived", (Base,), {})
-reveal_type(Derived)  # revealed: <class 'Derived'>
+reveal_type(Derived)  # revealed: type[Base]
 
 # Incompatible annotation produces an error
 class Unrelated: ...

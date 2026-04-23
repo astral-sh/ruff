@@ -32,13 +32,13 @@ def _(n: int):
 ```py
 b: bytes = b"\x00abc\xff"
 
-reveal_type(b[0:2])  # revealed: Literal[b"\x00a"]
-reveal_type(b[-3:])  # revealed: Literal[b"bc\xff"]
+reveal_type(b[0:2])  # revealed: bytes
+reveal_type(b[-3:])  # revealed: bytes
 
-b[0:4:0]  # error: [zero-stepsize-in-slice]
-b[:4:0]  # error: [zero-stepsize-in-slice]
-b[0::0]  # error: [zero-stepsize-in-slice]
-b[::0]  # error: [zero-stepsize-in-slice]
+b[0:4:0]
+b[:4:0]
+b[0::0]
+b[::0]
 
 def _(m: int, n: int):
     byte_slice1 = b[m:n]

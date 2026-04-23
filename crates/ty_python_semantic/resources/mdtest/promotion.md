@@ -246,7 +246,7 @@ x11: list[Literal[1] | Literal[2] | Literal[3]] = [1, 2, 3]
 reveal_type(x11)  # revealed: list[Literal[1, 2, 3]]
 
 x12: Y[Y[Literal[1]]] = [[1]]
-reveal_type(x12)  # revealed: list[list[Literal[1]]]
+reveal_type(x12)  # revealed: list[Y[Literal[1]]]
 
 x13: list[tuple[Literal[1], Literal[2], Literal[3]]] = [(1, 2, 3)]
 reveal_type(x13)  # revealed: list[tuple[Literal[1], Literal[2], Literal[3]]]
@@ -275,13 +275,13 @@ reveal_type(x19)  # revealed: list[Literal[1]]
 reveal_type(x19)  # revealed: list[Literal[1]]
 
 x20: list[Literal[1]] | None = [1]
-reveal_type(x20)  # revealed: list[Literal[1]]
+reveal_type(x20)  # revealed: list[Literal[1]] | None
 
 x21: X[Literal[1]] | None = X([1])
-reveal_type(x21)  # revealed: X[Literal[1]]
+reveal_type(x21)  # revealed: X[Literal[1]] | None
 
 x22: X[Literal[1]] | None = x([1])
-reveal_type(x22)  # revealed: X[Literal[1]]
+reveal_type(x22)  # revealed: X[Literal[1]] | None
 
 def make_callable[T](x: T) -> Callable[[T], bool]:
     raise NotImplementedError
@@ -296,24 +296,25 @@ x24: Callable[[Literal[1]], bool] | None = maybe_make_callable(1)
 reveal_type(x24)  # revealed: ((Literal[1], /) -> bool) | None
 ```
 
-## Literal annotations see through subtyping
+## Literal annotations still guide inference through subtyping
 
-Literal annotations are respected even if the inferred type is a subtype of the declared type:
+Literal annotations are still used for bidirectional inference even if the inferred type is a
+subtype of the declared type, but the binding itself keeps the declared type:
 
 ```py
 from typing import Any, Iterable, Literal, MutableSequence, Sequence
 
 x1: Sequence[Literal[1, 2, 3]] = [1, 2, 3]
-reveal_type(x1)  # revealed: list[Literal[1, 2, 3]]
+reveal_type(x1)  # revealed: Sequence[Literal[1, 2, 3]]
 
 x2: MutableSequence[Literal[1, 2, 3]] = [1, 2, 3]
-reveal_type(x2)  # revealed: list[Literal[1, 2, 3]]
+reveal_type(x2)  # revealed: MutableSequence[Literal[1, 2, 3]]
 
 x3: Iterable[Literal[1, 2, 3]] = [1, 2, 3]
-reveal_type(x3)  # revealed: list[Literal[1, 2, 3]]
+reveal_type(x3)  # revealed: Iterable[Literal[1, 2, 3]]
 
 x4: Iterable[Literal[1, 2, 3]] = list([1, 2, 3])
-reveal_type(x4)  # revealed: list[Literal[1, 2, 3]]
+reveal_type(x4)  # revealed: Iterable[Literal[1, 2, 3]]
 
 x5: frozenset[Literal[1]] = frozenset([1])
 reveal_type(x5)  # revealed: frozenset[Literal[1]]
@@ -330,13 +331,13 @@ x6: Sub1[Literal[1]] = sub1(1)
 reveal_type(x6)  # revealed: Sub1[Literal[1]]
 
 x7: Sup1[Literal[1]] = sub1(1)
-reveal_type(x7)  # revealed: Sub1[Literal[1]]
+reveal_type(x7)  # revealed: Sup1[Literal[1]]
 
 x8: Sup1[Literal[1]] | None = sub1(1)
-reveal_type(x8)  # revealed: Sub1[Literal[1]]
+reveal_type(x8)  # revealed: Sup1[Literal[1]] | None
 
 x9: Sup1[Literal[1]] | None = sub1(1)
-reveal_type(x9)  # revealed: Sub1[Literal[1]]
+reveal_type(x9)  # revealed: Sup1[Literal[1]] | None
 
 class Sup2A[T, U]:
     value: tuple[T, U]
@@ -353,10 +354,10 @@ x10 = sub2(1, 2)
 reveal_type(x10)  # revealed: Sub2[int, int]
 
 x11: Sup2A[Literal[1], Literal[2]] = sub2(1, 2)
-reveal_type(x11)  # revealed: Sub2[Literal[1], int]
+reveal_type(x11)  # revealed: Sup2A[Literal[1], Literal[2]]
 
 x12: Sup2B[Literal[1], Literal[2]] = sub2(1, 2)
-reveal_type(x12)  # revealed: Sub2[int, Literal[2]]
+reveal_type(x12)  # revealed: Sup2B[Literal[1], Literal[2]]
 ```
 
 ## Constrained TypeVars with Literal constraints
@@ -459,7 +460,7 @@ type X = Literal["hello"]
 
 x4: X = "hello"
 reveal_type(x4)  # revealed: Literal["hello"]
-reveal_type([x4])  # revealed: list[Literal["hello"]]
+reveal_type([x4])  # revealed: list[X]
 
 class MyEnum(Enum):
     A = 1
