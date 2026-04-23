@@ -781,20 +781,36 @@ impl Session {
         );
     }
     // Updates workspace folders from a workspace/didChangeConfiguration request.
-    // Reinitializes the workspaces (unregistered), and then hands off to the main
-    // initialize_workspace_folders function.
     pub(crate) fn update_workspace_folders(
         &mut self,
         client: &Client,
         workspace_folders: Vec<(Url, ClientOptions)>,
     ) {
-        tracing::debug!("Updating workspace folders...");
+        let mut global_options: Option<GlobalOptions> = None;
 
-        for (url, _) in &workspace_folders {
-            self.reinitialize_workspace(url.clone());
+        for (url, client_options) in workspace_folders {
+            // Like initialize_workspace_folders, the last workspace determines the global options
+            global_options = Some(
+                self.initialization_options
+                    .options
+                    .global
+                    .clone()
+                    .combine(client_options.global.clone()),
+            );
+
+            self.update_workspace(&url, client, &client_options);
+        }
+        if let Some(global_options) = global_options {
+            let global_settings = global_options.into_settings();
+            self.global_settings = Arc::new(global_settings);
+        }
+        if let Some(check_mode) = self.global_settings.diagnostic_mode().to_check_mode() {
+            for project in self.projects.values_mut() {
+                project.db.set_check_mode(check_mode);
+            }
         }
 
-        self.initialize_workspace_folders(client, workspace_folders);
+        self.register_capabilities(client);
     }
 
     /// Removes a workspace folder at the given URL.
@@ -903,8 +919,12 @@ impl Session {
         }
     }
 
-    // Unregister and reregister a current initialized workspace
-    fn reinitialize_workspace(&mut self, url: Url) {
+    // Update workspace given new client options
+    //
+    // Intended to be used when handling `workspace/didChangeConfiguration`.
+    // Replaces [WorkspaceSettings], and compares and replaces the [Project.settings] if the
+    // resolved [ProjectMetadata] does not match.
+    fn update_workspace(&mut self, url: &Url, client: &Client, client_options: &ClientOptions) {
         let Ok(root) = url.to_file_path() else {
             tracing::debug!("Ignoring workspace with non-path root: {url}");
             return;
@@ -922,9 +942,53 @@ impl Session {
             }
         };
 
-        // Refresh the workspace with the new options.
-        self.workspaces.unregister(&root);
-        let _ = self.workspaces.register(url);
+        let options = self
+            .initialization_options
+            .options
+            .workspace
+            .clone()
+            .combine(client_options.workspace.clone());
+
+        let Some(workspace) = self.workspaces.workspaces.get_mut(&root) else {
+            return;
+        };
+
+        let workspace_settings =
+            Arc::new(options.into_settings(&root, client, &*self.native_system));
+
+        workspace.settings = workspace_settings.clone();
+
+        let db = self.project_db_mut(&AnySystemPath::System(root.clone()));
+
+        let system = db.system();
+
+        let configuration_file = workspace_settings
+            .project_options_overrides()
+            .and_then(|settings| settings.config_file_override.as_ref());
+
+        let metadata = if let Some(configuration_file) = configuration_file {
+            ProjectMetadata::from_config_file(configuration_file.clone(), &root, system)
+        } else {
+            ProjectMetadata::discover(&root, system)
+        };
+
+        match metadata {
+            Ok(mut metadata) => {
+                let _ = metadata.apply_configuration_files(system);
+                if let Some(overrides) = workspace_settings.project_options_overrides() {
+                    metadata.apply_overrides(overrides);
+                }
+
+                tracing::debug!("Replacing project settings for {}", root);
+                db.project().replace_settings(db, metadata);
+            }
+            _ => {
+                tracing::debug!(
+                    "Could not retrieve metadata, skipping project settings update for {}",
+                    root
+                );
+            }
+        }
     }
 
     /// Registers the dynamic capabilities with the client as per the resolved global settings.
@@ -938,6 +1002,10 @@ impl Session {
     ///
     /// This capability is used to enable / disable rename functionality as per the
     /// `ty.experimental.rename` global setting.
+    ///
+    /// ## Did change configuration capability
+    ///
+    /// This capability is used to enable or disable didChangeConfiguration requests
     fn register_capabilities(&mut self, client: &Client) {
         static DIAGNOSTIC_REGISTRATION_ID: &str = "ty/textDocument/diagnostic";
         static FILE_WATCHER_REGISTRATION_ID: &str = "ty/workspace/didChangeWatchedFiles";

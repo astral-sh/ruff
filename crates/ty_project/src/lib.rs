@@ -237,13 +237,12 @@ impl Project {
         )
     }
 
-    pub fn reload(self, db: &mut dyn Db, metadata: ProjectMetadata) {
-        tracing::debug!("Reloading project");
-
-        self.reload_files(db);
-
+    // Returns boolean representing if the settings were changed
+    //
+    // Will not replace the settings if the passed [ProjectMetadata] matches the current.
+    pub fn replace_settings(self, db: &mut dyn Db, metadata: ProjectMetadata) -> bool {
         if &metadata == self.metadata(db) {
-            return;
+            return false;
         }
 
         match metadata
@@ -269,7 +268,19 @@ impl Project {
         }
 
         self.set_metadata(db).to(Box::new(metadata));
-        self.try_add_file_root(db);
+        true
+    }
+
+    pub fn reload(self, db: &mut dyn Db, metadata: ProjectMetadata) {
+        tracing::debug!("Reloading project");
+
+        self.reload_files(db);
+
+        let did_change_settings = self.replace_settings(db, metadata);
+
+        if did_change_settings {
+            self.try_add_file_root(db);
+        }
     }
 
     /// Checks the project and its dependencies according to the project's check mode.

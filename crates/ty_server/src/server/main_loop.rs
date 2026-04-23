@@ -158,7 +158,7 @@ impl Server {
                     }
 
                     Action::UpdateWorkspaceConfigs(workspaces_with_options) => {
-                        tracing::debug!("Checking and updating workspace configs");
+                        tracing::debug!("Updating workspace configs");
 
                         self.session
                             .update_workspace_folders(&client, workspaces_with_options);

@@ -13,18 +13,14 @@ impl NotificationHandler for DidChangeConfiguration {
 }
 
 impl SyncNotificationHandler for DidChangeConfiguration {
+    // This is implemented as the pull-based model, settings included with the notification are
+    // not considered.
     fn run(
         session: &mut Session,
         client: &Client,
-        params: types::DidChangeConfigurationParams,
+        _params: types::DidChangeConfigurationParams,
     ) -> Result<()> {
         tracing::debug!("Received workspace/didChangeConfiguration");
-        // workspace/didChangeConfiguration is a pull based, meaning the request should be empty, and
-        // the server needs to pull the workspace configuration by requesting it from the
-        // client.
-        // See https://github.com/microsoft/vscode-languageserver-node/issues/380#issuecomment-414691493
-        // See https://github.com/microsoft/language-server-protocol/issues/676
-        assert!(params.settings.is_null());
 
         let workspace_urls: Vec<Url> = session
             .workspaces()
