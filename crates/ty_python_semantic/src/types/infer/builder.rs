@@ -1216,19 +1216,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
                 }
-                if inferred_ty.is_assignable_to(self.db(), declared_ty.inner_type()) {
-                    (declared_ty, inferred_ty)
+                let declared_type = declared_ty.inner_type();
+                if inferred_ty.is_assignable_to(self.db(), declared_type) {
+                    // `Unknown` here often means that the annotation did not declare a concrete
+                    // type (e.g. bare `Final` or invalid annotation syntax), so preserve the RHS
+                    // type in those cases.
+                    if !matches!(declared_type, Type::Dynamic(DynamicType::Unknown))
+                        && declared_type.is_assignable_to(self.db(), inferred_ty)
+                    {
+                        (declared_ty, declared_type)
+                    } else {
+                        (declared_ty, inferred_ty)
+                    }
                 } else {
                     report_invalid_assignment(
                         &self.context,
                         node,
                         definition,
-                        declared_ty.inner_type(),
+                        declared_type,
                         inferred_ty,
                     );
 
                     // if the assignment is invalid, fall back to assuming the annotation is correct
-                    (declared_ty, declared_ty.inner_type())
+                    (declared_ty, declared_type)
                 }
             }
         };

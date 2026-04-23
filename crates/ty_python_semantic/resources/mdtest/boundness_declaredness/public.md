@@ -29,6 +29,9 @@ In particular, we should raise errors in the "possibly-undeclared-and-unbound" a
 | possibly-unbound |          | `possibly-missing-import` | ?                   |
 | unbound          |          | ?                         | `unresolved-import` |
 
+When the declared and inferred types are mutually assignable, we use `T_declared` directly instead
+of unioning it with `T_inferred`.
+
 ## Declared
 
 ### Declared and bound
@@ -135,10 +138,10 @@ Public.a = None
 
 ### Possibly undeclared and possibly unbound
 
-If a symbol is possibly undeclared and possibly unbound, we also use the union of the declared and
-inferred types. This case is interesting because the "possibly declared" definition might not be the
-same as the "possibly bound" definition (symbol `b`). Note that we raise a `possibly-missing-import`
-error for both `a` and `b`:
+If a symbol is possibly undeclared and possibly unbound, we prefer the declared type for a binding
+when it is mutually assignable with the inferred type. This case is interesting because the
+"possibly declared" definition might not be the same as the "possibly bound" definition (symbol
+`b`). Note that we raise a `possibly-missing-import` error for both `a` and `b`:
 
 ```py
 from typing import Any
@@ -154,7 +157,7 @@ class Public:
         b: str
 
 # error: [possibly-missing-attribute]
-reveal_type(Public.a)  # revealed: Literal[1] | Any
+reveal_type(Public.a)  # revealed: Any
 # error: [possibly-missing-attribute]
 reveal_type(Public.b)  # revealed: Literal[2] | str
 

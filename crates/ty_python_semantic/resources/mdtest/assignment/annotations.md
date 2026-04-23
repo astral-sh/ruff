@@ -251,6 +251,31 @@ a: list[str] = [1, 2, 3]
 b: set[int] = {1, 2, "3"}
 ```
 
+## Mutually assignable annotated assignments use the declared type
+
+When an annotated assignment has a value whose inferred type is assignable to the declared type, the
+binding uses the declared type if the declared type is also assignable back to the inferred type.
+The actual inferred type of the right-hand side is still used to validate the assignment.
+
+```py
+from typing import Any
+
+def returns_list_int() -> list[int]:
+    return [1]
+
+reveal_type(returns_list_int())  # revealed: list[int]
+
+uses_declared_type: list[Any] = returns_list_int()
+reveal_type(uses_declared_type)  # revealed: list[Any]
+
+uses_inferred_type: object = returns_list_int()
+reveal_type(uses_inferred_type)  # revealed: list[int]
+
+invalid: list[str] = (  # error: [invalid-assignment] "Object of type `list[int]` is not assignable to `list[str]`"
+    returns_list_int()
+)
+```
+
 ## Generic constructor annotations are understood
 
 ```toml
@@ -531,28 +556,28 @@ class TD2(TypedDict):
 
 def _(dt: dict[str, Any], key: str):
     x1: TD = dt.get(key, {})
-    reveal_type(x1)  # revealed: Any
+    reveal_type(x1)  # revealed: TD
 
     x2: TD = dt.get(key, {"x": 0})
-    reveal_type(x2)  # revealed: Any
+    reveal_type(x2)  # revealed: TD
 
     x3: TD | None = dt.get(key, {})
-    reveal_type(x3)  # revealed: Any
+    reveal_type(x3)  # revealed: TD | None
 
     x4: TD | None = dt.get(key, {"x": 0})
-    reveal_type(x4)  # revealed: Any
+    reveal_type(x4)  # revealed: TD | None
 
     x5: TD2 = dt.get(key, {})
-    reveal_type(x5)  # revealed: Any
+    reveal_type(x5)  # revealed: TD2
 
     x6: TD2 = dt.get(key, {"x": 0})
-    reveal_type(x6)  # revealed: Any
+    reveal_type(x6)  # revealed: TD2
 
     x7: TD2 | None = dt.get(key, {})
-    reveal_type(x7)  # revealed: Any
+    reveal_type(x7)  # revealed: TD2 | None
 
     x8: TD2 | None = dt.get(key, {"x": 0})
-    reveal_type(x8)  # revealed: Any
+    reveal_type(x8)  # revealed: TD2 | None
 ```
 
 Partially specialized type context is not ignored:
@@ -642,11 +667,12 @@ f: list[Any] | None = f2(1)
 reveal_type(f)  # revealed: list[Any] | None
 
 g: list[Any] | dict[Any, Any] = f3(1)
-# TODO: Better constraint solver.
-reveal_type(g)  # revealed: list[int] | dict[int, int]
+reveal_type(g)  # revealed: list[Any] | dict[Any, Any]
 ```
 
-We only prefer the declared type if it is in non-covariant position.
+When inferring a generic call, we only use the declared type as type context if it is in
+non-covariant position. The final annotated assignment binding still uses the declared type if the
+inferred and declared types are mutually assignable.
 
 ```py
 class Bivariant[T]:
@@ -690,8 +716,8 @@ x6: Covariant[Any] = covariant(1)
 x7: Contravariant[Any] = contravariant(1)
 x8: Invariant[Any] = invariant(1)
 
-reveal_type(x5)  # revealed: Bivariant[Literal[1]]
-reveal_type(x6)  # revealed: Covariant[Literal[1]]
+reveal_type(x5)  # revealed: Bivariant[Any]
+reveal_type(x6)  # revealed: Covariant[Any]
 reveal_type(x7)  # revealed: Contravariant[Any]
 reveal_type(x8)  # revealed: Invariant[Any]
 ```
