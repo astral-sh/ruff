@@ -390,7 +390,7 @@ enum InstanceFallbackShadowsNonDataDescriptor {
 }
 
 bitflags! {
-    #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
+    #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash, salsa::Update)]
     pub(crate) struct MemberLookupPolicy: u8 {
         /// Dunder methods are looked up on the meta-type of a type without potentially falling
         /// back on attributes on the type itself. For example, when implicitly invoked on an

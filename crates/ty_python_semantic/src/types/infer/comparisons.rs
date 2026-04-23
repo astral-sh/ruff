@@ -29,7 +29,7 @@ pub(super) type BinaryComparisonVisitor<'db> = CycleDetector<
     Result<Type<'db>, UnsupportedComparisonError<'db>>,
 >;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 enum RichCompareOperator {
     Eq,
     Ne,
@@ -831,6 +831,25 @@ fn infer_rich_comparison<'db>(
     op: RichCompareOperator,
     policy: MemberLookupPolicy,
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
+    try_rich_comparison_return_type(db, left, right, op, policy).ok_or_else(|| {
+        UnsupportedComparisonError {
+            op: op.into(),
+            left_ty: left,
+            right_ty: right,
+        }
+    })
+}
+
+/// Memoize the pure return-type part of rich comparison dunder resolution so repeated identical
+/// comparisons don't re-run overload selection at every call site.
+#[salsa::tracked]
+fn try_rich_comparison_return_type<'db>(
+    db: &'db dyn Db,
+    left: Type<'db>,
+    right: Type<'db>,
+    op: RichCompareOperator,
+    policy: MemberLookupPolicy,
+) -> Option<Type<'db>> {
     // The following resource has details about the rich comparison algorithm:
     // https://snarky.ca/unravelling-rich-comparison-operators/
     let call_dunder = |op: RichCompareOperator, left: Type<'db>, right: Type<'db>| {
@@ -864,11 +883,6 @@ fn infer_rich_comparison<'db>(
         } else {
             None
         }
-    })
-    .ok_or_else(|| UnsupportedComparisonError {
-        op: op.into(),
-        left_ty: left,
-        right_ty: right,
     })
 }
 
