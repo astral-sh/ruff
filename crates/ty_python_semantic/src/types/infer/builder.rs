@@ -5126,37 +5126,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 // If this is a generic call, attempt to specialize the parameter type using the
-                // declared type context, if provided.
+                // declared type context, propagating the declared types of any type variables.
                 if let Some(generic_context) = overload.signature.generic_context {
-                    // Use a forward assignability check to infer typevar specializations from the
-                    // declared type context. For example, if the return type is `list[T]` and the
-                    // declared type context is `list[int]`, the check produces `T = int`.
-                    let mut tcx_mappings = FxHashMap::default();
+                    let mut builder = SpecializationBuilder::new(
+                        db,
+                        &constraints,
+                        generic_context.inferable_typevars(db),
+                    );
+
                     if let Some(declared_return_ty) = call_expression_tcx.annotation {
                         let return_ty = overload
                             .normalized_constructor_return(db)
                             .unwrap_or(overload.signature.return_ty);
-                        let set = return_ty.when_constraint_set_assignable_to(
-                            db,
-                            declared_return_ty,
-                            &constraints,
-                        );
-                        if let Solutions::Constrained(solutions) = set.solutions(db, &constraints) {
-                            for solution in solutions.iter() {
-                                for binding in solution {
-                                    tcx_mappings
-                                        .entry(binding.bound_typevar.identity(db))
-                                        .and_modify(|existing| {
-                                            *existing = UnionType::from_two_elements(
-                                                db,
-                                                *existing,
-                                                binding.solution,
-                                            );
-                                        })
-                                        .or_insert(binding.solution);
-                                }
-                            }
-                        }
+
+                        let _ = builder.infer(declared_return_ty, return_ty);
                     }
 
                     // Default specialize any type variables to a marker type, which will be ignored
@@ -5168,17 +5151,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // the specialization of one to influence the specialization of the other. It's
                     // not yet clear how we're going to do that. (We might have to start inferring
                     // constraint sets for each expression, instead of simple types?)
-                    let specialization = generic_context.specialize_recursive(
-                        db,
-                        generic_context.variables(db).map(|typevar| {
-                            Some(
-                                tcx_mappings
-                                    .get(&typevar.identity(db))
-                                    .copied()
-                                    .unwrap_or(Type::Dynamic(DynamicType::UnspecializedTypeVar)),
-                            )
-                        }),
-                    );
+                    let specialization = builder.build_with(generic_context, |_, bounds| {
+                        if bounds.is_none() {
+                            Some(Type::Dynamic(DynamicType::UnspecializedTypeVar))
+                        } else {
+                            None
+                        }
+                    });
 
                     parameter_type = parameter_type.apply_specialization(db, specialization);
                 }
@@ -6184,7 +6163,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let class_type = collection_alias
             .origin(self.db())
             .apply_specialization(self.db(), |_| {
-                builder.build_with(generic_context, |_, lower, _| {
+                builder.build_with(generic_context, |_, bounds| {
+                    let (lower, _upper) = bounds?;
                     // Promote singleton types to `T | Unknown` in inferred type parameters,
                     // so that e.g. `[None]` is inferred as `list[None | Unknown]`.
                     if elt_tcx_constraints.is_empty() {
