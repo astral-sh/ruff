@@ -681,7 +681,7 @@ impl<'a> SuppressionsBuilder<'a> {
 
         self.match_comments("", TextRange::up_to(self.source.text_len()));
 
-        self.valid.sort_by(|a, b| {
+        self.valid.sort_unstable_by(|a, b| {
             (
                 a.comments.first().action,
                 a.comments.first().range.start(),
@@ -2196,7 +2196,7 @@ bar = [
     }
 
     #[test]
-    fn file_disable_suppression_single() {
+    fn file_ignore_suppression_single() {
         let source = r#"
 print("start")
 # ruff:file-ignore[code]
@@ -2229,7 +2229,7 @@ print("end")
     }
 
     #[test]
-    fn file_disable_suppression_multiple() {
+    fn file_ignore_suppression_multiple() {
         let source = r#"
 print("start")
 # ruff:file-ignore[alpha, beta]
@@ -2291,7 +2291,7 @@ print("end")
     }
 
     #[test]
-    fn file_disable_suppression_trailing() {
+    fn file_ignore_suppression_trailing() {
         let source = r#"
 print("hello")  # ruff:file-ignore[code]
         "#;
@@ -2320,7 +2320,7 @@ print("hello")  # ruff:file-ignore[code]
     }
 
     #[test]
-    fn file_disable_suppression_indented() {
+    fn file_ignore_suppression_indented() {
         let source = r#"
 def foo():
     # ruff:file-ignore[code]
@@ -2537,7 +2537,7 @@ def foo():
     }
 
     #[test]
-    fn file_disable_single_code() {
+    fn file_ignore_single_code() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: file-ignore[code]"),
             @r##"
