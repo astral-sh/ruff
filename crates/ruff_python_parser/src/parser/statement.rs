@@ -117,8 +117,9 @@ impl<'src> Parser<'src> {
             self.leave_recursion();
             stmt
         } else {
-            // Return a trivial placeholder statement (`pass`) this
-            // won't be seen as an error will eventually be returned.
+            // `enter_recursion` already recorded a `RecursionLimitExceeded`
+            // error, so the returned `Parsed` is already in a failed state;
+            // this placeholder is only here so the parser can keep unwinding.
             Stmt::Pass(ast::StmtPass {
                 range,
                 node_index: AtomicNodeIndex::NONE,
