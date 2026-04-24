@@ -839,3 +839,7 @@ foo = lambda: call(argument_one,)(extra_argument_one, extra_argument_twooooooooo
 foo = lambda: call(argument_one, argument_two, argument_threeeeeeeeeeeeeeeeeeeeeeeeeeee)(extra_argument_one, extra_argument_twooooooooooooooooooo, extra_argument_threeeeeeeee)
 
 foo = lambda: callllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll(argument_one, argument_two, argument_threeeeeeeeeeeeeeeeeeeeeeeeeeee)(extra_argument_one, extra_argument_twooooooooooooooooooo, extra_argument_threeeeeeeee)
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/24807
+f"{' '.join(map(lambda object_name: os.path.join(dest_path, object_name), objects_to_remove))}"
