@@ -121,6 +121,31 @@ reveal_type(C.only_declared)  # revealed: str
 C.only_declared = "overwritten on class"
 ```
 
+#### Unknown `__get__` does not collapse declared instance attributes
+
+If an attribute is only declared in the class body, we still allow access on the class object as a
+typing convenience. If the annotated type inherits from an unsupported base, looking up `__get__` on
+the annotated type can return `Unknown`; this should not collapse the attribute access itself to
+`Unknown`:
+
+```py
+import random
+
+class A: ...
+class B: ...
+
+Base = A if random.random() > 0.5 else B
+
+class MyBaseClass(Base):  # error: [unsupported-base]
+    ...
+
+class C:
+    x: MyBaseClass
+
+reveal_type(C.x)  # revealed: MyBaseClass
+reveal_type(C().x)  # revealed: MyBaseClass
+```
+
 #### Mixed declarations/bindings in class body and `__init__`
 
 ```py

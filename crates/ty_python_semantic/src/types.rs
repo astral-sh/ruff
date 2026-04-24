@@ -2795,6 +2795,10 @@ impl<'db> Type<'db> {
             ..
         }) = descr_get
         {
+            if descr_get.is_unknown() {
+                return None;
+            }
+
             let instance_ty = instance.unwrap_or_else(|| Type::none(db));
             let return_ty = descr_get
                 .try_call(db, &CallArguments::positional([self, instance_ty, owner]))
