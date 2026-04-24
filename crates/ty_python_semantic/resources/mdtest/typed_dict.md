@@ -1873,7 +1873,7 @@ def _(
 
     reveal_type(being["name"])  # revealed: str
 
-    # error: [invalid-key] "Unknown key "age" for TypedDict `Animal`"
+    # error: [invalid-key] "Unknown key "age" for TypedDict `Animal` (subscripted object has type `Person | Animal`)"
     reveal_type(being["age"])  # revealed: int | None | Unknown
 
     # error: [invalid-key]
@@ -1928,7 +1928,7 @@ def _(being: Person | Animal):
     # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Animal`: value of type `Literal[1]`"
     being["name"] = 1
 
-    # error: [invalid-key] "Unknown key "leg" for TypedDict `Animal`"
+    # error: [invalid-key] "Unknown key "leg" for TypedDict `Animal` (subscripted object has type `Person | Animal`)"
     being["leg"] = "unknown"
 
 def _(centaur: Intersection[Person, Animal]):
@@ -1936,7 +1936,7 @@ def _(centaur: Intersection[Person, Animal]):
     centaur["age"] = 100
     centaur["legs"] = 4
 
-    # error: [invalid-key] "Unknown key "unknown" for TypedDict `Person`"
+    # error: [invalid-key] "Unknown key "unknown" for TypedDict `Person` (subscripted object has type `Person & Animal`)"
     centaur["unknown"] = "value"
 
 def _(person: Person, union_of_keys: Literal["name", "age"], unknown_value: Any):
