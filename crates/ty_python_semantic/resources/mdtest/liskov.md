@@ -20,200 +20,6 @@ several checks for a type checker to perform when it checks a subclass `B` of a 
 1. Mutable attributes should only ever be overridden invariantly: if a mutable attribute `A.attr`
     resolves to type `str`, it can only be overridden on a subclass with exactly the same type.
 
-## `ClassVar` and instance variables
-
-A pure class variable cannot override an inherited instance variable, and an instance variable
-cannot override an inherited pure class variable.
-
-### Direct overrides
-
-An annotation without `ClassVar` declares an instance variable, even if the declaration also has a
-class-level default value. An explicit `ClassVar` declaration is a pure class variable. Overriding
-one with the other changes the places where the attribute is valid, so it violates Liskov
-substitution:
-
-```py
-from typing import ClassVar
-
-class Base:
-    instance_attr: int
-    instance_attr_with_default: int = 1
-    class_attr: ClassVar[int] = 1
-
-class Subclass(Base):
-    # error: [invalid-attribute-override] "class variable cannot override instance variable `Base.instance_attr`"
-    instance_attr: ClassVar[int]
-
-    # error: [invalid-attribute-override] "class variable cannot override instance variable `Base.instance_attr_with_default`"
-    instance_attr_with_default: ClassVar[int] = 1
-
-    # error: [invalid-attribute-override] "instance variable cannot override class variable `Base.class_attr`"
-    class_attr: int
-
-class ValidSubclass(Base):
-    instance_attr: int
-    instance_attr_with_default: int = 1
-    class_attr: ClassVar[int] = 1
-```
-
-### Regular class-body assignments
-
-An unannotated class-body assignment is an instance variable with a class-level default. This means
-it can replace another inherited instance-variable default. If it overrides an inherited `ClassVar`,
-it inherits that declaration and remains a class variable. However, an explicit `ClassVar` cannot
-override an inherited unannotated class-body assignment, because code using the base class can still
-write that attribute through an instance:
-
-```py
-from typing import ClassVar
-
-class Base:
-    instance_attr_with_default: int = 1
-    class_attr: ClassVar[int] = 1
-
-class RegularClassAttributeOverride(Base):
-    class_attr = 1
-
-class AugmentedClassAttributeOverride(Base):
-    class_attr = 1
-    class_attr += 1
-
-class RegularClassAttributeBase:
-    attr = 1
-
-class ExplicitClassVarOverride(RegularClassAttributeBase):
-    # error: [invalid-attribute-override] "class variable cannot override instance variable `RegularClassAttributeBase.attr`"
-    attr: ClassVar[int] = 1
-
-class ClassDefaultBase:
-    class_default: int = 1
-    declared_instance: bool
-
-class ClassDefaultSubclass(ClassDefaultBase):
-    class_default = 2
-    declared_instance = True
-```
-
-### Repeated inherited conflicts
-
-If a parent class already made an invalid change from class variable to instance variable, a child
-that keeps the parent's kind should not receive a duplicate diagnostic. The same applies in the
-other direction:
-
-```py
-from typing import ClassVar
-
-class GrandparentClassVar:
-    attr: ClassVar[int]
-
-class ParentInstance(GrandparentClassVar):
-    # error: [invalid-attribute-override] "instance variable cannot override class variable `GrandparentClassVar.attr`"
-    attr: int
-
-class ChildInstance(ParentInstance):
-    attr: int
-
-class GrandparentInstance:
-    attr: int
-
-class ParentClassVar(GrandparentInstance):
-    # error: [invalid-attribute-override] "class variable cannot override instance variable `GrandparentInstance.attr`"
-    attr: ClassVar[int]
-
-class ChildClassVar(ParentClassVar):
-    attr: ClassVar[int]
-```
-
-### Descriptors
-
-A descriptor can define different behavior when accessed on an instance. Because descriptor lookup
-is neither a pure class variable nor a normal instance variable, overriding it with an instance
-attribute is accepted:
-
-```py
-class Descriptor:
-    def __get__(self, instance: object, owner: type[object]) -> int:
-        return 1
-
-class DescriptorBase:
-    descriptor_attr = Descriptor()
-
-class DescriptorOverride(DescriptorBase):
-    descriptor_attr: int
-```
-
-### Multiple inheritance
-
-The subclass must satisfy every base class. It is not enough for the first base in the MRO to agree
-with the subclass: an unrelated base that declares the same member as a pure class variable still
-makes an instance-variable override invalid.
-
-```py
-from typing import ClassVar
-
-class ClassVarBase:
-    attr: ClassVar[int]
-
-class InstanceBase:
-    attr: int
-
-class MultipleInheritanceSubclass(InstanceBase, ClassVarBase):
-    # error: [invalid-attribute-override] "instance variable cannot override class variable `ClassVarBase.attr`"
-    attr: int
-```
-
-### Dataclasses
-
-Dataclass fields are instance variables, even though they are usually declared in the class body.
-`ClassVar` fields remain pure class variables and are excluded from dataclass instance fields:
-
-```py
-from dataclasses import dataclass
-from typing import ClassVar
-
-@dataclass
-class DC6:
-    x: int
-    y: ClassVar[int] = 1
-
-@dataclass
-class DC7(DC6):
-    # error: [invalid-attribute-override] "class variable cannot override instance variable `DC6.x`"
-    x: ClassVar[int]
-
-    # error: [invalid-attribute-override] "instance variable cannot override class variable `DC6.y`"
-    y: int
-```
-
-### Protocol implementations
-
-Regular class-body assignments can implement protocol instance attributes. The `ClassVar` case below
-uses the same rule as normal classes: an unannotated class-body assignment over an inherited
-`ClassVar` provides a value while preserving the inherited declaration.
-
-```py
-from typing import ClassVar, Protocol
-
-class ProtocolBase(Protocol):
-    class_attr: ClassVar[int]
-    instance_attr: int
-    instance_attr_with_default: int = 1
-
-class ProtocolImpl(ProtocolBase):
-    class_attr = 1
-    instance_attr = 1
-    instance_attr_with_default = 1
-
-class ProtocolWithClassVar(Protocol):
-    x: int = 1
-    y: int
-    z: ClassVar[int]
-
-class ProtocolWithClassVarImpl(ProtocolWithClassVar):
-    y = 0
-    z = 0
-```
-
 ## Method return types
 
 It is fine for a subclass method to return a subtype of the return type of the method it overrides:
@@ -554,6 +360,204 @@ superclass.
 ```pyi
 class Sub23(Super4):
     def method(self, x, *args, y, **kwargs): ...
+```
+
+## `ClassVar` and instance variables
+
+A pure class variable cannot override an inherited instance variable, and an instance variable
+cannot override an inherited pure class variable.
+
+### Direct overrides
+
+An annotation without `ClassVar` declares an instance variable, even if the declaration also has a
+class-level default value. An explicit `ClassVar` declaration is a pure class variable. Overriding
+one with the other changes the places where the attribute is valid, so it violates Liskov
+substitution:
+
+```py
+from typing import ClassVar
+
+class Base:
+    instance_attr: int
+    instance_attr_with_default: int = 1
+    class_attr: ClassVar[int] = 1
+
+class Subclass(Base):
+    # error: [invalid-attribute-override] "class variable cannot override instance variable `Base.instance_attr`"
+    instance_attr: ClassVar[int]
+
+    # error: [invalid-attribute-override] "class variable cannot override instance variable `Base.instance_attr_with_default`"
+    instance_attr_with_default: ClassVar[int] = 1
+
+    # error: [invalid-attribute-override] "instance variable cannot override class variable `Base.class_attr`"
+    class_attr: int
+
+class ValidSubclass(Base):
+    instance_attr: int
+    instance_attr_with_default: int = 1
+    class_attr: ClassVar[int] = 1
+```
+
+### Regular class-body assignments
+
+An unannotated class-body assignment is an instance variable with a class-level default. This means
+it can replace another inherited instance-variable default. If it overrides an inherited `ClassVar`,
+it inherits that declaration and remains a class variable. However, an explicit `ClassVar` cannot
+override an inherited unannotated class-body assignment, because code using the base class can still
+write that attribute through an instance:
+
+```py
+from typing import ClassVar
+
+class Base:
+    instance_attr_with_default: int = 1
+    class_attr: ClassVar[int] = 1
+
+class RegularClassAttributeOverride(Base):
+    class_attr = 1
+
+class AugmentedClassAttributeOverride(Base):
+    class_attr = 1
+    class_attr += 1
+
+class RegularClassAttributeBase:
+    attr = 1
+
+class ExplicitClassVarOverride(RegularClassAttributeBase):
+    # error: [invalid-attribute-override] "class variable cannot override instance variable `RegularClassAttributeBase.attr`"
+    attr: ClassVar[int] = 1
+
+class ClassDefaultBase:
+    class_default: int = 1
+    declared_instance: bool
+
+class ClassDefaultSubclass(ClassDefaultBase):
+    class_default = 2
+    declared_instance = True
+```
+
+### Repeated inherited conflicts
+
+If a parent class already made an invalid change from class variable to instance variable, a child
+that keeps the parent's kind should not receive a duplicate diagnostic. The same applies in the
+other direction:
+
+```py
+from typing import ClassVar
+
+class GrandparentClassVar:
+    attr: ClassVar[int]
+
+class ParentInstance(GrandparentClassVar):
+    # error: [invalid-attribute-override] "instance variable cannot override class variable `GrandparentClassVar.attr`"
+    attr: int
+
+class ChildInstance(ParentInstance):
+    attr: int
+
+class GrandparentInstance:
+    attr: int
+
+class ParentClassVar(GrandparentInstance):
+    # error: [invalid-attribute-override] "class variable cannot override instance variable `GrandparentInstance.attr`"
+    attr: ClassVar[int]
+
+class ChildClassVar(ParentClassVar):
+    attr: ClassVar[int]
+```
+
+### Descriptors
+
+A descriptor can define different behavior when accessed on an instance. Because descriptor lookup
+is neither a pure class variable nor a normal instance variable, overriding it with an instance
+attribute is accepted:
+
+```py
+from typing import ClassVar
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type[object]) -> int:
+        return 1
+
+class DescriptorBase:
+    descriptor_attr = Descriptor()
+
+class DescriptorOverride(DescriptorBase):
+    descriptor_attr: int
+
+class DescriptorAnnotationBase:
+    descriptor_attr: Descriptor
+
+class DescriptorAnnotationOverride(DescriptorAnnotationBase):
+    # error: [invalid-attribute-override] "class variable cannot override instance variable `DescriptorAnnotationBase.descriptor_attr`"
+    descriptor_attr: ClassVar[Descriptor]
+```
+
+### Multiple inheritance
+
+The subclass must satisfy every base class. It is not enough for the first base in the MRO to agree
+with the subclass: an unrelated base that declares the same member as a pure class variable still
+makes an instance-variable override invalid.
+
+```py
+from typing import ClassVar
+
+class ClassVarBase:
+    attr: ClassVar[int]
+
+class InstanceBase:
+    attr: int
+
+class MultipleInheritanceSubclass(InstanceBase, ClassVarBase):
+    # error: [invalid-attribute-override] "instance variable cannot override class variable `ClassVarBase.attr`"
+    attr: int
+```
+
+### Dataclasses
+
+Dataclass fields are instance variables, even though they are usually declared in the class body.
+`ClassVar` fields remain pure class variables and are excluded from dataclass instance fields:
+
+```py
+from dataclasses import dataclass
+from typing import ClassVar
+
+@dataclass
+class DC6:
+    x: int
+    y: ClassVar[int] = 1
+
+@dataclass
+class DC7(DC6):
+    # error: [invalid-attribute-override] "class variable cannot override instance variable `DC6.x`"
+    x: ClassVar[int]
+
+    # error: [invalid-attribute-override] "instance variable cannot override class variable `DC6.y`"
+    y: int
+```
+
+### Protocol implementations
+
+Regular class-body assignments can implement protocol instance attributes. The `ClassVar` case below
+uses the same rule as normal classes: an unannotated class-body assignment over an inherited
+`ClassVar` provides a value while preserving the inherited declaration.
+
+```py
+from typing import ClassVar, Protocol
+
+class ProtocolBase(Protocol):
+    class_attr: ClassVar[int]
+    instance_attr: int
+    instance_attr_with_default: int = 1
+
+class ProtocolImpl(ProtocolBase):
+    class_attr = 1
+    instance_attr = 1
+    instance_attr_with_default = 1
+
+class ProtocolWithClassVarImpl(ProtocolBase):
+    class_attr = 0
+    instance_attr = 0
 ```
 
 ## The entire class hierarchy is checked

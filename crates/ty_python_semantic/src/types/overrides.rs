@@ -3,8 +3,6 @@
 //!
 //! [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 
-use std::cell::OnceCell;
-
 use bitflags::bitflags;
 use ruff_db::diagnostic::Annotation;
 use ruff_python_ast::name::Name;
@@ -14,7 +12,7 @@ use rustc_hash::FxHashSet;
 use crate::{
     Db,
     lint::LintId,
-    place::{DefinedPlace, Place, PlaceAndQualifiers},
+    place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
         CallableType, ClassBase, ClassLiteral, ClassType, KnownClass, Parameter, Parameters,
         Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
@@ -135,41 +133,6 @@ fn check_class_declaration<'db>(
     class_scope: ScopeId<'db>,
     member: &MemberWithDefinition<'db>,
 ) {
-    /// Salsa-tracked query to check whether any of the definitions of a symbol
-    /// in a superclass scope are function definitions.
-    ///
-    /// We need to know this for compatibility with pyright and mypy, neither of which emit an error
-    /// on `C.f` here:
-    ///
-    /// ```python
-    /// from typing import final
-    ///
-    /// class A:
-    ///     @final
-    ///     def f(self) -> None: ...
-    ///
-    /// class B:
-    ///     f = A.f
-    ///
-    /// class C(B):
-    ///     def f(self) -> None: ...  # no error here
-    /// ```
-    ///
-    /// This is a Salsa-tracked query because it has to look at the AST node for the definition,
-    /// which might be in a different Python module. If this weren't a tracked query, we could
-    /// introduce cross-module dependencies and over-invalidation.
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn is_function_definition<'db>(
-        db: &'db dyn Db,
-        scope: ScopeId<'db>,
-        symbol: ScopedSymbolId,
-    ) -> bool {
-        use_def_map(db, scope)
-            .end_of_scope_symbol_bindings(symbol)
-            .filter_map(|binding| binding.binding.definition())
-            .any(|definition| definition.kind(db).is_function_def())
-    }
-
     let db = context.db();
 
     let MemberWithDefinition {
@@ -328,7 +291,7 @@ fn check_class_declaration<'db>(
     let mut overridden_final_method = None;
     let mut overridden_final_variable: Option<(ClassType<'db>, Option<Definition<'db>>)> = None;
     let is_private_member = is_mangled_private(member.name.as_str());
-    let subclass_variable_kind: OnceCell<Option<VariableKind>> = OnceCell::new();
+    let mut subclass_variable_kind: Option<Option<VariableKind>> = None;
 
     // Track the first superclass that defines this method (the "immediate parent" for this method).
     // We need this to check if parent itself already has an LSP violation with an ancestor.
@@ -476,6 +439,8 @@ fn check_class_declaration<'db>(
             if configuration.check_attribute_liskov_violations() {
                 let superclass_variable_kind = superclass_variable_kind(
                     db,
+                    superclass_scope,
+                    superclass_symbol_id,
                     superclass.own_class_member(db, None, &member.name).inner,
                     superclass_instance_member,
                 );
@@ -487,7 +452,7 @@ fn check_class_declaration<'db>(
                 }
 
                 if let Some(superclass_variable_kind) = superclass_variable_kind {
-                    let subclass_kind = *subclass_variable_kind.get_or_init(|| {
+                    let subclass_kind = *subclass_variable_kind.get_or_insert_with(|| {
                         variable_kind(
                             db,
                             class.own_class_member(db, None, &member.name).inner,
@@ -684,17 +649,66 @@ impl VariableKind {
     }
 }
 
-/// Returns the variable kind for a superclass member, excluding final attributes.
+/// Returns the variable kind for a superclass member.
 fn superclass_variable_kind<'db>(
     db: &'db dyn Db,
+    superclass_scope: ScopeId<'db>,
+    superclass_symbol_id: Option<ScopedSymbolId>,
     class_member: PlaceAndQualifiers<'db>,
     instance_member: PlaceAndQualifiers<'db>,
 ) -> Option<VariableKind> {
+    // Method definitions and properties are not instance-variable declarations. Check the symbol
+    // definition before class/instance member lookup can erase that distinction. For example,
+    // resolving an abstract `@property def f(self) -> int` through instance-member lookup would
+    // make it look like an instance variable of type `int`, causing this rule to report
+    // `f: ClassVar[int]` as an invalid attribute override even though the superclass member is not
+    // an instance-attribute declaration.
+    if superclass_symbol_id.is_some_and(|id| is_function_definition(db, superclass_scope, id)) {
+        return None;
+    }
+
+    // Final attributes have their own override rule and diagnostic. Treating them as class
+    // variables here would report both diagnostics for the same override.
     if class_member.qualifiers.contains(TypeQualifiers::FINAL) {
         return None;
     }
 
     variable_kind(db, class_member, instance_member)
+}
+
+/// Salsa-tracked query to check whether any of the definitions of a symbol
+/// in a superclass scope are function definitions.
+///
+/// We need to know this for compatibility with pyright and mypy, neither of which emit an error
+/// on `C.f` here:
+///
+/// ```python
+/// from typing import final
+///
+/// class A:
+///     @final
+///     def f(self) -> None: ...
+///
+/// class B:
+///     f = A.f
+///
+/// class C(B):
+///     def f(self) -> None: ...  # no error here
+/// ```
+///
+/// This is a Salsa-tracked query because it has to look at the AST node for the definition,
+/// which might be in a different Python module. If this weren't a tracked query, we could
+/// introduce cross-module dependencies and over-invalidation.
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+fn is_function_definition<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    symbol: ScopedSymbolId,
+) -> bool {
+    use_def_map(db, scope)
+        .end_of_scope_symbol_bindings(symbol)
+        .filter_map(|binding| binding.binding.definition())
+        .any(|definition| definition.kind(db).is_function_def())
 }
 
 /// Returns the variable kind for an attribute if it should participate in `ClassVar` override checks.
@@ -703,20 +717,28 @@ fn variable_kind<'db>(
     class_member: PlaceAndQualifiers<'db>,
     instance_member: PlaceAndQualifiers<'db>,
 ) -> Option<VariableKind> {
-    let class_member_ty = class_member.ignore_possibly_undefined()?;
-    let instance_member_ty = instance_member.ignore_possibly_undefined()?;
-
-    if !is_variable_like_type(db, class_member_ty) || !is_variable_like_type(db, instance_member_ty)
-    {
-        return None;
-    }
-
     if class_member.is_class_var() || instance_member.is_class_var() {
         return Some(VariableKind::Class);
     }
 
-    if class_member.qualifiers.contains(TypeQualifiers::FINAL)
-        || class_member_ty
+    // A `Final` attribute behaves like a class variable, but final overrides are diagnosed by
+    // `override-of-final-variable` instead of this rule.
+    if class_member.qualifiers.contains(TypeQualifiers::FINAL) {
+        return None;
+    }
+
+    // Descriptor values are not normal instance variables: lookup calls `__get__`, so the value
+    // exposed through an instance can differ from the value stored on the class. For example,
+    // `attr = property(lambda self: 1)` installs a descriptor value, so `C().attr` exposes the
+    // getter return type instead of the `property` object. By contrast, `attr: Descriptor` only
+    // annotates an instance attribute; the annotated type having `__get__` does not make `C.attr`
+    // a descriptor value.
+    if let Place::Defined(DefinedPlace {
+        ty: class_member_ty,
+        origin: TypeOrigin::Inferred,
+        ..
+    }) = class_member.place
+        && class_member_ty
             .class_member(db, "__get__".into())
             .place
             .ignore_possibly_undefined()
@@ -742,26 +764,6 @@ fn symbol_definition<'db>(
                 .end_of_scope_symbol_bindings(symbol)
                 .find_map(|binding| binding.binding.definition())
         })
-}
-
-/// Returns `true` if a type represents a variable-like attribute.
-fn is_variable_like_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    match ty {
-        Type::FunctionLiteral(_)
-        | Type::BoundMethod(_)
-        | Type::KnownBoundMethod(_)
-        | Type::WrapperDescriptor(_)
-        | Type::PropertyInstance(_) => false,
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .all(|element| is_variable_like_type(db, *element)),
-        Type::Intersection(intersection) => intersection
-            .positive(db)
-            .iter()
-            .all(|element| is_variable_like_type(db, *element)),
-        _ => true,
-    }
 }
 
 /// Reports an invalid override between a class variable and an instance variable.
