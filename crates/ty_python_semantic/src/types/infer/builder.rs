@@ -8524,6 +8524,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn report_unsupported_unary_operator(
+        &self,
+        unary: &ast::ExprUnaryOp,
+        op: ast::UnaryOp,
+        operand_type: Type<'db>,
+        unary_dunder_method: &str,
+        error: Option<&CallDunderError<'db>>,
+    ) {
+        let Some(builder) = self.context.report_lint(&UNSUPPORTED_OPERATOR, unary) else {
+            return;
+        };
+
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Unary operator `{op}` is not supported for object of type `{}`",
+            operand_type.display(self.db()),
+        ));
+
+        if let Some(CallDunderError::PossiblyUnbound {
+            unbound_on: Some(unbound_on),
+            ..
+        }) = error
+        {
+            for ty in unbound_on.iter().copied() {
+                diagnostic.info(format_args!(
+                    "`{}` does not implement `{unary_dunder_method}`",
+                    ty.display(self.db())
+                ));
+            }
+        }
+    }
+
     fn infer_unary_expression(&mut self, unary: &ast::ExprUnaryOp) -> Type<'db> {
         let ast::ExprUnaryOp {
             range: _,
@@ -8561,12 +8592,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ) {
                 Ok(outcome) => outcome.return_type(self.db()),
                 Err(e) => {
-                    if let Some(builder) = self.context.report_lint(&UNSUPPORTED_OPERATOR, unary) {
-                        builder.into_diagnostic(format_args!(
-                            "Unary operator `{op}` is not supported for object of type `{}`",
-                            operand_type.display(self.db()),
-                        ));
-                    }
+                    self.report_unsupported_unary_operator(
+                        unary,
+                        op,
+                        operand_type,
+                        unary_dunder_method,
+                        Some(&e),
+                    );
                     e.fallback_return_type(self.db())
                 }
             }
@@ -8659,14 +8691,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Some(ty) => ty,
                             None => {
                                 // At least one constraint failed; report error.
-                                if let Some(builder) =
-                                    self.context.report_lint(&UNSUPPORTED_OPERATOR, unary)
-                                {
-                                    builder.into_diagnostic(format_args!(
-                                        "Unary operator `{op}` is not supported for object of type `{}`",
-                                        operand_type.display(db),
-                                    ));
-                                }
+                                self.report_unsupported_unary_operator(
+                                    unary,
+                                    op,
+                                    operand_type,
+                                    unary_dunder_method,
+                                    None,
+                                );
                                 operand_type
                                     .try_call_dunder(
                                         db,
@@ -8695,14 +8726,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ) {
                         Ok(outcome) => outcome.return_type(self.db()),
                         Err(e) => {
-                            if let Some(builder) =
-                                self.context.report_lint(&UNSUPPORTED_OPERATOR, unary)
-                            {
-                                builder.into_diagnostic(format_args!(
-                                    "Unary operator `{op}` is not supported for object of type `{}`",
-                                    operand_type.display(self.db()),
-                                ));
-                            }
+                            self.report_unsupported_unary_operator(
+                                unary,
+                                op,
+                                operand_type,
+                                unary_dunder_method,
+                                Some(&e),
+                            );
                             e.fallback_return_type(self.db())
                         }
                     },
