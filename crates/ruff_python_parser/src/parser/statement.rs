@@ -111,6 +111,22 @@ impl<'src> Parser<'src> {
     /// - <https://docs.python.org/3/reference/compound_stmts.html>
     /// - <https://docs.python.org/3/reference/simple_stmts.html>
     pub(super) fn parse_statement(&mut self) -> Stmt {
+        let range = self.current_token_range();
+        if self.enter_recursion(range) {
+            let stmt = self.parse_statement_inner();
+            self.leave_recursion();
+            stmt
+        } else {
+            // Return a trivial placeholder statement (`pass`) this
+            // won't be seen as an error will eventually be returned.
+            Stmt::Pass(ast::StmtPass {
+                range,
+                node_index: AtomicNodeIndex::NONE,
+            })
+        }
+    }
+
+    fn parse_statement_inner(&mut self) -> Stmt {
         let start = self.node_start();
 
         match self.current_token_kind() {

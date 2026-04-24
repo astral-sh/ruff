@@ -16,7 +16,7 @@ use crate::token_source::{TokenSource, TokenSourceCheckpoint};
 use crate::{Mode, ParseError, ParseErrorType, UnsupportedSyntaxErrorKind};
 use crate::{Parsed, Tokens};
 
-pub use crate::parser::options::ParseOptions;
+pub use crate::parser::options::{DEFAULT_MAX_RECURSION_DEPTH, ParseOptions};
 
 mod expression;
 mod helpers;
@@ -56,6 +56,11 @@ pub(crate) struct Parser<'src> {
 
     /// The start offset in the source code from which to start parsing at.
     start_offset: TextSize,
+
+    /// Current parser recursion depth. Incremented on entry to each recursive
+    /// parsing function (expressions, statements, patterns) and decremented on
+    /// exit.
+    current_depth: u16,
 }
 
 impl<'src> Parser<'src> {
@@ -82,7 +87,38 @@ impl<'src> Parser<'src> {
             prev_token_end: TextSize::new(0),
             start_offset,
             current_token_id: TokenId::default(),
+            current_depth: 0,
         }
+    }
+
+    /// Call at the top of every recursive parsing function. Returns `false` if
+    /// the caller must abort and return a placeholder instead of recursing
+    /// further, because either the recursion limit was just hit or a previous
+    /// call already tripped the sticky `recursion_limit_exceeded` flag.
+    ///
+    /// Every successful call must be paired with a matching [`Parser::leave_recursion`].
+    #[must_use]
+    fn enter_recursion<R: Ranged>(&mut self, ranged: R) -> bool {
+        if self.current_depth >= self.options.max_recursion_depth {
+            self.add_error(ParseErrorType::RecursionLimitExceeded, ranged);
+            // Skip to end-of-file so outer parser frames unwind quickly
+            // and our `ParserProgress` infinite-loop guards don't fire
+            // when they see the same `(` / `[` etc. that this frame
+            // failed to consume.
+            while self.current_token_kind() != TokenKind::EndOfFile {
+                self.bump_any();
+            }
+            false
+        } else {
+            self.current_depth = self.current_depth.saturating_add(1);
+            true
+        }
+    }
+
+    /// Must be called at the end of every recursive parsing function whose
+    /// matching [`Parser::enter_recursion`] returned `true`.
+    fn leave_recursion(&mut self) {
+        self.current_depth = self.current_depth.saturating_sub(1);
     }
 
     /// Consumes the [`Parser`] and returns the parsed [`Parsed`].
