@@ -6,34 +6,26 @@ Released on 2026-04-24.
 
 ### Preview features
 
-- Fix PLC2701 for type parameter scopes ([#24576](https://github.com/astral-sh/ruff/pull/24576))
 - Implement `#ruff:file-ignore` file-level suppressions ([#23599](https://github.com/astral-sh/ruff/pull/23599))
 - Implement `#ruff:ignore` logical-line suppressions ([#23404](https://github.com/astral-sh/ruff/pull/23404))
 - Revert preview changes to displayed diagnostic severity in LSP ([#24789](https://github.com/astral-sh/ruff/pull/24789))
 - \[`airflow`\] Implement `task-branch-as-short-circuit` (`AIR004`) ([#23579](https://github.com/astral-sh/ruff/pull/23579))
-- [flake8-bugbear] Fix `break`/`continue` handling in `loop-iterator-mutation` (`B909`) ([#24440](https://github.com/astral-sh/ruff/pull/24440))
+- \[`flake8-bugbear`\] Fix `break`/`continue` handling in `loop-iterator-mutation` (`B909`) ([#24440](https://github.com/astral-sh/ruff/pull/24440))
+- \[`pylint`\] Fix `PLC2701` for type parameter scopes ([#24576](https://github.com/astral-sh/ruff/pull/24576))
 
 ### Rule changes
 
 - \[`pandas-vet`\] Suggest `.array` as well in `PD011` ([#24805](https://github.com/astral-sh/ruff/pull/24805))
 
-### Performance
-
-- Update Rust toolchain to 1.95 and MSRV to 1.93 ([#24677](https://github.com/astral-sh/ruff/pull/24677))
-
 ### CLI
 
-- fix: respect default unix permissions for cache files ([#24794](https://github.com/astral-sh/ruff/pull/24794))
+- Respect default Unix permissions for cache files ([#24794](https://github.com/astral-sh/ruff/pull/24794))
 
 ### Documentation
 
 - \[`pylint`\] Fix `PLR0124` description not to claim self-comparison always returns the same value ([#24749](https://github.com/astral-sh/ruff/pull/24749))
 - \[`pyupgrade`\] Expand docs on reusable `TypeVar`s and scoping (`UP046`) ([#24153](https://github.com/astral-sh/ruff/pull/24153))
-- [docs] Improve rules table accessibility ([#24711](https://github.com/astral-sh/ruff/pull/24711))
-
-### Other changes
-
-- Drop deprecated license classifier ([#24808](https://github.com/astral-sh/ruff/pull/24808))
+- Improve rules table accessibility ([#24711](https://github.com/astral-sh/ruff/pull/24711))
 
 ### Contributors
 
