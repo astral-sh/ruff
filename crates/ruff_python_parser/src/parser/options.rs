@@ -2,9 +2,7 @@ use ruff_python_ast::{PySourceType, PythonVersion};
 
 use crate::{AsMode, Mode};
 
-/// The default maximum recursion depth used by the parser when the caller does
-/// not explicitly configure one via [`ParseOptions::with_max_recursion_depth`]
-/// or [`ParseOptions::without_recursion_limit`].
+/// The default maximum recursion depth used by the parser.
 ///
 /// Real-world Python rarely nests more than a handful of levels deep; this cap
 /// exists to keep the parser from overflowing the stack on adversarial or

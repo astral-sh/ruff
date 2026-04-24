@@ -1821,11 +1821,17 @@ impl<'src> Parser<'src> {
 
         let format_spec = if self.eat(TokenKind::Colon) {
             let spec_start = self.node_start();
-            let elements = self.parse_interpolated_string_elements(
-                flags,
-                InterpolatedStringElementsKind::FormatSpec(string_kind),
-                string_kind,
-            );
+            let elements = if self.enter_recursion(self.current_token_range()) {
+                let elements = self.parse_interpolated_string_elements(
+                    flags,
+                    InterpolatedStringElementsKind::FormatSpec(string_kind),
+                    string_kind,
+                );
+                self.leave_recursion();
+                elements
+            } else {
+                ast::InterpolatedStringElements::from(vec![])
+            };
             Some(Box::new(ast::InterpolatedStringFormatSpec {
                 range: self.node_range(spec_start),
                 elements,
