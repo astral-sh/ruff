@@ -1219,16 +1219,6 @@ impl<'db> FunctionType<'db> {
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
-        if binding_context
-            .is_some_and(|binding_context| self.literal(db).definition(db) == binding_context)
-        {
-            // When building a function's own generic context, a self-referential `TypeOf[foo]`
-            // cannot introduce any legacy type variables that aren't already present elsewhere in
-            // the signature. Re-walking the signature here can instead force recursive expansion
-            // of the function type while that same signature is still under construction.
-            return;
-        }
-
         let signatures = self.signature(db);
         for signature in &signatures.overloads {
             signature.find_legacy_typevars_impl(db, binding_context, typevars, visitor);

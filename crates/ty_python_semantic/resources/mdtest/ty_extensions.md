@@ -493,6 +493,56 @@ def foo(x: "TypeOf[foo]"):
     reveal_type(x)  # revealed: def foo(x: def foo(...)) -> Unknown
 ```
 
+## Self-referential `TypeOf` in returned callables
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from collections.abc import Callable
+from typing import Concatenate
+from ty_extensions import TypeOf, generic_context
+
+def foo[**P, T](
+    x: Callable[Concatenate[TypeOf[foo], ...], T],
+) -> Callable[Concatenate[TypeOf[foo], P], T]:
+    return x
+
+reveal_type(generic_context(foo))  # revealed: ty_extensions.GenericContext[T@foo]
+# revealed: def foo[T](x: (def foo(...), /, *args: Any, **kwargs: Any) -> T) -> ((def foo(...), /, *args: P'return.args, **kwargs: P'return.kwargs) -> T)
+reveal_type(foo)
+```
+
+## Mutually recursive `TypeOf` in returned callables
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Concatenate
+from ty_extensions import TypeOf, generic_context
+
+def foo[**P, T](
+    x: "Callable[Concatenate[TypeOf[bar], ...], T]",
+) -> "Callable[Concatenate[TypeOf[bar], P], T]":
+    return x
+
+def bar[**P, T](
+    x: "Callable[Concatenate[TypeOf[foo], ...], T]",
+) -> "Callable[Concatenate[TypeOf[foo], P], T]":
+    return x
+
+reveal_type(generic_context(foo))  # revealed: ty_extensions.GenericContext[T@foo]
+reveal_type(generic_context(bar))  # revealed: ty_extensions.GenericContext[T@bar]
+```
+
 ## Deeply nested `TypeOf` chains
 
 Multiple redefinitions of a function with `TypeOf[foo]` as the return type create a chain of
