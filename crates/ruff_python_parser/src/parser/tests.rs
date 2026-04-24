@@ -261,18 +261,32 @@ fn recursion_limit_binary_paren_interplay() {
 fn recursion_limit_first_error_is_recursion_not_noise() {
     // When the limit is hit the outer parser frames will emit secondary
     // errors as they unwind. Callers read the first error via `into_result`
-    // / `Parsed::errors()`, so `RecursionLimitExceeded` must come first.
+    // / `Parsed::errors()`, so `RecursionLimitExceeded` must come first, and
+    // the drain-to-EOF inside `enter_recursion` should keep the total count
+    // small rather than producing one noisy error per unwound frame.
     let src = format!("{}1{}", "(".repeat(2_000), ")".repeat(2_000));
     let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(50);
     let parsed = crate::parse_unchecked(&src, opts);
-    let first = parsed
-        .errors()
-        .first()
-        .expect("expected at least one error");
+    let errors = parsed.errors();
+    let first = errors.first().expect("expected at least one error");
     assert!(matches!(
         first.error,
         ParseErrorType::RecursionLimitExceeded
     ));
+    // Exactly one `RecursionLimitExceeded` — guards against a regression
+    // where the unwind loops and re-triggers the limit check.
+    let recursion_errors = errors
+        .iter()
+        .filter(|e| matches!(e.error, ParseErrorType::RecursionLimitExceeded))
+        .count();
+    assert_eq!(recursion_errors, 1);
+    // Small, bounded tail of follow-up errors from the unwinding frames.
+    // Today this is 0; the generous cap is a regression gate, not a spec.
+    assert!(
+        errors.len() <= 8,
+        "expected a small number of errors, got {}: {errors:?}",
+        errors.len(),
+    );
 }
 
 #[test]

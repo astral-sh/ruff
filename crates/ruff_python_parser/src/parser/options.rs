@@ -37,10 +37,10 @@ pub struct ParseOptions {
     pub(crate) mode: Mode,
     /// Target version for detecting version-related syntax errors.
     pub(crate) target_version: PythonVersion,
-    /// Maximum recursion depth for the parser. The parser aborts
-    /// with a [`crate::ParseErrorType::RecursionLimitExceeded`] error once `n`
+    /// Maximum recursion depth for the parser. The parser aborts with a
+    /// [`crate::ParseErrorType::RecursionLimitExceeded`] error once this many
     /// nested expression / statement / pattern nodes are on the parser's call
-    /// stack. Defaults to `DEFAULT_MAX_RECURSION_DEPTH`
+    /// stack. Defaults to [`DEFAULT_MAX_RECURSION_DEPTH`].
     pub(crate) max_recursion_depth: u16,
 }
 
