@@ -328,6 +328,29 @@ impl<'src> Parser<'src> {
         left_precedence: OperatorPrecedence,
         context: ExpressionContext,
     ) -> ParsedExpr {
+        let range = self.current_token_range();
+        if self.enter_recursion(range) {
+            let result = self.parse_lhs_expression_inner(left_precedence, context);
+            self.leave_recursion();
+            result
+        } else {
+            // Returns a trivial placeholder expression to stand in for a real
+            // expression when the recursion limit has been exceeded.
+            ParsedExpr {
+                expr: Expr::EllipsisLiteral(ast::ExprEllipsisLiteral {
+                    range,
+                    node_index: AtomicNodeIndex::NONE,
+                }),
+                is_parenthesized: false,
+            }
+        }
+    }
+
+    fn parse_lhs_expression_inner(
+        &mut self,
+        left_precedence: OperatorPrecedence,
+        context: ExpressionContext,
+    ) -> ParsedExpr {
         let start = self.node_start();
         let token = self.current_token_kind();
 

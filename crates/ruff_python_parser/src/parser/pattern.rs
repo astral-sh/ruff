@@ -88,6 +88,23 @@ impl Parser<'_> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-pattern>
     fn parse_match_pattern(&mut self, allow_star_pattern: AllowStarPattern) -> Pattern {
+        let range = self.current_token_range();
+        if self.enter_recursion(range) {
+            let result = self.parse_match_pattern_inner(allow_star_pattern);
+            self.leave_recursion();
+            result
+        } else {
+            // Wildcard-style placeholder so the caller always gets a valid `Pattern`.
+            Pattern::MatchAs(ast::PatternMatchAs {
+                range,
+                name: None,
+                pattern: None,
+                node_index: AtomicNodeIndex::NONE,
+            })
+        }
+    }
+
+    fn parse_match_pattern_inner(&mut self, allow_star_pattern: AllowStarPattern) -> Pattern {
         let start = self.node_start();
 
         // We don't yet know if it's an or pattern or an as pattern, so use whatever
