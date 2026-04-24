@@ -420,6 +420,12 @@ class AugmentedClassAttributeOverride(Base):
     class_attr = 1
     class_attr += 1
 
+class IntermediateClassAttributeOverride(Base):
+    class_attr = 1
+
+class ExplicitClassVarOverrideAfterInheritedClassVar(IntermediateClassAttributeOverride):
+    class_attr: ClassVar[int] = 1
+
 class RegularClassAttributeBase:
     attr = 1
 
@@ -434,6 +440,47 @@ class ClassDefaultBase:
 class ClassDefaultSubclass(ClassDefaultBase):
     class_default = 2
     declared_instance = True
+```
+
+### Method definitions
+
+Method definitions create descriptors in the class body. They are not instance variable
+declarations, so the class-variable vs. instance-variable override check does not apply to them:
+
+```py
+from collections.abc import Callable
+from typing import Any, ClassVar
+
+class ClassVarBase:
+    plain: ClassVar[Callable[..., Any]]
+    static: ClassVar[Callable[..., Any]]
+    class_: ClassVar[Callable[..., Any]]
+    non_callable: ClassVar[int]
+
+class MethodSubclass(ClassVarBase):
+    def plain(self, x: int) -> int:
+        return x
+
+    @staticmethod
+    def static(x: int) -> int:
+        return x
+
+    @classmethod
+    def class_(cls, x: int) -> int:
+        return x
+
+    def non_callable(self) -> int:
+        return 1
+
+class PropertyBase:
+    attr: ClassVar[int]
+
+class PropertySubclass(PropertyBase):
+    @property
+    def attr(  # error: [invalid-attribute-override] "instance variable cannot override class variable `PropertyBase.attr`"
+        self,
+    ) -> int:
+        return 1
 ```
 
 ### Repeated inherited conflicts

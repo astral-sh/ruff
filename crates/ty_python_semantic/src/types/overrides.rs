@@ -437,21 +437,14 @@ fn check_class_declaration<'db>(
             }
 
             if configuration.check_attribute_liskov_violations() {
-                let superclass_variable_kind = superclass_variable_kind(
-                    db,
-                    superclass_scope,
-                    superclass_symbol_id,
-                    superclass.own_class_member(db, None, &member.name).inner,
-                    superclass_instance_member,
-                );
-
-                if let Some(superclass_variable_kind) = superclass_variable_kind
-                    && immediate_parent_variable_kind.is_none()
+                if let Some(superclass_variable_kind) =
+                    effective_superclass_variable_kind(db, superclass, member.name.clone())
                 {
-                    immediate_parent_variable_kind = Some((superclass, superclass_variable_kind));
-                }
+                    if immediate_parent_variable_kind.is_none() {
+                        immediate_parent_variable_kind =
+                            Some((superclass, superclass_variable_kind));
+                    }
 
-                if let Some(superclass_variable_kind) = superclass_variable_kind {
                     let subclass_kind = *subclass_variable_kind.get_or_insert_with(|| {
                         variable_kind(
                             db,
@@ -631,7 +624,7 @@ fn check_class_declaration<'db>(
 }
 
 /// Whether an attribute declaration is a class variable or an instance variable.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 enum VariableKind {
     /// A variable annotated with `ClassVar`.
     Class,
@@ -674,6 +667,84 @@ fn superclass_variable_kind<'db>(
     }
 
     variable_kind(db, class_member, instance_member)
+}
+
+/// Returns the variable kind for a superclass member, preserving inherited `ClassVar` declarations
+/// through unannotated class-body assignments.
+///
+/// For example, `Intermediate.x = 1` inherits the pure-class-variable declaration from `Base`, so
+/// `Sub.x: ClassVar[int]` should not be reported as overriding an instance variable:
+///
+/// ```python
+/// from typing import ClassVar
+///
+/// class Base:
+///     x: ClassVar[int]
+///
+/// class Intermediate(Base):
+///     x = 1
+///
+/// class Sub(Intermediate):
+///     x: ClassVar[int] = 2
+/// ```
+#[allow(clippy::needless_pass_by_value)]
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+fn effective_superclass_variable_kind<'db>(
+    db: &'db dyn Db,
+    superclass: ClassType<'db>,
+    name: Name,
+) -> Option<VariableKind> {
+    let inherited_variable_kind = || {
+        superclass
+            .iter_mro(db)
+            .skip(1)
+            .filter_map(ClassBase::into_class)
+            .find_map(|base| effective_superclass_variable_kind(db, base, name.clone()))
+    };
+
+    let (superclass_literal, superclass_specialization) = superclass.static_class_literal(db)?;
+    let superclass_scope = superclass_literal.body_scope(db);
+    let superclass_symbol_table = place_table(db, superclass_scope);
+    let superclass_symbol_id = superclass_symbol_table.symbol_id(&name);
+
+    let has_own_member = if let Some(id) = superclass_symbol_id {
+        let superclass_symbol = superclass_symbol_table.symbol(id);
+        superclass_symbol.is_bound() || superclass_symbol.is_declared()
+    } else {
+        superclass_literal
+            .own_synthesized_member(db, superclass_specialization, None, &name)
+            .is_some()
+    };
+
+    if has_own_member {
+        let superclass_variable_kind = superclass_variable_kind(
+            db,
+            superclass_scope,
+            superclass_symbol_id,
+            superclass.own_class_member(db, None, &name).inner,
+            Type::instance(db, superclass).member(db, &name),
+        );
+
+        if superclass_variable_kind == Some(VariableKind::Instance)
+            && superclass_symbol_id.is_some_and(|id| {
+                symbol_definition(db, superclass_scope, id).is_some_and(|definition| {
+                    matches!(
+                        definition.kind(db),
+                        DefinitionKind::Assignment(_) | DefinitionKind::AugmentedAssignment(_)
+                    )
+                })
+            })
+            && inherited_variable_kind() == Some(VariableKind::Class)
+        {
+            return Some(VariableKind::Class);
+        }
+
+        if superclass_variable_kind.is_some() {
+            return superclass_variable_kind;
+        }
+    }
+
+    inherited_variable_kind()
 }
 
 /// Salsa-tracked query to check whether any of the definitions of a symbol
@@ -724,6 +795,28 @@ fn variable_kind<'db>(
     // A `Final` attribute behaves like a class variable, but final overrides are diagnosed by
     // `override-of-final-variable` instead of this rule.
     if class_member.qualifiers.contains(TypeQualifiers::FINAL) {
+        return None;
+    }
+
+    // A method definition is a descriptor in the class body, not an instance variable declaration,
+    // even though instance lookup binds it as a method. It should therefore not participate in the
+    // class-variable vs. instance-variable declaration check. For example, `Sub.f` here is a
+    // descriptor stored on the class, not an instance attribute:
+    //
+    // ```python
+    // class Base:
+    //     f: ClassVar[int]
+    //
+    // class Sub(Base):
+    //     def f(self) -> int: ...
+    // ```
+    if matches!(
+        class_member.place,
+        Place::Defined(DefinedPlace {
+            ty: Type::FunctionLiteral(_),
+            ..
+        })
+    ) {
         return None;
     }
 
