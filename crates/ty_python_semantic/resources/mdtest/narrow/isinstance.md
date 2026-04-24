@@ -1015,7 +1015,7 @@ class Movie(TypedDict):
 
 def narrow_reversed_typeddict_union(x: Movie | int) -> None:
     if isinstance(x, dict):
-        reveal_type(reversed(x))  # revealed: Iterator[Unknown]
+        reveal_type(reversed(x))  # revealed: Iterator[str]
 
 def narrow_reversed_object(x: object) -> None:
     if isinstance(x, dict):

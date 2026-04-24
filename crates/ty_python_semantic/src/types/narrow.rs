@@ -1,5 +1,4 @@
 use crate::Db;
-use crate::place::known_module_symbol;
 use crate::reachability::{ReachabilityConstraintsExtension, sequence_pattern_type};
 use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
@@ -452,16 +451,14 @@ struct Conjunctions<'db> {
 }
 
 impl<'db> Conjunctions<'db> {
-    fn singleton(constraint: Type<'db>) -> Self {
+    fn singleton(ty: Type<'db>) -> Self {
         Self {
-            conjuncts: smallvec![constraint],
+            conjuncts: smallvec![ty],
         }
     }
 
     fn and_with(mut self, other: Self) -> Self {
-        let has_never = |constraint: &Type<'db>| constraint.is_never();
-
-        if self.conjuncts.iter().any(has_never) || other.conjuncts.iter().any(has_never) {
+        if self.conjuncts.iter().any(Type::is_never) || other.conjuncts.iter().any(Type::is_never) {
             return Self::singleton(Type::Never);
         }
 
@@ -534,10 +531,6 @@ impl<'db> NarrowingConstraint<'db> {
             intersection_disjuncts: smallvec![],
             replacement_disjuncts: smallvec_inline![Conjunctions::singleton(constraint)],
         }
-    }
-
-    fn classinfo(constraint: Type<'db>) -> Self {
-        Self::intersection(constraint)
     }
 
     /// Merge two constraints, taking their intersection but respecting "replacement" semantics (with
@@ -1794,10 +1787,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 }
             }
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
-                let [first_arg_node, second_arg] = &*expr_call.arguments.args else {
+                let [first_arg, second_arg] = &*expr_call.arguments.args else {
                     return None;
                 };
-                let first_arg = PlaceExpr::try_from_expr(first_arg_node)?;
+                let first_arg = PlaceExpr::try_from_expr(first_arg)?;
                 let function = function_type.known(self.db)?;
                 let place = self.expect_place(&first_arg);
 
@@ -1835,7 +1828,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .map(|classinfo| {
                         NarrowingConstraints::from_iter([(
                             place,
-                            NarrowingConstraint::classinfo(if is_positive {
+                            NarrowingConstraint::intersection(if is_positive {
                                 classinfo
                             } else {
                                 negate_classinfo_constraint(self.db, classinfo)
@@ -1963,16 +1956,13 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
         let place = self.expect_place(&subject);
 
-        let mapping_type = ClassInfoConstraintFunction::IsInstance.generate_constraint(
-            self.db,
-            KnownClass::Mapping.to_class_literal(self.db),
-            is_positive,
-        )?;
-        let mapping_type = if is_positive {
-            mapping_type
-        } else {
-            negate_classinfo_constraint(self.db, mapping_type)
-        };
+        let mapping_type = ClassInfoConstraintFunction::IsInstance
+            .generate_constraint(
+                self.db,
+                KnownClass::Mapping.to_class_literal(self.db),
+                is_positive,
+            )?
+            .negate_if(self.db, !is_positive);
 
         Some(NarrowingConstraints::from_iter([(
             place,
