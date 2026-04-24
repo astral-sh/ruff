@@ -13,6 +13,7 @@ use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBounds, Solutions,
 };
+use crate::types::protocol_class::protocol_bind_self;
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
@@ -25,13 +26,17 @@ use crate::types::typevar::{
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
-    MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, UnionType, binding_type, declaration_type,
-    infer_definition_types,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallArguments, CallableType,
+    CallableTypes, ClassLiteral, FindLegacyTypeVarsVisitor,
+    InstanceFallbackShadowsNonDataDescriptor, IntersectionType, KnownClass, KnownInstanceType,
+    MaterializationKind, MemberLookupPolicy, Type, TypeAliasType, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionType, binding_type,
+    declaration_type, infer_definition_types,
 };
-use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
+use crate::{
+    Db, FxIndexMap, FxOrderMap, FxOrderSet,
+    place::{DefinedPlace, Definedness, Place},
+};
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::node_key::NodeKey;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKey, NodeWithScopeKind, ScopeId};
@@ -1873,6 +1878,66 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         Ok(())
     }
 
+    fn infer_from_structural_protocol_methods(
+        &mut self,
+        protocol: crate::types::ProtocolInstanceType<'db>,
+        actual: Type<'db>,
+        polarity: TypeVarVariance,
+        f: &mut dyn FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
+        seen: &mut FxHashSet<(Type<'db>, Type<'db>)>,
+    ) {
+        let actual_self = actual.literal_fallback_instance(self.db).unwrap_or(actual);
+
+        // The constraint-set protocol check below verifies compatibility, but it does not always
+        // produce concrete type-variable solutions from structural members. For zero-argument
+        // protocol methods, compare return types directly; this lets calls such as
+        // `def f[T](x: Iterable[T]) -> T: ...; f(Color)` infer `T` from `Color.__iter__()`.
+        for member in protocol.interface(self.db).members(self.db) {
+            if member.name() == "__call__" {
+                continue;
+            }
+
+            let Some(formal_callable) = member.callable() else {
+                continue;
+            };
+
+            let formal_return = Type::Callable(protocol_bind_self(
+                self.db,
+                formal_callable,
+                Some(actual_self),
+            ))
+            .try_call(self.db, &CallArguments::none())
+            .ok()
+            .map(|bindings| bindings.return_type(self.db));
+
+            let actual_place = actual
+                .invoke_descriptor_protocol(
+                    self.db,
+                    member.name(),
+                    Place::Undefined.into(),
+                    InstanceFallbackShadowsNonDataDescriptor::No,
+                    MemberLookupPolicy::default(),
+                )
+                .place;
+
+            let actual_return = match actual_place {
+                Place::Defined(DefinedPlace {
+                    ty: attribute_type,
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                }) => attribute_type
+                    .try_call(self.db, &CallArguments::none())
+                    .ok()
+                    .map(|bindings| bindings.return_type(self.db)),
+                Place::Defined(_) | Place::Undefined => None,
+            };
+
+            if let (Some(formal_return), Some(actual_return)) = (formal_return, actual_return) {
+                let _ = self.infer_map_impl(formal_return, actual_return, polarity, f, seen);
+            }
+        }
+    }
+
     /// Infer type mappings for the specialization based on a given type and its declared type.
     pub(crate) fn infer(
         &mut self,
@@ -2256,6 +2321,48 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 return self.infer_map_impl(formal, actual_instance, polarity, f, seen);
             }
 
+            (formal @ Type::ProtocolInstance(formal_protocol), actual) => {
+                if let Type::ProtocolInstance(actual_protocol) = actual
+                    && let Some(actual_nominal) = actual_protocol.to_nominal_instance()
+                {
+                    self.infer_map_impl(
+                        formal,
+                        Type::NominalInstance(actual_nominal),
+                        polarity,
+                        f,
+                        seen,
+                    )?;
+                }
+
+                if let Some(call_method) = formal_protocol.interface(self.db).call_method(self.db)
+                    && let Some(actual_callables) = actual.try_upcast_to_callable(self.db)
+                {
+                    let formal_signature = call_method.bind_self(self.db, None).signatures(self.db);
+                    let _ = self.infer_from_callable_signature(
+                        formal,
+                        formal_signature,
+                        &actual_callables,
+                        f,
+                    );
+                }
+
+                self.infer_from_structural_protocol_methods(
+                    formal_protocol,
+                    actual,
+                    polarity,
+                    &mut *f,
+                    seen,
+                );
+
+                let when = actual.when_constraint_set_assignable_to(
+                    self.db,
+                    Type::ProtocolInstance(formal_protocol),
+                    self.constraints,
+                );
+                let _ = self.add_type_mappings_from_constraint_set(formal, when, &mut *f);
+                return Ok(());
+            }
+
             (formal, Type::ProtocolInstance(actual_protocol)) => {
                 // TODO: This will only handle protocol classes that explicit inherit
                 // from other generic protocol classes by listing it as a base class.
@@ -2313,26 +2420,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         formal_nominal.class(self.db).into_generic_alias()
                     }
 
-                    Type::ProtocolInstance(_) => {
-                        // TODO: For protocols, we use the new constraint set implementation, which
-                        // will handle implicitly implemented protocols and generic protocols. We
-                        // eventually want this logic to be used for _all_ nominal instances
-                        // (replacing the logic below).
-                        let when = actual.when_constraint_set_assignable_to(
-                            self.db,
-                            formal,
-                            self.constraints,
-                        );
-                        // For protocol inference via constraint sets, we currently treat
-                        // unsatisfiable results as "no inference" instead of an immediate
-                        // specialization error. This matches the previous behavior (where
-                        // unsatisfied comparisons simply produced no type mappings), and avoids
-                        // false positives for callable-wrapper patterns while this path is still
-                        // a hybrid of old and new solver logic.
-                        let _ = self.add_type_mappings_from_constraint_set(formal, when, &mut f);
-                        return Ok(());
-                    }
-
                     _ => None,
                 };
 
@@ -2363,34 +2450,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         return Ok(());
                     }
                 }
-            }
-
-            // When the formal type is a protocol with a `__call__` method, infer the specialization
-            // from matching the actual type's callable signature against the protocol's `__call__`
-            // method signature.
-            (Type::ProtocolInstance(formal_protocol), _) => {
-                let Some(call_method) = formal_protocol.interface(self.db).call_method(self.db)
-                else {
-                    return Ok(());
-                };
-                let Some(actual_callables) = actual.try_upcast_to_callable(self.db) else {
-                    return Ok(());
-                };
-
-                // The `__call__` method is bound to `self`, so we need to bind it to get the
-                // callable signature that the actual type needs to match.
-                let formal_signature = call_method.bind_self(self.db, None).signatures(self.db);
-
-                // For callable-signature inference, keep unsatisfiable constraint-set
-                // comparisons non-fatal for now. The hybrid inference/checking pipeline still
-                // depends on post-specialization assignability checks for some callable wrapper
-                // patterns (e.g. `functools.wraps`, callback adapters).
-                let _ = self.infer_from_callable_signature(
-                    formal,
-                    formal_signature,
-                    &actual_callables,
-                    f,
-                );
             }
 
             (Type::Callable(formal_callable), _) => {

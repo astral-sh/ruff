@@ -1090,6 +1090,9 @@ reveal_type(Answer.value)  # revealed: Literal[Answer.value]
 
 ```py
 from enum import Enum
+from typing import Iterable, TypeVar
+
+T = TypeVar("T")
 
 class Color(Enum):
     RED = 1
@@ -1099,8 +1102,12 @@ class Color(Enum):
 for color in Color:
     reveal_type(color)  # revealed: Color
 
-# TODO: Should be `list[Color]`
-reveal_type(list(Color))  # revealed: list[Unknown]
+def takes_iterable(i: Iterable[T]) -> T:
+    return next(iter(i))
+
+reveal_type(takes_iterable(Color))  # revealed: Color
+
+reveal_type(list(Color))  # revealed: list[Color]
 ```
 
 ## Methods / non-member attributes

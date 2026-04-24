@@ -2821,6 +2821,25 @@ static_assert(not is_assignable_to(TypeOf[doesnt_satisfy_foo], Foo))
 static_assert(not is_subtype_of(TypeOf[doesnt_satisfy_foo], Foo))
 ```
 
+Generic callback protocols infer type variables from the callable signature:
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Proc(Protocol[T]):
+    def __call__(self) -> T: ...
+
+def callback_result(callback: Proc[T]) -> T:
+    return callback()
+
+def returns_int() -> int:
+    return 1
+
+reveal_type(callback_result(returns_int))  # revealed: int
+```
+
 Class-literals and generic aliases can also be subtypes of callback protocols:
 
 ```py

@@ -660,6 +660,13 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         self.definition
     }
 
+    pub(super) const fn callable(&self) -> Option<CallableType<'db>> {
+        match self.kind {
+            ProtocolMemberKind::Method(callable) => Some(callable),
+            ProtocolMemberKind::Property(_) | ProtocolMemberKind::Other(_) => None,
+        }
+    }
+
     fn ty(&self) -> Type<'db> {
         match &self.kind {
             ProtocolMemberKind::Method(callable) => Type::Callable(*callable),
@@ -1083,7 +1090,7 @@ fn proto_interface_cycle_recover<'db>(
 /// This additional upcasting is required in order for protocols with `__call__` method
 /// members to be considered assignable to `Callable` types, since the `Callable` supertype
 /// of the `__call__` method will be function-like but a `Callable` type is not.
-fn protocol_bind_self<'db>(
+pub(super) fn protocol_bind_self<'db>(
     db: &'db dyn Db,
     callable: CallableType<'db>,
     self_type: Option<Type<'db>>,
