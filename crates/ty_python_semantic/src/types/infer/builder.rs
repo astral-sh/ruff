@@ -2631,18 +2631,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     infer_value_ty(self, TypeContext::default());
                     return true;
                 };
-                let class_attr_self_ty = match object_ty {
-                    Type::ClassLiteral(_) | Type::GenericAlias(_) => object_ty.to_instance(db),
-                    Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
-                        // Preserve symbolic subtype information for `type[Self]`, `type[T]`, and
-                        // gradual forms, but avoid collapsing `type[Concrete]` to `Concrete`.
-                        SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => {
-                            Some(subclass_of.to_instance(db))
-                        }
-                        SubclassOfInner::Class(_) => None,
-                    },
-                    _ => unreachable!(),
-                };
+                let class_attr_self_ty = object_ty.to_instance(db);
 
                 match meta_attr {
                     PlaceAndQualifiers {
@@ -2665,7 +2654,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // attribute resolution.
                         let mut infer_value_ty = MultiInferenceGuard::new(infer_value_ty);
 
-                        let meta_attr_ty = meta_attr_ty.bind_self_typevars(db, object_ty);
                         // Perform loud inference without type context, as we may encounter multiple equally
                         // applicable type contexts during attribute resolution.
                         let value_ty = infer_value_ty.infer_loud(self, TypeContext::default());

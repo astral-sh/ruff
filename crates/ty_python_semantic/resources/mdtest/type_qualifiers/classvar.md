@@ -201,8 +201,7 @@ class Sub(Base): ...
 reveal_type(Sub.all_instances)  # revealed: list[Sub]
 ```
 
-Assignments through exact class objects should bind `Self` when writing a `ClassVar`, while symbolic
-subclass objects remain conservative.
+Assignments through class objects should bind `Self` when writing a `ClassVar`.
 
 ```py
 from typing import ClassVar, Self, TypeVar
@@ -221,13 +220,33 @@ class SavedSub(Saved): ...
 
 reveal_type(SavedSub.latest)  # revealed: SavedSub
 
-def store_bad(cls: type[Saved]) -> None:
-    cls.latest = Saved()  # error: [invalid-assignment]
+def store_concrete(cls: type[Saved]) -> None:
+    cls.latest = Saved()
 
 T = TypeVar("T", bound=Saved)
 
 def store_ok(cls: type[T], value: T) -> None:
     cls.latest = value
+
+def store_wrong(cls: type[Saved]) -> None:
+    cls.latest = object()  # error: [invalid-assignment]
+```
+
+Assignments through a possibly missing metaclass attribute still fall back to the class variable.
+
+```py
+from typing import ClassVar, Self
+
+def _(flag: bool) -> None:
+    class Meta(type):
+        if flag:
+            latest: object = object()
+
+    class MaybeSaved(metaclass=Meta):
+        latest: ClassVar[Self]
+
+    MaybeSaved.latest = MaybeSaved()
+    MaybeSaved.latest = object()  # error: [invalid-assignment]
 ```
 
 Assignments through gradual class objects remain permissive.
