@@ -1,5 +1,4 @@
 use crate::Db;
-use crate::place::known_module_symbol;
 use crate::reachability::{ReachabilityConstraintsExtension, sequence_pattern_type};
 use crate::subscript::PyIndex;
 use crate::types::enums::{enum_member_literals, enum_metadata};

@@ -6013,8 +6013,6 @@ except <CURSOR># Trigger completion/hover here
         info[hover]: Hovered content is
          --> main.py:4:8
           |
-        2 | from ty_extensions import TypedDictTop
-        3 |
         4 | value: TypedDictTop
           |        ^^^^^^^^-^^^
           |        |       |

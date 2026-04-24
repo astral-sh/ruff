@@ -179,20 +179,14 @@ mod tests {
         info[goto-type definition]: Go to type definition
          --> main.py:4:8
           |
-        2 | from ty_extensions import TypedDictTop
-        3 |
         4 | value: TypedDictTop
           |        ^^^^^^^^^^^^ Clicking here
           |
         info: Found 1 type definition
            --> stdlib/ty_extensions.pyi:105:1
             |
-        103 | \"\"\"
-        104 |
         105 | TypedDictTop: _SpecialForm
             | ------------
-        106 | \"\"\"
-        107 | `TypedDictTop` represents the top type of all `TypedDict` instances.
             |
         ");
     }
