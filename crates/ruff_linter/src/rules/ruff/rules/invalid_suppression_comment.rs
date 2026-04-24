@@ -38,10 +38,13 @@ impl AlwaysFixableViolation for InvalidSuppressionComment {
                 "unexpected indentation".to_string()
             }
             InvalidSuppressionCommentKind::Invalid(InvalidSuppressionKind::Trailing) => {
-                "trailing comments are not supported".to_string()
+                "trailing comments are only support for ruff:ignore suppressions".to_string()
             }
             InvalidSuppressionCommentKind::Invalid(InvalidSuppressionKind::Unmatched) => {
                 "no matching 'disable' comment".to_string()
+            }
+            InvalidSuppressionCommentKind::Invalid(InvalidSuppressionKind::NotModuleScope) => {
+                "file-level suppressions must be at global module scope".to_string()
             }
             InvalidSuppressionCommentKind::Error(error) => format!("{error}"),
         };
