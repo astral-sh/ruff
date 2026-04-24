@@ -5,20 +5,56 @@ expression: ranges
 [
   {
     "startLine": 0,
-    "startCharacter": 0,
-    "endLine": 5,
-    "endCharacter": 25
+    "startCharacter": 14,
+    "endLine": 23,
+    "endCharacter": 16
   },
   {
     "startLine": 1,
-    "startCharacter": 4,
+    "startCharacter": 23,
     "endLine": 2,
     "endCharacter": 22
   },
   {
     "startLine": 4,
-    "startCharacter": 4,
+    "startCharacter": 21,
     "endLine": 5,
     "endCharacter": 25
+  },
+  {
+    "startLine": 7,
+    "startCharacter": 16,
+    "endLine": 10,
+    "endCharacter": 4
+  },
+  {
+    "startLine": 10,
+    "startCharacter": 6,
+    "endLine": 11,
+    "endCharacter": 29
+  },
+  {
+    "startLine": 13,
+    "startCharacter": 18,
+    "endLine": 16,
+    "endCharacter": 4
+  },
+  {
+    "startLine": 16,
+    "startCharacter": 6,
+    "endLine": 17,
+    "endCharacter": 17
+  },
+  {
+    "startLine": 19,
+    "startCharacter": 8,
+    "endLine": 22,
+    "endCharacter": 4
+  },
+  {
+    "startLine": 22,
+    "startCharacter": 6,
+    "endLine": 23,
+    "endCharacter": 16
   }
 ]
