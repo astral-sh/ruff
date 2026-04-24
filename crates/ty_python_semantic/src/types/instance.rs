@@ -571,7 +571,20 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         if left.is_object() || right.is_object() {
             return result;
         }
-        if let Some(left_spec) = left.tuple_spec(db) {
+
+        let left_class = left.class(db);
+        let right_class = right.class(db);
+        if left_class.class_literal(db) != right_class.class_literal(db)
+            && left_class.is_final(db)
+            && right_class.is_final(db)
+        {
+            return self.always();
+        }
+
+        let compare_tuple_specs = matches!(left.0, NominalInstanceInner::ExactTuple(_))
+            || matches!(right.0, NominalInstanceInner::ExactTuple(_));
+
+        if compare_tuple_specs && let Some(left_spec) = left.tuple_spec(db) {
             if let Some(right_spec) = right.tuple_spec(db) {
                 let compatible = self.check_tuple_spec_pair(db, &left_spec, &right_spec);
                 if result
@@ -586,9 +599,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         result.or(db, self.constraints, || {
             ConstraintSet::from_bool(
                 self.constraints,
-                !left
-                    .class(db)
-                    .could_coexist_in_mro_with(db, right.class(db), self.constraints),
+                !left_class.could_coexist_in_mro_with(db, right_class, self.constraints),
             )
         })
     }

@@ -115,6 +115,86 @@ static_assert(not is_disjoint_from(Foo[Any], Foo[B]))
 static_assert(not is_disjoint_from(Foo[int], Foo[str]))
 ```
 
+## Generic specializations and generic bases
+
+```py
+from typing import Any, Generic, Sequence, TypeVar, final
+from typing_extensions import Never, disjoint_base
+from ty_extensions import is_disjoint_from, static_assert
+
+class A: ...
+class B: ...
+
+@final
+class FinalA: ...
+
+@disjoint_base
+class DisjointA: ...
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+U_co = TypeVar("U_co", covariant=True)
+
+class Invariant(Generic[T]):
+    x: T
+
+class InvSubA(Invariant[A]):
+    pass
+
+class Covariant(Generic[T_co]):
+    def get(self) -> T_co:
+        raise NotImplementedError()
+
+class CoSubB(Covariant[B]):
+    pass
+
+class CoSubNever(Covariant[Never]):
+    pass
+
+class CoSubFinalA(Covariant[FinalA]):
+    pass
+
+@final
+class FinalCoSubA(Covariant[FinalA]):
+    pass
+
+class Left(Covariant[FinalA], Generic[T]):
+    pass
+
+class Right(Covariant[B], Generic[T]):
+    pass
+
+class Pair(Generic[T, U_co]):
+    pass
+
+class PairLeft(Pair[Any, FinalA]):
+    pass
+
+class PairRight(Pair[int, B]):
+    pass
+
+static_assert(is_disjoint_from(Invariant[A], Invariant[B]))
+static_assert(is_disjoint_from(InvSubA, Invariant[B]))
+static_assert(not is_disjoint_from(Invariant[A], Invariant[A]))
+static_assert(not is_disjoint_from(Invariant[FinalA], Invariant[FinalA]))
+static_assert(not is_disjoint_from(Invariant[DisjointA], Invariant[DisjointA]))
+
+static_assert(not is_disjoint_from(Covariant[A], Covariant[B]))
+static_assert(not is_disjoint_from(Covariant[A], CoSubB))
+static_assert(not is_disjoint_from(Covariant[A], CoSubNever))
+static_assert(not is_disjoint_from(CoSubNever, Covariant[A]))
+static_assert(not is_disjoint_from(Covariant[FinalA], Covariant[B]))
+static_assert(is_disjoint_from(CoSubFinalA, Covariant[B]))
+static_assert(is_disjoint_from(FinalCoSubA, Covariant[B]))
+static_assert(is_disjoint_from(Covariant[FinalA], CoSubB))
+static_assert(is_disjoint_from(Left[int], Right[str]))
+static_assert(not is_disjoint_from(PairLeft, PairRight))
+
+static_assert(not is_disjoint_from(Sequence[int], Sequence[str]))
+static_assert(is_disjoint_from(str, Sequence[int]))
+static_assert(not is_disjoint_from(str, Sequence[str]))
+```
+
 ## "Disjoint base" builtin types
 
 Most other builtins can be subclassed and can even be used in multiple inheritance. However, builtin

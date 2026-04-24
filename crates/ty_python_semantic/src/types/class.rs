@@ -1247,16 +1247,26 @@ impl<'db> ClassType<'db> {
                     this_class == other_class
                 }
                 (ClassType::Generic(this_alias), ClassType::Generic(other_alias)) => {
-                    this_alias.origin(db) == other_alias.origin(db)
-                        && !this_alias
-                            .specialization(db)
-                            .is_disjoint_from(
-                                db,
-                                other_alias.specialization(db),
-                                constraints,
-                                InferableTypeVars::None,
-                            )
-                            .is_always_satisfied(db)
+                    if this_alias.origin(db) != other_alias.origin(db) {
+                        return false;
+                    }
+
+                    let this_specialization = this_alias.specialization(db);
+                    let other_specialization = other_alias.specialization(db);
+                    if this_specialization.tuple(db).is_some()
+                        && other_specialization.tuple(db).is_some()
+                    {
+                        return true;
+                    }
+
+                    !this_specialization
+                        .is_disjoint_from(
+                            db,
+                            other_specialization,
+                            constraints,
+                            InferableTypeVars::None,
+                        )
+                        .is_always_satisfied(db)
                 }
                 (ClassType::NonGeneric(_), ClassType::Generic(_))
                 | (ClassType::Generic(_), ClassType::NonGeneric(_)) => false,
@@ -1276,6 +1286,62 @@ impl<'db> ClassType<'db> {
     ) -> bool {
         if self == other {
             return true;
+        }
+
+        let direct_aliases_have_same_origin =
+            match (self.into_generic_alias(), other.into_generic_alias()) {
+                (Some(self_alias), Some(other_alias)) => {
+                    self_alias.origin(db) == other_alias.origin(db)
+                }
+                _ => false,
+            };
+
+        let other_generic_bases: Vec<_> = other
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .filter_map(ClassType::into_generic_alias)
+            .collect();
+
+        if self
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .filter_map(ClassType::into_generic_alias)
+            .any(|self_alias| {
+                other_generic_bases.iter().any(|other_alias| {
+                    if self_alias.origin(db) != other_alias.origin(db) {
+                        return false;
+                    }
+
+                    if direct_aliases_have_same_origin {
+                        if self_alias.specialization(db).tuple(db).is_some()
+                            && other_alias.specialization(db).tuple(db).is_some()
+                        {
+                            return false;
+                        }
+
+                        self_alias
+                            .specialization(db)
+                            .is_disjoint_from(
+                                db,
+                                other_alias.specialization(db),
+                                constraints,
+                                InferableTypeVars::None,
+                            )
+                            .is_always_satisfied(db)
+                    } else {
+                        self_alias
+                            .specialization(db)
+                            .is_incompatible_in_mro_with(
+                                db,
+                                other_alias.specialization(db),
+                                constraints,
+                            )
+                            .is_always_satisfied(db)
+                    }
+                })
+            })
+        {
+            return false;
         }
 
         if self.is_final(db) {

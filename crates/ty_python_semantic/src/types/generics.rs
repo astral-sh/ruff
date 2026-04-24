@@ -1326,6 +1326,32 @@ impl<'db> Specialization<'db> {
         checker.check_specialization_pair(db, self, other)
     }
 
+    /// Return the constraints under which two specializations of the same generic class
+    /// cannot appear together in a valid MRO.
+    ///
+    /// This is stricter than ordinary specialization disjointness for covariant type
+    /// parameters. For example, two direct generic aliases might overlap in the set of
+    /// runtime instances they describe, while still being incompatible as shared generic
+    /// bases of a single subclass.
+    pub(crate) fn is_incompatible_in_mro_with<'c>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        let checker = DisjointnessChecker::new(
+            constraints,
+            InferableTypeVars::None,
+            &relation_visitor,
+            &disjointness_visitor,
+            &materialization_visitor,
+        );
+        checker.check_specialization_pair_in_mro(db, self, other)
+    }
+
     pub(crate) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
@@ -1592,6 +1618,155 @@ fn specialization_variance<'db>(
 }
 
 impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
+    /// Return `true` if a type is unchanged by both top and bottom materialization.
+    fn type_is_fully_static(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        let visitor = ApplyTypeMappingVisitor::default();
+        let top = ty.materialize(db, MaterializationKind::Top, &visitor);
+        let bottom = ty.materialize(db, MaterializationKind::Bottom, &visitor);
+
+        visitor.is_equivalent_to_materialization(db, ty, top)
+            && visitor.is_equivalent_to_materialization(db, ty, bottom)
+    }
+
+    /// Return `true` if a type can safely participate in the MRO incompatibility shortcut.
+    ///
+    /// Dynamic types and unresolved type variables are intentionally excluded. They can
+    /// materialize to compatible types, so treating them as definitive evidence of MRO
+    /// incompatibility would make overload filtering and union simplification too eager.
+    fn type_is_static_for_mro_incompatibility_check(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        !ty.is_dynamic()
+            && !ty.has_typevar_or_typevar_instance(db)
+            && Self::type_is_fully_static(db, ty)
+    }
+
+    /// Return `true` if every type argument in a specialization is static enough for the
+    /// MRO incompatibility shortcut.
+    fn specialization_is_static_for_mro_incompatibility_check(
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> bool {
+        specialization
+            .types(db)
+            .iter()
+            .copied()
+            .all(|ty| Self::type_is_static_for_mro_incompatibility_check(db, ty))
+    }
+
+    /// Return the constraints under which two invariant specialization arguments are disjoint.
+    ///
+    /// Besides direct type disjointness, fully static non-equivalent invariant arguments
+    /// make the enclosing specializations disjoint. Inferable type variables are handled
+    /// through their bounds or constraints.
+    fn invariant_specialization_pair_is_disjoint(
+        &self,
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        if let Type::TypeVar(typevar) = left
+            && typevar.is_inferable(db, self.inferable)
+        {
+            return self.inferable_typevar_bound_is_disjoint(db, typevar, right);
+        }
+        if let Type::TypeVar(typevar) = right
+            && typevar.is_inferable(db, self.inferable)
+        {
+            return self.inferable_typevar_bound_is_disjoint(db, typevar, left);
+        }
+
+        self.check_type_pair(db, left, right)
+            .or(db, self.constraints, || {
+                // For fully static invariant arguments, any non-equivalent
+                // specialization forces the enclosing generic specializations
+                // to be disjoint. For gradual types and type variables, stay
+                // conservative unless direct disjointness already proved it.
+                ConstraintSet::from_bool(
+                    self.constraints,
+                    !left.has_typevar_or_typevar_instance(db)
+                        && !right.has_typevar_or_typevar_instance(db)
+                        && Self::type_is_fully_static(db, left)
+                        && Self::type_is_fully_static(db, right),
+                )
+                .and(db, self.constraints, || {
+                    self.as_equivalence_checker()
+                        .check_type_pair(db, left, right)
+                        .negate(db, self.constraints)
+                })
+            })
+    }
+
+    /// Return whether the bound or constraints of an inferable type variable are disjoint
+    /// from another specialization argument.
+    fn inferable_typevar_bound_is_disjoint(
+        &self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        other: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        match typevar.typevar(db).bound_or_constraints(db) {
+            None => self.never(),
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                self.invariant_specialization_pair_is_disjoint(db, bound, other)
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                .elements(db)
+                .iter()
+                .when_all(db, self.constraints, |constraint| {
+                    self.invariant_specialization_pair_is_disjoint(db, *constraint, other)
+                }),
+        }
+    }
+
+    /// Return the constraints under which two generic specializations are incompatible as
+    /// shared bases in a valid MRO.
+    ///
+    /// This is used when comparing generic aliases found in the MROs of two classes.
+    /// The check is intentionally conservative for tuple specializations, dynamic types,
+    /// and type variables, because those cases can recurse through class disjointness or
+    /// materialize to compatible bases.
+    fn check_specialization_pair_in_mro(
+        &self,
+        db: &'db dyn Db,
+        left: Specialization<'db>,
+        right: Specialization<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let generic_context = left.generic_context(db);
+        if generic_context != right.generic_context(db) {
+            return self.always();
+        }
+
+        // Tuple element checks can re-enter class disjointness through recursive tuple bases.
+        if left.tuple_inner(db).is_some() && right.tuple_inner(db).is_some() {
+            return self.never();
+        }
+
+        if !Self::specialization_is_static_for_mro_incompatibility_check(db, left)
+            || !Self::specialization_is_static_for_mro_incompatibility_check(db, right)
+        {
+            return self.never();
+        }
+
+        itertools::izip!(
+            generic_context.variables(db),
+            left.types(db),
+            right.types(db)
+        )
+        .when_any(
+            db,
+            self.constraints,
+            |(bound_typevar, left_type, right_type)| match bound_typevar.variance(db) {
+                TypeVarVariance::Invariant => {
+                    self.invariant_specialization_pair_is_disjoint(db, *left_type, *right_type)
+                }
+                TypeVarVariance::Covariant if left_type.is_never() || right_type.is_never() => {
+                    self.never()
+                }
+                TypeVarVariance::Covariant => self.check_type_pair(db, *left_type, *right_type),
+                TypeVarVariance::Contravariant | TypeVarVariance::Bivariant => self.never(),
+            },
+        )
+    }
+
     pub(super) fn check_specialization_pair(
         &self,
         db: &'db dyn Db,
@@ -1614,19 +1789,17 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             right.types(db)
         );
 
-        types.when_all(
+        // A single incompatible type argument is enough to make the two
+        // specializations disjoint.
+        types.when_any(
             db,
             self.constraints,
             |(bound_typevar, left_type, right_type)| match bound_typevar.variance(db) {
-                // TODO: This check can lead to false negatives.
-                //
-                // For example, `Foo[int]` and `Foo[bool]` are disjoint, even though `bool` is a subtype
-                // of `int`. However, given two non-inferable type variables `T` and `U`, `Foo[T]` and
-                // `Foo[U]` should not be considered disjoint, as `T` and `U` could be specialized to the
-                // same type. We don't currently have a good typing relationship to represent this.
-                TypeVarVariance::Invariant => self.check_type_pair(db, *left_type, *right_type),
+                TypeVarVariance::Invariant => {
+                    self.invariant_specialization_pair_is_disjoint(db, *left_type, *right_type)
+                }
 
-                // If `Foo[T]` is covariant in `T`, `Foo[Never]` is a subtype of `Foo[A]` and `Foo[B]`
+                // `Foo[Never]` is a subtype of both `Foo[A]` and `Foo[B]`.
                 TypeVarVariance::Covariant => self.never(),
 
                 // If `Foo[T]` is contravariant in `T`, `Foo[A | B]` is a subtype of `Foo[A]` and `Foo[B]`
@@ -1963,21 +2136,31 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return Ok(());
         }
 
+        if let Type::TypeAlias(alias) = formal {
+            return self.infer_map_impl(alias.value_type(self.db), actual, polarity, f, seen);
+        }
+        if let Type::TypeAlias(alias) = actual {
+            return self.infer_map_impl(formal, alias.value_type(self.db), polarity, f, seen);
+        }
+
+        if !formal.has_typevar(self.db) && !actual.has_typevar(self.db) {
+            return Ok(());
+        }
+
         // Remove the union elements from `actual` that are not related to `formal`, and vice
         // versa.
         //
         // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to
         // specialize `T` to `int`, and so ignore the `None`.
         let actual = actual.filter_disjoint_elements(self.db, formal, self.inferable);
-        let formal = formal.filter_disjoint_elements(self.db, actual, self.inferable);
+        let filtered_formal = formal.filter_disjoint_elements(self.db, actual, self.inferable);
+        let formal = if filtered_formal.is_never() && !formal.is_never() {
+            formal
+        } else {
+            filtered_formal
+        };
 
         match (formal, actual) {
-            // Expand PEP 695 type aliases in the formal type.
-            // This is necessary for solving generics like `def head[T](my_list: MyList[T]) -> T`.
-            (Type::TypeAlias(alias), _) => {
-                return self.infer_map_impl(alias.value_type(self.db), actual, polarity, f, seen);
-            }
-
             // TODO: We haven't implemented a full unification solver yet. If typevars appear in
             // multiple union elements, we ideally want to express that _only one_ of them needs to
             // match, and that we should infer the smallest type mapping that allows that.
