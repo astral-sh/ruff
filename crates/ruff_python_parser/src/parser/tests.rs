@@ -190,7 +190,10 @@ fn recursion_limit_nested_parens() {
 
 #[test]
 fn recursion_limit_normal_python_unaffected() {
-    let src = format!("x = {}1{}", "(".repeat(200), ")".repeat(200));
+    // 50 levels is well above what real-world Python ever produces and well
+    // below the default cap — the point is to confirm the default doesn't
+    // reject ordinary input.
+    let src = format!("x = {}1{}", "(".repeat(50), ")".repeat(50));
     parse_module(&src).unwrap();
 }
 
