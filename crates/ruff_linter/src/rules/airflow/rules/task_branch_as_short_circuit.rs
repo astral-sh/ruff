@@ -70,7 +70,7 @@ use crate::rules::airflow::helpers::is_airflow_task_variant;
 /// task = ShortCircuitOperator(task_id="my_task", python_callable=my_callable)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "0.15.12")]
 pub(crate) struct AirflowTaskBranchAsShortCircuit {
     kind: BranchKind,
 }
