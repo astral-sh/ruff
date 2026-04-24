@@ -8,10 +8,12 @@ use crate::{AsMode, Mode};
 /// exists to keep the parser from overflowing the stack on adversarial or
 /// machine-generated input. The value is intentionally modest because each
 /// "depth unit" corresponds to several real stack frames on the parser's
-/// descent — a threading stack of 2 MB (Rust's default worker-thread size)
-/// fits several hundred levels comfortably, and anything a human wrote is
-/// significantly below this.
-const DEFAULT_MAX_RECURSION_DEPTH: u16 = 500;
+/// descent (for a parenthesised expression: ~8 frames, each a few KB in a
+/// debug build), so one depth unit is roughly 15–30 KB of actual stack. The
+/// default has to fit comfortably within the tightest stacks we care about:
+/// Rust's default 2 MB worker-thread stack (used by `std::thread`, tokio,
+/// `cargo test`, …) and Windows' 1 MB main-thread stack.
+const DEFAULT_MAX_RECURSION_DEPTH: u16 = 200;
 
 /// Options for controlling how a source file is parsed.
 ///
