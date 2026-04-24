@@ -168,20 +168,10 @@ impl Options {
         let mut diagnostics = Vec::new();
         let environment = self.environment.or_default();
 
-        let options_python_version =
-            environment
-                .python_version
-                .as_ref()
-                .map(|ranged_version| PythonVersionWithSource {
-                    version: PythonVersion::from(**ranged_version),
-                    source: match ranged_version.source() {
-                        ValueSource::Cli => PythonVersionSource::Cli,
-                        ValueSource::File(path) => PythonVersionSource::ConfigFile(
-                            PythonVersionFileSource::new(path.clone(), ranged_version.range()),
-                        ),
-                        ValueSource::Editor => PythonVersionSource::Editor,
-                    },
-                });
+        let configured_python_version = environment
+            .python_version
+            .as_ref()
+            .map(python_version_from_config);
         let python_platform = environment
             .python_platform
             .as_deref()
@@ -254,26 +244,20 @@ impl Options {
             }).ok()
         });
 
-        let python_version = options_python_version
+        let python_version = configured_python_version
+            .map(PythonVersionResolution::Configured)
             .or_else(|| {
-                python_environment
-                    .as_ref()?
-                    .python_version_from_metadata()
+                let inferred_python_version = python_environment
+                    .as_ref()
+                    .and_then(|python_environment| {
+                        python_environment.python_version_from_metadata()
+                    })
                     .cloned()
-            })
-            .or_else(|| site_packages_paths.python_version_from_layout(system))
-            .filter(|python_version| {
-                if SupportedPythonVersion::try_from(python_version.version).is_ok() {
-                    return true;
-                }
+                    .or_else(|| site_packages_paths.python_version_from_layout(system));
 
-                diagnostics.push(unsupported_inferred_python_version_diagnostic(
-                    db,
-                    python_version,
-                ));
-
-                false
+                inferred_python_version.map(PythonVersionResolution::Inferred)
             })
+            .and_then(|resolution| resolution.into_program_version(db, &mut diagnostics))
             .unwrap_or_default();
 
         // Safe mode is handled inside this function, so we just assume this can't fail
@@ -562,6 +546,53 @@ impl Options {
     }
 }
 
+fn python_version_from_config(
+    ranged_version: &RangedValue<SupportedPythonVersion>,
+) -> PythonVersionWithSource {
+    PythonVersionWithSource {
+        version: PythonVersion::from(**ranged_version),
+        source: match ranged_version.source() {
+            ValueSource::Cli => PythonVersionSource::Cli,
+            ValueSource::File(path) => PythonVersionSource::ConfigFile(
+                PythonVersionFileSource::new(path.clone(), ranged_version.range()),
+            ),
+            ValueSource::Editor => PythonVersionSource::Editor,
+        },
+    }
+}
+
+/// A Python version before unsupported inferred versions are filtered.
+#[derive(Eq, PartialEq, Debug, Clone)]
+enum PythonVersionResolution {
+    /// The Python version was configured directly by the user.
+    Configured(PythonVersionWithSource),
+    /// The Python version was inferred from the environment.
+    Inferred(PythonVersionWithSource),
+}
+
+impl PythonVersionResolution {
+    fn into_program_version(
+        self,
+        db: &dyn Db,
+        diagnostics: &mut Vec<OptionDiagnostic>,
+    ) -> Option<PythonVersionWithSource> {
+        match self {
+            Self::Configured(python_version) => Some(python_version),
+            Self::Inferred(python_version) => {
+                if SupportedPythonVersion::try_from(python_version.version).is_ok() {
+                    Some(python_version)
+                } else {
+                    diagnostics.push(unsupported_inferred_python_version_diagnostic(
+                        db,
+                        &python_version,
+                    ));
+                    None
+                }
+            }
+        }
+    }
+}
+
 /// Construct an [`OptionDiagnostic`] to indicate that the inferred Python version is unsupported.
 fn unsupported_inferred_python_version_diagnostic(
     db: &dyn Db,
@@ -587,7 +618,7 @@ fn unsupported_inferred_python_version_diagnostic(
     ))
     .sub(SubDiagnostic::new(
         SubDiagnosticSeverity::Info,
-        "Set `python-version` explicitly to override the inferred version.",
+        "Set `environment.python-version` explicitly to override the inferred version.",
     ));
 
     diagnostic = match &python_version.source {
