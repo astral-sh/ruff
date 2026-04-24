@@ -11,7 +11,7 @@ use crate::{AsMode, Mode};
 /// descent — a threading stack of 2 MB (Rust's default worker-thread size)
 /// fits several hundred levels comfortably, and anything a human wrote is
 /// significantly below this.
-pub const DEFAULT_MAX_RECURSION_DEPTH: u16 = 500;
+const DEFAULT_MAX_RECURSION_DEPTH: u16 = 500;
 
 /// Options for controlling how a source file is parsed.
 ///

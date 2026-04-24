@@ -68,7 +68,7 @@ pub use crate::error::{
     InterpolatedStringErrorType, LexicalErrorType, ParseError, ParseErrorType,
     UnsupportedSyntaxError, UnsupportedSyntaxErrorKind,
 };
-pub use crate::parser::{DEFAULT_MAX_RECURSION_DEPTH, ParseOptions};
+pub use crate::parser::ParseOptions;
 
 use crate::parser::Parser;
 
