@@ -332,9 +332,7 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::UnexpectedExpressionToken => {
                 write!(f, "Unexpected token at the end of an expression")
             }
-            ParseErrorType::RecursionLimitExceeded => {
-                f.write_str("Source is too deeply nested for the parser")
-            }
+            ParseErrorType::RecursionLimitExceeded => f.write_str("Source is too deeply nested"),
         }
     }
 }
