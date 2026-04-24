@@ -715,6 +715,28 @@ mod tests {
     }
 
     #[test]
+    fn skips_annotation_only_declaration_before_unused_binding() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def fn():
+                a: int
+                a = 1
+            ",
+        );
+
+        let bindings = collect_unused_bindings(&source)?;
+        let assignment_start = TextSize::try_from(source.rfind("a = 1").unwrap()).unwrap();
+        assert_eq!(
+            bindings,
+            vec![UnusedBinding {
+                range: TextRange::new(assignment_start, assignment_start + TextSize::new(1)),
+                name: Name::new("a"),
+            }]
+        );
+        Ok(())
+    }
+
+    #[test]
     fn reports_dead_annotation_only_declaration() -> anyhow::Result<()> {
         let source = dedent(
             "
