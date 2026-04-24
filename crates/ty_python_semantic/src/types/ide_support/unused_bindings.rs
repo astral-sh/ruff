@@ -6,7 +6,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
-use ty_python_core::definition::{DefinitionKind, DefinitionState};
+use ty_python_core::definition::{DefinitionCategory, DefinitionKind, DefinitionState};
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
 use ty_python_core::{SemanticIndex, get_loop_header, semantic_index};
@@ -67,7 +67,8 @@ pub struct UnusedBinding {
 /// This intentionally reports only function-, lambda-, and comprehension-scope bindings.
 /// Module- and class-scope bindings can still be observed indirectly (for example via
 /// imports or attribute access), so reporting them here would risk false positives
-/// without broader reference analysis.
+/// without broader reference analysis. Bare local annotations (`x: int`) are also
+/// reported, but only if the symbol is neither bound nor used elsewhere in the scope.
 #[salsa::tracked(returns(ref))]
 pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBinding> {
     let parsed = parsed_module(db, file).load(db);
@@ -156,6 +157,13 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
             // Global and nonlocal assignments target bindings from outer scopes.
             // Treat them as externally managed to avoid false positives here.
             if symbol.is_global() || symbol.is_nonlocal() {
+                continue;
+            }
+
+            let category = kind.category(is_stub_file, &parsed);
+            if matches!(category, DefinitionCategory::Declaration)
+                && (symbol.is_bound() || symbol.is_used())
+            {
                 continue;
             }
 
@@ -683,6 +691,40 @@ mod tests {
 
         let names = collect_unused_names(&source)?;
         assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_annotation_only_declaration_before_reassignment() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def fn(value: bool):
+                a: int
+                if value:
+                    a = 1
+                else:
+                    a = 2
+
+                return a
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn reports_dead_annotation_only_declaration() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def fn():
+                a: int
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, vec!["a"]);
         Ok(())
     }
 
