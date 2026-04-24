@@ -201,7 +201,8 @@ class Sub(Base): ...
 reveal_type(Sub.all_instances)  # revealed: list[Sub]
 ```
 
-Assignments through `type(self)` should bind `Self` to the instance type when writing a `ClassVar`.
+Assignments through exact class objects should bind `Self` when writing a `ClassVar`, while symbolic
+subclass objects remain conservative.
 
 ```py
 from typing import ClassVar, Self, TypeVar
@@ -212,7 +213,7 @@ class Saved:
     def save(self) -> None:
         type(self).latest = self
 
-Saved.latest = Saved()  # error: [invalid-assignment]
+Saved.latest = Saved()
 
 reveal_type(Saved.latest)  # revealed: Saved
 

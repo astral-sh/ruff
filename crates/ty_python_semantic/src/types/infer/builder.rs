@@ -2632,15 +2632,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return true;
                 };
                 let class_attr_self_ty = match object_ty {
+                    Type::ClassLiteral(_) | Type::GenericAlias(_) => object_ty.to_instance(db),
                     Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                         // Preserve symbolic subtype information for `type[Self]`, `type[T]`, and
-                        // gradual forms, but avoid collapsing concrete class objects to instances.
+                        // gradual forms, but avoid collapsing `type[Concrete]` to `Concrete`.
                         SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => {
                             Some(subclass_of.to_instance(db))
                         }
                         SubclassOfInner::Class(_) => None,
                     },
-                    Type::ClassLiteral(_) | Type::GenericAlias(_) => None,
                     _ => unreachable!(),
                 };
 
