@@ -9,6 +9,7 @@ use ruff_db::source::source_text;
 use ruff_db::system::{
     OsSystem, System, SystemPath, SystemPathBuf, UserConfigDirectoryOverrideGuard, file_time_now,
 };
+use ruff_python_ast::PythonVersion;
 use ty_module_resolver::{Module, ModuleName, resolve_module_confident};
 use ty_project::metadata::options::{EnvironmentOptions, Options, ProjectOptionsOverrides};
 use ty_project::metadata::pyproject::{PyProject, Tool};
@@ -1169,6 +1170,61 @@ print(sys.last_exc, os.getegid())
 
     let diagnostics = case.db.check();
     assert!(diagnostics.is_empty());
+
+    Ok(())
+}
+
+#[cfg_attr(windows, ignore = "site-packages layout inference is Unix-only")]
+#[test]
+fn touching_pyproject_updates_inferred_python_version_diagnostics_when_metadata_is_unchanged()
+-> anyhow::Result<()> {
+    let latest_supported_minor = PythonVersion::iter().last().unwrap().minor;
+    let unsupported_minor = latest_supported_minor + 1;
+    let unsupported_site_packages = SystemPathBuf::from(format!(
+        ".venv/lib/python3.{unsupported_minor}/site-packages/foo.py"
+    ));
+    let unsupported_python_directory =
+        SystemPathBuf::from(format!(".venv/lib/python3.{unsupported_minor}"));
+    let supported_python_directory =
+        SystemPathBuf::from(format!(".venv/lib/python3.{latest_supported_minor}"));
+
+    let mut case = setup(|context: &mut SetupContext| {
+        let python_home = context.join_root_path("base/bin");
+
+        context.write_project_file("main.py", "x = 1\n")?;
+        context.write_file("base/bin/python", "")?;
+        context.write_project_file(".venv/bin/python", "")?;
+        context.write_project_file(".venv/pyvenv.cfg", &format!("home = {python_home}\n"))?;
+        context.write_project_file(&unsupported_site_packages, "")?;
+        context.set_options(Options::default());
+
+        Ok(())
+    })?;
+
+    let diagnostics = case.db.check();
+
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].primary_message(),
+        format!(
+            "Ignoring unsupported inferred Python version `3.{unsupported_minor}`; ty will use Python {} instead.",
+            PythonVersion::latest_ty()
+        )
+    );
+
+    std::fs::rename(
+        case.project_path(&unsupported_python_directory)
+            .as_std_path(),
+        case.project_path(&supported_python_directory).as_std_path(),
+    )?;
+
+    case.update_options(Options::default())?;
+
+    let diagnostics = case.db.check();
+    assert!(
+        diagnostics.is_empty(),
+        "Expected no diagnostics but got: {diagnostics:#?}"
+    );
 
     Ok(())
 }

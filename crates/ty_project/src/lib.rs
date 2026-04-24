@@ -737,33 +737,17 @@ where
 mod tests {
     use crate::ProjectMetadata;
     use crate::check_file_impl;
-    use crate::db::Db;
     use crate::db::tests::TestDb;
-    use crate::metadata::options::OptionDiagnostic;
-    use ruff_db::diagnostic::{DiagnosticId, Severity};
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
-    use ty_python_core::program::FallibleStrategy;
     use ty_python_semantic::types::check_types;
-
-    fn test_project_metadata() -> ProjectMetadata {
-        ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/"))
-    }
-
-    fn settings_diagnostic_messages(project: crate::Project, db: &dyn Db) -> Vec<String> {
-        project
-            .check_settings(db)
-            .iter()
-            .map(|diagnostic| diagnostic.primary_message().to_string())
-            .collect()
-    }
 
     #[test]
     fn check_file_skips_type_checking_when_file_cant_be_read() -> ruff_db::system::Result<()> {
-        let project = test_project_metadata();
+        let project = ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/"));
         let mut db = TestDb::new(project);
         db.init_program().unwrap();
         let path = SystemPath::new("test.py");
@@ -804,54 +788,5 @@ mod tests {
         );
 
         Ok(())
-    }
-
-    #[test]
-    fn reload_updates_settings_diagnostics_when_metadata_is_unchanged() {
-        let mut db = TestDb::new(test_project_metadata());
-        let project = db.project();
-        let first_metadata = test_project_metadata();
-        let first_settings = first_metadata
-            .to_settings(&db, &FallibleStrategy)
-            .unwrap()
-            .0;
-
-        project.reload(
-            &mut db,
-            first_metadata,
-            Some(first_settings),
-            vec![OptionDiagnostic::new(
-                DiagnosticId::UnsupportedPythonVersion,
-                "first diagnostic".to_string(),
-                Severity::Warning,
-            )],
-        );
-
-        assert_eq!(
-            settings_diagnostic_messages(project, &db),
-            vec!["first diagnostic".to_string()]
-        );
-
-        let second_metadata = test_project_metadata();
-        let second_settings = second_metadata
-            .to_settings(&db, &FallibleStrategy)
-            .unwrap()
-            .0;
-
-        project.reload(
-            &mut db,
-            second_metadata,
-            Some(second_settings),
-            vec![OptionDiagnostic::new(
-                DiagnosticId::UnsupportedPythonVersion,
-                "second diagnostic".to_string(),
-                Severity::Warning,
-            )],
-        );
-
-        assert_eq!(
-            settings_diagnostic_messages(project, &db),
-            vec!["second diagnostic".to_string()]
-        );
     }
 }
