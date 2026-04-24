@@ -2,6 +2,7 @@ use crate::Db;
 use crate::reachability::is_reachable;
 use crate::types::function::FunctionDecorators;
 use crate::types::infer::function_known_decorator_flags;
+use get_size2::GetSize;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
@@ -56,7 +57,7 @@ fn function_scope_is_overload_declaration(
     function_known_decorator_flags(db, definition).contains(FunctionDecorators::OVERLOAD)
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, GetSize)]
 pub struct UnusedBinding {
     pub range: TextRange,
     pub name: Name,
@@ -69,7 +70,7 @@ pub struct UnusedBinding {
 /// imports or attribute access), so reporting them here would risk false positives
 /// without broader reference analysis. Bare local annotations (`x: int`) are also
 /// reported, but only if the symbol is neither bound nor used elsewhere in the scope.
-#[salsa::tracked(returns(ref))]
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBinding> {
     let parsed = parsed_module(db, file).load(db);
     let is_stub_file = file.is_stub(db);
@@ -197,7 +198,7 @@ mod tests {
     ) -> anyhow::Result<Vec<UnusedBinding>> {
         let db = TestDbBuilder::new().with_file(path, source).build()?;
         let file = system_path_to_file(&db, path).unwrap();
-        let mut bindings = unused_bindings(&db, file).clone();
+        let mut bindings = unused_bindings(&db, file).to_vec();
         bindings.sort_unstable_by_key(|binding| (binding.range.start(), binding.range.end()));
         Ok(bindings)
     }
