@@ -347,7 +347,23 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             (SubclassOfInner::Class(left), SubclassOfInner::Class(right)) => {
                 ConstraintSet::from_bool(
                     self.constraints,
-                    !left.could_coexist_in_mro_with(db, right, self.constraints),
+                    // Use the current checker for generic-base comparisons so recursive
+                    // subclass-of disjointness keeps the same cycle guard. A fresh checker here
+                    // would recurse on cases like `type[L]` vs `type[R]` where `L` and `R`
+                    // inherit from `Co["type[L]"]` and `Co["type[R]"]`.
+                    !left.could_coexist_in_mro_with_specialization_check(
+                        db,
+                        right,
+                        self.constraints,
+                        &|left_specialization, right_specialization| {
+                            self.check_specialization_pair_in_mro(
+                                db,
+                                left_specialization,
+                                right_specialization,
+                            )
+                            .is_always_satisfied(db)
+                        },
+                    ),
                 )
             }
             (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {

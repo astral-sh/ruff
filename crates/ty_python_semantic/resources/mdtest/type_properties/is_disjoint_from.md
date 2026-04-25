@@ -190,6 +190,14 @@ static_assert(is_disjoint_from(Covariant[FinalA], CoSubB))
 static_assert(is_disjoint_from(Left[int], Right[str]))
 static_assert(not is_disjoint_from(PairLeft, PairRight))
 
+class RecursiveLeft(Covariant["type[RecursiveLeft]"]):
+    pass
+
+class RecursiveRight(Covariant["type[RecursiveRight]"]):
+    pass
+
+static_assert(not is_disjoint_from(type[RecursiveLeft], type[RecursiveRight]))
+
 static_assert(not is_disjoint_from(Sequence[int], Sequence[str]))
 static_assert(is_disjoint_from(str, Sequence[int]))
 static_assert(not is_disjoint_from(str, Sequence[str]))

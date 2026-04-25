@@ -2549,8 +2549,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 }
             }
 
-            (Type::SubclassOf(left), Type::SubclassOf(right)) => {
-                self.check_subclassof_pair(db, left, right)
+            (Type::SubclassOf(left_subclass), Type::SubclassOf(right_subclass)) => {
+                // Generic bases can mention the class object being compared, e.g.
+                // `class L(Co["type[L]"])` checked against `class R(Co["type[R]"])`.
+                // Reuse the active disjointness guard so that recursive `type[L]` vs `type[R]`
+                // comparisons bottom out conservatively instead of re-entering indefinitely.
+                self.with_recursion_guard(left, right, || {
+                    self.check_subclassof_pair(db, left_subclass, right_subclass)
+                })
             }
 
             // for `type[Any]`/`type[Unknown]`/`type[Todo]`, we know the type cannot be any larger than `type`,

@@ -533,6 +533,19 @@ def f() -> JSON_OBJECT:
     return {"hello": 23}
 ```
 
+### Assignment through recursive aliases with recursive branches first
+
+```py
+type JsonValue = dict[str, JsonValue] | list[JsonValue] | str
+type JsonObject = dict[str, JsonValue]
+
+def f() -> JsonObject:
+    return {"hello": "world"}
+
+def g() -> JsonValue:
+    return {"hello": "world"}
+```
+
 ### Recursive dict alias in method return
 
 ```py
