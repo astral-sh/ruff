@@ -889,50 +889,9 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn try_build(self) -> Option<Type<'db>> {
-        let mut elements = self.elements;
-        match elements.len() {
-            0 => return None,
-            1 => {
-                let element = elements.pop().unwrap();
-                match element {
-                    UnionElement::Type(ty) => return Some(ty),
-                    UnionElement::IntLiterals(literals) if literals.len() == 1 => {
-                        let (literal, promotable) = literals.into_iter().next().unwrap();
-                        return Some(Type::from(
-                            LiteralValueType::new(literal, promotable)
-                                .with_recursively_defined(self.recursively_defined),
-                        ));
-                    }
-                    UnionElement::StringLiterals(literals) if literals.len() == 1 => {
-                        let (literal, promotable) = literals.into_iter().next().unwrap();
-                        return Some(Type::from(
-                            LiteralValueType::new(literal, promotable)
-                                .with_recursively_defined(self.recursively_defined),
-                        ));
-                    }
-                    UnionElement::BytesLiterals(literals) if literals.len() == 1 => {
-                        let (literal, promotable) = literals.into_iter().next().unwrap();
-                        return Some(Type::from(
-                            LiteralValueType::new(literal, promotable)
-                                .with_recursively_defined(self.recursively_defined),
-                        ));
-                    }
-                    UnionElement::EnumLiterals { literals, .. } if literals.len() == 1 => {
-                        let (literal, promotable) = literals.into_iter().next().unwrap();
-                        return Some(Type::from(
-                            LiteralValueType::new(literal, promotable)
-                                .with_recursively_defined(self.recursively_defined),
-                        ));
-                    }
-                    element => elements.push(element),
-                }
-            }
-            _ => {}
-        }
-
-        let type_count = elements.iter().map(UnionElement::type_count).sum();
+        let type_count = self.elements.iter().map(UnionElement::type_count).sum();
         let mut types = Vec::with_capacity(type_count);
-        for element in elements {
+        for element in self.elements {
             match element {
                 UnionElement::IntLiterals(literals) => {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
