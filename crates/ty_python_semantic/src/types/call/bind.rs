@@ -651,26 +651,21 @@ impl<'db> Bindings<'db> {
             .filter_map(CallableItem::as_constructor_mut)
     }
 
-    fn collect_type_context_callables<'a>(&'a self, out: &mut Vec<&'a CallableBinding<'db>>) {
+    /// Visits the callables that should contribute argument type context, including deferred
+    /// constructor callables that are relevant to the matched upstream constructor path.
+    pub(crate) fn visit_type_context_callables<'a>(
+        &'a self,
+        visit: &mut impl FnMut(&'a CallableBinding<'db>),
+    ) {
         for item in self.iter_callable_items() {
-            out.push(item.callable());
+            visit(item.callable());
 
             if let Some(constructor) = item.as_constructor()
                 && let Some(downstream) = &constructor.downstream_constructor
             {
-                downstream.collect_type_context_callables(out);
+                downstream.visit_type_context_callables(visit);
             }
         }
-    }
-
-    /// Returns the callables that should contribute argument type context, including deferred
-    /// constructor callables that are relevant to the matched upstream constructor path.
-    pub(crate) fn iter_type_context_callables(
-        &self,
-    ) -> impl Iterator<Item = &CallableBinding<'db>> + '_ {
-        let mut callables = Vec::new();
-        self.collect_type_context_callables(&mut callables);
-        callables.into_iter()
     }
 
     /// Returns `true` if every element of the union contains an intersection element with a matching
