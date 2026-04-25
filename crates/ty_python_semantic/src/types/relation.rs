@@ -12,8 +12,8 @@ use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
     CallableType, ClassBase, ClassType, CycleDetector, KnownBoundMethodType, KnownClass,
-    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
-    ProtocolInstanceType, SubclassOfInner, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType,
+    SubclassOfInner, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -689,45 +689,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (_, Type::TypeAlias(target_alias)) => self.with_recursion_guard(source, target, || {
                 self.check_type_pair(db, source, target_alias.value_type(db))
             }),
-
-            // Field definitions in dataclasses and dataclass-transformers can involve calls to
-            // `dataclasses.field` or custom field-specifier functions. The annotated return type
-            // of these functions is often explicitly wrong to "help" type checkers. We therefore
-            // overwrite their return type unconditionally and pretend that all field-specifier
-            // calls return a `KnownInstanceType::Field`.
-            //
-            // Here, we model assignability of this special type to the declared field type. In
-            // order to catch mistakes in the field definition, we only consider this known instance
-            // type to be assignable if the default value and converter output type is compatible
-            // with the declared field type.
-            //
-            // We consider three cases:
-            //     1. If a converter is provided, we validate the output/return type of the converter
-            //        function against the declared field type. The presence of a default value is
-            //        irrelevant in this case, as the converter is expected to handle conversion from
-            //        the default value's type to the declared field type. Incompatibilities between
-            //        the two must be caught by the field-specifier function's signature.
-            //     2. If no converter is provided, we validate the default value's type against the
-            //        declared field type.
-            //     3. If neither a converter nor a default value is provided, we allow the field to be
-            //        considered assignable to any type.
-            (Type::KnownInstance(KnownInstanceType::Field(field)), _)
-                if self.relation.is_assignability() =>
-            {
-                field
-                    .default_type(db)
-                    .when_none_or(db, self.constraints, |default_type| {
-                        self.check_type_pair(db, default_type, target)
-                    })
-                    .and(db, self.constraints, || {
-                        field
-                            .converter(db)
-                            .map(|(_, output_ty)| output_ty)
-                            .when_none_or(db, self.constraints, |converter_output_type| {
-                                self.check_type_pair(db, converter_output_type, target)
-                            })
-                    })
-            }
 
             // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
             // handled above. It's always assignable, though.

@@ -263,3 +263,77 @@ C(name="foo")
 # error: [unknown-argument]
 B(name="foo")
 ```
+
+## Validating `default` and `default_factory`
+
+`default` values and `default_factory` return types should be validated against the annotated field
+type, even for `init=False` fields and even for custom field specifiers annotated to return `Any`.
+
+```py
+from dataclasses import dataclass, field
+from typing import Any, Literal, TypeVar
+from typing_extensions import dataclass_transform
+
+T = TypeVar("T")
+
+def make_foo() -> Literal["foo"]:
+    return "foo"
+
+@dataclass
+class DC:
+    # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
+    with_default: int = field(init=False, default="foo")
+    # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
+    with_default_factory: int = field(init=False, default_factory=make_foo)
+
+def xfield(**kwargs: Any) -> Any: ...
+@dataclass_transform(field_specifiers=(xfield,))
+def xmodel(cls: type[T]) -> type[T]:
+    return cls
+
+@xmodel
+class XC:
+    # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
+    with_default: int = xfield(init=False, default="foo")
+    # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
+    with_default_factory: int = xfield(init=False, default_factory=make_foo)
+```
+
+## Contextual inference for `default` and `default_factory`
+
+When validating default values for dataclass fields, we should infer the `default` expression and
+the return type of `default_factory` using the annotated field type as context. This should hold for
+stdlib `field(...)` and for custom field specifiers, even if they are accurately annotated to return
+a field-info object rather than the field type itself.
+
+```py
+from dataclasses import dataclass, field
+from typing import Callable, Generic, TypeVar
+from typing_extensions import dataclass_transform
+
+T = TypeVar("T")
+
+class FieldInfo(Generic[T]): ...
+
+def xfield(
+    *,
+    default: T | None = None,
+    default_factory: Callable[[], T] | None = None,
+    init: bool = True,
+) -> FieldInfo[T]:
+    raise NotImplementedError
+
+@dataclass_transform(field_specifiers=(xfield,))
+def xmodel(cls: type[T]) -> type[T]:
+    return cls
+
+@dataclass
+class DC:
+    values: list[int | None] = field(default=[1])
+    other_values: list[int | None] = field(default_factory=list)
+
+@xmodel
+class XC:
+    values: list[int | None] = xfield(default=[1])
+    other_values: list[int | None] = xfield(default_factory=list)
+```

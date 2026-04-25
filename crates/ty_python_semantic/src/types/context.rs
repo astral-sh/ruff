@@ -99,6 +99,17 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.diagnostics.get_mut().extend(other);
     }
 
+    pub(super) fn has_diagnostic_with_primary_range(
+        &self,
+        lint: &'static LintMetadata,
+        range: TextRange,
+    ) -> bool {
+        self.diagnostics.borrow().iter().any(|diagnostic| {
+            diagnostic.id().as_lint() == Some(lint.name())
+                && diagnostic.primary_span_ref().and_then(|span| span.range()) == Some(range)
+        })
+    }
+
     pub(super) fn is_lint_enabled(&self, lint: &'static LintMetadata) -> bool {
         LintDiagnosticGuardBuilder::severity_and_source(self, LintId::of(lint)).is_some()
     }

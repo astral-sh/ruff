@@ -998,7 +998,7 @@ class Person:
     email: str = field(kw_only=True)
     internal_notes: str = field(alias="notes", default="")
 
-# revealed: (self: Person, name: str, age: int = ..., tags: list[str] = ..., notes: str = ..., *, email: str) -> None
+# revealed: (self: Person, name: str, age: int = 0, tags: list[str] = ..., notes: str = "", *, email: str) -> None
 reveal_type(Person.__init__)
 
 Person("Alice", 30, [], "some notes", email="alice@example.com")
@@ -1026,7 +1026,7 @@ class Person(ModelBase):
     email: str = field(kw_only=True)
     internal_notes: str = field(alias="notes", default="")
 
-# revealed: (self: Person, name: str, age: int = ..., tags: list[str] = ..., notes: str = ..., *, email: str) -> None
+# revealed: (self: Person, name: str, age: int = 0, tags: list[str] = ..., notes: str = "", *, email: str) -> None
 reveal_type(Person.__init__)
 
 Person("Alice", 30, [], "some notes", email="alice@example.com")
@@ -1052,7 +1052,7 @@ class Person(ModelBase):
     email: str = field(kw_only=True)
     internal_notes: str = field(alias="notes", default="")
 
-# revealed: (self: Person, name: str, age: int = ..., tags: list[str] = ..., notes: str = ..., *, email: str) -> None
+# revealed: (self: Person, name: str, age: int = 0, tags: list[str] = ..., notes: str = "", *, email: str) -> None
 reveal_type(Person.__init__)
 
 Person("Alice", 30, [], "some notes", email="alice@example.com")
@@ -1817,7 +1817,7 @@ class Basic:
     a: int = field(converter=str_to_int)
     b: int = field(converter=str_to_int, default="0")
 
-reveal_type(Basic.__init__)  # revealed: (self: Basic, a: str, b: str = ...) -> None
+reveal_type(Basic.__init__)  # revealed: (self: Basic, a: str, b: str = "0") -> None
 
 Basic("1", "2")
 Basic("1")
@@ -1996,7 +1996,7 @@ When the declared field type does not match the converter's output type, we emit
 ```py
 @my_model
 class WrongConverterOutput:
-    # error: [invalid-assignment] "Object of type `dataclasses.Field[int]` is not assignable to `bytes`"
+    # error: [invalid-assignment] "Object of type `int` is not assignable to `bytes`"
     x: bytes = field(converter=str_to_int)
 ```
 
@@ -2014,9 +2014,9 @@ def validate(x: str | int) -> str | int:
 class WrongOverloadedConverterOutput:
     correct: str | int = field(converter=validate)
 
-    # error: [invalid-assignment] "Object of type `dataclasses.Field[str | int]` is not assignable to `int`"
+    # error: [invalid-assignment] "Object of type `str | int` is not assignable to `int`"
     incorrect1: int = field(converter=validate)
-    # error: [invalid-assignment] "Object of type `dataclasses.Field[str | int]` is not assignable to `str`"
+    # error: [invalid-assignment] "Object of type `str | int` is not assignable to `str`"
     incorrect2: str = field(converter=validate)
 ```
 
@@ -2031,7 +2031,7 @@ class ConverterWithDefault:
     # error: [invalid-argument-type]
     incorrect1: int = field(converter=str_to_int, default=0)
 
-    # TODO: this should be an error
+    # error: [invalid-assignment] "Object of type `Literal["0"]` is not assignable to `int`"
     incorrect2: int = field(default="0")
 ```
 
