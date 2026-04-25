@@ -229,17 +229,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
 
-        let decorator_inference = function_known_decorators(db, definition);
-        self.context.extend(decorator_inference.diagnostics());
-        self.expressions.extend(
-            decorator_inference
-                .expression_types()
-                .iter()
-                .map(|(expression, ty)| (*expression, *ty)),
-        );
-        self.bindings.extend(decorator_inference.bindings());
-        self.called_functions
-            .extend(decorator_inference.called_functions().iter().copied());
+        let decorator_inference =
+            (!decorator_list.is_empty()).then(|| function_known_decorators(db, definition));
+        if let Some(decorator_inference) = decorator_inference.as_ref() {
+            self.context.extend(decorator_inference.diagnostics());
+            self.expressions.extend(
+                decorator_inference
+                    .expression_types()
+                    .iter()
+                    .map(|(expression, ty)| (*expression, *ty)),
+            );
+            self.bindings.extend(decorator_inference.bindings());
+            self.called_functions
+                .extend(decorator_inference.called_functions().iter().copied());
+        }
 
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
         let mut function_decorators = FunctionDecorators::empty();
@@ -249,7 +252,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for decorator in decorator_list {
             let decorator_type = decorator_inference
-                .expression_type(&decorator.expression)
+                .as_ref()
+                .and_then(|decorator_inference| {
+                    decorator_inference.expression_type(&decorator.expression)
+                })
                 .unwrap_or_else(Type::unknown);
             let decorator_function_decorator =
                 FunctionDecorators::from_decorator_type(db, decorator_type);
