@@ -326,6 +326,21 @@ reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (...) -> None
 reveal_type(OnlyParamSpec[()]().attr)  # revealed: (...) -> None
 ```
 
+Specializing a union of generic classes supports the same `ParamSpec` argument forms.
+
+```py
+if input():
+    class ConditionalParamSpec[**P]:
+        attr: Callable[P, None]
+
+else:
+    class ConditionalParamSpec[**P]:
+        attr: Callable[P, None]
+
+def conditional_class_paramspec[**P](_: ConditionalParamSpec[P]) -> None: ...
+def conditional_class_paramspec_list(_: ConditionalParamSpec[[int, str]]) -> None: ...
+```
+
 An explicit tuple expression (unlike an implicit one that omits the parentheses) is also accepted
 when the `ParamSpec` is the only type variable. But, this isn't recommended is mainly a fallout of
 it having the same AST as the one without the parentheses. Both mypy and Pyright also allow this.
