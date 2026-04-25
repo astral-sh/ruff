@@ -56,6 +56,22 @@ V = TypeVar("V")
 type TA1[K] = dict[K, V]
 ```
 
+## Inferring through nested aliases
+
+```py
+type Alias[T] = T
+
+def f[T](x: list[Alias[T]]) -> T:
+    raise NotImplementedError
+
+reveal_type(f([1]))  # revealed: int
+
+def g[T](x: Alias[T] | None) -> T:
+    raise NotImplementedError
+
+reveal_type(g(1))  # revealed: Literal[1]
+```
+
 ## Specializing type aliases explicitly
 
 The type parameter can be specified explicitly:
