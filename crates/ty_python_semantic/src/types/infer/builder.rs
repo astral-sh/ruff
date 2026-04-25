@@ -2,7 +2,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use itertools::Itertools;
-use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
@@ -1098,9 +1097,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .index
                 .symbol_is_nonlocal_in_scope(symbol_id, file_scope_id)
             {
-                // If we run out of ancestor scopes without finding a definition, we'll fall back to
-                // the local scope. This will also be a syntax error in `infer_nonlocal_statement` (no
-                // binding for `nonlocal` found), but ignore that here.
+                // If we run out of ancestor scopes without finding a definition, we'll fall back
+                // to the local scope. This will also be a semantic syntax error (no binding for
+                // `nonlocal` found), but ignore that here.
                 let mut declarations = use_def.declarations_at_binding(binding);
                 let mut is_local = true;
                 // Walk up parent scopes looking for the enclosing scope that has definition of this
@@ -1125,9 +1124,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         continue;
                     }
                     if enclosing_symbol.is_global() {
-                        // The variable is `global` in this ancestor scope. This breaks the `nonlocal`
-                        // chain, and it's a syntax error in `infer_nonlocal_statement`. Ignore that
-                        // here and just bail out of this loop.
+                        // The variable is `global` in this ancestor scope. This breaks the
+                        // `nonlocal` chain, and it's a semantic syntax error. Ignore that here and
+                        // just bail out of this loop.
                         break;
                     }
                     // We found the closest definition. Note that (as in `infer_place_load`) this does
@@ -1574,9 +1573,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Stmt::Raise(raise) => self.infer_raise_statement(raise),
             ast::Stmt::Return(ret) => self.infer_return_statement(ret),
             ast::Stmt::Delete(delete) => self.infer_delete_statement(delete),
-            ast::Stmt::Nonlocal(nonlocal) => self.infer_nonlocal_statement(nonlocal),
             ast::Stmt::Global(global) => self.infer_global_statement(global),
-            ast::Stmt::Break(_)
+            ast::Stmt::Nonlocal(_)
+            | ast::Stmt::Break(_)
             | ast::Stmt::Continue(_)
             | ast::Stmt::Pass(_)
             | ast::Stmt::IpyEscapeCommand(_) => {
@@ -4666,75 +4665,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             diag.info(format_args!(
                 "Consider adding a declaration to the global scope, e.g. `{name}: int`"
             ));
-        }
-    }
-
-    fn infer_nonlocal_statement(&mut self, nonlocal: &ast::StmtNonlocal) {
-        let ast::StmtNonlocal {
-            node_index: _,
-            range,
-            names,
-        } = nonlocal;
-        let db = self.db();
-        let scope = self.scope();
-        let file_scope_id = scope.file_scope_id(db);
-
-        'names: for name in names {
-            // Walk up parent scopes looking for a possible enclosing scope that may have a
-            // definition of this name visible to us. Note that we skip the scope containing the
-            // use that we are resolving, since we already looked for the place there up above.
-            for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
-                // Class scopes are not visible to nested scopes, and `nonlocal` cannot refer to
-                // globals, so check only function-like scopes.
-                let enclosing_scope = self.index.scope(enclosing_scope_file_id);
-                if !enclosing_scope.kind().is_function_like() {
-                    continue;
-                }
-                let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
-                let Some(enclosing_symbol_id) = enclosing_place_table.symbol_id(name) else {
-                    // This scope doesn't define this name. Keep going.
-                    continue;
-                };
-                let enclosing_symbol = enclosing_place_table.symbol(enclosing_symbol_id);
-                // We've found a definition for this name in an enclosing function-like scope.
-                // Either this definition is the valid place this name refers to, or else we'll
-                // emit a syntax error. Either way, we won't walk any more enclosing scopes. Note
-                // that there are differences here compared to `infer_place_load`: A regular load
-                // (e.g. `print(x)`) is allowed to refer to a global variable (e.g. `x = 1` in the
-                // global scope), and similarly it's allowed to refer to a local variable in an
-                // enclosing function that's declared `global` (e.g. `global x`). However, the
-                // `nonlocal` keyword can't refer to global variables (that's a `SyntaxError`), and
-                // it also can't refer to local variables in enclosing functions that are declared
-                // `global` (also a `SyntaxError`).
-                if enclosing_symbol.is_global() {
-                    // A "chain" of `nonlocal` statements is "broken" by a `global` statement. Stop
-                    // looping and report that this `nonlocal` statement is invalid.
-                    break;
-                }
-                if !enclosing_symbol.is_bound()
-                    && !enclosing_symbol.is_declared()
-                    && !enclosing_symbol.is_nonlocal()
-                {
-                    debug_assert!(enclosing_symbol.is_used());
-                    // The name is only referenced here, not defined. Keep going.
-                    continue;
-                }
-                // We found a definition. We've checked that the name isn't `global` in this scope,
-                // but it's ok if it's `nonlocal`. If a "chain" of `nonlocal` statements fails to
-                // lead to a valid binding, the outermost one will be an error; we don't need to
-                // walk the whole chain for each one.
-                continue 'names;
-            }
-            // There's no matching binding in an enclosing scope. This `nonlocal` statement is
-            // invalid.
-            if let Some(builder) = self
-                .context
-                .report_diagnostic(DiagnosticId::InvalidSyntax, Severity::Error)
-            {
-                builder
-                    .into_diagnostic(format_args!("no binding for nonlocal `{name}` found"))
-                    .annotate(Annotation::primary(self.context.span(*range)));
-            }
         }
     }
 
@@ -7967,7 +7897,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // see a `global` declaration, stop walking scopes and proceed to the global
                 // handling below. (If we're walking from a prior/inner scope where this variable
                 // is `nonlocal`, then this is a semantic syntax error, but we don't enforce that
-                // here. See `infer_nonlocal_statement`.)
+                // here.)
                 if enclosing_place.as_symbol().is_some_and(Symbol::is_global) {
                     break;
                 }
