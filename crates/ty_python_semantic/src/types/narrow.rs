@@ -636,6 +636,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 if let Some(alias_predicate) = index.narrowing_alias_predicate(expression_node) {
                     let aliased_constraints =
                         self.evaluate_expression_predicate(alias_predicate.expression, is_positive);
+                    // For example, suppose we have an alias `is_none = x is None`.
+                    // When this alias is used for narrowing, that is, within a block like `if is_none: ...`,
+                    // both the constraint `is_none: Literal[True]` and the constraint `x: None` should be imposed.
+                    // The former is `constraints` and the latter is `aliased_constraints`.
                     Self::merge_optional_constraints_and(constraints, aliased_constraints)
                 } else {
                     constraints
