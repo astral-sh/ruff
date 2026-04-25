@@ -355,6 +355,83 @@ impl<'db> CallableItem<'db> {
     }
 }
 
+pub(crate) fn field_converter_types<'db>(
+    db: &'db dyn Db,
+    converter_ty: Type<'db>,
+) -> Option<(Type<'db>, Type<'db>)> {
+    let mut input_types = UnionBuilder::new(db);
+    let mut output_types = UnionBuilder::new(db);
+    let mut found_any = false;
+    let bindings = converter_ty.bindings(db);
+
+    // Note: `iter_callable_items` collapses the union/intersection structure. In principle, if the
+    // converter is a union of callables, we should only accept the intersection of all first
+    // parameter types for the input type. This seems unlikely to be a real world use case, so we
+    // currently don't have any special handling for this.
+    for item in bindings.iter_callable_items() {
+        let binding = item.callable();
+        // The index of the "actual" first parameters depends on whether or not there is a bound
+        // `self` parameter in the converter callable.
+        let first_index = usize::from(binding.bound_type.is_some());
+        // TODO: for generic converters, we currently use the default specialization so as not to
+        // produce any false-positives on the field declarations. Ideally, we would treat the type
+        // variables as inferable and use the declared field type as type context to solve them, but
+        // no other type checker seems to support this at the moment, and `converter` is not a
+        // widely used feature anyway.
+        let class_default_specialization = item
+            .as_constructor()
+            .map(ConstructorBinding::constructed_instance_type)
+            .and_then(|ty| ty.class_specialization(db))
+            .map(|(_, specialization)| {
+                specialization
+                    .generic_context(db)
+                    .default_specialization(db, None)
+            });
+        for overload in binding {
+            let params = overload.signature.parameters();
+            let mut return_ty = overload.return_ty;
+
+            let default_specialization = class_default_specialization.or_else(|| {
+                overload
+                    .signature
+                    .generic_context
+                    .map(|ctx| ctx.default_specialization(db, None))
+            });
+
+            if let Some(first_param) = params.get_positional(first_index) {
+                let mut input_ty = first_param.annotated_type();
+                if let Some(specialization) = default_specialization {
+                    input_ty = input_ty.apply_specialization(db, specialization);
+                }
+                input_types = input_types.add(input_ty);
+                if let Some(specialization) = default_specialization {
+                    return_ty = return_ty.apply_specialization(db, specialization);
+                }
+                output_types = output_types.add(return_ty);
+                found_any = true;
+            } else if let Some((_, variadic)) = params.variadic() {
+                let mut input_ty = variadic.annotated_type();
+                if let Some(specialization) = default_specialization {
+                    input_ty = input_ty.apply_specialization(db, specialization);
+                    return_ty = return_ty.apply_specialization(db, specialization);
+                }
+                input_types = input_types.add(input_ty);
+                output_types = output_types.add(return_ty);
+                found_any = true;
+            } else if params.is_gradual() {
+                input_types = input_types.add(Type::unknown());
+                if let Some(specialization) = default_specialization {
+                    return_ty = return_ty.apply_specialization(db, specialization);
+                }
+                output_types = output_types.add(return_ty);
+                found_any = true;
+            }
+        }
+    }
+
+    found_any.then(|| (input_types.build(), output_types.build()))
+}
+
 /// A single element in a union of callables.
 /// This could be a single callable or an intersection of callables.
 /// If there are multiple items, they form an intersection.
@@ -1800,17 +1877,18 @@ impl<'db> Bindings<'db> {
                         let alias = get_argument_type("alias", true);
                         let converter = get_argument_type("converter", true);
 
-                        // `dataclasses.field` and field-specifier functions of commonly used
-                        // libraries like `pydantic`, `attrs`, and `SQLAlchemy` all return
-                        // the default type for the field (or `Any`) instead of an actual `Field`
-                        // instance, even if this is not what happens at runtime (see also below).
-                        // We still make use of this fact and pretend that all field specifiers
-                        // return the type of the default value:
-                        let default_ty = if has_default_value {
-                            Some(overload.return_ty)
-                        } else {
-                            None
-                        };
+                        let default_ty = get_argument_type("default", false).or_else(|| {
+                            ["default_factory", "factory"].into_iter().find_map(|name| {
+                                get_argument_type(name, false).and_then(|factory_ty| {
+                                    factory_ty
+                                        .try_call(db, &CallArguments::none())
+                                        .ok()
+                                        .map(|bindings| bindings.return_type(db))
+                                })
+                            })
+                        });
+
+                        let default_ty = has_default_value.then_some(default_ty).flatten();
 
                         let init = init
                             .map(|init| !init.bool(db).is_always_false())
@@ -1840,94 +1918,15 @@ impl<'db> Bindings<'db> {
                         // field in the `__init__` signature and when assigning to this field on
                         // instances (`my_model.field = …`). The output type is used to validate
                         // that the converter's return type is assignable to the field's declared type.
-                        let converter = converter.and_then(|converter_ty| {
-                            let mut input_types = UnionBuilder::new(db);
-                            let mut output_types = UnionBuilder::new(db);
-                            let mut found_any = false;
-                            let bindings = converter_ty.bindings(db);
-                            // Note: `iter_callable_items` collapses the union/intersection
-                            // structure. In principle, if the converter is a union of callables,
-                            // we should only accept the intersection of all first parameter
-                            // types for the input type. This seems unlikely to be a real world
-                            // use case, so we currently don't have any special handling for this.
-                            for item in bindings.iter_callable_items() {
-                                let binding = item.callable();
-                                // The index of the "actual" first parameters depends on whether or not there
-                                // is a bound `self` parameter in the converter callable.
-                                let first_index = usize::from(binding.bound_type.is_some());
-                                // TODO: for generic converters, we currently use the default
-                                // specialization so as not to produce any false-positives on
-                                // the field declarations. Ideally, we would treat the type
-                                // variables as inferable and use the declared field type as
-                                // type context to solve them, but no other type checker seems
-                                // to support this at the moment, and `converter` is not a
-                                // widely used feature anyway.
-                                let class_default_specialization = item
-                                    .as_constructor()
-                                    .map(ConstructorBinding::constructed_instance_type)
-                                    .and_then(|ty| ty.class_specialization(db))
-                                    .map(|(_, specialization)| {
-                                        specialization
-                                            .generic_context(db)
-                                            .default_specialization(db, None)
-                                    });
-                                for overload in binding {
-                                    let params = overload.signature.parameters();
-                                    let mut return_ty = overload.return_ty;
-
-                                    let default_specialization = class_default_specialization
-                                        .or_else(|| {
-                                            overload
-                                                .signature
-                                                .generic_context
-                                                .map(|ctx| ctx.default_specialization(db, None))
-                                        });
-
-                                    if let Some(first_param) = params.get_positional(first_index) {
-                                        let mut input_ty = first_param.annotated_type();
-                                        if let Some(specialization) = default_specialization {
-                                            input_ty =
-                                                input_ty.apply_specialization(db, specialization);
-                                        }
-                                        input_types = input_types.add(input_ty);
-                                        if let Some(specialization) = default_specialization {
-                                            return_ty =
-                                                return_ty.apply_specialization(db, specialization);
-                                        }
-                                        output_types = output_types.add(return_ty);
-                                        found_any = true;
-                                    } else if let Some((_, variadic)) = params.variadic() {
-                                        let mut input_ty = variadic.annotated_type();
-                                        if let Some(specialization) = default_specialization {
-                                            input_ty =
-                                                input_ty.apply_specialization(db, specialization);
-                                            return_ty =
-                                                return_ty.apply_specialization(db, specialization);
-                                        }
-                                        input_types = input_types.add(input_ty);
-                                        output_types = output_types.add(return_ty);
-                                        found_any = true;
-                                    } else if params.is_gradual() {
-                                        input_types = input_types.add(Type::unknown());
-                                        if let Some(specialization) = default_specialization {
-                                            return_ty =
-                                                return_ty.apply_specialization(db, specialization);
-                                        }
-                                        output_types = output_types.add(return_ty);
-                                        found_any = true;
-                                    }
-                                }
-                            }
-                            found_any.then(|| (input_types.build(), output_types.build()))
-                        });
+                        let converter = converter
+                            .and_then(|converter_ty| field_converter_types(db, converter_ty));
 
                         // `typeshed` pretends that `dataclasses.field()` returns the type of the
                         // default value directly. At runtime, however, this function returns an
                         // instance of `dataclasses.Field`. We also model it this way and return
-                        // a known-instance type with information about the field. The drawback
-                        // of this approach is that we need to pretend that instances of `Field`
-                        // are assignable to `T` if the default type of the field is assignable
-                        // to `T`. Otherwise, we would error on `name: str = field(default="")`.
+                        // a known-instance type with information about the field. Validation of
+                        // the default value and converter is handled at the annotated-assignment
+                        // site, where we have access to the declared field type.
                         overload.set_return_type(Type::KnownInstance(KnownInstanceType::Field(
                             FieldInstance::new(db, default_ty, init, kw_only, alias, converter),
                         )));
@@ -5741,6 +5740,24 @@ pub(crate) enum ArgumentTypeContext<'db> {
     },
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ArgumentTypeContextInput<'db> {
+    call_expression_tcx: TypeContext<'db>,
+    field_default_target_ty: Option<Type<'db>>,
+}
+
+impl<'db> ArgumentTypeContextInput<'db> {
+    pub(crate) fn new(
+        call_expression_tcx: TypeContext<'db>,
+        field_default_target_ty: Option<Type<'db>>,
+    ) -> Self {
+        Self {
+            call_expression_tcx,
+            field_default_target_ty,
+        }
+    }
+}
+
 impl<'db> ArgumentTypeContext<'db> {
     /// Creates a context for ordinary parameter annotations.
     ///
@@ -6139,8 +6156,12 @@ impl<'db> Binding<'db> {
         binding: &CallableBinding<'db>,
         arguments_types: &CallArguments<'_, 'db>,
         argument_index: usize,
-        call_expression_tcx: TypeContext<'db>,
+        input: ArgumentTypeContextInput<'db>,
     ) -> Option<ArgumentTypeContext<'db>> {
+        let ArgumentTypeContextInput {
+            call_expression_tcx,
+            field_default_target_ty,
+        } = input;
         let argument_matches = self.matched_argument_for_call_argument(binding, argument_index)?;
         let [parameter] = argument_matches.parameters.as_slice() else {
             return None;
@@ -6259,6 +6280,26 @@ impl<'db> Binding<'db> {
             }
 
             parameter_type = parameter_type.apply_specialization(db, specialization);
+        }
+
+        if let Some(field_default_target_ty) = field_default_target_ty
+            && let Some(parameter_name) = parameter.name().map(Name::as_str)
+        {
+            let field_parameter_type = match parameter_name {
+                "default" => Some(field_default_target_ty),
+                "default_factory" | "factory" => Some(Type::Callable(CallableType::single(
+                    db,
+                    Signature::new(Parameters::empty(), field_default_target_ty),
+                ))),
+                _ => None,
+            };
+
+            if let Some(field_parameter_type) = field_parameter_type {
+                return Some(ArgumentTypeContext::standard(
+                    original_parameter_type,
+                    field_parameter_type,
+                ));
+            }
         }
 
         Some(ArgumentTypeContext::standard(

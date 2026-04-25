@@ -37,7 +37,9 @@ use crate::place::{
 };
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
-use crate::types::call::bind::MatchingOverloadIndex;
+use crate::types::call::bind::{
+    ArgumentTypeContextInput, MatchingOverloadIndex, field_converter_types,
+};
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::class::{ClassLiteral, CodeGeneratorKind, MethodDecorator};
@@ -103,7 +105,7 @@ use crate::types::{
     TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
     infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
-use crate::{AnalysisSettings, Db, FxIndexSet, Program};
+use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
 use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
@@ -152,6 +154,11 @@ enum DeclaredAndInferredType<'db> {
     AreTheSame(TypeAndQualifiers<'db>),
     /// Declared and inferred types might be different, we need to check assignability.
     MightBeDifferent {
+        declared_ty: TypeAndQualifiers<'db>,
+        inferred_ty: Type<'db>,
+    },
+    /// Store the inferred type as the binding, but skip the ordinary assignability check.
+    SkipAssignabilityCheck {
         declared_ty: TypeAndQualifiers<'db>,
         inferred_ty: Type<'db>,
     },
@@ -1435,6 +1442,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DeclaredAndInferredType::MightBeDifferent {
                 declared_ty,
                 inferred_ty,
+            }
+            | DeclaredAndInferredType::SkipAssignabilityCheck {
+                declared_ty,
+                inferred_ty,
             } => {
                 let file_scope_id = self.scope().file_scope_id(self.db());
                 if file_scope_id.is_global() {
@@ -1465,7 +1476,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 let declared_type = declared_ty.inner_type();
-                if inferred_ty.is_assignable_to(self.db(), declared_type) {
+                if matches!(
+                    declared_and_inferred_ty,
+                    DeclaredAndInferredType::SkipAssignabilityCheck { .. }
+                ) {
+                    (declared_ty, inferred_ty)
+                } else if inferred_ty.is_assignable_to(self.db(), declared_type) {
                     if !should_preserve_inferred_binding_type(inferred_ty)
                         // TODO We currently can't distinguish here between "no declared type" and
                         // "declared types is `Unknown` (e.g. due to a bad annotation, missing
@@ -1508,6 +1524,126 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             definition,
             &DeclaredAndInferredType::are_the_same_type(Type::unknown()),
         );
+    }
+
+    fn dataclass_field_call<'expr>(
+        value: &'expr ast::Expr,
+        inferred_ty: Type<'db>,
+    ) -> Option<(
+        &'expr ast::ExprCall,
+        crate::types::known_instance::FieldInstance<'db>,
+    )> {
+        let ast::Expr::Call(call) = value else {
+            return None;
+        };
+        let Type::KnownInstance(KnownInstanceType::Field(field)) = inferred_ty else {
+            return None;
+        };
+        Some((call, field))
+    }
+
+    fn dataclass_field_default_argument(call: &ast::ExprCall) -> Option<&ast::Expr> {
+        call.arguments.keywords.iter().find_map(|keyword| {
+            keyword.arg.as_ref().and_then(|name| {
+                matches!(name.as_str(), "default" | "default_factory" | "factory")
+                    .then_some(&keyword.value)
+            })
+        })
+    }
+
+    fn report_invalid_dataclass_field_assignment<T: Ranged>(
+        &self,
+        value: T,
+        annotation: &ast::Expr,
+        declared_ty: Type<'db>,
+        provided_ty: Type<'db>,
+    ) {
+        let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, value) else {
+            return;
+        };
+
+        let display_settings =
+            DisplaySettings::from_possibly_ambiguous_types(self.db(), [declared_ty, provided_ty]);
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Object of type `{}` is not assignable to `{}`",
+            provided_ty.display_with(self.db(), display_settings.clone()),
+            declared_ty.display_with(self.db(), display_settings),
+        ));
+        diagnostic.annotate(self.context.secondary(annotation).message("Declared type"));
+        diagnostic.set_primary_message(format_args!(
+            "Incompatible value of type `{}`",
+            provided_ty.display(self.db()),
+        ));
+        let concise_message = diagnostic.primary_message().to_string();
+        diagnostic.set_concise_message(concise_message);
+
+        diagnostic::note_numbers_module_not_supported(
+            self.db(),
+            &mut diagnostic,
+            declared_ty,
+            provided_ty,
+        );
+        diagnostic::add_invariant_generic_hints(
+            self.db(),
+            &mut diagnostic,
+            declared_ty,
+            provided_ty,
+        );
+    }
+
+    fn validate_dataclass_field_specifier_assignment(
+        &mut self,
+        call: &ast::ExprCall,
+        annotation: &ast::Expr,
+        field: crate::types::known_instance::FieldInstance<'db>,
+        declared_ty: Type<'db>,
+    ) {
+        if let Some((_, converter_output_ty)) = field.converter(self.db())
+            && !converter_output_ty.is_assignable_to(self.db(), declared_ty)
+        {
+            self.report_invalid_dataclass_field_assignment(
+                call,
+                annotation,
+                declared_ty,
+                converter_output_ty,
+            );
+        }
+
+        let Some(default_ty) = field.default_type(self.db()) else {
+            return;
+        };
+
+        let default_target_ty = field
+            .converter(self.db())
+            .map(|(converter_input_ty, _)| converter_input_ty)
+            .unwrap_or(declared_ty);
+
+        if default_ty.is_assignable_to(self.db(), default_target_ty) {
+            return;
+        }
+
+        if let Some(default_expr) = Self::dataclass_field_default_argument(call) {
+            if self
+                .context
+                .has_diagnostic_with_primary_range(&INVALID_ARGUMENT_TYPE, default_expr.range())
+            {
+                return;
+            }
+
+            self.report_invalid_dataclass_field_assignment(
+                default_expr,
+                annotation,
+                default_target_ty,
+                default_ty,
+            );
+        } else {
+            self.report_invalid_dataclass_field_assignment(
+                call,
+                annotation,
+                default_target_ty,
+                default_ty,
+            );
+        }
     }
 
     fn record_return_type(&mut self, ty: Type<'db>, range: TextRange) {
@@ -4330,10 +4466,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let value_ty = value.as_ref().map(|value| {
-                self.infer_maybe_standalone_expression(
+                self.setup_dataclass_field_specifiers();
+                let inferred_ty = self.infer_maybe_standalone_expression(
                     value,
                     TypeContext::new(Some(annotated.inner_type())),
-                )
+                );
+                self.dataclass_field_specifiers.clear();
+                inferred_ty
             });
 
             // If we have an annotated assignment like `self.attr: int = 1`, we still need to
@@ -4365,7 +4504,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // type, report an error and fall back to the annotated type.
             let target_ty = if let Some(value_ty) = value_ty {
                 let declared_ty = annotated.inner_type();
-                if value_ty.is_assignable_to(self.db(), declared_ty) {
+                if Self::dataclass_field_call(value.as_deref().unwrap(), value_ty).is_some() {
+                    declared_ty
+                } else if value_ty.is_assignable_to(self.db(), declared_ty) {
                     value_ty
                 } else {
                     if let Some(builder) = self
@@ -4759,13 +4900,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
 
+                let declared_and_inferred_ty =
+                    if let Some((call, field)) = Self::dataclass_field_call(value, inferred_ty) {
+                        self.validate_dataclass_field_specifier_assignment(
+                            call,
+                            annotation,
+                            field,
+                            declared.inner_type(),
+                        );
+                        DeclaredAndInferredType::SkipAssignabilityCheck {
+                            declared_ty: declared,
+                            inferred_ty,
+                        }
+                    } else {
+                        DeclaredAndInferredType::MightBeDifferent {
+                            declared_ty: declared,
+                            inferred_ty,
+                        }
+                    };
+
                 self.add_declaration_with_binding(
                     target.into(),
                     definition,
-                    &DeclaredAndInferredType::MightBeDifferent {
-                        declared_ty: declared,
-                        inferred_ty,
-                    },
+                    &declared_and_inferred_ty,
                 );
             }
 
@@ -5626,6 +5783,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             add_overloads_from_binding(&mut overloads_with_binding, binding);
         });
 
+        let field_default_target_ty = call_expression_tcx.annotation.and_then(|declared_ty| {
+            overloads_with_binding
+                .iter()
+                .all(|(overload, _)| {
+                    self.dataclass_field_specifiers
+                        .contains(&overload.callable_type)
+                })
+                .then(|| {
+                    ast_arguments
+                        .clone()
+                        .find_map(|argument| match argument {
+                            ast::ArgOrKeyword::Keyword(ast::Keyword {
+                                arg: Some(name),
+                                value,
+                                ..
+                            }) if name == "converter" => {
+                                let mut speculative = self.speculate();
+                                Some(speculative.infer_expression(value, TypeContext::default()))
+                            }
+                            _ => None,
+                        })
+                        .and_then(|converter_ty| {
+                            field_converter_types(self.db(), converter_ty)
+                                .map(|(converter_input_ty, _)| converter_input_ty)
+                        })
+                        .unwrap_or(declared_ty)
+                })
+        });
+
         // A keyword argument matched to `**P.kwargs` can appear before the keyword argument that
         // binds `P`, e.g. `wrapper(TagSet=[...], func=put_object)`. Seed those binder argument
         // types first so the normal ParamSpec context path below is not source-order dependent.
@@ -5704,7 +5890,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     binding,
                     arguments_types,
                     argument_index,
-                    call_expression_tcx,
+                    ArgumentTypeContextInput::new(call_expression_tcx, field_default_target_ty),
                 )
             };
 
