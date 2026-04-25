@@ -13,7 +13,7 @@ python-version = "3.12"
 Here, we define a `TypedDict` using the class-based syntax:
 
 ```py
-from typing import TypedDict
+from typing import Optional, TypedDict
 
 class Person(TypedDict):
     name: str
@@ -49,7 +49,7 @@ Functional `TypedDict`s with non-identifier keys should synthesize `__init__` wi
 keys into invalid named parameters:
 
 ```py
-from typing import TypedDict
+from typing import Optional, TypedDict
 
 Config = TypedDict("Config", {"in": int, "x-y": str, "ok": int})
 # revealed: Overload[(self: Config, map: Config, /, *, ok: int = ..., **kwargs) -> None, (self: Config, /, *, ok: int, **kwargs) -> None]
@@ -993,6 +993,55 @@ def convert_positional(src: Source) -> Target:
     return Target(src)
 ```
 
+Unpacking a narrower `TypedDict` into a wider `TypedDict` literal should preserve the unpacked
+required keys:
+
+```py
+from typing import Optional, TypedDict
+
+class MyTypedDict1(TypedDict):
+    aaa: int
+    bbb: int
+
+class MyTypedDict2(TypedDict):
+    aaa: int
+    bbb: int
+    ccc: int
+
+d1: MyTypedDict1 = {
+    "aaa": 1,
+    "bbb": 2,
+}
+
+d2: MyTypedDict2 = {
+    **d1,
+    "ccc": 3,
+}
+
+d3 = MyTypedDict2({**d1, "ccc": 3})
+
+class BadTypedDict1(TypedDict):
+    aaa: str
+    bbb: int
+
+bad1: BadTypedDict1 = {
+    "aaa": "bad",
+    "bbb": 2,
+}
+
+ok1: MyTypedDict2 = {
+    **bad1,
+    "aaa": 1,
+    "ccc": 3,
+}
+
+ok2 = MyTypedDict2({**bad1, "aaa": 1, "ccc": 3})
+
+# error: [invalid-argument-type] "Invalid argument to key "aaa" with declared type `int` on TypedDict `MyTypedDict2`: value of type `str`"
+still_union: Optional[MyTypedDict2] = {**bad1, "ccc": 3}
+reveal_type(still_union)  # revealed: MyTypedDict2 | None
+```
+
 Unpacking `Never` or a dynamic type (`Any`, `Unknown`) passes unconditionally, since these types can
 have any keys:
 
@@ -1824,7 +1873,7 @@ def _(
 
     reveal_type(being["name"])  # revealed: str
 
-    # error: [invalid-key] "Unknown key "age" for TypedDict `Animal`"
+    # error: [invalid-key] "Unknown key "age" for TypedDict `Animal` (subscripted object has type `Person | Animal`)"
     reveal_type(being["age"])  # revealed: int | None | Unknown
 
     # error: [invalid-key]
@@ -1879,7 +1928,7 @@ def _(being: Person | Animal):
     # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Animal`: value of type `Literal[1]`"
     being["name"] = 1
 
-    # error: [invalid-key] "Unknown key "leg" for TypedDict `Animal`"
+    # error: [invalid-key] "Unknown key "leg" for TypedDict `Animal` (subscripted object has type `Person | Animal`)"
     being["leg"] = "unknown"
 
 def _(centaur: Intersection[Person, Animal]):
@@ -1887,7 +1936,7 @@ def _(centaur: Intersection[Person, Animal]):
     centaur["age"] = 100
     centaur["legs"] = 4
 
-    # error: [invalid-key] "Unknown key "unknown" for TypedDict `Person`"
+    # error: [invalid-key] "Unknown key "unknown" for TypedDict `Person` (subscripted object has type `Person & Animal`)"
     centaur["unknown"] = "value"
 
 def _(person: Person, union_of_keys: Literal["name", "age"], unknown_value: Any):

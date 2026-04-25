@@ -2778,6 +2778,86 @@ Source with applied edits:
     }
 
     #[test]
+    fn test_enum_literal() {
+        let mut test = inlay_hint_test(
+            r#"
+            from enum import Enum
+
+            class Color(Enum):
+                RED = 1
+                BLUE = 2
+
+            x = Color.RED
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+
+        from enum import Enum
+
+        class Color(Enum):
+            RED = 1
+            BLUE = 2
+
+        x[: Literal[Color.RED]] = Color.RED
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:487:1
+            |
+        487 | Literal: _SpecialForm
+            | ^^^^^^^
+            |
+        info: Source
+         --> main2.py:8:5
+          |
+        8 | x[: Literal[Color.RED]] = Color.RED
+          |     ^^^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:4:7
+          |
+        4 | class Color(Enum):
+          |       ^^^^^
+          |
+        info: Source
+         --> main2.py:8:13
+          |
+        8 | x[: Literal[Color.RED]] = Color.RED
+          |             ^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:5:5
+          |
+        5 |     RED = 1
+          |     ^^^
+          |
+        info: Source
+         --> main2.py:8:19
+          |
+        8 | x[: Literal[Color.RED]] = Color.RED
+          |                   ^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 + from typing import Literal
+        2 |
+        3 | from enum import Enum
+        4 |
+        --------------------------------------------------------------------------------
+        6 |     RED = 1
+        7 |     BLUE = 2
+        8 |
+          - x = Color.RED
+        9 + x: Literal[Color.RED] = Color.RED
+        ");
+    }
+
+    #[test]
     fn test_simple_init_call() {
         let mut test = inlay_hint_test(
             r#"

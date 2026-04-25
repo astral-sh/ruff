@@ -261,6 +261,11 @@ pub fn definitions_for_attribute<'db>(
             continue;
         }
 
+        // Prevent lookup on BoundSuper proxy object
+        if matches!(ty, Type::BoundSuper(_)) {
+            continue;
+        }
+
         let meta_type = ty.to_meta_type(db);
 
         // Look up the attribute first on the meta-type, unless it's already a class-like type.
@@ -1868,9 +1873,8 @@ mod resolve_definition {
             | DefinitionKind::DictKeyAssignment(_)
             | DefinitionKind::For(_)
             | DefinitionKind::Comprehension(_)
-            | DefinitionKind::VariadicPositionalParameter(_)
-            | DefinitionKind::VariadicKeywordParameter(_)
             | DefinitionKind::Parameter(_)
+            | DefinitionKind::LambdaParameter { .. }
             | DefinitionKind::WithItem(_)
             | DefinitionKind::MatchPattern(_)
             | DefinitionKind::ExceptHandler(_)

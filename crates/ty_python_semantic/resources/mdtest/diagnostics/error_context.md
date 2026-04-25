@@ -2,7 +2,7 @@
 
 ```toml
 [environment]
-python-version = "3.12"
+python-version = "3.13"
 ```
 
 A lot of ty's diagnostics are emitted as a direct result of a type-to-type assignability check
@@ -94,60 +94,89 @@ Assigning an intersection to a non-intersection:
 
 ```py
 from ty_extensions import Intersection
+from typing import Protocol
 
-class P: ...
-class Q: ...
-class R: ...
+class SupportsFoo(Protocol):
+    def foo(self) -> None: ...
 
-def _(source: Intersection[P, Q]):
-    target: int = source  # snapshot
+class SupportsBar(Protocol):
+    def bar(self) -> None: ...
+
+class SupportsFooAndBar(Protocol):
+    def foo(self) -> None: ...
+    def bar(self) -> None: ...
+
+class HasFoo:
+    def foo(self) -> None: ...
+
+class HasBar:
+    def bar(self) -> None: ...
+
+class HasNeither: ...
+
+def _(source: Intersection[HasBar, HasNeither]):
+    target: SupportsFooAndBar = source  # snapshot
 ```
 
 ```snapshot
-error[invalid-assignment]: Object of type `P & Q` is not assignable to `int`
- --> src/mdtest_snippet.py:8:13
-  |
-8 |     target: int = source  # snapshot
-  |             ---   ^^^^^^ Incompatible value of type `P & Q`
-  |             |
-  |             Declared type
-  |
+error[invalid-assignment]: Object of type `HasBar & HasNeither` is not assignable to `SupportsFooAndBar`
+  --> src/mdtest_snippet.py:23:13
+   |
+23 |     target: SupportsFooAndBar = source  # snapshot
+   |             -----------------   ^^^^^^ Incompatible value of type `HasBar & HasNeither`
+   |             |
+   |             Declared type
+   |
+info: no element of intersection `HasBar & HasNeither` is assignable to `SupportsFooAndBar`
+info: ├── type `HasBar` is not assignable to protocol `SupportsFooAndBar`
+info: │   └── protocol member `foo` is not defined on type `HasBar`
+info: └── type `HasNeither` is not assignable to protocol `SupportsFooAndBar`
+info:     └── protocol member `bar` is not defined on type `HasNeither`
 ```
 
 Assigning a non-intersection to an intersection:
 
 ```py
-def _(source: P):
-    target: Intersection[P, Q] = source  # snapshot
+def _(source: HasFoo):
+    target: Intersection[SupportsFoo, SupportsBar] = source  # snapshot
 ```
 
 ```snapshot
-error[invalid-assignment]: Object of type `P` is not assignable to `P & Q`
-  --> src/mdtest_snippet.py:10:13
+error[invalid-assignment]: Object of type `HasFoo` is not assignable to `SupportsFoo & SupportsBar`
+  --> src/mdtest_snippet.py:25:13
    |
-10 |     target: Intersection[P, Q] = source  # snapshot
-   |             ------------------   ^^^^^^ Incompatible value of type `P`
+25 |     target: Intersection[SupportsFoo, SupportsBar] = source  # snapshot
+   |             --------------------------------------   ^^^^^^ Incompatible value of type `HasFoo`
    |             |
    |             Declared type
    |
+info: type `HasFoo` is not assignable to element `SupportsBar` of intersection `SupportsFoo & SupportsBar`
+info: └── type `HasFoo` is not assignable to protocol `SupportsBar`
+info:     └── protocol member `bar` is not defined on type `HasFoo`
 ```
 
 Assigning an intersection to an intersection:
 
 ```py
-def _(source: Intersection[P, R]):
-    target: Intersection[P, Q] = source  # snapshot
+def _(source: Intersection[HasFoo, HasNeither]):
+    target: Intersection[SupportsFoo, SupportsBar] = source  # snapshot
 ```
 
 ```snapshot
-error[invalid-assignment]: Object of type `P & R` is not assignable to `P & Q`
-  --> src/mdtest_snippet.py:12:13
+error[invalid-assignment]: Object of type `HasFoo & HasNeither` is not assignable to `SupportsFoo & SupportsBar`
+  --> src/mdtest_snippet.py:27:13
    |
-12 |     target: Intersection[P, Q] = source  # snapshot
-   |             ------------------   ^^^^^^ Incompatible value of type `P & R`
+27 |     target: Intersection[SupportsFoo, SupportsBar] = source  # snapshot
+   |             --------------------------------------   ^^^^^^ Incompatible value of type `HasFoo & HasNeither`
    |             |
    |             Declared type
    |
+info: type `HasFoo & HasNeither` is not assignable to element `SupportsBar` of intersection `SupportsFoo & SupportsBar`
+info: └── no element of intersection `HasFoo & HasNeither` is assignable to `SupportsBar`
+info:     ├── type `HasFoo` is not assignable to protocol `SupportsBar`
+info:     │   └── protocol member `bar` is not defined on type `HasFoo`
+info:     └── type `HasNeither` is not assignable to protocol `SupportsBar`
+info:         └── protocol member `bar` is not defined on type `HasNeither`
 ```
 
 ## Tuples
@@ -409,7 +438,7 @@ info: This violates the Liskov Substitution Principle
 Incompatible field types:
 
 ```py
-from typing import Any, TypedDict
+from typing import Any, TypedDict, NotRequired, ReadOnly
 
 class Person(TypedDict):
     name: str
@@ -430,6 +459,7 @@ error[invalid-assignment]: Object of type `Person` is not assignable to `Other`
    |             |
    |             Declared type
    |
+info: field "name" on TypedDict `Person` has type `str` which is not assignable to type `bytes` expected by TypedDict `Other`
 ```
 
 Missing required fields:
@@ -452,28 +482,93 @@ error[invalid-assignment]: Object of type `Person` is not assignable to `PersonW
    |             |
    |             Declared type
    |
+info: required field "age" is not present in source TypedDict `Person`
+```
+
+Non-required fields that are required in the target:
+
+```py
+class PersonWithOptionalAge(TypedDict):
+    name: str
+    age: NotRequired[int]
+
+def _(source: PersonWithOptionalAge):
+    target: PersonWithAge = source  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `PersonWithOptionalAge` is not assignable to `PersonWithAge`
+  --> src/mdtest_snippet.py:22:13
+   |
+22 |     target: PersonWithAge = source  # snapshot
+   |             -------------   ^^^^^^ Incompatible value of type `PersonWithOptionalAge`
+   |             |
+   |             Declared type
+   |
+info: field "age" is required in TypedDict `PersonWithAge` but not required in TypedDict `PersonWithOptionalAge`
+```
+
+Read-only fields that are mutable in the target:
+
+```py
+class PersonWithReadOnlyName(TypedDict):
+    name: ReadOnly[str]
+
+def _(source: PersonWithReadOnlyName):
+    target: Person = source  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `PersonWithReadOnlyName` is not assignable to `Person`
+  --> src/mdtest_snippet.py:27:13
+   |
+27 |     target: Person = source  # snapshot
+   |             ------   ^^^^^^ Incompatible value of type `PersonWithReadOnlyName`
+   |             |
+   |             Declared type
+   |
+info: field "name" is read-only in TypedDict `PersonWithReadOnlyName` but mutable in TypedDict `Person`
+```
+
+Required fields that are not required and mutable in the target:
+
+```py
+def _(source: PersonWithAge):
+    target: PersonWithOptionalAge = source  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `PersonWithAge` is not assignable to `PersonWithOptionalAge`
+  --> src/mdtest_snippet.py:29:13
+   |
+29 |     target: PersonWithOptionalAge = source  # snapshot
+   |             ---------------------   ^^^^^^ Incompatible value of type `PersonWithAge`
+   |             |
+   |             Declared type
+   |
+info: field "age" is required in TypedDict `PersonWithAge` but not required and mutable in TypedDict `PersonWithOptionalAge`
+help: The required field could be removed through a destructive operation like `del` on the target.
 ```
 
 Assigning a `TypedDict` to a `dict`
 
 ```py
-class Person(TypedDict):
-    name: str
-
 def _(source: Person):
     target: dict[str, Any] = source  # snapshot
 ```
 
 ```snapshot
 error[invalid-assignment]: Object of type `Person` is not assignable to `dict[str, Any]`
-  --> src/mdtest_snippet.py:21:13
+  --> src/mdtest_snippet.py:31:13
    |
-21 |     target: dict[str, Any] = source  # snapshot
+31 |     target: dict[str, Any] = source  # snapshot
    |             --------------   ^^^^^^ Incompatible value of type `Person`
    |             |
    |             Declared type
    |
-info: `TypedDict` types are not assignable to `dict` (consider using `Mapping` instead)
+info: TypedDict `Person` is not assignable to `dict`
+help: A TypedDict is not usually assignable to any `dict[..]` type; `dict` types allow destructive operations like `clear()`.
+help: Consider using `Mapping[..]` instead of `dict[..]`.
 ```
 
 ## Protocols
@@ -723,6 +818,11 @@ error[invalid-assignment]: Object of type `DoesNotSupportFoo1 & DoesNotSupportFo
    |             |
    |             Declared type
    |
+info: no element of intersection `DoesNotSupportFoo1 & DoesNotSupportFoo2` is assignable to `SupportsFoo`
+info: ├── type `DoesNotSupportFoo1` is not assignable to protocol `SupportsFoo`
+info: │   └── protocol member `foo` is not defined on type `DoesNotSupportFoo1`
+info: └── type `DoesNotSupportFoo2` is not assignable to protocol `SupportsFoo`
+info:     └── protocol member `foo` is not defined on type `DoesNotSupportFoo2`
 ```
 
 ## Assigning an overload set
@@ -1079,4 +1179,66 @@ def _(source: frozenset[bool]):
 
 def _(source: tuple[bool, bool]):
     target: tuple[int, int] = source
+```
+
+## Error context in other scenarios
+
+### In `invalid-return-type` diagnostics
+
+```py
+def f() -> tuple[int, str]:
+    return 1, b""  # snapshot: invalid-return-type
+```
+
+```snapshot
+error[invalid-return-type]: Return type does not match returned value
+ --> src/mdtest_snippet.py:1:12
+  |
+1 | def f() -> tuple[int, str]:
+  |            --------------- Expected `tuple[int, str]` because of return type
+2 |     return 1, b""  # snapshot: invalid-return-type
+  |            ^^^^^^ expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
+  |
+info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
+```
+
+### In `invalid-assignment` for attribute assignments
+
+```py
+class C:
+    x: tuple[int, str]
+
+c = C()
+c.x = (1, b"")  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `tuple[Literal[1], Literal[b""]]` is not assignable to attribute `x` of type `tuple[int, str]`
+ --> src/mdtest_snippet.py:5:1
+  |
+5 | c.x = (1, b"")  # snapshot
+  | ^^^
+  |
+info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
+```
+
+### In `invalid-yield` diagnostics
+
+```py
+from typing import Generator
+
+def f() -> Generator[tuple[int, str], None, None]:
+    yield (1, b"")  # snapshot: invalid-yield
+```
+
+```snapshot
+error[invalid-yield]: Yield expression type does not match annotation
+ --> src/mdtest_snippet.py:3:12
+  |
+3 | def f() -> Generator[tuple[int, str], None, None]:
+  |            -------------------------------------- Function annotated with yield type `tuple[int, str]` here
+4 |     yield (1, b"")  # snapshot: invalid-yield
+  |           ^^^^^^^^ expression of type `tuple[Literal[1], Literal[b""]]`, expected `tuple[int, str]`
+  |
+info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
 ```

@@ -1,7 +1,6 @@
 use itertools::Itertools;
 use ruff_db::{
-    diagnostic::{Annotation, Span, SubDiagnostic, SubDiagnosticSeverity},
-    parsed::parsed_module,
+    diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity},
     source::source_text,
 };
 use ruff_diagnostics::{Edit, Fix};
@@ -9,7 +8,6 @@ use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
-use crate::attribute_assignments;
 use crate::{
     TypeQualifiers,
     diagnostic::format_enumeration,
@@ -17,7 +15,7 @@ use crate::{
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, GenericAlias, KnownInstanceType,
         MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
-        StaticClassLiteral, Type,
+        StaticClassLiteral, Type, binding_type,
         call::Argument,
         class::{
             AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind,
@@ -26,12 +24,12 @@ use crate::{
         context::InferContext,
         definition_expression_type,
         diagnostic::{
-            ABSTRACT_METHOD_IN_FINAL_CLASS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION,
-            DATACLASS_FIELD_ORDER, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE, INCONSISTENT_MRO,
-            INVALID_ARGUMENT_TYPE, INVALID_BASE, INVALID_DATACLASS, INVALID_GENERIC_CLASS,
-            INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_PROTOCOL,
-            INVALID_TYPED_DICT_HEADER, IncompatibleBases, SUBCLASS_OF_FINAL_CLASS,
-            UNKNOWN_ARGUMENT, report_bad_frozen_dataclass_inheritance,
+            ABSTRACT_METHOD_IN_FINAL_CLASS, AbstractMethodAnnotationPolicy, CONFLICTING_METACLASS,
+            CYCLIC_CLASS_DEFINITION, DATACLASS_FIELD_ORDER, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE,
+            INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_BASE, INVALID_DATACLASS,
+            INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE,
+            INVALID_PROTOCOL, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
+            SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT, report_bad_frozen_dataclass_inheritance,
             report_conflicting_metaclass_from_bases, report_duplicate_bases,
             report_instance_layout_conflict, report_invalid_or_unsupported_base,
             report_invalid_total_ordering, report_invalid_type_param_order,
@@ -53,6 +51,7 @@ use crate::{
         visitor::find_over_type,
     },
 };
+use crate::{attribute_assignments, types::diagnostic::abstract_method_span};
 use ty_python_core::{SemanticIndex, definition::DefinitionKind, scope::ScopeId};
 
 /// Iterate over all static class definitions (created using `class` statements) to check that
@@ -1095,6 +1094,23 @@ fn check_final_class_abstract_methods<'db>(
         "Final class `{class_name}` has unimplemented abstract methods",
     ));
 
+    let definition_types = infer_definition_types(db, class.definition(db));
+
+    if let Some(class_node) = class.body_scope(db).node(db).as_class()
+        && let Some(decorator) = class_node
+            .node(context.module())
+            .decorator_list
+            .iter()
+            .find(|decorator| {
+                definition_types
+                    .expression_type(&decorator.expression)
+                    .as_function_literal()
+                    .is_some_and(|function| function.is_known(db, KnownFunction::Final))
+            })
+    {
+        diagnostic.annotate(context.secondary(decorator));
+    }
+
     let num_abstract_methods = abstract_methods.len();
 
     if num_abstract_methods == 1 {
@@ -1139,19 +1155,25 @@ fn check_final_class_abstract_methods<'db>(
         kind,
     } = abstract_method;
 
-    let module = parsed_module(db, definition.file(db)).load(db);
-    let span = Span::from(definition.focus_range(db, &module));
     let defining_class_name = defining_class.name(db);
 
-    let mut secondary_annotation = Annotation::secondary(span);
-    secondary_annotation = if defining_class.class_literal(db) == ClassLiteral::Static(class) {
-        secondary_annotation.message(format_args!("`{first_method_name}` declared as abstract"))
-    } else {
-        secondary_annotation.message(format_args!(
-            "`{first_method_name}` declared as abstract on superclass `{defining_class_name}`",
-        ))
-    };
-    diagnostic.annotate(secondary_annotation);
+    if let Type::FunctionLiteral(function) = binding_type(db, *definition) {
+        let policy = if kind.is_explicit() {
+            AbstractMethodAnnotationPolicy::ExcludeVerboseBody
+        } else {
+            AbstractMethodAnnotationPolicy::AlwaysIncludeBody
+        };
+        let secondary_span = abstract_method_span(db, function, policy);
+        let mut secondary_annotation = Annotation::secondary(secondary_span);
+        secondary_annotation = if defining_class.class_literal(db) == ClassLiteral::Static(class) {
+            secondary_annotation.message(format_args!("`{first_method_name}` declared as abstract"))
+        } else {
+            secondary_annotation.message(format_args!(
+                "`{first_method_name}` declared as abstract on superclass `{defining_class_name}`",
+            ))
+        };
+        diagnostic.annotate(secondary_annotation);
+    }
 
     if !kind.is_explicit() {
         let mut sub = SubDiagnostic::new(

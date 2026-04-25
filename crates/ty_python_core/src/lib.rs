@@ -15,7 +15,7 @@ use smallvec::SmallVec;
 use ty_module_resolver::ModuleName;
 
 use crate::place::ScopedPlaceId;
-
+pub use crate::statement::{Statement, StatementNodeKey};
 use ast_ids::AstIds;
 pub use ast_ids::ExpressionNodeKey;
 use builder::SemanticIndexBuilder;
@@ -49,6 +49,7 @@ pub mod rank;
 mod re_exports;
 pub mod reachability_constraints;
 pub mod scope;
+pub mod statement;
 pub mod symbol;
 pub mod unpack;
 mod use_def;
@@ -271,8 +272,14 @@ pub struct SemanticIndex<'db> {
     /// Map from a standalone expression to its [`Expression`] ingredient.
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
 
+    /// Map from a standalone statement to its [`Statement`] ingredient.
+    statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
+
     /// Map from nodes that create a scope to the scope they create.
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
+
+    /// Map from a lambda expression to its containing statement.
+    enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
 
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
@@ -423,6 +430,10 @@ impl<'db> SemanticIndex<'db> {
             .map(|node_ref| self.expect_single_definition(node_ref))
     }
 
+    pub fn enclosing_lambda_statement(&self, lambda: ExpressionNodeKey) -> Option<Statement<'db>> {
+        self.enclosing_lambda_statements.get(&lambda).copied()
+    }
+
     pub fn is_in_type_checking_block(&self, scope_id: FileScopeId, range: TextRange) -> bool {
         self.ancestor_scopes(scope_id).any(|(scope_id, _)| {
             self.use_def_map(scope_id)
@@ -519,6 +530,13 @@ impl<'db> SemanticIndex<'db> {
     pub fn is_standalone_expression(&self, expression_key: impl Into<ExpressionNodeKey>) -> bool {
         self.expressions_by_node
             .contains_key(&expression_key.into())
+    }
+
+    pub fn try_statement(
+        &self,
+        statement_key: impl Into<StatementNodeKey>,
+    ) -> Option<Statement<'db>> {
+        self.statements_by_node.get(&statement_key.into()).copied()
     }
 
     /// Returns the id of the scope that `node` creates.
@@ -922,7 +940,9 @@ mod tests {
     use crate::{
         ast_ids::{HasScopedUseId, ScopedUseId},
         db::tests::{TestDb, TestDbBuilder},
-        definition::DefinitionKind,
+        definition::{
+            DefinitionKind, LambdaParameterDefinitionNodeKind, ParameterDefinitionNodeKind,
+        },
     };
 
     impl UseDefMap<'_> {
@@ -1209,14 +1229,14 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             .unwrap();
         assert!(matches!(
             args_binding.kind(&db),
-            DefinitionKind::VariadicPositionalParameter(_)
+            DefinitionKind::Parameter(ParameterDefinitionNodeKind::VariadicPositionalParameter(_))
         ));
         let kwargs_binding = use_def
             .first_public_binding(function_table.symbol_id("kwargs").expect("symbol exists"))
             .unwrap();
         assert!(matches!(
             kwargs_binding.kind(&db),
-            DefinitionKind::VariadicKeywordParameter(_)
+            DefinitionKind::Parameter(ParameterDefinitionNodeKind::VariadicKeywordParameter(_))
         ));
     }
 
@@ -1239,7 +1259,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let lambda_table = index.place_table(lambda_scope_id);
         assert_eq!(
             names(lambda_table),
-            vec!["a", "b", "c", "d", "args", "kwargs"],
+            vec!["a", "b", "c", "args", "d", "kwargs"],
         );
 
         let use_def = index.use_def_map(lambda_scope_id);
@@ -1247,21 +1267,36 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             let binding = use_def
                 .first_public_binding(lambda_table.symbol_id(name).expect("symbol exists"))
                 .unwrap();
-            assert!(matches!(binding.kind(&db), DefinitionKind::Parameter(_)));
+            assert!(matches!(
+                binding.kind(&db),
+                DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
+                    index: _,
+                    lambda: _,
+                    parameter: ParameterDefinitionNodeKind::Parameter(_)
+                })
+            ));
         }
         let args_binding = use_def
             .first_public_binding(lambda_table.symbol_id("args").expect("symbol exists"))
             .unwrap();
         assert!(matches!(
             args_binding.kind(&db),
-            DefinitionKind::VariadicPositionalParameter(_)
+            DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
+                index: 3,
+                lambda: _,
+                parameter: ParameterDefinitionNodeKind::VariadicPositionalParameter(_)
+            })
         ));
         let kwargs_binding = use_def
             .first_public_binding(lambda_table.symbol_id("kwargs").expect("symbol exists"))
             .unwrap();
         assert!(matches!(
             kwargs_binding.kind(&db),
-            DefinitionKind::VariadicKeywordParameter(_)
+            DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
+                index: 5,
+                lambda: _,
+                parameter: ParameterDefinitionNodeKind::VariadicKeywordParameter(_)
+            })
         ));
     }
 

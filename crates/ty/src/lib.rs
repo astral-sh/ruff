@@ -456,7 +456,7 @@ impl MainLoop {
 
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
-                    db.apply_changes(changes, Some(&self.project_options_overrides));
+                    db.apply_changes(&changes, Some(&self.project_options_overrides));
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }

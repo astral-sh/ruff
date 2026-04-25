@@ -2914,7 +2914,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.15.11"
+version = "0.15.12"
 dependencies = [
  "anyhow",
  "argfile",
@@ -3175,7 +3175,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.15.11"
+version = "0.15.12"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3551,7 +3551,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.15.11"
+version = "0.15.12"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -4742,7 +4742,6 @@ dependencies = [
  "ty_module_resolver",
  "ty_project",
  "ty_python_core",
- "ty_python_semantic",
 ]
 
 [[package]]

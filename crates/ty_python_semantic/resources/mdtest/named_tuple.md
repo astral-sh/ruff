@@ -1855,7 +1855,7 @@ class ConcreteChild(GenericBase[str]):
 class GenericChild(GenericBase[T]):
     def __new__(cls, x: T) -> Self:
         instance = super().__new__(cls, x)
-        reveal_type(instance)  # revealed: @Todo(super in generic class)
+        reveal_type(instance)  # revealed: Self@__new__
         return instance
 
 reveal_type(GenericChild(x=3.14))  # revealed: GenericChild[int | float]

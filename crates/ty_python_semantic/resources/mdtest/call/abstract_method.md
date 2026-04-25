@@ -18,16 +18,16 @@ Foo.method()
 
 ```snapshot
 error[call-abstract-method]: Cannot call `method` on class object
- --> src/mdtest_snippet.py:9:1
+ --> src/mdtest_snippet.py:4:5
   |
-9 | Foo.method()
-  | ^^^^^^^^^^^^ `method` is an abstract classmethod with a trivial body
-  |
-info: Method `method` defined here
- --> src/mdtest_snippet.py:6:9
-  |
-6 |     def method(cls) -> int: ...
-  |         ^^^^^^
+4 | /     @classmethod
+5 | |     @abstractmethod
+6 | |     def method(cls) -> int: ...
+  | |_______________________________- Method `method` defined here
+7 |
+8 |   # snapshot: call-abstract-method
+9 |   Foo.method()
+  |   ^^^^^^^^^^^^ `method` is an abstract classmethod with a trivial body
   |
 ```
 

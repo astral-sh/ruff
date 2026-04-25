@@ -9,6 +9,20 @@ def get_int() -> int:
 reveal_type(get_int())  # revealed: int
 ```
 
+## Gradual variadic parameters
+
+```py
+from typing import Any
+
+def accepts_anything(first: int, *args: Any, **kwargs: Any) -> None: ...
+def accepts_only_gradual(*args: Any, **kwargs: Any) -> None: ...
+
+accepts_anything(1, "one", object(), keyword=object())
+accepts_anything("not an int")  # error: [invalid-argument-type]
+accepts_only_gradual(1, "one", keyword=object())
+accepts_only_gradual(**{1: "one"})  # error: [invalid-argument-type]
+```
+
 ## Async
 
 ```py

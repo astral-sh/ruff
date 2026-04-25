@@ -20,7 +20,6 @@ use ruff_python_parser::semantic_errors::{
 use ruff_text_size::{Ranged, TextRange};
 use ty_module_resolver::{ModuleName, resolve_module};
 
-use crate::Db;
 use crate::HasTrackedScope;
 use crate::ast_ids::AstIdsBuilder;
 use crate::ast_ids::node_key::ExpressionNodeKey;
@@ -30,8 +29,9 @@ use crate::definition::{
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
     DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef, ExceptHandlerDefinitionNodeRef,
     ForStmtDefinitionNodeRef, ImportDefinitionNodeRef, ImportFromDefinitionNodeRef,
-    ImportFromSubmoduleDefinitionNodeRef, LoopHeaderDefinitionNodeRef, LoopStmtRef,
-    MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    ImportFromSubmoduleDefinitionNodeRef, LambdaParameterDefinitionNodeRef,
+    LoopHeaderDefinitionNodeRef, LoopStmtRef, MatchPatternDefinitionNodeRef,
+    ParameterDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::expression::{Expression, ExpressionKind};
 use crate::member::MemberExprBuilder;
@@ -49,12 +49,14 @@ use crate::scope::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef, Scope, ScopeId, ScopeKind,
     ScopeLaziness,
 };
+use crate::statement::StatementInner;
 use crate::symbol::{ScopedSymbolId, Symbol};
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, PreviousDefinitions, ScopedDefinitionId,
     ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
+use crate::{Db, Statement, StatementNodeKey};
 use crate::{
     EvaluationMode, ExpressionsScopeMap, LoopHeader, LoopToken, PossiblyNarrowedPlaces,
     SemanticIndex, VisibleAncestorsIter, get_loop_header,
@@ -97,8 +99,11 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     module: &'ast ParsedModuleRef,
     scope_stack: Vec<ScopeInfo>,
     /// The assignments we're currently visiting, with
-    /// the most recent visit at the end of the Vec
+    /// the most recent visit at the end of the Vec.
     current_assignments: Vec<CurrentAssignment<'ast, 'db>>,
+    /// The statements we're currently visiting, with
+    /// the most recent visit at the end of the Vec.
+    current_statements: Vec<CurrentStatement<'ast>>,
     /// The match case we're currently visiting.
     current_match_case: Option<CurrentMatchCase<'ast>>,
     /// The name of the first function parameter of the innermost function that we're currently visiting.
@@ -128,6 +133,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     scopes_by_expression: ExpressionsScopeMapBuilder,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
+    statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
+    enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
     imported_modules: FxHashSet<ModuleName>,
     seen_submodule_imports: FxHashSet<String>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
@@ -148,7 +155,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             source_type: file.source_type(db),
             module: module_ref,
             scope_stack: Vec::new(),
-            current_assignments: vec![],
+            current_assignments: Vec::new(),
+            current_statements: Vec::new(),
             current_match_case: None,
             current_first_parameter_name: None,
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
@@ -166,6 +174,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
+            statements_by_node: FxHashMap::default(),
+            enclosing_lambda_statements: FxHashMap::default(),
 
             seen_submodule_imports: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
@@ -198,6 +208,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn current_scope(&self) -> FileScopeId {
         self.current_scope_info().file_scope_id
+    }
+
+    pub(crate) fn expect_single_definition(
+        &self,
+        definition_key: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy,
+    ) -> Definition<'db> {
+        let definitions = &self.definitions_by_node[&definition_key.into()];
+        debug_assert_eq!(
+            definitions.len(),
+            1,
+            "Expected exactly one definition to be associated with AST node {definition_key:?} but found {}",
+            definitions.len()
+        );
+        definitions[0]
     }
 
     /// Returns an iterator over ancestors of `scope` that are visible for name resolution,
@@ -1312,6 +1336,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_assignments.last_mut()
     }
 
+    fn push_statement(&mut self, statement: CurrentStatement<'ast>) {
+        self.current_statements.push(statement);
+    }
+
+    fn pop_statement(&mut self) -> CurrentStatement<'ast> {
+        self.current_statements.pop().unwrap()
+    }
+
+    fn current_statement_mut(&mut self) -> Option<&mut CurrentStatement<'ast>> {
+        self.current_statements.last_mut()
+    }
+
     fn predicate_kind(&mut self, pattern: &ast::Pattern) -> PatternPredicateKind<'db> {
         match pattern {
             ast::Pattern::MatchValue(pattern) => {
@@ -1352,6 +1388,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     ClassPatternKind::Refutable
                 })
             }
+            ast::Pattern::MatchSequence(pattern) => {
+                // `case [*rest]` matches every sequence, while all other sequence patterns
+                // are refutable because they impose a minimum and/or exact length.
+                PatternPredicateKind::Sequence(
+                    if matches!(pattern.patterns.as_slice(), [ast::Pattern::MatchStar(_)]) {
+                        ClassPatternKind::Irrefutable
+                    } else {
+                        ClassPatternKind::Refutable
+                    },
+                )
+            }
             ast::Pattern::MatchOr(pattern) => {
                 let predicates = pattern
                     .patterns
@@ -1367,7 +1414,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .map(|p| Box::new(self.predicate_kind(p))),
                 pattern.name.as_ref().map(|name| name.id.clone()),
             ),
-            _ => PatternPredicateKind::Unsupported,
+            ast::Pattern::MatchStar(_) => PatternPredicateKind::Unsupported,
         }
     }
 
@@ -1470,6 +1517,56 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.expressions_by_node
             .insert(expression_node.into(), expression);
         expression
+    }
+
+    fn add_standalone_statement(&mut self, statement_node: &ast::Stmt) -> Statement<'db> {
+        // Avoid allocating a salsa ingredient if the statement represents an existing
+        // definition or standalone expression.
+        let statement = match statement_node {
+            ast::Stmt::FunctionDef(function) => Some(Statement::Definition(
+                self.expect_single_definition(function),
+            )),
+            ast::Stmt::ClassDef(class) => {
+                Some(Statement::Definition(self.expect_single_definition(class)))
+            }
+            ast::Stmt::Expr(expr) => self
+                .expressions_by_node
+                .get(&(&expr.value).into())
+                .copied()
+                .map(Statement::Expression),
+            ast::Stmt::Assign(assign) => {
+                if let [ast::Expr::Name(name)] = &assign.targets[..] {
+                    Some(Statement::Definition(self.expect_single_definition(name)))
+                } else {
+                    None
+                }
+            }
+            ast::Stmt::AnnAssign(assign) if assign.target.is_name_expr() => {
+                Some(Statement::Definition(self.expect_single_definition(assign)))
+            }
+            ast::Stmt::AugAssign(assign) if assign.target.is_name_expr() => {
+                Some(Statement::Definition(self.expect_single_definition(assign)))
+            }
+            ast::Stmt::TypeAlias(alias) => {
+                Some(Statement::Definition(self.expect_single_definition(alias)))
+            }
+            _ => None,
+        };
+
+        let statement = if let Some(statement) = statement {
+            statement
+        } else {
+            Statement::Other(StatementInner::new(
+                self.db,
+                self.file,
+                self.current_scope(),
+                AstNodeRef::new(self.module, statement_node),
+            ))
+        };
+
+        self.statements_by_node
+            .insert(statement_node.into(), statement);
+        statement
     }
 
     fn with_type_params(
@@ -1616,7 +1713,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .mark_parameter();
             self.add_definition(
                 symbol.into(),
-                DefinitionNodeRef::VariadicPositionalParameter(vararg),
+                ParameterDefinitionNodeRef::VariadicPositionalParameter(vararg),
             );
         }
         if let Some(kwarg) = parameters.kwarg.as_ref() {
@@ -1626,7 +1723,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .mark_parameter();
             self.add_definition(
                 symbol.into(),
-                DefinitionNodeRef::VariadicKeywordParameter(kwarg),
+                ParameterDefinitionNodeRef::VariadicKeywordParameter(kwarg),
             );
         }
     }
@@ -1634,7 +1731,90 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn declare_parameter(&mut self, parameter: &'ast ast::ParameterWithDefault) {
         let symbol = self.add_symbol(parameter.name().id().clone());
 
-        let definition = self.add_definition(symbol.into(), parameter);
+        let definition = self.add_definition(
+            symbol.into(),
+            ParameterDefinitionNodeRef::Parameter(parameter),
+        );
+
+        self.current_place_table_mut()
+            .symbol_mut(symbol)
+            .mark_parameter();
+
+        // Insert a mapping from the inner Parameter node to the same definition. This
+        // ensures that calling `HasType::inferred_type` on the inner parameter returns
+        // a valid type (and doesn't panic)
+        let existing_definition = self.definitions_by_node.insert(
+            (&parameter.parameter).into(),
+            Definitions::single(definition),
+        );
+        debug_assert_eq!(existing_definition, None);
+    }
+
+    fn declare_lambda_parameters(
+        &mut self,
+        parameters: &'ast ast::Parameters,
+        lambda: &'ast ast::ExprLambda,
+    ) {
+        let mut index = 0;
+        for parameter in &parameters.posonlyargs {
+            self.declare_lambda_parameter(index, parameter, lambda);
+            index += 1;
+        }
+        for parameter in &parameters.args {
+            self.declare_lambda_parameter(index, parameter, lambda);
+            index += 1;
+        }
+        if let Some(vararg) = parameters.vararg.as_ref() {
+            let symbol = self.add_symbol(vararg.name.id().clone());
+            self.current_place_table_mut()
+                .symbol_mut(symbol)
+                .mark_parameter();
+            self.add_definition(
+                symbol.into(),
+                LambdaParameterDefinitionNodeRef {
+                    index,
+                    lambda,
+                    parameter: ParameterDefinitionNodeRef::VariadicPositionalParameter(vararg),
+                },
+            );
+            index += 1;
+        }
+        for parameter in &parameters.kwonlyargs {
+            self.declare_lambda_parameter(index, parameter, lambda);
+            index += 1;
+        }
+        if let Some(kwarg) = parameters.kwarg.as_ref() {
+            let symbol = self.add_symbol(kwarg.name.id().clone());
+            self.current_place_table_mut()
+                .symbol_mut(symbol)
+                .mark_parameter();
+            self.add_definition(
+                symbol.into(),
+                LambdaParameterDefinitionNodeRef {
+                    index,
+                    lambda,
+                    parameter: ParameterDefinitionNodeRef::VariadicKeywordParameter(kwarg),
+                },
+            );
+        }
+    }
+
+    fn declare_lambda_parameter(
+        &mut self,
+        index: usize,
+        parameter: &'ast ast::ParameterWithDefault,
+        lambda: &'ast ast::ExprLambda,
+    ) {
+        let symbol = self.add_symbol(parameter.name().id().clone());
+
+        let definition = self.add_definition(
+            symbol.into(),
+            LambdaParameterDefinitionNodeRef {
+                index,
+                lambda,
+                parameter: ParameterDefinitionNodeRef::Parameter(parameter),
+            },
+        );
 
         self.current_place_table_mut()
             .symbol_mut(symbol)
@@ -1746,6 +1926,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         use_def_maps.shrink_to_fit();
         ast_ids.shrink_to_fit();
         self.definitions_by_node.shrink_to_fit();
+        self.statements_by_node.shrink_to_fit();
+        self.enclosing_lambda_statements.shrink_to_fit();
 
         self.scope_ids_by_scope.shrink_to_fit();
         self.scopes_by_node.shrink_to_fit();
@@ -1757,11 +1939,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes: self.scopes,
             definitions_by_node: self.definitions_by_node,
             expressions_by_node: self.expressions_by_node,
+            statements_by_node: self.statements_by_node,
             scope_ids_by_scope: self.scope_ids_by_scope,
             ast_ids,
             scopes_by_expression: self.scopes_by_expression.build(),
             scopes_by_node: self.scopes_by_node,
             use_def_maps,
+            enclosing_lambda_statements: self.enclosing_lambda_statements,
             imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: self.enclosing_snapshots,
@@ -1780,10 +1964,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.source_text
             .get_or_init(|| source_text(self.db, self.file))
     }
-}
 
-impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
-    fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
+    fn visit_stmt_impl(&mut self, stmt: &'ast ast::Stmt) {
         self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
 
         let in_type_checking_block = self.in_type_checking_block;
@@ -2998,6 +3180,29 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             }
         }
     }
+}
+
+impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
+    fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
+        self.push_statement(CurrentStatement {
+            lambda_exprs: Vec::new(),
+        });
+
+        self.visit_stmt_impl(stmt);
+
+        let current_statement = self.pop_statement();
+        if !current_statement.lambda_exprs.is_empty() {
+            // The body of a lambda expression needs access to the `Callable` type
+            // context the lambda is being inferred with, and so any statement
+            // containing a lambda must be inferable as a standalone statement
+            // to avoid large scope-level cycles.
+            let standalone_stmt = self.add_standalone_statement(stmt);
+            for lambda in current_statement.lambda_exprs {
+                self.enclosing_lambda_statements
+                    .insert(lambda.into(), standalone_stmt);
+            }
+        }
+    }
 
     fn visit_keyword(&mut self, keyword: &'ast ast::Keyword) {
         walk_keyword(self, keyword);
@@ -3129,6 +3334,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             }
             ast::Expr::Lambda(lambda) => {
+                self.current_statement_mut()
+                    .expect("every lambda expression is part of a statement")
+                    .lambda_exprs
+                    .push(lambda);
+
                 if let Some(parameters) = &lambda.parameters {
                     // The default value of the parameters needs to be evaluated in the
                     // enclosing scope.
@@ -3144,7 +3354,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 // Add symbols and definitions for the parameters to the lambda scope.
                 if let Some(parameters) = lambda.parameters.as_ref() {
-                    self.declare_parameters(parameters);
+                    self.declare_lambda_parameters(parameters, lambda);
                 }
 
                 self.visit_expr(lambda.body.as_ref());
@@ -3568,6 +3778,11 @@ impl<'ast> From<&'ast ast::ExprNamed> for CurrentAssignment<'ast, '_> {
     fn from(value: &'ast ast::ExprNamed) -> Self {
         Self::Named(value)
     }
+}
+
+struct CurrentStatement<'ast> {
+    /// The lambda expressions part of this statement.
+    lambda_exprs: Vec<&'ast ast::ExprLambda>,
 }
 
 #[derive(Debug, PartialEq)]

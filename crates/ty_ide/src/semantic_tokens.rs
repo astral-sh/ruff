@@ -43,7 +43,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
-use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_semantic::{
     HasType, SemanticModel,
     types::ide_support::{
@@ -314,7 +314,7 @@ impl<'db> SemanticTokenVisitor<'db> {
             }
             DefinitionKind::Class(_) => Some((SemanticTokenType::Class, modifiers)),
             DefinitionKind::TypeVar(_) => Some((SemanticTokenType::TypeParameter, modifiers)),
-            DefinitionKind::Parameter(parameter) => {
+            DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) => {
                 let parsed = parsed_module(db, definition.file(db));
                 let ty = parameter.node(&parsed.load(db)).inferred_type(&model);
 
@@ -342,12 +342,7 @@ impl<'db> SemanticTokenVisitor<'db> {
 
                 Some((SemanticTokenType::Parameter, modifiers))
             }
-            DefinitionKind::VariadicPositionalParameter(_) => {
-                Some((SemanticTokenType::Parameter, modifiers))
-            }
-            DefinitionKind::VariadicKeywordParameter(_) => {
-                Some((SemanticTokenType::Parameter, modifiers))
-            }
+            DefinitionKind::Parameter(_) => Some((SemanticTokenType::Parameter, modifiers)),
             DefinitionKind::TypeAlias(_) => Some((SemanticTokenType::TypeParameter, modifiers)),
             DefinitionKind::Import(_)
             | DefinitionKind::ImportFrom(_)
@@ -1886,7 +1881,6 @@ f: """'list["int | str"]' | 'None'"""
 import os
 import sys
 from collections import defaultdict
-from typing import List
 
 class MyClass:
     CONSTANT = 42
@@ -1906,7 +1900,7 @@ y = obj.method           # method should be method (bound method)
 z = obj.CONSTANT         # CONSTANT should be variable with readonly modifier
 w = obj.prop             # prop should be property
 v = MyClass.method       # method should be method (function)
-u = List.__name__        # __name__ should be variable
+u = MyClass.__name__     # __name__ should resolve on the class object
 t = MyClass.prop          # prop should be property on the class itself
 ",
         );
@@ -1918,41 +1912,40 @@ t = MyClass.prop          # prop should be property on the class itself
         "sys" @ 18..21: Namespace
         "collections" @ 27..38: Namespace
         "defaultdict" @ 46..57: Class
-        "typing" @ 63..69: Namespace
-        "List" @ 77..81: Variable
-        "MyClass" @ 89..96: Class [definition]
-        "CONSTANT" @ 102..110: Variable [definition, readonly]
-        "42" @ 113..115: Number
-        "method" @ 125..131: Method [definition]
-        "self" @ 132..136: SelfParameter [definition]
-        "\"hello\"" @ 154..161: String
-        "property" @ 168..176: Decorator
-        "prop" @ 185..189: Method [definition]
-        "self" @ 190..194: SelfParameter [definition]
-        "self" @ 212..216: SelfParameter
-        "CONSTANT" @ 217..225: Variable [readonly]
-        "obj" @ 227..230: Variable [definition]
-        "MyClass" @ 233..240: Class
-        "x" @ 278..279: Variable [definition]
-        "os" @ 282..284: Namespace
-        "path" @ 285..289: Namespace
-        "y" @ 339..340: Variable [definition]
-        "obj" @ 343..346: Variable
-        "method" @ 347..353: Method
-        "z" @ 405..406: Variable [definition]
-        "obj" @ 409..412: Variable
-        "CONSTANT" @ 413..421: Variable [readonly]
-        "w" @ 483..484: Variable [definition]
-        "obj" @ 487..490: Variable
-        "prop" @ 491..495: Property [readonly]
-        "v" @ 534..535: Variable [definition]
-        "MyClass" @ 538..545: Class
-        "method" @ 546..552: Method
-        "u" @ 596..597: Variable [definition]
-        "List" @ 600..604: Variable
-        "t" @ 651..652: Variable [definition]
-        "MyClass" @ 655..662: Class
-        "prop" @ 663..667: Property [readonly]
+        "MyClass" @ 65..72: Class [definition]
+        "CONSTANT" @ 78..86: Variable [definition, readonly]
+        "42" @ 89..91: Number
+        "method" @ 101..107: Method [definition]
+        "self" @ 108..112: SelfParameter [definition]
+        "\"hello\"" @ 130..137: String
+        "property" @ 144..152: Decorator
+        "prop" @ 161..165: Method [definition]
+        "self" @ 166..170: SelfParameter [definition]
+        "self" @ 188..192: SelfParameter
+        "CONSTANT" @ 193..201: Variable [readonly]
+        "obj" @ 203..206: Variable [definition]
+        "MyClass" @ 209..216: Class
+        "x" @ 254..255: Variable [definition]
+        "os" @ 258..260: Namespace
+        "path" @ 261..265: Namespace
+        "y" @ 315..316: Variable [definition]
+        "obj" @ 319..322: Variable
+        "method" @ 323..329: Method
+        "z" @ 381..382: Variable [definition]
+        "obj" @ 385..388: Variable
+        "CONSTANT" @ 389..397: Variable [readonly]
+        "w" @ 459..460: Variable [definition]
+        "obj" @ 463..466: Variable
+        "prop" @ 467..471: Property [readonly]
+        "v" @ 510..511: Variable [definition]
+        "MyClass" @ 514..521: Class
+        "method" @ 522..528: Method
+        "u" @ 572..573: Variable [definition]
+        "MyClass" @ 576..583: Class
+        "__name__" @ 584..592: Variable
+        "t" @ 643..644: Variable [definition]
+        "MyClass" @ 647..654: Class
+        "prop" @ 655..659: Property [readonly]
         "#);
     }
 
@@ -3602,6 +3595,12 @@ def generic_function[T](value: T) -> T:
     fn decorator_classification() {
         let test = SemanticTokenTest::new(
             r#"
+class App:
+    def route(self, path):
+        pass
+
+app = App()
+
 @staticmethod
 @property
 @app.route("/path")
@@ -3617,12 +3616,20 @@ class MyClass:
         let tokens = test.highlight_file();
 
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
-        "staticmethod" @ 2..14: Decorator
-        "property" @ 16..24: Decorator
-        "\"/path\"" @ 36..43: String
-        "my_function" @ 49..60: Function [definition]
-        "dataclass" @ 75..84: Decorator
-        "MyClass" @ 91..98: Class [definition]
+        "App" @ 7..10: Class [definition]
+        "route" @ 20..25: Method [definition]
+        "self" @ 26..30: SelfParameter [definition]
+        "path" @ 32..36: Parameter [definition]
+        "app" @ 53..56: Variable [definition]
+        "App" @ 59..62: Class
+        "staticmethod" @ 67..79: Decorator
+        "property" @ 81..89: Decorator
+        "app" @ 91..94: Variable
+        "route" @ 95..100: Method
+        "\"/path\"" @ 101..108: String
+        "my_function" @ 114..125: Function [definition]
+        "dataclass" @ 140..149: Decorator
+        "MyClass" @ 156..163: Class [definition]
         "#);
     }
 
