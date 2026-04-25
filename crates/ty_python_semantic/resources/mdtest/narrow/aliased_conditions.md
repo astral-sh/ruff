@@ -237,6 +237,14 @@ def _(a: A):
     a = A()
     if is_none:
         reveal_type(a.x)  # revealed: int | None
+
+def _(x: int | None):
+    # In-place reassignment
+    x = x is None
+    if x:
+        reveal_type(x)  # revealed: Literal[True]
+    else:
+        reveal_type(x)  # revealed: Literal[False]
 ```
 
 ## Alias variable reassigned invalidates alias

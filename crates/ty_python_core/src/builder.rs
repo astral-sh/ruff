@@ -735,6 +735,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Try to register a narrowing alias for a simple name assignment.
+    ///
+    /// Any pre-existing alias entry for the `target` name has already been removed by
+    /// [`Self::invalidate_narrowing_aliases_for`] in the binding pathway that ran before
+    /// this call, so we only need to decide whether to insert a new entry.
     fn try_register_narrowing_alias(&mut self, target: &ast::Expr, value: Option<&'ast ast::Expr>) {
         let Some(target_name_expr) = target.as_name_expr() else {
             return;
@@ -743,7 +747,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let target_name = &target_name_expr.id;
 
         if !Self::can_register_narrowing_alias(value) {
-            self.narrowing_aliases.remove(target_name);
             return;
         }
 
@@ -751,7 +754,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let narrowed_places =
             PossiblyNarrowedPlacesBuilder::new(self.db, place_table).expression(value);
 
-        // Don't register if the target itself is one of the narrowed places.
+        // Don't register if the target itself is one of the narrowed places (e.g. `x = x is None`),
+        // since the alias would be invalidated immediately by this same assignment.
         let target_is_narrowed = place_table
             .symbol_id(target_name)
             .is_some_and(|symbol| narrowed_places.contains(&symbol.into()));
@@ -765,8 +769,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     narrowed_places,
                 },
             );
-        } else {
-            self.narrowing_aliases.remove(target_name);
         }
     }
 
