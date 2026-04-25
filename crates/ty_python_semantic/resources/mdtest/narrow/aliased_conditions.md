@@ -452,7 +452,7 @@ def _(x: int | None):
     inner()
 ```
 
-## Chained alias
+## Chained aliases
 
 > TODO: This feature is not supported yet.
 
