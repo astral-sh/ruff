@@ -34,6 +34,9 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
+  # The conformance suite only runs the binary; it doesn't need full debug
+  # info. Keep line tables so panic backtraces still report file:line.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
   CONFORMANCE_SUITE_COMMIT: 5a701a037b5243df1f39622b642893d865f06205
   PYTHON_VERSION: 3.12
 

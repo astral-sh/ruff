@@ -21,6 +21,11 @@ env:
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
+  # Trim debug info to line tables only across the dev and `profiling` profiles
+  # used by CI. Panic backtraces still report file:line, but compilation and
+  # linking are significantly faster than with the default `debug = "full"`.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
   PACKAGE_NAME: ruff
   PYTHON_VERSION: "3.14"
   NEXTEST_PROFILE: ci

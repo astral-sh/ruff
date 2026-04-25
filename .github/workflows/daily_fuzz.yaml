@@ -20,6 +20,10 @@ env:
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
+  # The fuzzer only runs the binary; we don't need full debug info. Keep line
+  # tables so panic backtraces (which the fuzzer specifically hunts for) still
+  # report file:line.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
   PACKAGE_NAME: ruff
   FORCE_COLOR: 1
 

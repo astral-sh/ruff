@@ -18,6 +18,10 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
+  # The ecosystem-analyzer doesn't need full debug symbols, but we keep line
+  # tables so panic backtraces still report file:line. This is significantly
+  # cheaper than the `profiling` profile's default `debug = "full"`.
+  CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
 
 jobs:
   ty-ecosystem-report:

@@ -34,6 +34,10 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
+  # The memory report only consumes JSON output from the binary, so override
+  # the `profiling` profile's `debug = "full"` to speed up compilation and
+  # linking. Line tables are kept so panic backtraces still report file:line.
+  CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
   PYTHON_VERSION: 3.14
 
 jobs:
