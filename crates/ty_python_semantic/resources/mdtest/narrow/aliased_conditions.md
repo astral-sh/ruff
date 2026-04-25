@@ -326,8 +326,7 @@ def _(a: A):
 
 ### Narrowed variable reassigned
 
-If the narrowed variable is reassigned inside an eager scope, the alias is invalidated within that
-scope.
+If the target is reassigned inside an eager scope, narrowing does not take place within that scope.
 
 ```py
 def _(x: int | None):
