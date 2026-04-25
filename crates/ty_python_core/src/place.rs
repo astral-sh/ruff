@@ -243,6 +243,14 @@ impl PlaceTable {
     pub fn member_id_by_instance_attribute_name(&self, name: &str) -> Option<ScopedMemberId> {
         self.members.place_id_by_instance_attribute_name(name)
     }
+
+    pub(crate) fn nested_scopes_with_bindings(&self, symbol_id: ScopedSymbolId) -> &[FileScopeId] {
+        if let Some(scopes) = self.symbols.nested_scopes_with_bindings.get(&symbol_id) {
+            scopes
+        } else {
+            &[]
+        }
+    }
 }
 
 #[derive(Default)]
@@ -387,6 +395,16 @@ impl PlaceTableBuilder {
                 self.member_mut(member_id).mark_declared();
             }
         }
+    }
+
+    #[track_caller]
+    pub(super) fn add_nested_scope_with_binding(
+        &mut self,
+        this_scope_symbol_id: ScopedSymbolId,
+        nested_scope: FileScopeId,
+    ) {
+        self.symbols
+            .add_nested_scope_with_binding(this_scope_symbol_id, nested_scope);
     }
 
     pub fn finish(self) -> PlaceTable {
