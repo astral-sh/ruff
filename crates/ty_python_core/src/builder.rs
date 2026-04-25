@@ -774,22 +774,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Invalidate any narrowing aliases affected by a new definition of `place`.
     fn invalidate_narrowing_aliases_for(&mut self, place: ScopedPlaceId) {
-        // Also invalidate aliases that narrow any member of `place`.
-        let associated_members = self
-            .current_place_table()
-            .associated_place_ids(place)
-            .to_vec();
-        self.narrowing_aliases.retain(|_, alias| {
+        let place_table = &self.place_tables[self.current_scope()];
+        let associated_members = place_table.associated_place_ids(place);
+        let reassigned_alias_name = place
+            .as_symbol()
+            .map(|symbol_id| place_table.symbol(symbol_id).name());
+
+        self.narrowing_aliases.retain(|name, alias| {
+            // Drop aliases that narrow the reassigned place or any of its members.
+            //  e.g. `is_none = x is None and ...; x = 1`
             !alias.narrowed_places.contains(&place)
+                //  e.g. `is_none = a.x is None; a = A()`
                 && !associated_members
                     .iter()
                     .any(|m| alias.narrowed_places.contains(&(*m).into()))
+                // Drop the alias whose own variable is the reassigned place.
+                // e.g. `is_none = x is None; is_none = False`
+                && reassigned_alias_name != Some(name)
         });
-        // Remove alias for the place itself (alias variable reassigned).
-        if let Some(symbol_id) = place.as_symbol() {
-            let name = self.current_place_table().symbol(symbol_id).name().clone();
-            self.narrowing_aliases.remove(&name);
-        }
     }
 
     fn can_register_narrowing_alias(value: &ast::Expr) -> bool {
