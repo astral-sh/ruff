@@ -1740,7 +1740,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             .variables_inner(db)
             .iter()
             .map(|(identity, variable)| {
-                let mapped_ty = self.types.get_mut(identity)?.get_or_build();
+                let mapped_ty = self.types.get_mut(identity)?.get_or_build(db);
                 // The typevar was inferred — present both bounds as the inferred type.
                 let chosen = choose(*variable, mapped_ty, mapped_ty);
                 Some(chosen.unwrap_or(mapped_ty))
