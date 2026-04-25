@@ -16,14 +16,14 @@ use ruff_db::files::File;
 use ruff_db::source::source_text;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
+use ty_ide::{Hint, hints};
 use ty_project::{ProgressReporter, ProjectDatabase};
-use ty_python_semantic::types::ide_support::UnusedBinding;
 
 use crate::PositionEncoding;
 use crate::capabilities::ResolvedClientCapabilities;
 use crate::document::DocumentKey;
 use crate::server::api::diagnostics::{
-    Diagnostics, collect_unused_bindings, to_lsp_diagnostic, unused_bindings_to_lsp_diagnostics,
+    Diagnostics, to_lsp_diagnostic, unnecessary_hints_to_lsp_diagnostics,
 };
 use crate::server::api::traits::{
     BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
@@ -238,7 +238,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
     }
 
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
-        let unused_bindings = collect_unused_bindings(db, file);
+        let unnecessary_hints = hints(db, file);
 
         // Another thread might have panicked at this point because of a salsa cancellation which
         // poisoned the result. If the response is poisoned, just don't report and wait for our thread
@@ -260,10 +260,10 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         // Don't report empty diagnostics. We clear previous diagnostics in `into_response`
         // which also handles the case where a file no longer has diagnostics because
         // it's no longer part of the project.
-        if !diagnostics.is_empty() || !unused_bindings.is_empty() {
+        if !diagnostics.is_empty() || !unnecessary_hints.is_empty() {
             state
                 .response
-                .write_diagnostics_for_file(db, file, diagnostics, &unused_bindings);
+                .write_diagnostics_for_file(db, file, diagnostics, &unnecessary_hints);
         }
 
         state.response.maybe_flush();
@@ -286,7 +286,8 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         let response = &mut self.state.get_mut().unwrap().response;
 
         for (file, diagnostics) in by_file {
-            response.write_diagnostics_for_file(db, file, &diagnostics, &[]);
+            let unnecessary_hints = hints(db, file);
+            response.write_diagnostics_for_file(db, file, &diagnostics, &unnecessary_hints);
         }
         response.maybe_flush();
     }
@@ -304,12 +305,10 @@ impl ProgressReporterState<'_> {
         let checked = self.checked_files;
         let total = self.total_files;
 
-        #[allow(clippy::cast_possible_truncation)]
-        let percentage = if total > 0 {
-            Some((checked * 100 / total) as u32)
-        } else {
-            None
-        };
+        #[expect(clippy::cast_possible_truncation)]
+        let percentage = (checked * 100)
+            .checked_div(total)
+            .map(|result| result as u32);
 
         work_done.report_progress(format!("{checked}/{total} files"), percentage);
 
@@ -376,7 +375,7 @@ impl<'a> ResponseWriter<'a> {
         db: &ProjectDatabase,
         file: File,
         diagnostics: &[Diagnostic],
-        unused_bindings: &[UnusedBinding],
+        unnecessary_hints: &[Hint],
     ) {
         let Some(url) = file_to_url(db, file) else {
             tracing::debug!("Failed to convert file path to URL at {}", file.path(db));
@@ -398,7 +397,7 @@ impl<'a> ResponseWriter<'a> {
             .map(|doc| i64::from(doc.version()))
             .ok();
 
-        let result_id = Diagnostics::result_id_from_hash(diagnostics, unused_bindings);
+        let result_id = Diagnostics::result_id_from_hash(diagnostics, unnecessary_hints);
 
         let previous_result_id = self.previous_result_ids.remove(&key).map(|(_url, id)| id);
 
@@ -430,11 +429,11 @@ impl<'a> ResponseWriter<'a> {
                         )
                     })
                     .collect::<Vec<_>>();
-                lsp_diagnostics.extend(unused_bindings_to_lsp_diagnostics(
+                lsp_diagnostics.extend(unnecessary_hints_to_lsp_diagnostics(
                     db,
                     file,
                     self.position_encoding,
-                    unused_bindings,
+                    unnecessary_hints,
                 ));
 
                 WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {

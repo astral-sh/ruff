@@ -17,7 +17,7 @@ help: Replace `zip()` with `itertools.pairwise()`
 4  | foo = [1, 2, 3, 4]
 --------------------------------------------------------------------------------
 14 | zip(foo[:-1], foo[1:], foo, strict=True)  # more than 2 inputs
-15 | 
+15 |
 16 | # Errors
    - zip(input, input[1:])
 17 + itertools.pairwise(input)
@@ -42,7 +42,7 @@ help: Replace `zip()` with `itertools.pairwise()`
 3  | otherInput = [2, 3, 4]
 4  | foo = [1, 2, 3, 4]
 --------------------------------------------------------------------------------
-15 | 
+15 |
 16 | # Errors
 17 | zip(input, input[1:])
    - zip(input, input[1::1])

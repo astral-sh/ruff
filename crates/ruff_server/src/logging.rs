@@ -14,7 +14,7 @@ use tracing_subscriber::{
     layer::SubscriberExt,
 };
 
-pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&std::path::Path>) {
+pub fn init_logging(log_level: LogLevel, log_file: Option<&std::path::Path>) {
     let log_file = log_file
         .map(|path| {
             // this expands `logFile` so that tildes and environment variables
@@ -73,7 +73,7 @@ pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&std::path::Pat
 /// The default log level is `info`.
 #[derive(Clone, Copy, Debug, Deserialize, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum LogLevel {
+pub enum LogLevel {
     Error,
     Warn,
     #[default]

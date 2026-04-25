@@ -188,9 +188,9 @@ def get_object() -> object:
 match get_object():
     case {"something": M}:
         pass
-    case [*N]:
-        pass
     case [O]:
+        pass
+    case [*N]:
         pass
     case I(foo=R):
         pass

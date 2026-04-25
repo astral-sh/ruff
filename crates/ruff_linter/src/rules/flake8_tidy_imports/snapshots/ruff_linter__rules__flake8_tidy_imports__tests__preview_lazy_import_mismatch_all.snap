@@ -13,12 +13,12 @@ TID254 [*] Use a `lazy` import instead of an eager import
   |
 help: Convert to a lazy import
 1 | from __future__ import annotations
-2 | 
+2 |
   - import os
 3 + lazy import os
 4 | import typing as t
 5 | lazy import pathlib
-6 | 
+6 |
 note: This is an unsafe fix and may change runtime behavior
 
 TID254 [*] Use a `lazy` import instead of an eager import
@@ -31,12 +31,12 @@ TID254 [*] Use a `lazy` import instead of an eager import
   |
 help: Convert to a lazy import
 1 | from __future__ import annotations
-2 | 
+2 |
 3 | import os
   - import typing as t
 4 + lazy import typing as t
 5 | lazy import pathlib
-6 | 
+6 |
 7 | from foo import bar
 note: This is an unsafe fix and may change runtime behavior
 
@@ -53,12 +53,12 @@ TID254 [*] Use a `lazy` import instead of an eager import
 help: Convert to a lazy import
 4  | import typing as t
 5  | lazy import pathlib
-6  | 
+6  |
    - from foo import bar
 7  + lazy from foo import bar
 8  | lazy from foo import baz
 9  | from starry import *
-10 | 
+10 |
 note: This is an unsafe fix and may change runtime behavior
 
 TID254 [*] Use a `lazy` import instead of an eager import
@@ -72,11 +72,11 @@ TID254 [*] Use a `lazy` import instead of an eager import
    |
 help: Convert to a lazy import
 9  | from starry import *
-10 | 
+10 |
 11 | with manager():
    -     import email
 12 +     lazy import email
-13 | 
+13 |
 14 | if True:
 15 |     from bar import qux
 note: This is an unsafe fix and may change runtime behavior
@@ -92,11 +92,11 @@ TID254 [*] Use a `lazy` import instead of an eager import
    |
 help: Convert to a lazy import
 12 |     import email
-13 | 
+13 |
 14 | if True:
    -     from bar import qux
 15 +     lazy from bar import qux
-16 | 
+16 |
 17 | try:
 18 |     import collections
 note: This is an unsafe fix and may change runtime behavior
@@ -112,7 +112,7 @@ TID254 [*] Use a `lazy` import instead of an eager import
 help: Convert to a lazy import
 25 | class Example:
 26 |     import decimal
-27 | 
+27 |
    - x = 1; import pkg.submodule
 28 + x = 1; lazy import pkg.submodule
 note: This is an unsafe fix and may change runtime behavior

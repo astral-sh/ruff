@@ -16,15 +16,15 @@ use crate::{
         DefinedPlace, Place, PlaceWithDefinition, imported_symbol, place_from_bindings,
         place_from_declarations,
     },
-    semantic_index::{
-        attribute_scopes, definition::Definition, global_scope, place_table, scope::ScopeId,
-        semantic_index, use_def_map,
-    },
     types::{
         ClassBase, ClassLiteral, KnownClass, KnownInstanceType, StaticClassLiteral,
         SubclassOfInner, Type, TypeVarBoundOrConstraints, class::CodeGeneratorKind,
         generics::Specialization,
     },
+};
+use ty_python_core::{
+    attribute_scopes, definition::Definition, global_scope, place_table, scope::ScopeId,
+    semantic_index, use_def_map,
 };
 
 /// Iterate over all declarations and bindings that exist at the end
@@ -284,7 +284,11 @@ impl<'db> AllMembers<'db> {
                 }
             },
 
-            Type::Dynamic(_) | Type::Never | Type::AlwaysTruthy | Type::AlwaysFalsy => {
+            Type::Dynamic(_)
+            | Type::Divergent(_)
+            | Type::Never
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy => {
                 self.extend_with_type(db, Type::object());
             }
 

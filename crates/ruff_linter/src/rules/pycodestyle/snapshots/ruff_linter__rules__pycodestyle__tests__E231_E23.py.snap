@@ -68,13 +68,13 @@ E231 [*] Missing whitespace after `,`
 20 |         pass
    |
 help: Add missing whitespace
-16 | 
+16 |
 17 | def foo() -> None:
 18 |     #: E231
    -     if (1,2):
 19 +     if (1, 2):
 20 |         pass
-21 | 
+21 |
 22 | #: Okay
 
 E231 [*] Missing whitespace after `:`
@@ -93,7 +93,7 @@ help: Add missing whitespace
    -     'tag_smalldata':[('byte_count_mdtype', 'u4'), ('data', 'S4')],
 29 +     'tag_smalldata': [('byte_count_mdtype', 'u4'), ('data', 'S4')],
 30 | }
-31 | 
+31 |
 32 | # E231
 
 E231 [*] Missing whitespace after `,`
@@ -107,11 +107,11 @@ E231 [*] Missing whitespace after `,`
    |
 help: Add missing whitespace
 30 | }
-31 | 
+31 |
 32 | # E231
    - f"{(a,b)}"
 33 + f"{(a, b)}"
-34 | 
+34 |
 35 | # Okay because it's hard to differentiate between the usages of a colon in a f-string
 36 | f"{a:=1}"
 
@@ -126,11 +126,11 @@ E231 [*] Missing whitespace after `:`
    |
 help: Add missing whitespace
 44 | snapshot.file_uri[len(f's3://{self.s3_bucket_name}/'):]
-45 | 
+45 |
 46 | #: E231
    - {len(f's3://{self.s3_bucket_name}/'):1}
 47 + {len(f's3://{self.s3_bucket_name}/'): 1}
-48 | 
+48 |
 49 | #: Okay
 50 | a = (1,)
 
@@ -212,7 +212,7 @@ help: Add missing whitespace
 76 +             "k2": [2],
 77 |         }
 78 |     ]
-79 | 
+79 |
 
 E231 [*] Missing whitespace after `:`
   --> E23.py:82:13
@@ -225,7 +225,7 @@ E231 [*] Missing whitespace after `:`
 84 |         "k3":[2],  # E231
    |
 help: Add missing whitespace
-79 | 
+79 |
 80 | x = [
 81 |     {
    -         "k1":[2], # E231
@@ -465,7 +465,7 @@ E231 [*] Missing whitespace after `:`
     |
 help: Add missing whitespace
 106 | ]
-107 | 
+107 |
 108 | # Should be E231 errors on all of these type parameters and function parameters, but not on their (strange) defaults
     - def pep_696_bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
 109 + def pep_696_bad[A: object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
@@ -484,7 +484,7 @@ E231 [*] Missing whitespace after `:`
     |
 help: Add missing whitespace
 106 | ]
-107 | 
+107 |
 108 | # Should be E231 errors on all of these type parameters and function parameters, but not on their (strange) defaults
     - def pep_696_bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
 109 + def pep_696_bad[A:object="foo"[::-1], B: object =[[["foo", "bar"]]], C:object= bytes](
@@ -503,7 +503,7 @@ E231 [*] Missing whitespace after `:`
     |
 help: Add missing whitespace
 106 | ]
-107 | 
+107 |
 108 | # Should be E231 errors on all of these type parameters and function parameters, but not on their (strange) defaults
     - def pep_696_bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
 109 + def pep_696_bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C: object= bytes](
@@ -522,7 +522,7 @@ E231 [*] Missing whitespace after `:`
 112 |     z:object = "fooo",
     |
 help: Add missing whitespace
-107 | 
+107 |
 108 | # Should be E231 errors on all of these type parameters and function parameters, but not on their (strange) defaults
 109 | def pep_696_bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
     -     x:A = "foo"[::-1],
@@ -569,7 +569,7 @@ help: Add missing whitespace
 112 +     z: object = "fooo",
 113 | ):
 114 |     pass
-115 | 
+115 |
 
 E231 [*] Missing whitespace after `:`
    --> E23.py:116:18
@@ -584,7 +584,7 @@ E231 [*] Missing whitespace after `:`
 help: Add missing whitespace
 113 | ):
 114 |     pass
-115 | 
+115 |
     - class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
 116 + class PEP696Bad[A: object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
 117 |     def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
@@ -604,7 +604,7 @@ E231 [*] Missing whitespace after `:`
 help: Add missing whitespace
 113 | ):
 114 |     pass
-115 | 
+115 |
     - class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
 116 + class PEP696Bad[A:object="foo"[::-1], B: object =[[["foo", "bar"]]], C:object= bytes]:
 117 |     def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
@@ -624,7 +624,7 @@ E231 [*] Missing whitespace after `:`
 help: Add missing whitespace
 113 | ):
 114 |     pass
-115 | 
+115 |
     - class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
 116 + class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C: object= bytes]:
 117 |     def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
@@ -642,7 +642,7 @@ E231 [*] Missing whitespace after `:`
     |
 help: Add missing whitespace
 114 |     pass
-115 | 
+115 |
 116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
     -     def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
 117 +     def pep_696_bad_method[A: object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
@@ -661,7 +661,7 @@ E231 [*] Missing whitespace after `:`
     |
 help: Add missing whitespace
 114 |     pass
-115 | 
+115 |
 116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
     -     def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
 117 +     def pep_696_bad_method[A:object="foo"[::-1], B: object =[[["foo", "bar"]]], C:object= bytes](
@@ -680,7 +680,7 @@ E231 [*] Missing whitespace after `:`
     |
 help: Add missing whitespace
 114 |     pass
-115 | 
+115 |
 116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
     -     def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
 117 +     def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C: object= bytes](
@@ -746,7 +746,7 @@ help: Add missing whitespace
 121 +         z: object = "fooo",
 122 |     ):
 123 |         pass
-124 | 
+124 |
 
 E231 [*] Missing whitespace after `:`
    --> E23.py:125:32
@@ -761,12 +761,12 @@ E231 [*] Missing whitespace after `:`
 help: Add missing whitespace
 122 |     ):
 123 |         pass
-124 | 
+124 |
     - class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
 125 + class PEP696BadWithEmptyBases[A: object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
 126 |     class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
 127 |         pass
-128 | 
+128 |
 
 E231 [*] Missing whitespace after `:`
    --> E23.py:125:54
@@ -781,12 +781,12 @@ E231 [*] Missing whitespace after `:`
 help: Add missing whitespace
 122 |     ):
 123 |         pass
-124 | 
+124 |
     - class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
 125 + class PEP696BadWithEmptyBases[A:object="foo"[::-1], B: object =[[["foo", "bar"]]], C:object= bytes]():
 126 |     class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
 127 |         pass
-128 | 
+128 |
 
 E231 [*] Missing whitespace after `:`
    --> E23.py:125:84
@@ -801,12 +801,12 @@ E231 [*] Missing whitespace after `:`
 help: Add missing whitespace
 122 |     ):
 123 |         pass
-124 | 
+124 |
     - class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
 125 + class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C: object= bytes]():
 126 |     class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
 127 |         pass
-128 | 
+128 |
 
 E231 [*] Missing whitespace after `:`
    --> E23.py:126:47
@@ -818,12 +818,12 @@ E231 [*] Missing whitespace after `:`
     |
 help: Add missing whitespace
 123 |         pass
-124 | 
+124 |
 125 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
     -     class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
 126 +     class IndentedPEP696BadWithNonEmptyBases[A: object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
 127 |         pass
-128 | 
+128 |
 129 | # Should be no E231 errors on any of these:
 
 E231 [*] Missing whitespace after `:`
@@ -836,12 +836,12 @@ E231 [*] Missing whitespace after `:`
     |
 help: Add missing whitespace
 123 |         pass
-124 | 
+124 |
 125 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
     -     class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
 126 +     class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B: object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
 127 |         pass
-128 | 
+128 |
 129 | # Should be no E231 errors on any of these:
 
 E231 [*] Missing whitespace after `:`
@@ -854,12 +854,12 @@ E231 [*] Missing whitespace after `:`
     |
 help: Add missing whitespace
 123 |         pass
-124 | 
+124 |
 125 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
     -     class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
 126 +     class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C: object= bytes](object, something_dynamic[x::-1]):
 127 |         pass
-128 | 
+128 |
 129 | # Should be no E231 errors on any of these:
 
 E231 [*] Missing whitespace after `,`
@@ -873,11 +873,11 @@ E231 [*] Missing whitespace after `,`
     |
 help: Add missing whitespace
 144 |     pass
-145 | 
+145 |
 146 | # E231
     - t"{(a,b)}"
 147 + t"{(a, b)}"
-148 | 
+148 |
 149 | # Okay because it's hard to differentiate between the usages of a colon in a t-string
 150 | t"{a:=1}"
 
@@ -890,7 +890,7 @@ E231 [*] Missing whitespace after `:`
     |
 help: Add missing whitespace
 158 | snapshot.file_uri[len(t's3://{self.s3_bucket_name}/'):]
-159 | 
+159 |
 160 | #: E231
     - {len(t's3://{self.s3_bucket_name}/'):1}
 161 + {len(t's3://{self.s3_bucket_name}/'): 1}

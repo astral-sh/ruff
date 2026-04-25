@@ -98,7 +98,7 @@ Using json from the shell to validate and pretty-print::
 
 from _typeshed import SupportsRead, SupportsWrite
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal
 
 from .decoder import JSONDecodeError as JSONDecodeError, JSONDecoder as JSONDecoder
 from .encoder import JSONEncoder as JSONEncoder
@@ -296,4 +296,6 @@ def load(
     kwarg; otherwise ``JSONDecoder`` is used.
     """
 
-def detect_encoding(b: bytes | bytearray) -> str: ...  # undocumented
+def detect_encoding(
+    b: bytes | bytearray,
+) -> Literal["utf-8", "utf-8-sig", "utf-16", "utf-16-be", "utf-16-le", "utf-32", "utf-32-be", "utf-32-le"]: ...  # undocumented

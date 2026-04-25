@@ -43,11 +43,56 @@ def f[T](x: T, cond: bool) -> T | list[T]:
 
 l5: int | list[int] = f(1, True)
 
-a: list[int] = [1, 2, *(3, 4, 5)]
-reveal_type(a)  # revealed: list[int]
+x: list[int] = [1, 2, *(3, 4, 5)]
+reveal_type(x)  # revealed: list[int]
 
-b: list[list[int]] = [[1], [2], *([3], [4])]
-reveal_type(b)  # revealed: list[list[int]]
+x: list[list[int]] = [[1], [2], *([3], [4])]
+reveal_type(x)  # revealed: list[list[int]]
+
+x: list[list[int | str]] = [[1], [2]] * 3
+reveal_type(x)  # revealed: list[list[int | str]]
+
+x: list[list[int | str]] = 3 * ([[1]] + [[2]])
+reveal_type(x)  # revealed: list[list[int | str]]
+
+x: list[int | str] = 3 * ["x" for _ in range(3)]
+reveal_type(x)  # revealed: list[int | str]
+
+# Tuple elements are inferred individually, but type context can prevent e.g. `int` widening.
+x: tuple[list[Literal[1]]] = (list1(1),)
+reveal_type(x)  # revealed: tuple[list[Literal[1]]]
+
+x: tuple[list[Literal[1]], ...] = (list1(1),) * 3
+reveal_type(x)  # revealed: tuple[list[Literal[1]], ...]
+
+x: tuple[list[Literal[1]], ...] = 3 * ((list1(1),) + (list1(1),))
+reveal_type(x)  # revealed: tuple[list[Literal[1]], ...]
+
+x: set[int | str] = {1, 2} | {3, 4}
+reveal_type(x)  # revealed: set[int | str]
+
+x: set[int | str] = {42 for _ in range(3)}
+reveal_type(x)  # revealed: set[int | str]
+
+x: dict[int | str, int | str] = {1: 2} | {3: 4}
+reveal_type(x)  # revealed: dict[int | str, int | str]
+
+x: dict[int | str, int | str] = {str(i): i for i in range(3)}
+reveal_type(x)  # revealed: dict[int | str, int | str]
+
+# TODO: We currently eagerly pass type context to collection literals on either side of a binary
+# operator. That makes the cases above work, but it's not generally sound. For example, it gives the
+# wrong result in this case.
+class X:
+    def __add__(self, _: list[int]) -> list[int | str]:
+        return []
+
+# error: [unsupported-operator] "Operator `+` is not supported between objects of type `X` and `list[int | str]`"
+x: list[int | str] = X() + [1]
+
+# TODO: We also don't yet support generic function calls like this.
+# error: [invalid-assignment] "Object of type `list[int]` is not assignable to `list[int | str]`"
+x: list[int | str] = list1(42) * 3
 ```
 
 `typed_dict.py`:
@@ -87,6 +132,8 @@ reveal_type(d4_invalid_dict)  # revealed: TD
 # special-case this pattern to match the behavior of `d5_literal`.
 d5_literal: dict[Hashable, Callable[..., object]] = {"x": lambda: 1}
 d5_dict: dict[Hashable, Callable[..., object]] = dict(x=lambda: 1)
+
+d6_dict: TD = {"x": 1} | {"x": 2}
 
 def return_literal() -> TD:
     return {"x": 1}
@@ -262,7 +309,9 @@ def _(xy: X | Y):
 The type context of all matching overloads are considered during argument inference:
 
 ```py
-from typing import overload, TypedDict
+from concurrent.futures import Future
+from os.path import abspath
+from typing import Awaitable, Callable, TypeVar, Union, overload, TypedDict
 
 def int_or_str() -> int | str:
     raise NotImplementedError
@@ -357,6 +406,24 @@ def f7(y: object) -> object:
 # TODO: We should reveal `list[int | str]` here.
 x9 = f7(reveal_type(["Sheet1"]))  # revealed: list[str]
 reveal_type(x9)  # revealed: list[int | str]
+
+# TODO: We should not error here once call inference can conjoin constraints
+# from all call arguments.
+def f8(xs: tuple[str, ...]) -> tuple[str, ...]:
+    # error: [invalid-return-type]
+    return tuple(map(abspath, xs))
+
+T2 = TypeVar("T2")
+
+def sink(func: Callable[[], Union[Awaitable[T2], T2]], future: Future[T2]) -> None:
+    raise NotImplementedError
+
+# TODO: This should not error once we conjoin constraints from all call arguments.
+def f9(func: Callable[[], Union[Awaitable[T2], T2]]) -> Future[T2]:
+    future: Future[T2] = Future()
+    # error: [invalid-argument-type]
+    sink(func, future)
+    return future
 ```
 
 ## Class constructor parameters
@@ -376,8 +443,7 @@ class A:
 
 A(f(1))
 
-# error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `list[int | str]`, found `list[list[Unknown]]`"
-# error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `list[int | None]`, found `list[list[Unknown]]`"
+# error: [invalid-argument-type] "Argument to constructor `A.__new__` is incorrect: Expected `list[int | str]`, found `list[list[Unknown]]`"
 A(f([]))
 ```
 
@@ -408,6 +474,9 @@ from typing import Callable, TypedDict
 class Bar(TypedDict):
     bar: int
 
+def id[T](x: T) -> T:
+    return x
+
 f1 = lambda x: {"bar": 1}
 reveal_type(f1)  # revealed: (x) -> dict[str, int]
 
@@ -419,35 +488,68 @@ reveal_type(f2)  # revealed: (x: int) -> Bar
 f3: Callable[[int], Bar] = lambda x: {}
 reveal_type(f3)  # revealed: (int, /) -> Bar
 
-# TODO: This should reveal `str`.
-f4: Callable[[str], str] = lambda x: reveal_type(x)  # revealed: Unknown
-reveal_type(f4)  # revealed: (x: str) -> Unknown
+f4: Callable[[str], str] = lambda x: reveal_type(x)  # revealed: str
+reveal_type(f4)  # revealed: (x: str) -> str
+
+f5: Callable[[str], str] = id(lambda x: reveal_type(x))  # revealed: str
+reveal_type(f5)  # revealed: (x: str) -> str
 
 # TODO: This should not error once we support `Unpack`.
 # error: [invalid-assignment]
-f5: Callable[[*tuple[int, ...]], None] = lambda x, y, z: None
-reveal_type(f5)  # revealed: (tuple[int, ...], /) -> None
+f6: Callable[[*tuple[int, ...]], None] = lambda x, y, z: None
+reveal_type(f6)  # revealed: (tuple[int, ...], /) -> None
 
-f6: Callable[[int, str], None] = lambda *args: None
-reveal_type(f6)  # revealed: (*args) -> None
+f7: Callable[[int, str], None] = lambda *args: None
+reveal_type(f7)  # revealed: (*args) -> None
 
 # N.B. `Callable` annotations only support positional parameters.
 # error: [invalid-assignment]
-f7: Callable[[int], None] = lambda *, x=1: None
-reveal_type(f7)  # revealed: (int, /) -> None
+f8: Callable[[int], None] = lambda *, x=1: None
+reveal_type(f8)  # revealed: (int, /) -> None
 
 # TODO: This should reveal `(*args: int, *, x=1) -> None` once we support `Unpack`.
-f8: Callable[[*tuple[int, ...], int], None] = lambda *args, x=1: None
-reveal_type(f8)  # revealed: (*args, *, x=1) -> None
+f9: Callable[[*tuple[int, ...], int], None] = lambda *args, x=1: None
+reveal_type(f9)  # revealed: (*args, *, x=1) -> None
+
+f10: Callable[[str, int, str], tuple[str, int, str]] = lambda x, y, z: reveal_type((x, y, z))  # revealed: tuple[str, int, str]
+reveal_type(f10)  # revealed: (x: str, y: int, z: str) -> tuple[str, int, str]
+
+# TODO: This should reveal `tuple[int, ...]` once we support `Unpack`.
+f11: Callable[[*tuple[int, ...]], tuple[int, ...]] = lambda *args: reveal_type(args)  # revealed: tuple[Unknown, ...]
+reveal_type(f11)  # revealed: (*args) -> tuple[Unknown, ...]
+
+# TODO: Better generic call inference.
+def _(x: list[int]):
+    f12 = list(map(lambda y: y + 1, x))
+    reveal_type(f12)  # revealed: list[Unknown]
+
+def _() -> Callable[[int], int]:
+    return id(lambda x: reveal_type(x))  # revealed: int
+
+def _():
+    def takes_callable(_: Callable[[int], int]): ...
+
+    takes_callable(lambda x: reveal_type(x))  # revealed: int
+    takes_callable(id(id(lambda x: reveal_type(x))))  # revealed: int
+
+def _(x: bool):
+    signatures = {
+        "upper": str.upper,
+        "lower": str.lower,
+        "title": str.title,
+    }
+
+    # revealed: (x) -> Unknown
+    f = signatures.get("", reveal_type(lambda x: x))
 ```
 
 We do not currently account for type annotations present later in the scope:
 
 ```py
-f9 = lambda: [1]
+f12 = lambda: [1]
 # TODO: This should not error.
-_: list[int | str] = f9()  # error: [invalid-assignment]
-reveal_type(f9)  # revealed: () -> list[int]
+_: list[int | str] = f12()  # error: [invalid-assignment]
+reveal_type(f12)  # revealed: () -> list[int]
 ```
 
 ## Dunder Calls

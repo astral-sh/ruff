@@ -12,8 +12,8 @@ help: Replace with `None`; initialize within function
   - def foo(a: list = []):
 1 + def foo(a: list = None):
 2 |     raise NotImplementedError("")
-3 | 
-4 | 
+3 |
+4 |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -26,13 +26,13 @@ B006 [*] Do not use mutable data structures for argument defaults
   |
 help: Replace with `None`; initialize within function
 2 |     raise NotImplementedError("")
-3 | 
-4 | 
+3 |
+4 |
   - def bar(a: dict = {}):
 5 + def bar(a: dict = None):
 6 |     """ This one also has a docstring"""
 7 |     raise NotImplementedError("and has some text in here")
-8 | 
+8 |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -45,16 +45,16 @@ B006 [*] Do not use mutable data structures for argument defaults
    |
 help: Replace with `None`; initialize within function
 7  |     raise NotImplementedError("and has some text in here")
-8  | 
-9  | 
+8  |
+9  |
    - def baz(a: list = []):
 10 + def baz(a: list = None):
 11 |     """This one raises a different exception"""
 12 +     if a is None:
 13 +         a = []
 14 |     raise IndexError()
-15 | 
-16 | 
+15 |
+16 |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -66,13 +66,13 @@ B006 [*] Do not use mutable data structures for argument defaults
    |
 help: Replace with `None`; initialize within function
 12 |     raise IndexError()
-13 | 
-14 | 
+13 |
+14 |
    - def qux(a: list = []):
 15 + def qux(a: list = None):
 16 |     raise NotImplementedError
-17 | 
-18 | 
+17 |
+18 |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -84,8 +84,8 @@ B006 [*] Do not use mutable data structures for argument defaults
    |
 help: Replace with `None`; initialize within function
 16 |     raise NotImplementedError
-17 | 
-18 | 
+17 |
+18 |
    - def quux(a: list = []):
 19 + def quux(a: list = None):
 20 |     raise NotImplemented

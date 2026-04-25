@@ -4,6 +4,7 @@ use super::TypeInferenceBuilder;
 use crate::Db;
 use crate::types::call::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
     DIVISION_BY_ZERO, report_unsupported_augmented_assignment, report_unsupported_binary_operation,
 };
@@ -21,6 +22,9 @@ enum BinaryExpressionOperandTypes<'db> {
     Inferred(Type<'db>, Type<'db>),
     TypedDictResult(Type<'db>),
 }
+
+type BinaryExpressionVisitor<'db> =
+    CycleDetector<ast::Operator, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>>;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_binary_expression(
@@ -40,11 +44,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             node_index: _,
         } = binary;
 
-        let (left_ty, right_ty) = match self.infer_binary_expression_operand_types(left, *op, right)
-        {
-            BinaryExpressionOperandTypes::TypedDictResult(ty) => return ty,
-            BinaryExpressionOperandTypes::Inferred(left_ty, right_ty) => (left_ty, right_ty),
-        };
+        let (left_ty, right_ty) =
+            match self.infer_binary_expression_operand_types(left, *op, right, tcx) {
+                BinaryExpressionOperandTypes::TypedDictResult(ty) => return ty,
+                BinaryExpressionOperandTypes::Inferred(left_ty, right_ty) => (left_ty, right_ty),
+            };
 
         self.infer_binary_expression_type(binary.into(), false, left_ty, right_ty, *op)
             .unwrap_or_else(|| {
@@ -96,7 +100,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 [left_ty, right_ty],
                 self.scope(),
                 self.typevar_binding_context,
-                self.inference_flags,
+                self.inference_flags(),
             )
         }
     }
@@ -108,12 +112,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         left: &ast::Expr,
         op: ast::Operator,
         right: &ast::Expr,
+        tcx: TypeContext<'db>,
     ) -> BinaryExpressionOperandTypes<'db> {
+        // As a special case, pass `tcx` to binary operands that are collection literals/displays.
+        // Note that it's not correct to pass it to all binary operands, for example:
+        // ```
+        // x: list[str] = ["x"] * 3
+        // ```
+        // It doesn't make sense to pass the list type context to the `3` expression. It wouldn't
+        // have any effect in this case, but it could in more complicated cases.
+        // TODO: When we support passing `tcx` through generic method calls, we can remove this
+        // special case and handle the relevant dunder method instead.
+        let operand_tcx = |expr: &ast::Expr| -> TypeContext<'db> {
+            match expr {
+                ast::Expr::List(_)
+                | ast::Expr::Tuple(_)
+                | ast::Expr::Set(_)
+                | ast::Expr::Dict(_)
+                | ast::Expr::ListComp(_)
+                | ast::Expr::SetComp(_)
+                | ast::Expr::DictComp(_) => tcx,
+                // Also pass `tcx` to nested binary expressions.
+                ast::Expr::BinOp(_) => tcx,
+                _ => TypeContext::default(),
+            }
+        };
+
         // When a dict literal is `|`'d with a TypedDict, infer the non-literal side first
         // so we can use bidirectional inference on the literal before calling the synthesized
         // `__or__`/`__ror__` method on the TypedDict side.
         if op == ast::Operator::BitOr && matches!(left, ast::Expr::Dict(_)) {
-            let right_ty = self.infer_expression(right, TypeContext::default());
+            let right_ty = self.infer_expression(right, operand_tcx(right));
             if let Type::TypedDict(typed_dict) = right_ty
                 && let Some(ty) = self.try_typed_dict_pep_584_dunder(
                     left,
@@ -128,12 +157,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // If the TypedDict update path rejects the literal, fall back to ordinary inference
             // even though that means re-inferring the literal without TypedDict context.
             return BinaryExpressionOperandTypes::Inferred(
-                self.infer_expression(left, TypeContext::default()),
+                self.infer_expression(left, operand_tcx(left)),
                 right_ty,
             );
         }
 
-        let left_ty = self.infer_expression(left, TypeContext::default());
+        let left_ty = self.infer_expression(left, operand_tcx(left));
         if op == ast::Operator::BitOr
             && let Type::TypedDict(typed_dict) = left_ty
             && matches!(right, ast::Expr::Dict(_))
@@ -149,7 +178,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         BinaryExpressionOperandTypes::Inferred(
             left_ty,
-            self.infer_expression(right, TypeContext::default()),
+            self.infer_expression(right, operand_tcx(right)),
         )
     }
 
@@ -265,10 +294,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_binary_expression_type(
         &mut self,
         node: AnyNodeRef<'_>,
+        emitted_division_by_zero_diagnostic: bool,
+        left_ty: Type<'db>,
+        right_ty: Type<'db>,
+        op: ast::Operator,
+    ) -> Option<Type<'db>> {
+        self.infer_binary_expression_type_impl(
+            node,
+            emitted_division_by_zero_diagnostic,
+            left_ty,
+            right_ty,
+            op,
+            &BinaryExpressionVisitor::new(Some(Type::Never)),
+        )
+    }
+
+    fn infer_binary_expression_type_impl(
+        &mut self,
+        node: AnyNodeRef<'_>,
         mut emitted_division_by_zero_diagnostic: bool,
         left_ty: Type<'db>,
         right_ty: Type<'db>,
         op: ast::Operator,
+        visitor: &BinaryExpressionVisitor<'db>,
     ) -> Option<Type<'db>> {
         let db = self.db();
 
@@ -289,44 +337,52 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let pep_604_unions_allowed = || {
             Program::get(db).python_version(db) >= PythonVersion::PY310
                 || self.file().is_stub(db)
-                || self.scope().scope(db).in_type_checking_block()
+                || self.is_in_type_checking_block(self.scope(), node)
         };
 
         match (left_ty, right_ty, op) {
             (Type::Union(lhs_union), rhs, _) => lhs_union.try_map(db, |lhs_element| {
-                self.infer_binary_expression_type(
+                self.infer_binary_expression_type_impl(
                     node,
                     emitted_division_by_zero_diagnostic,
                     *lhs_element,
                     rhs,
                     op,
+                    visitor,
                 )
             }),
             (lhs, Type::Union(rhs_union), _) => rhs_union.try_map(db, |rhs_element| {
-                self.infer_binary_expression_type(
+                self.infer_binary_expression_type_impl(
                     node,
                     emitted_division_by_zero_diagnostic,
                     lhs,
                     *rhs_element,
                     op,
+                    visitor,
                 )
             }),
 
-            (Type::TypeAlias(alias), rhs, _) => self.infer_binary_expression_type(
-                node,
-                emitted_division_by_zero_diagnostic,
-                alias.value_type(db),
-                rhs,
-                op,
-            ),
+            (Type::TypeAlias(alias), rhs, _) => visitor.visit((left_ty, op, right_ty), || {
+                self.infer_binary_expression_type_impl(
+                    node,
+                    emitted_division_by_zero_diagnostic,
+                    alias.value_type(db),
+                    rhs,
+                    op,
+                    visitor,
+                )
+            }),
 
-            (lhs, Type::TypeAlias(alias), _) => self.infer_binary_expression_type(
-                node,
-                emitted_division_by_zero_diagnostic,
-                lhs,
-                alias.value_type(db),
-                op,
-            ),
+            (lhs, Type::TypeAlias(alias), _) => visitor.visit((left_ty, op, right_ty), || {
+                self.infer_binary_expression_type_impl(
+                    node,
+                    emitted_division_by_zero_diagnostic,
+                    lhs,
+                    alias.value_type(db),
+                    op,
+                    visitor,
+                )
+            }),
 
             (Type::TypedDict(left_typed_dict), rhs, ast::Operator::BitOr)
                 if rhs.is_assignable_to(db, Type::TypedDict(left_typed_dict)) =>
@@ -342,14 +398,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
             // the result would then become Any or Unknown, respectively).
-            (div @ Type::Dynamic(DynamicType::Divergent(_)), _, _)
-            | (_, div @ Type::Dynamic(DynamicType::Divergent(_)), _) => Some(div),
+            (div @ Type::Divergent(_), _, _) | (_, div @ Type::Divergent(_), _) => Some(div),
 
             (any @ Type::Dynamic(DynamicType::Any), _, _)
             | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),
 
             (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
+
+            (unknown @ Type::Dynamic(DynamicType::InvalidConcatenateUnknown), _, _)
+            | (_, unknown @ Type::Dynamic(DynamicType::InvalidConcatenateUnknown), _) => {
+                Some(unknown)
+            }
 
             (unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _) => Some(unknown),
@@ -390,9 +450,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         )
                     }
                     // For bounded TypeVars or unconstrained TypeVars, fall through to the default handling.
-                    _ => Type::try_call_bin_op(db, left_ty, op, right_ty)
-                        .map(|outcome| outcome.return_type(db))
-                        .ok(),
+                    _ => Type::try_call_bin_op_return_type(db, left_ty, op, right_ty),
                 }
             }
 
@@ -411,20 +469,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             left_ty,
                             constraints,
                             |constraint| {
-                                self.infer_binary_expression_type(
+                                self.infer_binary_expression_type_impl(
                                     node,
                                     emitted_division_by_zero_diagnostic,
                                     constraint,
                                     rhs,
                                     op,
+                                    visitor,
                                 )
                             },
                         )
                     }
                     // For bounded TypeVars or unconstrained TypeVars, fall through to the default handling.
-                    _ => Type::try_call_bin_op(db, left_ty, op, right_ty)
-                        .map(|outcome| outcome.return_type(db))
-                        .ok(),
+                    _ => Type::try_call_bin_op_return_type(db, left_ty, op, right_ty),
                 }
             }
 
@@ -438,20 +495,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             right_ty,
                             constraints,
                             |constraint| {
-                                self.infer_binary_expression_type(
+                                self.infer_binary_expression_type_impl(
                                     node,
                                     emitted_division_by_zero_diagnostic,
                                     lhs,
                                     constraint,
                                     op,
+                                    visitor,
                                 )
                             },
                         )
                     }
                     // For bounded TypeVars or unconstrained TypeVars, fall through to the default handling.
-                    _ => Type::try_call_bin_op(db, left_ty, op, right_ty)
-                        .map(|outcome| outcome.return_type(db))
-                        .ok(),
+                    _ => Type::try_call_bin_op_return_type(db, left_ty, op, right_ty),
                 }
             }
 
@@ -462,32 +518,28 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // positional arguments get. In those cases we need to explicitly delegate to the base
             // type, so that it hits the `Type::Union` branches above.
             (Type::NewTypeInstance(newtype), rhs, _) => {
-                Type::try_call_bin_op(db, left_ty, op, right_ty)
-                    .map(|outcome| outcome.return_type(db))
-                    .ok()
-                    .or_else(|| {
-                        self.infer_binary_expression_type(
-                            node,
-                            emitted_division_by_zero_diagnostic,
-                            newtype.concrete_base_type(db),
-                            rhs,
-                            op,
-                        )
-                    })
+                Type::try_call_bin_op_return_type(db, left_ty, op, right_ty).or_else(|| {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        emitted_division_by_zero_diagnostic,
+                        newtype.concrete_base_type(db),
+                        rhs,
+                        op,
+                        visitor,
+                    )
+                })
             }
             (lhs, Type::NewTypeInstance(newtype), _) => {
-                Type::try_call_bin_op(db, left_ty, op, right_ty)
-                    .map(|outcome| outcome.return_type(db))
-                    .ok()
-                    .or_else(|| {
-                        self.infer_binary_expression_type(
-                            node,
-                            emitted_division_by_zero_diagnostic,
-                            lhs,
-                            newtype.concrete_base_type(db),
-                            op,
-                        )
-                    })
+                Type::try_call_bin_op_return_type(db, left_ty, op, right_ty).or_else(|| {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        emitted_division_by_zero_diagnostic,
+                        lhs,
+                        newtype.concrete_base_type(db),
+                        op,
+                        visitor,
+                    )
+                })
             }
 
             (
@@ -790,9 +842,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         Some(result)
                     }
 
-                    _ => Type::try_call_bin_op(db, left_ty, op, right_ty)
-                        .map(|outcome| outcome.return_type(db))
-                        .ok(),
+                    _ => Type::try_call_bin_op_return_type(db, left_ty, op, right_ty),
                 }
             }
 
@@ -864,7 +914,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         [left_ty, right_ty],
                         self.scope(),
                         self.typevar_binding_context,
-                        self.inference_flags,
+                        self.inference_flags(),
                     ))
                 }
             }
@@ -891,7 +941,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     [left_ty, right_ty],
                     self.scope(),
                     self.typevar_binding_context,
-                    self.inference_flags,
+                    self.inference_flags(),
                 ))
             }
 
@@ -975,9 +1025,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 | Type::TypeGuard(_)
                 | Type::TypedDict(_),
                 op,
-            ) => Type::try_call_bin_op(db, left_ty, op, right_ty)
-                .map(|outcome| outcome.return_type(db))
-                .ok(),
+            ) => Type::try_call_bin_op_return_type(db, left_ty, op, right_ty),
         }
     }
 

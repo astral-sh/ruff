@@ -121,22 +121,23 @@ class C:
 
         # However, for non-data descriptors, instance attributes do take precedence.
         # So it is possible to override them.
+        # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `non_data_descriptor` of type `NonDataDescriptor`"
         self.non_data_descriptor = 1
 
 c = C()
 
-reveal_type(c.data_descriptor)  # revealed: Unknown | Literal["data"]
+reveal_type(c.data_descriptor)  # revealed: Literal["data"]
 
-reveal_type(c.non_data_descriptor)  # revealed: Unknown | Literal["non-data", 1]
+reveal_type(c.non_data_descriptor)  # revealed: Literal["non-data"] | int
 
-reveal_type(C.data_descriptor)  # revealed: Unknown | Literal["data"]
+reveal_type(C.data_descriptor)  # revealed: Literal["data"]
 
-reveal_type(C.non_data_descriptor)  # revealed: Unknown | Literal["non-data"]
+reveal_type(C.non_data_descriptor)  # revealed: Literal["non-data"]
 
-# It is possible to override data descriptors via class objects. The following
-# assignment does not call `DataDescriptor.__set__`. For this reason, we infer
-# `Unknown | …` for all (descriptor) attributes.
-C.data_descriptor = "something else"  # This is okay
+# Assignments through class objects are still checked against the declared
+# descriptor type.
+# error: [invalid-assignment] "Object of type `Literal["something else"]` is not assignable to attribute `data_descriptor` of type `DataDescriptor`"
+C.data_descriptor = "something else"
 ```
 
 ### Partial fall back
@@ -171,11 +172,12 @@ def f1(flag: bool):
 
         def f(self):
             # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `attr` on type `Self@f` with custom `__set__` method"
-            self.attr = "normal"
+            self.attr = b"foo"
 
-    reveal_type(C1().attr)  # revealed: Unknown | Literal["data", "normal"]
+    reveal_type(C1().attr)  # revealed: Literal["data"] | bytes
 
     # Assigning to the attribute also causes no `possibly-unbound` diagnostic:
+    # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `attr` of type `bytes`"
     C1().attr = 1
 ```
 
@@ -185,12 +187,15 @@ descriptor here:
 ```py
 class C2:
     def f(self):
-        self.attr = "normal"
+        # error: [invalid-assignment] "Object of type `Literal[b"normal"]` is not assignable to attribute `attr` of type `NonDataDescriptor`"
+        self.attr = b"normal"
     attr = NonDataDescriptor()
 
-reveal_type(C2().attr)  # revealed: Unknown | Literal["non-data", "normal"]
+reveal_type(C2().attr)  # revealed: Literal["non-data"] | bytes
 
-# Assignments always go to the instance attribute in this case
+# Reads still fall back to the instance attribute in this case, but assignments
+# are checked against the declared class attribute type.
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `attr` of type `NonDataDescriptor`"
 C2().attr = 1
 ```
 
@@ -563,8 +568,6 @@ class Derived(Base):
 
 ### Properties with no setters
 
-<!-- snapshot-diagnostics -->
-
 If a property has no setter, we emit a bespoke error message when a user attempts to set that
 attribute, since this is a common error.
 
@@ -573,8 +576,21 @@ class DontAssignToMe:
     @property
     def immutable(self): ...
 
-# error: [invalid-assignment]
+# snapshot: invalid-assignment
 DontAssignToMe().immutable = "the properties, they are a-changing"
+```
+
+```snapshot
+error[invalid-assignment]: Cannot assign to read-only property `immutable` on object of type `DontAssignToMe`
+ --> src/mdtest_snippet.py:3:9
+  |
+3 |     def immutable(self): ...
+  |         --------- Property `DontAssignToMe.immutable` defined here with no setter
+4 |
+5 | # snapshot: invalid-assignment
+6 | DontAssignToMe().immutable = "the properties, they are a-changing"
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Attempted assignment to `DontAssignToMe.immutable` here
+  |
 ```
 
 ### Built-in `classmethod` descriptor
@@ -797,8 +813,9 @@ class Descriptor:
 class C:
     descriptor = Descriptor()
 
+# error: [invalid-assignment] "Object of type `Literal["something else"]` is not assignable to attribute `descriptor` of type `Descriptor`"
 C.descriptor = "something else"
-reveal_type(C.descriptor)  # revealed: Literal["something else"]
+reveal_type(C.descriptor)  # revealed: int
 ```
 
 ### Possibly unbound descriptor attributes
@@ -890,6 +907,33 @@ class C:
     d: Descriptor1 = Descriptor1()
 
 reveal_type(C.d)  # revealed: int
+```
+
+### Descriptors with `Concatenate` self-types on `__get__`
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3289>.
+
+```py
+from typing import Any, Callable, Concatenate, Generic, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+P2 = ParamSpec("P2")
+T = TypeVar("T")
+
+class FunctionWrapper(Generic[P]):
+    def __get__(
+        self: "FunctionWrapper[Concatenate[T, P2]]",
+        instance: T,
+    ) -> None:
+        raise NotImplementedError
+
+def wrapper(fn: Callable[P, Any]) -> FunctionWrapper[P]:
+    raise NotImplementedError
+
+class Example:
+    @wrapper
+    def __call__(self) -> None:
+        pass
 ```
 
 [descriptors]: https://docs.python.org/3/howto/descriptor.html

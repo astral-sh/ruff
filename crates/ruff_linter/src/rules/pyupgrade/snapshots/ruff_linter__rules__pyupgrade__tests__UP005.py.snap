@@ -12,7 +12,7 @@ UP005 [*] `assertEquals` is deprecated, use `assertEqual`
 8 |         self.assertEqual(3, 4)
   |
 help: Replace `assertEqual` with `assertEquals`
-3 | 
+3 |
 4 | class Suite(unittest.TestCase):
 5 |     def test(self) -> None:
   -         self.assertEquals (1, 2)

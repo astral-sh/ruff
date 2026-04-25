@@ -84,6 +84,47 @@ def f():
         x = "hello"  # error: [invalid-assignment] "Object of type `Literal["hello"]` is not assignable to `int`"
 ```
 
+## Nested function after conditional nonlocal rebinding
+
+An inner function should still resolve a name through an enclosing `nonlocal` declaration, even if
+that enclosing scope also conditionally rebinds the name:
+
+```py
+def outer(flag: bool) -> None:
+    x: int = 1
+
+    def middle() -> None:
+        nonlocal x
+
+        if flag:
+            x = 2
+            return
+
+        def inner() -> None:
+            y: int = x
+```
+
+## Generator expression after nonlocal rebinding
+
+A nested eager scope such as a generator expression should see the rebound type of a `nonlocal`
+symbol:
+
+```py
+from typing import Optional
+
+class C:
+    value: int
+
+def check(x: Optional[C]) -> C:
+    return C()
+
+def outer(x: Optional[C]) -> None:
+    def inner() -> None:
+        nonlocal x
+        x = check(x)
+        all(reveal_type(x.value) == 1 for _ in [0])  # revealed: int
+```
+
 ## The types of `nonlocal` binding get unioned
 
 Without a type declaration, we union the bindings in enclosing scopes to infer a type. But name

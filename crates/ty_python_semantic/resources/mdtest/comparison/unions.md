@@ -66,8 +66,6 @@ def _(flag_s: bool, flag_l: bool):
 
 ## Unsupported operations
 
-<!-- snapshot-diagnostics -->
-
 Make sure we emit a diagnostic if *any* of the possible comparisons is unsupported. For now, we fall
 back to `bool` for the result type instead of trying to infer something more precise from the other
 (supported) variants:
@@ -82,13 +80,87 @@ def _(
     bb: tuple[int] | tuple[int, int],
     cc: tuple[str] | tuple[str, str],
 ):
-    result = 1 in x  # error: "Operator `in` is not supported"
+    result = 1 in x  # snapshot
     reveal_type(result)  # revealed: bool
+```
 
-    result2 = y in x  # error: [unsupported-operator]
+```snapshot
+error[unsupported-operator]: Unsupported `in` operation
+  --> src/mdtest_snippet.py:10:14
+   |
+10 |     result = 1 in x  # snapshot
+   |              -^^^^-
+   |              |    |
+   |              |    Has type `list[int] | Literal[1]`
+   |              Has type `Literal[1]`
+   |
+info: Operation fails because operator `in` is not supported between two objects of type `Literal[1]`
+```
+
+```py
+    result2 = y in x  # snapshot: unsupported-operator
     reveal_type(result)  # revealed: bool
+```
 
-    result3 = aa < cc  # error: [unsupported-operator]
-    result4 = cc < aa  # error: [unsupported-operator]
-    result5 = bb < cc  # error: [unsupported-operator]
+```snapshot
+error[unsupported-operator]: Unsupported `in` operation
+  --> src/mdtest_snippet.py:12:15
+   |
+12 |     result2 = y in x  # snapshot: unsupported-operator
+   |               -^^^^-
+   |               |
+   |               Both operands have type `list[int] | Literal[1]`
+   |
+info: Operation fails because operator `in` is not supported between objects of type `list[int]` and `Literal[1]`
+```
+
+```py
+    result3 = aa < cc  # snapshot: unsupported-operator
+```
+
+```snapshot
+error[unsupported-operator]: Unsupported `<` operation
+  --> src/mdtest_snippet.py:14:15
+   |
+14 |     result3 = aa < cc  # snapshot: unsupported-operator
+   |               --^^^--
+   |               |    |
+   |               |    Has type `tuple[str] | tuple[str, str]`
+   |               Has type `tuple[int]`
+   |
+info: Operation fails because operator `<` is not supported between objects of type `int` and `str`
+```
+
+```py
+    result4 = cc < aa  # snapshot: unsupported-operator
+```
+
+```snapshot
+error[unsupported-operator]: Unsupported `<` operation
+  --> src/mdtest_snippet.py:15:15
+   |
+15 |     result4 = cc < aa  # snapshot: unsupported-operator
+   |               --^^^--
+   |               |    |
+   |               |    Has type `tuple[int]`
+   |               Has type `tuple[str] | tuple[str, str]`
+   |
+info: Operation fails because operator `<` is not supported between objects of type `str` and `int`
+```
+
+```py
+    result5 = bb < cc  # snapshot: unsupported-operator
+```
+
+```snapshot
+error[unsupported-operator]: Unsupported `<` operation
+  --> src/mdtest_snippet.py:16:15
+   |
+16 |     result5 = bb < cc  # snapshot: unsupported-operator
+   |               --^^^--
+   |               |    |
+   |               |    Has type `tuple[str] | tuple[str, str]`
+   |               Has type `tuple[int] | tuple[int, int]`
+   |
+info: Operation fails because operator `<` is not supported between objects of type `int` and `str`
 ```

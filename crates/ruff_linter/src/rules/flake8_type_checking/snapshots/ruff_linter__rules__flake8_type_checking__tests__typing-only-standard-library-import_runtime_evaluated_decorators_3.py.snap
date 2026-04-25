@@ -18,14 +18,14 @@ help: Move into type-checking block
    - from uuid import UUID  # TC003
 6  | from collections.abc import Sequence
 7  | from pydantic import validate_call
-8  | 
+8  |
 9  | import attrs
 10 | from attrs import frozen
 11 + from typing import TYPE_CHECKING
-12 + 
+12 +
 13 + if TYPE_CHECKING:
 14 +     from uuid import UUID
-15 | 
-16 | 
+15 |
+16 |
 17 | @attrs.define(auto_attribs=True)
 note: This is an unsafe fix and may change runtime behavior

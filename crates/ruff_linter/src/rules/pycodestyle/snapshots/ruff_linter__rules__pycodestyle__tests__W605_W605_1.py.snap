@@ -12,11 +12,11 @@ W605 [*] Invalid escape sequence: `\.`
   |
 help: Use a raw string literal
 1 | # Same as `W605_0.py` but using f-strings and t-strings instead.
-2 | 
+2 |
 3 | #: W605:1:10
   - regex = f'\.png$'
 4 + regex = rf'\.png$'
-5 | 
+5 |
 6 | #: W605:2:1
 7 | regex = f'''
 
@@ -31,13 +31,13 @@ W605 [*] Invalid escape sequence: `\.`
   |
 help: Use a raw string literal
 4  | regex = f'\.png$'
-5  | 
+5  |
 6  | #: W605:2:1
    - regex = f'''
 7  + regex = rf'''
 8  | \.png$
 9  | '''
-10 | 
+10 |
 
 W605 [*] Invalid escape sequence: `\_`
   --> W605_1.py:13:7
@@ -49,13 +49,13 @@ W605 [*] Invalid escape sequence: `\_`
 14 | )
    |
 help: Use a raw string literal
-10 | 
+10 |
 11 | #: W605:2:6
 12 | f(
    -     f'\_'
 13 +     rf'\_'
 14 | )
-15 | 
+15 |
 16 | #: W605:4:6
 
 W605 [*] Invalid escape sequence: `\_`
@@ -70,7 +70,7 @@ W605 [*] Invalid escape sequence: `\_`
    |
 help: Use a raw string literal
 14 | )
-15 | 
+15 |
 16 | #: W605:4:6
    - f"""
 17 + rf"""
@@ -87,12 +87,12 @@ W605 [*] Invalid escape sequence: `\_`
    |
 help: Add backslash to escape sequence
 22 | """
-23 | 
+23 |
 24 | #: W605:1:38
    - value = f'new line\nand invalid escape \_ here'
 25 + value = f'new line\nand invalid escape \\_ here'
-26 | 
-27 | 
+26 |
+27 |
 28 | #: Okay
 
 W605 [*] Invalid escape sequence: `\_`
@@ -108,7 +108,7 @@ W605 [*] Invalid escape sequence: `\_`
 help: Add backslash to escape sequence
 40 | \w
 41 | '''  # noqa
-42 | 
+42 |
    - regex = f'\\\_'
 43 + regex = f'\\\\_'
 44 | value = f'\{{1}}'
@@ -126,7 +126,7 @@ W605 [*] Invalid escape sequence: `\{`
    |
 help: Use a raw string literal
 41 | '''  # noqa
-42 | 
+42 |
 43 | regex = f'\\\_'
    - value = f'\{{1}}'
 44 + value = rf'\{{1}}'
@@ -145,7 +145,7 @@ W605 [*] Invalid escape sequence: `\{`
 47 | value = f"{f"\{1}"}"
    |
 help: Use a raw string literal
-42 | 
+42 |
 43 | regex = f'\\\_'
 44 | value = f'\{{1}}'
    - value = f'\{1}'
@@ -172,7 +172,7 @@ help: Use a raw string literal
 46 + value = rf'{1:\}'
 47 | value = f"{f"\{1}"}"
 48 | value = rf"{f"\{1}"}"
-49 | 
+49 |
 
 W605 [*] Invalid escape sequence: `\{`
   --> W605_1.py:47:14
@@ -190,7 +190,7 @@ help: Use a raw string literal
    - value = f"{f"\{1}"}"
 47 + value = f"{rf"\{1}"}"
 48 | value = rf"{f"\{1}"}"
-49 | 
+49 |
 50 | # Okay
 
 W605 [*] Invalid escape sequence: `\{`
@@ -209,7 +209,7 @@ help: Use a raw string literal
 47 | value = f"{f"\{1}"}"
    - value = rf"{f"\{1}"}"
 48 + value = rf"{rf"\{1}"}"
-49 | 
+49 |
 50 | # Okay
 51 | value = rf'\{{1}}'
 
@@ -224,13 +224,13 @@ W605 [*] Invalid escape sequence: `\d`
    |
 help: Use a raw string literal
 54 | value = f"{rf"\{1}"}"
-55 | 
+55 |
 56 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
    - f"{{}}+-\d"
 57 + rf"{{}}+-\d"
 58 | f"\n{{}}+-\d+"
 59 | f"\n{{}}�+-\d+"
-60 | 
+60 |
 
 W605 [*] Invalid escape sequence: `\d`
   --> W605_1.py:58:11
@@ -242,13 +242,13 @@ W605 [*] Invalid escape sequence: `\d`
 59 | f"\n{{}}�+-\d+"
    |
 help: Add backslash to escape sequence
-55 | 
+55 |
 56 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
 57 | f"{{}}+-\d"
    - f"\n{{}}+-\d+"
 58 + f"\n{{}}+-\\d+"
 59 | f"\n{{}}�+-\d+"
-60 | 
+60 |
 61 | # See https://github.com/astral-sh/ruff/issues/11491
 
 W605 [*] Invalid escape sequence: `\d`
@@ -267,7 +267,7 @@ help: Add backslash to escape sequence
 58 | f"\n{{}}+-\d+"
    - f"\n{{}}�+-\d+"
 59 + f"\n{{}}�+-\\d+"
-60 | 
+60 |
 61 | # See https://github.com/astral-sh/ruff/issues/11491
 62 | total = 10
 
@@ -287,7 +287,7 @@ help: Add backslash to escape sequence
 64 | incomplete = 3
    - s = f"TOTAL: {total}\nOK: {ok}\INCOMPLETE: {incomplete}\n"
 65 + s = f"TOTAL: {total}\nOK: {ok}\\INCOMPLETE: {incomplete}\n"
-66 | 
+66 |
 67 | # Debug text (should trigger)
 68 | t = f"{'\InHere'=}"
 
@@ -300,13 +300,13 @@ W605 [*] Invalid escape sequence: `\I`
    |
 help: Use a raw string literal
 65 | s = f"TOTAL: {total}\nOK: {ok}\INCOMPLETE: {incomplete}\n"
-66 | 
+66 |
 67 | # Debug text (should trigger)
    - t = f"{'\InHere'=}"
 68 + t = f"{r'\InHere'=}"
-69 | 
-70 | 
-71 | 
+69 |
+70 |
+71 |
 
 W605 [*] Invalid escape sequence: `\.`
   --> W605_1.py:73:11
@@ -318,12 +318,12 @@ W605 [*] Invalid escape sequence: `\.`
 75 | #: W605:2:1
    |
 help: Use a raw string literal
-70 | 
-71 | 
+70 |
+71 |
 72 | #: W605:1:10
    - regex = t'\.png$'
 73 + regex = rt'\.png$'
-74 | 
+74 |
 75 | #: W605:2:1
 76 | regex = t'''
 
@@ -338,13 +338,13 @@ W605 [*] Invalid escape sequence: `\.`
    |
 help: Use a raw string literal
 73 | regex = t'\.png$'
-74 | 
+74 |
 75 | #: W605:2:1
    - regex = t'''
 76 + regex = rt'''
 77 | \.png$
 78 | '''
-79 | 
+79 |
 
 W605 [*] Invalid escape sequence: `\_`
   --> W605_1.py:82:7
@@ -356,13 +356,13 @@ W605 [*] Invalid escape sequence: `\_`
 83 | )
    |
 help: Use a raw string literal
-79 | 
+79 |
 80 | #: W605:2:6
 81 | f(
    -     t'\_'
 82 +     rt'\_'
 83 | )
-84 | 
+84 |
 85 | #: W605:4:6
 
 W605 [*] Invalid escape sequence: `\_`
@@ -377,7 +377,7 @@ W605 [*] Invalid escape sequence: `\_`
    |
 help: Use a raw string literal
 83 | )
-84 | 
+84 |
 85 | #: W605:4:6
    - t"""
 86 + rt"""
@@ -394,12 +394,12 @@ W605 [*] Invalid escape sequence: `\_`
    |
 help: Add backslash to escape sequence
 91 | """
-92 | 
+92 |
 93 | #: W605:1:38
    - value = t'new line\nand invalid escape \_ here'
 94 + value = t'new line\nand invalid escape \\_ here'
-95 | 
-96 | 
+95 |
+96 |
 97 | #: Okay
 
 W605 [*] Invalid escape sequence: `\_`
@@ -415,7 +415,7 @@ W605 [*] Invalid escape sequence: `\_`
 help: Add backslash to escape sequence
 109 | \w
 110 | '''  # noqa
-111 | 
+111 |
     - regex = t'\\\_'
 112 + regex = t'\\\\_'
 113 | value = t'\{{1}}'
@@ -433,7 +433,7 @@ W605 [*] Invalid escape sequence: `\{`
     |
 help: Use a raw string literal
 110 | '''  # noqa
-111 | 
+111 |
 112 | regex = t'\\\_'
     - value = t'\{{1}}'
 113 + value = rt'\{{1}}'
@@ -452,7 +452,7 @@ W605 [*] Invalid escape sequence: `\{`
 116 | value = t"{t"\{1}"}"
     |
 help: Use a raw string literal
-111 | 
+111 |
 112 | regex = t'\\\_'
 113 | value = t'\{{1}}'
     - value = t'\{1}'
@@ -479,7 +479,7 @@ help: Use a raw string literal
 115 + value = rt'{1:\}'
 116 | value = t"{t"\{1}"}"
 117 | value = rt"{t"\{1}"}"
-118 | 
+118 |
 
 W605 [*] Invalid escape sequence: `\{`
    --> W605_1.py:116:14
@@ -497,7 +497,7 @@ help: Use a raw string literal
     - value = t"{t"\{1}"}"
 116 + value = t"{rt"\{1}"}"
 117 | value = rt"{t"\{1}"}"
-118 | 
+118 |
 119 | # Okay
 
 W605 [*] Invalid escape sequence: `\{`
@@ -516,7 +516,7 @@ help: Use a raw string literal
 116 | value = t"{t"\{1}"}"
     - value = rt"{t"\{1}"}"
 117 + value = rt"{rt"\{1}"}"
-118 | 
+118 |
 119 | # Okay
 120 | value = rt'\{{1}}'
 
@@ -531,13 +531,13 @@ W605 [*] Invalid escape sequence: `\d`
     |
 help: Use a raw string literal
 123 | value = t"{rt"\{1}"}"
-124 | 
+124 |
 125 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
     - t"{{}}+-\d"
 126 + rt"{{}}+-\d"
 127 | t"\n{{}}+-\d+"
 128 | t"\n{{}}�+-\d+"
-129 | 
+129 |
 
 W605 [*] Invalid escape sequence: `\d`
    --> W605_1.py:127:11
@@ -549,13 +549,13 @@ W605 [*] Invalid escape sequence: `\d`
 128 | t"\n{{}}�+-\d+"
     |
 help: Add backslash to escape sequence
-124 | 
+124 |
 125 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
 126 | t"{{}}+-\d"
     - t"\n{{}}+-\d+"
 127 + t"\n{{}}+-\\d+"
 128 | t"\n{{}}�+-\d+"
-129 | 
+129 |
 130 | # See https://github.com/astral-sh/ruff/issues/11491
 
 W605 [*] Invalid escape sequence: `\d`
@@ -574,7 +574,7 @@ help: Add backslash to escape sequence
 127 | t"\n{{}}+-\d+"
     - t"\n{{}}�+-\d+"
 128 + t"\n{{}}�+-\\d+"
-129 | 
+129 |
 130 | # See https://github.com/astral-sh/ruff/issues/11491
 131 | total = 10
 
@@ -594,7 +594,7 @@ help: Add backslash to escape sequence
 133 | incomplete = 3
     - s = t"TOTAL: {total}\nOK: {ok}\INCOMPLETE: {incomplete}\n"
 134 + s = t"TOTAL: {total}\nOK: {ok}\\INCOMPLETE: {incomplete}\n"
-135 | 
+135 |
 136 | # Debug text (should trigger)
 137 | t = t"{'\InHere'=}"
 
@@ -607,7 +607,7 @@ W605 [*] Invalid escape sequence: `\I`
     |
 help: Use a raw string literal
 134 | s = t"TOTAL: {total}\nOK: {ok}\INCOMPLETE: {incomplete}\n"
-135 | 
+135 |
 136 | # Debug text (should trigger)
     - t = t"{'\InHere'=}"
 137 + t = t"{r'\InHere'=}"

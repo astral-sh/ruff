@@ -10,13 +10,13 @@ UP050 [*] Class `A` uses `metaclass=type`, which is redundant
   |
 help: Remove `metaclass=type`
 2 |     ...
-3 | 
-4 | 
+3 |
+4 |
   - class A(metaclass=type):
 5 + class A:
 6 |     ...
-7 | 
-8 | 
+7 |
+8 |
 
 UP050 [*] Class `A` uses `metaclass=type`, which is redundant
   --> UP050.py:10:5
@@ -29,15 +29,15 @@ UP050 [*] Class `A` uses `metaclass=type`, which is redundant
    |
 help: Remove `metaclass=type`
 6  |     ...
-7  | 
-8  | 
+7  |
+8  |
    - class A(
    -     metaclass=type
    - ):
 9  + class A:
 10 |     ...
-11 | 
-12 | 
+11 |
+12 |
 
 UP050 [*] Class `A` uses `metaclass=type`, which is redundant
   --> UP050.py:16:5
@@ -50,16 +50,16 @@ UP050 [*] Class `A` uses `metaclass=type`, which is redundant
    |
 help: Remove `metaclass=type`
 12 |     ...
-13 | 
-14 | 
+13 |
+14 |
    - class A(
    -     metaclass=type
    -     #
    - ):
 15 + class A:
 16 |     ...
-17 | 
-18 | 
+17 |
+18 |
 note: This is an unsafe fix and may change runtime behavior
 
 UP050 [*] Class `A` uses `metaclass=type`, which is redundant
@@ -74,16 +74,16 @@ UP050 [*] Class `A` uses `metaclass=type`, which is redundant
    |
 help: Remove `metaclass=type`
 19 |     ...
-20 | 
-21 | 
+20 |
+21 |
    - class A(
    -     #
    -     metaclass=type
    - ):
 22 + class A:
 23 |     ...
-24 | 
-25 | 
+24 |
+25 |
 note: This is an unsafe fix and may change runtime behavior
 
 UP050 [*] Class `A` uses `metaclass=type`, which is redundant
@@ -97,16 +97,16 @@ UP050 [*] Class `A` uses `metaclass=type`, which is redundant
    |
 help: Remove `metaclass=type`
 26 |     ...
-27 | 
-28 | 
+27 |
+28 |
    - class A(
    -     metaclass=type,
    -     #
    - ):
 29 + class A:
 30 |     ...
-31 | 
-32 | 
+31 |
+32 |
 note: This is an unsafe fix and may change runtime behavior
 
 UP050 [*] Class `A` uses `metaclass=type`, which is redundant
@@ -121,8 +121,8 @@ UP050 [*] Class `A` uses `metaclass=type`, which is redundant
    |
 help: Remove `metaclass=type`
 33 |     ...
-34 | 
-35 | 
+34 |
+35 |
    - class A(
    -     #
    -     metaclass=type,
@@ -130,8 +130,8 @@ help: Remove `metaclass=type`
    - ):
 36 + class A:
 37 |     ...
-38 | 
-39 | 
+38 |
+39 |
 note: This is an unsafe fix and may change runtime behavior
 
 UP050 [*] Class `B` uses `metaclass=type`, which is redundant
@@ -143,13 +143,13 @@ UP050 [*] Class `B` uses `metaclass=type`, which is redundant
    |
 help: Remove `metaclass=type`
 41 |     ...
-42 | 
-43 | 
+42 |
+43 |
    - class B(A, metaclass=type):
 44 + class B(A):
 45 |     ...
-46 | 
-47 | 
+46 |
+47 |
 
 UP050 [*] Class `B` uses `metaclass=type`, which is redundant
   --> UP050.py:50:5
@@ -162,13 +162,13 @@ UP050 [*] Class `B` uses `metaclass=type`, which is redundant
 52 |     ...
    |
 help: Remove `metaclass=type`
-47 | 
+47 |
 48 | class B(
 49 |     A,
    -     metaclass=type,
 50 | ):
 51 |     ...
-52 | 
+52 |
 
 UP050 [*] Class `B` uses `metaclass=type`, which is redundant
   --> UP050.py:58:5
@@ -181,14 +181,14 @@ UP050 [*] Class `B` uses `metaclass=type`, which is redundant
 60 |     ...
    |
 help: Remove `metaclass=type`
-54 | 
+54 |
 55 | class B(
 56 |     A,
    -     # comment
    -     metaclass=type,
 57 | ):
 58 |     ...
-59 | 
+59 |
 note: This is an unsafe fix and may change runtime behavior
 
 UP050 [*] Class `A` uses `metaclass=type`, which is redundant
@@ -202,16 +202,16 @@ UP050 [*] Class `A` uses `metaclass=type`, which is redundant
    |
 help: Remove `metaclass=type`
 65 |         ...
-66 | 
-67 | 
+66 |
+67 |
    - class A(
    -     metaclass=type  # comment
    -     ,
    - ):
 68 + class A:
 69 |     ...
-70 | 
-71 | 
+70 |
+71 |
 note: This is an unsafe fix and may change runtime behavior
 
 UP050 [*] Class `A` uses `metaclass=type`, which is redundant
@@ -224,9 +224,9 @@ UP050 [*] Class `A` uses `metaclass=type`, which is redundant
 84 |     ...
    |
 help: Remove `metaclass=type`
-80 | 
+80 |
 81 | import builtins
-82 | 
+82 |
    - class A(metaclass=builtins.type):
 83 + class A:
 84 |     ...

@@ -16,9 +16,9 @@ exit_code: 1
 ----- stdout -----
 unformatted: File would be reformatted
  --> input.py:1:1
-  - 
+  -
 1 | from test import say_hy
-2 | 
+2 |
 3 | if __name__ == "__main__":
 
 1 file would be reformatted

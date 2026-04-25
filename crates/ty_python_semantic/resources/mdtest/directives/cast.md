@@ -81,14 +81,51 @@ def f(x: Any, y: Unknown, z: Any | str | int):
     e = cast(str | int | Any, z)  # error: [redundant-cast]
 ```
 
-## Diagnostic snapshots
+Recursive aliases that fall back to `Divergent` should not trigger `redundant-cast`.
 
-<!-- snapshot-diagnostics -->
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import cast
+
+RecursiveAlias = list["RecursiveAlias | None"]
+
+def f(x: RecursiveAlias):
+    cast(RecursiveAlias, x)
+```
+
+## Diagnostic snapshots
 
 ```py
 import secrets
 from typing import cast
 
-# error: [redundant-cast] "Value is already of type `int`"
+# snapshot: redundant-cast
 cast(int, secrets.randbelow(10))
+```
+
+```snapshot
+warning[redundant-cast]: Value is already of type `int`
+ --> src/mdtest_snippet.py:5:1
+  |
+5 | cast(int, secrets.randbelow(10))
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+```
+
+```py
+# snapshot: redundant-cast
+cast(val=secrets.randbelow(10), typ=int)
+```
+
+```snapshot
+warning[redundant-cast]: Value is already of type `int`
+ --> src/mdtest_snippet.py:7:1
+  |
+7 | cast(val=secrets.randbelow(10), typ=int)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 ```

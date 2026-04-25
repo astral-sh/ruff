@@ -26,8 +26,7 @@ error[invalid-syntax]: Cannot use `match` statement on Python 3.9 (syntax was ad
   |
 1 | match 2:  # error: 1 [invalid-syntax] "Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)"
   | ^^^^^
-2 |     case 1:
-3 |         print("it's one")
   |
+info: Python 3.9 was assumed when parsing syntax because it was specified on the command line
 
 ```

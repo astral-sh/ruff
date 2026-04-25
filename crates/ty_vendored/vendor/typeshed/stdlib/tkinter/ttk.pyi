@@ -82,6 +82,7 @@ _VsapiStatespec: TypeAlias = tuple[Unpack[tuple[str, ...]], int]
 _P = ParamSpec("_P")
 _T = TypeVar("_T")
 
+@type_check_only
 class _Layout(TypedDict, total=False):
     side: Literal["left", "right", "top", "bottom"]
     sticky: str  # consists of letters 'n', 's', 'w', 'e', may contain repeats, may be empty
@@ -93,6 +94,7 @@ class _Layout(TypedDict, total=False):
 _LayoutSpec: TypeAlias = list[tuple[str, _Layout | None]]
 
 # Keep these in sync with the appropriate methods in Style
+@type_check_only
 class _ElementCreateImageKwargs(TypedDict, total=False):
     border: _Padding
     height: float | str
@@ -107,12 +109,15 @@ _ElementCreateArgsCrossPlatform: TypeAlias = (
     | tuple[Literal["from"], str]  # (fromelement is optional)
 )
 if sys.platform == "win32" and sys.version_info >= (3, 13):
+    @type_check_only
     class _ElementCreateVsapiKwargsPadding(TypedDict, total=False):
         padding: _Padding
 
+    @type_check_only
     class _ElementCreateVsapiKwargsMargin(TypedDict, total=False):
         padding: _Padding
 
+    @type_check_only
     class _ElementCreateVsapiKwargsSize(TypedDict):
         width: float | str
         height: float | str

@@ -170,3 +170,18 @@ try:
     foo()
 finally:  # comment
     pass
+
+# Bare try finally with line starting with a formfeed
+try:
+    1
+    2
+finally:
+    pass
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/24373
+# (`try` is preceded by a form feed below)
+try:
+    1
+finally:
+    pass

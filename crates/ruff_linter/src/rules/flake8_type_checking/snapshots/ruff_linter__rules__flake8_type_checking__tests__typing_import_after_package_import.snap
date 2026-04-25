@@ -12,16 +12,16 @@ TC002 [*] Move third-party import `pandas` into a type-checking block
 6 | from typing import TYPE_CHECKING
   |
 help: Move into type-checking block
-1  | 
+1  |
 2  | from __future__ import annotations
-3  | 
+3  |
    - import pandas as pd
-4  | 
+4  |
 5  | from typing import TYPE_CHECKING
-6  | 
+6  |
 7  + if TYPE_CHECKING:
 8  +     import pandas as pd
-9  + 
+9  +
 10 | def f(x: pd.DataFrame):
 11 |     pass
 note: This is an unsafe fix and may change runtime behavior

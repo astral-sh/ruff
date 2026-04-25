@@ -92,8 +92,11 @@ CustomerModel(id=1, name="Test")
 
 ### Decorating a metaclass
 
+If the metaclass of a class `A` is decorated with `@dataclass_transform`, `A` will have
+dataclass-like semantics.
+
 ```py
-from typing_extensions import dataclass_transform
+from typing_extensions import Any, dataclass_transform
 
 @dataclass_transform()
 class ModelMeta(type): ...
@@ -108,6 +111,45 @@ CustomerModel(id=1, name="Test")
 
 # error: [missing-argument]
 CustomerModel()
+```
+
+This is also true if the metaclass is a subclass of a class decorated with `@dataclass_transform`:
+
+```py
+@dataclass_transform()
+class ModelMeta(type): ...
+
+class RegistryMeta(ModelMeta): ...
+class ModelBase(metaclass=RegistryMeta): ...
+
+class Person(ModelBase):
+    name: str
+
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str) -> None
+
+Person("Alice")
+Person(name="Alice")
+
+# error: [missing-argument]
+Person()
+
+# error: [unknown-argument]
+Person(name="Alice", extra=1)
+```
+
+But when a subclass of `type` is decorated with `@dataclass_transform`, we do not consider its
+subclasses to themselves be dataclasses; this would break the above case. If `RegistryMeta` were
+given dataclass semantics itself, it would no longer be usable as a metaclass, since its `__init__`
+would be overridden with a dataclass-style `__init__` method, instead of the `type.__init__`
+signature.
+
+This is an unclear area in the typing spec, which should be clarified. Pyright does the opposite
+(treats `RegistryMeta` as a dataclass, but does not treat `Person` as a dataclass), but that seems
+less useful in practice, and Pydantic relies on the behavior we implement.
+
+```py
+# revealed: Overload[(self, o: object, /) -> None, (self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None]
+reveal_type(RegistryMeta.__init__)
 ```
 
 ### Decorating a base class

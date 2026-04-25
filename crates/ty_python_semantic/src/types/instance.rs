@@ -8,9 +8,11 @@ use ruff_python_ast::name::Name;
 use ty_module_resolver::{ModuleName, file_to_module};
 
 use super::protocol_class::ProtocolInterface;
-use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
+use super::{
+    BoundTypeVarInstance, ClassType, DivergentType, KnownClass, MaterializationKind,
+    SubclassOfType, Type, TypeVarVariance,
+};
 use crate::place::PlaceAndQualifiers;
-use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
@@ -24,11 +26,12 @@ use crate::types::relation::{
 };
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
-    LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
+    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
+    FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
 };
 use crate::{Db, FxOrderSet, Program};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
+use ty_python_core::definition::Definition;
 
 impl<'db> Type<'db> {
     pub(crate) const fn object() -> Self {
@@ -39,13 +42,19 @@ impl<'db> Type<'db> {
         matches!(
             self,
             Type::NominalInstance(NominalInstanceType(NominalInstanceInner::Object))
+                | Type::Divergent(DivergentType {
+                    materialization: Some(MaterializationKind::Top),
+                    ..
+                })
         )
     }
 
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
         match class.class_literal(db) {
             // Dynamic classes created via `type()` don't have special instance types.
-            ClassLiteral::Dynamic(_) | ClassLiteral::DynamicNamedTuple(_) => {
+            ClassLiteral::Dynamic(_)
+            | ClassLiteral::DynamicNamedTuple(_)
+            | ClassLiteral::DynamicEnum(_) => {
                 Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
             }
             // Functional TypedDicts return a TypedDict instance type.
@@ -486,7 +495,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return result;
         }
 
-        if !has_all_protocol_members_defined(db, ty, protocol) {
+        // Fast path: skip expensive per-member type comparisons when members are plainly
+        // missing. When collecting error context, we continue and let the structural check
+        // below report per-member errors instead.
+        if !self.is_context_collection_enabled()
+            && !has_all_protocol_members_defined(db, ty, protocol)
+        {
             return result;
         }
 
@@ -505,6 +519,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.type_satisfies_protocol_member(db, ty, &member)
                 })
         };
+        if structurally_satisfied.is_never_satisfied(db) {
+            self.provide_context(|| ErrorContext::TypeNotCompatibleWithProtocol {
+                ty,
+                protocol: Type::ProtocolInstance(protocol),
+            });
+        }
         result.or(db, self.constraints, || structurally_satisfied)
     }
 
@@ -712,11 +732,13 @@ impl<'db> ProtocolInstanceType<'db> {
             let constraints = ConstraintSetBuilder::new();
             let relation_visitor = HasRelationToVisitor::default(&constraints);
             let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+            let materialization_visitor = ApplyTypeMappingVisitor::default();
             let checker = TypeRelationChecker::subtyping(
                 &constraints,
                 InferableTypeVars::None,
                 &relation_visitor,
                 &disjointness_visitor,
+                &materialization_visitor,
             );
             checker
                 .check_type_satisfies_protocol(db, Type::object(), protocol)
@@ -822,6 +844,10 @@ impl<'db> Protocol<'db> {
             )),
         }
     }
+
+    pub(super) const fn is_synthesized(self) -> bool {
+        matches!(self, Self::Synthesized(_))
+    }
 }
 
 impl<'db> VarianceInferable<'db> for Protocol<'db> {
@@ -836,13 +862,13 @@ impl<'db> VarianceInferable<'db> for Protocol<'db> {
 }
 
 mod synthesized_protocol {
-    use crate::semantic_index::definition::Definition;
     use crate::types::protocol_class::ProtocolInterface;
     use crate::types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, Type,
         TypeContext, TypeMapping, TypeVarVariance, VarianceInferable,
     };
     use crate::{Db, FxOrderSet};
+    use ty_python_core::definition::Definition;
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]

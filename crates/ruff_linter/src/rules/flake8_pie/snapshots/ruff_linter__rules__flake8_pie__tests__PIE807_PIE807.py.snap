@@ -16,8 +16,8 @@ help: Replace with `lambda` with `list`
   -     foo: List[str] = field(default_factory=lambda: [])  # PIE807
 3 +     foo: List[str] = field(default_factory=list)  # PIE807
 4 |     bar: Dict[str, int] = field(default_factory=lambda: {})  # PIE807
-5 | 
-6 | 
+5 |
+6 |
 
 PIE807 [*] Prefer `dict` over useless lambda
  --> PIE807.py:4:49
@@ -33,8 +33,8 @@ help: Replace with `lambda` with `dict`
 3 |     foo: List[str] = field(default_factory=lambda: [])  # PIE807
   -     bar: Dict[str, int] = field(default_factory=lambda: {})  # PIE807
 4 +     bar: Dict[str, int] = field(default_factory=dict)  # PIE807
-5 | 
-6 | 
+5 |
+6 |
 7 | class FooTable(BaseTable):
 
 PIE807 [*] Prefer `list` over useless lambda
@@ -46,14 +46,14 @@ PIE807 [*] Prefer `list` over useless lambda
 9 |     bar = fields.ListField(default=lambda: {})  # PIE807
   |
 help: Replace with `lambda` with `list`
-5  | 
-6  | 
+5  |
+6  |
 7  | class FooTable(BaseTable):
    -     foo = fields.ListField(default=lambda: [])  # PIE807
 8  +     foo = fields.ListField(default=list)  # PIE807
 9  |     bar = fields.ListField(default=lambda: {})  # PIE807
-10 | 
-11 | 
+10 |
+11 |
 
 PIE807 [*] Prefer `dict` over useless lambda
  --> PIE807.py:9:36
@@ -64,13 +64,13 @@ PIE807 [*] Prefer `dict` over useless lambda
   |                                    ^^^^^^^^^^
   |
 help: Replace with `lambda` with `dict`
-6  | 
+6  |
 7  | class FooTable(BaseTable):
 8  |     foo = fields.ListField(default=lambda: [])  # PIE807
    -     bar = fields.ListField(default=lambda: {})  # PIE807
 9  +     bar = fields.ListField(default=dict)  # PIE807
-10 | 
-11 | 
+10 |
+11 |
 12 | class FooTable(BaseTable):
 
 PIE807 [*] Prefer `list` over useless lambda
@@ -82,14 +82,14 @@ PIE807 [*] Prefer `list` over useless lambda
 14 |     bar = fields.ListField(default=lambda: {})  # PIE807
    |
 help: Replace with `lambda` with `list`
-10 | 
-11 | 
+10 |
+11 |
 12 | class FooTable(BaseTable):
    -     foo = fields.ListField(lambda: [])  # PIE807
 13 +     foo = fields.ListField(list)  # PIE807
 14 |     bar = fields.ListField(default=lambda: {})  # PIE807
-15 | 
-16 | 
+15 |
+16 |
 
 PIE807 [*] Prefer `dict` over useless lambda
   --> PIE807.py:14:36
@@ -100,11 +100,11 @@ PIE807 [*] Prefer `dict` over useless lambda
    |                                    ^^^^^^^^^^
    |
 help: Replace with `lambda` with `dict`
-11 | 
+11 |
 12 | class FooTable(BaseTable):
 13 |     foo = fields.ListField(lambda: [])  # PIE807
    -     bar = fields.ListField(default=lambda: {})  # PIE807
 14 +     bar = fields.ListField(default=dict)  # PIE807
-15 | 
-16 | 
+15 |
+16 |
 17 | @dataclass

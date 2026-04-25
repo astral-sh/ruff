@@ -1,0 +1,44 @@
+[package]
+name = "mdtest"
+version = "0.0.0"
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lib]
+doctest = false
+
+[dependencies]
+ruff_db = { workspace = true }
+ruff_diagnostics = { workspace = true }
+ruff_index = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_python_trivia = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
+
+anyhow = { workspace = true }
+camino = { workspace = true }
+colored = { workspace = true }
+indexmap = { workspace = true }
+insta = { workspace = true }
+memchr = { workspace = true }
+path-slash = { workspace = true }
+regex = { workspace = true }
+rustc-hash = { workspace = true }
+rustc-stable-hash = { workspace = true }
+salsa = { workspace = true }
+serde = { workspace = true }
+similar = { workspace = true }
+smallvec = { workspace = true }
+thiserror = { workspace = true }
+toml = { workspace = true }
+tracing = { workspace = true }
+
+[lints]
+workspace = true

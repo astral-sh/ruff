@@ -97,7 +97,7 @@ python-version = "3.12"
 ```py
 from __future__ import annotations
 
-# error: [invalid-type-form] "Named expressions are not allowed in type expressions"
+# error: [invalid-type-form] "Named expressions are not allowed in return type annotations"
 # error: [invalid-syntax] "named expression cannot be used within a type annotation"
 def f() -> (y := 3): ...
 ```
@@ -326,11 +326,11 @@ def _():
     type X[T: (yield 1)] = int
 
 def _():
-    # error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
+    # error: [invalid-type-form] "`yield` expressions are not allowed in type alias values"
     # error: [invalid-syntax] "yield expression cannot be used within a type alias"
     type Y = (yield 1)
 
-# error: [invalid-type-form] "Named expressions are not allowed in type expressions"
+# error: [invalid-type-form] "Named expressions are not allowed in return type annotations"
 # error: [invalid-syntax] "named expression cannot be used within a generic definition"
 def f[T](x: int) -> (y := 3):
     return x

@@ -9,15 +9,14 @@ use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 pub use db::tests::TestDb;
 pub use db::{ChangeResult, CheckMode, Db, ProjectDatabase, SalsaMemoryDump};
 use files::{Index, Indexed, IndexedFiles};
-pub use fixes::suppress_all_diagnostics;
+
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
 use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
+    Diagnostic, DiagnosticId, Severity, SubDiagnostic, SubDiagnosticSeverity,
 };
 use ruff_db::files::{File, FileRootKind};
 use ruff_db::parsed::parsed_module;
-use ruff_db::source::{SourceTextError, source_text};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
 use salsa::{Database, Durability, Setter};
@@ -26,16 +25,11 @@ use std::collections::hash_set;
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
-use thiserror::Error;
+use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy};
 use ty_python_semantic::lint::RuleSelection;
-use ty_python_semantic::types::check_types;
-use ty_python_semantic::{
-    FallibleStrategy, MisconfigurationStrategy, add_inferred_python_version_hint_to_diagnostic,
-};
 
 mod db;
 mod files;
-mod fixes;
 pub mod glob;
 pub mod metadata;
 mod walk;
@@ -298,12 +292,7 @@ impl Project {
         let files = ProjectFiles::new(db, self);
         reporter.set_files(files.len());
 
-        diagnostics.extend(
-            files
-                .diagnostics()
-                .iter()
-                .map(IOErrorDiagnostic::to_diagnostic),
-        );
+        diagnostics.extend_from_slice(files.diagnostics());
 
         reporter.report_diagnostics(db, diagnostics);
 
@@ -367,10 +356,9 @@ impl Project {
             return Vec::new();
         }
 
-        match check_file_impl(db, file) {
-            Ok(diagnostics) => diagnostics.to_vec(),
-            Err(diagnostic) => vec![diagnostic.clone()],
-        }
+        check_file_impl(db, file)
+            .map(<[Diagnostic]>::to_vec)
+            .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
     }
 
     /// Opens a file in the project.
@@ -563,7 +551,7 @@ impl Project {
     /// Replaces the diagnostics from indexing the project files with `diagnostics`.
     ///
     /// This is a no-op if the project files haven't been indexed yet.
-    pub fn replace_index_diagnostics(self, db: &mut dyn Db, diagnostics: Vec<IOErrorDiagnostic>) {
+    pub fn replace_index_diagnostics(self, db: &mut dyn Db, diagnostics: Vec<Diagnostic>) {
         let Some(mut index) = IndexedFiles::indexed_mut(db, self) else {
             return;
         };
@@ -614,56 +602,15 @@ impl Project {
     }
 }
 
-#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnostic> {
-    let mut diagnostics: Vec<Diagnostic> = Vec::new();
-
-    // Abort checking if there are IO errors.
-    let source = source_text(db, file);
-
-    if let Some(read_error) = source.read_error() {
-        return Err(IOErrorDiagnostic {
-            file: Some(file),
-            error: read_error.clone().into(),
-        }
-        .to_diagnostic());
-    }
-
-    let parsed = parsed_module(db, file);
-
-    let parsed_ref = parsed.load(db);
-    diagnostics.extend(
-        parsed_ref
-            .errors()
-            .iter()
-            .map(|error| Diagnostic::invalid_syntax(file, &error.error, error)),
-    );
-
-    diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
-        let mut error = Diagnostic::invalid_syntax(file, error, error);
-        add_inferred_python_version_hint_to_diagnostic(db, &mut error, "parsing syntax");
-        error
-    }));
-
     {
         let db = AssertUnwindSafe(db);
-        match catch(&**db, file, || check_types(*db, file)) {
-            Ok(type_check_diagnostics) => {
-                diagnostics.extend(type_check_diagnostics);
-            }
-            Err(diagnostic) => diagnostics.push(diagnostic),
+        match catch(&**db, file, || ty_python_semantic::check_file(*db, file)) {
+            Ok(result) => result,
+            Err(diagnostic) => Ok(Box::new([diagnostic])),
         }
     }
-
-    diagnostics.sort_unstable_by_key(|diagnostic| {
-        diagnostic
-            .primary_span()
-            .and_then(|span| span.range())
-            .unwrap_or_default()
-            .start()
-    });
-
-    Ok(diagnostics.into_boxed_slice())
 }
 
 #[derive(Debug)]
@@ -680,7 +627,7 @@ impl<'a> ProjectFiles<'a> {
         }
     }
 
-    fn diagnostics(&self) -> &[IOErrorDiagnostic] {
+    fn diagnostics(&self) -> &[Diagnostic] {
         match self {
             ProjectFiles::OpenFiles(_) => &[],
             ProjectFiles::Indexed(files) => files.diagnostics(),
@@ -724,31 +671,6 @@ impl Iterator for ProjectFilesIter<'_> {
 }
 
 impl FusedIterator for ProjectFilesIter<'_> {}
-
-#[derive(Debug, Clone, get_size2::GetSize)]
-pub struct IOErrorDiagnostic {
-    file: Option<File>,
-    error: IOErrorKind,
-}
-
-impl IOErrorDiagnostic {
-    fn to_diagnostic(&self) -> Diagnostic {
-        let mut diag = Diagnostic::new(DiagnosticId::Io, Severity::Error, &self.error);
-        if let Some(file) = self.file {
-            diag.annotate(Annotation::primary(Span::from(file)));
-        }
-        diag
-    }
-}
-
-#[derive(Error, Debug, Clone, get_size2::GetSize)]
-enum IOErrorKind {
-    #[error(transparent)]
-    Walk(#[from] walk::WalkError),
-
-    #[error(transparent)]
-    SourceText(#[from] SourceTextError),
-}
 
 fn catch<F, R>(db: &dyn Db, file: File, f: F) -> Result<R, Diagnostic>
 where

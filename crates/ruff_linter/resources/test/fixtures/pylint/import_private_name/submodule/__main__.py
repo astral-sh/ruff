@@ -45,4 +45,8 @@ class Class:
     def __init__(self, arg: vv) -> "zz":
         pass
 
+
+def generic[T: _nn](arg: T) -> T:
+    return arg
+
 from foo.    _bar import baz

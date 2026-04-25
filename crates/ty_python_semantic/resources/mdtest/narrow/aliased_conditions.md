@@ -181,12 +181,6 @@ def _(a: A):
             reveal_type(a.x)  # revealed: None
 
 def _(a: A):
-    is_none = a.x is None
-    a.x = 1
-    if is_none:
-        reveal_type(a.x)  # revealed: Literal[1]
-
-def _(a: A):
     # Attribute targets are not treated as aliases.
     # It is difficult to track them accurately.
     a.b = a.x is None
@@ -220,10 +214,10 @@ def _(l: list[int | None], lb: list[bool]):
         reveal_type(l[0])  # revealed: int | None
 ```
 
-## Narrowed variable reassigned invalidates alias
+## Narrowing is invalidated when target is reassigned
 
-If the narrowed variable is reassigned between the alias and its use as a condition, the alias must
-not be followed.
+If the target is reassigned between the definition of the alias and its use as a condition,
+narrowing does not take place:
 
 ```py
 def _(x: int | None, cond: bool):
@@ -236,6 +230,29 @@ def _(x: int | None, cond: bool):
     is_none = x is None
     if is_none:
         reveal_type(x)  # revealed: None
+
+class A:
+    x: int | None
+
+def _(a: A):
+    is_none = a.x is None
+    a.x = 1
+    if is_none:
+        reveal_type(a.x)  # revealed: Literal[1]
+
+def _(a: A):
+    is_none = a.x is None
+    a = A()
+    if is_none:
+        reveal_type(a.x)  # revealed: int | None
+
+def _(x: int | None):
+    # In-place reassignment
+    x = x is None
+    if x:
+        reveal_type(x)  # revealed: Literal[True]
+    else:
+        reveal_type(x)  # revealed: Literal[False]
 ```
 
 ## Alias variable reassigned invalidates alias
@@ -256,10 +273,12 @@ def _(x: int | None):
 
 ## Nested scope can preserve alias
 
-Aliases remain valid inside nested scopes. For eager scopes (class bodies, comprehensions) they are
-evaluated inline. For lazy scopes (inner functions), the narrowing evaluator uses lazy snapshots to
-track whether the narrowed variable was reassigned, so alias-based narrowing works the same as
-direct narrowing across scope boundaries.
+Aliases defined in the outer scope behave the same way across nested scope boundaries as if the
+target had been directly narrowed (see also: [`conditionals/nested.md`](./conditionals/nested.md)).
+
+In other words, in eager scope (class body, list comprehension, etc.), the alias is adopted as it
+was when it entered the scope. In lazy scope (function body, etc.), the alias remains valid unless
+either the target or the alias is reassigned.
 
 ```py
 def _(x: int | None):
@@ -268,11 +287,11 @@ def _(x: int | None):
     if is_none:
         reveal_type(x)  # revealed: None
 
-    class Inner:
+    class EagerScope:
         if is_none:
             reveal_type(x)  # revealed: None
 
-        def inner():
+        def lazy_scope():
             if is_none:
                 reveal_type(x)  # revealed: None
 
@@ -289,7 +308,6 @@ class A:
 
 def _(a: A):
     a = A()
-    a.x = None
     is_none = a.x is None
 
     if is_none:
@@ -314,10 +332,9 @@ def _(a: A):
 
 ## Cross-scope invalidation
 
-### Narrowed variable reassigned
+### Target reassignments
 
-If the narrowed variable is reassigned inside an eager scope, the alias is invalidated within that
-scope.
+If the target is reassigned inside an eager scope, narrowing does not take place within that scope.
 
 ```py
 def _(x: int | None):
@@ -440,7 +457,7 @@ def _(x: int | None):
     inner()
 ```
 
-## Chained alias
+## Chained aliases
 
 ### Basic
 
@@ -676,4 +693,42 @@ def _(x: str | int | None):
     def inner():
         if is_int_or_none:
             reveal_type(x)  # revealed: int | None
+```
+
+## Simple name aliases do not have a narrowing effect
+
+This is a technical limitation: simple name aliases are so common in real-world Python code that
+assuming all of them are subject to alias narrowing would lead to performance degradation. TODO: It
+would be nice if we could resolve this limitation, but it probably won't be a serious issue in
+practice.
+
+```py
+def _(x: int, y: bool):
+    if x:
+        reveal_type(x)  # revealed: int & ~AlwaysFalsy
+    if y:
+        reveal_type(y)  # revealed: Literal[True]
+    if x and y:
+        reveal_type(x)  # revealed: int & ~AlwaysFalsy
+        reveal_type(y)  # revealed: Literal[True]
+
+    x_alias = x
+    y_alias = y
+    if x_alias:
+        reveal_type(x)  # revealed: int
+    if y_alias:
+        reveal_type(y)  # revealed: bool
+    if x_alias and y_alias:
+        reveal_type(x)  # revealed: int
+        reveal_type(y)  # revealed: bool
+
+    x_alias2 = bool(x)
+    y_alias2 = bool(y)
+    if x_alias2:
+        reveal_type(x)  # revealed: int & ~AlwaysFalsy
+    if y_alias2:
+        reveal_type(y)  # revealed: Literal[True]
+    if x_alias2 and y_alias2:
+        reveal_type(x)  # revealed: int & ~AlwaysFalsy
+        reveal_type(y)  # revealed: Literal[True]
 ```

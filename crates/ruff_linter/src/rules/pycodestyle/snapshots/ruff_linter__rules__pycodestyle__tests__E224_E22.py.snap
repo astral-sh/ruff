@@ -11,8 +11,8 @@ E224 [*] Tab after operator
 50 | #:
    |
 help: Replace with single space
-45 | 
-46 | 
+45 |
+46 |
 47 | #: E224
    - a +=	1
 48 + a += 1
