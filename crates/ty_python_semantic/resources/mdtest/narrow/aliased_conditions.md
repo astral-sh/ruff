@@ -721,3 +721,41 @@ def _(x: str | int | None):
             # TODO: should be `int | None`
             reveal_type(x)  # revealed: str | int | None
 ```
+
+## Simple name aliases do not have a narrowing effect
+
+This is a technical limitation: simple name aliases are so common in real-world Python code that
+assuming all of them are subject to alias narrowing would lead to performance degradation. TODO: It
+would be nice if we could resolve this limitation, but it probably won't be a serious issue in
+practice.
+
+```py
+def _(x: int, y: bool):
+    if x:
+        reveal_type(x)  # revealed: int & ~AlwaysFalsy
+    if y:
+        reveal_type(y)  # revealed: Literal[True]
+    if x and y:
+        reveal_type(x)  # revealed: int & ~AlwaysFalsy
+        reveal_type(y)  # revealed: Literal[True]
+
+    x_alias = x
+    y_alias = y
+    if x_alias:
+        reveal_type(x)  # revealed: int
+    if y_alias:
+        reveal_type(y)  # revealed: bool
+    if x_alias and y_alias:
+        reveal_type(x)  # revealed: int
+        reveal_type(y)  # revealed: bool
+
+    x_alias2 = bool(x)
+    y_alias2 = bool(y)
+    if x_alias2:
+        reveal_type(x)  # revealed: int & ~AlwaysFalsy
+    if y_alias2:
+        reveal_type(y)  # revealed: Literal[True]
+    if x_alias2 and y_alias2:
+        reveal_type(x)  # revealed: int & ~AlwaysFalsy
+        reveal_type(y)  # revealed: Literal[True]
+```
