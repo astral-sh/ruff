@@ -1194,12 +1194,21 @@ impl<'db> ClassType<'db> {
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, target: ClassType<'db>) -> bool {
         let constraints = ConstraintSetBuilder::new();
-        let relation_visitor = HasRelationToVisitor::default(&constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+        self.is_subclass_of_with_constraints(db, target, &constraints)
+    }
+
+    pub(super) fn is_subclass_of_with_constraints(
+        self,
+        db: &'db dyn Db,
+        target: ClassType<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+    ) -> bool {
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::subtyping(
-            &constraints,
+            constraints,
             InferableTypeVars::None,
             &relation_visitor,
             &disjointness_visitor,
@@ -1291,12 +1300,14 @@ impl<'db> ClassType<'db> {
         // `could_coexist_in_mro_with_specialization_check` below to keep their active guard.
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = DisjointnessChecker::new(
             constraints,
             InferableTypeVars::None,
             &relation_visitor,
             &disjointness_visitor,
+            &signature_relation_visitor,
             &materialization_visitor,
         );
         self.could_coexist_in_mro_with_specialization_check(
@@ -1333,12 +1344,29 @@ impl<'db> ClassType<'db> {
         // `Covariant[FinalA]` and `Covariant[B]` can overlap through `Covariant[Never]`, even
         // though no concrete subclass can have both `Covariant[FinalA]` and `Covariant[B]` as
         // separate generic bases in its MRO.
-        let direct_aliases_have_same_origin = self
+        if let Some((self_alias, other_alias)) = self
             .into_generic_alias()
             .zip(other.into_generic_alias())
-            .is_some_and(|(self_alias, other_alias)| {
-                self_alias.origin(db) == other_alias.origin(db)
-            });
+            .filter(|(self_alias, other_alias)| self_alias.origin(db) == other_alias.origin(db))
+        {
+            // As above, tuple element specs do not make two direct aliases incompatible as
+            // runtime classes.
+            if self_alias.specialization(db).tuple(db).is_some()
+                && other_alias.specialization(db).tuple(db).is_some()
+            {
+                return true;
+            }
+
+            return !self_alias
+                .specialization(db)
+                .is_disjoint_from(
+                    db,
+                    other_alias.specialization(db),
+                    constraints,
+                    InferableTypeVars::None,
+                )
+                .is_always_satisfied(db);
+        }
 
         let other_generic_bases: Vec<_> = other
             .iter_mro(db)
@@ -1356,30 +1384,10 @@ impl<'db> ClassType<'db> {
                         return false;
                     }
 
-                    if direct_aliases_have_same_origin {
-                        // As above, tuple element specs do not make two direct aliases
-                        // incompatible as runtime classes.
-                        if self_alias.specialization(db).tuple(db).is_some()
-                            && other_alias.specialization(db).tuple(db).is_some()
-                        {
-                            return false;
-                        }
-
-                        self_alias
-                            .specialization(db)
-                            .is_disjoint_from(
-                                db,
-                                other_alias.specialization(db),
-                                constraints,
-                                InferableTypeVars::None,
-                            )
-                            .is_always_satisfied(db)
-                    } else {
-                        specializations_are_incompatible_in_mro(
-                            self_alias.specialization(db),
-                            other_alias.specialization(db),
-                        )
-                    }
+                    specializations_are_incompatible_in_mro(
+                        self_alias.specialization(db),
+                        other_alias.specialization(db),
+                    )
                 })
             })
         {

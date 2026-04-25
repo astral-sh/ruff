@@ -119,7 +119,7 @@ static_assert(not is_disjoint_from(Foo[int], Foo[str]))
 
 ```py
 from typing import Any, Generic, Sequence, TypeVar, final
-from typing_extensions import Never, disjoint_base
+from typing_extensions import Never, TypeAlias, disjoint_base
 from ty_extensions import is_disjoint_from, static_assert
 
 class A: ...
@@ -141,6 +141,10 @@ class Invariant(Generic[T]):
 class InvSubA(Invariant[A]):
     pass
 
+@final
+class FinalInvSubInt(Invariant[int]):
+    pass
+
 class Covariant(Generic[T_co]):
     def get(self) -> T_co:
         raise NotImplementedError()
@@ -148,7 +152,12 @@ class Covariant(Generic[T_co]):
 class CoSubB(Covariant[B]):
     pass
 
+AliasToNever: TypeAlias = Never
+
 class CoSubNever(Covariant[Never]):
+    pass
+
+class CoSubAliasNever(Covariant[AliasToNever]):
     pass
 
 class CoSubFinalA(Covariant[FinalA]):
@@ -178,15 +187,21 @@ static_assert(is_disjoint_from(InvSubA, Invariant[B]))
 static_assert(not is_disjoint_from(Invariant[A], Invariant[A]))
 static_assert(not is_disjoint_from(Invariant[FinalA], Invariant[FinalA]))
 static_assert(not is_disjoint_from(Invariant[DisjointA], Invariant[DisjointA]))
+static_assert(not is_disjoint_from(type[Invariant[Any]], type[FinalInvSubInt]))
+static_assert(not is_disjoint_from(type[FinalInvSubInt], type[Invariant[Any]]))
 
 static_assert(not is_disjoint_from(Covariant[A], Covariant[B]))
 static_assert(not is_disjoint_from(Covariant[A], CoSubB))
 static_assert(not is_disjoint_from(Covariant[A], CoSubNever))
 static_assert(not is_disjoint_from(CoSubNever, Covariant[A]))
+static_assert(not is_disjoint_from(Covariant[A], CoSubAliasNever))
+static_assert(not is_disjoint_from(CoSubAliasNever, CoSubB))
 static_assert(not is_disjoint_from(Covariant[FinalA], Covariant[B]))
 static_assert(is_disjoint_from(CoSubFinalA, Covariant[B]))
 static_assert(is_disjoint_from(FinalCoSubA, Covariant[B]))
 static_assert(is_disjoint_from(Covariant[FinalA], CoSubB))
+static_assert(is_disjoint_from(type[FinalCoSubA], type[Covariant[B]]))
+static_assert(is_disjoint_from(type[Covariant[B]], type[FinalCoSubA]))
 static_assert(is_disjoint_from(Left[int], Right[str]))
 static_assert(not is_disjoint_from(PairLeft, PairRight))
 
@@ -201,6 +216,48 @@ static_assert(not is_disjoint_from(type[RecursiveLeft], type[RecursiveRight]))
 static_assert(not is_disjoint_from(Sequence[int], Sequence[str]))
 static_assert(is_disjoint_from(str, Sequence[int]))
 static_assert(not is_disjoint_from(str, Sequence[str]))
+```
+
+## Generic type aliases
+
+Generic type aliases should not let us conclude disjointness too eagerly when their values preserve
+free type variables or inherited generic bases:
+
+```py
+from typing import Generic, TypeVar, final
+from typing_extensions import TypeAlias, TypeAliasType
+from ty_extensions import is_disjoint_from, static_assert
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+U = TypeVar("U")
+
+FreeAlias = TypeAliasType("FreeAlias", T)
+
+class B: ...
+
+@final
+class FinalA: ...
+
+class Invariant(Generic[U]):
+    pass
+
+class Covariant(Generic[T_co], Invariant[T_co]):
+    pass
+
+LeftWithFreeAlias: TypeAlias = Invariant[FreeAlias]
+RightWithConcrete: TypeAlias = Invariant[int]
+
+# `FreeAlias` has an unspecialized type variable, so `Invariant[FreeAlias]` could overlap with
+# `Invariant[int]`.
+static_assert(not is_disjoint_from(LeftWithFreeAlias, RightWithConcrete))
+
+LeftWithInheritedBase: TypeAlias = Covariant[FinalA]
+RightWithInheritedBase: TypeAlias = Covariant[B]
+
+# The direct `Covariant[...]` aliases can overlap even though their inherited invariant bases
+# appear disjoint.
+static_assert(not is_disjoint_from(LeftWithInheritedBase, RightWithInheritedBase))
 ```
 
 ## "Disjoint base" builtin types

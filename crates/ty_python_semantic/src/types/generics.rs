@@ -1591,6 +1591,71 @@ fn specialization_variance<'db>(
     }
 }
 
+fn type_or_alias_value_has_typevar<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    type_or_alias_value_contains_typevar(db, ty, false)
+}
+
+fn type_or_alias_value_has_typevar_or_typevar_instance<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> bool {
+    type_or_alias_value_contains_typevar(db, ty, true)
+}
+
+/// Return `true` if a type contains a type variable, including one hidden behind a type alias.
+fn type_or_alias_value_contains_typevar<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    include_typevar_instance: bool,
+) -> bool {
+    struct HasTypeVarVisitor<'db> {
+        found_typevar: Cell<bool>,
+        include_typevar_instance: bool,
+        recursion_guard: TypeCollector<'db>,
+    }
+
+    impl<'db> TypeVisitor<'db> for HasTypeVarVisitor<'db> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            false
+        }
+
+        fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
+            match type_alias {
+                TypeAliasType::PEP695(type_alias) => {
+                    walk_pep_695_type_alias(db, type_alias, self);
+                }
+                TypeAliasType::ManualPEP695(type_alias) => {
+                    walk_manual_pep_695_type_alias(db, type_alias, self);
+                }
+            }
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            if self.found_typevar.get() {
+                return;
+            }
+
+            if matches!(ty, Type::TypeVar(_))
+                || matches!(ty, Type::KnownInstance(KnownInstanceType::TypeVar(_)))
+                    && self.include_typevar_instance
+            {
+                self.found_typevar.set(true);
+                return;
+            }
+
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+    }
+
+    let visitor = HasTypeVarVisitor {
+        found_typevar: Cell::new(false),
+        include_typevar_instance,
+        recursion_guard: TypeCollector::default(),
+    };
+    visitor.visit_type(db, ty);
+    visitor.found_typevar.get()
+}
+
 impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     /// Return `true` if a type can safely participate in specialization disjointness shortcuts.
     ///
@@ -1599,7 +1664,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     /// type as another type variable, so treating either as definitive evidence of disjointness
     /// would make overload filtering and union simplification too eager.
     fn type_is_static_for_specialization_disjointness(db: &'db dyn Db, ty: Type<'db>) -> bool {
-        if ty.is_dynamic() || ty.has_typevar_or_typevar_instance(db) {
+        if ty.is_dynamic() || type_or_alias_value_has_typevar_or_typevar_instance(db, ty) {
             return false;
         }
 
@@ -1737,7 +1802,10 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                 }
                 // `Covariant[Never]` is compatible with every `Covariant[T]`, so `Never` cannot
                 // prove that two covariant generic bases are impossible to combine.
-                TypeVarVariance::Covariant if left_type.is_never() || right_type.is_never() => {
+                TypeVarVariance::Covariant
+                    if left_type.resolve_type_alias(db).is_never()
+                        || right_type.resolve_type_alias(db).is_never() =>
+                {
                     self.never()
                 }
                 TypeVarVariance::Covariant => self.check_type_pair(db, *left_type, *right_type),
@@ -2124,31 +2192,52 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         if let Type::TypeAlias(alias) = formal {
             return self.infer_map_impl(alias.value_type(self.db), actual, polarity, f, seen);
         }
-        if let Type::TypeAlias(alias) = actual {
+
+        let preserve_actual_alias_for_typevar = matches!(
+            (formal, actual),
+            (Type::TypeVar(bound_typevar), Type::TypeAlias(_))
+                if bound_typevar.is_inferable(self.db, self.inferable)
+        );
+        if let Type::TypeAlias(alias) = actual
+            && !preserve_actual_alias_for_typevar
+        {
             return self.infer_map_impl(formal, alias.value_type(self.db), polarity, f, seen);
         }
 
-        // Once aliases are expanded, pairs with no type variables cannot contribute any mapping.
-        if !formal.has_typevar(self.db) && !actual.has_typevar(self.db) {
+        // Pairs with no type variables cannot contribute any mapping. Look through nested alias
+        // values here so `list[Alias[T]]` still reaches structural inference.
+        if !type_or_alias_value_has_typevar(self.db, formal)
+            && !type_or_alias_value_has_typevar(self.db, actual)
+        {
             return Ok(());
         }
 
-        // Remove the union elements from `actual` that are not related to `formal`, and vice
-        // versa.
-        //
-        // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to
-        // specialize `T` to `int`, and so ignore the `None`.
-        let actual = actual.filter_disjoint_elements(self.db, formal, self.inferable);
-        let filtered_formal = formal.filter_disjoint_elements(self.db, actual, self.inferable);
-        // Filtering is only an inference shortcut. If it removes every formal candidate, keep the
-        // original type so later matching still gets a chance to find a useful branch. This can
-        // happen around recursive aliases whose recursive branch is visited before a concrete
-        // branch, such as `JsonValue = dict[str, JsonValue] | list[JsonValue] | str`.
-        let formal = if filtered_formal.is_never() && !formal.is_never() {
-            formal
+        let (formal, actual) = if preserve_actual_alias_for_typevar {
+            (formal, actual)
         } else {
-            filtered_formal
+            // Remove the union elements from `actual` that are not related to `formal`, and vice
+            // versa.
+            //
+            // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to
+            // specialize `T` to `int`, and so ignore the `None`.
+            let actual = actual.filter_disjoint_elements(self.db, formal, self.inferable);
+            let filtered_formal = formal.filter_disjoint_elements(self.db, actual, self.inferable);
+            // Filtering is only an inference shortcut. If it removes every formal candidate, keep the
+            // original type so later matching still gets a chance to find a useful branch. This can
+            // happen around recursive aliases whose recursive branch is visited before a concrete
+            // branch, such as `JsonValue = dict[str, JsonValue] | list[JsonValue] | str`.
+            let formal = if filtered_formal.is_never() && !formal.is_never() {
+                formal
+            } else {
+                filtered_formal
+            };
+
+            (formal, actual)
         };
+
+        if let Type::TypeAlias(alias) = formal {
+            return self.infer_map_impl(alias.value_type(self.db), actual, polarity, f, seen);
+        }
 
         match (formal, actual) {
             // TODO: We haven't implemented a full unification solver yet. If typevars appear in

@@ -2521,14 +2521,17 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of() {
                     SubclassOfInner::Dynamic(_) => self.never(),
-                    SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
-                        self.constraints,
-                        !class_a.could_exist_in_mro_of(
-                            db,
-                            ClassType::NonGeneric(class_b),
-                            self.constraints,
-                        ),
-                    ),
+                    SubclassOfInner::Class(class_a) => {
+                        let class_b = ClassType::NonGeneric(class_b);
+                        let could_exist = if class_b.is_final(db) {
+                            self.as_relation_checker(TypeRelation::Assignability)
+                                .check_class_pair(db, class_b, class_a)
+                                .is_always_satisfied(db)
+                        } else {
+                            class_a.could_exist_in_mro_of(db, class_b, self.constraints)
+                        };
+                        ConstraintSet::from_bool(self.constraints, !could_exist)
+                    }
                     SubclassOfInner::TypeVar(_) => unreachable!(),
                 }
             }
