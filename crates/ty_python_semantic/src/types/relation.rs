@@ -1261,14 +1261,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         })
                 }),
 
-            // Ideally we'd just move the generalised case for assignability to a protocol-instance up here,
-            // but that leads to Salsa cycles and performance regressions. It's only *necessary* for the
-            // `intersection <-> Protocol` case to be this high.
-            (Type::Intersection(_), Type::ProtocolInstance(target_proto)) => self
-                .with_recursion_guard(source, target, || {
-                    self.check_type_satisfies_protocol(db, source, target_proto)
-                }),
-
             (Type::Intersection(intersection), _) => {
                 // An intersection type is a subtype of another type if at least one of its
                 // positive elements is a subtype of that type. If there are no positive elements,
@@ -1297,6 +1289,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                                 intersection.with_expanded_typevars_and_newtypes(db),
                                 target,
                             )
+                        } else if let Type::ProtocolInstance(target_proto) = target {
+                            self.with_recursion_guard(source, target, || {
+                                self.check_type_satisfies_protocol(db, source, target_proto)
+                            })
                         } else {
                             self.never()
                         }
