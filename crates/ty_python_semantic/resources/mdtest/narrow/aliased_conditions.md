@@ -259,10 +259,12 @@ def _(x: int | None):
 
 > TODO: This feature is not supported yet.
 
-Aliases remain valid inside nested scopes. For eager scopes (class bodies, comprehensions) they are
-evaluated inline. For lazy scopes (inner functions), the narrowing evaluator uses lazy snapshots to
-track whether the narrowed variable was reassigned, so alias-based narrowing works the same as
-direct narrowing across scope boundaries.
+Aliases defined in the outer scope behave the same way across nested scope boundaries as if the
+target had been directly narrowed (see also: [`conditionals/nested.md`](./conditionals/nested.md)).
+
+In other words, in eager scope (class body, list comprehension, etc.), the alias is adopted as it
+was when it entered the scope. In lazy scope (function body, etc.), the alias remains valid unless
+either the target or the alias is reassigned.
 
 ```py
 def _(x: int | None):
@@ -296,7 +298,6 @@ class A:
 
 def _(a: A):
     a = A()
-    a.x = None
     is_none = a.x is None
 
     if is_none:
@@ -304,7 +305,8 @@ def _(a: A):
 
     class Inner:
         if is_none:
-            reveal_type(a.x)  # revealed: None
+            # TODO: should be `None`
+            reveal_type(a.x)  # revealed: int | None
 
         def inner():
             if is_none:
