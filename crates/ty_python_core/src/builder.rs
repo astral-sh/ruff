@@ -220,7 +220,7 @@ struct NarrowingAlias<'ast> {
 struct NarrowingAliasInfo<'ast> {
     sub_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
     place_keys: FxHashSet<PlaceKey>,
-    value_guards: Vec<ReassignmentGuard>,
+    value_guards: FxHashSet<ReassignmentGuard>,
 }
 
 struct ScopeInfo<'ast> {
@@ -924,7 +924,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let mut info = NarrowingAliasInfo {
             sub_aliases: FxHashMap::default(),
             place_keys: FxHashSet::default(),
-            value_guards: Vec::new(),
+            value_guards: FxHashSet::default(),
         };
         self.collect_narrowing_alias_info(
             expression,
@@ -980,16 +980,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         };
         collector.visit_expr(expression);
 
-        for (name, use_id) in collector.use_ids {
-            let guard = ReassignmentGuard {
-                scope: expression_scope,
-                name,
-                use_id,
-            };
-            if !info.value_guards.contains(&guard) {
-                info.value_guards.push(guard);
-            }
-        }
+        info.value_guards
+            .extend(
+                collector
+                    .use_ids
+                    .into_iter()
+                    .map(|(name, use_id)| ReassignmentGuard {
+                        scope: expression_scope,
+                        name,
+                        use_id,
+                    }),
+            );
     }
 
     fn collect_narrowing_alias_info(
@@ -1034,9 +1035,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
             ast::Expr::Call(call) => {
+                // If any argument references a sub-alias (e.g. `bool(is_none)`), recurse into
+                // each such argument so the alias is registered. Otherwise (e.g.
+                // `isinstance(x, int)`) record the entire call as a single value guard.
                 let mut has_alias = false;
-                for arg in &call.arguments.args {
-                    // Sub-alias found: e.g. `bool(is_none)`
+                let arg_iter = call
+                    .arguments
+                    .args
+                    .iter()
+                    .chain(call.arguments.keywords.iter().map(|kw| &kw.value));
+                for arg in arg_iter {
                     if Self::contains_sub_narrowing_alias(arg, available_aliases) {
                         has_alias = true;
                         self.collect_narrowing_alias_info(
@@ -1047,18 +1055,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         );
                     }
                 }
-                for keyword in &call.arguments.keywords {
-                    if Self::contains_sub_narrowing_alias(&keyword.value, available_aliases) {
-                        has_alias = true;
-                        self.collect_narrowing_alias_info(
-                            &keyword.value,
-                            expression_scope,
-                            available_aliases,
-                            info,
-                        );
-                    }
-                }
-                // Sub-alias not found: e.g. `isinstance(x, int)`
                 if !has_alias {
                     self.add_expr_value_guards(expression, expression_scope, info);
                 }
@@ -1108,13 +1104,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &self,
         sub_aliases: &FxHashMap<Name, NarrowingAlias<'ast>>,
     ) -> FxHashSet<Name> {
+        let place_table = self.current_place_table();
         let mut result = FxHashSet::default();
         for (name, alias) in sub_aliases {
-            if self
-                .current_place_table()
-                .symbol_id(name)
-                .map(|symbol_id| self.current_place_table().symbol(symbol_id))
-                .is_some_and(Symbol::is_free)
+            if let Some(symbol_id) = place_table.symbol_id(name)
+                && place_table.symbol(symbol_id).is_free()
             {
                 result.insert(name.clone());
             }
@@ -1779,7 +1773,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         if !info.place_keys.is_empty() && !target_is_narrowed {
             let guard = NarrowingAliasGuard {
-                value_guards: info.value_guards.into_boxed_slice(),
+                value_guards: info.value_guards.into_iter().collect(),
                 target_guard: self.narrowing_alias_target_guard(target_name_expr),
                 chained_source_names: self.chained_source_names(&info.sub_aliases),
             };

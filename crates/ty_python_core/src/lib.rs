@@ -330,7 +330,7 @@ pub struct NarrowingAliasGuard {
     pub chained_source_names: FxHashSet<Name>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub struct ReassignmentGuard {
     pub scope: FileScopeId,
     pub name: Name,
