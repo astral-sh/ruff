@@ -5072,9 +5072,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut overloads_with_binding: Vec<(&Binding<'db>, &CallableBinding<'db>)> = Vec::new();
 
-        for binding in bindings.iter_type_context_callables() {
+        bindings.visit_type_context_callables(&mut |binding| {
             add_overloads_from_binding(&mut overloads_with_binding, binding);
-        }
+        });
 
         for (argument_index, (_, argument_types), argument_form, ast_argument) in iter {
             let ast_argument = match ast_argument {
