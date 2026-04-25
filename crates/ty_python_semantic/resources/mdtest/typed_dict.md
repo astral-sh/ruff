@@ -13,7 +13,8 @@ python-version = "3.12"
 Here, we define a `TypedDict` using the class-based syntax:
 
 ```py
-from typing import Optional, TypedDict
+from typing import Optional, TypeVar, TypedDict
+from typing_extensions import assert_type
 
 class Person(TypedDict):
     name: str
@@ -374,7 +375,8 @@ bob["extra"] = True
 Nested `TypedDict` fields are also supported.
 
 ```py
-from typing import TypedDict
+from typing import TypeVar, TypedDict
+from typing_extensions import assert_type
 
 class Inner(TypedDict):
     name: str
@@ -404,10 +406,22 @@ reveal_type(box | {"inner": {"age": 31, "name": "Alice"}})  # revealed: Box
 reveal_type({"inner": {"age": 31, "name": "Alice"}} | box)  # revealed: Box
 ```
 
-## Validation of `TypedDict` construction
+`dict` fallbacks should remain valid for incompatible `TypedDict` literals:
 
 ```py
 from typing import TypedDict
+
+class ConfigOrDict(TypedDict):
+    a: int
+
+x12: ConfigOrDict | dict[str, list[int]] = {"a": [1]}
+```
+
+## Validation of `TypedDict` construction
+
+```py
+from typing import TypeVar, TypedDict
+from typing_extensions import assert_type
 
 class Person(TypedDict):
     name: str
@@ -436,7 +450,8 @@ house.owner = {"name": "Alice", "age": 30}
 TypedDict constructor validation should not duplicate diagnostics emitted by argument inference:
 
 ```py
-from typing import TypedDict
+from typing import TypeVar, TypedDict
+from typing_extensions import assert_type
 
 class TD(TypedDict):
     x: int
@@ -797,6 +812,123 @@ reveal_type(x7)  # revealed: FooBar1 | FooBar3
 
 x8: FooBar1 | FooBar2 | FooBar3 | None = {"foo": 1, "bar": 1}
 reveal_type(x8)  # revealed: FooBar1 | FooBar2 | FooBar3
+
+class DictFallbackFoo(TypedDict):
+    a: list[str]
+
+class DictFallbackBar(TypedDict):
+    b: list[int]
+
+x8_dict_fallback: DictFallbackFoo | DictFallbackBar | dict[str, list[int]] = {"a": [1]}
+
+class DivergentValueFoo(TypedDict):
+    a: list[int]
+
+class DivergentValueBar(TypedDict):
+    a: list[str]
+
+x8_divergent_value: DivergentValueFoo | DivergentValueBar = {"a": [1]}
+reveal_type(x8_divergent_value)  # revealed: DivergentValueFoo
+```
+
+Literal tag fields should narrow same-shape `TypedDict` unions before inferring the remaining
+values:
+
+```py
+from typing import Literal, TypedDict
+
+class AssistantDelta(TypedDict):
+    role: Literal["assistant"]
+    content: str
+
+class ToolDelta(TypedDict):
+    role: Literal["tool_result"]
+    content: str
+
+x9: AssistantDelta | ToolDelta = {"role": "tool_result", "content": "done"}
+reveal_type(x9)  # revealed: ToolDelta
+
+x9_shadowed: AssistantDelta | ToolDelta = {
+    "role": "tool_result",
+    "role": "assistant",
+    "content": "done",
+}
+reveal_type(x9_shadowed)  # revealed: AssistantDelta
+
+class LaterUnpackFoo(TypedDict):
+    kind: Literal["foo"]
+    foo: int
+
+class LaterUnpackBar(TypedDict):
+    kind: Literal["bar"]
+    bar: int
+
+def _(bar_kwargs: LaterUnpackBar) -> None:
+    x9_unpack: LaterUnpackFoo | LaterUnpackBar = {"kind": "foo", **bar_kwargs}
+    reveal_type(x9_unpack)  # revealed: LaterUnpackBar
+```
+
+Disjoint keys should narrow `TypedDict` unions before validating nested values:
+
+```py
+from typing import TypedDict
+
+class PutPayload(TypedDict):
+    Item: dict[str, dict[str, str]]
+
+class PutWrite(TypedDict):
+    PutRequest: PutPayload
+
+class DeletePayload(TypedDict):
+    Key: dict[str, dict[str, str]]
+
+class DeleteWrite(TypedDict):
+    DeleteRequest: DeletePayload
+
+x10: PutWrite | DeleteWrite = {"PutRequest": {"Item": {"some-key": {"S": "some-value"}}}}
+reveal_type(x10)  # revealed: PutWrite
+
+class InnerInt(TypedDict):
+    a: int
+
+class InnerStr(TypedDict):
+    a: str
+
+class OuterInt(TypedDict):
+    inner: InnerInt
+
+class OuterStr(TypedDict):
+    inner: InnerStr
+
+x10_contextual: OuterInt | OuterStr = {"inner": {"a": 1}}
+reveal_type(x10_contextual)  # revealed: OuterInt
+```
+
+This should also work for ABI-like unions with nested collection fields:
+
+```py
+from typing import Literal, TypedDict
+
+class FunctionAbi(TypedDict):
+    type: Literal["function"]
+    name: str
+    inputs: list[dict[str, str]]
+    outputs: list[dict[str, str]]
+    stateMutability: str
+
+class EventAbi(TypedDict):
+    type: Literal["event"]
+    name: str
+    inputs: list[dict[str, str]]
+
+x11: FunctionAbi | EventAbi = {
+    "type": "function",
+    "name": "balanceOf",
+    "inputs": [{"name": "owner", "type": "address"}],
+    "outputs": [{"name": "", "type": "uint256"}],
+    "stateMutability": "view",
+}
+reveal_type(x11)  # revealed: FunctionAbi
 ```
 
 In doing so, may have to infer the same type with multiple distinct type contexts:
@@ -2296,6 +2428,10 @@ def _(t: type[Foo | Bar]) -> None:
     # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `Foo`: value of type `Literal["baz"]`"
     # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `Bar`: value of type `Literal["baz"]`"
     t(a="baz")
+
+    # error: [too-many-positional-arguments]
+    # error: [too-many-positional-arguments]
+    t({"a": 1}, {"a": 2})
 ```
 
 Upper-bounded `type[T]` constructor calls still validate the bound `TypedDict` schema:
@@ -2323,6 +2459,105 @@ class Config(TypedDict):
 
 def _(t: type[Config] | type[dict]) -> None:
     t(factory=1)
+    t({"factory": 1})
+```
+
+Other callable arms should also suppress nested `TypedDict` field inference:
+
+```py
+from typing import TypedDict
+
+class NestedConfig(TypedDict):
+    inner: int
+
+class ConfigWithNested(TypedDict):
+    a: NestedConfig
+
+class Other:
+    def __init__(self, *, a: dict[str, str]) -> None: ...
+
+def _(t: type[ConfigWithNested] | type[Other]) -> None:
+    t(a={"k": "v"})
+```
+
+Constructor diagnostics for `type[Foo | Bar]` should only use compatible `TypedDict` arms:
+
+```py
+from typing import TypedDict
+
+class FooCompatible(TypedDict):
+    a: int
+    foo: int
+
+class BarCompatible(TypedDict):
+    a: int
+    bar: int
+
+def _(t: type[FooCompatible | BarCompatible]) -> None:
+    t(a=1, foo=1)
+    reveal_type(t(a=1, foo=1))  # revealed: FooCompatible
+```
+
+Literal tag keywords should narrow constructor unions before inferring remaining values:
+
+```py
+from typing import Literal, TypeVar, TypedDict
+from typing_extensions import assert_type
+
+class TaggedKeywordFoo(TypedDict):
+    role: Literal["foo"]
+    content: list[int]
+
+class TaggedKeywordBar(TypedDict):
+    role: Literal["bar"]
+    content: list[str]
+
+T = TypeVar("T")
+
+def homogeneous_list(*args: T) -> list[T]:
+    return list(args)
+
+def _(t: type[TaggedKeywordFoo | TaggedKeywordBar]) -> None:
+    t(role="foo", content=assert_type(homogeneous_list(), list[int]))
+    reveal_type(t({"role": "bar", "content": [1]}, role="foo"))  # revealed: TaggedKeywordFoo
+```
+
+Arm-specific keywords should narrow constructor unions before inferring nested values:
+
+```py
+from typing import TypedDict
+
+class FooPayload(TypedDict):
+    a: int
+
+class KeywordNarrowFoo(TypedDict):
+    foo: FooPayload
+
+class KeywordNarrowBar(TypedDict):
+    bar: int
+
+def _(t: type[KeywordNarrowFoo | KeywordNarrowBar]) -> None:
+    t(foo={"a": 1})
+```
+
+Unpacked keyword arguments should be treated as later constructor keys when narrowing positional
+dict literals:
+
+```py
+from typing import TypedDict
+
+class UnpackKeywordFoo(TypedDict):
+    a: int
+    foo: int
+
+class UnpackKeywordBar(TypedDict):
+    foo: int
+
+class ProvidesA(TypedDict):
+    a: int
+
+def _(t: type[UnpackKeywordFoo | UnpackKeywordBar], kw_a: ProvidesA) -> None:
+    t({"foo": 1}, **kw_a)
 ```
 
 Union-bounded `type[T]` constructor calls validate every `TypedDict` target in the bound:
@@ -2342,6 +2577,64 @@ def _(t: type[T]) -> None:
     # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `BoundFoo`: value of type `Literal["x"]`"
     # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `BoundBar`: value of type `Literal["x"]`"
     t(a="x")
+
+class BoundSpecificFoo(TypedDict):
+    a: int
+    foo: int
+
+class BoundSpecificBar(TypedDict):
+    a: int
+
+SpecificT = TypeVar("SpecificT", bound=Union[BoundSpecificFoo, BoundSpecificBar])
+
+def construct_bound_specific(t: type[SpecificT]) -> None:
+    # error: [invalid-key] "Unknown key "foo" for TypedDict `BoundSpecificBar`"
+    reveal_type(t(a=1, foo=1))  # revealed: SpecificT@construct_bound_specific
+```
+
+Shared field types across a union of `TypedDict` class objects still provide constructor value
+context:
+
+```py
+from typing import TypeVar, TypedDict
+from typing_extensions import assert_type
+
+class SharedKeywordFoo(TypedDict):
+    a: list[int]
+
+class SharedKeywordBar(TypedDict):
+    a: list[int]
+
+class SharedLiteralFoo(TypedDict):
+    a: list[int]
+    b: int
+
+class SharedLiteralBar(TypedDict):
+    a: list[int]
+    b: int
+
+class DivergentFoo(TypedDict):
+    a: list[int]
+
+class DivergentBar(TypedDict):
+    a: list[str]
+
+T = TypeVar("T")
+
+def homogeneous_list(*args: T) -> list[T]:
+    return list(args)
+
+def _(t: type[SharedKeywordFoo | SharedKeywordBar]) -> None:
+    t(a=assert_type(homogeneous_list(), list[int]))
+
+def _(t: type[SharedKeywordFoo | SharedKeywordBar]) -> None:
+    t({"a": assert_type(homogeneous_list(), list[int])})
+
+def _(t: type[SharedLiteralFoo | SharedLiteralBar]) -> None:
+    t({"a": assert_type(homogeneous_list(), list[int])}, b=1)
+
+def _(t: type[DivergentFoo | DivergentBar]) -> None:
+    t(a=assert_type(homogeneous_list(), list[int]))  # error: [type-assertion-failure]
 ```
 
 ## Subclassing

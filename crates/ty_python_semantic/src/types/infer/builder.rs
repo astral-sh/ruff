@@ -73,7 +73,6 @@ use crate::types::function::{
 use crate::types::generics::{InferableTypeVars, SpecializationBuilder, bind_typevar};
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
-use crate::types::infer::builder::typed_dict::TypedDictConstructorForm;
 use crate::types::infer::{
     StatementInference, StatementInferenceInner, StatementInferenceInnerExtra,
     infer_statement_types, nearest_enclosing_class, nearest_enclosing_function,
@@ -93,8 +92,8 @@ use crate::types::{
     KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind, MemberLookupPolicy,
     ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
     SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
-    UnionType, binding_type, infer_complete_scope_types, infer_scope_types, todo_type,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type,
+    infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -312,7 +311,6 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
 /// An expression cache shared across builders during multi-inference.
 type ExpressionCache<'db> = FxHashMap<(ExpressionNodeKey, TypeContext<'db>), Type<'db>>;
-
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// How big a string do we build before bailing?
     ///
@@ -5795,42 +5793,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         return ty;
                     }
-                } else if !typed_dicts.is_empty() {
-                    // Infer all expressions with diagnostics enabled before starting
-                    // multi-inference. This preserves the general expression types even if we later
-                    // fall back to a non-`TypedDict` arm of the union.
-                    for item in items {
-                        if let Some(key) = item.key.as_ref() {
-                            let key_ty = self.infer_expression(key, TypeContext::default());
-                            item_types.insert(key.node_index().load(), key_ty);
-                        }
-
-                        let value_ty = self.infer_expression(&item.value, TypeContext::default());
-                        item_types.insert(item.value.node_index().load(), value_ty);
-                    }
-
-                    let mut narrowed_tys = Vec::new();
-                    let mut item_types = FxHashMap::default();
-                    for typed_dict in typed_dicts {
-                        // Disable diagnostics as we attempt to narrow to specific `TypedDict`
-                        // elements of the union. Mixed unions like `TypedDict | dict[str, Any]`
-                        // should not emit `TypedDict` diagnostics if a non-`TypedDict` arm accepts
-                        // the literal.
-                        if let Some(inferred_ty) = self.speculate().infer_typed_dict_expression(
-                            dict,
-                            typed_dict,
-                            &mut item_types,
-                        ) {
-                            narrowed_tys.push(inferred_ty);
-                        }
-
-                        item_types.clear();
-                    }
-
+                } else if !typed_dicts.is_empty()
+                    && let Some(ty) = self.infer_shared_typed_dict_expression(
+                        dict,
+                        &typed_dicts,
+                        &mut item_types,
+                        !has_dict_compatible_fallback,
+                    )
+                {
                     // Successfully narrowed to a subset of typed dicts.
-                    if !narrowed_tys.is_empty() {
-                        return UnionType::from_elements(self.db(), narrowed_tys);
-                    }
+                    return ty;
                 }
             }
         }
@@ -7207,35 +7179,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &bindings,
         );
 
-        // Prepare `TypedDict` constructor calls before general argument inference so the field
-        // type context becomes the canonical inference for constructor values.
-        let has_prepared_typed_dict_constructor = class
-            .filter(|class| class.is_typed_dict(self.db()))
-            .map(|class| {
-                let typed_dict = TypedDictType::new(class);
-                let form = TypedDictConstructorForm::from_arguments(arguments);
-                self.prepare_typed_dict_constructor(
-                    typed_dict,
-                    form,
-                    arguments,
-                    func.as_ref().into(),
-                );
-            })
-            .is_some();
+        let typed_dict_constructor_plan =
+            self.plan_typed_dict_constructor(callable_type, arguments, func.as_ref().into());
 
         let bindings_result = self.infer_and_check_argument_types(
             ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
             &mut |builder, (_, expr, tcx)| {
-                if has_prepared_typed_dict_constructor {
-                    builder.get_or_infer_expression(expr, tcx)
-                } else {
-                    builder.infer_expression(expr, tcx)
-                }
+                typed_dict_constructor_plan.infer_argument(builder, expr, tcx)
             },
             &mut bindings,
             call_expression_tcx,
         );
+
+        typed_dict_constructor_plan.validate_remaining(self, arguments, func.as_ref().into());
+        typed_dict_constructor_plan.apply_return_override(self.db(), &mut bindings);
 
         let mut bindings = match bindings_result {
             Ok(()) => bindings,
@@ -7244,14 +7202,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return bindings.return_type(self.db());
             }
         };
-
-        if !has_prepared_typed_dict_constructor {
-            self.validate_typed_dict_constructor_targets(
-                callable_type,
-                arguments,
-                func.as_ref().into(),
-            );
-        }
 
         for binding in bindings.iter_flat_mut() {
             let binding_type = binding.callable_type;
