@@ -271,12 +271,12 @@ def _(x: int | None):
     if is_none:
         reveal_type(x)  # revealed: None
 
-    class Inner:
+    class EagerScope:
         if is_none:
             # TODO: should be `None`
             reveal_type(x)  # revealed: int | None
 
-        def inner():
+        def lazy_scope():
             if is_none:
                 # TODO: should be `None`
                 reveal_type(x)  # revealed: int | None
