@@ -1088,10 +1088,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         sub_aliases: &FxHashMap<Name, NarrowingAlias<'ast>>,
     ) -> bool {
         let mut contains_sub_alias = false;
-        Self::walk_narrowing_alias_predicate(expression, &mut |leaf| {
-            let Some(name) = leaf.as_name_expr() else {
-                return;
-            };
+        Self::walk_narrowing_alias_predicate(expression, &mut |name| {
             if sub_aliases.contains_key(&name.id) {
                 contains_sub_alias = true;
             }
@@ -1100,21 +1097,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Compute chained source names from the sub-aliases map.
+    ///
+    /// Free-variable sub-alias references (e.g. an alias from an enclosing function used in a
+    /// nested function as the RHS of a non-name expression like `b = not a`) would belong here
+    /// too, but they are already absorbed by [`Self::try_register_narrowing_alias`]'s direct
+    /// chained-alias path (which handles the `b = a` case explicitly). So we only propagate
+    /// the chained-source names already accumulated on each sub-alias's guard.
     fn chained_source_names(
-        &self,
         sub_aliases: &FxHashMap<Name, NarrowingAlias<'ast>>,
     ) -> FxHashSet<Name> {
-        let place_table = self.current_place_table();
-        let mut result = FxHashSet::default();
-        for (name, alias) in sub_aliases {
-            if let Some(symbol_id) = place_table.symbol_id(name)
-                && place_table.symbol(symbol_id).is_free()
-            {
-                result.insert(name.clone());
-            }
-            result.extend(alias.guard.chained_source_names.iter().cloned());
-        }
-        result
+        sub_aliases
+            .values()
+            .flat_map(|alias| alias.guard.chained_source_names.iter().cloned())
+            .collect()
     }
 
     fn narrowing_alias_target_guard(&mut self, target: &ast::ExprName) -> ReassignmentGuard {
@@ -1775,7 +1770,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let guard = NarrowingAliasGuard {
                 value_guards: info.value_guards.into_iter().collect(),
                 target_guard: self.narrowing_alias_target_guard(target_name_expr),
-                chained_source_names: self.chained_source_names(&info.sub_aliases),
+                chained_source_names: Self::chained_source_names(&info.sub_aliases),
             };
             self.narrowing_aliases.insert(
                 target_name.clone(),
@@ -1818,10 +1813,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn walk_narrowing_alias_predicate<'expr>(
         expr: &'expr ast::Expr,
-        f: &mut impl FnMut(&'expr ast::Expr),
+        f: &mut impl FnMut(&'expr ast::ExprName),
     ) {
         match expr {
-            ast::Expr::Name(_) => f(expr),
+            ast::Expr::Name(name) => f(name),
             ast::Expr::UnaryOp(unary) if unary.op == ast::UnaryOp::Not => {
                 Self::walk_narrowing_alias_predicate(&unary.operand, f);
             }
@@ -1853,20 +1848,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         expr: &'ast ast::Expr,
         sub_aliases: &FxHashMap<Name, NarrowingAlias<'ast>>,
     ) {
-        Self::walk_narrowing_alias_predicate(expr, &mut |leaf| {
-            let Some(name) = leaf.as_name_expr() else {
-                return;
-            };
-            let Some(alias) = sub_aliases.get(&name.id).cloned() else {
-                return;
-            };
-            self.register_narrowing_alias_predicate(leaf, &alias, None);
+        Self::walk_narrowing_alias_predicate(expr, &mut |name| {
+            if let Some(alias) = sub_aliases.get(&name.id).cloned() {
+                self.register_narrowing_alias_predicate(name, &alias, None);
+            }
         });
     }
 
     fn register_narrowing_alias_predicate(
         &mut self,
-        leaf: &'ast ast::Expr,
+        leaf: &'ast ast::ExprName,
         alias: &NarrowingAlias<'ast>,
         guard: Option<NarrowingAliasGuard>,
     ) {
@@ -1881,7 +1872,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         );
 
         self.alias_predicates.insert(
-            ExpressionNodeKey::from(leaf),
+            ExpressionNodeKey::from(ast::ExprRef::from(leaf)),
             NarrowingAliasPredicate {
                 expression: aliased_expression,
                 guard,
@@ -1892,10 +1883,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn register_narrowing_aliases(&mut self, expr: &'ast ast::Expr) {
-        Self::walk_narrowing_alias_predicate(expr, &mut |leaf| {
-            let Some(name) = leaf.as_name_expr() else {
-                return;
-            };
+        Self::walk_narrowing_alias_predicate(expr, &mut |name| {
             let Some(alias) = self.narrowing_aliases.get(&name.id).cloned() else {
                 return;
             };
@@ -1906,7 +1894,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             } else {
                 None
             };
-            self.register_narrowing_alias_predicate(leaf, &alias, guard);
+            self.register_narrowing_alias_predicate(name, &alias, guard);
         });
     }
 
@@ -1917,8 +1905,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// adds the places from the aliased expressions (e.g., `x` from `x is None`) so that
     /// narrowing constraints are recorded for them.
     fn add_alias_narrowed_places(&self, expr: &ast::Expr, places: &mut PossiblyNarrowedPlaces) {
-        Self::walk_narrowing_alias_predicate(expr, &mut |leaf| {
-            let key = ExpressionNodeKey::from(leaf);
+        Self::walk_narrowing_alias_predicate(expr, &mut |name| {
+            let key = ExpressionNodeKey::from(ast::ExprRef::from(name));
             if let Some(alias_predicate) = self.alias_predicates.get(&key) {
                 let aliased_node = alias_predicate
                     .expression
