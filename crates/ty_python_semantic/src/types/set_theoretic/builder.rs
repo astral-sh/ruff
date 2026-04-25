@@ -343,7 +343,7 @@ pub(crate) struct UnionBuilder<'db> {
 /// Accumulates types into a union, deferring `UnionBuilder` allocation until a second type is added.
 pub(crate) enum UnionAccumulator<'db> {
     Single(Type<'db>),
-    Union(UnionBuilder<'db>),
+    Union(Box<UnionBuilder<'db>>),
 }
 
 impl<'db> UnionAccumulator<'db> {
@@ -357,7 +357,7 @@ impl<'db> UnionAccumulator<'db> {
                 let mut builder = UnionBuilder::new(db);
                 builder.add_in_place(*existing);
                 builder.add_in_place(ty);
-                *self = UnionAccumulator::Union(builder);
+                *self = UnionAccumulator::Union(Box::new(builder));
             }
             UnionAccumulator::Union(builder) => builder.add_in_place(ty),
         }
