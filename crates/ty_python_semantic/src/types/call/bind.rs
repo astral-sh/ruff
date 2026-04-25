@@ -4399,7 +4399,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
                 let preferred: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> = preferred
                     .into_iter()
-                    .map(|(identity, accumulator)| (identity, accumulator.into_type()))
+                    .map(|(identity, accumulator)| (identity, accumulator.into_type(self.db)))
                     .collect();
 
                 // Add preferred types to the builder so they serve as the base mapping

@@ -6098,10 +6098,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
+            let db = self.db();
             let elt_tcx_constraints: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
                 elt_tcx_constraints
                     .into_iter()
-                    .map(|(identity, accumulator)| (identity, accumulator.into_type()))
+                    .map(|(identity, accumulator)| (identity, accumulator.into_type(db)))
                     .collect();
 
             (elt_tcx_constraints, elt_tcx_variance)
