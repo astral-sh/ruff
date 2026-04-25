@@ -7245,6 +7245,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
+        if !has_prepared_typed_dict_constructor {
+            self.validate_typed_dict_constructor_targets(
+                callable_type,
+                arguments,
+                func.as_ref().into(),
+            );
+        }
+
         for binding in bindings.iter_flat_mut() {
             let binding_type = binding.callable_type;
             for (_, overload) in binding.matching_overloads_mut() {

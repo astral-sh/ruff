@@ -13,13 +13,15 @@ use crate::types::diagnostic::{
 };
 use crate::types::infer::builder::DeferredExpressionState;
 use crate::types::special_form::TypeQualifier;
+use crate::types::subclass_of::SubclassOfInner;
 use crate::types::typed_dict::{
     TypedDictSchema, collect_guaranteed_keyword_keys, functional_typed_dict_field,
     infer_unpacked_keyword_types, typed_dict_with_relaxed_keys, validate_typed_dict_constructor,
     validate_typed_dict_dict_literal,
 };
 use crate::types::{
-    IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictType,
+    ClassType, IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext,
+    TypeVarBoundOrConstraints, TypedDictType,
 };
 use ty_python_core::definition::Definition;
 
@@ -334,6 +336,106 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         })
         .ok()
         .map(|_| Type::TypedDict(typed_dict))
+    }
+
+    fn push_typed_dict_constructor_target(
+        &self,
+        class: ClassType<'db>,
+        targets: &mut SmallVec<[TypedDictType<'db>; 2]>,
+    ) -> Option<()> {
+        if !class.is_typed_dict(self.db()) {
+            return None;
+        }
+
+        let typed_dict = TypedDictType::new(class);
+        if !targets.contains(&typed_dict) {
+            targets.push(typed_dict);
+        }
+
+        Some(())
+    }
+
+    fn collect_typed_dict_constructor_targets(
+        &self,
+        callable_type: Type<'db>,
+        targets: &mut SmallVec<[TypedDictType<'db>; 2]>,
+    ) -> Option<()> {
+        let db = self.db();
+
+        match callable_type.resolve_type_alias(db) {
+            Type::ClassLiteral(class) => {
+                self.push_typed_dict_constructor_target(ClassType::NonGeneric(class), targets)
+            }
+            Type::GenericAlias(alias) => {
+                self.push_typed_dict_constructor_target(ClassType::Generic(alias), targets)
+            }
+            Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+                SubclassOfInner::Class(class) => {
+                    self.push_typed_dict_constructor_target(class, targets)
+                }
+                SubclassOfInner::TypeVar(bound_typevar) => {
+                    match bound_typevar.typevar(db).bound_or_constraints(db)? {
+                        TypeVarBoundOrConstraints::UpperBound(bound) => self
+                            .collect_typed_dict_constructor_targets(
+                                bound.to_meta_type(db),
+                                targets,
+                            ),
+                        TypeVarBoundOrConstraints::Constraints(constraints) => self
+                            .collect_typed_dict_constructor_targets(
+                                constraints.as_type(db).to_meta_type(db),
+                                targets,
+                            ),
+                    }
+                }
+                SubclassOfInner::Dynamic(_) => None,
+            },
+            Type::Union(union) => {
+                for element in union.elements(db) {
+                    self.collect_typed_dict_constructor_targets(*element, targets)?;
+                }
+                Some(())
+            }
+            Type::Intersection(intersection) => {
+                for element in intersection.positive_elements_or_object(db) {
+                    self.collect_typed_dict_constructor_targets(element, targets)?;
+                }
+                Some(())
+            }
+            Type::TypeAlias(alias) => {
+                self.collect_typed_dict_constructor_targets(alias.value_type(db), targets)
+            }
+            _ => None,
+        }
+    }
+
+    /// Validate calls to concrete `TypedDict` constructor targets that are not handled by the
+    /// single-target constructor preparation path.
+    ///
+    /// Mixed callable unions are intentionally left to the general call-binding path.
+    pub(super) fn validate_typed_dict_constructor_targets<'expr>(
+        &mut self,
+        callable_type: Type<'db>,
+        arguments: &'expr ast::Arguments,
+        error_node: AnyNodeRef<'expr>,
+    ) {
+        let mut typed_dicts: SmallVec<[TypedDictType<'db>; 2]> = SmallVec::new();
+        if self
+            .collect_typed_dict_constructor_targets(callable_type, &mut typed_dicts)
+            .is_none()
+            || typed_dicts.is_empty()
+        {
+            return;
+        }
+
+        for typed_dict in typed_dicts {
+            validate_typed_dict_constructor(
+                &self.context,
+                typed_dict,
+                arguments,
+                error_node,
+                |expr, _| self.expression_type(expr),
+            );
+        }
     }
 
     /// Prepare a `TypedDict` constructor call before general argument inference.

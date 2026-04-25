@@ -2281,6 +2281,69 @@ def accepts_typed_dict_class(t_person: type[Person]) -> None:
 accepts_typed_dict_class(Person)
 ```
 
+Calling a union of `TypedDict` class objects validates each constructor arm:
+
+```py
+from typing import TypedDict
+
+class Foo(TypedDict):
+    a: int
+
+class Bar(TypedDict):
+    a: int
+
+def _(t: type[Foo | Bar]) -> None:
+    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `Foo`: value of type `Literal["baz"]`"
+    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `Bar`: value of type `Literal["baz"]`"
+    t(a="baz")
+```
+
+Upper-bounded `type[T]` constructor calls still validate the bound `TypedDict` schema:
+
+```py
+from typing import TypeVar, TypedDict
+
+class NeedsInt(TypedDict):
+    a: int
+
+T = TypeVar("T", bound=NeedsInt)
+
+def _(t: type[T]) -> None:
+    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `NeedsInt`: value of type `Literal["x"]`"
+    t(a="x")
+```
+
+Other callable arms should suppress eager `TypedDict` constructor diagnostics:
+
+```py
+from typing import TypedDict
+
+class Config(TypedDict):
+    a: int
+
+def _(t: type[Config] | type[dict]) -> None:
+    t(factory=1)
+```
+
+Union-bounded `type[T]` constructor calls validate every `TypedDict` target in the bound:
+
+```py
+from typing import TypeVar, TypedDict, Union
+
+class BoundFoo(TypedDict):
+    a: int
+
+class BoundBar(TypedDict):
+    a: int
+
+T = TypeVar("T", bound=Union[BoundFoo, BoundBar])
+
+def _(t: type[T]) -> None:
+    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `BoundFoo`: value of type `Literal["x"]`"
+    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `BoundBar`: value of type `Literal["x"]`"
+    t(a="x")
+```
+
 ## Subclassing
 
 `TypedDict` types can be subclassed. The subclass can add new keys:
