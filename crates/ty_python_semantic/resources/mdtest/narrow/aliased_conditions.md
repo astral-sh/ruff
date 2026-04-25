@@ -324,7 +324,7 @@ def _(a: A):
 
 ## Cross-scope invalidation
 
-### Narrowed variable reassigned
+### Target reassignments
 
 If the target is reassigned inside an eager scope, narrowing does not take place within that scope.
 
