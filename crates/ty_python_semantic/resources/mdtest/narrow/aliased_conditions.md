@@ -208,8 +208,8 @@ def _(l: list[int | None], lb: list[bool]):
 
 ## Narrowing is invalidated when target is reassigned
 
-If the narrowed variable is reassigned between the alias and its use as a condition, the alias must
-not be followed.
+If the target is reassigned between the definition of the alias and its use as a condition,
+narrowing does not take place:
 
 ```py
 def _(x: int | None, cond: bool):
