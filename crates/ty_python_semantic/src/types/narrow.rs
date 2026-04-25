@@ -20,7 +20,7 @@ use ty_python_core::predicate::{
     PredicateNode,
 };
 use ty_python_core::scope::ScopeId;
-use ty_python_core::{NarrowingEvaluator, place_table};
+use ty_python_core::{NarrowingEvaluator, place_table, semantic_index};
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
@@ -629,7 +629,23 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         match expression_node {
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+            ast::Expr::Name(_) => {
+                let file = expression.file(self.db);
+                let index = semantic_index(self.db, file);
+                let constraints = self.evaluate_simple_expr(expression_node, is_positive);
+                if let Some(alias_predicate) = index.narrowing_alias_predicate(expression_node) {
+                    let aliased_constraints =
+                        self.evaluate_expression_predicate(alias_predicate.expression, is_positive);
+                    // For example, suppose we have an alias `is_none = x is None`.
+                    // When this alias is used for narrowing, that is, within a block like `if is_none: ...`,
+                    // both the constraint `is_none: Literal[True]` and the constraint `x: None` should be imposed.
+                    // The former is `constraints` and the latter is `aliased_constraints`.
+                    Self::merge_optional_constraints_and(constraints, aliased_constraints)
+                } else {
+                    constraints
+                }
+            }
+            ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
                 self.evaluate_simple_expr(expression_node, is_positive)
             }
             ast::Expr::Compare(expr_compare) => {

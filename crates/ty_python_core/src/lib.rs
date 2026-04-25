@@ -307,6 +307,17 @@ pub struct SemanticIndex<'db> {
 
     /// Set of all generator functions in this file.
     generator_functions: FxHashSet<FileScopeId>,
+
+    /// Narrowing alias metadata for predicate leaf names.
+    /// When a predicate references an alias variable (e.g., `is_none` from `is_none = x is None`),
+    /// the alias Name node is mapped to its aliased expression for constraint-generation time.
+    narrowing_alias_predicates: FxHashMap<ExpressionNodeKey, NarrowingAliasPredicate<'db>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub struct NarrowingAliasPredicate<'db> {
+    /// Aliased expression, e.g., `x is None` in `is_none = x is None`.
+    pub expression: Expression<'db>,
 }
 
 impl<'db> SemanticIndex<'db> {
@@ -317,6 +328,14 @@ impl<'db> SemanticIndex<'db> {
     #[track_caller]
     pub fn place_table(&self, scope_id: FileScopeId) -> &PlaceTable {
         &self.place_tables[scope_id]
+    }
+
+    /// Returns alias metadata for an alias Name node in a predicate, if one exists.
+    pub fn narrowing_alias_predicate(
+        &self,
+        key: impl Into<ExpressionNodeKey>,
+    ) -> Option<&NarrowingAliasPredicate<'db>> {
+        self.narrowing_alias_predicates.get(&key.into())
     }
 
     /// Returns the use-def map for a specific scope.
