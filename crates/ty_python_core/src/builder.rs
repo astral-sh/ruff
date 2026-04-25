@@ -1787,6 +1787,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Invalidate any narrowing aliases affected by a new definition of `place`.
     fn invalidate_narrowing_aliases_for(&mut self, place: ScopedPlaceId) {
+        // Optimization: this method is called for every binding-creating definition.
+        // If no aliases are tracked in this scope, skip all of the following handling.
+        if self.narrowing_aliases.is_empty() {
+            return;
+        }
+
         let place_table = &self.place_tables[self.current_scope()];
         let place_key = PlaceKey::from(place_table.place(place));
         let reassigned_local_name = place
