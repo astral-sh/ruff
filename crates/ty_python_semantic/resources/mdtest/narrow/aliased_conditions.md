@@ -206,7 +206,7 @@ def _(l: list[int | None], lb: list[bool]):
         reveal_type(l[0])  # revealed: int | None
 ```
 
-## Narrowed variable reassigned invalidates alias
+## Narrowing is invalidated when target is reassigned
 
 If the narrowed variable is reassigned between the alias and its use as a condition, the alias must
 not be followed.
