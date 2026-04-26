@@ -14,7 +14,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    SubclassOfType, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{
     Db,
@@ -1261,13 +1261,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         })
                 }),
 
-            // Ideally we'd just move the generalised case for assignability to a protocol-instance up here,
-            // but that leads to Salsa cycles and performance regressions. It's only *necessary* for the
-            // `intersection <-> Protocol` case to be this high.
+            // Ideally we'd just move the generalised cases for assignability to a protocol-instance or
+            // Callable up here, but that leads to Salsa cycles and performance regressions. It's only
+            // *necessary* for the `intersection <-> <some structural type>` cases to be this high.
+            //
+            // TODO TypedDicts are also structural types.
             (Type::Intersection(_), Type::ProtocolInstance(target_proto)) => self
                 .with_recursion_guard(source, target, || {
                     self.check_type_satisfies_protocol(db, source, target_proto)
                 }),
+            (Type::Intersection(_), Type::Callable(target_callable)) => {
+                self.with_recursion_guard(source, target, || {
+                    self.check_type_satisfies_callable(db, source, target_callable)
+                })
+            }
 
             (Type::Intersection(intersection), _) => {
                 // An intersection type is a subtype of another type if at least one of its
@@ -1433,11 +1440,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (_, Type::Callable(target_callable)) => {
                 self.with_recursion_guard(source, target, || {
-                    source
-                        .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(self.relation))
-                        .when_some_and(db, self.constraints, |callables| {
-                            self.check_callables_vs_callable(db, &callables, target_callable)
-                        })
+                    self.check_type_satisfies_callable(db, source, target_callable)
                 })
             }
 

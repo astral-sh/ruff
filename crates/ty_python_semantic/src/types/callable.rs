@@ -9,7 +9,7 @@ use crate::{
         KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
         Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
         UnionType,
-        constraints::{ConstraintSet, IteratorConstraintsExtension},
+        constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         relation::{TypeRelation, TypeRelationChecker},
         signatures::CallableSignature,
         visitor, walk_signature,
@@ -530,5 +530,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source.iter().when_all(db, self.constraints, |element| {
             self.check_callable_pair(db, *element, target)
         })
+    }
+
+    pub(super) fn check_type_satisfies_callable(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: CallableType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        source
+            .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(self.relation))
+            .when_some_and(db, self.constraints, |callables| {
+                self.check_callables_vs_callable(db, &callables, target)
+            })
     }
 }
