@@ -6875,6 +6875,31 @@ func("<CURSOR>")
     }
 
     #[test]
+    fn string_literal_completions_overloaded_function_argument() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Literal, overload
+
+@overload
+def func(mode: Literal["r"]) -> int: ...
+@overload
+def func(mode: Literal["w"]) -> str: ...
+def func(mode: str) -> int | str: ...
+
+func("<CURSOR>")
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        r :: Literal["r"]
+        w :: Literal["w"]
+        "#,
+        );
+    }
+
+    #[test]
     fn string_literal_completions_annotated_assignment() {
         let builder = completion_test_builder(
             r#"

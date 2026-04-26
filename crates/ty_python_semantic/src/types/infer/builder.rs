@@ -4879,10 +4879,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // We use a speculative builder to silence any diagnostics emitted during multi-inference, as the
                     // type context is only used as a hint to infer a more assignable argument type, and should not lead
                     // to diagnostics for non-matching overloads.
+                    let mut speculative_builder = self.speculate();
                     let inferred_ty = infer_argument_ty(
-                        &mut self.speculate(),
+                        &mut speculative_builder,
                         (argument_index, ast_argument, parameter_tcx),
                     );
+                    self.union_expected_types(&speculative_builder.expected_types);
                     argument_types.insert(parameter.annotated_type(), inferred_ty);
                 }
 
@@ -5070,6 +5072,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn store_expected_type(&mut self, expression: impl Into<ExpressionNodeKey>, ty: Type<'db>) {
         self.expected_types.insert(expression.into(), ty);
+    }
+
+    fn union_expected_types(&mut self, expected_types: &FxHashMap<ExpressionNodeKey, Type<'db>>) {
+        let db = self.db();
+        for (expression, ty) in expected_types {
+            self.expected_types
+                .entry(*expression)
+                .and_modify(|existing| *existing = UnionType::from_two_elements(db, *existing, *ty))
+                .or_insert(*ty);
+        }
     }
 
     fn infer_number_literal_expression(&self, literal: &ast::ExprNumberLiteral) -> Type<'db> {
