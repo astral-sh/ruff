@@ -3076,6 +3076,17 @@ pub(crate) struct Parameter<'db> {
     /// type semantics of the parameter.
     pub(crate) inferred_annotation: bool,
 
+    /// Syntax-level annotation kind for cases where the annotation has special parameter semantics.
+    annotation_kind: ParameterAnnotationKind,
+
+    kind: ParameterKind<'db>,
+    pub(crate) form: ParameterForm,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+enum ParameterAnnotationKind {
+    Normal,
+
     /// Variadic parameters can have starred annotations, e.g.
     /// - `*args: *Ts`
     /// - `*args: *tuple[int, ...]`
@@ -3083,13 +3094,10 @@ pub(crate) struct Parameter<'db> {
     ///
     /// The `*` prior to the type gives the annotation a different meaning,
     /// so this must be propagated upwards.
-    has_starred_annotation: bool,
+    Starred,
 
-    /// Whether this parameter was declared as `**kwargs: Unpack[TypedDict]`.
-    has_unpacked_kwargs_annotation: bool,
-
-    kind: ParameterKind<'db>,
-    pub(crate) form: ParameterForm,
+    /// The parameter was declared as `**kwargs: Unpack[TypedDict]`.
+    UnpackedTypedDictKwargs,
 }
 
 impl<'db> Parameter<'db> {
@@ -3097,8 +3105,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
-            has_starred_annotation: false,
-            has_unpacked_kwargs_annotation: false,
+            annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::PositionalOnly {
                 name,
                 default_type: None,
@@ -3111,8 +3118,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
-            has_starred_annotation: false,
-            has_unpacked_kwargs_annotation: false,
+            annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::PositionalOrKeyword {
                 name,
                 default_type: None,
@@ -3125,8 +3131,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
-            has_starred_annotation: false,
-            has_unpacked_kwargs_annotation: false,
+            annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::Variadic { name },
             form: ParameterForm::Value,
         }
@@ -3136,8 +3141,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
-            has_starred_annotation: false,
-            has_unpacked_kwargs_annotation: false,
+            annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::KeywordOnly {
                 name,
                 default_type: None,
@@ -3150,8 +3154,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
-            has_starred_annotation: false,
-            has_unpacked_kwargs_annotation: false,
+            annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::KeywordVariadic { name },
             form: ParameterForm::Value,
         }
@@ -3208,8 +3211,7 @@ impl<'db> Parameter<'db> {
                 .kind
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             inferred_annotation: self.inferred_annotation,
-            has_starred_annotation: self.has_starred_annotation,
-            has_unpacked_kwargs_annotation: self.has_unpacked_kwargs_annotation,
+            annotation_kind: self.annotation_kind,
             form: self.form,
         }
     }
@@ -3224,8 +3226,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type,
             inferred_annotation: self.inferred_annotation,
-            has_starred_annotation: self.has_starred_annotation,
-            has_unpacked_kwargs_annotation: self.has_unpacked_kwargs_annotation,
+            annotation_kind: self.annotation_kind,
             kind,
             form: self.form,
         }
@@ -3239,8 +3240,7 @@ impl<'db> Parameter<'db> {
     ) -> Option<Self> {
         let Parameter {
             annotated_type,
-            has_starred_annotation,
-            has_unpacked_kwargs_annotation,
+            annotation_kind,
             inferred_annotation,
             kind,
             form,
@@ -3301,8 +3301,7 @@ impl<'db> Parameter<'db> {
         Some(Self {
             annotated_type,
             inferred_annotation: *inferred_annotation,
-            has_starred_annotation: *has_starred_annotation,
-            has_unpacked_kwargs_annotation: *has_unpacked_kwargs_annotation,
+            annotation_kind: *annotation_kind,
             kind,
             form: *form,
         })
@@ -3324,7 +3323,7 @@ impl<'db> Parameter<'db> {
             } else {
                 (Type::unknown(), true, false)
             };
-        let has_unpacked_kwargs_annotation = matches!(&kind, ParameterKind::KeywordVariadic { .. })
+        let is_unpacked_typed_dict_kwargs = matches!(&kind, ParameterKind::KeywordVariadic { .. })
             && parameter.annotation().is_some_and(|annotation| {
                 extract_unpacked_typed_dict_keys_from_kwargs_annotation(
                     db,
@@ -3335,11 +3334,17 @@ impl<'db> Parameter<'db> {
                 )
                 .is_some()
             });
+        let annotation_kind = if is_unpacked_typed_dict_kwargs {
+            ParameterAnnotationKind::UnpackedTypedDictKwargs
+        } else if has_starred_annotation {
+            ParameterAnnotationKind::Starred
+        } else {
+            ParameterAnnotationKind::Normal
+        };
         Self {
             annotated_type,
             kind,
-            has_starred_annotation,
-            has_unpacked_kwargs_annotation,
+            annotation_kind,
             form: ParameterForm::Value,
             inferred_annotation,
         }
@@ -3401,9 +3406,13 @@ impl<'db> Parameter<'db> {
         &self,
         db: &'db dyn Db,
     ) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
-        (self.is_keyword_variadic() && self.has_unpacked_kwargs_annotation)
-            .then(|| extract_unpacked_typed_dict_keys_from_value_type(db, self.annotated_type))
-            .flatten()
+        (self.is_keyword_variadic()
+            && matches!(
+                self.annotation_kind,
+                ParameterAnnotationKind::UnpackedTypedDictKwargs
+            ))
+        .then(|| extract_unpacked_typed_dict_keys_from_value_type(db, self.annotated_type))
+        .flatten()
     }
 
     /// Annotated type of the parameter. If no annotation was provided, this is `Unknown`.
@@ -3414,7 +3423,7 @@ impl<'db> Parameter<'db> {
     /// Return `true` if this parameter has a starred annotation,
     /// e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...], bytes]`
     pub(crate) fn has_starred_annotation(&self) -> bool {
-        self.has_starred_annotation
+        matches!(self.annotation_kind, ParameterAnnotationKind::Starred)
     }
 
     /// Kind of the parameter.
