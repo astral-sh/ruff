@@ -48,7 +48,9 @@ jobs:
       timestamp: ${{ steps.build.outputs.timestamp }}
       merge-base: ${{ steps.build.outputs.merge-base }}
     steps:
-      # Clone before rust-cache so it can find Cargo.lock
+      # Clone before rust-cache so it can find Cargo.lock.
+      # Avoid `actions/checkout` because we'd need `fetch-depth: 0`,
+      # which is really slow on this repo.
       - name: Clone repository (blobless)
         run: |
           git clone --filter=blob:none https://github.com/astral-sh/ruff ruff
