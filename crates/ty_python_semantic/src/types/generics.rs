@@ -337,9 +337,7 @@ impl<'db> GenericContext<'db> {
             NodeWithScopeKind::Function(function) => {
                 let definition = index.expect_single_definition(function);
                 infer_definition_types(db, definition)
-                    .undecorated_type()
-                    .expect("function should have undecorated type")
-                    .as_function_literal()?
+                    .function_type(definition)?
                     .last_definition_signature(db)
                     .generic_context
             }
