@@ -7104,6 +7104,23 @@ x: Intersection[Literal["a", "b"], Literal["b", "c"]] = "<CURSOR>"
     }
 
     #[test]
+    fn string_literal_completions_intersection_excludes_negative_elements() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Literal
+from ty_extensions import Intersection, Not
+
+x: Intersection[Literal["a"], Not[Literal["b"]]] = "<CURSOR>"
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"a :: Literal["a"]"#,
+        );
+    }
+
+    #[test]
     fn string_literal_completions_type_alias_recursion_safe() {
         let builder = completion_test_builder(
             r#"
