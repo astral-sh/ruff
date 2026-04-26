@@ -127,11 +127,8 @@ error[invalid-assignment]: Object of type `HasBar & HasNeither` is not assignabl
    |             |
    |             Declared type
    |
-info: no element of intersection `HasBar & HasNeither` is assignable to `SupportsFooAndBar`
-info: ├── type `HasBar` is not assignable to protocol `SupportsFooAndBar`
-info: │   └── protocol member `foo` is not defined on type `HasBar`
-info: └── type `HasNeither` is not assignable to protocol `SupportsFooAndBar`
-info:     └── protocol member `bar` is not defined on type `HasNeither`
+info: type `HasBar & HasNeither` is not assignable to protocol `SupportsFooAndBar`
+info: └── protocol member `foo` is not defined on type `HasBar & HasNeither`
 ```
 
 Assigning a non-intersection to an intersection:
@@ -172,11 +169,8 @@ error[invalid-assignment]: Object of type `HasFoo & HasNeither` is not assignabl
    |             Declared type
    |
 info: type `HasFoo & HasNeither` is not assignable to element `SupportsBar` of intersection `SupportsFoo & SupportsBar`
-info: └── no element of intersection `HasFoo & HasNeither` is assignable to `SupportsBar`
-info:     ├── type `HasFoo` is not assignable to protocol `SupportsBar`
-info:     │   └── protocol member `bar` is not defined on type `HasFoo`
-info:     └── type `HasNeither` is not assignable to protocol `SupportsBar`
-info:         └── protocol member `bar` is not defined on type `HasNeither`
+info: └── type `HasFoo & HasNeither` is not assignable to protocol `SupportsBar`
+info:     └── protocol member `bar` is not defined on type `HasFoo & HasNeither`
 ```
 
 ## Tuples
@@ -818,11 +812,8 @@ error[invalid-assignment]: Object of type `DoesNotSupportFoo1 & DoesNotSupportFo
    |             |
    |             Declared type
    |
-info: no element of intersection `DoesNotSupportFoo1 & DoesNotSupportFoo2` is assignable to `SupportsFoo`
-info: ├── type `DoesNotSupportFoo1` is not assignable to protocol `SupportsFoo`
-info: │   └── protocol member `foo` is not defined on type `DoesNotSupportFoo1`
-info: └── type `DoesNotSupportFoo2` is not assignable to protocol `SupportsFoo`
-info:     └── protocol member `foo` is not defined on type `DoesNotSupportFoo2`
+info: type `DoesNotSupportFoo1 & DoesNotSupportFoo2` is not assignable to protocol `SupportsFoo`
+info: └── protocol member `foo` is not defined on type `DoesNotSupportFoo1 & DoesNotSupportFoo2`
 ```
 
 ## Assigning an overload set
