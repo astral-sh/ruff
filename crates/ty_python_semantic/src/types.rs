@@ -3033,6 +3033,12 @@ impl<'db> Type<'db> {
         policy: InstanceFallbackShadowsNonDataDescriptor,
         member_policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
+        if let Type::Intersection(intersection) = self {
+            return intersection.map_with_boundness_and_qualifiers(db, |element| {
+                element.invoke_descriptor_protocol(db, name, fallback, policy, member_policy)
+            });
+        }
+
         let (
             PlaceAndQualifiers {
                 place: meta_attr,

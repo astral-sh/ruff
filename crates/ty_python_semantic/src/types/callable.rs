@@ -205,6 +205,13 @@ impl<'db> Type<'db> {
                 )))
             }
 
+            // TODO if >1 element in the intersection is callable,
+            // we should intersect them rather than just picking the first one that we find
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .find_map(|element| element.try_upcast_to_callable_with_policy(db, policy)),
+
             Type::Never
             | Type::DataclassTransformer(_)
             | Type::AlwaysTruthy
@@ -219,7 +226,6 @@ impl<'db> Type<'db> {
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
             | Type::PropertyInstance(_)
-            | Type::Intersection(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_) => None,
         }

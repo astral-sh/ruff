@@ -1362,6 +1362,18 @@ static_assert(is_subtype_of(Intersection[NominalX, NominalY], HasXAndYProto))
 static_assert(is_subtype_of(Intersection[NominalX, NominalY], Intersection[HasX, HasY]))
 ```
 
+Intersections of nominal types also satisfy method-based protocols like `Sized`:
+
+```py
+from typing import Mapping
+from ty_extensions import Unknown, Intersection, Top
+
+def f(x: Intersection[list[Unknown], Top[Mapping[Unknown, object]]]):
+    # revealed: (bound method list[Unknown].__len__() -> int) & (bound method Top[Mapping[Unknown, object]].__len__() -> int)
+    reveal_type(x.__len__)
+    len(x)  # fine
+```
+
 A protocol type `X` and a nominal type `Y` can be inferred as disjoint types if `Y` is a `@final`
 type and `Y` does not satisfy the interface declared by `X`. But if `Y` is not `@final`, then this
 does not hold true, since a subclass of `Y` could always provide additional methods or attributes
