@@ -2,10 +2,10 @@ use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::hash::{DefaultHasher, Hash as _, Hasher as _};
 
-use lsp_types::notification::PublishDiagnostics;
+use lsp_types::{Code, PublishDiagnosticsNotification};
 use lsp_types::{
     CodeDescription, Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag,
-    NumberOrString, PublishDiagnosticsParams, Url,
+    Message, PublishDiagnosticsParams, Uri,
 };
 use ruff_diagnostics::Applicability;
 use ruff_text_size::Ranged;
@@ -22,7 +22,7 @@ use crate::capabilities::ResolvedClientCapabilities;
 use crate::document::{FileRangeExt, ToRangeExt};
 use crate::session::client::Client;
 use crate::session::{DocumentHandle, GlobalSettings};
-use crate::system::{AnySystemPath, file_to_url};
+use crate::system::{AnySystemPath, file_to_uri};
 use crate::{DIAGNOSTIC_NAME, Db, DiagnosticMode};
 use crate::{PositionEncoding, Session};
 
@@ -69,16 +69,16 @@ impl Diagnostics {
         global_settings: &GlobalSettings,
     ) -> LspDiagnostics {
         if let Some(notebook_document) = db.notebook_document(self.file_or_notebook) {
-            let mut cell_diagnostics: FxHashMap<Url, Vec<Diagnostic>> = FxHashMap::default();
+            let mut cell_diagnostics: FxHashMap<Uri, Vec<Diagnostic>> = FxHashMap::default();
 
-            // Populates all relevant URLs with an empty diagnostic list. This ensures that documents
+            // Populates all relevant URIs with an empty diagnostic list. This ensures that documents
             // without diagnostics still get updated.
-            for cell_url in notebook_document.cell_urls() {
-                cell_diagnostics.entry(cell_url.clone()).or_default();
+            for cell_uri in notebook_document.cell_uris() {
+                cell_diagnostics.entry(cell_uri.clone()).or_default();
             }
 
             for diagnostic in &*self.items {
-                let Some((url, lsp_diagnostic)) = to_lsp_diagnostic(
+                let Some((uri, lsp_diagnostic)) = to_lsp_diagnostic(
                     db,
                     diagnostic,
                     self.encoding,
@@ -88,19 +88,19 @@ impl Diagnostics {
                     continue;
                 };
 
-                let Some(url) = url else {
+                let Some(uri) = uri else {
                     tracing::warn!("Unable to find notebook cell");
                     continue;
                 };
 
                 cell_diagnostics
-                    .entry(url)
+                    .entry(uri)
                     .or_default()
                     .push(lsp_diagnostic);
             }
 
             for hint in &self.unnecessary_hints {
-                let Some((url, lsp_diagnostic)) = unnecessary_hint_to_lsp_diagnostic(
+                let Some((uri, lsp_diagnostic)) = unnecessary_hint_to_lsp_diagnostic(
                     db,
                     self.file_or_notebook,
                     self.encoding,
@@ -109,13 +109,13 @@ impl Diagnostics {
                     continue;
                 };
 
-                let Some(url) = url else {
+                let Some(uri) = uri else {
                     tracing::warn!("Unable to find notebook cell");
                     continue;
                 };
 
                 cell_diagnostics
-                    .entry(url)
+                    .entry(uri)
                     .or_default()
                     .push(lsp_diagnostic);
             }
@@ -153,8 +153,8 @@ impl Diagnostics {
 pub(super) enum LspDiagnostics {
     TextDocument(Vec<Diagnostic>),
 
-    /// A map of cell URLs to the diagnostics for that cell.
-    NotebookDocument(FxHashMap<Url, Vec<Diagnostic>>),
+    /// A map of cell URIs to the diagnostics for that cell.
+    NotebookDocument(FxHashMap<Uri, Vec<Diagnostic>>),
 }
 
 impl LspDiagnostics {
@@ -208,8 +208,8 @@ pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, 
     };
 
     // Sends a notification to the client with the diagnostics for the document.
-    let publish_diagnostics_notification = |uri: Url, diagnostics: Vec<Diagnostic>| {
-        client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
+    let publish_diagnostics_notification = |uri: Uri, diagnostics: Vec<Diagnostic>| {
+        client.send_notification::<PublishDiagnosticsNotification>(PublishDiagnosticsParams {
             uri,
             diagnostics,
             version: Some(document.version()),
@@ -222,11 +222,11 @@ pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, 
         session.global_settings(),
     ) {
         LspDiagnostics::TextDocument(diagnostics) => {
-            publish_diagnostics_notification(document.url().clone(), diagnostics);
+            publish_diagnostics_notification(document.uri().clone(), diagnostics);
         }
         LspDiagnostics::NotebookDocument(cell_diagnostics) => {
-            for (cell_url, diagnostics) in cell_diagnostics {
-                publish_diagnostics_notification(cell_url, diagnostics);
+            for (cell_uri, diagnostics) in cell_diagnostics {
+                publish_diagnostics_notification(cell_uri, diagnostics);
             }
         }
     }
@@ -258,7 +258,7 @@ pub(crate) fn publish_settings_diagnostics(
 
     let project_path = AnySystemPath::System(path);
 
-    let (mut diagnostics_by_url, old_untracked) = {
+    let (mut diagnostics_by_uri, old_untracked) = {
         let state = session.project_state_mut(&project_path);
         let db = &state.db;
         let project = db.project();
@@ -272,40 +272,40 @@ pub(crate) fn publish_settings_diagnostics(
             return;
         }
 
-        // Group diagnostics by URL
-        let mut diagnostics_by_url: FxHashMap<Url, Vec<_>> = FxHashMap::default();
+        // Group diagnostics by URI
+        let mut diagnostics_by_uri: FxHashMap<Uri, Vec<_>> = FxHashMap::default();
         for diagnostic in settings_diagnostics {
             if let Some(span) = diagnostic.primary_span() {
                 let file = span.expect_ty_file();
-                let Some(url) = file_to_url(db, file) else {
-                    tracing::debug!("Failed to convert file to URL at {}", file.path(db));
+                let Some(uri) = file_to_uri(db, file) else {
+                    tracing::debug!("Failed to convert file to URI at {}", file.path(db));
                     continue;
                 };
-                diagnostics_by_url.entry(url).or_default().push(diagnostic);
+                diagnostics_by_uri.entry(uri).or_default().push(diagnostic);
             }
         }
 
-        // Record the URLs we're sending non-empty diagnostics for, so we know to clear them
+        // Record the URIs we're sending non-empty diagnostics for, so we know to clear them
         // the next time we publish settings diagnostics!
         let old_untracked = std::mem::replace(
             &mut state.untracked_files_with_pushed_diagnostics,
-            diagnostics_by_url.keys().cloned().collect(),
+            diagnostics_by_uri.keys().cloned().collect(),
         );
 
-        (diagnostics_by_url, old_untracked)
+        (diagnostics_by_uri, old_untracked)
     };
 
     // Add empty diagnostics for any files that had diagnostics before but don't now.
     // This will clear them (either the file is no longer relevant to us or fixed!)
-    for url in old_untracked {
-        diagnostics_by_url.entry(url).or_default();
+    for uri in old_untracked {
+        diagnostics_by_uri.entry(uri).or_default();
     }
 
     let db = session.project_db(&project_path);
     let global_settings = session.global_settings();
 
     // Send the settings diagnostics!
-    for (url, file_diagnostics) in diagnostics_by_url {
+    for (uri, file_diagnostics) in diagnostics_by_uri {
         // Convert diagnostics to LSP format
         let lsp_diagnostics = file_diagnostics
             .into_iter()
@@ -323,8 +323,8 @@ pub(crate) fn publish_settings_diagnostics(
             })
             .collect::<Vec<_>>();
 
-        client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
-            uri: url,
+        client.send_notification::<PublishDiagnosticsNotification>(PublishDiagnosticsParams {
+            uri,
             diagnostics: lsp_diagnostics,
             version: None,
         });
@@ -373,21 +373,21 @@ fn unnecessary_hint_to_lsp_diagnostic(
     file: File,
     encoding: PositionEncoding,
     hint: &Hint,
-) -> Option<(Option<Url>, Diagnostic)> {
+) -> Option<(Option<Uri>, Diagnostic)> {
     let range = hint.range.to_lsp_range(db, file, encoding)?;
-    let url = range.to_location().map(|location| location.uri);
+    let uri = range.to_location().map(|location| location.uri);
 
     Some((
-        url,
+        uri,
         Diagnostic {
             range: range.local_range(),
-            severity: Some(DiagnosticSeverity::HINT),
+            severity: Some(DiagnosticSeverity::Hint),
             code: None,
             code_description: None,
             source: Some(DIAGNOSTIC_NAME.into()),
-            message: hint.message(),
+            message: Message::String(hint.message()),
             related_information: None,
-            tags: Some(vec![DiagnosticTag::UNNECESSARY]),
+            tags: Some(vec![DiagnosticTag::Unnecessary]),
             data: None,
         },
     ))
@@ -401,7 +401,7 @@ pub(super) fn to_lsp_diagnostic(
     encoding: PositionEncoding,
     client_capabilities: ResolvedClientCapabilities,
     global_settings: &GlobalSettings,
-) -> Option<(Option<lsp_types::Url>, Diagnostic)> {
+) -> Option<(Option<lsp_types::Uri>, Diagnostic)> {
     if diagnostic.is_invalid_syntax() && !global_settings.show_syntax_errors() {
         return None;
     }
@@ -417,15 +417,15 @@ pub(super) fn to_lsp_diagnostic(
             .to_location()
     });
 
-    let (range, url) = match location {
+    let (range, uri) = match location {
         Some(location) => (location.range, Some(location.uri)),
         None => (lsp_types::Range::default(), None),
     };
 
     let severity = match diagnostic.severity() {
-        Severity::Info => DiagnosticSeverity::INFORMATION,
-        Severity::Warning => DiagnosticSeverity::WARNING,
-        Severity::Error | Severity::Fatal => DiagnosticSeverity::ERROR,
+        Severity::Info => DiagnosticSeverity::Information,
+        Severity::Warning => DiagnosticSeverity::Warning,
+        Severity::Error | Severity::Fatal => DiagnosticSeverity::Error,
     };
 
     let tags = diagnostic
@@ -433,15 +433,15 @@ pub(super) fn to_lsp_diagnostic(
         .map(|tags| {
             tags.iter()
                 .map(|tag| match tag {
-                    ruff_db::diagnostic::DiagnosticTag::Unnecessary => DiagnosticTag::UNNECESSARY,
-                    ruff_db::diagnostic::DiagnosticTag::Deprecated => DiagnosticTag::DEPRECATED,
+                    ruff_db::diagnostic::DiagnosticTag::Unnecessary => DiagnosticTag::Unnecessary,
+                    ruff_db::diagnostic::DiagnosticTag::Deprecated => DiagnosticTag::Deprecated,
                 })
                 .collect::<Vec<DiagnosticTag>>()
         })
         .filter(|mapped_tags| !mapped_tags.is_empty());
 
     let code_description = diagnostic.documentation_url().and_then(|url| {
-        let href = Url::parse(url).ok()?;
+        let href = Uri::parse(url).ok()?;
 
         Some(CodeDescription { href })
     });
@@ -513,15 +513,15 @@ pub(super) fn to_lsp_diagnostic(
     }
 
     Some((
-        url,
+        uri,
         Diagnostic {
             range,
             severity: Some(severity),
             tags,
-            code: Some(NumberOrString::String(diagnostic.id().to_string())),
+            code: Some(Code::String(diagnostic.id().to_string())),
             code_description,
             source: Some(DIAGNOSTIC_NAME.into()),
-            message,
+            message: Message::String(message),
             related_information,
             data: serde_json::to_value(data).ok(),
         },
@@ -567,7 +567,7 @@ fn sub_diagnostic_to_related_information(
 #[derive(Serialize, Deserialize)]
 pub(crate) struct DiagnosticData {
     pub(crate) fix_title: String,
-    pub(crate) edits: HashMap<Url, Vec<lsp_types::TextEdit>>,
+    pub(crate) edits: HashMap<Uri, Vec<lsp_types::TextEdit>>,
 }
 
 impl DiagnosticData {
@@ -583,7 +583,7 @@ impl DiagnosticData {
         let primary_span = diagnostic.primary_span()?;
         let file = primary_span.expect_ty_file();
 
-        let mut lsp_edits: HashMap<Url, Vec<lsp_types::TextEdit>> = HashMap::new();
+        let mut lsp_edits: HashMap<Uri, Vec<lsp_types::TextEdit>> = HashMap::new();
 
         for edit in fix.edits() {
             let location = edit
