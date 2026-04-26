@@ -5,7 +5,7 @@ use crate::session::Client;
 pub(crate) struct ShutdownHandler;
 
 impl RequestHandler for ShutdownHandler {
-    type RequestType = lsp_types::request::Shutdown;
+    type RequestType = lsp_types::ShutdownRequest;
 }
 
 impl SyncRequestHandler for ShutdownHandler {

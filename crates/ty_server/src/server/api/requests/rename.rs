@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use lsp_types::request::Rename;
-use lsp_types::{RenameParams, TextEdit, Url, WorkspaceEdit};
+use lsp_types::RenameRequest;
+use lsp_types::{RenameParams, TextEdit, Uri as Url, WorkspaceEdit};
 use ty_ide::rename;
 use ty_project::ProjectDatabase;
 
@@ -16,12 +16,12 @@ use crate::session::client::Client;
 pub(crate) struct RenameRequestHandler;
 
 impl RequestHandler for RenameRequestHandler {
-    type RequestType = Rename;
+    type RequestType = RenameRequest;
 }
 
 impl BackgroundDocumentRequestHandler for RenameRequestHandler {
     fn document_url(params: &RenameParams) -> Cow<'_, Url> {
-        Cow::Borrowed(&params.text_document_position.text_document.uri)
+        Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
     fn run_with_snapshot(
@@ -41,7 +41,7 @@ impl BackgroundDocumentRequestHandler for RenameRequestHandler {
             return Ok(None);
         };
 
-        let Some(offset) = params.text_document_position.position.to_text_size(
+        let Some(offset) = params.text_document_position_params.position.to_text_size(
             db,
             file,
             snapshot.url(),

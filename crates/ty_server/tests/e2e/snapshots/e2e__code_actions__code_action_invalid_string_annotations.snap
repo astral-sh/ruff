@@ -27,6 +27,7 @@ expression: code_actions
         "message": "Name `foobar` used when not defined"
       }
     ],
+    "isPreferred": false,
     "edit": {
       "changes": {
         "file://<temp_dir>/src/foo.py": [
@@ -45,7 +46,6 @@ expression: code_actions
           }
         ]
       }
-    },
-    "isPreferred": false
+    }
   }
 ]

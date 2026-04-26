@@ -1,9 +1,10 @@
 use anyhow::Result;
-use lsp_types::notification::DidOpenTextDocument;
-use lsp_types::request::InlayHintRequest;
+use lsp_types::DidOpenTextDocumentNotification;
+use lsp_types::InlayHintRequest;
+use lsp_types::LanguageKind;
 use lsp_types::{
     DidOpenTextDocumentParams, InlayHintParams, Position, Range, TextDocumentIdentifier,
-    TextDocumentItem, Url, WorkDoneProgressParams,
+    TextDocumentItem, Uri as Url, WorkDoneProgressParams,
 };
 use ruff_db::system::SystemPath;
 use ty_server::ClientOptions;
@@ -183,10 +184,10 @@ fn variable_inlay_hints_disabled_for_virtual_file() -> Result<()> {
     let file_uri = server.file_uri(file);
     let virtual_uri = Url::parse(&format!("untitled://{}", file_uri.path())).unwrap();
 
-    server.send_notification::<DidOpenTextDocument>(DidOpenTextDocumentParams {
+    server.send_notification::<DidOpenTextDocumentNotification>(DidOpenTextDocumentParams {
         text_document: TextDocumentItem {
             uri: virtual_uri.clone(),
-            language_id: "python".to_string(),
+            language_id: LanguageKind::Python,
             version: 1,
             text: content.to_string(),
         },

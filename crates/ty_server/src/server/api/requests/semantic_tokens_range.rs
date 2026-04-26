@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use lsp_types::{SemanticTokens, SemanticTokensRangeParams, SemanticTokensRangeResult, Url};
+use lsp_types::{SemanticTokens, SemanticTokensRangeParams, Uri as Url};
 use ty_project::ProjectDatabase;
 
 use crate::document::RangeExt;
@@ -14,7 +14,7 @@ use crate::session::client::Client;
 pub(crate) struct SemanticTokensRangeRequestHandler;
 
 impl RequestHandler for SemanticTokensRangeRequestHandler {
-    type RequestType = lsp_types::request::SemanticTokensRangeRequest;
+    type RequestType = lsp_types::SemanticTokensRangeRequest;
 }
 
 impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
@@ -27,7 +27,7 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
         snapshot: &DocumentSnapshot,
         _client: &Client,
         params: SemanticTokensRangeParams,
-    ) -> crate::server::Result<Option<SemanticTokensRangeResult>> {
+    ) -> crate::server::Result<Option<SemanticTokens>> {
         if snapshot
             .workspace_settings()
             .is_language_services_disabled()
@@ -58,10 +58,10 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
                 .supports_multiline_semantic_tokens(),
         );
 
-        Ok(Some(SemanticTokensRangeResult::Tokens(SemanticTokens {
+        Ok(Some(SemanticTokens {
             result_id: None,
             data: lsp_tokens,
-        })))
+        }))
     }
 }
 

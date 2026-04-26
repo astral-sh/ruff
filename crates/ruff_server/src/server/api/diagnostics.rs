@@ -24,7 +24,7 @@ pub(super) fn publish_diagnostics_for_document(
 ) -> crate::server::Result<()> {
     for (uri, diagnostics) in generate_diagnostics(snapshot) {
         client
-            .send_notification::<lsp_types::notification::PublishDiagnostics>(
+            .send_notification::<lsp_types::PublishDiagnosticsNotification>(
                 lsp_types::PublishDiagnosticsParams {
                     uri,
                     diagnostics,
@@ -42,7 +42,7 @@ pub(super) fn clear_diagnostics_for_document(
     client: &Client,
 ) -> crate::server::Result<()> {
     client
-        .send_notification::<lsp_types::notification::PublishDiagnostics>(
+        .send_notification::<lsp_types::PublishDiagnosticsNotification>(
             lsp_types::PublishDiagnosticsParams {
                 uri: query.make_key().into_url(),
                 diagnostics: vec![],

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use lsp_types::NotebookCellKind;
 use ruff_notebook::CellMetadata;
 use ruff_source_file::OneIndexed;
@@ -13,12 +15,12 @@ use crate::session::index::Index;
 /// [`super::TextDocument`]s (they can be looked up by the Cell's URL).
 #[derive(Clone, Debug)]
 pub struct NotebookDocument {
-    url: lsp_types::Url,
+    url: lsp_types::Uri,
     cells: Vec<NotebookCell>,
     metadata: ruff_notebook::RawNotebookMetadata,
     version: DocumentVersion,
     /// Map from Cell URL to their index in `cells`
-    cell_index: FxHashMap<lsp_types::Url, usize>,
+    cell_index: FxHashMap<lsp_types::Uri, usize>,
 }
 
 /// The metadata of a single cell within a notebook.
@@ -34,17 +36,17 @@ struct NotebookCell {
     /// > cells and can therefore be used to uniquely identify a notebook cell
     /// >  or the cell’s text document.
     /// > <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#notebookDocument_synchronization>
-    url: lsp_types::Url,
+    url: lsp_types::Uri,
     kind: NotebookCellKind,
     execution_summary: Option<lsp_types::ExecutionSummary>,
 }
 
 impl NotebookDocument {
     pub fn new(
-        url: lsp_types::Url,
+        url: lsp_types::Uri,
         notebook_version: DocumentVersion,
         cells: Vec<lsp_types::NotebookCell>,
-        metadata: serde_json::Map<String, serde_json::Value>,
+        metadata: HashMap<String, serde_json::Value>,
     ) -> crate::Result<Self> {
         let cells: Vec<_> = cells.into_iter().map(NotebookCell::new).collect();
         let index = cells
@@ -58,11 +60,11 @@ impl NotebookDocument {
             url,
             version: notebook_version,
             cells,
-            metadata: serde_json::from_value(serde_json::Value::Object(metadata))?,
+            metadata: serde_json::from_value(serde_json::to_value(metadata)?)?,
         })
     }
 
-    pub(crate) fn url(&self) -> &lsp_types::Url {
+    pub(crate) fn url(&self) -> &lsp_types::Uri {
         &self.url
     }
 
@@ -125,7 +127,7 @@ impl NotebookDocument {
         &mut self,
         array: lsp_types::NotebookCellArrayChange,
         updated_cells: Vec<lsp_types::NotebookCell>,
-        metadata_change: Option<serde_json::Map<String, serde_json::Value>>,
+        metadata_change: Option<HashMap<String, serde_json::Value>>,
         version: DocumentVersion,
     ) -> crate::Result<()> {
         self.version = version;
@@ -159,7 +161,7 @@ impl NotebookDocument {
         }
 
         if let Some(metadata_change) = metadata_change {
-            self.metadata = serde_json::from_value(serde_json::Value::Object(metadata_change))?;
+            self.metadata = serde_json::from_value(serde_json::to_value(metadata_change)?)?;
         }
 
         Ok(())
@@ -171,18 +173,18 @@ impl NotebookDocument {
     }
 
     /// Get the URI for a cell by its index within the cell array.
-    pub(crate) fn cell_uri_by_index(&self, index: OneIndexed) -> Option<&lsp_types::Url> {
+    pub(crate) fn cell_uri_by_index(&self, index: OneIndexed) -> Option<&lsp_types::Uri> {
         self.cells
             .get(index.to_zero_indexed())
             .map(|cell| &cell.url)
     }
 
     /// Returns a list of cell URIs in the order they appear in the array.
-    pub(crate) fn cell_urls(&self) -> impl Iterator<Item = &lsp_types::Url> {
+    pub(crate) fn cell_urls(&self) -> impl Iterator<Item = &lsp_types::Uri> {
         self.cells.iter().map(|cell| &cell.url)
     }
 
-    pub(crate) fn cell_index_by_uri(&self, cell_url: &lsp_types::Url) -> Option<OneIndexed> {
+    pub(crate) fn cell_index_by_uri(&self, cell_url: &lsp_types::Uri) -> Option<OneIndexed> {
         Some(OneIndexed::from_zero_indexed(
             self.cell_index.get(cell_url).copied()?,
         ))

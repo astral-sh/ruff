@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
-use lsp_types::request::PrepareRenameRequest;
-use lsp_types::{PrepareRenameResponse, TextDocumentPositionParams, Url};
+use lsp_types::{PrepareRenameParams, PrepareRenameRequest, PrepareRenameResult, Uri as Url};
 use ty_ide::can_rename;
 use ty_project::ProjectDatabase;
 
@@ -19,16 +18,16 @@ impl RequestHandler for PrepareRenameRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for PrepareRenameRequestHandler {
-    fn document_url(params: &TextDocumentPositionParams) -> Cow<'_, Url> {
-        Cow::Borrowed(&params.text_document.uri)
+    fn document_url(params: &PrepareRenameParams) -> Cow<'_, Url> {
+        Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
     fn run_with_snapshot(
         db: &ProjectDatabase,
         snapshot: &DocumentSnapshot,
         _client: &Client,
-        params: TextDocumentPositionParams,
-    ) -> crate::server::Result<Option<PrepareRenameResponse>> {
+        params: PrepareRenameParams,
+    ) -> crate::server::Result<Option<PrepareRenameResult>> {
         if snapshot
             .workspace_settings()
             .is_language_services_disabled()
@@ -40,11 +39,12 @@ impl BackgroundDocumentRequestHandler for PrepareRenameRequestHandler {
             return Ok(None);
         };
 
-        let Some(offset) =
-            params
-                .position
-                .to_text_size(db, file, snapshot.url(), snapshot.encoding())
-        else {
+        let Some(offset) = params.text_document_position_params.position.to_text_size(
+            db,
+            file,
+            snapshot.url(),
+            snapshot.encoding(),
+        ) else {
             return Ok(None);
         };
 
@@ -59,7 +59,7 @@ impl BackgroundDocumentRequestHandler for PrepareRenameRequestHandler {
             return Ok(None);
         };
 
-        Ok(Some(PrepareRenameResponse::Range(lsp_range)))
+        Ok(Some(lsp_range.into()))
     }
 }
 

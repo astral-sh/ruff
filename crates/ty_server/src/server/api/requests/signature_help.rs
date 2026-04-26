@@ -6,10 +6,10 @@ use crate::server::api::traits::{
 };
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
-use lsp_types::request::SignatureHelpRequest;
+use lsp_types::{ActiveParameter, SignatureHelpRequest};
 use lsp_types::{
-    Documentation, ParameterInformation, ParameterLabel, SignatureHelp, SignatureHelpParams,
-    SignatureInformation, Url,
+    Documentation, ParameterInformation, ParameterInformationLabel, SignatureHelp,
+    SignatureHelpParams, SignatureInformation, Uri as Url,
 };
 use ty_ide::signature_help;
 use ty_project::ProjectDatabase;
@@ -63,7 +63,8 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
             .active_signature
             .and_then(|s| signature_help_info.signatures.get(s))
             .and_then(|sig| sig.active_parameter)
-            .and_then(|p| u32::try_from(p).ok());
+            .and_then(|p| u32::try_from(p).ok())
+            .map(ActiveParameter::Int);
 
         // Convert from IDE types to LSP types
         let signatures = signature_help_info
@@ -102,12 +103,12 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
                                 let start_u32 =
                                     u32::try_from(start_char_offset).unwrap_or(u32::MAX);
                                 let end_u32 = u32::try_from(end_char_offset).unwrap_or(u32::MAX);
-                                ParameterLabel::LabelOffsets([start_u32, end_u32])
+                                ParameterInformationLabel::Tuple((start_u32, end_u32))
                             } else {
-                                ParameterLabel::Simple(param.label)
+                                ParameterInformationLabel::String(param.label)
                             }
                         } else {
-                            ParameterLabel::Simple(param.label)
+                            ParameterInformationLabel::String(param.label)
                         };
 
                         ParameterInformation {
@@ -119,7 +120,9 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
 
                 let active_parameter =
                     if resolved_capabilities.supports_signature_active_parameter() {
-                        sig.active_parameter.and_then(|p| u32::try_from(p).ok())
+                        sig.active_parameter
+                            .and_then(|p| u32::try_from(p).ok())
+                            .map(ActiveParameter::Int)
                     } else {
                         None
                     };

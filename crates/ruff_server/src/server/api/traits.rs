@@ -29,13 +29,15 @@
 
 use crate::session::{Client, DocumentSnapshot, Session};
 
-use lsp_types::notification::Notification as LSPNotification;
-use lsp_types::request::Request;
+use lsp_types::LspNotificationMethod;
+use lsp_types::LspRequestMethod;
+use lsp_types::Notification as LSPNotification;
+use lsp_types::Request;
 
 /// A supertrait for any server request handler.
 pub(super) trait RequestHandler {
     type RequestType: Request;
-    const METHOD: &'static str = <<Self as RequestHandler>::RequestType as Request>::METHOD;
+    const METHOD: LspRequestMethod = <<Self as RequestHandler>::RequestType as Request>::METHOD;
 }
 
 /// A request handler that needs mutable access to the session.
@@ -62,7 +64,7 @@ pub(super) trait BackgroundDocumentRequestHandler: RequestHandler {
     /// [`define_document_url`]: super::define_document_url
     fn document_url(
         params: &<<Self as RequestHandler>::RequestType as Request>::Params,
-    ) -> std::borrow::Cow<'_, lsp_types::Url>;
+    ) -> std::borrow::Cow<'_, lsp_types::Uri>;
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
@@ -74,7 +76,7 @@ pub(super) trait BackgroundDocumentRequestHandler: RequestHandler {
 /// A supertrait for any server notification handler.
 pub(super) trait NotificationHandler {
     type NotificationType: LSPNotification;
-    const METHOD: &'static str =
+    const METHOD: LspNotificationMethod =
         <<Self as NotificationHandler>::NotificationType as LSPNotification>::METHOD;
 }
 
@@ -100,7 +102,7 @@ pub(super) trait BackgroundDocumentNotificationHandler: NotificationHandler {
     /// [`define_document_url`]: super::define_document_url
     fn document_url(
         params: &<<Self as NotificationHandler>::NotificationType as LSPNotification>::Params,
-    ) -> std::borrow::Cow<'_, lsp_types::Url>;
+    ) -> std::borrow::Cow<'_, lsp_types::Uri>;
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,

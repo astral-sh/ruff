@@ -1,6 +1,6 @@
 use std::{path::PathBuf, str::FromStr as _};
 
-use lsp_types::Url;
+use lsp_types::Uri as Url;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 use serde_json::{Map, Value};

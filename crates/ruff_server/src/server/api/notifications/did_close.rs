@@ -2,13 +2,12 @@ use crate::server::Result;
 use crate::server::api::LSPResult;
 use crate::server::api::diagnostics::clear_diagnostics_for_document;
 use crate::session::{Client, Session};
-use lsp_types as types;
-use lsp_types::notification as notif;
+use lsp_types::{self as types, DidCloseTextDocumentNotification};
 
 pub(crate) struct DidClose;
 
 impl super::NotificationHandler for DidClose {
-    type NotificationType = notif::DidCloseTextDocument;
+    type NotificationType = DidCloseTextDocumentNotification;
 }
 
 impl super::SyncNotificationHandler for DidClose {

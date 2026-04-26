@@ -1,9 +1,10 @@
 //! Data model, state management, and configuration resolution.
 
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use lsp_types::{ClientCapabilities, FileEvent, NotebookDocumentCellChange, Url};
+use lsp_types::{ClientCapabilities, FileEvent, NotebookDocumentCellChanges, Uri as Url};
 use settings::ClientSettings;
 
 use crate::edit::{DocumentKey, DocumentVersion, NotebookDocument};
@@ -108,12 +109,12 @@ impl Session {
     }
 
     /// Iterates over the LSP URLs for all open text documents. These URLs are valid file paths.
-    pub(super) fn text_document_urls(&self) -> impl Iterator<Item = &lsp_types::Url> + '_ {
+    pub(super) fn text_document_urls(&self) -> impl Iterator<Item = &lsp_types::Uri> + '_ {
         self.index.text_document_urls()
     }
 
     /// Iterates over the LSP URLs for all open notebook documents. These URLs are valid file paths.
-    pub(super) fn notebook_document_urls(&self) -> impl Iterator<Item = &lsp_types::Url> + '_ {
+    pub(super) fn notebook_document_urls(&self) -> impl Iterator<Item = &lsp_types::Uri> + '_ {
         self.index.notebook_document_urls()
     }
 
@@ -140,8 +141,8 @@ impl Session {
     pub(crate) fn update_notebook_document(
         &mut self,
         key: &DocumentKey,
-        cells: Option<NotebookDocumentCellChange>,
-        metadata: Option<serde_json::Map<String, serde_json::Value>>,
+        cells: Option<NotebookDocumentCellChanges>,
+        metadata: Option<HashMap<String, serde_json::Value>>,
         version: DocumentVersion,
     ) -> crate::Result<()> {
         let encoding = self.encoding();

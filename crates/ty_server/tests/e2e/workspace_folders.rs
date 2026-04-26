@@ -1,10 +1,8 @@
 use anyhow::Result;
 use insta::assert_snapshot;
 use lsp_types::{
-    DiagnosticSeverity, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
-    FullDocumentDiagnosticReport, Position, WorkspaceDiagnosticReport,
-    WorkspaceDiagnosticReportPartialResult, WorkspaceDiagnosticReportResult,
-    WorkspaceDocumentDiagnosticReport,
+    DiagnosticSeverity, DocumentDiagnosticReport, FullDocumentDiagnosticReport, Position,
+    WorkspaceDiagnosticReport, WorkspaceDocumentDiagnosticReport,
 };
 use ruff_db::system::SystemPath;
 use ty_server::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
@@ -705,24 +703,23 @@ fn global_settings_change() -> Result<()> {
 /// LSP is correctly recognizing and reporting diagnostics for each
 /// workspace folder. This isn't really meant to test the diagnostics
 /// themselves, hence the condensed output.
-fn condensed_workspace_diagnostic_snapshot(report: WorkspaceDiagnosticReportResult) -> String {
-    let items = match report {
-        WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport { items }) => items,
-        WorkspaceDiagnosticReportResult::Partial(WorkspaceDiagnosticReportPartialResult {
-            items,
-        }) => items,
-    };
+fn condensed_workspace_diagnostic_snapshot(report: WorkspaceDiagnosticReport) -> String {
+    let items = report.items;
     items
         .into_iter()
         .map(|item| match item {
-            WorkspaceDocumentDiagnosticReport::Full(doc_report) => {
+            WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport(
+                doc_report,
+            ) => {
                 let diagnostics = condensed_full_document_diagnostic_report(
                     doc_report.full_document_diagnostic_report,
                 )
                 .join("\n\t");
                 format!("{}\n\t{diagnostics}", doc_report.uri)
             }
-            WorkspaceDocumentDiagnosticReport::Unchanged(doc_report) => {
+            WorkspaceDocumentDiagnosticReport::WorkspaceUnchangedDocumentDiagnosticReport(
+                doc_report,
+            ) => {
                 format!("{}\n\tUNCHANGED", doc_report.uri)
             }
         })
@@ -730,21 +727,18 @@ fn condensed_workspace_diagnostic_snapshot(report: WorkspaceDiagnosticReportResu
         .join("\n")
 }
 
-pub(crate) fn condensed_document_diagnostic_snapshot(
-    report: DocumentDiagnosticReportResult,
-) -> String {
+pub(crate) fn condensed_document_diagnostic_snapshot(report: DocumentDiagnosticReport) -> String {
     match report {
-        DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Full(full)) => {
+        DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(full) => {
             condensed_full_document_diagnostic_report(full.full_document_diagnostic_report)
                 .join("\n")
         }
         // NOTE: It might be worth providing more details for these
         // cases, but I don't think there's currently a use case for
         // it.
-        DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Unchanged(_)) => {
+        DocumentDiagnosticReport::RelatedUnchangedDocumentDiagnosticReport(_) => {
             "UNCHANGED".to_string()
         }
-        DocumentDiagnosticReportResult::Partial(_) => "PARTIAL".to_string(),
     }
 }
 
@@ -761,11 +755,11 @@ fn condensed_full_document_diagnostic_report(report: FullDocumentDiagnosticRepor
                 end_char = d.range.end.character,
             );
             let severity = match d.severity {
-                Some(DiagnosticSeverity::ERROR) => "ERROR",
-                Some(DiagnosticSeverity::WARNING) => "WARNING",
-                Some(DiagnosticSeverity::INFORMATION) => "INFORMATION",
-                Some(DiagnosticSeverity::HINT) => "HINT",
-                None | Some(_) => "unknown",
+                Some(DiagnosticSeverity::Error) => "ERROR",
+                Some(DiagnosticSeverity::Warning) => "WARNING",
+                Some(DiagnosticSeverity::Information) => "INFORMATION",
+                Some(DiagnosticSeverity::Hint) => "HINT",
+                None => "unknown",
             };
             format!("{range}[{severity}]: {message}", message = d.message)
         })
@@ -787,7 +781,7 @@ fn condensed_full_document_diagnostic_report(report: FullDocumentDiagnosticRepor
 /// expect to never have a response for.
 fn get_expected_empty_workspace_diagnostics_and_shutdown(
     mut server: TestServer,
-) -> WorkspaceDiagnosticReportResult {
+) -> WorkspaceDiagnosticReport {
     let request_id = send_workspace_diagnostic_request(&mut server);
     assert_workspace_diagnostics_suspends_for_long_polling(&mut server, &request_id);
     shutdown_and_await_workspace_diagnostic(server, &request_id)

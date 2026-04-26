@@ -2,10 +2,10 @@ use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::hash::{DefaultHasher, Hash as _, Hasher as _};
 
-use lsp_types::notification::PublishDiagnostics;
+use lsp_types::{Code, PublishDiagnosticsNotification};
 use lsp_types::{
     CodeDescription, Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag,
-    NumberOrString, PublishDiagnosticsParams, Url,
+    PublishDiagnosticsParams, Uri as Url,
 };
 use ruff_diagnostics::Applicability;
 use ruff_text_size::Ranged;
@@ -209,7 +209,7 @@ pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, 
 
     // Sends a notification to the client with the diagnostics for the document.
     let publish_diagnostics_notification = |uri: Url, diagnostics: Vec<Diagnostic>| {
-        client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
+        client.send_notification::<PublishDiagnosticsNotification>(PublishDiagnosticsParams {
             uri,
             diagnostics,
             version: Some(document.version()),
@@ -323,7 +323,7 @@ pub(crate) fn publish_settings_diagnostics(
             })
             .collect::<Vec<_>>();
 
-        client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
+        client.send_notification::<PublishDiagnosticsNotification>(PublishDiagnosticsParams {
             uri: url,
             diagnostics: lsp_diagnostics,
             version: None,
@@ -381,13 +381,13 @@ fn unnecessary_hint_to_lsp_diagnostic(
         url,
         Diagnostic {
             range: range.local_range(),
-            severity: Some(DiagnosticSeverity::HINT),
+            severity: Some(DiagnosticSeverity::Hint),
             code: None,
             code_description: None,
             source: Some(DIAGNOSTIC_NAME.into()),
             message: hint.message(),
             related_information: None,
-            tags: Some(vec![DiagnosticTag::UNNECESSARY]),
+            tags: Some(vec![DiagnosticTag::Unnecessary]),
             data: None,
         },
     ))
@@ -401,7 +401,7 @@ pub(super) fn to_lsp_diagnostic(
     encoding: PositionEncoding,
     client_capabilities: ResolvedClientCapabilities,
     global_settings: &GlobalSettings,
-) -> Option<(Option<lsp_types::Url>, Diagnostic)> {
+) -> Option<(Option<lsp_types::Uri>, Diagnostic)> {
     if diagnostic.is_invalid_syntax() && !global_settings.show_syntax_errors() {
         return None;
     }
@@ -423,9 +423,9 @@ pub(super) fn to_lsp_diagnostic(
     };
 
     let severity = match diagnostic.severity() {
-        Severity::Info => DiagnosticSeverity::INFORMATION,
-        Severity::Warning => DiagnosticSeverity::WARNING,
-        Severity::Error | Severity::Fatal => DiagnosticSeverity::ERROR,
+        Severity::Info => DiagnosticSeverity::Information,
+        Severity::Warning => DiagnosticSeverity::Warning,
+        Severity::Error | Severity::Fatal => DiagnosticSeverity::Error,
     };
 
     let tags = diagnostic
@@ -433,8 +433,8 @@ pub(super) fn to_lsp_diagnostic(
         .map(|tags| {
             tags.iter()
                 .map(|tag| match tag {
-                    ruff_db::diagnostic::DiagnosticTag::Unnecessary => DiagnosticTag::UNNECESSARY,
-                    ruff_db::diagnostic::DiagnosticTag::Deprecated => DiagnosticTag::DEPRECATED,
+                    ruff_db::diagnostic::DiagnosticTag::Unnecessary => DiagnosticTag::Unnecessary,
+                    ruff_db::diagnostic::DiagnosticTag::Deprecated => DiagnosticTag::Deprecated,
                 })
                 .collect::<Vec<DiagnosticTag>>()
         })
@@ -518,7 +518,7 @@ pub(super) fn to_lsp_diagnostic(
             range,
             severity: Some(severity),
             tags,
-            code: Some(NumberOrString::String(diagnostic.id().to_string())),
+            code: Some(Code::String(diagnostic.id().to_string())),
             code_description,
             source: Some(DIAGNOSTIC_NAME.into()),
             message,

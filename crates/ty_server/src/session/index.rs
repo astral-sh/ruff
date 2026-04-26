@@ -1,4 +1,5 @@
 use rustc_hash::FxHashMap;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::document::{DocumentKey, LanguageId};
@@ -33,7 +34,7 @@ impl Index {
 
     pub(crate) fn document_handle(
         &self,
-        url: &lsp_types::Url,
+        url: &lsp_types::Uri,
     ) -> Result<DocumentHandle, DocumentError> {
         let key = DocumentKey::from_url(url);
         let Some(document) = self.documents.get(&key) else {
@@ -54,8 +55,8 @@ impl Index {
     pub(super) fn update_notebook_document(
         &mut self,
         notebook_key: &DocumentKey,
-        cells: Option<lsp_types::NotebookDocumentCellChange>,
-        metadata: Option<serde_json::Map<String, serde_json::Value>>,
+        cells: Option<lsp_types::NotebookDocumentCellChanges>,
+        metadata: Option<HashMap<String, serde_json::Value>>,
         new_version: DocumentVersion,
         encoding: PositionEncoding,
     ) -> crate::Result<()> {
@@ -66,7 +67,7 @@ impl Index {
 
         let (structure, data, text_content) = cells
             .map(|cells| {
-                let lsp_types::NotebookDocumentCellChange {
+                let lsp_types::NotebookDocumentCellChanges {
                     structure,
                     data,
                     text_content,
@@ -114,7 +115,7 @@ impl Index {
                         opened_cell.uri,
                         opened_cell.text,
                         opened_cell.version,
-                        &opened_cell.language_id,
+                        opened_cell.language_id,
                     )
                     .with_notebook(notebook_path.clone())
                     .into(),
@@ -123,12 +124,12 @@ impl Index {
         }
 
         for updated_cell in text_content.into_iter().flatten() {
-            let Ok(document_mut) =
-                self.document_mut(&DocumentKey::from_url(&updated_cell.document.uri))
-            else {
+            let Ok(document_mut) = self.document_mut(&DocumentKey::from_url(
+                &updated_cell.document.text_document_identifier.uri,
+            )) else {
                 tracing::warn!(
                     "Could not find document for cell {}",
-                    updated_cell.document.uri
+                    updated_cell.document.text_document_identifier.uri
                 );
                 continue;
             };

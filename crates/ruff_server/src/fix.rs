@@ -20,7 +20,7 @@ use ruff_source_file::LineIndex;
 
 /// A simultaneous fix made across a single text document or among an arbitrary
 /// number of notebook cells.
-pub(crate) type Fixes = FxHashMap<lsp_types::Url, Vec<lsp_types::TextEdit>>;
+pub(crate) type Fixes = FxHashMap<lsp_types::Uri, Vec<lsp_types::TextEdit>>;
 
 pub(crate) fn fix_all(
     query: &DocumentQuery,

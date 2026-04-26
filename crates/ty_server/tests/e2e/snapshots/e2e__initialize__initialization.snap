@@ -21,13 +21,12 @@ expression: initialization_result
       ],
       "save": false
     },
-    "selectionRangeProvider": true,
-    "hoverProvider": true,
     "completionProvider": {
       "triggerCharacters": [
         "."
       ]
     },
+    "hoverProvider": true,
     "signatureHelpProvider": {
       "triggerCharacters": [
         "(",
@@ -37,33 +36,28 @@ expression: initialization_result
         ")"
       ]
     },
+    "declarationProvider": true,
     "definitionProvider": true,
     "typeDefinitionProvider": true,
     "referencesProvider": true,
     "documentHighlightProvider": true,
     "documentSymbolProvider": true,
-    "workspaceSymbolProvider": true,
     "codeActionProvider": {
       "codeActionKinds": [
         "quickfix"
       ]
     },
+    "workspaceSymbolProvider": true,
     "renameProvider": {
       "prepareProvider": true
     },
     "foldingRangeProvider": true,
-    "declarationProvider": true,
+    "selectionRangeProvider": true,
     "executeCommandProvider": {
       "commands": [
         "ty.printDebugInformation"
       ],
       "workDoneProgress": false
-    },
-    "workspace": {
-      "workspaceFolders": {
-        "supported": true,
-        "changeNotifications": true
-      }
     },
     "semanticTokensProvider": {
       "legend": {
@@ -101,6 +95,12 @@ expression: initialization_result
       "interFileDependencies": true,
       "workspaceDiagnostics": true,
       "workDoneProgress": true
+    },
+    "workspace": {
+      "workspaceFolders": {
+        "supported": true,
+        "changeNotifications": true
+      }
     }
   },
   "serverInfo": {

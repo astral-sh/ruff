@@ -3,8 +3,8 @@ use crate::session::Session;
 use anyhow::anyhow;
 use lsp_server as server;
 use lsp_server::{ErrorCode, RequestId};
-use lsp_types::notification::Notification;
-use lsp_types::request::Request;
+use lsp_types::{LspNotificationMethod, Notification};
+use lsp_types::{LspRequestMethod, Request};
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 
 mod diagnostics;
@@ -19,7 +19,6 @@ use self::traits::{NotificationHandler, RequestHandler};
 use super::{Result, schedule::BackgroundSchedule};
 use crate::session::client::Client;
 pub(crate) use diagnostics::publish_settings_diagnostics;
-pub use requests::{PartialWorkspaceProgress, PartialWorkspaceProgressParams};
 use ruff_db::panic::PanicError;
 
 /// Processes a request from the client to the server.
@@ -31,7 +30,7 @@ use ruff_db::panic::PanicError;
 pub(super) fn request(req: server::Request) -> Task {
     let id = req.id.clone();
 
-    match req.method.as_str() {
+    match LspRequestMethod::from(req.method.clone()) {
         requests::ExecuteCommand::METHOD => sync_request_task::<requests::ExecuteCommand>(req),
         requests::CodeActionRequestHandler::METHOD => background_document_request_task::<
             requests::CodeActionRequestHandler,
@@ -125,7 +124,7 @@ pub(super) fn request(req: server::Request) -> Task {
         >(
             req, BackgroundSchedule::Worker
         ),
-        lsp_types::request::Shutdown::METHOD => sync_request_task::<requests::ShutdownHandler>(req),
+        lsp_types::ShutdownRequest::METHOD => sync_request_task::<requests::ShutdownHandler>(req),
 
         method => {
             tracing::warn!("Received request {method} which does not have a handler");
@@ -161,7 +160,7 @@ pub(super) fn request(req: server::Request) -> Task {
 }
 
 pub(super) fn notification(notif: server::Notification) -> Task {
-    match notif.method.as_str() {
+    match LspNotificationMethod::from(notif.method.clone()) {
         notifications::DidCloseTextDocumentHandler::METHOD => {
             sync_notification_task::<notifications::DidCloseTextDocumentHandler>(notif)
         }
@@ -186,10 +185,10 @@ pub(super) fn notification(notif: server::Notification) -> Task {
         notifications::DidChangeWorkspaceFoldersHandler::METHOD => {
             sync_notification_task::<notifications::DidChangeWorkspaceFoldersHandler>(notif)
         }
-        lsp_types::notification::Cancel::METHOD => {
+        lsp_types::CancelNotification::METHOD => {
             sync_notification_task::<notifications::CancelNotificationHandler>(notif)
         }
-        lsp_types::notification::SetTrace::METHOD => {
+        lsp_types::SetTraceNotification::METHOD => {
             tracing::trace!("Ignoring `setTrace` notification");
             return Task::nothing();
         }
@@ -218,7 +217,7 @@ where
 {
     let (id, params) = cast_request::<R>(req)?;
     Ok(Task::sync(move |session, client: &Client| {
-        let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+        let _span = tracing::debug_span!("request", %id, method = R::METHOD.as_str()).entered();
         let result = R::run(session, client, params);
         respond::<R>(&id, result, client, session.client_name().log_guidance());
     }))
@@ -247,7 +246,7 @@ where
         let log_guidance = snapshot.0.client_name().log_guidance();
 
         Box::new(move |client| {
-            let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+            let _span = tracing::debug_span!("request", %id, method = R::METHOD.as_str()).entered();
 
             // Test again if the request was cancelled since it was scheduled on the background task
             // and, if so, return early
@@ -315,7 +314,7 @@ where
         let log_guidance = document.client_name().log_guidance();
 
         Box::new(move |client| {
-            let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+            let _span = tracing::debug_span!("request", %id, method = R::METHOD.as_str()).entered();
 
             // Test again if the request was cancelled since it was scheduled on the background task
             // and, if so, return early
@@ -386,7 +385,7 @@ fn sync_notification_task<N: traits::SyncNotificationHandler>(
 ) -> Result<Task> {
     let (id, params) = cast_notification::<N>(notif)?;
     Ok(Task::sync(move |session, client| {
-        let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
+        let _span = tracing::debug_span!("notification", method = N::METHOD.as_str()).entered();
         if let Err(err) = N::run(session, client, params) {
             tracing::error!("An error occurred while running {id}: {err}");
             client.show_error_message(format!(
@@ -427,7 +426,7 @@ where
         let log_guidance = snapshot.client_name().log_guidance();
 
         Box::new(move |client| {
-            let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
+            let _span = tracing::debug_span!("notification", method = N::METHOD.as_str()).entered();
 
             let result = match ruff_db::panic::catch_unwind(|| {
                 N::run_with_snapshot(snapshot, client, params)
@@ -463,7 +462,7 @@ where
     <<Req as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
 {
     request
-        .extract(Req::METHOD)
+        .extract(Req::METHOD.as_str())
         .map_err(|err| match err {
             json_err @ server::ExtractError::JsonError { .. } => {
                 anyhow::anyhow!("JSON parsing failure:\n{json_err}")
@@ -503,7 +502,7 @@ fn respond_silent_error(id: RequestId, client: &Client, error: lsp_server::Respo
 fn cast_notification<N>(
     notification: server::Notification,
 ) -> Result<(
-    &'static str,
+    LspNotificationMethod,
     <<N as NotificationHandler>::NotificationType as Notification>::Params,
 )>
 where
@@ -512,7 +511,7 @@ where
     Ok((
         N::METHOD,
         notification
-            .extract(N::METHOD)
+            .extract(N::METHOD.as_str())
             .map_err(|err| match err {
                 json_err @ server::ExtractError::JsonError { .. } => {
                     anyhow::anyhow!("JSON parsing failure:\n{json_err}")

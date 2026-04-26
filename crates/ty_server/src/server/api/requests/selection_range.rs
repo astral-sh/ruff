@@ -1,7 +1,8 @@
 use std::borrow::Cow;
 
-use lsp_types::request::SelectionRangeRequest;
-use lsp_types::{SelectionRange as LspSelectionRange, SelectionRangeParams, Url};
+use lsp_types::{
+    SelectionRange as LspSelectionRange, SelectionRangeParams, SelectionRangeRequest, Uri as Url,
+};
 use ty_ide::selection_range;
 use ty_project::ProjectDatabase;
 

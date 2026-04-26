@@ -1,8 +1,8 @@
 use lsp_server::ErrorCode;
-use lsp_types::{self as types, request as req};
+use lsp_types::{self as types, CodeActionRequest, CodeActionResponse};
 use ruff_python_ast::SourceType;
 use rustc_hash::FxHashSet;
-use types::{CodeActionKind, CodeActionOrCommand};
+use types::CodeActionKind;
 
 use crate::DIAGNOSTIC_NAME;
 use crate::edit::WorkspaceEditTracker;
@@ -18,7 +18,7 @@ use super::code_action_resolve::{resolve_edit_for_fix_all, resolve_edit_for_orga
 pub(crate) struct CodeActions;
 
 impl super::RequestHandler for CodeActions {
-    type RequestType = req::CodeActionRequest;
+    type RequestType = CodeActionRequest;
 }
 
 impl super::BackgroundDocumentRequestHandler for CodeActions {
@@ -27,8 +27,8 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
         snapshot: DocumentSnapshot,
         _client: &Client,
         params: types::CodeActionParams,
-    ) -> Result<Option<types::CodeActionResponse>> {
-        let mut response: types::CodeActionResponse = types::CodeActionResponse::default();
+    ) -> Result<Option<Vec<types::CodeActionResponse>>> {
+        let mut response = Vec::new();
 
         let query = snapshot.query();
 
@@ -116,7 +116,7 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
 fn quick_fix(
     snapshot: &DocumentSnapshot,
     fixes: &[DiagnosticFix],
-) -> crate::Result<Vec<CodeActionOrCommand>> {
+) -> crate::Result<Vec<CodeActionResponse>> {
     let document = snapshot.query();
 
     fixes
@@ -133,9 +133,9 @@ fn quick_fix(
                 fix.edits.clone(),
             )?;
 
-            Ok(types::CodeActionOrCommand::CodeAction(types::CodeAction {
+            Ok(CodeActionResponse::CodeAction(types::CodeAction {
                 title: format!("{DIAGNOSTIC_NAME} ({}): {}", fix.code, fix.title),
-                kind: Some(types::CodeActionKind::QUICKFIX),
+                kind: Some(types::CodeActionKind::QuickFix),
                 edit: Some(tracker.into_workspace_edit()),
                 diagnostics: Some(vec![fix.fixed_diagnostic.clone()]),
                 data: Some(
@@ -147,7 +147,7 @@ fn quick_fix(
         .collect()
 }
 
-fn noqa_comments(snapshot: &DocumentSnapshot, fixes: &[DiagnosticFix]) -> Vec<CodeActionOrCommand> {
+fn noqa_comments(snapshot: &DocumentSnapshot, fixes: &[DiagnosticFix]) -> Vec<CodeActionResponse> {
     fixes
         .iter()
         .filter_map(|fix| {
@@ -163,9 +163,9 @@ fn noqa_comments(snapshot: &DocumentSnapshot, fixes: &[DiagnosticFix]) -> Vec<Co
                 )
                 .ok()?;
 
-            Some(types::CodeActionOrCommand::CodeAction(types::CodeAction {
+            Some(CodeActionResponse::CodeAction(types::CodeAction {
                 title: format!("{DIAGNOSTIC_NAME} ({}): Disable for this line", fix.code),
-                kind: Some(types::CodeActionKind::QUICKFIX),
+                kind: Some(types::CodeActionKind::QuickFix),
                 edit: Some(tracker.into_workspace_edit()),
                 diagnostics: Some(vec![fix.fixed_diagnostic.clone()]),
                 data: Some(
@@ -178,7 +178,7 @@ fn noqa_comments(snapshot: &DocumentSnapshot, fixes: &[DiagnosticFix]) -> Vec<Co
         .collect()
 }
 
-fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
+fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionResponse> {
     let document = snapshot.query();
 
     let (edit, data) = if snapshot
@@ -204,7 +204,7 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
         )
     };
 
-    Ok(CodeActionOrCommand::CodeAction(types::CodeAction {
+    Ok(CodeActionResponse::CodeAction(types::CodeAction {
         title: format!("{DIAGNOSTIC_NAME}: Fix all auto-fixable problems"),
         kind: Some(crate::SOURCE_FIX_ALL_RUFF),
         edit,
@@ -213,7 +213,7 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
     }))
 }
 
-fn notebook_fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
+fn notebook_fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionResponse> {
     let document = snapshot.query();
 
     let (edit, data) = if snapshot
@@ -239,7 +239,7 @@ fn notebook_fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
         )
     };
 
-    Ok(CodeActionOrCommand::CodeAction(types::CodeAction {
+    Ok(CodeActionResponse::CodeAction(types::CodeAction {
         title: format!("{DIAGNOSTIC_NAME}: Fix all auto-fixable problems"),
         kind: Some(crate::NOTEBOOK_SOURCE_FIX_ALL_RUFF),
         edit,
@@ -248,7 +248,7 @@ fn notebook_fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
     }))
 }
 
-fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
+fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionResponse> {
     let document = snapshot.query();
 
     let (edit, data) = if snapshot
@@ -274,7 +274,7 @@ fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
         )
     };
 
-    Ok(CodeActionOrCommand::CodeAction(types::CodeAction {
+    Ok(CodeActionResponse::CodeAction(types::CodeAction {
         title: format!("{DIAGNOSTIC_NAME}: Organize imports"),
         kind: Some(crate::SOURCE_ORGANIZE_IMPORTS_RUFF),
         edit,
@@ -283,7 +283,7 @@ fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
     }))
 }
 
-fn notebook_organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
+fn notebook_organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionResponse> {
     let document = snapshot.query();
 
     let (edit, data) = if snapshot
@@ -309,7 +309,7 @@ fn notebook_organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeA
         )
     };
 
-    Ok(CodeActionOrCommand::CodeAction(types::CodeAction {
+    Ok(CodeActionResponse::CodeAction(types::CodeAction {
         title: format!("{DIAGNOSTIC_NAME}: Organize imports"),
         kind: Some(crate::NOTEBOOK_SOURCE_ORGANIZE_IMPORTS_RUFF),
         edit,

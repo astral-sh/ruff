@@ -8,7 +8,7 @@ use std::sync::Arc;
 use crate::Db;
 use crate::document::{DocumentKey, LanguageId};
 use crate::session::index::{Document, Index};
-use lsp_types::Url;
+use lsp_types::Uri as Url;
 use ruff_db::file_revision::FileRevision;
 use ruff_db::files::{File, FilePath};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;

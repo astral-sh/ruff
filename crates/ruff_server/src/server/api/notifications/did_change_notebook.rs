@@ -3,13 +3,12 @@ use crate::server::api::LSPResult;
 use crate::server::api::diagnostics::publish_diagnostics_for_document;
 use crate::session::{Client, Session};
 use lsp_server::ErrorCode;
-use lsp_types as types;
-use lsp_types::notification as notif;
+use lsp_types::{self as types, DidChangeNotebookDocumentNotification};
 
 pub(crate) struct DidChangeNotebook;
 
 impl super::NotificationHandler for DidChangeNotebook {
-    type NotificationType = notif::DidChangeNotebookDocument;
+    type NotificationType = DidChangeNotebookDocumentNotification;
 }
 
 impl super::SyncNotificationHandler for DidChangeNotebook {

@@ -14,7 +14,7 @@ pub(crate) struct LspRange {
     range: lsp_types::Range,
 
     /// The URI of this range's text document
-    uri: Option<lsp_types::Url>,
+    uri: Option<lsp_types::Uri>,
 }
 
 impl LspRange {
@@ -55,7 +55,7 @@ pub(crate) struct LspPosition {
     position: lsp_types::Position,
 
     /// The URI of this range's text document
-    uri: Option<lsp_types::Url>,
+    uri: Option<lsp_types::Uri>,
 }
 
 impl LspPosition {
@@ -72,7 +72,7 @@ impl LspPosition {
 
     /// Returns the uri of the text document this position belongs to.
     #[expect(unused)]
-    pub(crate) fn uri(&self) -> Option<&lsp_types::Url> {
+    pub(crate) fn uri(&self) -> Option<&lsp_types::Uri> {
         self.uri.as_ref()
     }
 }
@@ -87,7 +87,7 @@ pub(crate) trait RangeExt {
         &self,
         db: &dyn Db,
         file: File,
-        url: &lsp_types::Url,
+        url: &lsp_types::Uri,
         encoding: PositionEncoding,
     ) -> Option<TextRange>;
 }
@@ -97,7 +97,7 @@ impl RangeExt for lsp_types::Range {
         &self,
         db: &dyn Db,
         file: File,
-        url: &lsp_types::Url,
+        url: &lsp_types::Uri,
         encoding: PositionEncoding,
     ) -> Option<TextRange> {
         let start = self.start.to_text_size(db, file, url, encoding)?;
@@ -121,7 +121,7 @@ pub(crate) trait PositionExt {
         &self,
         db: &dyn Db,
         file: File,
-        url: &lsp_types::Url,
+        url: &lsp_types::Uri,
         encoding: PositionEncoding,
     ) -> Option<TextSize>;
 }
@@ -131,7 +131,7 @@ impl PositionExt for lsp_types::Position {
         &self,
         db: &dyn Db,
         file: File,
-        url: &lsp_types::Url,
+        url: &lsp_types::Uri,
         encoding: PositionEncoding,
     ) -> Option<TextSize> {
         let source = source_text(db, file);

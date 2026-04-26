@@ -1,12 +1,9 @@
 use lsp_types::{
     self as types, ClientCapabilities, CodeActionKind, CodeActionOptions, CompletionOptions,
-    DeclarationCapability, DiagnosticOptions, DiagnosticServerCapabilities,
-    HoverProviderCapability, InlayHintOptions, InlayHintServerCapabilities, MarkupKind,
-    NotebookCellSelector, NotebookSelector, OneOf, RenameOptions, SelectionRangeProviderCapability,
-    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
-    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TypeDefinitionProviderCapability, WorkDoneProgressOptions,
+    DiagnosticOptions, DiagnosticProvider, InlayHintOptions, MarkupKind, NotebookCellLanguage,
+    NotebookDocumentFilterWithCells, NotebookSelector, RenameOptions, SemanticTokensLegend,
+    SemanticTokensOptions, ServerCapabilities, SignatureHelpOptions, TextDocumentSyncKind,
+    TextDocumentSyncOptions, WorkDoneProgressOptions,
 };
 use std::str::FromStr;
 
@@ -230,7 +227,11 @@ impl ResolvedClientCapabilities {
         if let Some(publish_diagnostics) =
             text_document.and_then(|text_document| text_document.publish_diagnostics.as_ref())
         {
-            if publish_diagnostics.related_information == Some(true) {
+            if publish_diagnostics
+                .diagnostics_capabilities
+                .related_information
+                == Some(true)
+            {
                 flags |= Self::DIAGNOSTIC_RELATED_INFORMATION;
             }
         }
@@ -379,19 +380,20 @@ pub(crate) fn server_capabilities(
             None
         } else {
             // Otherwise, we always advertise support for workspace and pull diagnostics.
-            Some(DiagnosticServerCapabilities::Options(
+            Some(DiagnosticProvider::DiagnosticOptions(
                 server_diagnostic_options(true),
             ))
         };
 
     ServerCapabilities {
         position_encoding: Some(position_encoding.into()),
-        code_action_provider: Some(types::CodeActionProviderCapability::Options(
+        code_action_provider: Some(
             CodeActionOptions {
-                code_action_kinds: Some(vec![CodeActionKind::QUICKFIX]),
+                code_action_kinds: Some(vec![CodeActionKind::QuickFix]),
                 ..CodeActionOptions::default()
-            },
-        )),
+            }
+            .into(),
+        ),
 
         execute_command_provider: Some(types::ExecuteCommandOptions {
             commands: SupportedCommand::all()
@@ -403,29 +405,28 @@ pub(crate) fn server_capabilities(
         }),
 
         diagnostic_provider,
-        text_document_sync: Some(TextDocumentSyncCapability::Options(
+        text_document_sync: Some(
             TextDocumentSyncOptions {
                 open_close: Some(true),
-                change: Some(TextDocumentSyncKind::INCREMENTAL),
+                change: Some(TextDocumentSyncKind::Incremental),
                 ..Default::default()
-            },
-        )),
-        type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
-        definition_provider: Some(OneOf::Left(true)),
-        declaration_provider: Some(DeclarationCapability::Simple(true)),
-        references_provider: Some(OneOf::Left(true)),
-        rename_provider: Some(OneOf::Right(server_rename_options())),
-        document_highlight_provider: Some(OneOf::Left(true)),
-        hover_provider: Some(HoverProviderCapability::Simple(true)),
+            }
+            .into(),
+        ),
+        type_definition_provider: Some(true.into()),
+        definition_provider: Some(true.into()),
+        declaration_provider: Some(true.into()),
+        references_provider: Some(true.into()),
+        rename_provider: Some(server_rename_options().into()),
+        document_highlight_provider: Some(true.into()),
+        hover_provider: Some(true.into()),
         signature_help_provider: Some(SignatureHelpOptions {
             trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),
             retrigger_characters: Some(vec![")".to_string()]),
             work_done_progress_options: WorkDoneProgressOptions::default(),
         }),
-        inlay_hint_provider: Some(OneOf::Right(InlayHintServerCapabilities::Options(
-            InlayHintOptions::default(),
-        ))),
-        semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
+        inlay_hint_provider: Some(InlayHintOptions::default().into()),
+        semantic_tokens_provider: Some(
             SemanticTokensOptions {
                 work_done_progress_options: WorkDoneProgressOptions::default(),
                 legend: SemanticTokensLegend {
@@ -438,38 +439,44 @@ pub(crate) fn server_capabilities(
                         .map(|&s| s.into())
                         .collect(),
                 },
-                range: Some(true),
-                full: Some(SemanticTokensFullOptions::Bool(true)),
-            },
-        )),
+                range: Some(true.into()),
+                full: Some(true.into()),
+            }
+            .into(),
+        ),
         completion_provider: Some(CompletionOptions {
             trigger_characters: Some(vec!['.'.to_string()]),
             ..Default::default()
         }),
-        selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
-        folding_range_provider: Some(types::FoldingRangeProviderCapability::Simple(true)),
-        document_symbol_provider: Some(OneOf::Left(true)),
-        workspace_symbol_provider: Some(OneOf::Left(true)),
-        notebook_document_sync: Some(OneOf::Left(lsp_types::NotebookDocumentSyncOptions {
-            save: Some(false),
-            notebook_selector: [NotebookSelector::ByCells {
-                notebook: None,
-                cells: vec![NotebookCellSelector {
-                    language: "python".to_string(),
-                }],
-            }]
-            .to_vec(),
-        })),
-        workspace: Some(lsp_types::WorkspaceServerCapabilities {
+        selection_range_provider: Some(true.into()),
+        folding_range_provider: Some(true.into()),
+        document_symbol_provider: Some(true.into()),
+        workspace_symbol_provider: Some(true.into()),
+        notebook_document_sync: Some(
+            lsp_types::NotebookDocumentSyncOptions {
+                save: Some(false),
+                notebook_selector: [NotebookSelector::NotebookDocumentFilterWithCells(
+                    NotebookDocumentFilterWithCells {
+                        notebook: None,
+                        cells: vec![NotebookCellLanguage {
+                            language: "python".to_string(),
+                        }],
+                    },
+                )]
+                .to_vec(),
+            }
+            .into(),
+        ),
+        workspace: Some(lsp_types::WorkspaceOptions {
             workspace_folders: Some(lsp_types::WorkspaceFoldersServerCapabilities {
                 // N.B. It seems this is purely informational:
                 // https://github.com/microsoft/language-server-protocol/issues/1720#issuecomment-1514732305
                 supported: Some(true),
-                change_notifications: Some(OneOf::Left(true)),
+                change_notifications: Some(true.into()),
             }),
             ..Default::default()
         }),
-        type_hierarchy_provider: Some(OneOf::Left(true)),
+        type_hierarchy_provider: Some(true.into()),
         ..Default::default()
     }
 }

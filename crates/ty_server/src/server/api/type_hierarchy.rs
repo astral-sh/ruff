@@ -92,7 +92,7 @@ pub(crate) fn convert_to_lsp_item(
 
     Some(TypeHierarchyItem {
         name: item.name.into(),
-        kind: SymbolKind::CLASS,
+        kind: SymbolKind::Class,
         tags: None,
         detail: item.detail,
         uri,

@@ -2,8 +2,7 @@ use anyhow::anyhow;
 use crossbeam::select;
 use lsp_server::Message;
 use lsp_types::{
-    self as types, DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher,
-    notification::Notification as _,
+    self as types, DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, Notification as _,
 };
 
 use crate::{
@@ -61,7 +60,7 @@ impl Server {
                             api::request(req)
                         }
                         Message::Notification(notification) => {
-                            if notification.method == lsp_types::notification::Exit::METHOD {
+                            if notification.method == lsp_types::ExitNotification::METHOD.as_str() {
                                 if !self.session.is_shutdown_requested() {
                                     return Err(anyhow!(
                                         "Received exit notification before a shutdown request"
@@ -156,17 +155,19 @@ impl Server {
                         serde_json::to_value(DidChangeWatchedFilesRegistrationOptions {
                             watchers: vec![
                                 FileSystemWatcher {
-                                    glob_pattern: types::GlobPattern::String(
+                                    glob_pattern: types::GlobPattern::Pattern(
                                         "**/.ruff.toml".into(),
                                     ),
                                     kind: None,
                                 },
                                 FileSystemWatcher {
-                                    glob_pattern: types::GlobPattern::String("**/ruff.toml".into()),
+                                    glob_pattern: types::GlobPattern::Pattern(
+                                        "**/ruff.toml".into(),
+                                    ),
                                     kind: None,
                                 },
                                 FileSystemWatcher {
-                                    glob_pattern: types::GlobPattern::String(
+                                    glob_pattern: types::GlobPattern::Pattern(
                                         "**/pyproject.toml".into(),
                                     ),
                                     kind: None,
@@ -182,7 +183,7 @@ impl Server {
                 tracing::info!("Configuration file watcher successfully registered");
             };
 
-            if let Err(err) = client.send_request::<lsp_types::request::RegisterCapability>(
+            if let Err(err) = client.send_request::<lsp_types::RegistrationRequest>(
                 &self.session,
                 params,
                 response_handler,

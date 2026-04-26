@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use lsp_types::{Url, WorkspaceFolder};
+use lsp_types::{Uri as Url, WorkspaceFolders};
 use thiserror::Error;
 
 use crate::session::{ClientOptions, WorkspaceOptionsMap};
@@ -12,7 +12,7 @@ impl Workspaces {
     /// Create the workspaces from the provided workspace folders as provided by the client during
     /// initialization.
     pub(crate) fn from_workspace_folders(
-        workspace_folders: Option<Vec<WorkspaceFolder>>,
+        workspace_folders: Option<WorkspaceFolders>,
         mut workspace_options: WorkspaceOptionsMap,
     ) -> std::result::Result<Workspaces, WorkspacesError> {
         let mut client_options_for_url = |url: &Url| {
@@ -25,27 +25,34 @@ impl Workspaces {
             })
         };
 
-        let workspaces =
-            if let Some(folders) = workspace_folders.filter(|folders| !folders.is_empty()) {
-                folders
-                    .into_iter()
-                    .map(|folder| {
-                        let options = client_options_for_url(&folder.uri);
-                        Workspace::new(folder.uri).with_options(options)
-                    })
-                    .collect()
+        let workspaces = if let Some(folders) = workspace_folders.and_then(|folders| {
+            if let WorkspaceFolders::WorkspaceFolderList(folders) = folders
+                && !folders.is_empty()
+            {
+                Some(folders)
             } else {
-                let current_dir = std::env::current_dir().map_err(WorkspacesError::Io)?;
-                tracing::info!(
-                    "No workspace(s) were provided during initialization. \
+                None
+            }
+        }) {
+            folders
+                .into_iter()
+                .map(|folder| {
+                    let options = client_options_for_url(&folder.uri);
+                    Workspace::new(folder.uri).with_options(options)
+                })
+                .collect()
+        } else {
+            let current_dir = std::env::current_dir().map_err(WorkspacesError::Io)?;
+            tracing::info!(
+                "No workspace(s) were provided during initialization. \
                 Using the current working directory as a default workspace: {}",
-                    current_dir.display()
-                );
-                let uri = Url::from_file_path(current_dir)
-                    .map_err(|()| WorkspacesError::InvalidCurrentDir)?;
-                let options = client_options_for_url(&uri);
-                vec![Workspace::default(uri).with_options(options)]
-            };
+                current_dir.display()
+            );
+            let uri = Url::from_file_path(current_dir)
+                .map_err(|()| WorkspacesError::InvalidCurrentDir)?;
+            let options = client_options_for_url(&uri);
+            vec![Workspace::default(uri).with_options(options)]
+        };
 
         Ok(Workspaces(workspaces))
     }

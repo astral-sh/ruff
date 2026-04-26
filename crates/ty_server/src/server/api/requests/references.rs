@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use lsp_types::request::References;
-use lsp_types::{Location, ReferenceParams, Url};
+use lsp_types::ReferencesRequest;
+use lsp_types::{Location, ReferenceParams, Uri as Url};
 use ty_ide::find_references;
 use ty_project::ProjectDatabase;
 
@@ -15,12 +15,12 @@ use crate::session::client::Client;
 pub(crate) struct ReferencesRequestHandler;
 
 impl RequestHandler for ReferencesRequestHandler {
-    type RequestType = References;
+    type RequestType = ReferencesRequest;
 }
 
 impl BackgroundDocumentRequestHandler for ReferencesRequestHandler {
     fn document_url(params: &ReferenceParams) -> Cow<'_, Url> {
-        Cow::Borrowed(&params.text_document_position.text_document.uri)
+        Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
     fn run_with_snapshot(
@@ -40,7 +40,7 @@ impl BackgroundDocumentRequestHandler for ReferencesRequestHandler {
             return Ok(None);
         };
 
-        let Some(offset) = params.text_document_position.position.to_text_size(
+        let Some(offset) = params.text_document_position_params.position.to_text_size(
             db,
             file,
             snapshot.url(),

@@ -1,5 +1,5 @@
 use anyhow::Context;
-use lsp_types::{self as types, Range, request as req};
+use lsp_types::{self as types, DocumentRangeFormattingRequest, Range};
 
 use crate::edit::{RangeExt, ToRangeExt};
 use crate::resolve::is_document_excluded_for_formatting;
@@ -11,7 +11,7 @@ use crate::{PositionEncoding, TextDocument};
 pub(crate) struct FormatRange;
 
 impl super::RequestHandler for FormatRange {
-    type RequestType = req::RangeFormatting;
+    type RequestType = DocumentRangeFormattingRequest;
 }
 
 impl super::BackgroundDocumentRequestHandler for FormatRange {

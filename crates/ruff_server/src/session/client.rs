@@ -46,11 +46,11 @@ impl Client {
         response_handler: impl FnOnce(&Client, R::Result) + Send + 'static,
     ) -> crate::Result<()>
     where
-        R: lsp_types::request::Request,
+        R: lsp_types::Request,
     {
         let response_handler = Box::new(move |client: &Client, response: lsp_server::Response| {
             let _span =
-                tracing::debug_span!("client_response", id=%response.id, method = R::METHOD)
+                tracing::debug_span!("client_response", id=%response.id, method = R::METHOD.as_str())
                     .entered();
 
             match (response.error, response.result) {
@@ -110,7 +110,7 @@ impl Client {
     /// Sends a notification to the client.
     pub(crate) fn send_notification<N>(&self, params: N::Params) -> crate::Result<()>
     where
-        N: lsp_types::notification::Notification,
+        N: lsp_types::Notification,
     {
         let method = N::METHOD.to_string();
 
@@ -190,12 +190,10 @@ impl Client {
         message: impl Display,
         message_type: lsp_types::MessageType,
     ) -> crate::Result<()> {
-        self.send_notification::<lsp_types::notification::ShowMessage>(
-            lsp_types::ShowMessageParams {
-                typ: message_type,
-                message: message.to_string(),
-            },
-        )
+        self.send_notification::<lsp_types::ShowMessageNotification>(lsp_types::ShowMessageParams {
+            kind: message_type,
+            message: message.to_string(),
+        })
     }
 
     /// Sends a request to display a warning to the client with a formatted message. The warning is
@@ -203,7 +201,7 @@ impl Client {
     ///
     /// Logs an error if the message could not be sent.
     pub(crate) fn show_warning_message(&self, message: impl Display) {
-        let result = self.show_message(message, lsp_types::MessageType::WARNING);
+        let result = self.show_message(message, lsp_types::MessageType::Warning);
 
         if let Err(err) = result {
             tracing::error!("Failed to send warning message to the client: {err}");
@@ -215,7 +213,7 @@ impl Client {
     ///
     /// Logs an error if the message could not be sent.
     pub(crate) fn show_error_message(&self, message: impl Display) {
-        let result = self.show_message(message, lsp_types::MessageType::ERROR);
+        let result = self.show_message(message, lsp_types::MessageType::Error);
 
         if let Err(err) = result {
             tracing::error!("Failed to send error message to the client: {err}");

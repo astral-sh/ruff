@@ -1,13 +1,13 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use lsp_types::{self as types, NumberOrString, TextEdit, Url, request as req};
+use lsp_types::{self as types, Code, CodeActionRequest, CodeActionResponse, TextEdit, Uri as Url};
 use ruff_db::files::File;
 use ruff_diagnostics::Edit;
 use ruff_text_size::Ranged;
 use ty_ide::code_actions;
 use ty_project::ProjectDatabase;
-use types::{CodeActionKind, CodeActionOrCommand};
+use types::CodeActionKind;
 
 use crate::db::Db;
 use crate::document::{RangeExt, ToRangeExt};
@@ -22,7 +22,7 @@ use crate::{DIAGNOSTIC_NAME, PositionEncoding};
 pub(crate) struct CodeActionRequestHandler;
 
 impl RequestHandler for CodeActionRequestHandler {
-    type RequestType = req::CodeActionRequest;
+    type RequestType = CodeActionRequest;
 }
 
 impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
@@ -35,7 +35,7 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
         snapshot: &DocumentSnapshot,
         _client: &Client,
         params: types::CodeActionParams,
-    ) -> Result<Option<types::CodeActionResponse>> {
+    ) -> Result<Option<Vec<CodeActionResponse>>> {
         let diagnostics = params.context.diagnostics;
 
         let Some(file) = snapshot.to_notebook_or_file(db) else {
@@ -57,9 +57,9 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
                     }
                 };
 
-                actions.push(CodeActionOrCommand::CodeAction(lsp_types::CodeAction {
+                actions.push(CodeActionResponse::CodeAction(lsp_types::CodeAction {
                     title: data.fix_title,
-                    kind: Some(CodeActionKind::QUICKFIX),
+                    kind: Some(CodeActionKind::QuickFix),
                     diagnostics: Some(vec![diagnostic.clone()]),
                     edit: Some(lsp_types::WorkspaceEdit {
                         changes: Some(data.edits),
@@ -70,6 +70,7 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
                     command: None,
                     disabled: None,
                     data: None,
+                    tags: None,
                 }));
             }
 
@@ -80,13 +81,13 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
             // which is dubious when you're in the middle of resolving symbols.
             let url = snapshot.url();
             let encoding = snapshot.encoding();
-            if let Some(NumberOrString::String(diagnostic_id)) = &diagnostic.code
+            if let Some(Code::String(diagnostic_id)) = &diagnostic.code
                 && let Some(range) = diagnostic.range.to_text_range(db, file, url, encoding)
             {
                 for action in code_actions(db, file, range, diagnostic_id) {
-                    actions.push(CodeActionOrCommand::CodeAction(lsp_types::CodeAction {
+                    actions.push(CodeActionResponse::CodeAction(lsp_types::CodeAction {
                         title: action.title,
-                        kind: Some(CodeActionKind::QUICKFIX),
+                        kind: Some(CodeActionKind::QuickFix),
                         diagnostics: Some(vec![diagnostic.clone()]),
                         edit: Some(lsp_types::WorkspaceEdit {
                             changes: to_lsp_edits(db, file, encoding, action.edits),
@@ -97,6 +98,7 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
                         command: None,
                         disabled: None,
                         data: None,
+                        tags: None,
                     }));
                 }
             }

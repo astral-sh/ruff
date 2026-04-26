@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::Ok;
 use lsp_types::NotebookCellKind;
 use ruff_notebook::CellMetadata;
@@ -17,13 +19,13 @@ pub(crate) struct NotebookDocument {
     metadata: ruff_notebook::RawNotebookMetadata,
     version: DocumentVersion,
     // Used to quickly find the index of a cell for a given URL.
-    cell_index: FxHashMap<lsp_types::Url, CellId>,
+    cell_index: FxHashMap<lsp_types::Uri, CellId>,
 }
 
 /// A single cell within a notebook, which has text contents represented as a `TextDocument`.
 #[derive(Clone, Debug)]
 struct NotebookCell {
-    url: lsp_types::Url,
+    url: lsp_types::Uri,
     kind: NotebookCellKind,
     document: TextDocument,
 }
@@ -32,7 +34,7 @@ impl NotebookDocument {
     pub(crate) fn new(
         version: DocumentVersion,
         cells: Vec<lsp_types::NotebookCell>,
-        metadata: serde_json::Map<String, serde_json::Value>,
+        metadata: HashMap<String, serde_json::Value>,
         cell_documents: Vec<lsp_types::TextDocumentItem>,
     ) -> crate::Result<Self> {
         let mut cell_contents: FxHashMap<_, _> = cell_documents
@@ -51,7 +53,7 @@ impl NotebookDocument {
         Ok(Self {
             version,
             cell_index: Self::make_cell_index(cells.as_slice()),
-            metadata: serde_json::from_value(serde_json::Value::Object(metadata))?,
+            metadata: serde_json::from_value(serde_json::to_value(metadata)?)?,
             cells,
         })
     }
@@ -97,14 +99,14 @@ impl NotebookDocument {
 
     pub(crate) fn update(
         &mut self,
-        cells: Option<lsp_types::NotebookDocumentCellChange>,
-        metadata_change: Option<serde_json::Map<String, serde_json::Value>>,
+        cells: Option<lsp_types::NotebookDocumentCellChanges>,
+        metadata_change: Option<HashMap<String, serde_json::Value>>,
         version: DocumentVersion,
         encoding: PositionEncoding,
     ) -> crate::Result<()> {
         self.version = version;
 
-        if let Some(lsp_types::NotebookDocumentCellChange {
+        if let Some(lsp_types::NotebookDocumentCellChanges {
             structure,
             data,
             text_content,
@@ -178,7 +180,9 @@ impl NotebookDocument {
 
             if let Some(content_changes) = text_content {
                 for content_change in content_changes {
-                    if let Some(cell) = self.cell_by_uri_mut(&content_change.document.uri) {
+                    if let Some(cell) =
+                        self.cell_by_uri_mut(&content_change.document.text_document_identifier.uri)
+                    {
                         cell.document
                             .apply_changes(content_change.changes, version, encoding);
                     }
@@ -187,7 +191,7 @@ impl NotebookDocument {
         }
 
         if let Some(metadata_change) = metadata_change {
-            self.metadata = serde_json::from_value(serde_json::Value::Object(metadata_change))?;
+            self.metadata = serde_json::from_value(serde_json::to_value(metadata_change)?)?;
         }
 
         Ok(())
@@ -199,27 +203,27 @@ impl NotebookDocument {
     }
 
     /// Get the URI for a cell by its index within the cell array.
-    pub(crate) fn cell_uri_by_index(&self, index: CellId) -> Option<&lsp_types::Url> {
+    pub(crate) fn cell_uri_by_index(&self, index: CellId) -> Option<&lsp_types::Uri> {
         self.cells.get(index).map(|cell| &cell.url)
     }
 
     /// Get the text document representing the contents of a cell by the cell URI.
-    pub(crate) fn cell_document_by_uri(&self, uri: &lsp_types::Url) -> Option<&TextDocument> {
+    pub(crate) fn cell_document_by_uri(&self, uri: &lsp_types::Uri) -> Option<&TextDocument> {
         self.cells
             .get(*self.cell_index.get(uri)?)
             .map(|cell| &cell.document)
     }
 
     /// Returns a list of cell URIs in the order they appear in the array.
-    pub(crate) fn urls(&self) -> impl Iterator<Item = &lsp_types::Url> {
+    pub(crate) fn urls(&self) -> impl Iterator<Item = &lsp_types::Uri> {
         self.cells.iter().map(|cell| &cell.url)
     }
 
-    fn cell_by_uri_mut(&mut self, uri: &lsp_types::Url) -> Option<&mut NotebookCell> {
+    fn cell_by_uri_mut(&mut self, uri: &lsp_types::Uri) -> Option<&mut NotebookCell> {
         self.cells.get_mut(*self.cell_index.get(uri)?)
     }
 
-    fn make_cell_index(cells: &[NotebookCell]) -> FxHashMap<lsp_types::Url, CellId> {
+    fn make_cell_index(cells: &[NotebookCell]) -> FxHashMap<lsp_types::Uri, CellId> {
         let mut index = FxHashMap::with_capacity_and_hasher(cells.len(), FxBuildHasher);
         for (i, cell) in cells.iter().enumerate() {
             index.insert(cell.url.clone(), i);
@@ -244,6 +248,10 @@ impl NotebookCell {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
+    use lsp_types::LanguageKind;
+
     use super::NotebookDocument;
 
     enum TestCellContent {
@@ -252,8 +260,8 @@ mod tests {
         Code(String),
     }
 
-    fn create_test_url(index: usize) -> lsp_types::Url {
-        lsp_types::Url::parse(&format!("cell:/test.ipynb#{index}")).unwrap()
+    fn create_test_url(index: usize) -> lsp_types::Uri {
+        lsp_types::Uri::parse(&format!("cell:/test.ipynb#{index}")).unwrap()
     }
 
     fn create_test_notebook(test_cells: Vec<TestCellContent>) -> NotebookDocument {
@@ -272,7 +280,7 @@ mod tests {
                     });
                     cell_documents.push(lsp_types::TextDocumentItem {
                         uri: url,
-                        language_id: "markdown".to_owned(),
+                        language_id: LanguageKind::new("markdown"),
                         version: 0,
                         text: content,
                     });
@@ -286,7 +294,7 @@ mod tests {
                     });
                     cell_documents.push(lsp_types::TextDocumentItem {
                         uri: url,
-                        language_id: "python".to_owned(),
+                        language_id: LanguageKind::new("python"),
                         version: 0,
                         text: content,
                     });
@@ -294,7 +302,7 @@ mod tests {
             }
         }
 
-        NotebookDocument::new(0, cells, serde_json::Map::default(), cell_documents).unwrap()
+        NotebookDocument::new(0, cells, HashMap::default(), cell_documents).unwrap()
     }
 
     /// This test case checks that for a notebook with three code cells, when the client sends a
@@ -312,7 +320,7 @@ mod tests {
 
         notebook
             .update(
-                Some(lsp_types::NotebookDocumentCellChange {
+                Some(lsp_types::NotebookDocumentCellChanges {
                     structure: Some(lsp_types::NotebookDocumentCellChangeStructure {
                         array: lsp_types::NotebookCellArrayChange {
                             start: 0,

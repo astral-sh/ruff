@@ -90,7 +90,7 @@ unresolved-reference="warn"
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, foo_content, 1);
-    let show_message = server.await_notification::<lsp_types::notification::ShowMessage>();
+    let show_message = server.await_notification::<lsp_types::ShowMessageNotification>();
     let diagnostics = server.document_diagnostic_request(foo, None);
 
     assert_json_snapshot!(show_message, @r#"
@@ -216,7 +216,6 @@ reveal_type(sys.version_info[:2])
 
     assert_json_snapshot!(diagnostics, @r#"
     {
-      "kind": "full",
       "resultId": "[RESULT_ID]",
       "items": [
         {
@@ -235,7 +234,8 @@ reveal_type(sys.version_info[:2])
           "source": "ty",
           "message": "Revealed type: `tuple[Literal[3], Literal[14]]`"
         }
-      ]
+      ],
+      "kind": "full"
     }
     "#);
 

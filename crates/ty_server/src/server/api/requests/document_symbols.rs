@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use lsp_types::request::DocumentSymbolRequest;
-use lsp_types::{DocumentSymbol, DocumentSymbolParams, SymbolInformation, Url};
+use lsp_types::DocumentSymbolRequest;
+use lsp_types::{DocumentSymbol, DocumentSymbolParams, Uri as Url};
 use ruff_db::files::File;
 use ty_ide::{HierarchicalSymbols, SymbolId, SymbolInfo, document_symbols};
 use ty_project::ProjectDatabase;
@@ -55,7 +55,7 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
 
         if supports_hierarchical {
             let symbols = symbols.to_hierarchical();
-            let lsp_symbols: Vec<DocumentSymbol> = symbols
+            let lsp_symbols = symbols
                 .iter()
                 .filter_map(|(id, symbol)| {
                     convert_to_lsp_document_symbol(
@@ -69,17 +69,21 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
                 })
                 .collect();
 
-            Ok(Some(lsp_types::DocumentSymbolResponse::Nested(lsp_symbols)))
+            Ok(Some(lsp_types::DocumentSymbolResponse::DocumentSymbolList(
+                lsp_symbols,
+            )))
         } else {
             // Return flattened symbols as SymbolInformation
-            let lsp_symbols: Vec<SymbolInformation> = symbols
+            let lsp_symbols = symbols
                 .iter()
                 .filter_map(|(_, symbol)| {
                     convert_to_lsp_symbol_information(db, file, symbol, snapshot.encoding())
                 })
                 .collect();
 
-            Ok(Some(lsp_types::DocumentSymbolResponse::Flat(lsp_symbols)))
+            Ok(Some(
+                lsp_types::DocumentSymbolResponse::SymbolInformationList(lsp_symbols),
+            ))
         }
     }
 }

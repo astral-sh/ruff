@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
-use lsp_types::request::{GotoDeclaration, GotoDeclarationParams};
-use lsp_types::{GotoDefinitionResponse, Url};
+use lsp_types::{DeclarationParams, DeclarationRequest, DeclarationResponse, Uri as Url};
 use ty_ide::goto_declaration;
 use ty_project::ProjectDatabase;
 
@@ -15,11 +14,11 @@ use crate::session::client::Client;
 pub(crate) struct GotoDeclarationRequestHandler;
 
 impl RequestHandler for GotoDeclarationRequestHandler {
-    type RequestType = GotoDeclaration;
+    type RequestType = DeclarationRequest;
 }
 
 impl BackgroundDocumentRequestHandler for GotoDeclarationRequestHandler {
-    fn document_url(params: &GotoDeclarationParams) -> Cow<'_, Url> {
+    fn document_url(params: &DeclarationParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
@@ -27,8 +26,8 @@ impl BackgroundDocumentRequestHandler for GotoDeclarationRequestHandler {
         db: &ProjectDatabase,
         snapshot: &DocumentSnapshot,
         _client: &Client,
-        params: GotoDeclarationParams,
-    ) -> crate::server::Result<Option<GotoDefinitionResponse>> {
+        params: DeclarationParams,
+    ) -> crate::server::Result<Option<DeclarationResponse>> {
         if snapshot
             .workspace_settings()
             .is_language_services_disabled()
@@ -63,14 +62,14 @@ impl BackgroundDocumentRequestHandler for GotoDeclarationRequestHandler {
                 .filter_map(|target| target.to_link(db, src, snapshot.encoding()))
                 .collect();
 
-            Ok(Some(GotoDefinitionResponse::Link(links)))
+            Ok(Some(links.into()))
         } else {
             let locations: Vec<_> = ranged
                 .into_iter()
                 .filter_map(|target| target.to_location(db, snapshot.encoding()))
                 .collect();
 
-            Ok(Some(GotoDefinitionResponse::Array(locations)))
+            Ok(Some(DeclarationResponse::Declaration(locations.into())))
         }
     }
 }

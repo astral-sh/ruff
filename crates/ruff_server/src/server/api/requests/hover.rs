@@ -1,7 +1,7 @@
 use crate::server::Result;
 use crate::session::{Client, DocumentSnapshot};
 use anyhow::Context;
-use lsp_types::{self as types, request as req};
+use lsp_types::{self as types, HoverRequest};
 use regex::Regex;
 use ruff_linter::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
@@ -12,11 +12,11 @@ use std::fmt::Write;
 pub(crate) struct Hover;
 
 impl super::RequestHandler for Hover {
-    type RequestType = req::HoverRequest;
+    type RequestType = HoverRequest;
 }
 
 impl super::BackgroundDocumentRequestHandler for Hover {
-    fn document_url(params: &types::HoverParams) -> std::borrow::Cow<'_, lsp_types::Url> {
+    fn document_url(params: &types::HoverParams) -> std::borrow::Cow<'_, lsp_types::Uri> {
         std::borrow::Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
     fn run_with_snapshot(
@@ -78,10 +78,11 @@ pub(crate) fn hover(
     };
 
     let hover = types::Hover {
-        contents: types::HoverContents::Markup(types::MarkupContent {
+        contents: types::MarkupContent {
             kind: types::MarkupKind::Markdown,
             value: output,
-        }),
+        }
+        .into(),
         range: None,
     };
 

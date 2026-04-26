@@ -3,13 +3,12 @@ use crate::server::Result;
 use crate::server::api::LSPResult;
 use crate::server::api::diagnostics::publish_diagnostics_for_document;
 use crate::session::{Client, Session};
-use lsp_types as types;
-use lsp_types::notification as notif;
+use lsp_types::{self as types, DidOpenTextDocumentNotification};
 
 pub(crate) struct DidOpen;
 
 impl super::NotificationHandler for DidOpen {
-    type NotificationType = notif::DidOpenTextDocument;
+    type NotificationType = DidOpenTextDocumentNotification;
 }
 
 impl super::SyncNotificationHandler for DidOpen {
@@ -26,7 +25,7 @@ impl super::SyncNotificationHandler for DidOpen {
                 },
         }: types::DidOpenTextDocumentParams,
     ) -> Result<()> {
-        let document = TextDocument::new(text, version).with_language_id(&language_id);
+        let document = TextDocument::new(text, version).with_language_id(language_id.as_str());
 
         session.open_text_document(uri.clone(), document);
 

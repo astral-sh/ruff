@@ -63,5 +63,3 @@ pub(super) use type_hierarchy_subtypes::TypeHierarchySubtypesRequestHandler;
 pub(super) use type_hierarchy_supertypes::TypeHierarchySupertypesRequestHandler;
 pub(super) use workspace_diagnostic::WorkspaceDiagnosticRequestHandler;
 pub(super) use workspace_symbols::WorkspaceSymbolRequestHandler;
-
-pub use workspace_diagnostic::{PartialWorkspaceProgress, PartialWorkspaceProgressParams};

@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use lsp_types::request::DocumentHighlightRequest;
-use lsp_types::{DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams, Url};
+use lsp_types::DocumentHighlightRequest;
+use lsp_types::{DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams, Uri as Url};
 use ty_ide::{ReferenceKind, document_highlights};
 use ty_project::ProjectDatabase;
 
@@ -62,9 +62,9 @@ impl BackgroundDocumentRequestHandler for DocumentHighlightRequestHandler {
                     .local_range();
 
                 let kind = match target.kind() {
-                    ReferenceKind::Read => Some(DocumentHighlightKind::READ),
-                    ReferenceKind::Write => Some(DocumentHighlightKind::WRITE),
-                    ReferenceKind::Other => Some(DocumentHighlightKind::TEXT),
+                    ReferenceKind::Read => Some(DocumentHighlightKind::Read),
+                    ReferenceKind::Write => Some(DocumentHighlightKind::Write),
+                    ReferenceKind::Other => Some(DocumentHighlightKind::Text),
                 };
 
                 Some(DocumentHighlight { range, kind })

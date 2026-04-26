@@ -38,15 +38,13 @@ use crate::session::{DocumentSnapshot, Session, SessionSnapshot};
 use lsp_server::RequestId;
 use std::borrow::Cow;
 
-use lsp_types::Url;
-use lsp_types::notification::Notification;
-use lsp_types::request::Request;
+use lsp_types::{LspNotificationMethod, LspRequestMethod, Notification, Request, Uri as Url};
 use ty_project::ProjectDatabase;
 
 /// A supertrait for any server request handler.
 pub(super) trait RequestHandler {
     type RequestType: Request;
-    const METHOD: &'static str = <<Self as RequestHandler>::RequestType>::METHOD;
+    const METHOD: LspRequestMethod = <<Self as RequestHandler>::RequestType>::METHOD;
 }
 
 /// A request handler that needs mutable access to the session.
@@ -169,7 +167,7 @@ pub(super) trait BackgroundRequestHandler: RetriableRequestHandler {
 /// A supertrait for any server notification handler.
 pub(super) trait NotificationHandler {
     type NotificationType: Notification;
-    const METHOD: &'static str = <<Self as NotificationHandler>::NotificationType>::METHOD;
+    const METHOD: LspNotificationMethod = <<Self as NotificationHandler>::NotificationType>::METHOD;
 }
 
 /// A notification handler that needs mutable access to the session.

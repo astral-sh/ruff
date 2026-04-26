@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use lsp_types::request::TypeHierarchyPrepare;
-use lsp_types::{TypeHierarchyItem, TypeHierarchyPrepareParams, Url};
+use lsp_types::TypeHierarchyPrepareRequest;
+use lsp_types::{TypeHierarchyItem, TypeHierarchyPrepareParams, Uri as Url};
 use ty_project::ProjectDatabase;
 
 use crate::document::PositionExt;
@@ -24,7 +24,7 @@ use crate::session::client::Client;
 pub(crate) struct PrepareTypeHierarchyRequestHandler;
 
 impl RequestHandler for PrepareTypeHierarchyRequestHandler {
-    type RequestType = TypeHierarchyPrepare;
+    type RequestType = TypeHierarchyPrepareRequest;
 }
 
 impl BackgroundDocumentRequestHandler for PrepareTypeHierarchyRequestHandler {

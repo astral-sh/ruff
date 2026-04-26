@@ -1,5 +1,7 @@
-use lsp_types::notification::DidCloseNotebookDocument;
-use lsp_types::{DidCloseNotebookDocumentParams, NotebookDocumentIdentifier};
+use lsp_types::{
+    DidCloseNotebookDocumentNotification, DidCloseNotebookDocumentParams,
+    NotebookDocumentIdentifier,
+};
 
 use crate::server::Result;
 use crate::server::api::LSPResult;
@@ -10,7 +12,7 @@ use crate::session::client::Client;
 pub(crate) struct DidCloseNotebookHandler;
 
 impl NotificationHandler for DidCloseNotebookHandler {
-    type NotificationType = DidCloseNotebookDocument;
+    type NotificationType = DidCloseNotebookDocumentNotification;
 }
 
 impl SyncNotificationHandler for DidCloseNotebookHandler {

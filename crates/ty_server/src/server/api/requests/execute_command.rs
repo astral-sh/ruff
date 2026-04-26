@@ -6,7 +6,8 @@ use crate::server::api::traits::SyncRequestHandler;
 use crate::session::Session;
 use crate::session::client::Client;
 use lsp_server::ErrorCode;
-use lsp_types::{self as types, request as req};
+use lsp_types::ExecuteCommandRequest;
+use lsp_types::{self as types};
 use std::fmt::Write;
 use std::str::FromStr;
 use ty_project::Db as _;
@@ -14,7 +15,7 @@ use ty_project::Db as _;
 pub(crate) struct ExecuteCommand;
 
 impl RequestHandler for ExecuteCommand {
-    type RequestType = req::ExecuteCommand;
+    type RequestType = ExecuteCommandRequest;
 }
 
 impl SyncRequestHandler for ExecuteCommand {

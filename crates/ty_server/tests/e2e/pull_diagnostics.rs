@@ -3,13 +3,14 @@ use std::time::Duration;
 use anyhow::Result;
 use insta::{assert_compact_json_snapshot, assert_debug_snapshot};
 use lsp_server::RequestId;
-use lsp_types::request::WorkspaceDiagnosticRequest;
 use lsp_types::{
-    NumberOrString, PartialResultParams, PreviousResultId, Url, WorkDoneProgressParams,
-    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
+    PartialResultParams, PreviousResultId, ProgressNotification, Uri as Url, WorkDoneProgressBegin,
+    WorkDoneProgressEnd, WorkDoneProgressParams, WorkspaceDiagnosticParams,
+    WorkspaceDiagnosticReport, WorkspaceDocumentDiagnosticReport,
 };
+use lsp_types::{TextDocumentContentChangeWholeDocument, WorkspaceDiagnosticRequest};
 use ruff_db::system::SystemPath;
-use ty_server::{ClientOptions, DiagnosticMode, PartialWorkspaceProgress};
+use ty_server::{ClientOptions, DiagnosticMode};
 
 use crate::workspace_folders::condensed_document_diagnostic_snapshot;
 use crate::{AwaitResponseError, TestServer, TestServerBuilder};
@@ -273,7 +274,7 @@ def buy_sell_once(prices: list[float]) -> float:
     server.open_text_document(foo, foo_content, 1);
     let diagnostics = server.document_diagnostic_request(foo, None);
 
-    assert_compact_json_snapshot!(diagnostics, @r#"{"kind": "full", "items": []}"#);
+    assert_compact_json_snapshot!(diagnostics, @r#"{"items": [], "kind": "full"}"#);
 
     Ok(())
 }
@@ -301,7 +302,7 @@ def foo() -> str:
     server.open_text_document(foo, foo_content, 1);
     let diagnostics = server.document_diagnostic_request(foo, None);
 
-    assert_compact_json_snapshot!(diagnostics, @r#"{"kind": "full", "items": []}"#);
+    assert_compact_json_snapshot!(diagnostics, @r#"{"items": [], "kind": "full"}"#);
 
     Ok(())
 }
@@ -335,11 +336,11 @@ def foo(
     {
       "items": [
         {
-          "kind": "full",
           "uri": "file://<temp_dir>/src/foo.py",
           "version": null,
           "resultId": "[RESULT_ID]",
-          "items": []
+          "items": [],
+          "kind": "full"
         }
       ]
     }
@@ -348,7 +349,7 @@ def foo(
     server.open_text_document(foo, foo_content, 1);
     let diagnostics = server.document_diagnostic_request(foo, None);
 
-    assert_compact_json_snapshot!(diagnostics, @r#"{"kind": "full", "resultId": "[RESULT_ID]", "items": []}"#);
+    assert_compact_json_snapshot!(diagnostics, @r#"{"resultId": "[RESULT_ID]", "items": [], "kind": "full"}"#);
 
     Ok(())
 }
@@ -445,9 +446,7 @@ def foo() -> str:
 
     // Extract result ID from first response
     let result_id = match &first_response {
-        lsp_types::DocumentDiagnosticReportResult::Report(
-            lsp_types::DocumentDiagnosticReport::Full(report),
-        ) => report
+        lsp_types::DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) => report
             .full_document_diagnostic_report
             .result_id
             .as_ref()
@@ -461,9 +460,7 @@ def foo() -> str:
 
     // Verify it's an unchanged report
     match second_response {
-        lsp_types::DocumentDiagnosticReportResult::Report(
-            lsp_types::DocumentDiagnosticReport::Unchanged(_),
-        ) => {
+        lsp_types::DocumentDiagnosticReport::RelatedUnchangedDocumentDiagnosticReport(_) => {
             // Success - got unchanged report as expected
         }
         _ => panic!("Expected an unchanged report when diagnostics haven't changed"),
@@ -500,9 +497,7 @@ def foo() -> str:
 
     // Extract result ID from first response
     let result_id = match &first_response {
-        lsp_types::DocumentDiagnosticReportResult::Report(
-            lsp_types::DocumentDiagnosticReport::Full(report),
-        ) => report
+        lsp_types::DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) => report
             .full_document_diagnostic_report
             .result_id
             .as_ref()
@@ -514,11 +509,13 @@ def foo() -> str:
     // Change the document to fix the error
     server.change_text_document(
         foo,
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: foo_content_v2.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: foo_content_v2.to_string(),
+                },
+            ),
+        ],
         2,
     );
 
@@ -527,9 +524,7 @@ def foo() -> str:
 
     // Verify it's a full report (not unchanged)
     match second_response {
-        lsp_types::DocumentDiagnosticReportResult::Report(
-            lsp_types::DocumentDiagnosticReport::Full(report),
-        ) => {
+        lsp_types::DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) => {
             // Should have no diagnostics now
             assert_eq!(report.full_document_diagnostic_report.items.len(), 0);
         }
@@ -615,8 +610,10 @@ def foo() -> str:
     server.open_text_document(file_a, file_a_content, 1);
 
     // First request with no previous result IDs
-    let mut first_response = server
-        .workspace_diagnostic_request(Some(NumberOrString::String("progress-1".to_string())), None);
+    let mut first_response = server.workspace_diagnostic_request(
+        Some(lsp_types::ProgressToken::String("progress-1".to_string())),
+        None,
+    );
     sort_workspace_diagnostic_response(&mut first_response);
 
     assert_debug_snapshot!("workspace_diagnostic_initial_state", first_response);
@@ -637,44 +634,52 @@ def foo() -> str:
     // File B: Add a new error
     server.change_text_document(
         file_b,
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: file_b_content_v2.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: file_b_content_v2.to_string(),
+                },
+            ),
+        ],
         2,
     );
 
     // File C: Fix the error
     server.change_text_document(
         file_c,
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: file_c_content_v2.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: file_c_content_v2.to_string(),
+                },
+            ),
+        ],
         2,
     );
 
     // File D: Change the error
     server.change_text_document(
         file_d,
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: file_d_content_v2.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: file_d_content_v2.to_string(),
+                },
+            ),
+        ],
         2,
     );
 
     // File E: Modify the file but keep the same diagnostic
     server.change_text_document(
         file_e,
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: file_e_content_v2.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: file_e_content_v2.to_string(),
+                },
+            ),
+        ],
         2,
     );
 
@@ -686,7 +691,7 @@ def foo() -> str:
     // - File D: Full report (diagnostic content changed)
     // - File E: Full report (the range changes)
     let mut second_response = server.workspace_diagnostic_request(
-        Some(NumberOrString::String("progress-2".to_string())),
+        Some(lsp_types::ProgressToken::String("progress-2".to_string())),
         Some(previous_result_ids),
     );
     sort_workspace_diagnostic_response(&mut second_response);
@@ -746,7 +751,7 @@ def foo() -> str:
 
     let second_response = shutdown_and_await_workspace_diagnostic(server, &workspace_request_id);
 
-    insta::assert_compact_debug_snapshot!(second_response, @"Report(WorkspaceDiagnosticReport { items: [] })");
+    insta::assert_compact_debug_snapshot!(second_response, @"WorkspaceDiagnosticReport { items: [] }");
 
     Ok(())
 }
@@ -760,23 +765,19 @@ pub(crate) fn filter_result_id() -> insta::internals::SettingsBindDropGuard {
 
 fn consume_all_progress_notifications(server: &mut TestServer) -> Result<()> {
     // Always consume Begin
-    let begin_params = server.await_notification::<lsp_types::notification::Progress>();
+    let begin_params = server.await_notification::<lsp_types::ProgressNotification>();
 
     // The params are already the ProgressParams type
-    let lsp_types::ProgressParamsValue::WorkDone(lsp_types::WorkDoneProgress::Begin(_)) =
-        begin_params.value
-    else {
+    let Ok(_) = serde_json::from_value::<WorkDoneProgressBegin>(begin_params.value) else {
         return Err(anyhow::anyhow!("Expected Begin progress notification"));
     };
 
     // Consume Report notifications - there may be multiple based on number of files
     // Keep consuming until we hit the End notification
     loop {
-        let params = server.await_notification::<lsp_types::notification::Progress>();
+        let params = server.await_notification::<lsp_types::ProgressNotification>();
 
-        if let lsp_types::ProgressParamsValue::WorkDone(lsp_types::WorkDoneProgress::End(_)) =
-            params.value
-        {
+        if let Ok(_) = serde_json::from_value::<WorkDoneProgressEnd>(params.value) {
             // Found the End notification, we're done
             break;
         }
@@ -842,10 +843,7 @@ def foo() -> str:
     // This should always be a partial report. However, the type definition in the LSP specification
     // is broken in the sense that both `Report` and `Partial` have the exact same shape
     // and deserializing a previously serialized `Partial` result will yield a `Report` type.
-    let response_items = match final_response {
-        WorkspaceDiagnosticReportResult::Report(report) => report.items,
-        WorkspaceDiagnosticReportResult::Partial(partial) => partial.items,
-    };
+    let response_items = final_response.items;
 
     // The last batch should contain 1 item because the server sends a partial result with
     // 2 items each.
@@ -854,18 +852,16 @@ def foo() -> str:
 
     // Collect any partial results sent via progress notifications
     while let Ok(params) =
-        server.try_await_notification::<PartialWorkspaceProgress>(Some(Duration::from_secs(1)))
+        server.try_await_notification::<ProgressNotification>(Some(Duration::from_secs(1)))
     {
         if params.token == partial_token {
-            let streamed_items = match params.value {
-                // Ideally we'd assert that only the first response is a full report
-                // However, the type definition in the LSP specification is broken
-                // in the sense that both `Report` and `Partial` have the exact same structure
-                // but it also doesn't use a tag to tell them apart...
-                // That means, a client can never tell if it's a full report or a partial report
-                WorkspaceDiagnosticReportResult::Report(report) => report.items,
-                WorkspaceDiagnosticReportResult::Partial(partial) => partial.items,
-            };
+            // Ideally we'd assert that only the first response is a full report
+            // However, the type definition in the LSP specification is broken
+            // in the sense that both `Report` and `Partial` have the exact same structure
+            // but it also doesn't use a tag to tell them apart...
+            // That means, a client can never tell if it's a full report or a partial report
+            let report = serde_json::from_value::<WorkspaceDiagnosticReport>(params.value).unwrap();
+            let streamed_items = report.items;
 
             // All streamed batches should contain 2 items (test behavior).
             assert_eq!(streamed_items.len(), 2);
@@ -922,31 +918,37 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
     // Fix three errors
     server.change_text_document(
         SystemPath::new("src/error_0.py"),
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: changed_content.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: changed_content.to_string(),
+                },
+            ),
+        ],
         2,
     );
 
     server.change_text_document(
         SystemPath::new("src/error_1.py"),
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: changed_content.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: changed_content.to_string(),
+                },
+            ),
+        ],
         2,
     );
 
     server.change_text_document(
         SystemPath::new("src/error_2.py"),
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: changed_content.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: changed_content.to_string(),
+                },
+            ),
+        ],
         2,
     );
 
@@ -969,10 +971,7 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
     let mut all_items = Vec::new();
 
     // The final response should contain one fixed file and all unchanged files
-    let items = match final_response2 {
-        WorkspaceDiagnosticReportResult::Report(report) => report.items,
-        WorkspaceDiagnosticReportResult::Partial(partial) => partial.items,
-    };
+    let items = final_response2.items;
 
     assert_eq!(items.len(), NUM_FILES - 3 + 1); // 3 fixed, 4 unchanged, 1 full report for fixed file
 
@@ -980,18 +979,16 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
 
     // Collect any partial results sent via progress notifications
     while let Ok(params) =
-        server.try_await_notification::<PartialWorkspaceProgress>(Some(Duration::from_secs(1)))
+        server.try_await_notification::<ProgressNotification>(Some(Duration::from_secs(1)))
     {
         if params.token == partial_token {
-            let streamed_items = match params.value {
-                // Ideally we'd assert that only the first response is a full report
-                // However, the type definition in the LSP specification is broken
-                // in the sense that both `Report` and `Partial` have the exact same structure
-                // but it also doesn't use a tag to tell them apart...
-                // That means, a client can never tell if it's a full report or a partial report
-                WorkspaceDiagnosticReportResult::Report(report) => report.items,
-                WorkspaceDiagnosticReportResult::Partial(partial) => partial.items,
-            };
+            // Ideally we'd assert that only the first response is a full report
+            // However, the type definition in the LSP specification is broken
+            // in the sense that both `Report` and `Partial` have the exact same structure
+            // but it also doesn't use a tag to tell them apart...
+            // That means, a client can never tell if it's a full report or a partial report
+            let report = serde_json::from_value::<WorkspaceDiagnosticReport>(params.value).unwrap();
+            let streamed_items = report.items;
 
             // All streamed batches should contain 2 items.
             assert_eq!(streamed_items.len(), 2);
@@ -1010,20 +1007,19 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
     Ok(())
 }
 
-fn sort_workspace_diagnostic_response(response: &mut WorkspaceDiagnosticReportResult) {
-    let items = match response {
-        WorkspaceDiagnosticReportResult::Report(report) => &mut report.items,
-        WorkspaceDiagnosticReportResult::Partial(partial) => &mut partial.items,
-    };
-
-    sort_workspace_report_items(items);
+fn sort_workspace_diagnostic_response(response: &mut WorkspaceDiagnosticReport) {
+    sort_workspace_report_items(&mut response.items);
 }
 
 fn sort_workspace_report_items(items: &mut [WorkspaceDocumentDiagnosticReport]) {
     fn item_uri(item: &WorkspaceDocumentDiagnosticReport) -> &Url {
         match item {
-            WorkspaceDocumentDiagnosticReport::Full(full_report) => &full_report.uri,
-            WorkspaceDocumentDiagnosticReport::Unchanged(unchanged_report) => &unchanged_report.uri,
+            WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport(
+                full_report,
+            ) => &full_report.uri,
+            WorkspaceDocumentDiagnosticReport::WorkspaceUnchangedDocumentDiagnosticReport(
+                unchanged_report,
+            ) => &unchanged_report.uri,
         }
     }
 
@@ -1100,11 +1096,13 @@ def hello() -> str:
     // Now introduce an error to the file - this should trigger the long-polling request to complete
     server.change_text_document(
         file_path,
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: file_content_with_error.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: file_content_with_error.to_string(),
+                },
+            ),
+        ],
         2,
     );
 
@@ -1200,11 +1198,13 @@ def hello() -> str:
     // PHASE 2: Introduce error to trigger response
     server.change_text_document(
         file_path,
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: file_content_with_error.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: file_content_with_error.to_string(),
+                },
+            ),
+        ],
         2,
     );
 
@@ -1233,11 +1233,13 @@ def hello() -> str:
     // PHASE 4: Fix the error to trigger the second response
     server.change_text_document(
         file_path,
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: file_content_fixed.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: file_content_fixed.to_string(),
+                },
+            ),
+        ],
         3,
     );
 
@@ -1353,16 +1355,16 @@ pub(crate) fn send_workspace_diagnostic_request(server: &mut TestServer) -> lsp_
 pub(crate) fn shutdown_and_await_workspace_diagnostic(
     mut server: TestServer,
     request_id: &RequestId,
-) -> WorkspaceDiagnosticReportResult {
+) -> WorkspaceDiagnosticReport {
     // Send shutdown request - this should cause the suspended workspace diagnostic request to respond
-    let shutdown_id = server.send_request::<lsp_types::request::Shutdown>(());
+    let shutdown_id = server.send_request::<lsp_types::ShutdownRequest>(());
 
     // The workspace diagnostic request should now respond with an empty report
     let workspace_response = server.await_response::<WorkspaceDiagnosticRequest>(request_id);
 
     // Complete shutdown sequence
-    server.await_response::<lsp_types::request::Shutdown>(&shutdown_id);
-    server.send_notification::<lsp_types::notification::Exit>(());
+    server.await_response::<lsp_types::ShutdownRequest>(&shutdown_id);
+    server.send_notification::<lsp_types::ExitNotification>(());
 
     workspace_response
 }
@@ -1389,21 +1391,15 @@ pub(crate) fn assert_workspace_diagnostics_suspends_for_long_polling(
     }
 }
 
-fn extract_result_ids_from_response(
-    response: &WorkspaceDiagnosticReportResult,
-) -> Vec<PreviousResultId> {
-    let items = match response {
-        WorkspaceDiagnosticReportResult::Report(report) => &report.items,
-        WorkspaceDiagnosticReportResult::Partial(partial) => {
-            // For partial results, extract from items the same way
-            &partial.items
-        }
-    };
+fn extract_result_ids_from_response(response: &WorkspaceDiagnosticReport) -> Vec<PreviousResultId> {
+    let items = &response.items;
 
     items
         .iter()
         .filter_map(|item| match item {
-            WorkspaceDocumentDiagnosticReport::Full(full_report) => {
+            WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport(
+                full_report,
+            ) => {
                 let result_id = full_report
                     .full_document_diagnostic_report
                     .result_id
@@ -1414,7 +1410,7 @@ fn extract_result_ids_from_response(
                     value: result_id.clone(),
                 })
             }
-            WorkspaceDocumentDiagnosticReport::Unchanged(_) => {
+            WorkspaceDocumentDiagnosticReport::WorkspaceUnchangedDocumentDiagnosticReport(_) => {
                 // Unchanged reports don't provide new result IDs
                 None
             }

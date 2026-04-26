@@ -5,7 +5,7 @@ mod notebook;
 mod range;
 mod text_document;
 
-use lsp_types::{PositionEncodingKind, Url};
+use lsp_types::{PositionEncodingKind, Uri as Url};
 use ruff_db::system::{SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
 
 use crate::system::AnySystemPath;

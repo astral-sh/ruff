@@ -1,4 +1,7 @@
-use lsp_types::{TextDocumentContentChangeEvent, Url};
+use lsp_types::{
+    LanguageKind, TextDocumentContentChangeEvent, TextDocumentContentChangePartial,
+    TextDocumentContentChangeWholeDocument, Uri as Url,
+};
 use ruff_source_file::LineIndex;
 
 use crate::PositionEncoding;
@@ -36,17 +39,22 @@ pub enum LanguageId {
     Other,
 }
 
-impl From<&str> for LanguageId {
-    fn from(language_id: &str) -> Self {
+impl From<LanguageKind> for LanguageId {
+    fn from(language_id: LanguageKind) -> Self {
         match language_id {
-            "python" => Self::Python,
+            LanguageKind::Python => Self::Python,
             _ => Self::Other,
         }
     }
 }
 
 impl TextDocument {
-    pub fn new(url: Url, contents: String, version: DocumentVersion, language_id: &str) -> Self {
+    pub fn new(
+        url: Url,
+        contents: String,
+        version: DocumentVersion,
+        language_id: LanguageKind,
+    ) -> Self {
         Self {
             url,
             contents,
@@ -93,9 +101,9 @@ impl TextDocument {
         encoding: PositionEncoding,
     ) {
         if let [
-            lsp_types::TextDocumentContentChangeEvent {
-                range: None, text, ..
-            },
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument { text },
+            ),
         ] = changes.as_slice()
         {
             tracing::debug!("Fast path - replacing entire document");
@@ -109,21 +117,22 @@ impl TextDocument {
         let mut new_contents = self.contents().to_string();
         let mut active_index = LineIndex::from_source_text(&new_contents);
 
-        for TextDocumentContentChangeEvent {
-            range,
-            text: change,
-            ..
-        } in changes
-        {
-            if let Some(range) = range {
-                let range = lsp_range_to_text_range(range, &new_contents, &active_index, encoding);
+        for change in changes {
+            match change {
+                TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                    TextDocumentContentChangePartial { range, text, .. },
+                ) => {
+                    let range =
+                        lsp_range_to_text_range(range, &new_contents, &active_index, encoding);
 
-                new_contents.replace_range(
-                    usize::from(range.start())..usize::from(range.end()),
-                    &change,
-                );
-            } else {
-                new_contents = change;
+                    new_contents
+                        .replace_range(usize::from(range.start())..usize::from(range.end()), &text);
+                }
+                TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                    TextDocumentContentChangeWholeDocument { text },
+                ) => {
+                    new_contents = text;
+                }
             }
 
             active_index = LineIndex::from_source_text(&new_contents);
@@ -152,7 +161,10 @@ impl TextDocument {
 #[cfg(test)]
 mod tests {
     use crate::{PositionEncoding, TextDocument};
-    use lsp_types::{Position, TextDocumentContentChangeEvent, Url};
+    use lsp_types::{
+        LanguageKind, Position, TextDocumentContentChangeEvent, TextDocumentContentChangePartial,
+        Uri as Url,
+    };
 
     #[test]
     fn redo_edit() {
@@ -171,36 +183,33 @@ def interface():
 "#
             .to_string(),
             0,
-            "python",
+            LanguageKind::Python,
         );
 
         // Add an `s`, remove it again (back to the original code), and then re-add the `s`
         document.apply_changes(
             vec![
-                TextDocumentContentChangeEvent {
-                    range: Some(lsp_types::Range::new(
-                        Position::new(9, 7),
-                        Position::new(9, 7),
-                    )),
-                    range_length: Some(0),
-                    text: "s".to_string(),
-                },
-                TextDocumentContentChangeEvent {
-                    range: Some(lsp_types::Range::new(
-                        Position::new(9, 7),
-                        Position::new(9, 8),
-                    )),
-                    range_length: Some(1),
-                    text: String::new(),
-                },
-                TextDocumentContentChangeEvent {
-                    range: Some(lsp_types::Range::new(
-                        Position::new(9, 7),
-                        Position::new(9, 7),
-                    )),
-                    range_length: Some(0),
-                    text: "s".to_string(),
-                },
+                TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                    TextDocumentContentChangePartial {
+                        range: lsp_types::Range::new(Position::new(9, 7), Position::new(9, 7)),
+                        text: "s".to_string(),
+                        ..Default::default()
+                    },
+                ),
+                TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                    TextDocumentContentChangePartial {
+                        range: lsp_types::Range::new(Position::new(9, 7), Position::new(9, 8)),
+                        text: String::new(),
+                        ..Default::default()
+                    },
+                ),
+                TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                    TextDocumentContentChangePartial {
+                        range: lsp_types::Range::new(Position::new(9, 7), Position::new(9, 7)),
+                        text: "s".to_string(),
+                        ..Default::default()
+                    },
+                ),
             ],
             1,
             PositionEncoding::UTF16,

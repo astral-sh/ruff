@@ -1,4 +1,4 @@
-use lsp_types::request::WorkspaceSymbolRequest;
+use lsp_types::WorkspaceSymbolRequest;
 use lsp_types::{WorkspaceSymbolParams, WorkspaceSymbolResponse};
 use ty_ide::{WorkspaceSymbolInfo, workspace_symbols};
 
@@ -58,7 +58,7 @@ impl BackgroundRequestHandler for WorkspaceSymbolRequestHandler {
         if all_symbols.is_empty() {
             Ok(None)
         } else {
-            Ok(Some(WorkspaceSymbolResponse::Flat(all_symbols)))
+            Ok(Some(all_symbols.into()))
         }
     }
 }

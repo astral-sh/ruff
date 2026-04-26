@@ -7,7 +7,7 @@ mod text_document;
 
 use std::collections::HashMap;
 
-use lsp_types::{PositionEncodingKind, Url};
+use lsp_types::{DocumentChange, PositionEncodingKind, TextDocumentIdentifier, Uri as Url};
 pub(crate) use notebook::NotebookDocument;
 pub(crate) use range::{NotebookRange, RangeExt, ToRangeExt};
 pub(crate) use replacement::Replacement;
@@ -137,7 +137,7 @@ impl WorkspaceEditTracker {
             Self::DocumentChanges(document_edits) => {
                 if document_edits
                     .iter()
-                    .any(|document| document.text_document.uri == uri)
+                    .any(|document| document.text_document.text_document_identifier.uri == uri)
                 {
                     return Err(anyhow::anyhow!(
                         "Attempted to add edits for a document that was already edited"
@@ -145,11 +145,11 @@ impl WorkspaceEditTracker {
                 }
                 document_edits.push(lsp_types::TextDocumentEdit {
                     text_document: lsp_types::OptionalVersionedTextDocumentIdentifier {
-                        uri,
+                        text_document_identifier: TextDocumentIdentifier { uri },
                         // TODO(jane): Re-enable versioned edits after investigating whether it could work with notebook cells
                         version: None,
                     },
-                    edits: edits.into_iter().map(lsp_types::OneOf::Left).collect(),
+                    edits: edits.into_iter().map(lsp_types::Edit::TextEdit).collect(),
                 });
                 Ok(())
             }
@@ -175,10 +175,15 @@ impl WorkspaceEditTracker {
     pub(crate) fn into_workspace_edit(self) -> lsp_types::WorkspaceEdit {
         match self {
             Self::DocumentChanges(document_edits) => lsp_types::WorkspaceEdit {
-                document_changes: Some(lsp_types::DocumentChanges::Edits(document_edits)),
+                document_changes: Some(
+                    document_edits
+                        .into_iter()
+                        .map(DocumentChange::TextDocumentEdit)
+                        .collect(),
+                ),
                 ..Default::default()
             },
-            Self::Changes(changes) => lsp_types::WorkspaceEdit::new(changes),
+            Self::Changes(changes) => lsp_types::WorkspaceEdit::new(Some(changes), None, None),
         }
     }
 }

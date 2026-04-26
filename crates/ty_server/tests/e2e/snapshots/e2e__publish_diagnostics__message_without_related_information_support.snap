@@ -14,6 +14,9 @@ PublishDiagnosticsParams {
         query: None,
         fragment: None,
     },
+    version: Some(
+        1,
+    ),
     diagnostics: [
         Diagnostic {
             range: Range {
@@ -59,12 +62,9 @@ PublishDiagnosticsParams {
                 "ty",
             ),
             message: "Type `Literal[\"test\"]` does not match asserted type `list[str]`\n\ninfo: `list[str]` and `Literal[\"test\"]` are not equivalent types",
-            related_information: None,
             tags: None,
+            related_information: None,
             data: None,
         },
     ],
-    version: Some(
-        1,
-    ),
 }

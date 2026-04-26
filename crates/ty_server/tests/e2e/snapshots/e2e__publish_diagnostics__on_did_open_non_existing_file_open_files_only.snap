@@ -14,6 +14,9 @@ PublishDiagnosticsParams {
         query: None,
         fragment: None,
     },
+    version: Some(
+        1,
+    ),
     diagnostics: [
         Diagnostic {
             range: Range {
@@ -59,12 +62,9 @@ PublishDiagnosticsParams {
                 "ty",
             ),
             message: "Return type does not match returned value: expected `str`, found `Literal[42]`",
-            related_information: None,
             tags: None,
+            related_information: None,
             data: None,
         },
     ],
-    version: Some(
-        1,
-    ),
 }

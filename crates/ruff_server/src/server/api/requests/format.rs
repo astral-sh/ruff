@@ -1,5 +1,5 @@
 use anyhow::Context;
-use lsp_types::{self as types, request as req};
+use lsp_types::{self as types, DocumentFormattingRequest};
 use types::TextEdit;
 
 use ruff_source_file::LineIndex;
@@ -16,7 +16,7 @@ use crate::{PositionEncoding, TextDocument};
 pub(crate) struct Format;
 
 impl super::RequestHandler for Format {
-    type RequestType = req::Formatting;
+    type RequestType = DocumentFormattingRequest;
 }
 
 impl super::BackgroundDocumentRequestHandler for Format {

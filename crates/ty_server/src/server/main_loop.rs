@@ -5,8 +5,8 @@ use crate::session::{ClientOptions, SuspendedWorkspaceDiagnosticRequest};
 use anyhow::anyhow;
 use crossbeam::select;
 use lsp_server::Message;
-use lsp_types::Url;
-use lsp_types::notification::Notification;
+use lsp_types::Notification;
+use lsp_types::Uri as Url;
 
 pub(crate) type ConnectionSender = crossbeam::channel::Sender<Message>;
 pub(crate) type MainLoopSender = crossbeam::channel::Sender<Event>;
@@ -63,7 +63,7 @@ impl Server {
                             api::request(req)
                         }
                         Message::Notification(notification) => {
-                            if notification.method == lsp_types::notification::Exit::METHOD {
+                            if notification.method == lsp_types::ExitNotification::METHOD.as_str() {
                                 if !self.session.is_shutdown_requested() {
                                     return Err(anyhow!(
                                         "Received exit notification before a shutdown request"

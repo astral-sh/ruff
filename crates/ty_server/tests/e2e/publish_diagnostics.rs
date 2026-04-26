@@ -2,8 +2,9 @@ use std::time::Duration;
 
 use anyhow::Result;
 use lsp_types::{
-    DidOpenTextDocumentParams, FileChangeType, FileEvent, TextDocumentItem, Url,
-    notification::{DidOpenTextDocument, PublishDiagnostics},
+    DidOpenTextDocumentNotification, DidOpenTextDocumentParams, FileChangeType, FileEvent,
+    LanguageKind, PublishDiagnosticsNotification, TextDocumentContentChangeWholeDocument,
+    TextDocumentItem, Uri as Url,
 };
 use ruff_db::system::SystemPath;
 use ty_server::ClientOptions;
@@ -27,7 +28,7 @@ def foo() -> str:
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, foo_content, 1);
-    let diagnostics = server.await_notification::<PublishDiagnostics>();
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
 
     insta::assert_debug_snapshot!(diagnostics);
 
@@ -58,7 +59,7 @@ def foo() -> str:
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, foo_content, 1);
-    let diagnostics = server.await_notification::<PublishDiagnostics>();
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
     insta::assert_debug_snapshot!(diagnostics);
 
     Ok(())
@@ -91,7 +92,7 @@ def foo() -> str:
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, foo_content, 1);
-    let diagnostics = server.await_notification::<PublishDiagnostics>();
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
     insta::assert_debug_snapshot!(diagnostics);
 
     Ok(())
@@ -130,18 +131,18 @@ def foo() -> str:
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.send_notification::<DidOpenTextDocument>(DidOpenTextDocumentParams {
+    server.send_notification::<DidOpenTextDocumentNotification>(DidOpenTextDocumentParams {
         text_document: TextDocumentItem {
             uri: {
                 let uri = server.file_uri(foo);
                 Url::parse(&format!("untitled://{}", uri.path())).unwrap()
             },
-            language_id: "python".to_string(),
+            language_id: LanguageKind::Python,
             version: 1,
             text: foo_content.to_string(),
         },
     });
-    let diagnostics = server.await_notification::<PublishDiagnostics>();
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
     insta::assert_debug_snapshot!(diagnostics);
 
     Ok(())
@@ -167,8 +168,8 @@ def foo() -> str:
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, foo_content, 1);
-    let diagnostics =
-        server.try_await_notification::<PublishDiagnostics>(Some(Duration::from_millis(100)));
+    let diagnostics = server
+        .try_await_notification::<PublishDiagnosticsNotification>(Some(Duration::from_millis(100)));
 
     assert!(
         diagnostics.is_err(),
@@ -195,17 +196,19 @@ def foo() -> str:
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, foo_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
+    let _ = server.await_notification::<PublishDiagnosticsNotification>();
 
-    let changes = vec![lsp_types::TextDocumentContentChangeEvent {
-        range: None,
-        range_length: None,
-        text: "def foo() -> int: return 42".to_string(),
-    }];
+    let changes = vec![
+        lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+            TextDocumentContentChangeWholeDocument {
+                text: "def foo() -> int: return 42".to_string(),
+            },
+        ),
+    ];
 
     server.change_text_document(foo, changes, 2);
 
-    let diagnostics = server.await_notification::<PublishDiagnostics>();
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
 
     assert_eq!(diagnostics.version, Some(2));
 
@@ -235,16 +238,18 @@ def foo() -> str:
 
     server.open_text_document(foo, foo_content, 1);
 
-    let changes = vec![lsp_types::TextDocumentContentChangeEvent {
-        range: None,
-        range_length: None,
-        text: "def foo() -> int: return 42".to_string(),
-    }];
+    let changes = vec![
+        lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+            TextDocumentContentChangeWholeDocument {
+                text: "def foo() -> int: return 42".to_string(),
+            },
+        ),
+    ];
 
     server.change_text_document(foo, changes, 2);
 
-    let diagnostics =
-        server.try_await_notification::<PublishDiagnostics>(Some(Duration::from_millis(100)));
+    let diagnostics = server
+        .try_await_notification::<PublishDiagnosticsNotification>(Some(Duration::from_millis(100)));
 
     assert!(
         diagnostics.is_err(),
@@ -272,7 +277,7 @@ assert_type("test", list[str])
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, foo_content, 1);
-    let diagnostics = server.await_notification::<PublishDiagnostics>();
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
 
     insta::assert_debug_snapshot!(diagnostics);
 
@@ -298,7 +303,7 @@ assert_type("test", list[str])
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, foo_content, 1);
-    let diagnostics = server.await_notification::<PublishDiagnostics>();
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
 
     insta::assert_debug_snapshot!(diagnostics);
 
@@ -325,16 +330,16 @@ def foo() -> str:
 
     server.open_text_document(&foo, "", 1);
 
-    let _open_diagnostics = server.await_notification::<PublishDiagnostics>();
+    let _open_diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
 
     std::fs::write(&foo, foo_content)?;
 
     server.did_change_watched_files(vec![FileEvent {
         uri: server.file_uri(foo),
-        typ: FileChangeType::CHANGED,
+        kind: FileChangeType::Changed,
     }]);
 
-    let diagnostics = server.await_notification::<PublishDiagnostics>();
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
 
     // Note how ty reports no diagnostics here. This is because
     // the contents received by didOpen/didChange take precedence over the file
@@ -371,11 +376,11 @@ def foo() -> str:
 
     server.did_change_watched_files(vec![FileEvent {
         uri: server.file_uri(foo),
-        typ: FileChangeType::CHANGED,
+        kind: FileChangeType::Changed,
     }]);
 
-    let diagnostics =
-        server.try_await_notification::<PublishDiagnostics>(Some(Duration::from_millis(100)));
+    let diagnostics = server
+        .try_await_notification::<PublishDiagnosticsNotification>(Some(Duration::from_millis(100)));
 
     assert!(
         diagnostics.is_err(),
@@ -401,7 +406,7 @@ def foo() -> str:
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, foo_content, 1);
-    let diagnostics = server.await_notification::<PublishDiagnostics>();
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
 
     insta::assert_debug_snapshot!(diagnostics);
 
@@ -424,24 +429,24 @@ def foo() -> str:
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, foo_content, 1);
-    let diagnostics = server.await_notification::<PublishDiagnostics>();
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
 
     insta::assert_debug_snapshot!(diagnostics);
 
     server.close_text_document(foo);
-    let diagnostics = server.await_notification::<PublishDiagnostics>();
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
     insta::assert_debug_snapshot!(diagnostics);
 
     let params = DidOpenTextDocumentParams {
         text_document: TextDocumentItem {
             uri: server.file_uri(foo),
-            language_id: "text".to_string(),
+            language_id: LanguageKind::new("text"),
             version: 1,
             text: foo_content.to_string(),
         },
     };
-    server.send_notification::<DidOpenTextDocument>(params);
-    let diagnostics = server.await_notification::<PublishDiagnostics>();
+    server.send_notification::<DidOpenTextDocumentNotification>(params);
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
 
     insta::assert_debug_snapshot!(diagnostics);
 
@@ -468,7 +473,7 @@ def foo(
 
     server.open_text_document(foo, foo_content, 1);
 
-    let diagnostics = server.await_notification::<PublishDiagnostics>();
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
 
     insta::assert_debug_snapshot!(diagnostics);
 

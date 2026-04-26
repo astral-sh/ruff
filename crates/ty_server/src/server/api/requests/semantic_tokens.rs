@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use lsp_types::{SemanticTokens, SemanticTokensParams, SemanticTokensResult, Url};
+use lsp_types::{SemanticTokens, SemanticTokensParams, Uri};
 use ruff_db::source::source_text;
 use ty_project::ProjectDatabase;
 
@@ -15,11 +15,11 @@ use crate::session::client::Client;
 pub(crate) struct SemanticTokensRequestHandler;
 
 impl RequestHandler for SemanticTokensRequestHandler {
-    type RequestType = lsp_types::request::SemanticTokensFullRequest;
+    type RequestType = lsp_types::SemanticTokensRequest;
 }
 
 impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
-    fn document_url(params: &SemanticTokensParams) -> Cow<'_, Url> {
+    fn document_url(params: &SemanticTokensParams) -> Cow<'_, Uri> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -28,7 +28,7 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
         snapshot: &DocumentSnapshot,
         _client: &Client,
         _params: SemanticTokensParams,
-    ) -> crate::server::Result<Option<SemanticTokensResult>> {
+    ) -> crate::server::Result<Option<SemanticTokens>> {
         if snapshot
             .workspace_settings()
             .is_language_services_disabled()
@@ -65,10 +65,10 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
                 .supports_multiline_semantic_tokens(),
         );
 
-        Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
+        Ok(Some(SemanticTokens {
             result_id: None,
             data: lsp_tokens,
-        })))
+        }))
     }
 }
 

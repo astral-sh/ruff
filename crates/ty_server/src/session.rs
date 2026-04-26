@@ -7,15 +7,15 @@ use std::sync::Arc;
 
 use anyhow::{Context, anyhow};
 use lsp_server::{Message, RequestId};
-use lsp_types::notification::{DidChangeWatchedFiles, Exit, Notification};
-use lsp_types::request::{
-    DocumentDiagnosticRequest, RegisterCapability, Request, Shutdown, UnregisterCapability,
-    WorkspaceDiagnosticRequest,
-};
 use lsp_types::{
-    ClientInfo, DiagnosticRegistrationOptions, DiagnosticServerCapabilities,
+    ClientInfo, DiagnosticProvider, DiagnosticRegistrationOptions,
     DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, Registration, RegistrationParams,
-    TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Url,
+    TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Uri as Url,
+};
+use lsp_types::{DidChangeWatchedFilesNotification, ExitNotification, Notification};
+use lsp_types::{
+    DocumentDiagnosticRequest, RegistrationRequest, Request, ShutdownRequest,
+    UnregistrationRequest, WorkspaceDiagnosticRequest,
 };
 use ruff_db::Db;
 use ruff_db::files::{File, system_path_to_file};
@@ -265,7 +265,7 @@ impl Session {
         } else {
             match &message {
                 Message::Request(request) => {
-                    if request.method == Shutdown::METHOD {
+                    if request.method == ShutdownRequest::METHOD.as_str() {
                         return Some(message);
                     }
                     tracing::debug!(
@@ -278,7 +278,7 @@ impl Session {
                     return Some(message);
                 }
                 Message::Notification(notification) => {
-                    if notification.method == Exit::METHOD {
+                    if notification.method == ExitNotification::METHOD.as_str() {
                         return Some(message);
                     }
                     tracing::debug!(
@@ -739,7 +739,7 @@ impl Session {
             .collect();
 
         tracing::debug!("Requesting workspace configuration for workspaces");
-        client.send_request::<lsp_types::request::WorkspaceConfiguration>(
+        client.send_request::<lsp_types::ConfigurationRequest>(
             self,
             lsp_types::ConfigurationParams { items },
             move |client, result: Vec<serde_json::Value>| {
@@ -871,7 +871,7 @@ impl Session {
         if self.global_settings().diagnostic_mode().is_off() {
             return;
         }
-        client.send_notification::<lsp_types::notification::PublishDiagnostics>(
+        client.send_notification::<lsp_types::PublishDiagnosticsNotification>(
             lsp_types::PublishDiagnosticsParams {
                 uri: uri.clone(),
                 diagnostics: vec![],
@@ -912,7 +912,7 @@ impl Session {
         {
             if self
                 .registrations
-                .contains(DocumentDiagnosticRequest::METHOD)
+                .contains(DocumentDiagnosticRequest::METHOD.as_str())
             {
                 unregistrations.push(Unregistration {
                     id: DIAGNOSTIC_REGISTRATION_ID.into(),
@@ -937,7 +937,7 @@ impl Session {
                         method: DocumentDiagnosticRequest::METHOD.into(),
                         register_options: Some(
                             serde_json::to_value(
-                                DiagnosticServerCapabilities::RegistrationOptions(
+                                DiagnosticProvider::DiagnosticRegistrationOptions(
                                     DiagnosticRegistrationOptions {
                                         diagnostic_options: server_diagnostic_options(
                                             diagnostic_mode.is_workspace(),
@@ -954,15 +954,18 @@ impl Session {
         }
 
         if let Some(register_options) = self.file_watcher_registration_options() {
-            if self.registrations.contains(DidChangeWatchedFiles::METHOD) {
+            if self
+                .registrations
+                .contains(DidChangeWatchedFilesNotification::METHOD.as_str())
+            {
                 unregistrations.push(Unregistration {
                     id: FILE_WATCHER_REGISTRATION_ID.into(),
-                    method: DidChangeWatchedFiles::METHOD.into(),
+                    method: DidChangeWatchedFilesNotification::METHOD.into(),
                 });
             }
             registrations.push(Registration {
                 id: FILE_WATCHER_REGISTRATION_ID.into(),
-                method: DidChangeWatchedFiles::METHOD.into(),
+                method: DidChangeWatchedFilesNotification::METHOD.into(),
                 register_options: Some(serde_json::to_value(register_options).unwrap()),
             });
         }
@@ -982,7 +985,7 @@ impl Session {
             self.registrations.insert(registration.method.clone());
         }
 
-        client.send_request::<RegisterCapability>(
+        client.send_request::<RegistrationRequest>(
             self,
             RegistrationParams { registrations },
             |_: &Client, ()| {
@@ -1010,7 +1013,7 @@ impl Session {
             }
         }
 
-        client.send_request::<UnregisterCapability>(
+        client.send_request::<UnregistrationRequest>(
             self,
             UnregistrationParams {
                 unregisterations: unregistrations,
@@ -1031,21 +1034,26 @@ impl Session {
     ) -> Option<DidChangeWatchedFilesRegistrationOptions> {
         fn make_watcher(glob: &str) -> FileSystemWatcher {
             FileSystemWatcher {
-                glob_pattern: lsp_types::GlobPattern::String(glob.into()),
-                kind: Some(lsp_types::WatchKind::all()),
+                glob_pattern: lsp_types::GlobPattern::Pattern(glob.into()),
+                kind: None,
             }
         }
 
         fn make_relative_watcher(relative_to: &SystemPath, glob: &str) -> FileSystemWatcher {
             let base_uri = Url::from_file_path(relative_to.as_std_path())
                 .expect("system path must be a valid URI");
-            let glob_pattern = lsp_types::GlobPattern::Relative(lsp_types::RelativePattern {
-                base_uri: lsp_types::OneOf::Right(base_uri),
-                pattern: glob.to_string(),
-            });
+            let glob_pattern =
+                lsp_types::GlobPattern::RelativePattern(lsp_types::RelativePattern {
+                    base_uri: base_uri.into(),
+                    pattern: glob.to_string(),
+                });
             FileSystemWatcher {
                 glob_pattern,
-                kind: Some(lsp_types::WatchKind::all()),
+                kind: Some(
+                    lsp_types::WatchKind::Change
+                        | lsp_types::WatchKind::Delete
+                        | lsp_types::WatchKind::Create,
+                ),
             }
         }
 
@@ -1162,7 +1170,7 @@ impl Session {
     /// If the document is not found.
     pub(crate) fn document_handle(
         &self,
-        url: &lsp_types::Url,
+        url: &lsp_types::Uri,
     ) -> Result<DocumentHandle, DocumentError> {
         self.index().document_handle(url)
     }
@@ -1380,7 +1388,7 @@ impl DocumentSnapshot {
         &self.document
     }
 
-    pub(crate) fn url(&self) -> &lsp_types::Url {
+    pub(crate) fn url(&self) -> &lsp_types::Uri {
         self.document.url()
     }
 
@@ -1669,17 +1677,17 @@ impl SuspendedWorkspaceDiagnosticRequest {
 #[derive(Clone, Debug)]
 pub(crate) enum DocumentHandle {
     Text {
-        url: lsp_types::Url,
+        url: lsp_types::Uri,
         path: AnySystemPath,
         version: DocumentVersion,
     },
     Notebook {
-        url: lsp_types::Url,
+        url: lsp_types::Uri,
         path: AnySystemPath,
         version: DocumentVersion,
     },
     Cell {
-        url: lsp_types::Url,
+        url: lsp_types::Uri,
         version: DocumentVersion,
         notebook_path: AnySystemPath,
     },
@@ -1729,7 +1737,7 @@ impl DocumentHandle {
     }
 
     /// The URL as used by the client to reference this document.
-    pub(crate) fn url(&self) -> &lsp_types::Url {
+    pub(crate) fn url(&self) -> &lsp_types::Uri {
         match self {
             Self::Text { url, .. } | Self::Notebook { url, .. } | Self::Cell { url, .. } => url,
         }
@@ -1819,8 +1827,8 @@ impl DocumentHandle {
     pub(crate) fn update_notebook_document(
         &mut self,
         session: &mut Session,
-        cells: Option<lsp_types::NotebookDocumentCellChange>,
-        metadata: Option<lsp_types::LSPObject>,
+        cells: Option<lsp_types::NotebookDocumentCellChanges>,
+        metadata: Option<lsp_types::LspObject>,
         new_version: DocumentVersion,
     ) -> crate::Result<()> {
         let position_encoding = session.position_encoding();

@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 
-use lsp_types::request::DocumentDiagnosticRequest;
+use lsp_types::DocumentDiagnosticRequest;
 use lsp_types::{
-    DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
-    FullDocumentDiagnosticReport, RelatedFullDocumentDiagnosticReport,
-    RelatedUnchangedDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport, Url,
+    DocumentDiagnosticParams, DocumentDiagnosticReport, FullDocumentDiagnosticReport,
+    RelatedFullDocumentDiagnosticReport, RelatedUnchangedDocumentDiagnosticReport,
+    UnchangedDocumentDiagnosticReport, Uri as Url,
 };
 
 use crate::server::Result;
@@ -32,34 +32,31 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
         snapshot: &DocumentSnapshot,
         _client: &Client,
         params: DocumentDiagnosticParams,
-    ) -> Result<DocumentDiagnosticReportResult> {
+    ) -> Result<DocumentDiagnosticReport> {
         if snapshot.global_settings().diagnostic_mode().is_off() {
-            return Ok(DocumentDiagnosticReportResult::Report(
-                DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport::default()),
-            ));
+            return Ok(RelatedFullDocumentDiagnosticReport::default().into());
         }
 
         let diagnostics = compute_diagnostics(db, snapshot.document(), snapshot.encoding());
 
         let Some(diagnostics) = diagnostics else {
-            return Ok(DocumentDiagnosticReportResult::Report(
-                DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport::default()),
-            ));
+            return Ok(RelatedFullDocumentDiagnosticReport::default().into());
         };
 
         let result_id = diagnostics.result_id();
 
         let report = match result_id {
             Some(new_id) if Some(&new_id) == params.previous_result_id.as_ref() => {
-                DocumentDiagnosticReport::Unchanged(RelatedUnchangedDocumentDiagnosticReport {
+                RelatedUnchangedDocumentDiagnosticReport {
                     related_documents: None,
                     unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
                         result_id: new_id,
                     },
-                })
+                }
+                .into()
             }
             new_id => {
-                DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
+                RelatedFullDocumentDiagnosticReport {
                     related_documents: None,
                     full_document_diagnostic_report: FullDocumentDiagnosticReport {
                         result_id: new_id,
@@ -73,11 +70,12 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
                             )
                             .expect_text_document(),
                     },
-                })
+                }
+                .into()
             }
         };
 
-        Ok(DocumentDiagnosticReportResult::Report(report))
+        Ok(report)
     }
 }
 

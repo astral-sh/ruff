@@ -62,7 +62,7 @@ pub(crate) struct DiagnosticFix {
 }
 
 /// A series of diagnostics across a single text document or an arbitrary number of notebook cells.
-pub(crate) type DiagnosticsMap = FxHashMap<lsp_types::Url, Vec<lsp_types::Diagnostic>>;
+pub(crate) type DiagnosticsMap = FxHashMap<lsp_types::Uri, Vec<lsp_types::Diagnostic>>;
 
 pub(crate) fn check(
     query: &DocumentQuery,
@@ -302,10 +302,10 @@ fn to_lsp_diagnostic(
     } else {
         (
             match diagnostic.severity() {
-                ruff_db::diagnostic::Severity::Info => lsp_types::DiagnosticSeverity::INFORMATION,
-                ruff_db::diagnostic::Severity::Warning => lsp_types::DiagnosticSeverity::WARNING,
-                ruff_db::diagnostic::Severity::Error => lsp_types::DiagnosticSeverity::ERROR,
-                ruff_db::diagnostic::Severity::Fatal => lsp_types::DiagnosticSeverity::ERROR,
+                ruff_db::diagnostic::Severity::Info => lsp_types::DiagnosticSeverity::Information,
+                ruff_db::diagnostic::Severity::Warning => lsp_types::DiagnosticSeverity::Warning,
+                ruff_db::diagnostic::Severity::Error => lsp_types::DiagnosticSeverity::Error,
+                ruff_db::diagnostic::Severity::Fatal => lsp_types::DiagnosticSeverity::Error,
             },
             diagnostic.secondary_code_or_id().to_string(),
         )
@@ -317,10 +317,10 @@ fn to_lsp_diagnostic(
             range,
             severity: Some(severity),
             tags: tags(diagnostic),
-            code: Some(lsp_types::NumberOrString::String(code)),
+            code: Some(lsp_types::Code::String(code)),
             code_description: diagnostic.documentation_url().and_then(|url| {
                 Some(lsp_types::CodeDescription {
-                    href: lsp_types::Url::parse(url).ok()?,
+                    href: lsp_types::Uri::parse(url).ok()?,
                 })
             }),
             source: Some(DIAGNOSTIC_NAME.into()),
@@ -350,8 +350,8 @@ fn severity(code: &str) -> lsp_types::DiagnosticSeverity {
     match code {
         // F821: undefined name <name>
         // E902: IOError
-        "F821" | "E902" => lsp_types::DiagnosticSeverity::ERROR,
-        _ => lsp_types::DiagnosticSeverity::WARNING,
+        "F821" | "E902" => lsp_types::DiagnosticSeverity::Error,
+        _ => lsp_types::DiagnosticSeverity::Warning,
     }
 }
 
@@ -360,10 +360,10 @@ fn tags(diagnostic: &Diagnostic) -> Option<Vec<lsp_types::DiagnosticTag>> {
         tags.iter()
             .map(|tag| match tag {
                 ruff_db::diagnostic::DiagnosticTag::Unnecessary => {
-                    lsp_types::DiagnosticTag::UNNECESSARY
+                    lsp_types::DiagnosticTag::Unnecessary
                 }
                 ruff_db::diagnostic::DiagnosticTag::Deprecated => {
-                    lsp_types::DiagnosticTag::DEPRECATED
+                    lsp_types::DiagnosticTag::Deprecated
                 }
             })
             .collect()

@@ -5,6 +5,7 @@ expression: "[cell1_diagnostics, cell2_diagnostics, cell3_diagnostics]"
 [
   {
     "uri": "vscode-notebook-cell://test.ipynb#1",
+    "version": 0,
     "diagnostics": [
       {
         "range": {
@@ -26,11 +27,11 @@ expression: "[cell1_diagnostics, cell2_diagnostics, cell3_diagnostics]"
         "message": "Function can implicitly return `None`, which is not assignable to return type `str`",
         "relatedInformation": []
       }
-    ],
-    "version": 0
+    ]
   },
   {
     "uri": "vscode-notebook-cell://test.ipynb#2",
+    "version": 0,
     "diagnostics": [
       {
         "range": {
@@ -85,12 +86,11 @@ expression: "[cell1_diagnostics, cell2_diagnostics, cell3_diagnostics]"
           }
         ]
       }
-    ],
-    "version": 0
+    ]
   },
   {
     "uri": "vscode-notebook-cell://test.ipynb#0",
-    "diagnostics": [],
-    "version": 0
+    "version": 0,
+    "diagnostics": []
   }
 ]

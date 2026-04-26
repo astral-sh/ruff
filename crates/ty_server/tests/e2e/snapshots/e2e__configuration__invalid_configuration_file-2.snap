@@ -3,7 +3,6 @@ source: crates/ty_server/tests/e2e/configuration.rs
 expression: diagnostics
 ---
 {
-  "kind": "full",
   "resultId": "[RESULT_ID]",
   "items": [
     {
@@ -25,5 +24,6 @@ expression: diagnostics
       "source": "ty",
       "message": "Name `a` used when not defined"
     }
-  ]
+  ],
+  "kind": "full"
 }

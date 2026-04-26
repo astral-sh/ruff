@@ -8,14 +8,16 @@ use crate::session::{Client, Session};
 use crate::{DIAGNOSTIC_NAME, DocumentKey};
 use crate::{edit::DocumentVersion, server};
 use lsp_server::ErrorCode;
-use lsp_types::{self as types, TextDocumentIdentifier, request as req};
+use lsp_types::{
+    self as types, ApplyWorkspaceEditRequest, ExecuteCommandRequest, TextDocumentIdentifier,
+};
 use serde::Deserialize;
 
 pub(crate) struct ExecuteCommand;
 
 #[derive(Deserialize)]
 struct Argument {
-    uri: types::Url,
+    uri: types::Uri,
     version: DocumentVersion,
 }
 
@@ -31,7 +33,7 @@ struct DebugCommandArgument {
 }
 
 impl super::RequestHandler for ExecuteCommand {
-    type RequestType = req::ExecuteCommand;
+    type RequestType = ExecuteCommandRequest;
 }
 
 impl super::SyncRequestHandler for ExecuteCommand {
@@ -48,7 +50,10 @@ impl super::SyncRequestHandler for ExecuteCommand {
             // provided but we could expand this to consider all *open* documents.
             let argument: DebugCommandArgument = params.arguments.into_iter().next().map_or_else(
                 || Ok(DebugCommandArgument::default()),
-                |value| serde_json::from_value(value).with_failure_code(ErrorCode::InvalidParams),
+                |value| {
+                    serde_json::from_value(serde_json::Value::Array(value))
+                        .with_failure_code(ErrorCode::InvalidParams)
+                },
             )?;
             return Ok(Some(serde_json::Value::String(
                 debug_information(session, argument.text_document)
@@ -64,7 +69,10 @@ impl super::SyncRequestHandler for ExecuteCommand {
         let mut arguments: Vec<Argument> = params
             .arguments
             .into_iter()
-            .map(|value| serde_json::from_value(value).with_failure_code(ErrorCode::InvalidParams))
+            .map(|value| {
+                serde_json::from_value(serde_json::Value::Array(value))
+                    .with_failure_code(ErrorCode::InvalidParams)
+            })
             .collect::<server::Result<_>>()?;
 
         arguments.sort_by(|a, b| a.uri.cmp(&b.uri));
@@ -130,11 +138,12 @@ fn apply_edit(
     label: &str,
     edit: types::WorkspaceEdit,
 ) -> crate::Result<()> {
-    client.send_request::<req::ApplyWorkspaceEdit>(
+    client.send_request::<ApplyWorkspaceEditRequest>(
         session,
         types::ApplyWorkspaceEditParams {
             label: Some(format!("{DIAGNOSTIC_NAME}: {label}")),
             edit,
+            metadata: None,
         },
         move |client, response| {
             if !response.applied {
@@ -216,3 +225,4 @@ config_path = {config_path:?}
 
     Ok(buffer)
 }
+

@@ -1,7 +1,8 @@
 use std::borrow::Cow;
 
 use lsp_server::ErrorCode;
-use lsp_types::{self as types, request as req};
+use lsp_types::CodeActionResolveRequest;
+use lsp_types::{self as types};
 
 use ruff_linter::codes::Rule;
 
@@ -17,12 +18,12 @@ use crate::session::{DocumentQuery, DocumentSnapshot, ResolvedClientCapabilities
 pub(crate) struct CodeActionResolve;
 
 impl super::RequestHandler for CodeActionResolve {
-    type RequestType = req::CodeActionResolveRequest;
+    type RequestType = CodeActionResolveRequest;
 }
 
 impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
-    fn document_url(params: &types::CodeAction) -> Cow<'_, types::Url> {
-        let uri: lsp_types::Url = serde_json::from_value(params.data.clone().unwrap_or_default())
+    fn document_url(params: &types::CodeAction) -> Cow<'_, types::Uri> {
+        let uri: lsp_types::Uri = serde_json::from_value(params.data.clone().unwrap_or_default())
             .expect("code actions should have a URI in their data fields");
         Cow::Owned(uri)
     }

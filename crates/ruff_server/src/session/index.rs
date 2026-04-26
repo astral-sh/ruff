@@ -1,10 +1,11 @@
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use anyhow::anyhow;
-use lsp_types::{FileEvent, Url};
+use lsp_types::{FileEvent, Uri as Url};
 use rustc_hash::{FxHashMap, FxHashSet};
 use thiserror::Error;
 
@@ -141,8 +142,8 @@ impl Index {
     pub(super) fn update_notebook_document(
         &mut self,
         key: &DocumentKey,
-        cells: Option<lsp_types::NotebookDocumentCellChange>,
-        metadata: Option<serde_json::Map<String, serde_json::Value>>,
+        cells: Option<lsp_types::NotebookDocumentCellChanges>,
+        metadata: Option<HashMap<String, serde_json::Value>>,
         new_version: DocumentVersion,
         encoding: PositionEncoding,
     ) -> crate::Result<()> {

@@ -30,8 +30,8 @@ ignore = ["F401"]
         diagnostics,
         @r#"
     {
-      "kind": "full",
-      "items": []
+      "items": [],
+      "kind": "full"
     }
     "#
     );
@@ -40,7 +40,6 @@ ignore = ["F401"]
         external_diagnostics,
         @r#"
     {
-      "kind": "full",
       "items": [
         {
           "range": {
@@ -96,7 +95,8 @@ ignore = ["F401"]
             "title": "Remove unused import: `os`"
           }
         }
-      ]
+      ],
+      "kind": "full"
     }
     "#
     );

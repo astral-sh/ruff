@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use lsp_types::request::FoldingRangeRequest;
-use lsp_types::{FoldingRange, FoldingRangeKind, FoldingRangeParams, Url};
+use lsp_types::FoldingRangeRequest;
+use lsp_types::{FoldingRange, FoldingRangeKind, FoldingRangeParams, Uri as Url};
 use ruff_db::source::source_text;
 use ruff_text_size::TextRange;
 use ty_ide::folding_ranges;

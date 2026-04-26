@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use lsp_types::Url;
+use lsp_types::Uri as Url;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_macros::Combine;
 use ruff_python_ast::PythonVersion;

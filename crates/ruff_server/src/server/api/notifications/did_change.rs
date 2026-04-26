@@ -3,13 +3,12 @@ use crate::server::api::LSPResult;
 use crate::server::api::diagnostics::publish_diagnostics_for_document;
 use crate::session::{Client, Session};
 use lsp_server::ErrorCode;
-use lsp_types as types;
-use lsp_types::notification as notif;
+use lsp_types::{self as types, DidChangeTextDocumentNotification, TextDocumentIdentifier};
 
 pub(crate) struct DidChange;
 
 impl super::NotificationHandler for DidChange {
-    type NotificationType = notif::DidChangeTextDocument;
+    type NotificationType = DidChangeTextDocumentNotification;
 }
 
 impl super::SyncNotificationHandler for DidChange {
@@ -19,7 +18,7 @@ impl super::SyncNotificationHandler for DidChange {
         types::DidChangeTextDocumentParams {
             text_document:
                 types::VersionedTextDocumentIdentifier {
-                    uri,
+                    text_document_identifier: TextDocumentIdentifier { uri },
                     version: new_version,
                 },
             content_changes,

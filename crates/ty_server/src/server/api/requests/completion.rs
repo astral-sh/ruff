@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 use std::time::Instant;
 
-use lsp_types::request::Completion;
+use lsp_types::CompletionRequest;
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionList,
-    CompletionParams, CompletionResponse, Documentation, TextEdit, Url,
+    CompletionParams, CompletionResponse, Documentation, TextEdit, Uri as Url,
 };
 use ruff_source_file::OneIndexed;
 use ruff_text_size::Ranged;
@@ -21,12 +21,12 @@ use crate::session::client::Client;
 pub(crate) struct CompletionRequestHandler;
 
 impl RequestHandler for CompletionRequestHandler {
-    type RequestType = Completion;
+    type RequestType = CompletionRequest;
 }
 
 impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
     fn document_url(params: &CompletionParams) -> Cow<'_, Url> {
-        Cow::Borrowed(&params.text_document_position.text_document.uri)
+        Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
     fn run_with_snapshot(
@@ -48,7 +48,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             return Ok(None);
         };
 
-        let Some(offset) = params.text_document_position.position.to_text_size(
+        let Some(offset) = params.text_document_position_params.position.to_text_size(
             db,
             file,
             snapshot.url(),
@@ -131,9 +131,11 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             })
             .collect();
         let len = items.len();
-        let response = CompletionResponse::List(CompletionList {
+        let response = CompletionResponse::CompletionList(CompletionList {
             is_incomplete: true,
             items,
+            item_defaults: None,
+            apply_kind: None,
         });
         tracing::debug!(
             "Completions request returned {len} suggestions in {elapsed:?}",
@@ -154,30 +156,30 @@ fn ty_kind_to_lsp_kind(kind: CompletionKind) -> CompletionItemKind {
 
     // ref https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItemKind
     match kind {
-        Text => CompletionItemKind::TEXT,
-        Method => CompletionItemKind::METHOD,
-        Function => CompletionItemKind::FUNCTION,
-        Constructor => CompletionItemKind::CONSTRUCTOR,
-        Field => CompletionItemKind::FIELD,
-        Variable => CompletionItemKind::VARIABLE,
-        Class => CompletionItemKind::CLASS,
-        Interface => CompletionItemKind::INTERFACE,
-        Module => CompletionItemKind::MODULE,
-        Property => CompletionItemKind::PROPERTY,
-        Unit => CompletionItemKind::UNIT,
-        Value => CompletionItemKind::VALUE,
-        Enum => CompletionItemKind::ENUM,
-        Keyword => CompletionItemKind::KEYWORD,
-        Snippet => CompletionItemKind::SNIPPET,
-        Color => CompletionItemKind::COLOR,
-        File => CompletionItemKind::FILE,
-        Reference => CompletionItemKind::REFERENCE,
-        Folder => CompletionItemKind::FOLDER,
-        EnumMember => CompletionItemKind::ENUM_MEMBER,
-        Constant => CompletionItemKind::CONSTANT,
-        Struct => CompletionItemKind::STRUCT,
-        Event => CompletionItemKind::EVENT,
-        Operator => CompletionItemKind::OPERATOR,
-        TypeParameter => CompletionItemKind::TYPE_PARAMETER,
+        Text => CompletionItemKind::Text,
+        Method => CompletionItemKind::Method,
+        Function => CompletionItemKind::Function,
+        Constructor => CompletionItemKind::Constructor,
+        Field => CompletionItemKind::Field,
+        Variable => CompletionItemKind::Variable,
+        Class => CompletionItemKind::Class,
+        Interface => CompletionItemKind::Interface,
+        Module => CompletionItemKind::Module,
+        Property => CompletionItemKind::Property,
+        Unit => CompletionItemKind::Unit,
+        Value => CompletionItemKind::Value,
+        Enum => CompletionItemKind::Enum,
+        Keyword => CompletionItemKind::Keyword,
+        Snippet => CompletionItemKind::Snippet,
+        Color => CompletionItemKind::Color,
+        File => CompletionItemKind::File,
+        Reference => CompletionItemKind::Reference,
+        Folder => CompletionItemKind::Folder,
+        EnumMember => CompletionItemKind::EnumMember,
+        Constant => CompletionItemKind::Constant,
+        Struct => CompletionItemKind::Struct,
+        Event => CompletionItemKind::Event,
+        Operator => CompletionItemKind::Operator,
+        TypeParameter => CompletionItemKind::TypeParameter,
     }
 }

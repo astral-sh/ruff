@@ -6,7 +6,10 @@ use crate::capabilities::{ResolvedClientCapabilities, server_capabilities};
 use crate::session::{ClientName, InitializationOptions, Session, warn_about_unknown_options};
 use anyhow::Context;
 use lsp_server::Connection;
-use lsp_types::{ClientCapabilities, InitializeParams, MessageType, Url};
+use lsp_types::{
+    ClientCapabilities, InitializeParams, MessageType, Uri as Url, WorkspaceFolders,
+    WorkspaceFoldersInitializeParams,
+};
 use ruff_db::system::System;
 use std::num::NonZeroUsize;
 use std::panic::{PanicHookInfo, RefUnwindSafe};
@@ -24,7 +27,6 @@ pub(crate) use main_loop::{
     Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender, SendRequest,
 };
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
-pub use api::{PartialWorkspaceProgress, PartialWorkspaceProgressParams};
 
 pub struct Server {
     connection: Connection,
@@ -46,7 +48,8 @@ impl Server {
         let InitializeParams {
             initialization_options,
             capabilities: client_capabilities,
-            workspace_folders,
+            workspace_folders_initialize_params:
+                WorkspaceFoldersInitializeParams { workspace_folders },
             client_info,
             ..
         } = serde_json::from_value(init_value)
@@ -103,7 +106,15 @@ impl Server {
 
         // Get workspace URLs without settings - settings will come from workspace/configuration
         let workspace_urls = workspace_folders
-            .filter(|folders| !folders.is_empty())
+            .and_then(|folders| {
+                if let WorkspaceFolders::WorkspaceFolderList(folders) = folders
+                    && !folders.is_empty()
+                {
+                    Some(folders)
+                } else {
+                    None
+                }
+            })
             .map(|folders| {
                 folders
                     .into_iter()
@@ -207,7 +218,7 @@ impl ServerPanicHookHandler {
             if let Some(client) = hook_client.upgrade() {
                 client.show_message(
                     "The ty language server exited with a panic. See the logs for more details.",
-                    MessageType::ERROR,
+                    MessageType::Error,
                 );
             }
         }));

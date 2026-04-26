@@ -7,8 +7,8 @@ use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
 use crate::system::AnySystemPath;
-use lsp_types as types;
-use lsp_types::{FileChangeType, notification as notif};
+use lsp_types::FileChangeType;
+use lsp_types::{self as types, DidChangeWatchedFilesNotification};
 use ruff_db::system::SystemPathBuf;
 use ty_project::Db as _;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
@@ -16,7 +16,7 @@ use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 pub(crate) struct DidChangeWatchedFiles;
 
 impl NotificationHandler for DidChangeWatchedFiles {
-    type NotificationType = notif::DidChangeWatchedFiles;
+    type NotificationType = DidChangeWatchedFilesNotification;
 }
 
 impl SyncNotificationHandler for DidChangeWatchedFiles {
@@ -38,26 +38,19 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
                 }
             };
 
-            let change_event = match change.typ {
-                FileChangeType::CREATED => ChangeEvent::Created {
+            let change_event = match change.kind {
+                FileChangeType::Created => ChangeEvent::Created {
                     path: system_path,
                     kind: CreatedKind::Any,
                 },
-                FileChangeType::CHANGED => ChangeEvent::Changed {
+                FileChangeType::Changed => ChangeEvent::Changed {
                     path: system_path,
                     kind: ChangedKind::Any,
                 },
-                FileChangeType::DELETED => ChangeEvent::Deleted {
+                FileChangeType::Deleted => ChangeEvent::Deleted {
                     path: system_path,
                     kind: DeletedKind::Any,
                 },
-                _ => {
-                    tracing::debug!(
-                        "Ignoring unsupported change event type: `{:?}` for {system_path}",
-                        change.typ
-                    );
-                    continue;
-                }
             };
 
             changes.push(change_event);
@@ -82,11 +75,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         let client_capabilities = session.client_capabilities();
 
         if client_capabilities.supports_workspace_diagnostic_refresh() {
-            client.send_request::<types::request::WorkspaceDiagnosticRefresh>(
-                session,
-                (),
-                |_, ()| {},
-            );
+            client.send_request::<types::DiagnosticRefreshRequest>(session, (), |_, ()| {});
         } else {
             for key in session.text_document_handles() {
                 publish_diagnostics_if_needed(&key, session, client);
@@ -94,7 +83,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         }
 
         if client_capabilities.supports_inlay_hint_refresh() {
-            client.send_request::<types::request::InlayHintRefreshRequest>(session, (), |_, ()| {});
+            client.send_request::<types::InlayHintRefreshRequest>(session, (), |_, ()| {});
         }
 
         Ok(())

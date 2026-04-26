@@ -40,7 +40,7 @@ impl Client {
         params: R::Params,
         response_handler: impl FnOnce(&Client, R::Result) + Send + 'static,
     ) where
-        R: lsp_types::request::Request,
+        R: lsp_types::Request,
     {
         self.send_request_raw(
             session,
@@ -64,7 +64,7 @@ impl Client {
         params: R::Params,
         response_handler: impl FnOnce(&Client, R::Result) + Send + 'static,
     ) where
-        R: lsp_types::request::Request,
+        R: lsp_types::Request,
     {
         self.main_loop_sender
             .send(Event::Action(Action::SendRequest(SendRequest {
@@ -99,7 +99,7 @@ impl Client {
     /// Sends a notification to the client.
     pub(crate) fn send_notification<N>(&self, params: N::Params)
     where
-        N: lsp_types::notification::Notification,
+        N: lsp_types::Notification,
     {
         if let Err(err) =
             self.client_sender
@@ -172,9 +172,9 @@ impl Client {
     ///
     /// This opens a pop up in VS Code showing `message`.
     pub(crate) fn show_message(&self, message: impl Display, message_type: lsp_types::MessageType) {
-        self.send_notification::<lsp_types::notification::ShowMessage>(
+        self.send_notification::<lsp_types::ShowMessageNotification>(
             lsp_types::ShowMessageParams {
-                typ: message_type,
+                kind: message_type,
                 message: message.to_string(),
             },
         );
@@ -185,7 +185,7 @@ impl Client {
     ///
     /// Logs an error if the message could not be sent.
     pub(crate) fn show_warning_message(&self, message: impl Display) {
-        self.show_message(message, lsp_types::MessageType::WARNING);
+        self.show_message(message, lsp_types::MessageType::Warning);
     }
 
     /// Sends a request to display an error to the client with a formatted message. The error is
@@ -193,7 +193,7 @@ impl Client {
     ///
     /// Logs an error if the message could not be sent.
     pub(crate) fn show_error_message(&self, message: impl Display) {
-        self.show_message(message, lsp_types::MessageType::ERROR);
+        self.show_message(message, lsp_types::MessageType::Error);
     }
 
     /// Re-queues this request after a salsa cancellation for a retry.
@@ -245,12 +245,12 @@ pub(crate) struct ClientResponseHandler(Box<dyn FnOnce(&Client, lsp_server::Resp
 impl ClientResponseHandler {
     fn for_request<R>(response_handler: impl FnOnce(&Client, R::Result) + Send + 'static) -> Self
     where
-        R: lsp_types::request::Request,
+        R: lsp_types::Request,
     {
         Self(Box::new(
             move |client: &Client, response: lsp_server::Response| {
                 let _span =
-                    tracing::debug_span!("client_response", id=%response.id, method = R::METHOD)
+                    tracing::debug_span!("client_response", id=%response.id, method = R::METHOD.as_str())
                         .entered();
 
                 match (response.error, response.result) {

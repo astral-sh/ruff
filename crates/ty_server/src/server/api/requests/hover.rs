@@ -6,8 +6,8 @@ use crate::server::api::traits::{
 };
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
-use lsp_types::request::HoverRequest;
-use lsp_types::{HoverContents, HoverParams, MarkupContent, Url};
+use lsp_types::HoverRequest;
+use lsp_types::{HoverParams, MarkupContent, Uri as Url};
 use ty_ide::{MarkupKind, hover};
 use ty_project::ProjectDatabase;
 
@@ -64,10 +64,11 @@ impl BackgroundDocumentRequestHandler for HoverRequestHandler {
         let contents = range_info.display(db, markup_kind).to_string();
 
         Ok(Some(lsp_types::Hover {
-            contents: HoverContents::Markup(MarkupContent {
+            contents: MarkupContent {
                 kind: lsp_markup_kind,
                 value: contents,
-            }),
+            }
+            .into(),
             range: range_info
                 .file_range()
                 .to_lsp_range(db, snapshot.encoding())
