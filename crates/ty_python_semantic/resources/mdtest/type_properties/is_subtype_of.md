@@ -1002,13 +1002,13 @@ Parameter types are contravariant.
 
 ```py
 from typing import Callable
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert, TypeOf
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert, TypeOf
 
 def float_param(a: float, /) -> None: ...
 def int_param(a: int, /) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[float_param], CallableTypeOf[int_param]))
-static_assert(not is_subtype_of(CallableTypeOf[int_param], CallableTypeOf[float_param]))
+static_assert(is_subtype_of(RegularCallableTypeOf[float_param], RegularCallableTypeOf[int_param]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[int_param], RegularCallableTypeOf[float_param]))
 
 static_assert(is_subtype_of(TypeOf[int_param], Callable[[int], None]))
 static_assert(is_subtype_of(TypeOf[float_param], Callable[[float], None]))
@@ -1022,8 +1022,8 @@ Parameter name is not required to be the same for positional-only parameters at 
 ```py
 def int_param_different_name(b: int, /) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[int_param], CallableTypeOf[int_param_different_name]))
-static_assert(is_subtype_of(CallableTypeOf[int_param_different_name], CallableTypeOf[int_param]))
+static_assert(is_subtype_of(RegularCallableTypeOf[int_param], RegularCallableTypeOf[int_param_different_name]))
+static_assert(is_subtype_of(RegularCallableTypeOf[int_param_different_name], RegularCallableTypeOf[int_param]))
 ```
 
 Multiple positional-only parameters are checked in order:
@@ -1032,8 +1032,8 @@ Multiple positional-only parameters are checked in order:
 def multi_param1(a: float, b: int, c: str, /) -> None: ...
 def multi_param2(b: int, c: bool, a: str, /) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[multi_param1], CallableTypeOf[multi_param2]))
-static_assert(not is_subtype_of(CallableTypeOf[multi_param2], CallableTypeOf[multi_param1]))
+static_assert(is_subtype_of(RegularCallableTypeOf[multi_param1], RegularCallableTypeOf[multi_param2]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[multi_param2], RegularCallableTypeOf[multi_param1]))
 
 static_assert(is_subtype_of(TypeOf[multi_param1], Callable[[float, int, str], None]))
 
@@ -1047,17 +1047,17 @@ corresponding position in the supertype does not need to have a default value.
 
 ```py
 from typing import Callable
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert, TypeOf
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert, TypeOf
 
 def float_with_default(a: float = 1, /) -> None: ...
 def int_with_default(a: int = 1, /) -> None: ...
 def int_without_default(a: int, /) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[float_with_default], CallableTypeOf[int_with_default]))
-static_assert(not is_subtype_of(CallableTypeOf[int_with_default], CallableTypeOf[float_with_default]))
+static_assert(is_subtype_of(RegularCallableTypeOf[float_with_default], RegularCallableTypeOf[int_with_default]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[int_with_default], RegularCallableTypeOf[float_with_default]))
 
-static_assert(is_subtype_of(CallableTypeOf[int_with_default], CallableTypeOf[int_without_default]))
-static_assert(not is_subtype_of(CallableTypeOf[int_without_default], CallableTypeOf[int_with_default]))
+static_assert(is_subtype_of(RegularCallableTypeOf[int_with_default], RegularCallableTypeOf[int_without_default]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[int_without_default], RegularCallableTypeOf[int_with_default]))
 
 static_assert(is_subtype_of(TypeOf[int_with_default], Callable[[int], None]))
 static_assert(is_subtype_of(TypeOf[int_with_default], Callable[[], None]))
@@ -1072,9 +1072,9 @@ As the parameter itself is optional, it can be omitted in the supertype:
 ```py
 def empty() -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[int_with_default], CallableTypeOf[empty]))
-static_assert(not is_subtype_of(CallableTypeOf[int_without_default], CallableTypeOf[empty]))
-static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[int_with_default]))
+static_assert(is_subtype_of(RegularCallableTypeOf[int_with_default], RegularCallableTypeOf[empty]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[int_without_default], RegularCallableTypeOf[empty]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[empty], RegularCallableTypeOf[int_with_default]))
 ```
 
 The subtype can include any number of positional-only parameters as long as they have the default
@@ -1083,8 +1083,8 @@ value:
 ```py
 def multi_param(a: float = 1, b: int = 2, c: str = "3", /) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[multi_param], CallableTypeOf[empty]))
-static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[multi_param]))
+static_assert(is_subtype_of(RegularCallableTypeOf[multi_param], RegularCallableTypeOf[empty]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[empty], RegularCallableTypeOf[multi_param]))
 ```
 
 #### Positional-only with other kinds
@@ -1093,7 +1093,7 @@ If a parameter is declared as positional-only, then the corresponding parameter 
 cannot be any other parameter kind.
 
 ```py
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
 
 def positional_only(a: int, /) -> None: ...
 def standard(a: int) -> None: ...
@@ -1101,10 +1101,10 @@ def keyword_only(*, a: int) -> None: ...
 def variadic(*a: int) -> None: ...
 def keyword_variadic(**a: int) -> None: ...
 
-static_assert(not is_subtype_of(CallableTypeOf[positional_only], CallableTypeOf[standard]))
-static_assert(not is_subtype_of(CallableTypeOf[positional_only], CallableTypeOf[keyword_only]))
-static_assert(not is_subtype_of(CallableTypeOf[positional_only], CallableTypeOf[variadic]))
-static_assert(not is_subtype_of(CallableTypeOf[positional_only], CallableTypeOf[keyword_variadic]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[positional_only], RegularCallableTypeOf[standard]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[positional_only], RegularCallableTypeOf[keyword_only]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[positional_only], RegularCallableTypeOf[variadic]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[positional_only], RegularCallableTypeOf[keyword_variadic]))
 ```
 
 #### Standard
@@ -1114,13 +1114,13 @@ A standard parameter is either a positional or a keyword parameter.
 Unlike positional-only parameters, standard parameters should have the same name in the subtype.
 
 ```py
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
 
 def int_param_a(a: int) -> None: ...
 def int_param_b(b: int) -> None: ...
 
-static_assert(not is_subtype_of(CallableTypeOf[int_param_a], CallableTypeOf[int_param_b]))
-static_assert(not is_subtype_of(CallableTypeOf[int_param_b], CallableTypeOf[int_param_a]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[int_param_a], RegularCallableTypeOf[int_param_b]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[int_param_b], RegularCallableTypeOf[int_param_a]))
 ```
 
 Apart from the name, it behaves the same as positional-only parameters.
@@ -1129,8 +1129,8 @@ Apart from the name, it behaves the same as positional-only parameters.
 def float_param(a: float) -> None: ...
 def int_param(a: int) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[float_param], CallableTypeOf[int_param]))
-static_assert(not is_subtype_of(CallableTypeOf[int_param], CallableTypeOf[float_param]))
+static_assert(is_subtype_of(RegularCallableTypeOf[float_param], RegularCallableTypeOf[int_param]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[int_param], RegularCallableTypeOf[float_param]))
 ```
 
 With the same rules for default values as well.
@@ -1140,14 +1140,14 @@ def float_with_default(a: float = 1) -> None: ...
 def int_with_default(a: int = 1) -> None: ...
 def empty() -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[float_with_default], CallableTypeOf[int_with_default]))
-static_assert(not is_subtype_of(CallableTypeOf[int_with_default], CallableTypeOf[float_with_default]))
+static_assert(is_subtype_of(RegularCallableTypeOf[float_with_default], RegularCallableTypeOf[int_with_default]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[int_with_default], RegularCallableTypeOf[float_with_default]))
 
-static_assert(is_subtype_of(CallableTypeOf[int_with_default], CallableTypeOf[int_param]))
-static_assert(not is_subtype_of(CallableTypeOf[int_param], CallableTypeOf[int_with_default]))
+static_assert(is_subtype_of(RegularCallableTypeOf[int_with_default], RegularCallableTypeOf[int_param]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[int_param], RegularCallableTypeOf[int_with_default]))
 
-static_assert(is_subtype_of(CallableTypeOf[int_with_default], CallableTypeOf[empty]))
-static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[int_with_default]))
+static_assert(is_subtype_of(RegularCallableTypeOf[int_with_default], RegularCallableTypeOf[empty]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[empty], RegularCallableTypeOf[int_with_default]))
 ```
 
 Multiple standard parameters are checked in order along with their names:
@@ -1156,8 +1156,8 @@ Multiple standard parameters are checked in order along with their names:
 def multi_param1(a: float, b: int, c: str) -> None: ...
 def multi_param2(a: int, b: bool, c: str) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[multi_param1], CallableTypeOf[multi_param2]))
-static_assert(not is_subtype_of(CallableTypeOf[multi_param2], CallableTypeOf[multi_param1]))
+static_assert(is_subtype_of(RegularCallableTypeOf[multi_param1], RegularCallableTypeOf[multi_param2]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[multi_param2], RegularCallableTypeOf[multi_param1]))
 ```
 
 The subtype can include as many standard parameters as long as they have the default value:
@@ -1165,8 +1165,8 @@ The subtype can include as many standard parameters as long as they have the def
 ```py
 def multi_param_default(a: float = 1, b: int = 2, c: str = "s") -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[multi_param_default], CallableTypeOf[empty]))
-static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[multi_param_default]))
+static_assert(is_subtype_of(RegularCallableTypeOf[multi_param_default], RegularCallableTypeOf[empty]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[empty], RegularCallableTypeOf[multi_param_default]))
 ```
 
 #### Standard with keyword-only
@@ -1176,26 +1176,26 @@ parameter in the subtype with the same name. This is because a standard paramete
 than a keyword-only parameter.
 
 ```py
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
 
 def standard_a(a: int) -> None: ...
 def keyword_b(*, b: int) -> None: ...
 
 # The name of the parameters are different
-static_assert(not is_subtype_of(CallableTypeOf[standard_a], CallableTypeOf[keyword_b]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[standard_a], RegularCallableTypeOf[keyword_b]))
 
 def standard_float(a: float) -> None: ...
 def keyword_int(*, a: int) -> None: ...
 
 # Here, the name of the parameters are the same
-static_assert(is_subtype_of(CallableTypeOf[standard_float], CallableTypeOf[keyword_int]))
+static_assert(is_subtype_of(RegularCallableTypeOf[standard_float], RegularCallableTypeOf[keyword_int]))
 
 def standard_with_default(a: int = 1) -> None: ...
 def keyword_with_default(*, a: int = 1) -> None: ...
 def empty() -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[standard_with_default], CallableTypeOf[keyword_with_default]))
-static_assert(is_subtype_of(CallableTypeOf[standard_with_default], CallableTypeOf[empty]))
+static_assert(is_subtype_of(RegularCallableTypeOf[standard_with_default], RegularCallableTypeOf[keyword_with_default]))
+static_assert(is_subtype_of(RegularCallableTypeOf[standard_with_default], RegularCallableTypeOf[empty]))
 ```
 
 The position of the keyword-only parameters does not matter:
@@ -1204,7 +1204,7 @@ The position of the keyword-only parameters does not matter:
 def multi_standard(a: float, b: int, c: str) -> None: ...
 def multi_keyword(*, b: bool, c: str, a: int) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[multi_standard], CallableTypeOf[multi_keyword]))
+static_assert(is_subtype_of(RegularCallableTypeOf[multi_standard], RegularCallableTypeOf[multi_keyword]))
 ```
 
 #### Standard with positional-only
@@ -1214,25 +1214,25 @@ parameter in the subtype at the same position. This is because a standard parame
 than a positional-only parameter.
 
 ```py
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
 
 def standard_a(a: int) -> None: ...
 def positional_b(b: int, /) -> None: ...
 
 # The names are not important in this context
-static_assert(is_subtype_of(CallableTypeOf[standard_a], CallableTypeOf[positional_b]))
+static_assert(is_subtype_of(RegularCallableTypeOf[standard_a], RegularCallableTypeOf[positional_b]))
 
 def standard_float(a: float) -> None: ...
 def positional_int(a: int, /) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[standard_float], CallableTypeOf[positional_int]))
+static_assert(is_subtype_of(RegularCallableTypeOf[standard_float], RegularCallableTypeOf[positional_int]))
 
 def standard_with_default(a: int = 1) -> None: ...
 def positional_with_default(a: int = 1, /) -> None: ...
 def empty() -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[standard_with_default], CallableTypeOf[positional_with_default]))
-static_assert(is_subtype_of(CallableTypeOf[standard_with_default], CallableTypeOf[empty]))
+static_assert(is_subtype_of(RegularCallableTypeOf[standard_with_default], RegularCallableTypeOf[positional_with_default]))
+static_assert(is_subtype_of(RegularCallableTypeOf[standard_with_default], RegularCallableTypeOf[empty]))
 ```
 
 The position of the positional-only parameters matter:
@@ -1244,8 +1244,8 @@ def multi_positional1(b: int, c: bool, a: str, /) -> None: ...
 # Here, the type of the parameter `a` makes the subtype relation invalid
 def multi_positional2(b: int, a: float, c: str, /) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[multi_standard], CallableTypeOf[multi_positional1]))
-static_assert(not is_subtype_of(CallableTypeOf[multi_standard], CallableTypeOf[multi_positional2]))
+static_assert(is_subtype_of(RegularCallableTypeOf[multi_standard], RegularCallableTypeOf[multi_positional1]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[multi_standard], RegularCallableTypeOf[multi_positional2]))
 ```
 
 #### Standard with variadic
@@ -1254,14 +1254,14 @@ A variadic or keyword-variadic parameter in the supertype cannot be substituted 
 parameter in the subtype.
 
 ```py
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
 
 def standard(a: int) -> None: ...
 def variadic(*a: int) -> None: ...
 def keyword_variadic(**a: int) -> None: ...
 
-static_assert(not is_subtype_of(CallableTypeOf[standard], CallableTypeOf[variadic]))
-static_assert(not is_subtype_of(CallableTypeOf[standard], CallableTypeOf[keyword_variadic]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[standard], RegularCallableTypeOf[variadic]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[standard], RegularCallableTypeOf[keyword_variadic]))
 ```
 
 #### Variadic
@@ -1269,13 +1269,13 @@ static_assert(not is_subtype_of(CallableTypeOf[standard], CallableTypeOf[keyword
 The name of the variadic parameter does not need to be the same in the subtype.
 
 ```py
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
 
 def variadic_float(*args2: float) -> None: ...
 def variadic_int(*args1: int) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[variadic_float], CallableTypeOf[variadic_int]))
-static_assert(not is_subtype_of(CallableTypeOf[variadic_int], CallableTypeOf[variadic_float]))
+static_assert(is_subtype_of(RegularCallableTypeOf[variadic_float], RegularCallableTypeOf[variadic_int]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[variadic_int], RegularCallableTypeOf[variadic_float]))
 ```
 
 The variadic parameter does not need to be present in the supertype:
@@ -1283,8 +1283,8 @@ The variadic parameter does not need to be present in the supertype:
 ```py
 def empty() -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[variadic_int], CallableTypeOf[empty]))
-static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[variadic_int]))
+static_assert(is_subtype_of(RegularCallableTypeOf[variadic_int], RegularCallableTypeOf[empty]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[empty], RegularCallableTypeOf[variadic_int]))
 ```
 
 #### Variadic with positional-only
@@ -1293,7 +1293,7 @@ If the subtype has a variadic parameter then any unmatched positional-only param
 supertype should be checked against the variadic parameter.
 
 ```py
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
 
 def variadic(a: int, /, *args: float) -> None: ...
 
@@ -1303,8 +1303,8 @@ def positional_only(a: int, b: float, c: int, /) -> None: ...
 # Here, the parameter `b` is unmatched and there's also a variadic parameter
 def positional_variadic(a: int, b: float, /, *args: int) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[variadic], CallableTypeOf[positional_only]))
-static_assert(is_subtype_of(CallableTypeOf[variadic], CallableTypeOf[positional_variadic]))
+static_assert(is_subtype_of(RegularCallableTypeOf[variadic], RegularCallableTypeOf[positional_only]))
+static_assert(is_subtype_of(RegularCallableTypeOf[variadic], RegularCallableTypeOf[positional_variadic]))
 ```
 
 #### Variadic with other kinds
@@ -1313,7 +1313,7 @@ Variadic parameter in a subtype can only be used to match against an unmatched p
 parameters from the supertype, not any other parameter kind.
 
 ```py
-from ty_extensions import CallableTypeOf, is_subtype_of, is_assignable_to, static_assert
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, is_assignable_to, static_assert
 
 def variadic(*args: int) -> None: ...
 
@@ -1325,9 +1325,9 @@ def standard(a: int, b: float, /, c: int) -> None: ...
 def keyword_only(a: int, /, *, b: int) -> None: ...
 def keyword_variadic(a: int, /, **kwargs: int) -> None: ...
 
-static_assert(not is_subtype_of(CallableTypeOf[variadic], CallableTypeOf[standard]))
-static_assert(not is_subtype_of(CallableTypeOf[variadic], CallableTypeOf[keyword_only]))
-static_assert(not is_subtype_of(CallableTypeOf[variadic], CallableTypeOf[keyword_variadic]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[variadic], RegularCallableTypeOf[standard]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[variadic], RegularCallableTypeOf[keyword_only]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[variadic], RegularCallableTypeOf[keyword_variadic]))
 ```
 
 But, there are special cases when matching against standard parameters. This is due to the fact that
@@ -1339,8 +1339,8 @@ def variadic_keyword(*args: int, **kwargs: int) -> None: ...
 def standard_int(a: int) -> None: ...
 def standard_float(a: float) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[variadic_keyword], CallableTypeOf[standard_int]))
-static_assert(not is_subtype_of(CallableTypeOf[variadic_keyword], CallableTypeOf[standard_float]))
+static_assert(is_subtype_of(RegularCallableTypeOf[variadic_keyword], RegularCallableTypeOf[standard_int]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[variadic_keyword], RegularCallableTypeOf[standard_float]))
 ```
 
 If the type of either the variadic or keyword-variadic parameter is not a supertype of the standard
@@ -1350,8 +1350,8 @@ parameter, then the subtyping relation is invalid.
 def variadic_bool(*args: bool, **kwargs: int) -> None: ...
 def keyword_variadic_bool(*args: int, **kwargs: bool) -> None: ...
 
-static_assert(not is_subtype_of(CallableTypeOf[variadic_bool], CallableTypeOf[standard_int]))
-static_assert(not is_subtype_of(CallableTypeOf[keyword_variadic_bool], CallableTypeOf[standard_int]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[variadic_bool], RegularCallableTypeOf[standard_int]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[keyword_variadic_bool], RegularCallableTypeOf[standard_int]))
 ```
 
 The standard parameter can follow a variadic parameter in the subtype.
@@ -1360,8 +1360,8 @@ The standard parameter can follow a variadic parameter in the subtype.
 def standard_variadic_int(a: int, *args: int) -> None: ...
 def standard_variadic_float(a: int, *args: float) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[variadic_keyword], CallableTypeOf[standard_variadic_int]))
-static_assert(not is_subtype_of(CallableTypeOf[variadic_keyword], CallableTypeOf[standard_variadic_float]))
+static_assert(is_subtype_of(RegularCallableTypeOf[variadic_keyword], RegularCallableTypeOf[standard_variadic_int]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[variadic_keyword], RegularCallableTypeOf[standard_variadic_float]))
 ```
 
 The keyword part of the standard parameter can be matched against keyword-only parameter with the
@@ -1371,9 +1371,9 @@ same name if the keyword-variadic parameter is absent.
 def variadic_a(*args: int, a: int) -> None: ...
 def variadic_b(*args: int, b: int) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[variadic_a], CallableTypeOf[standard_int]))
+static_assert(is_subtype_of(RegularCallableTypeOf[variadic_a], RegularCallableTypeOf[standard_int]))
 # The parameter name is different
-static_assert(not is_subtype_of(CallableTypeOf[variadic_b], CallableTypeOf[standard_int]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[variadic_b], RegularCallableTypeOf[standard_int]))
 ```
 
 A variadic positional parameter alone cannot match a positional-or-keyword parameter because
@@ -1382,8 +1382,8 @@ variadic positional parameters can only be called positionally.
 ```py
 def only_variadic(*args: int) -> None: ...
 
-static_assert(not is_subtype_of(CallableTypeOf[only_variadic], CallableTypeOf[standard_int]))
-static_assert(not is_assignable_to(CallableTypeOf[only_variadic], CallableTypeOf[standard_int]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[only_variadic], RegularCallableTypeOf[standard_int]))
+static_assert(not is_assignable_to(RegularCallableTypeOf[only_variadic], RegularCallableTypeOf[standard_int]))
 ```
 
 #### Keyword-only
@@ -1391,15 +1391,15 @@ static_assert(not is_assignable_to(CallableTypeOf[only_variadic], CallableTypeOf
 For keyword-only parameters, the name should be the same:
 
 ```py
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
 
 def keyword_int(*, a: int) -> None: ...
 def keyword_float(*, a: float) -> None: ...
 def keyword_b(*, b: int) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[keyword_float], CallableTypeOf[keyword_int]))
-static_assert(not is_subtype_of(CallableTypeOf[keyword_int], CallableTypeOf[keyword_float]))
-static_assert(not is_subtype_of(CallableTypeOf[keyword_int], CallableTypeOf[keyword_b]))
+static_assert(is_subtype_of(RegularCallableTypeOf[keyword_float], RegularCallableTypeOf[keyword_int]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[keyword_int], RegularCallableTypeOf[keyword_float]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[keyword_int], RegularCallableTypeOf[keyword_b]))
 ```
 
 But, the order of the keyword-only parameters is not required to be the same:
@@ -1408,28 +1408,28 @@ But, the order of the keyword-only parameters is not required to be the same:
 def keyword_ab(*, a: float, b: float) -> None: ...
 def keyword_ba(*, b: int, a: int) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[keyword_ab], CallableTypeOf[keyword_ba]))
-static_assert(not is_subtype_of(CallableTypeOf[keyword_ba], CallableTypeOf[keyword_ab]))
+static_assert(is_subtype_of(RegularCallableTypeOf[keyword_ab], RegularCallableTypeOf[keyword_ba]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[keyword_ba], RegularCallableTypeOf[keyword_ab]))
 ```
 
 #### Keyword-only with default
 
 ```py
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
 
 def float_with_default(*, a: float = 1) -> None: ...
 def int_with_default(*, a: int = 1) -> None: ...
 def int_keyword(*, a: int) -> None: ...
 def empty() -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[float_with_default], CallableTypeOf[int_with_default]))
-static_assert(not is_subtype_of(CallableTypeOf[int_with_default], CallableTypeOf[float_with_default]))
+static_assert(is_subtype_of(RegularCallableTypeOf[float_with_default], RegularCallableTypeOf[int_with_default]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[int_with_default], RegularCallableTypeOf[float_with_default]))
 
-static_assert(is_subtype_of(CallableTypeOf[int_with_default], CallableTypeOf[int_keyword]))
-static_assert(not is_subtype_of(CallableTypeOf[int_keyword], CallableTypeOf[int_with_default]))
+static_assert(is_subtype_of(RegularCallableTypeOf[int_with_default], RegularCallableTypeOf[int_keyword]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[int_keyword], RegularCallableTypeOf[int_with_default]))
 
-static_assert(is_subtype_of(CallableTypeOf[int_with_default], CallableTypeOf[empty]))
-static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[int_with_default]))
+static_assert(is_subtype_of(RegularCallableTypeOf[int_with_default], RegularCallableTypeOf[empty]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[empty], RegularCallableTypeOf[int_with_default]))
 ```
 
 Keyword-only parameters with default values can be mixed with the ones without default values in any
@@ -1439,20 +1439,20 @@ order:
 # A keyword-only parameter with a default value follows the one without a default value (it's valid)
 def mixed(*, b: int = 1, a: int) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[mixed], CallableTypeOf[int_keyword]))
-static_assert(not is_subtype_of(CallableTypeOf[int_keyword], CallableTypeOf[mixed]))
+static_assert(is_subtype_of(RegularCallableTypeOf[mixed], RegularCallableTypeOf[int_keyword]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[int_keyword], RegularCallableTypeOf[mixed]))
 ```
 
 #### Keyword-only with standard
 
 ```py
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
 
 def keywords1(*, a: int, b: int) -> None: ...
 def standard(b: float, a: float) -> None: ...
 
-static_assert(not is_subtype_of(CallableTypeOf[keywords1], CallableTypeOf[standard]))
-static_assert(is_subtype_of(CallableTypeOf[standard], CallableTypeOf[keywords1]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[keywords1], RegularCallableTypeOf[standard]))
+static_assert(is_subtype_of(RegularCallableTypeOf[standard], RegularCallableTypeOf[keywords1]))
 ```
 
 The subtype can include additional standard parameters as long as it has the default value:
@@ -1461,8 +1461,8 @@ The subtype can include additional standard parameters as long as it has the def
 def standard_with_default(b: float, a: float, c: float = 1) -> None: ...
 def standard_without_default(b: float, a: float, c: float) -> None: ...
 
-static_assert(not is_subtype_of(CallableTypeOf[standard_without_default], CallableTypeOf[keywords1]))
-static_assert(is_subtype_of(CallableTypeOf[standard_with_default], CallableTypeOf[keywords1]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[standard_without_default], RegularCallableTypeOf[keywords1]))
+static_assert(is_subtype_of(RegularCallableTypeOf[standard_with_default], RegularCallableTypeOf[keywords1]))
 ```
 
 Here, we mix keyword-only parameters with standard parameters:
@@ -1471,8 +1471,8 @@ Here, we mix keyword-only parameters with standard parameters:
 def keywords2(*, a: int, c: int, b: int) -> None: ...
 def mixed(b: float, a: float, *, c: float) -> None: ...
 
-static_assert(not is_subtype_of(CallableTypeOf[keywords2], CallableTypeOf[mixed]))
-static_assert(is_subtype_of(CallableTypeOf[mixed], CallableTypeOf[keywords2]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[keywords2], RegularCallableTypeOf[mixed]))
+static_assert(is_subtype_of(RegularCallableTypeOf[mixed], RegularCallableTypeOf[keywords2]))
 ```
 
 But, we shouldn't consider any unmatched positional-only parameters:
@@ -1480,7 +1480,7 @@ But, we shouldn't consider any unmatched positional-only parameters:
 ```py
 def mixed_positional(b: float, /, a: float, *, c: float) -> None: ...
 
-static_assert(not is_subtype_of(CallableTypeOf[mixed_positional], CallableTypeOf[keywords2]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[mixed_positional], RegularCallableTypeOf[keywords2]))
 ```
 
 But, an unmatched variadic parameter is still valid:
@@ -1488,7 +1488,7 @@ But, an unmatched variadic parameter is still valid:
 ```py
 def mixed_variadic(*args: float, a: float, b: float, c: float, **kwargs: float) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[mixed_variadic], CallableTypeOf[keywords2]))
+static_assert(is_subtype_of(RegularCallableTypeOf[mixed_variadic], RegularCallableTypeOf[keywords2]))
 ```
 
 #### Keyword-variadic
@@ -1496,13 +1496,13 @@ static_assert(is_subtype_of(CallableTypeOf[mixed_variadic], CallableTypeOf[keywo
 The name of the keyword-variadic parameter does not need to be the same in the subtype.
 
 ```py
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
 
 def kwargs_float(**kwargs2: float) -> None: ...
 def kwargs_int(**kwargs1: int) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[kwargs_float], CallableTypeOf[kwargs_int]))
-static_assert(not is_subtype_of(CallableTypeOf[kwargs_int], CallableTypeOf[kwargs_float]))
+static_assert(is_subtype_of(RegularCallableTypeOf[kwargs_float], RegularCallableTypeOf[kwargs_int]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[kwargs_int], RegularCallableTypeOf[kwargs_float]))
 ```
 
 A variadic parameter can be added in a subtype, since callers can omit it:
@@ -1510,8 +1510,8 @@ A variadic parameter can be added in a subtype, since callers can omit it:
 ```py
 def empty() -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[kwargs_int], CallableTypeOf[empty]))
-static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[kwargs_int]))
+static_assert(is_subtype_of(RegularCallableTypeOf[kwargs_int], RegularCallableTypeOf[empty]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[empty], RegularCallableTypeOf[kwargs_int]))
 ```
 
 A positional parameter with default can also be added to the subtype, since callers can omit it:
@@ -1519,24 +1519,26 @@ A positional parameter with default can also be added to the subtype, since call
 ```py
 def positional_with_default(x: int = 0) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[positional_with_default], CallableTypeOf[empty]))
-static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[positional_with_default]))
+static_assert(is_subtype_of(RegularCallableTypeOf[positional_with_default], RegularCallableTypeOf[empty]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[empty], RegularCallableTypeOf[positional_with_default]))
 
 def positional_with_default_and_kwargs(x: int = 0, **kwargs: int) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[positional_with_default_and_kwargs], CallableTypeOf[empty]))
-static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[positional_with_default_and_kwargs]))
+static_assert(is_subtype_of(RegularCallableTypeOf[positional_with_default_and_kwargs], RegularCallableTypeOf[empty]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[empty], RegularCallableTypeOf[positional_with_default_and_kwargs]))
 
-static_assert(is_subtype_of(CallableTypeOf[positional_with_default_and_kwargs], CallableTypeOf[kwargs_int]))
-static_assert(not is_subtype_of(CallableTypeOf[kwargs_int], CallableTypeOf[positional_with_default_and_kwargs]))
+static_assert(is_subtype_of(RegularCallableTypeOf[positional_with_default_and_kwargs], RegularCallableTypeOf[kwargs_int]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[kwargs_int], RegularCallableTypeOf[positional_with_default_and_kwargs]))
 
 def positional_only_with_default_and_kwargs(x: int = 0, /, **kwargs: int) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[positional_only_with_default_and_kwargs], CallableTypeOf[empty]))
-static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[positional_only_with_default_and_kwargs]))
+static_assert(is_subtype_of(RegularCallableTypeOf[positional_only_with_default_and_kwargs], RegularCallableTypeOf[empty]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[empty], RegularCallableTypeOf[positional_only_with_default_and_kwargs]))
 
-static_assert(is_subtype_of(CallableTypeOf[positional_only_with_default_and_kwargs], CallableTypeOf[kwargs_int]))
-static_assert(not is_subtype_of(CallableTypeOf[kwargs_int], CallableTypeOf[positional_only_with_default_and_kwargs]))
+static_assert(is_subtype_of(RegularCallableTypeOf[positional_only_with_default_and_kwargs], RegularCallableTypeOf[kwargs_int]))
+static_assert(
+    not is_subtype_of(RegularCallableTypeOf[kwargs_int], RegularCallableTypeOf[positional_only_with_default_and_kwargs])
+)
 ```
 
 #### Keyword-variadic with keyword-only
@@ -1545,14 +1547,14 @@ If the subtype has a keyword-variadic parameter then any unmatched keyword-only 
 supertype should be checked against the keyword-variadic parameter.
 
 ```py
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
 
 def kwargs(**kwargs: float) -> None: ...
 def keyword_only(*, a: int, b: float, c: bool) -> None: ...
 def keyword_variadic(*, a: int, **kwargs: int) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[kwargs], CallableTypeOf[keyword_only]))
-static_assert(is_subtype_of(CallableTypeOf[kwargs], CallableTypeOf[keyword_variadic]))
+static_assert(is_subtype_of(RegularCallableTypeOf[kwargs], RegularCallableTypeOf[keyword_only]))
+static_assert(is_subtype_of(RegularCallableTypeOf[kwargs], RegularCallableTypeOf[keyword_variadic]))
 ```
 
 This is valid only for keyword-only parameters, not any other parameter kind:
@@ -1563,8 +1565,8 @@ def mixed1(a: int, *, b: int) -> None: ...
 # Same as above but with the default value
 def mixed2(a: int = 1, *, b: int) -> None: ...
 
-static_assert(not is_subtype_of(CallableTypeOf[kwargs], CallableTypeOf[mixed1]))
-static_assert(not is_subtype_of(CallableTypeOf[kwargs], CallableTypeOf[mixed2]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[kwargs], RegularCallableTypeOf[mixed1]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[kwargs], RegularCallableTypeOf[mixed2]))
 ```
 
 #### Empty
@@ -1573,25 +1575,25 @@ When the supertype has an empty list of parameters, then the subtype can have an
 as long as they contain the default values for non-variadic parameters.
 
 ```py
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
 
 def empty() -> None: ...
 def mixed(a: int = 1, /, b: int = 2, *args: int, c: int = 3, **kwargs: int) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[mixed], CallableTypeOf[empty]))
-static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[mixed]))
+static_assert(is_subtype_of(RegularCallableTypeOf[mixed], RegularCallableTypeOf[empty]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[empty], RegularCallableTypeOf[mixed]))
 ```
 
 #### Object
 
 ```py
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert, TypeOf
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert, TypeOf
 from typing import Callable
 
 def f1(a: int, b: str, /, *c: float, d: int = 1, **e: float) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[f1], object))
-static_assert(not is_subtype_of(object, CallableTypeOf[f1]))
+static_assert(is_subtype_of(RegularCallableTypeOf[f1], object))
+static_assert(not is_subtype_of(object, RegularCallableTypeOf[f1]))
 
 def _(
     f3: Callable[[int, str], None],
@@ -1613,12 +1615,12 @@ any arguments of any type, but otherwise is not a subtype or supertype of any ca
 
 ```py
 from typing import Callable, Never
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
 
 def bottom(*args: object, **kwargs: object) -> Never:
     raise Exception()
 
-type BottomCallable = CallableTypeOf[bottom]
+type BottomCallable = RegularCallableTypeOf[bottom]
 
 static_assert(is_subtype_of(BottomCallable, Callable[..., Never]))
 static_assert(is_subtype_of(BottomCallable, Callable[..., int]))
@@ -1634,11 +1636,11 @@ would not pass if we didn't handle this special case.
 
 ```py
 from typing import Callable, Any
-from ty_extensions import is_subtype_of, static_assert, CallableTypeOf
+from ty_extensions import is_subtype_of, static_assert, RegularCallableTypeOf
 
 def f(*args: Any, **kwargs: Any) -> Any: ...
 
-static_assert(not is_subtype_of(CallableTypeOf[f], Callable[[], object]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[f], Callable[[], object]))
 ```
 
 ### Classes with `__call__`
@@ -2041,16 +2043,16 @@ def overloaded(x: B) -> None: ...
 ```
 
 ```py
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
 from overloaded import A, B, C, overloaded
 
 def accepts_a(x: A) -> None: ...
 def accepts_b(x: B) -> None: ...
 def accepts_c(x: C) -> None: ...
 
-static_assert(is_subtype_of(CallableTypeOf[overloaded], CallableTypeOf[accepts_a]))
-static_assert(is_subtype_of(CallableTypeOf[overloaded], CallableTypeOf[accepts_b]))
-static_assert(not is_subtype_of(CallableTypeOf[overloaded], CallableTypeOf[accepts_c]))
+static_assert(is_subtype_of(RegularCallableTypeOf[overloaded], RegularCallableTypeOf[accepts_a]))
+static_assert(is_subtype_of(RegularCallableTypeOf[overloaded], RegularCallableTypeOf[accepts_b]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[overloaded], RegularCallableTypeOf[accepts_c]))
 ```
 
 #### Supertype overloaded
@@ -2076,7 +2078,7 @@ def overloaded(a: Grandparent) -> None: ...
 ```
 
 ```py
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
 from overloaded import Grandparent, Parent, Child, overloaded
 
 # This is a subtype of only the first overload
@@ -2088,9 +2090,9 @@ def parent(a: Parent) -> None: ...
 # This is the only function that's a subtype of all overloads
 def grandparent(a: Grandparent) -> None: ...
 
-static_assert(not is_subtype_of(CallableTypeOf[child], CallableTypeOf[overloaded]))
-static_assert(not is_subtype_of(CallableTypeOf[parent], CallableTypeOf[overloaded]))
-static_assert(is_subtype_of(CallableTypeOf[grandparent], CallableTypeOf[overloaded]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[child], RegularCallableTypeOf[overloaded]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[parent], RegularCallableTypeOf[overloaded]))
+static_assert(is_subtype_of(RegularCallableTypeOf[grandparent], RegularCallableTypeOf[overloaded]))
 ```
 
 #### Both overloads
@@ -2142,26 +2144,26 @@ def empty_cp(a: Parent) -> None: ...
 ```
 
 ```py
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
 from overloaded import pg, po, go, cpg, empty_go, empty_cp
 
-static_assert(is_subtype_of(CallableTypeOf[pg], CallableTypeOf[cpg]))
-static_assert(is_subtype_of(CallableTypeOf[cpg], CallableTypeOf[pg]))
+static_assert(is_subtype_of(RegularCallableTypeOf[pg], RegularCallableTypeOf[cpg]))
+static_assert(is_subtype_of(RegularCallableTypeOf[cpg], RegularCallableTypeOf[pg]))
 
-static_assert(not is_subtype_of(CallableTypeOf[po], CallableTypeOf[pg]))
-static_assert(not is_subtype_of(CallableTypeOf[pg], CallableTypeOf[po]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[po], RegularCallableTypeOf[pg]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[pg], RegularCallableTypeOf[po]))
 
-static_assert(is_subtype_of(CallableTypeOf[go], CallableTypeOf[pg]))
-static_assert(not is_subtype_of(CallableTypeOf[pg], CallableTypeOf[go]))
+static_assert(is_subtype_of(RegularCallableTypeOf[go], RegularCallableTypeOf[pg]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[pg], RegularCallableTypeOf[go]))
 
 # Overload 1 in `empty_go` is a subtype of overload 1 in `empty_cp`
 # Overload 2 in `empty_go` is a subtype of overload 2 in `empty_cp`
 # Overload 2 in `empty_go` is a subtype of overload 3 in `empty_cp`
 #
 # All overloads in `empty_cp` has a subtype in `empty_go`
-static_assert(is_subtype_of(CallableTypeOf[empty_go], CallableTypeOf[empty_cp]))
+static_assert(is_subtype_of(RegularCallableTypeOf[empty_go], RegularCallableTypeOf[empty_cp]))
 
-static_assert(not is_subtype_of(CallableTypeOf[empty_cp], CallableTypeOf[empty_go]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[empty_cp], RegularCallableTypeOf[empty_go]))
 ```
 
 #### Order of overloads
@@ -2188,10 +2190,55 @@ def overload_ba(x: A) -> None: ...
 
 ```py
 from overloaded import overload_ab, overload_ba
-from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
 
-static_assert(is_subtype_of(CallableTypeOf[overload_ab], CallableTypeOf[overload_ba]))
-static_assert(is_subtype_of(CallableTypeOf[overload_ba], CallableTypeOf[overload_ab]))
+static_assert(is_subtype_of(RegularCallableTypeOf[overload_ab], RegularCallableTypeOf[overload_ba]))
+static_assert(is_subtype_of(RegularCallableTypeOf[overload_ba], RegularCallableTypeOf[overload_ab]))
+```
+
+#### Overloaded callable with many arity-incompatible overloads
+
+When an overloaded source callable has many overloads with different arities, overloads whose
+positional parameter count is less than the target's should be quickly rejected without expensive
+per-parameter type comparisons.
+
+`many_overloads.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def many(a: int) -> int: ...
+@overload
+def many(a: int, b: int) -> int: ...
+@overload
+def many(a: int, b: int, c: int) -> int: ...
+@overload
+def many(a: int, b: int, c: int, d: int) -> int: ...
+@overload
+def many(a: int, b: int, c: int, d: int, e: int) -> int: ...
+```
+
+```py
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from many_overloads import many
+
+def two_args(a: int, b: int) -> int:
+    return 0
+
+def five_args(a: int, b: int, c: int, d: int, e: int) -> int:
+    return 0
+
+def six_args(a: int, b: int, c: int, d: int, e: int, f: int) -> int:
+    return 0
+
+def variadic_args(*args: int) -> int:
+    return 0
+
+static_assert(is_subtype_of(RegularCallableTypeOf[many], RegularCallableTypeOf[two_args]))
+static_assert(is_subtype_of(RegularCallableTypeOf[many], RegularCallableTypeOf[five_args]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[many], RegularCallableTypeOf[six_args]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[many], RegularCallableTypeOf[variadic_args]))
 ```
 
 ### Generic callables
@@ -2203,7 +2250,7 @@ the generic callable.)
 
 ```py
 from typing import Callable
-from ty_extensions import CallableTypeOf, TypeOf, is_subtype_of, static_assert
+from ty_extensions import RegularCallableTypeOf, TypeOf, is_subtype_of, static_assert
 
 def identity[T](t: T) -> T:
     return t
@@ -2222,11 +2269,11 @@ static_assert(not is_subtype_of(TypeOf[identity], Callable[[str], int]))
 
 # TODO: no error
 # error: [static-assert-error]
-static_assert(is_subtype_of(CallableTypeOf[identity], Callable[[int], int]))
+static_assert(is_subtype_of(RegularCallableTypeOf[identity], Callable[[int], int]))
 # TODO: no error
 # error: [static-assert-error]
-static_assert(is_subtype_of(CallableTypeOf[identity], Callable[[str], str]))
-static_assert(not is_subtype_of(CallableTypeOf[identity], Callable[[str], int]))
+static_assert(is_subtype_of(RegularCallableTypeOf[identity], Callable[[str], str]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[identity], Callable[[str], int]))
 ```
 
 The reverse is not true — if someone expects a generic function that can be called with any
@@ -2237,9 +2284,9 @@ static_assert(not is_subtype_of(Callable[[int], int], TypeOf[identity]))
 static_assert(not is_subtype_of(Callable[[str], str], TypeOf[identity]))
 static_assert(not is_subtype_of(Callable[[str], int], TypeOf[identity]))
 
-static_assert(not is_subtype_of(Callable[[int], int], CallableTypeOf[identity]))
-static_assert(not is_subtype_of(Callable[[str], str], CallableTypeOf[identity]))
-static_assert(not is_subtype_of(Callable[[str], int], CallableTypeOf[identity]))
+static_assert(not is_subtype_of(Callable[[int], int], RegularCallableTypeOf[identity]))
+static_assert(not is_subtype_of(Callable[[str], str], RegularCallableTypeOf[identity]))
+static_assert(not is_subtype_of(Callable[[str], int], RegularCallableTypeOf[identity]))
 ```
 
 ## String literals and Sequence

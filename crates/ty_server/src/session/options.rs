@@ -6,11 +6,13 @@ use ruff_macros::Combine;
 use ruff_python_ast::PythonVersion;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use strum::IntoEnumIterator;
 use ty_combine::Combine;
 use ty_ide::{CompletionSettings, InlayHintSettings};
 use ty_project::CheckMode;
 use ty_project::metadata::Options as TyOptions;
 use ty_project::metadata::options::ProjectOptionsOverrides;
+use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf, ValueSource};
 
 use super::settings::{ExperimentalSettings, GlobalSettings, WorkspaceSettings};
@@ -258,17 +260,15 @@ impl WorkspaceOptions {
                 })
             } else {
                 Some(RelativePathBuf::python_extension(
-                    active_environment.executable.sys_prefix.clone(),
+                    active_environment.executable.sys_prefix,
                 ))
             };
 
-            overrides.fallback_python_version =
-                active_environment.version.as_ref().and_then(|version| {
-                    Some(RangedValue::python_extension(PythonVersion::from((
-                        u8::try_from(version.major).ok()?,
-                        u8::try_from(version.minor).ok()?,
-                    ))))
-                });
+            overrides.fallback_python_version = active_environment
+                .version
+                .as_ref()
+                .and_then(resolve_editor_python_version)
+                .map(RangedValue::python_extension);
 
             if let Some(python) = &overrides.fallback_python {
                 tracing::debug!(
@@ -305,6 +305,33 @@ impl WorkspaceOptions {
             overrides,
         }
     }
+}
+
+/// Resolve the selected editor Python version, if ty supports it.
+fn resolve_editor_python_version(version: &EnvironmentVersion) -> Option<SupportedPythonVersion> {
+    let warn_unsupported_editor_python_version = || {
+        tracing::warn!(
+            "Unsupported Python version `{}.{}` selected in your editor; ty won't set \
+            the Python version to the selected interpreter's version. Expected one of {}.",
+            version.major,
+            version.minor,
+            SupportedPythonVersion::iter()
+                .map(|version| format!("`{version}`"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    };
+
+    let python_version = u8::try_from(version.major)
+        .and_then(|major| {
+            u8::try_from(version.minor).map(|minor| PythonVersion::from((major, minor)))
+        })
+        .inspect_err(|_| warn_unsupported_editor_python_version())
+        .ok()?;
+
+    SupportedPythonVersion::try_from(python_version)
+        .inspect_err(|_| warn_unsupported_editor_python_version())
+        .ok()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq, Eq)]

@@ -15,7 +15,7 @@ help: Add missing blank line
 57 | # E306:3:5
 58 | def a():
 59 |     x = 1
-60 + 
+60 +
 61 |     def b():
 62 |         pass
 63 | # end

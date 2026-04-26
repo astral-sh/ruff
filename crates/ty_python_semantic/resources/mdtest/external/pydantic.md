@@ -47,6 +47,33 @@ reveal_type(product.name)  # revealed: str
 reveal_type(product.internal_price_cent)  # revealed: int
 ```
 
+## Inherited `ModelMetaclass`
+
+Pydantic's metaclass-based `@dataclass_transform` metadata should continue to apply when a custom
+metaclass inherits from `ModelMetaclass`.
+
+```py
+from pydantic import BaseModel
+from pydantic._internal._model_construction import ModelMetaclass
+
+class RegistryMeta(ModelMetaclass): ...
+
+class User(BaseModel, metaclass=RegistryMeta):
+    name: str
+    age: int = 0
+
+reveal_type(User.__init__)  # revealed: (self: User, *, name: str, age: int = 0) -> None
+
+User(name="alice")
+User(name="alice", age=1)
+
+# error: [missing-argument]
+User()
+
+# error: [unknown-argument]
+User(name="alice", extra=1)
+```
+
 ## Validator and serializer decorators with explicit `@classmethod`
 
 Pydantic [recommends](https://docs.pydantic.dev/latest/concepts/validators/#class-validators) using

@@ -39,9 +39,9 @@ where
                 // * Take any new incoming change events and merge them with the previous change events
                 // * If there are no new incoming change events after 10 ms, flush the changes and wait for the next notify event.
                 // * Flush no later than after 3s.
-                loop {
-                    let start = std::time::Instant::now();
+                let batch_start = std::time::Instant::now();
 
+                loop {
                     crossbeam::select! {
                         recv(receiver) -> message => {
                             match message {
@@ -49,7 +49,7 @@ where
                                     debouncer.add_result(event);
 
                                     // Ensure that we flush the changes eventually.
-                                    if start.elapsed() > std::time::Duration::from_secs(3) {
+                                    if batch_start.elapsed() > std::time::Duration::from_secs(3) {
                                         break;
                                     }
                                 }
@@ -128,6 +128,13 @@ impl Watcher {
         self.inner_mut().watcher.unwatch(path.as_std_path())
     }
 
+    /// Returns a transaction-like view for updating watched paths in one backend operation.
+    pub fn paths_mut(&mut self) -> WatcherPathsMut<'_> {
+        WatcherPathsMut {
+            inner: self.inner_mut().watcher.paths_mut(),
+        }
+    }
+
     /// Stops the file watcher.
     ///
     /// Pending events will be discarded.
@@ -167,6 +174,26 @@ impl Watcher {
 
     fn inner_mut(&mut self) -> &mut WatcherInner {
         self.inner.as_mut().expect("Watcher to be running")
+    }
+}
+
+pub struct WatcherPathsMut<'a> {
+    inner: Box<dyn notify::PathsMut + 'a>,
+}
+
+impl WatcherPathsMut<'_> {
+    pub fn add(&mut self, path: &SystemPath) -> notify::Result<()> {
+        tracing::debug!("Watching path: `{path}`");
+        self.inner.add(path.as_std_path(), RecursiveMode::Recursive)
+    }
+
+    pub fn remove(&mut self, path: &SystemPath) -> notify::Result<()> {
+        tracing::debug!("Unwatching path: `{path}`");
+        self.inner.remove(path.as_std_path())
+    }
+
+    pub fn commit(self) -> notify::Result<()> {
+        self.inner.commit()
     }
 }
 

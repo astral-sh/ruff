@@ -16,10 +16,10 @@ help: Replace with `Path(...).resolve()`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
-9  | 
+9  |
    - a = abspath(p)
 10 + a = pathlib.Path(p).resolve()
 11 | aa = chmod(p)
@@ -53,10 +53,10 @@ help: Replace with `Path(...).mkdir()`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
-9  | 
+9  |
 10 | a = abspath(p)
 11 | aa = chmod(p)
    - aaa = mkdir(p)
@@ -80,7 +80,7 @@ help: Replace with `Path(...).mkdir(parents=True)`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
 --------------------------------------------------------------------------------
@@ -132,7 +132,7 @@ help: Replace with `Path(...).rmdir()`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
 --------------------------------------------------------------------------------
@@ -160,7 +160,7 @@ help: Replace with `Path(...).unlink()`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
 --------------------------------------------------------------------------------
@@ -188,7 +188,7 @@ help: Replace with `Path(...).unlink()`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
 --------------------------------------------------------------------------------
@@ -228,7 +228,7 @@ help: Replace with `Path(...).exists()`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
 --------------------------------------------------------------------------------
@@ -256,7 +256,7 @@ help: Replace with `Path(...).expanduser()`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
 --------------------------------------------------------------------------------
@@ -285,7 +285,7 @@ help: Replace with `Path(...).is_dir()`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
 --------------------------------------------------------------------------------
@@ -313,7 +313,7 @@ help: Replace with `Path(...).is_file()`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
 --------------------------------------------------------------------------------
@@ -341,7 +341,7 @@ help: Replace with `Path(...).is_symlink()`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
 --------------------------------------------------------------------------------
@@ -369,7 +369,7 @@ help: Replace with `Path(...).readlink()`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
 --------------------------------------------------------------------------------
@@ -408,7 +408,7 @@ help: Replace with `Path(...).is_absolute()`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
 --------------------------------------------------------------------------------
@@ -469,7 +469,7 @@ help: Replace with `Path(...).name`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
 --------------------------------------------------------------------------------
@@ -498,7 +498,7 @@ help: Replace with `Path(...).parent`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
 --------------------------------------------------------------------------------
@@ -550,7 +550,7 @@ help: Replace with `Path.open()`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
 --------------------------------------------------------------------------------
@@ -561,7 +561,7 @@ help: Replace with `Path.open()`
 35 + with pathlib.Path(p).open() as fp:
 36 |     fp.read()
 37 | open(p).close()
-38 | 
+38 |
 
 PTH123 [*] `open()` should be replaced by `Path.open()`
   --> import_from.py:36:1
@@ -576,7 +576,7 @@ help: Replace with `Path.open()`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
 --------------------------------------------------------------------------------
@@ -585,8 +585,8 @@ help: Replace with `Path.open()`
 36 |     fp.read()
    - open(p).close()
 37 + pathlib.Path(p).open().close()
-38 | 
-39 | 
+38 |
+39 |
 40 | # https://github.com/astral-sh/ruff/issues/15442
 
 PTH123 [*] `open()` should be replaced by `Path.open()`
@@ -602,17 +602,17 @@ help: Replace with `Path.open()`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
 --------------------------------------------------------------------------------
 41 | def _():
 42 |     from builtins import open
-43 | 
+43 |
    -     with open(p) as _: ...  # Error
 44 +     with pathlib.Path(p).open() as _: ...  # Error
-45 | 
-46 | 
+45 |
+46 |
 47 | def _():
 
 PTH104 [*] `os.rename()` should be replaced by `Path.rename()`
@@ -630,16 +630,16 @@ help: Replace with `Path(...).rename(...)`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
 --------------------------------------------------------------------------------
-51 | 
+51 |
 52 | file = "file_1.py"
-53 | 
+53 |
    - rename(file, "file_2.py")
 54 + pathlib.Path(file).rename("file_2.py")
-55 | 
+55 |
 56 | rename(
 57 |     # commment 1
 
@@ -658,13 +658,13 @@ help: Replace with `Path(...).rename(...)`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
 --------------------------------------------------------------------------------
-53 | 
+53 |
 54 | rename(file, "file_2.py")
-55 | 
+55 |
    - rename(
    -     # commment 1
    -     file, # comment 2
@@ -673,9 +673,9 @@ help: Replace with `Path(...).rename(...)`
    -     # comment 3
    - )
 56 + pathlib.Path(file).rename("file_2.py")
-57 | 
+57 |
 58 | rename(file, "file_2.py", src_dir_fd=None, dst_dir_fd=None)
-59 | 
+59 |
 note: This is an unsafe fix and may change runtime behavior
 
 PTH104 [*] `os.rename()` should be replaced by `Path.rename()`
@@ -693,14 +693,14 @@ help: Replace with `Path(...).rename(...)`
 3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
-6  | 
+6  |
 7  | p = "/foo"
 8  | q = "bar"
 --------------------------------------------------------------------------------
 61 |     # comment 3
 62 | )
-63 | 
+63 |
    - rename(file, "file_2.py", src_dir_fd=None, dst_dir_fd=None)
 64 + pathlib.Path(file).rename("file_2.py")
-65 | 
+65 |
 66 | rename(file, "file_2.py", src_dir_fd=1)

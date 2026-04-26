@@ -6,11 +6,12 @@ use rustc_hash::FxHashMap;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use crate::Db;
-use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
-use crate::semantic_index::scope::ScopeId;
+use crate::types::infer::ExpressionInference;
 use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
 use crate::types::{Type, TypeCheckDiagnostics, TypeContext, infer_expression_types};
-use crate::unpack::{UnpackKind, UnpackValue};
+use ty_python_core::ExpressionNodeKey;
+use ty_python_core::scope::ScopeId;
+use ty_python_core::unpack::{UnpackKind, UnpackValue};
 
 use super::context::InferContext;
 use super::diagnostic::INVALID_ASSIGNMENT;
@@ -48,18 +49,21 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_type =
-            infer_expression_types(self.db(), value.expression(), TypeContext::default())
-                .expression_type(value.expression().node_ref(self.db(), self.module()));
+        let value_inference =
+            infer_expression_types(self.db(), value.expression(), TypeContext::default());
+        let value_expr = value.expression().node_ref(self.db()).node(self.module());
+
+        if matches!(value.kind(), UnpackKind::Assign)
+            && self.unpack_assignment_sequence_from_inference(target, value_expr, value_inference)
+        {
+            return;
+        }
+
+        let value_type = value_inference.expression_type(value_expr);
 
         let value_type = match value.kind() {
             UnpackKind::Assign => {
-                if self.context.in_stub()
-                    && value
-                        .expression()
-                        .node_ref(self.db(), self.module())
-                        .is_ellipsis_literal_expr()
-                {
+                if self.context.in_stub() && value_expr.is_ellipsis_literal_expr() {
                     Type::unknown()
                 } else {
                     value_type
@@ -88,11 +92,72 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 }),
         };
 
-        self.unpack_inner(
-            target,
-            value.as_any_node_ref(self.db(), self.module()),
-            value_type,
-        );
+        self.unpack_inner(target, value_expr.into(), value_type);
+    }
+
+    /// In regular tuple assignments like `a, b = 1, 2` {or even `a, (b, c) = 1, (2, 3)`}, map each
+    /// expression on the left individually to the corresponding element type on the right, rather
+    /// than trying to walk the tuple type of the entire RHS.
+    ///
+    /// We avoid infinitely growing types in cycle resolution by preserving only the
+    /// topmost/outermost part of types that have `Divergent` components. For example, if the
+    /// assignment `x = (0, x)` shows up in a loop, we need to avoid infinite looping on a
+    /// never-ending type like `tuple[Literal[0], tuple[Literal[0], tuple[...]]]`. So when we see
+    /// an intermediate result like `tuple[Literal[0], tuple[Literal[0], Divergent]]`, we simplify
+    /// that to `tuple[Literal[0], Divergent]`.
+    ///
+    /// The problem here is that, when `Divergent` shows up on the RHS, we end up simplifying that
+    /// tuple to e.g. `tuple[Divergent, Divergent]`. If we proceed by unpacking that type, we won't
+    /// accumulate any information about the elements, and the user will end up seeing `Divergent`
+    /// as the type of their variables.
+    ///
+    /// This function avoids that problem by walking the AST on the RHS and looking directly at the
+    /// individual element types. That gives us one more level of structure for those types, which
+    /// is enough to resolve a lot of common cycles.
+    fn unpack_assignment_sequence_from_inference(
+        &mut self,
+        target: &ast::Expr,
+        value_expr: &ast::Expr,
+        value_inference: &ExpressionInference<'db>,
+    ) -> bool {
+        match target {
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+                self.targets
+                    .insert(target.into(), value_inference.expression_type(value_expr));
+                true
+            }
+            ast::Expr::List(ast::ExprList { elts, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                let Some(values) = sequence_elts(value_expr) else {
+                    return false;
+                };
+                self.unpack_fixed_sequence_from_inference(elts, values, value_inference)
+            }
+            _ => false,
+        }
+    }
+
+    fn unpack_fixed_sequence_from_inference(
+        &mut self,
+        targets: &[ast::Expr],
+        values: &[ast::Expr],
+        value_inference: &ExpressionInference<'db>,
+    ) -> bool {
+        if targets.len() != values.len()
+            || targets.iter().any(ast::Expr::is_starred_expr)
+            || values.iter().any(ast::Expr::is_starred_expr)
+        {
+            return false;
+        }
+
+        // Even `a, b = 1, 2` recurses through this helper. `.all()` short-circuits,
+        // so in nested cases an earlier element may update `self.targets` before a
+        // later element falls back to the general unpacking path. That's harmless
+        // because the fallback recomputes the full unpacking and overwrites any
+        // partial entries.
+        targets.iter().zip(values).all(|(target, value_expr)| {
+            self.unpack_assignment_sequence_from_inference(target, value_expr, value_inference)
+        })
     }
 
     fn unpack_inner(
@@ -251,5 +316,14 @@ impl<'db> UnpackResult<'db> {
         }
 
         self
+    }
+}
+
+/// Extract the element slice from a list or tuple expression.
+fn sequence_elts(expr: &ast::Expr) -> Option<&[ast::Expr]> {
+    match expr {
+        ast::Expr::List(list) => Some(&list.elts),
+        ast::Expr::Tuple(tuple) => Some(&tuple.elts),
+        _ => None,
     }
 }

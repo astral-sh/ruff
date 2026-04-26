@@ -6,7 +6,6 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::{
     Db, Program,
     place::{Place, PlaceAndQualifiers},
-    semantic_index::{definition::Definition, scope::ScopeId},
     types::{
         BindingContext, BoundTypeVarInstance, ClassBase, ClassLiteral, ClassType, GenericContext,
         KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Parameters,
@@ -14,6 +13,7 @@ use crate::{
         definition_expression_type, member::Member, mro::Mro, tuple::TupleType,
     },
 };
+use ty_python_core::{definition::Definition, scope::ScopeId};
 
 /// Synthesize a namedtuple class member given the field information.
 ///
@@ -43,7 +43,9 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
 
             let generic_context = GenericContext::from_typevar_instances(db, variables);
 
-            let first_parameter = Parameter::positional_or_keyword(Name::new_static("cls"))
+            // CPython generates namedtuple `__new__` as `(_cls, field1, ...)` so field names like
+            // `cls` remain usable as keyword arguments at call sites.
+            let first_parameter = Parameter::positional_or_keyword(Name::new_static("_cls"))
                 .with_annotated_type(SubclassOfType::from(db, self_typevar));
 
             let parameters = std::iter::once(first_parameter).chain(fields.map(|field| {
@@ -271,15 +273,9 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
 
     /// Look up an instance member defined directly on this class (not inherited).
     ///
-    /// For dynamic namedtuples, instance members are the field names.
-    /// If fields are unknown (dynamic), returns `Any` for any attribute.
-    pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
-        for field in self.fields(db) {
-            if field.name == name {
-                return Member::definitely_declared(field.ty);
-            }
-        }
-
+    /// `NamedTuple` fields are exposed via synthesized descriptors on the class rather than
+    /// instance attributes. If fields are unknown (dynamic), return `Any` for any attribute.
+    pub(super) fn own_instance_member(self, db: &'db dyn Db, _name: &str) -> Member<'db> {
         if !self.has_known_fields(db) {
             return Member::definitely_declared(Type::any());
         }
@@ -444,6 +440,11 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         self.spec(db).fields(db)
     }
 
+    /// Returns the field declared directly on this dynamic named tuple, if any.
+    pub(crate) fn field(self, db: &'db dyn Db, name: &Name) -> Option<&'db NamedTupleField<'db>> {
+        self.fields(db).iter().find(|field| field.name == *name)
+    }
+
     pub(super) fn has_known_fields(self, db: &'db dyn Db) -> bool {
         self.spec(db).has_known_fields(db)
     }
@@ -577,6 +578,6 @@ fn create_field_property<'db>(db: &'db dyn Db, field_ty: Type<'db>) -> Type<'db>
         field_ty,
     );
     let property_getter = Type::single_callable(db, property_getter_signature);
-    let property = PropertyInstanceType::new(db, Some(property_getter), None);
+    let property = PropertyInstanceType::new(db, Some(property_getter), None, None);
     Type::PropertyInstance(property)
 }

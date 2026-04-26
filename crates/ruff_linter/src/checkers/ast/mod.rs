@@ -912,10 +912,10 @@ impl SemanticSyntaxContext for Checker<'_> {
         for parent in self.semantic.current_statements().skip(1) {
             match parent {
                 Stmt::For(ast::StmtFor { orelse, .. })
-                | Stmt::While(ast::StmtWhile { orelse, .. }) => {
-                    if !orelse.contains(child) {
-                        return true;
-                    }
+                | Stmt::While(ast::StmtWhile { orelse, .. })
+                    if !orelse.contains(child) =>
+                {
+                    return true;
                 }
                 Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                     break;
@@ -1164,58 +1164,54 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 names,
                 range: _,
                 node_index: _,
-            }) => {
-                if !self.semantic.scope_id.is_global() {
-                    for name in names {
-                        let binding_id = self.semantic.global_scope().get(name);
+            }) if !self.semantic.scope_id.is_global() => {
+                for name in names {
+                    let binding_id = self.semantic.global_scope().get(name);
 
-                        // Mark the binding in the global scope as "rebound" in the current scope.
-                        if let Some(binding_id) = binding_id {
-                            self.semantic
-                                .add_rebinding_scope(binding_id, self.semantic.scope_id);
-                        }
-
-                        // Add a binding to the current scope.
-                        let binding_id = self.semantic.push_binding(
-                            name.range(),
-                            BindingKind::Global(binding_id),
-                            BindingFlags::GLOBAL,
-                        );
-                        let scope = self.semantic.current_scope_mut();
-                        scope.add(name, binding_id);
+                    // Mark the binding in the global scope as "rebound" in the current scope.
+                    if let Some(binding_id) = binding_id {
+                        self.semantic
+                            .add_rebinding_scope(binding_id, self.semantic.scope_id);
                     }
+
+                    // Add a binding to the current scope.
+                    let binding_id = self.semantic.push_binding(
+                        name.range(),
+                        BindingKind::Global(binding_id),
+                        BindingFlags::GLOBAL,
+                    );
+                    let scope = self.semantic.current_scope_mut();
+                    scope.add(name, binding_id);
                 }
             }
             Stmt::Nonlocal(ast::StmtNonlocal {
                 names,
                 range: _,
                 node_index: _,
-            }) => {
-                if !self.semantic.scope_id.is_global() {
-                    for name in names {
-                        if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
-                            // Mark the binding as "used", since the `nonlocal` requires an existing
-                            // binding.
-                            self.semantic.add_local_reference(
-                                binding_id,
-                                ExprContext::Load,
-                                name.range(),
-                            );
+            }) if !self.semantic.scope_id.is_global() => {
+                for name in names {
+                    if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
+                        // Mark the binding as "used", since the `nonlocal` requires an existing
+                        // binding.
+                        self.semantic.add_local_reference(
+                            binding_id,
+                            ExprContext::Load,
+                            name.range(),
+                        );
 
-                            // Mark the binding in the enclosing scope as "rebound" in the current
-                            // scope.
-                            self.semantic
-                                .add_rebinding_scope(binding_id, self.semantic.scope_id);
+                        // Mark the binding in the enclosing scope as "rebound" in the current
+                        // scope.
+                        self.semantic
+                            .add_rebinding_scope(binding_id, self.semantic.scope_id);
 
-                            // Add a binding to the current scope.
-                            let binding_id = self.semantic.push_binding(
-                                name.range(),
-                                BindingKind::Nonlocal(binding_id, scope_id),
-                                BindingFlags::NONLOCAL,
-                            );
-                            let scope = self.semantic.current_scope_mut();
-                            scope.add(name, binding_id);
-                        }
+                        // Add a binding to the current scope.
+                        let binding_id = self.semantic.push_binding(
+                            name.range(),
+                            BindingKind::Nonlocal(binding_id, scope_id),
+                            BindingFlags::NONLOCAL,
+                        );
+                        let scope = self.semantic.current_scope_mut();
+                        scope.add(name, binding_id);
                     }
                 }
             }
@@ -1461,7 +1457,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
 
                 self.semantic.set_branch(branch);
+                let flags_snapshot = self.semantic.flags;
+                self.semantic.flags |= SemanticModelFlags::ORELSE;
                 self.visit_body(orelse);
+                self.semantic.flags = flags_snapshot;
                 self.semantic.pop_branch();
 
                 self.semantic.push_branch();
@@ -1557,7 +1556,27 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }) => {
                 self.visit_boolean_test(test);
                 self.visit_body(body);
+                let flags_snapshot = self.semantic.flags;
+                self.semantic.flags |= SemanticModelFlags::ORELSE;
                 self.visit_body(orelse);
+                self.semantic.flags = flags_snapshot;
+            }
+            Stmt::For(ast::StmtFor {
+                node_index: _,
+                range: _,
+                is_async: _,
+                target,
+                iter,
+                body,
+                orelse,
+            }) => {
+                self.visit_expr(iter);
+                self.visit_expr(target);
+                self.visit_body(body);
+                let flags_snapshot = self.semantic.flags;
+                self.semantic.flags |= SemanticModelFlags::ORELSE;
+                self.visit_body(orelse);
+                self.semantic.flags = flags_snapshot;
             }
             Stmt::If(
                 stmt_if @ ast::StmtIf {
@@ -1598,11 +1617,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             DocstringState::Expected(ExpectedDocstringKind::Attribute);
                     }
                 }
-                Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
-                    if target.is_name_expr() {
-                        self.docstring_state =
-                            DocstringState::Expected(ExpectedDocstringKind::Attribute);
-                    }
+                Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) if target.is_name_expr() => {
+                    self.docstring_state =
+                        DocstringState::Expected(ExpectedDocstringKind::Attribute);
                 }
                 _ => {}
             }
@@ -1786,7 +1803,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }) => {
                 self.visit_boolean_test(test);
                 self.visit_expr(body);
+                let flags_snapshot = self.semantic.flags;
+                self.semantic.flags |= SemanticModelFlags::ORELSE;
                 self.visit_expr(orelse);
+                self.semantic.flags = flags_snapshot;
             }
             Expr::UnaryOp(ast::ExprUnaryOp {
                 op: UnaryOp::Not,
@@ -1869,7 +1889,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
                     }
                     Some(typing::Callable::Cast) => {
-                        for (i, arg) in arguments.arguments_source_order().enumerate() {
+                        for (i, arg) in arguments.iter_source_order().enumerate() {
                             match (i, arg) {
                                 (0, ArgOrKeyword::Arg(arg)) => self.visit_cast_type_argument(arg),
                                 (_, ArgOrKeyword::Arg(arg)) => self.visit_non_type_definition(arg),
@@ -1886,7 +1906,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
                     }
                     Some(typing::Callable::NewType) => {
-                        for (i, arg) in arguments.arguments_source_order().enumerate() {
+                        for (i, arg) in arguments.iter_source_order().enumerate() {
                             match (i, arg) {
                                 (1, ArgOrKeyword::Arg(arg)) => self.visit_type_definition(arg),
                                 (_, ArgOrKeyword::Arg(arg)) => self.visit_non_type_definition(arg),
@@ -1931,7 +1951,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                     Some(typing::Callable::TypeAliasType) => {
                         // Ex) TypeAliasType("Json", "Union[dict[str, Json]]", type_params=())
-                        for (i, arg) in arguments.arguments_source_order().enumerate() {
+                        for (i, arg) in arguments.iter_source_order().enumerate() {
                             match (i, arg) {
                                 (1, ArgOrKeyword::Arg(arg)) => self.visit_type_definition(arg),
                                 (_, ArgOrKeyword::Arg(arg)) => self.visit_non_type_definition(arg),
@@ -2332,6 +2352,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
         // Step 2: Traversal
         walk_pattern(self, pattern);
+
+        // Step 4: Analysis
+        analyze::pattern(pattern, self);
     }
 
     fn visit_body(&mut self, body: &'a [Stmt]) {
@@ -2749,16 +2772,15 @@ impl<'a> Checker<'a> {
 
         match parent {
             Stmt::TypeAlias(_) => flags.insert(BindingFlags::DEFERRED_TYPE_ALIAS),
-            Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
+            Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. })
                 // TODO: It is a bit unfortunate that we do this check twice
                 //       maybe we should change how we visit this statement
                 //       so the semantic flag for the type alias sticks around
                 //       until after we've handled this store, so we can check
                 //       the flag instead of duplicating this check
-                if self.semantic.match_typing_expr(annotation, "TypeAlias") {
+                if self.semantic.match_typing_expr(annotation, "TypeAlias") => {
                     flags.insert(BindingFlags::ANNOTATED_TYPE_ALIAS);
                 }
-            }
             _ => {}
         }
 
@@ -2863,7 +2885,10 @@ impl<'a> Checker<'a> {
 
         self.semantic.resolve_del(id, expr.range());
 
-        if helpers::on_conditional_branch(&mut self.semantic.current_statements()) {
+        if helpers::on_conditional_branch(&mut self.semantic.current_statements())
+            || self.semantic.in_exception_handler()
+            || self.semantic.in_orelse()
+        {
             return;
         }
 

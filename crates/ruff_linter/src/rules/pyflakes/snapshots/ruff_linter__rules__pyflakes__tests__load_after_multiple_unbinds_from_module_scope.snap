@@ -17,7 +17,7 @@ help: Remove assignment to unused variable `x`
    -     except ValueError as x:
 7  +     except ValueError:
 8  |         pass
-9  | 
+9  |
 10 |     try:
 
 F841 [*] Local variable `x` is assigned to but never used
@@ -30,11 +30,11 @@ F841 [*] Local variable `x` is assigned to but never used
 13 |         pass
    |
 help: Remove assignment to unused variable `x`
-9  | 
+9  |
 10 |     try:
 11 |         pass
    -     except ValueError as x:
 12 +     except ValueError:
 13 |         pass
-14 | 
+14 |
 15 |     # This should resolve to the `x` in `x = 1`.

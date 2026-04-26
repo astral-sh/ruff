@@ -306,7 +306,7 @@ def EncodedFile(file: _Stream, data_encoding: str, file_encoding: str | None = N
 
     """
 
-def iterencode(iterator: Iterable[str], encoding: str, errors: str = "strict") -> Generator[bytes, None, None]:
+def iterencode(iterator: Iterable[str], encoding: str, errors: str = "strict") -> Generator[bytes]:
     """
     Encoding iterator.
 
@@ -316,7 +316,7 @@ def iterencode(iterator: Iterable[str], encoding: str, errors: str = "strict") -
     constructor.
     """
 
-def iterdecode(iterator: Iterable[bytes], encoding: str, errors: str = "strict") -> Generator[str, None, None]:
+def iterdecode(iterator: Iterable[bytes], encoding: str, errors: str = "strict") -> Generator[str]:
     """
     Decoding iterator.
 

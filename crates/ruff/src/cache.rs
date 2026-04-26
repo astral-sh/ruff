@@ -1,7 +1,7 @@
 use std::fmt::Debug;
-use std::fs;
+use std::fs::{self, File};
 use std::hash::Hasher;
-use std::io::{self, Write};
+use std::io::{self, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -97,8 +97,8 @@ impl Cache {
         let key = format!("{}", cache_key(&package_root, settings));
         let path = PathBuf::from_iter([&settings.cache_dir, Path::new(VERSION), Path::new(&key)]);
 
-        let serialized = match fs::read(&path) {
-            Ok(serialized) => serialized,
+        let file = match File::open(&path) {
+            Ok(file) => file,
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 // No cache exist yet, return an empty cache.
                 return Cache::empty(path, package_root);
@@ -109,13 +109,14 @@ impl Cache {
             }
         };
 
-        let mut package: PackageCache = match bitcode::deserialize(&serialized) {
-            Ok(package) => package,
-            Err(err) => {
-                warn_user!("Failed parse cache file `{}`: {err}", path.display());
-                return Cache::empty(path, package_root);
-            }
-        };
+        let mut package: PackageCache =
+            match bincode::decode_from_reader(BufReader::new(file), bincode::config::standard()) {
+                Ok(package) => package,
+                Err(err) => {
+                    warn_user!("Failed parse cache file `{}`: {err}", path.display());
+                    return Cache::empty(path, package_root);
+                }
+            };
 
         // Sanity check.
         if package.package_root != package_root {
@@ -161,13 +162,13 @@ impl Cache {
         // Write the cache to a temporary file first and then rename it for an "atomic" write.
         // Protects against data loss if the process is killed during the write and races between different ruff
         // processes, resulting in a corrupted cache file. https://github.com/astral-sh/ruff/issues/8147#issuecomment-1943345964
-        let mut temp_file =
-            NamedTempFile::new_in(self.path.parent().expect("Write path must have a parent"))
-                .context("Failed to create temporary file")?;
+        let mut temp_file = tempfile_in(self.path.parent().expect("Write path must have a parent"))
+            .context("Failed to create temporary file")?;
 
         // Serialize to in-memory buffer because hyperfine benchmark showed that it's faster than
         // using a `BufWriter` and our cache files are small enough that streaming isn't necessary.
-        let serialized = bitcode::serialize(&self.package).context("Failed to serialize cache")?;
+        let serialized = bincode::encode_to_vec(&self.package, bincode::config::standard())
+            .context("Failed to serialize cache data")?;
         temp_file
             .write_all(&serialized)
             .context("Failed to write serialized cache to temporary file.")?;
@@ -198,7 +199,7 @@ impl Cache {
     #[expect(clippy::cast_possible_truncation)]
     pub(crate) fn save(&mut self) -> bool {
         /// Maximum duration for which we keep a file in cache that hasn't been seen.
-        const MAX_LAST_SEEN: Duration = Duration::from_secs(30 * 24 * 60 * 60); // 30 days.
+        const MAX_LAST_SEEN: Duration = Duration::from_hours(720); // 30 days.
 
         let changes = std::mem::take(self.changes.get_mut().unwrap());
         if changes.is_empty() {
@@ -296,8 +297,27 @@ impl Cache {
     }
 }
 
-/// Runtime representation of a cache of a package.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+/// Return a [`NamedTempFile`] in the specified directory.
+///
+/// Sets the permissions of the temporary file to `0o666`, to match the non-temporary file
+/// default. ([`NamedTempFile`] defaults to `0o600`.)
+#[cfg(unix)]
+fn tempfile_in(path: &Path) -> io::Result<NamedTempFile> {
+    use std::os::unix::fs::PermissionsExt;
+
+    tempfile::Builder::new()
+        .permissions(fs::Permissions::from_mode(0o666))
+        .tempfile_in(path)
+}
+
+/// Return a [`NamedTempFile`] in the specified directory.
+#[cfg(not(unix))]
+fn tempfile_in(path: &Path) -> io::Result<NamedTempFile> {
+    tempfile::Builder::new().tempfile_in(path)
+}
+
+/// On disk representation of a cache of a package.
+#[derive(bincode::Encode, Debug, bincode::Decode)]
 struct PackageCache {
     /// Path to the root of the package.
     ///
@@ -308,8 +328,8 @@ struct PackageCache {
     files: FxHashMap<RelativePathBuf, FileCache>,
 }
 
-/// Runtime representation of the cache per source file.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+/// On disk representation of the cache per source file.
+#[derive(bincode::Decode, Debug, bincode::Encode)]
 pub(crate) struct FileCache {
     /// Key that determines if the cached item is still valid.
     key: u64,
@@ -329,7 +349,7 @@ impl FileCache {
     }
 }
 
-#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Default, bincode::Decode, bincode::Encode)]
 struct FileCacheData {
     linted: bool,
     formatted: bool,
@@ -570,7 +590,7 @@ mod tests {
                 expected_diagnostics += diagnostics;
             }
         }
-        assert_ne!(paths, &[] as &[PathBuf], "no files checked");
+        assert_ne!(paths, &[] as &[std::path::PathBuf], "no files checked");
 
         cache.persist().unwrap();
 
@@ -856,6 +876,40 @@ mod tests {
             cache.package.files.keys().collect_vec(),
             vec![&new_path_key],
             "Only the new file should be present"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cache_file_permissions_match_default_file_permissions() {
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\"])\n";
+
+        let test_cache = TestCache::new("cache_file_permissions_match_default_file_permissions");
+        let cache = test_cache.open();
+        let cache_path = cache.path.clone();
+        test_cache.write_source_file("source.py", source);
+
+        test_cache
+            .lint_file_with_cache("source.py", &cache)
+            .expect("Failed to lint test file");
+        cache.persist().unwrap();
+
+        let control_path = cache_path.with_extension("control");
+        fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o666)
+            .open(&control_path)
+            .unwrap();
+
+        let cache_mode = fs::metadata(&cache_path).unwrap().permissions().mode() & 0o777;
+        let control_mode = fs::metadata(&control_path).unwrap().permissions().mode() & 0o777;
+
+        assert_eq!(
+            cache_mode, control_mode,
+            "Cache files should respect the same default permissions as regular files"
         );
     }
 

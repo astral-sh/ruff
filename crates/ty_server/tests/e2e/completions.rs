@@ -1,5 +1,5 @@
 use anyhow::Result;
-use lsp_types::{Position, notification::PublishDiagnostics};
+use lsp_types::Position;
 use ruff_db::system::SystemPath;
 use ty_server::ClientOptions;
 
@@ -22,7 +22,6 @@ walktr
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, foo_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
 
     let completions = server.completion_request(&server.file_uri(foo), Position::new(0, 6));
 
@@ -72,7 +71,6 @@ walktr
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, foo_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
 
     let completions = server.completion_request(&server.file_uri(foo), Position::new(0, 6));
 
@@ -103,7 +101,6 @@ TypedDi<CURSOR>
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, foo_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
 
     let completions = server.completion_request(&server.file_uri(foo), Position::new(2, 7));
 
@@ -188,7 +185,6 @@ TypedDi<CURSOR>
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, foo_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
 
     let completions = server.completion_request(&server.file_uri(foo), Position::new(0, 7));
 
@@ -303,7 +299,6 @@ re.match('', '', fla<CURSOR>
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, foo_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
 
     let completions = server.completion_request(&server.file_uri(foo), Position::new(1, 20));
 

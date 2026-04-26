@@ -21,12 +21,12 @@ UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keywo
 50 | # OK
    |
 help: Use the `type` keyword
-45 | 
+45 |
 46 | # `default` was added in Python 3.13
 47 | T = typing.TypeVar("T", default=Any)
    - x: typing.TypeAlias = list[T]
 48 + type x[T = Any] = list[T]
-49 | 
+49 |
 50 | # OK
 51 | x: TypeAlias
 note: This is an unsafe fix and may change runtime behavior
@@ -41,7 +41,7 @@ UP040 [*] Type alias `DefaultList` uses `TypeAlias` annotation instead of the `t
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Use the `type` keyword
-131 | 
+131 |
 132 | # Test case for TypeVar with default - should be converted when preview mode is enabled
 133 | T_default = TypeVar("T_default", default=int)
     - DefaultList: TypeAlias = list[T_default]

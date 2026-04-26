@@ -850,6 +850,75 @@ def intersection_is_assignable[T](t: T) -> None:
     static_assert(is_subtype_of(Intersection[T, Not[None]], T))
 ```
 
+## Bounded typevars remain assignable to their upper bound after narrowing
+
+Narrowing can leave a bounded typevar represented as an intersection, but it should still be
+assignable to its upper bound.
+
+```py
+from typing import Callable
+from ty_extensions import Intersection, Not
+
+class A: ...
+
+class SomeClass[T: int | str]:
+    field: T
+
+    def narrowed1(self) -> None:
+        narrowed: int | str
+        assert not isinstance(self.field, int)
+        reveal_type(self.field)  # revealed: T@SomeClass & ~int
+        narrowed = self.field
+
+    def narrowed2(self) -> None:
+        narrowed: int | str
+        assert not isinstance(self.field, A)
+        reveal_type(self.field)  # revealed: T@SomeClass & ~A
+        narrowed = self.field
+
+def lenient_issubclass[T: type | tuple[type, ...]](class_or_tuple: T) -> T:
+    if not isinstance(class_or_tuple, tuple):
+        reveal_type(class_or_tuple)  # revealed: T@lenient_issubclass & ~tuple[object, ...]
+        # `T@lenient_issubclass & ~tuple[object, ...]` is assignable to `type`,
+        # because `(type | tuple[type, ...]) & ~tuple[object, ...]` simplifies to `type`
+        return check(class_or_tuple)
+    return class_or_tuple
+
+def check(check_type: type): ...
+
+# In this scenario, we do not expand the intersection,
+# because it only has inferrable type variables in it.
+# This ensures that we continue to infer a precise type on the last line here:
+def higher[U](f: Callable[[U], type]) -> U:
+    raise NotImplementedError
+
+def source[T: type | tuple[type, ...]](x: T) -> Intersection[T, Not[tuple[object, ...]]]:
+    raise NotImplementedError
+
+reveal_type(higher(source))  # revealed: type
+```
+
+## Constrained typevars remain assignable to the union of their constraints after narrowing
+
+```py
+class A: ...
+
+class SomeClass[T: (int, str)]:
+    field: T
+
+    def narrowed1(self) -> None:
+        narrowed: int | str
+        assert not isinstance(self.field, int)
+        reveal_type(self.field)  # revealed: T@SomeClass & str
+        narrowed = self.field
+
+    def narrowed2(self) -> None:
+        narrowed: int | str
+        assert not isinstance(self.field, A)
+        reveal_type(self.field)  # revealed: T@SomeClass & ~A
+        narrowed = self.field
+```
+
 ## Narrowing
 
 We can use narrowing expressions to eliminate some of the possibilities of a constrained typevar:

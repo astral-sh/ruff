@@ -28,7 +28,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_dia
 error[invalid-assignment]: Invalid assignment to key "retries" with declared type `int` on TypedDict `Config`
  --> src/mdtest_snippet.py:7:5
   |
-6 | def _(config: Config) -> None:
 7 |     config["retries"] = "three"  # error: [invalid-assignment]
   |     ------ ---------    ^^^^^^^ value of type `Literal["three"]`
   |     |      |
@@ -38,12 +37,8 @@ error[invalid-assignment]: Invalid assignment to key "retries" with declared typ
 info: Item declaration
  --> src/mdtest_snippet.py:4:5
   |
-3 | class Config(TypedDict):
 4 |     retries: int
   |     ------------ Item declared here
-5 |
-6 | def _(config: Config) -> None:
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```

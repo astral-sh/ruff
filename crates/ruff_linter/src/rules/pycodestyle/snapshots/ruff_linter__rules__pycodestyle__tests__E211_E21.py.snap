@@ -87,12 +87,12 @@ E211 [*] Whitespace before '('
    |
 help: Removed whitespace before '('
 14 |     pass
-15 | 
-16 | 
+15 |
+16 |
    - def fetch_name () -> Union[str, None]:
 17 + def fetch_name() -> Union[str, None]:
 18 |     """Fetch name from --person-name in sys.argv.
-19 | 
+19 |
 20 |    Returns:
 
 E211 [*] Whitespace before '('

@@ -19,7 +19,7 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
     let files = project.files(db);
     let results = std::sync::Mutex::new(Vec::new());
     {
-        let db = db.dyn_clone();
+        let db = Db::dyn_clone(db);
         let files = &files;
         let results = &results;
         let query = &query;
@@ -28,7 +28,7 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
         rayon::scope(move |s| {
             // For each file, extract symbols and add them to results
             for file in files.iter() {
-                let db = db.dyn_clone();
+                let db = Db::dyn_clone(&*db);
                 s.spawn(move |_| {
                     let symbols_for_file_span = tracing::debug_span!(parent: workspace_symbols_span, "symbols_for_file", ?file);
                     let _entered = symbols_for_file_span.entered();

@@ -69,9 +69,13 @@ pub(crate) fn check(
     encoding: PositionEncoding,
     show_syntax_errors: bool,
 ) -> DiagnosticsMap {
-    let source_kind = query.make_source_kind();
     let settings = query.settings();
     let document_path = query.virtual_file_path();
+
+    let SourceType::Python(source_type) = query.source_type_for_lint() else {
+        return DiagnosticsMap::default();
+    };
+    let source_kind = query.make_python_source_kind(source_type);
 
     // If the document is excluded, return an empty list of diagnostics.
     if is_document_excluded_for_linting(
@@ -94,10 +98,6 @@ pub(crate) fn check(
         .map(PackageRoot::root)
     } else {
         None
-    };
-
-    let SourceType::Python(source_type) = query.source_type() else {
-        return DiagnosticsMap::default();
     };
 
     let target_version = settings.linter.resolve_target_version(&document_path);
@@ -123,7 +123,12 @@ pub(crate) fn check(
     let directives = extract_directives(parsed.tokens(), Flags::all(), &locator, &indexer);
 
     // Parse range suppression comments
-    let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
+    let suppressions = Suppressions::from_tokens(
+        locator.contents(),
+        parsed.tokens(),
+        &indexer,
+        &settings.linter,
+    );
 
     // Generate checks.
     let diagnostics = check_path(
@@ -302,7 +307,7 @@ fn to_lsp_diagnostic(
                 ruff_db::diagnostic::Severity::Error => lsp_types::DiagnosticSeverity::ERROR,
                 ruff_db::diagnostic::Severity::Fatal => lsp_types::DiagnosticSeverity::ERROR,
             },
-            diagnostic.id().to_string(),
+            diagnostic.secondary_code_or_id().to_string(),
         )
     };
 

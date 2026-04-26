@@ -18,7 +18,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::{isort, pycodestyle};
     use crate::settings::types::PreviewMode;
-    use crate::test::test_path;
+    use crate::test::{assert_notebook_path, test_path, test_resource_path};
     use crate::{assert_diagnostics, settings};
 
     use super::settings::Settings;
@@ -75,6 +75,7 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::LineTooLong, Path::new("E501_5.py"))]
     #[test_case(Rule::RedundantBackslash, Path::new("E502.py"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_0.py"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_1.py"))]
@@ -96,6 +97,27 @@ mod tests {
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn w391_consecutive_empty_cells_ipynb() -> Result<()> {
+        let actual =
+            test_resource_path("fixtures").join("pycodestyle/W391_consecutive_empty_cells.ipynb");
+        let expected = test_resource_path("fixtures")
+            .join("pycodestyle/W391_consecutive_empty_cells_expected.ipynb");
+
+        let tested_notebook = assert_notebook_path(
+            &actual,
+            &expected,
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(Rule::TooManyNewlinesAtEndOfFile)
+            },
+        )?;
+
+        assert_eq!(tested_notebook.diagnostics.len(), 3);
+
         Ok(())
     }
 

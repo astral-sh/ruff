@@ -347,9 +347,15 @@ class _BaseExitStack(Generic[_ExitT_co]):
     def pop_all(self) -> Self:
         """Preserve the context stack by transferring it to a new instance."""
 
-# In reality this is a subclass of `AbstractContextManager`;
-# see #7961 for why we don't do that in the stub
-class ExitStack(_BaseExitStack[_ExitT_co], metaclass=abc.ABCMeta):
+# this class is to avoid putting `metaclass=abc.ABCMeta` on the implementations directly, as this would make them
+# appear explicitly abstract to some tools. this is due to the implementations not subclassing `AbstractContextManager`
+#  see note on the subclasses
+@type_check_only
+class _BaseExitStackAbstract(_BaseExitStack[_ExitT_co], metaclass=abc.ABCMeta): ...
+
+# In reality this is a subclass of `AbstractContextManager`, but we can't provide `Self` as the argument for `__enter__`
+#  https://discuss.python.org/t/self-as-typevar-default/90939
+class ExitStack(_BaseExitStackAbstract[_ExitT_co]):
     """Context manager for dynamic management of a stack of exit callbacks.
 
     For example:
@@ -373,9 +379,9 @@ _ExitCoroFunc: TypeAlias = Callable[
 ]
 _ACM_EF = TypeVar("_ACM_EF", bound=AbstractAsyncContextManager[Any, Any] | _ExitCoroFunc)
 
-# In reality this is a subclass of `AbstractAsyncContextManager`;
-# see #7961 for why we don't do that in the stub
-class AsyncExitStack(_BaseExitStack[_ExitT_co], metaclass=abc.ABCMeta):
+# In reality this is a subclass of `AbstractContextManager`, but we can't provide `Self` as the argument for `__enter__`
+#  https://discuss.python.org/t/self-as-typevar-default/90939
+class AsyncExitStack(_BaseExitStackAbstract[_ExitT_co]):
     """Async context manager for dynamic management of a stack of exit
     callbacks.
 
@@ -434,7 +440,7 @@ if sys.version_info >= (3, 10):
 
         enter_result: _T
         @overload
-        def __init__(self: nullcontext[None], enter_result: None = None) -> None: ...
+        def __init__(self: nullcontext[None]) -> None: ...
         @overload
         def __init__(self: nullcontext[_T], enter_result: _T) -> None: ...  # pyright: ignore[reportInvalidTypeVarUse]  #11780
         def __enter__(self) -> _T: ...
@@ -456,7 +462,7 @@ else:
 
         enter_result: _T
         @overload
-        def __init__(self: nullcontext[None], enter_result: None = None) -> None: ...
+        def __init__(self: nullcontext[None]) -> None: ...
         @overload
         def __init__(self: nullcontext[_T], enter_result: _T) -> None: ...  # pyright: ignore[reportInvalidTypeVarUse]  #11780
         def __enter__(self) -> _T: ...

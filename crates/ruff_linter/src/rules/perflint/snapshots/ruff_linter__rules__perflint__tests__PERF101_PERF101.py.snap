@@ -13,11 +13,11 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
 help: Remove `list()` cast
 4  | foo_dict = {1: 2, 3: 4}
 5  | foo_int = 123
-6  | 
+6  |
    - for i in list(foo_tuple):  # PERF101
 7  + for i in foo_tuple:  # PERF101
 8  |     pass
-9  | 
+9  |
 10 | for i in list(foo_list):  # PERF101
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -32,11 +32,11 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
 help: Remove `list()` cast
 7  | for i in list(foo_tuple):  # PERF101
 8  |     pass
-9  | 
+9  |
    - for i in list(foo_list):  # PERF101
 10 + for i in foo_list:  # PERF101
 11 |     pass
-12 | 
+12 |
 13 | for i in list(foo_set):  # PERF101
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -51,11 +51,11 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
 help: Remove `list()` cast
 10 | for i in list(foo_list):  # PERF101
 11 |     pass
-12 | 
+12 |
    - for i in list(foo_set):  # PERF101
 13 + for i in foo_set:  # PERF101
 14 |     pass
-15 | 
+15 |
 16 | for i in list((1, 2, 3)):  # PERF101
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -70,11 +70,11 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
 help: Remove `list()` cast
 13 | for i in list(foo_set):  # PERF101
 14 |     pass
-15 | 
+15 |
    - for i in list((1, 2, 3)):  # PERF101
 16 + for i in (1, 2, 3):  # PERF101
 17 |     pass
-18 | 
+18 |
 19 | for i in list([1, 2, 3]):  # PERF101
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -89,11 +89,11 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
 help: Remove `list()` cast
 16 | for i in list((1, 2, 3)):  # PERF101
 17 |     pass
-18 | 
+18 |
    - for i in list([1, 2, 3]):  # PERF101
 19 + for i in [1, 2, 3]:  # PERF101
 20 |     pass
-21 | 
+21 |
 22 | for i in list({1, 2, 3}):  # PERF101
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -108,11 +108,11 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
 help: Remove `list()` cast
 19 | for i in list([1, 2, 3]):  # PERF101
 20 |     pass
-21 | 
+21 |
    - for i in list({1, 2, 3}):  # PERF101
 22 + for i in {1, 2, 3}:  # PERF101
 23 |     pass
-24 | 
+24 |
 25 | for i in list(
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -134,7 +134,7 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
 help: Remove `list()` cast
 22 | for i in list({1, 2, 3}):  # PERF101
 23 |     pass
-24 | 
+24 |
    - for i in list(
    -     {
 25 + for i in {
@@ -145,7 +145,7 @@ help: Remove `list()` cast
    - ):
 29 +     }:
 30 |     pass
-31 | 
+31 |
 32 | for i in list( # Comment
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -163,13 +163,13 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
 help: Remove `list()` cast
 31 | ):
 32 |     pass
-33 | 
+33 |
    - for i in list( # Comment
    -     {1, 2, 3}
    - ):  # PERF101
 34 + for i in {1, 2, 3}:  # PERF101
 35 |     pass
-36 | 
+36 |
 37 | for i in list(foo_dict):  # OK
 note: This is an unsafe fix and may change runtime behavior
 
@@ -186,12 +186,12 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
 help: Remove `list()` cast
 54 | for i in list(foo_list):  # OK
 55 |     foo_list.append(i + 1)
-56 | 
+56 |
    - for i in list(foo_list):  # PERF101
 57 + for i in foo_list:  # PERF101
 58 |     # Make sure we match the correct list
 59 |     other_list.append(i + 1)
-60 | 
+60 |
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
   --> PERF101.py:69:10
@@ -203,13 +203,13 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
 70 |     pass
    |
 help: Remove `list()` cast
-66 | 
+66 |
 67 | x, y, nested_tuple = (1, 2, (3, 4, 5))
-68 | 
+68 |
    - for i in list(nested_tuple):  # PERF101
 69 + for i in nested_tuple:  # PERF101
 70 |     pass
-71 | 
+71 |
 72 | for i in list(foo_list):  # OK
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -222,13 +222,13 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
 87 |     pass
    |
 help: Remove `list()` cast
-83 | 
+83 |
 84 | import builtins
-85 | 
+85 |
    - for i in builtins.list(nested_tuple):  # PERF101
 86 + for i in nested_tuple:  # PERF101
 87 |     pass
-88 | 
+88 |
 89 | # https://github.com/astral-sh/ruff/issues/18783
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -241,13 +241,13 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
 92 |     print(i)
    |
 help: Remove `list()` cast
-88 | 
+88 |
 89 | # https://github.com/astral-sh/ruff/issues/18783
 90 | items = (1, 2, 3)
    - for i in(list)(items):
 91 + for i in items:
 92 |     print(i)
-93 | 
+93 |
 94 | # https://github.com/astral-sh/ruff/issues/18784
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -267,7 +267,7 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
 103 |       print(i)
     |
 help: Remove `list()` cast
-93 | 
+93 |
 94 | # https://github.com/astral-sh/ruff/issues/18784
 95 | items = (1, 2, 3)
    - for i in (  # 1

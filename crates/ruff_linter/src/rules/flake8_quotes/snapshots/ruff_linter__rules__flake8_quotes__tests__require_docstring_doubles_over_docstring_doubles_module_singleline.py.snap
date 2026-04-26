@@ -14,7 +14,7 @@ help: Replace double multiline quotes with single quotes
 1 | """ Double quotes singleline module docstring """
   - """ this is not a docstring """
 2 + ''' this is not a docstring '''
-3 | 
+3 |
 4 | def foo():
 5 |     pass
 
@@ -27,7 +27,7 @@ Q001 [*] Double quote multiline found but single quotes preferred
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Replace double multiline quotes with single quotes
-3 | 
+3 |
 4 | def foo():
 5 |     pass
   - """ this is not a docstring """

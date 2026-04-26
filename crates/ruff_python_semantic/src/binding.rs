@@ -230,7 +230,6 @@ impl<'a> Binding<'a> {
             // Deletions, annotations, `__future__` imports, and builtins are never considered
             // redefinitions.
             BindingKind::Deletion
-            | BindingKind::ConditionalDeletion(_)
             | BindingKind::Annotation
             | BindingKind::FutureImport
             | BindingKind::Builtin => {
@@ -641,13 +640,6 @@ pub enum BindingKind<'a> {
     /// del x
     /// ```
     Deletion,
-
-    /// A binding for a deletion, like `x` in:
-    /// ```python
-    /// if x > 0:
-    ///     del x
-    /// ```
-    ConditionalDeletion(BindingId),
 
     /// A binding to bind an exception to a local variable, like `x` in:
     /// ```python

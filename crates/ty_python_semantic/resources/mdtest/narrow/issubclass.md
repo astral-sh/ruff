@@ -165,8 +165,6 @@ Except for the `None` special case mentioned above, narrowing can only take plac
 the PEP-604 union are class literals. If any elements are generic aliases or other types, the
 `issubclass()` call may fail at runtime, so no narrowing can take place:
 
-<!-- snapshot-diagnostics -->
-
 ```toml
 [environment]
 python-version = "3.10"
@@ -176,7 +174,7 @@ python-version = "3.10"
 from typing import Literal
 
 def _(x: type[int | list | bytes]):
-    # error: [invalid-argument-type]
+    # snapshot: invalid-argument-type
     if issubclass(x, int | list[int]):
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
     # error: [invalid-argument-type]
@@ -192,26 +190,65 @@ def _(x: type[int | list | bytes]):
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
 ```
 
+```snapshot
+error[invalid-argument-type]: Invalid second argument to `issubclass`
+ --> src/mdtest_snippet.py:3:8
+  |
+3 |     if issubclass(x, int | list[int]):
+  |        ^^^^^^^^^^^^^^---------------^
+  |                      |
+  |                      This `UnionType` instance contains non-class elements
+  |
+info: A `UnionType` instance can only be used as the second argument to `issubclass` if all elements are class objects
+info: Element `<class 'list[int]'>` in the union is not a class object
+```
+
 The same validation also applies when an invalid `UnionType` is nested inside a tuple:
 
 ```py
 def _(x: type[int | list | bytes]):
-    # error: [invalid-argument-type]
+    # snapshot: invalid-argument-type
     if issubclass(x, (int, list[int] | bytes)):
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
     else:
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
 ```
 
+```snapshot
+error[invalid-argument-type]: Invalid second argument to `issubclass`
+ --> src/mdtest_snippet.py:9:8
+  |
+9 |     if issubclass(x, (int, list[int] | bytes)):
+  |        ^^^^^^^^^^^^^^^^^^^^-----------------^^
+  |                            |
+  |                            This `UnionType` instance contains non-class elements
+  |
+info: A `UnionType` instance can only be used as the second argument to `issubclass` if all elements are class objects
+info: Element `<class 'list[int]'>` in the union is not a class object
+```
+
 Including nested tuples:
 
 ```py
 def _(x: type[int | list | bytes]):
-    # error: [invalid-argument-type]
+    # snapshot: invalid-argument-type
     if issubclass(x, (int, (str, list[int] | bytes))):
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
     else:
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid second argument to `issubclass`
+  --> src/mdtest_snippet.py:15:8
+   |
+15 |     if issubclass(x, (int, (str, list[int] | bytes))):
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^-----------------^^^
+   |                                  |
+   |                                  This `UnionType` instance contains non-class elements
+   |
+info: A `UnionType` instance can only be used as the second argument to `issubclass` if all elements are class objects
+info: Element `<class 'list[int]'>` in the union is not a class object
 ```
 
 And non-literal tuples:
@@ -220,11 +257,22 @@ And non-literal tuples:
 classes = (int, list[int] | bytes)
 
 def _(x: type[int | list | bytes]):
-    # error: [invalid-argument-type]
+    # snapshot: invalid-argument-type
     if issubclass(x, classes):
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
     else:
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid second argument to `issubclass`
+  --> src/mdtest_snippet.py:23:8
+   |
+23 |     if issubclass(x, classes):
+   |        ^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: A `UnionType` instance can only be used as the second argument to `issubclass` if all elements are class objects
+info: Element `<class 'list[int]'>` in the union `list[int] | bytes` is not a class object
 ```
 
 ## PEP-604 unions on Python \<3.10
@@ -238,6 +286,7 @@ python-version = "3.9"
 ```
 
 ```py
+# error: [unsupported-operator]
 def _(x: type[int | str | bytes]):
     # error: [unsupported-operator]
     if issubclass(x, int | str):

@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability::{Safe, Unsafe};
 use std::borrow::Cow;
 
 use anyhow::{Result, bail};
@@ -18,6 +19,7 @@ use crate::cst::helpers::space;
 use crate::cst::matchers::{match_function_def, match_if, match_indented_block, match_statement};
 use crate::fix::codemods::CodegenStylist;
 use crate::fix::edits::fits;
+use crate::preview::is_collapsible_if_fix_safe_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -41,6 +43,12 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// if foo and bar:
 ///     ...
 /// ```
+/// ## Preview and Fix Safety
+/// When [preview] is enabled, the fix for this rule is considered
+/// as safe. When [preview] is not enabled, the fix is always
+/// considered unsafe.
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 ///
 /// ## Options
 ///
@@ -121,8 +129,8 @@ pub(crate) fn nested_if_statements(
         CollapsibleIf,
         TextRange::new(nested_if.start(), colon.end()),
     );
-    // The fixer preserves comments in the nested body, but removes comments between
-    // the outer and inner if statements.
+    // We skip the fix if there are comments between the outer and inner if
+    // statements.
     if !checker.comment_ranges().intersects(TextRange::new(
         nested_if.start(),
         nested_if.body()[0].start(),
@@ -139,7 +147,14 @@ pub(crate) fn nested_if_statements(
                             checker.settings().tab_size,
                         )
                     }) {
-                        Ok(Some(Fix::unsafe_edit(edit)))
+                        Ok(Some(Fix::applicable_edit(
+                            edit,
+                            if is_collapsible_if_fix_safe_enabled(checker.settings()) {
+                                Safe
+                            } else {
+                                Unsafe
+                            },
+                        )))
                     } else {
                         Ok(None)
                     }

@@ -260,8 +260,8 @@ And it is also an error to use `Protocol` in type expressions:
 # fmt: off
 
 def f(
-    x: Protocol,  # error: [invalid-type-form] "`typing.Protocol` is not allowed in type expressions"
-    y: type[Protocol],  # error: [invalid-type-form] "`typing.Protocol` is not allowed in type expressions"
+    x: Protocol,  # error: [invalid-type-form] "`typing.Protocol` is not allowed in parameter annotations"
+    y: type[Protocol],  # error: [invalid-type-form] "`typing.Protocol` is not allowed in parameter annotations"
 ):
     reveal_type(x)  # revealed: Unknown
     reveal_type(y)  # revealed: type[Unknown]
@@ -729,10 +729,10 @@ static_assert(is_subtype_of(Qux, HasX))
 static_assert(is_assignable_to(Qux, HasX))
 
 class HalfUnknownQux:
-    def __init__(self, x: int) -> None:
-        self.x = x
+    def __init__(self, x: int, y, flag: bool) -> None:
+        self.x = x if flag else y
 
-reveal_type(HalfUnknownQux(1).x)  # revealed: Unknown | int
+reveal_type(HalfUnknownQux(1, "foo", True).x)  # revealed: int | Unknown
 
 static_assert(not is_subtype_of(HalfUnknownQux, HasX))
 static_assert(is_assignable_to(HalfUnknownQux, HasX))
@@ -1578,6 +1578,29 @@ as something that must be supported by type checkers:
 
 > To distinguish between protocol class variables and protocol instance variables, the special
 > `ClassVar` annotation should be used.
+
+## Declared instance attribute members
+
+Declared protocol instance attributes should be available both on protocol-typed values and through
+`self` inside protocol methods, with `Self` rebinding appropriately.
+
+```py
+from typing import Protocol
+from typing_extensions import Self
+
+class Linked(Protocol):
+    value: int
+    next: Self
+
+    def advance(self) -> Self:
+        reveal_type(self.value)  # revealed: int
+        reveal_type(self.next)  # revealed: Self@advance
+        return self.next
+
+def f(x: Linked) -> None:
+    reveal_type(x.value)  # revealed: int
+    reveal_type(x.next)  # revealed: Linked
+```
 
 ## Subtyping of protocols with property members
 
@@ -3094,6 +3117,42 @@ data: dict[str, IntArray] = {}
 indexed_data = {k: v[0:10] for k, v in data.items()}
 
 reveal_type(indexed_data)  # revealed: dict[str, IntArray]
+```
+
+### Regression test: `dict()` overloads with tuple-of-tuples input
+
+This is a regression test for [ty#3026](https://github.com/astral-sh/ty/issues/3026). Matching the
+`dict()` overloads that accept `_typeshed.SupportsKeysAndGetItem` against a tuple of tuples used to
+trigger exponential behavior before we rejected the protocol candidates.
+
+```py
+output = dict((
+    ("0", 0),
+    ("1", 1),
+    ("2", 2),
+    ("3", 3),
+    ("4", 4),
+    ("5", 5),
+    ("6", 6),
+    ("7", 7),
+    ("8", 8),
+    ("9", 9),
+    ("10", 10),
+    ("11", 11),
+    ("12", 12),
+    ("13", 13),
+    ("14", 14),
+    ("15", 15),
+    ("16", 16),
+    ("17", 17),
+    ("18", 18),
+    ("19", 19),
+    ("20", 20),
+    ("21", 21),
+    ("22", 22),
+    ("23", 23),
+))
+reveal_type(output)  # revealed: dict[str, int]
 ```
 
 ### Regression test: narrowing with self-referential protocols

@@ -278,6 +278,36 @@ def f(x: Literal["foo", b"bar"], y: Literal["foo"] | range):
         reveal_type(item)  # revealed: Literal["f", "o"] | int
 ```
 
+## Attribute errors from iterated aliased unions
+
+We should still report missing attributes when a loop variable comes from an aliased union element:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class A:
+    pass
+
+class B:
+    def do_b_thing(self) -> None:
+        pass
+
+type U = A | B
+
+class C:
+    def __init__(self, values: list[U]) -> None:
+        self.values = values
+
+    def f(self) -> None:
+        for item in self.values:
+            reveal_type(item)  # revealed: A | B
+            # error: [unresolved-attribute] "Attribute `do_b_thing` is not defined on `A` in union `U`"
+            item.do_b_thing()
+```
+
 ## Union type as iterable where one union element has no `__iter__` method
 
 <!-- snapshot-diagnostics -->
@@ -319,6 +349,34 @@ def _(flag: bool):
     # error: [not-iterable]
     for x in Test() if flag else Test2():
         reveal_type(x)  # revealed: int
+```
+
+## Union type as iterable where one union element has a non-callable `__iter__`
+
+<!-- snapshot-diagnostics -->
+
+When one union element has a callable `__iter__` and another has a non-callable `__iter__`
+attribute, the error should be "may not be iterable" (hedged), not "is not iterable" (definitive) —
+because at runtime the value might be the iterable variant.
+
+```py
+class TestIter:
+    def __next__(self) -> int:
+        return 42
+
+class Test:
+    def __iter__(self) -> TestIter:
+        return TestIter()
+
+class NotIter:
+    # `__iter__` is present but not callable
+    __iter__: int = 32
+
+def _(flag: bool):
+    iterable = Test() if flag else NotIter()
+    # error: [not-iterable]
+    for x in iterable:
+        reveal_type(x)  # revealed: int | Unknown
 ```
 
 ## Union type as iterator where one union element has no `__next__` method
@@ -1214,13 +1272,8 @@ x = 1
 y = 2
 for _ in range(1_000_000):
     x, y = y, x
-    # Note that we get correct types in the "avoid oscillations" test case below, but not here. I
-    # believe the difference is that in this case the Salsa "cycle head" is the tuple on the RHS of
-    # the assignment, which triggers our recursive type handling, whereas below it's `x`.
-    # TODO: should be Literal[2, 1]
-    reveal_type(x)  # revealed: Divergent
-    # TODO: should be Literal[1, 2]
-    reveal_type(y)  # revealed: Divergent
+    reveal_type(x)  # revealed: Literal[2, 1]
+    reveal_type(y)  # revealed: Literal[1, 2]
 ```
 
 ### Tuple assignments are inferred correctly
@@ -1229,8 +1282,7 @@ for _ in range(1_000_000):
 x = 0
 for _ in range(1_000_000):
     x, y = x + 1, None
-    # TODO: should be int
-    reveal_type(x)  # revealed: Divergent
+    reveal_type(x)  # revealed: int
 ```
 
 ### Avoid oscillations

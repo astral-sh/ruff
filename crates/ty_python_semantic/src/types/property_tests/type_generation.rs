@@ -1,13 +1,16 @@
 use crate::Db;
 use crate::db::tests::TestDb;
-use crate::place::{builtins_symbol, known_module_symbol};
+use crate::place::{DefinedPlace, Place, builtins_symbol, global_symbol, known_module_symbol};
 use crate::types::enums::is_single_member_enum;
+use crate::types::known_instance::KnownInstanceType;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    BoundMethodType, EnumLiteralType, IntersectionBuilder, IntersectionType, KnownClass, Parameter,
-    Parameters, Signature, SpecialFormType, SubclassOfType, Type, UnionType,
+    ApplyTypeMappingVisitor, BoundMethodType, EnumLiteralType, IntersectionBuilder,
+    IntersectionType, KnownClass, MaterializationKind, Parameter, Parameters, Signature,
+    SpecialFormType, SubclassOfType, Type, UnionType,
 };
 use quickcheck::{Arbitrary, Gen};
+use ruff_db::files::system_path_to_file;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 use ty_module_resolver::KnownModule;
@@ -20,6 +23,9 @@ use ty_module_resolver::KnownModule;
 pub(crate) enum Ty {
     Never,
     Unknown,
+    Divergent,
+    TopDivergent,
+    BottomDivergent,
     None,
     Any,
     IntLiteral(i64),
@@ -65,6 +71,16 @@ pub(crate) enum Ty {
     /// where the class has `Any` in its MRO
     UnittestMockInstance,
     UnittestMockLiteral,
+    /// Instances of various `NewType`s that we construct in `setup.rs`.
+    /// `FloatNewType` and `ComplexNewType` are interesting because they are the only
+    /// kinds of `NewType`s that can have unions as their concrete base types.
+    IntNewtypeInstance,
+    StrNewtypeInstance,
+    FloatNewtypeInstance,
+    ComplexNewtypeInstance,
+    SubNewTypeOfIntInstance,
+    SubSubNewTypeOfIntInstance,
+    SubNewTypeOfFloatInstance,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -135,6 +151,9 @@ impl Ty {
         match self {
             Ty::Never => Type::Never,
             Ty::Unknown => Type::unknown(),
+            Ty::Divergent => divergent(db, 1, None),
+            Ty::TopDivergent => divergent(db, 2, Some(MaterializationKind::Top)),
+            Ty::BottomDivergent => divergent(db, 3, Some(MaterializationKind::Bottom)),
             Ty::None => Type::none(db),
             Ty::Any => Type::any(),
             Ty::IntLiteral(n) => Type::int_literal(n),
@@ -235,7 +254,41 @@ impl Ty {
                 db,
                 Signature::new(params.into_parameters(db), returns.into_type(db)),
             ),
+            Ty::FloatNewtypeInstance => newtype_instance(db, "NewTypeOfFloat"),
+            Ty::IntNewtypeInstance => newtype_instance(db, "NewTypeOfInt"),
+            Ty::StrNewtypeInstance => newtype_instance(db, "NewTypeOfStr"),
+            Ty::ComplexNewtypeInstance => newtype_instance(db, "NewTypeOfComplex"),
+            Ty::SubNewTypeOfIntInstance => newtype_instance(db, "SubNewTypeOfInt"),
+            Ty::SubSubNewTypeOfIntInstance => newtype_instance(db, "SubSubNewTypeOfInt"),
+            Ty::SubNewTypeOfFloatInstance => newtype_instance(db, "SubNewTypeOfFloat"),
         }
+    }
+}
+
+fn divergent(db: &TestDb, id_bits: u64, materialization: Option<MaterializationKind>) -> Type<'_> {
+    let divergent = Type::divergent(salsa::plumbing::Id::from_bits(id_bits));
+
+    match materialization {
+        Some(materialization_kind) => divergent.materialize(
+            db,
+            materialization_kind,
+            &ApplyTypeMappingVisitor::default(),
+        ),
+        None => divergent,
+    }
+}
+
+fn newtype_instance<'db>(db: &'db dyn Db, name: &str) -> Type<'db> {
+    let file = system_path_to_file(db, super::setup::PROPERTY_TEST_MODULE_PATH)
+        .expect("Property-test module must exist");
+    let Place::Defined(DefinedPlace { ty, .. }) = global_symbol(db, file, name).place else {
+        panic!(
+            "Expected a global symbol for `{name}` in the property test module, but it was not found"
+        );
+    };
+    match ty {
+        Type::KnownInstance(KnownInstanceType::NewType(newtype)) => Type::NewTypeInstance(newtype),
+        _ => panic!("Expected NewType symbol for `{name}`, got {ty:?}"),
     }
 }
 
@@ -255,10 +308,13 @@ fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
     let bool_lit = Ty::BooleanLiteral(bool::arbitrary(g));
 
     // Update this if new non-fully-static types are added below.
-    let fully_static_index = 5;
+    let fully_static_index = 8;
     let types = &[
         Ty::Any,
         Ty::Unknown,
+        Ty::Divergent,
+        Ty::TopDivergent,
+        Ty::BottomDivergent,
         Ty::SubclassOfAny,
         Ty::UnittestMockLiteral,
         Ty::UnittestMockInstance,
@@ -280,6 +336,8 @@ fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
         Ty::KnownClassInstance(KnownClass::Object),
         Ty::KnownClassInstance(KnownClass::Str),
         Ty::KnownClassInstance(KnownClass::Int),
+        Ty::KnownClassInstance(KnownClass::Float),
+        Ty::KnownClassInstance(KnownClass::Complex),
         Ty::KnownClassInstance(KnownClass::Bool),
         Ty::KnownClassInstance(KnownClass::FunctionType),
         Ty::KnownClassInstance(KnownClass::SpecialForm),
@@ -313,6 +371,13 @@ fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
             class: "int",
             method: "bit_length",
         },
+        Ty::IntNewtypeInstance,
+        Ty::StrNewtypeInstance,
+        Ty::FloatNewtypeInstance,
+        Ty::ComplexNewtypeInstance,
+        Ty::SubNewTypeOfIntInstance,
+        Ty::SubSubNewTypeOfIntInstance,
+        Ty::SubNewTypeOfFloatInstance,
     ];
     let types = if fully_static {
         &types[fully_static_index..]

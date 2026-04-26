@@ -9,17 +9,18 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 help: Convert to `T | None`
 1  | # https://github.com/astral-sh/ruff/issues/13833
-2  + from __future__ import annotations
-3  | 
+2  |
+3  + from __future__ import annotations
 4  | from typing import Optional
-5  | 
+5  |
+6  |
 --------------------------------------------------------------------------------
 13 | def multiple_1(arg1: Optional, arg2: Optional = None): ...
-14 | 
-15 | 
+14 |
+15 |
    - def multiple_2(arg1: Optional, arg2: Optional = None, arg3: int = None): ...
 16 + def multiple_2(arg1: Optional, arg2: Optional = None, arg3: int | None = None): ...
-17 | 
-18 | 
+17 |
+18 |
 19 | def return_type(arg: Optional = None) -> Optional: ...
 note: This is an unsafe fix and may change runtime behavior

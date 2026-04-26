@@ -239,7 +239,7 @@ impl Client {
 }
 
 /// Type erased handler for client responses.
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 pub(crate) struct ClientResponseHandler(Box<dyn FnOnce(&Client, lsp_server::Response) + Send>);
 
 impl ClientResponseHandler {

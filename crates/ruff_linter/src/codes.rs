@@ -1049,6 +1049,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "047") => rules::ruff::rules::NeedlessElse,
         (Ruff, "048") => rules::ruff::rules::MapIntVersionParsing,
         (Ruff, "049") => rules::ruff::rules::DataclassEnum,
+        (Ruff, "050") => rules::ruff::rules::UnnecessaryIf,
         (Ruff, "051") => rules::ruff::rules::IfKeyInDictDel,
         (Ruff, "052") => rules::ruff::rules::UsedDummyVariable,
         (Ruff, "053") => rules::ruff::rules::ClassWithMixedTypeVars,
@@ -1069,6 +1070,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "069") => rules::ruff::rules::FloatEqualityComparison,
         (Ruff, "070") => rules::ruff::rules::UnnecessaryAssignBeforeYield,
         (Ruff, "071") => rules::ruff::rules::OsPathCommonprefix,
+        (Ruff, "072") => rules::ruff::rules::UselessFinally,
+        (Ruff, "073") => rules::ruff::rules::FStringPercentFormat,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,
@@ -1130,6 +1133,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // airflow
         (Airflow, "001") => rules::airflow::rules::AirflowVariableNameTaskIdMismatch,
         (Airflow, "002") => rules::airflow::rules::AirflowDagNoScheduleArgument,
+        (Airflow, "003") => rules::airflow::rules::AirflowVariableGetOutsideTask,
+        (Airflow, "004") => rules::airflow::rules::AirflowTaskBranchAsShortCircuit,
+        (Airflow, "201") => rules::airflow::rules::AirflowXcomPullInTemplateString,
         (Airflow, "301") => rules::airflow::rules::Airflow3Removal,
         (Airflow, "302") => rules::airflow::rules::Airflow3MovedToProvider,
         (Airflow, "303") => rules::airflow::rules::Airflow3IncompatibleFunctionSignature,

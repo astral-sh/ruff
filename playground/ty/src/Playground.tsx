@@ -9,9 +9,21 @@ import {
   useRef,
   useState,
 } from "react";
-import { ErrorMessage, Header, setupMonaco, useTheme } from "shared";
+import {
+  ErrorMessage,
+  Header,
+  setupMonaco,
+  useTheme,
+  downloadZip,
+} from "shared";
 import { FileHandle, PositionEncoding, Workspace } from "ty_wasm";
-import { persist, persistLocal, restore } from "./Editor/persist";
+import {
+  copyAsMarkdown,
+  copyAsMarkdownLink,
+  persist,
+  persistLocal,
+  restore,
+} from "./Editor/persist";
 import { loader } from "@monaco-editor/react";
 import tySchema from "../../../ty.schema.json";
 import Chrome, { formatError } from "./Editor/Chrome";
@@ -39,7 +51,6 @@ export default function Playground() {
   // We need useRef to avoid duplicate initialization when
   // running locally due to react rendering
   // everything twice in strict mode in debug builds.
-  // eslint-disable-next-line react-hooks/refs
   const workspacePromise = workspacePromiseRef.current;
 
   const fileName = useMemo(() => {
@@ -58,6 +69,44 @@ export default function Playground() {
     }
   }, [files]);
 
+  const handleCopyMarkdown = useCallback(async () => {
+    const serialized = serializeFiles(files);
+
+    if (serialized != null) {
+      await copyAsMarkdown(serialized);
+    }
+  }, [files]);
+
+  const handleCopyMarkdownLink = useCallback(async () => {
+    const serialized = serializeFiles(files);
+
+    if (serialized != null) {
+      await copyAsMarkdownLink(serialized);
+    }
+  }, [files]);
+
+  const handleDownload = useCallback(async () => {
+    const serialized = serializeFiles(files);
+
+    if (serialized != null) {
+      const downloadFiles = { ...serialized.files };
+
+      if (SETTINGS_FILE_NAME in downloadFiles) {
+        try {
+          const toml = await import("smol-toml");
+          const tomlContent = toml.stringify(
+            JSON.parse(downloadFiles[SETTINGS_FILE_NAME]),
+          );
+          delete downloadFiles[SETTINGS_FILE_NAME];
+          downloadFiles["ty.toml"] = tomlContent;
+        } catch {
+          // Keep the original JSON file if conversion fails.
+        }
+      }
+
+      await downloadZip(downloadFiles, "ty-playground");
+    }
+  }, [files]);
   const handleFileAdded = useCallback((workspace: Workspace, name: string) => {
     let handle = null;
 
@@ -175,12 +224,15 @@ export default function Playground() {
   return (
     <main className="flex flex-col h-full bg-ayu-background dark:bg-ayu-background-dark">
       <Header
-        edit={files.revision}
         theme={theme}
         tool="ty"
         version={version}
         onChangeTheme={setTheme}
+        edit={files.revision}
         onShare={handleShare}
+        onCopyMarkdownLink={handleCopyMarkdownLink}
+        onCopyMarkdown={handleCopyMarkdown}
+        onDownload={handleDownload}
         onReset={workspace == null ? undefined : handleReset}
       />
 

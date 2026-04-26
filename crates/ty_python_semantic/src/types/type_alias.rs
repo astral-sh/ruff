@@ -2,18 +2,18 @@ use std::fmt::Write;
 
 use crate::{
     Db,
-    ast_node_ref::AstNodeRef,
-    semantic_index::{
-        definition::{Definition, DefinitionKind},
-        expression::{Expression, ExpressionKind},
-        scope::ScopeId,
-        semantic_index,
-    },
     types::{
         GenericContext, Type, TypeContext, definition_expression_type,
         display::qualified_name_components_from_scope, generics::Specialization,
         infer_expression_type, visitor,
     },
+};
+use ty_python_core::{
+    ast_node_ref::AstNodeRef,
+    definition::{Definition, DefinitionKind},
+    expression::{Expression, ExpressionKind},
+    scope::ScopeId,
+    semantic_index,
 };
 
 use ruff_db::parsed::parsed_module;

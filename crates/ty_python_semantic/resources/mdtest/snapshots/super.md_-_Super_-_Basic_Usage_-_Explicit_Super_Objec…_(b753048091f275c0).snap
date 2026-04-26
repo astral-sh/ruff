@@ -127,14 +127,9 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
 error[unresolved-attribute]: Object of type `<super: <class 'C'>, C>` has no attribute `c`
   --> src/mdtest_snippet.py:20:1
    |
-18 | super(C, C()).a
-19 | super(C, C()).b
 20 | super(C, C()).c  # error: [unresolved-attribute]
    | ^^^^^^^^^^^^^^^
-21 |
-22 | super(B, C()).a
    |
-info: rule `unresolved-attribute` is enabled by default
 
 ```
 
@@ -142,12 +137,9 @@ info: rule `unresolved-attribute` is enabled by default
 error[unresolved-attribute]: Object of type `<super: <class 'B'>, C>` has no attribute `b`
   --> src/mdtest_snippet.py:23:1
    |
-22 | super(B, C()).a
 23 | super(B, C()).b  # error: [unresolved-attribute]
    | ^^^^^^^^^^^^^^^
-24 | super(B, C()).c  # error: [unresolved-attribute]
    |
-info: rule `unresolved-attribute` is enabled by default
 
 ```
 
@@ -155,14 +147,9 @@ info: rule `unresolved-attribute` is enabled by default
 error[unresolved-attribute]: Object of type `<super: <class 'B'>, C>` has no attribute `c`
   --> src/mdtest_snippet.py:24:1
    |
-22 | super(B, C()).a
-23 | super(B, C()).b  # error: [unresolved-attribute]
 24 | super(B, C()).c  # error: [unresolved-attribute]
    | ^^^^^^^^^^^^^^^
-25 |
-26 | super(A, C()).a  # error: [unresolved-attribute]
    |
-info: rule `unresolved-attribute` is enabled by default
 
 ```
 
@@ -170,14 +157,9 @@ info: rule `unresolved-attribute` is enabled by default
 error[unresolved-attribute]: Object of type `<super: <class 'A'>, C>` has no attribute `a`
   --> src/mdtest_snippet.py:26:1
    |
-24 | super(B, C()).c  # error: [unresolved-attribute]
-25 |
 26 | super(A, C()).a  # error: [unresolved-attribute]
    | ^^^^^^^^^^^^^^^
-27 | super(A, C()).b  # error: [unresolved-attribute]
-28 | super(A, C()).c  # error: [unresolved-attribute]
    |
-info: rule `unresolved-attribute` is enabled by default
 
 ```
 
@@ -185,12 +167,9 @@ info: rule `unresolved-attribute` is enabled by default
 error[unresolved-attribute]: Object of type `<super: <class 'A'>, C>` has no attribute `b`
   --> src/mdtest_snippet.py:27:1
    |
-26 | super(A, C()).a  # error: [unresolved-attribute]
 27 | super(A, C()).b  # error: [unresolved-attribute]
    | ^^^^^^^^^^^^^^^
-28 | super(A, C()).c  # error: [unresolved-attribute]
    |
-info: rule `unresolved-attribute` is enabled by default
 
 ```
 
@@ -198,14 +177,9 @@ info: rule `unresolved-attribute` is enabled by default
 error[unresolved-attribute]: Object of type `<super: <class 'A'>, C>` has no attribute `c`
   --> src/mdtest_snippet.py:28:1
    |
-26 | super(A, C()).a  # error: [unresolved-attribute]
-27 | super(A, C()).b  # error: [unresolved-attribute]
 28 | super(A, C()).c  # error: [unresolved-attribute]
    | ^^^^^^^^^^^^^^^
-29 |
-30 | reveal_type(super(C, C()).a)  # revealed: bound method C.a() -> Unknown
    |
-info: rule `unresolved-attribute` is enabled by default
 
 ```
 
@@ -213,14 +187,9 @@ info: rule `unresolved-attribute` is enabled by default
 error[invalid-super-argument]: `<Protocol with members 'bar'>` is an abstract/structural type in `super(<class 'object'>, <Protocol with members 'bar'>)` call
   --> src/mdtest_snippet.py:78:21
    |
-76 |         # error: [invalid-super-argument]
-77 |         # revealed: Unknown
 78 |         reveal_type(super(object, x))
    |                     ^^^^^^^^^^^^^^^^
-79 |
-80 |     # error: [invalid-super-argument]
    |
-info: rule `invalid-super-argument` is enabled by default
 
 ```
 
@@ -228,28 +197,18 @@ info: rule `invalid-super-argument` is enabled by default
 error[invalid-super-argument]: `(int, str, /) -> bool` is an abstract/structural type in `super(<class 'object'>, (int, str, /) -> bool)` call
   --> src/mdtest_snippet.py:82:17
    |
-80 |     # error: [invalid-super-argument]
-81 |     # revealed: Unknown
 82 |     reveal_type(super(object, z))
    |                 ^^^^^^^^^^^^^^^^
-83 |
-84 |     is_list = g(x)
    |
-info: rule `invalid-super-argument` is enabled by default
 
 ```
 
 ```
 error[invalid-super-argument]: `types.GenericAlias` instance `list[int]` is not a valid class
-   --> src/mdtest_snippet.py:98:13
-    |
- 96 | # error: [invalid-super-argument]
- 97 | # revealed: Unknown
- 98 | reveal_type(super(list[int], []))
-    |             ^^^^^^^^^^^^^^^^^^^^
- 99 | class Super:
-100 |     def method(self) -> int:
-    |
-info: rule `invalid-super-argument` is enabled by default
+  --> src/mdtest_snippet.py:98:13
+   |
+98 | reveal_type(super(list[int], []))
+   |             ^^^^^^^^^^^^^^^^^^^^
+   |
 
 ```

@@ -835,13 +835,24 @@ fn extract_rest_style_params(docstring: &str) -> HashMap<String, String> {
 
 #[cfg(test)]
 mod tests {
+    use insta::Settings;
     use insta::assert_snapshot;
 
     use super::*;
 
+    fn bind_docstring_snapshot_filters() -> impl Drop {
+        let mut settings = Settings::clone_current();
+        // Markdown hard breaks are encoded as trailing spaces (`"  \n"`), but many editors
+        // trim trailing whitespace in string literals. Replace them with `<HB>` in snapshots
+        // so tests are stable and the expected output stays readable.
+        settings.add_filter("  \n", "<HB>\n");
+        settings.bind_to_scope()
+    }
+
     // A nice doctest that is surrounded by prose
     #[test]
     fn dunder_escape() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         Here _this_ and ___that__ should be escaped
         Here *this* and **that** should be untouched
@@ -867,24 +878,24 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r"
-        Here \_this\_ and \_\_\_that\_\_ should be escaped  
-        Here *this* and **that** should be untouched  
-        Here `this` and ``that`` should be untouched  
-          
-        Here `_this_` and ``__that__`` should be untouched  
-        Here `_this_` ``__that__`` should be untouched  
-        `_this_too_should_be_untouched_`  
-          
-        Here `_this_```__that__`` should be untouched but this\_is\_escaped  
-        Here ``_this_```__that__` should be untouched but this\_is\_escaped  
-          
-        Here `_this_ and _that_ should be escaped (but isn't)  
-        Here \_this\_ and \_that\_` should be escaped  
-        `Here _this_ and _that_ should be escaped (but isn't)  
-        Here \_this\_ and \_that\_ should be escaped`  
-          
-        Here ```_is_``__a__`_balanced_``_mess_```  
-        Here ```_is_`````__a__``\_random\_````_mess__````  
+        Here \_this\_ and \_\_\_that\_\_ should be escaped<HB>
+        Here *this* and **that** should be untouched<HB>
+        Here `this` and ``that`` should be untouched<HB>
+        <HB>
+        Here `_this_` and ``__that__`` should be untouched<HB>
+        Here `_this_` ``__that__`` should be untouched<HB>
+        `_this_too_should_be_untouched_`<HB>
+        <HB>
+        Here `_this_```__that__`` should be untouched but this\_is\_escaped<HB>
+        Here ``_this_```__that__` should be untouched but this\_is\_escaped<HB>
+        <HB>
+        Here `_this_ and _that_ should be escaped (but isn't)<HB>
+        Here \_this\_ and \_that\_` should be escaped<HB>
+        `Here _this_ and _that_ should be escaped (but isn't)<HB>
+        Here \_this\_ and \_that\_ should be escaped`<HB>
+        <HB>
+        Here ```_is_``__a__`_balanced_``_mess_```<HB>
+        Here ```_is_`````__a__``\_random\_````_mess__````<HB>
         ```_is_`````__a__``\_random\_````_mess__````
         ");
     }
@@ -893,6 +904,7 @@ mod tests {
     // and should become `:`
     #[test]
     fn literal_colon() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         Check out this great example code::
 
@@ -911,7 +923,7 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Check out this great example code:    
+        Check out this great example code:  <HB>
         ```````````python
             x_y = "hello"
 
@@ -931,6 +943,7 @@ mod tests {
     // and should be erased
     #[test]
     fn literal_space() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         Check out this great example code ::
 
@@ -949,7 +962,7 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Check out this great example code    
+        Check out this great example code  <HB>
         ```````````python
             x_y = "hello"
 
@@ -969,6 +982,7 @@ mod tests {
     // and the whole line should be deleted
     #[test]
     fn literal_own_line() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         Check out this great example code
             ::
@@ -988,8 +1002,8 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Check out this great example code  
-        &nbsp;&nbsp;&nbsp;&nbsp;    
+        Check out this great example code<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;  <HB>
         ```````````python
             x_y = "hello"
 
@@ -1009,6 +1023,7 @@ mod tests {
     // and I have no idea what Should happen but let's record what Does
     #[test]
     fn literal_squeezed() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         Check out this great example code::
             x_y = "hello"
@@ -1025,7 +1040,7 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Check out this great example code:  
+        Check out this great example code:<HB>
         ```````````python
             x_y = "hello"
 
@@ -1044,6 +1059,7 @@ mod tests {
     // and we should tidy up
     #[test]
     fn literal_flush() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         Check out this great example code::
 
@@ -1059,7 +1075,7 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Check out this great example code:    
+        Check out this great example code:  <HB>
         ```````````python
             x_y = "hello"
 
@@ -1077,6 +1093,7 @@ mod tests {
     // still be shown as text and not ```code```.
     #[test]
     fn warning_block() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         The thing you need to understand is that computers are hard.
 
@@ -1096,18 +1113,18 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        The thing you need to understand is that computers are hard.  
-          
-        **Warning:**  
-        &nbsp;&nbsp;&nbsp;&nbsp;Now listen here buckaroo you might have seen me say computers are hard,  
-        &nbsp;&nbsp;&nbsp;&nbsp;and though "yeah I know computers are hard but NO you DON'T KNOW.  
-          
-        &nbsp;&nbsp;&nbsp;&nbsp;Listen:  
-          
-        &nbsp;&nbsp;&nbsp;&nbsp;- Computers  
-        &nbsp;&nbsp;&nbsp;&nbsp;- Are  
-        &nbsp;&nbsp;&nbsp;&nbsp;- Hard  
-          
+        The thing you need to understand is that computers are hard.<HB>
+        <HB>
+        **Warning:**<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;Now listen here buckaroo you might have seen me say computers are hard,<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;and though "yeah I know computers are hard but NO you DON'T KNOW.<HB>
+        <HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;Listen:<HB>
+        <HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;- Computers<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;- Are<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;- Hard<HB>
+        <HB>
         &nbsp;&nbsp;&nbsp;&nbsp;Ok!?!?!?
         "#);
     }
@@ -1116,6 +1133,7 @@ mod tests {
     // still be shown as text and not ```code```.
     #[test]
     fn version_blocks() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         Some much-updated docs
 
@@ -1135,18 +1153,18 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        Some much-updated docs  
-          
-        **Added in version 3.0:**  
-        &nbsp;&nbsp;&nbsp;Function added  
-          
-        **Changed in version 4.0:**  
-        &nbsp;&nbsp;&nbsp;The `spam` argument was added  
-        **Changed in version 4.1:**  
-        &nbsp;&nbsp;&nbsp;The `spam` argument is considered evil now.  
-          
-        &nbsp;&nbsp;&nbsp;You really shouldnt use it  
-          
+        Some much-updated docs<HB>
+        <HB>
+        **Added in version 3.0:**<HB>
+        &nbsp;&nbsp;&nbsp;Function added<HB>
+        <HB>
+        **Changed in version 4.0:**<HB>
+        &nbsp;&nbsp;&nbsp;The `spam` argument was added<HB>
+        **Changed in version 4.1:**<HB>
+        &nbsp;&nbsp;&nbsp;The `spam` argument is considered evil now.<HB>
+        <HB>
+        &nbsp;&nbsp;&nbsp;You really shouldnt use it<HB>
+        <HB>
         And that's the docs
         ");
     }
@@ -1155,6 +1173,7 @@ mod tests {
     // `..deprecated ::`
     #[test]
     fn deprecated_prefix_gunk() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         wow this is some changes .. deprecated:: 1.2.3
             x = 2
@@ -1163,7 +1182,7 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        **wow this is some changes Deprecated since version 1.2.3:**  
+        **wow this is some changes Deprecated since version 1.2.3:**<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;x = 2
         ");
     }
@@ -1171,6 +1190,7 @@ mod tests {
     // We should not parse the contents of a markdown codefence
     #[test]
     fn explicit_markdown_block_with_ps1_contents() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         My cool func:
 
@@ -1185,8 +1205,8 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        My cool func:  
-          
+        My cool func:<HB>
+        <HB>
         ```python
         >>> thing.do_thing()
         wow it did the thing
@@ -1199,6 +1219,7 @@ mod tests {
     // We should not parse the contents of a markdown codefence
     #[test]
     fn explicit_markdown_block_with_underscore_contents_tick() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         My cool func:
 
@@ -1212,8 +1233,8 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        My cool func:  
-          
+        My cool func:<HB>
+        <HB>
         `````python
         x_y = thing_do();
         ``` # this should't close the fence!
@@ -1225,6 +1246,7 @@ mod tests {
     // `~~~` also starts a markdown codefence
     #[test]
     fn explicit_markdown_block_with_underscore_contents_tilde() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         My cool func:
 
@@ -1238,8 +1260,8 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        My cool func:  
-          
+        My cool func:<HB>
+        <HB>
         ~~~~~python
         x_y = thing_do();
         ~~~ # this should't close the fence!
@@ -1253,6 +1275,7 @@ mod tests {
     // but it's nice if we handle it anyway because it makes visual sense).
     #[test]
     fn explicit_markdown_block_with_indent_tick() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         My cool func...
 
@@ -1269,15 +1292,15 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        My cool func...  
-          
-        Returns:  
-        &nbsp;&nbsp;&nbsp;&nbsp;Some details  
+        My cool func...<HB>
+        <HB>
+        Returns:<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;Some details<HB>
         `````python
             x_y = thing_do();
             ``` # this should't close the fence!
             a_b = other_thing();
-        `````  
+        `````<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;And so on.
         ");
     }
@@ -1287,6 +1310,7 @@ mod tests {
     // but it's nice if we handle it anyway because it makes visual sense).
     #[test]
     fn explicit_markdown_block_with_indent_tilde() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         My cool func...
 
@@ -1303,15 +1327,15 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        My cool func...  
-          
-        Returns:  
-        &nbsp;&nbsp;&nbsp;&nbsp;Some details  
+        My cool func...<HB>
+        <HB>
+        Returns:<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;Some details<HB>
         ~~~~~~python
             x_y = thing_do();
             ~~~ # this should't close the fence!
             a_b = other_thing();
-        ~~~~~~  
+        ~~~~~~<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;And so on.
         ");
     }
@@ -1319,6 +1343,7 @@ mod tests {
     // What do we do when we hit the end of the docstring with an unclosed markdown block?
     #[test]
     fn explicit_markdown_block_with_unclosed_fence_tick() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         My cool func:
 
@@ -1329,8 +1354,8 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        My cool func:  
-          
+        My cool func:<HB>
+        <HB>
         ````python
         x_y = thing_do();
         ````
@@ -1340,6 +1365,7 @@ mod tests {
     // What do we do when we hit the end of the docstring with an unclosed markdown block?
     #[test]
     fn explicit_markdown_block_with_unclosed_fence_tilde() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         My cool func:
 
@@ -1350,8 +1376,8 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        My cool func:  
-          
+        My cool func:<HB>
+        <HB>
         ~~~~~python
         x_y = thing_do();
         ~~~~~
@@ -1362,6 +1388,7 @@ mod tests {
     // It's fine to break this test, it's not particularly intentional behaviour.
     #[test]
     fn explicit_markdown_block_messy_corners_tick() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         My cool func:
 
@@ -1373,8 +1400,8 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        My cool func:  
-          
+        My cool func:<HB>
+        <HB>
         ``````we still think this is a codefence```
             x_y = thing_do();
         ```````````` and are sloppy as heck with indentation and closing shrugggg
@@ -1385,6 +1412,7 @@ mod tests {
     // It's fine to break this test, it's not particularly intentional behaviour.
     #[test]
     fn explicit_markdown_block_messy_corners_tilde() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         My cool func:
 
@@ -1396,8 +1424,8 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        My cool func:  
-          
+        My cool func:<HB>
+        <HB>
         ~~~~~~we still think this is a codefence~~~
             x_y = thing_do();
         ~~~~~~~~~~~~~ and are sloppy as heck with indentation and closing shrugggg
@@ -1407,6 +1435,7 @@ mod tests {
     // `.. code::` is a literal block and the `.. code::` should be deleted
     #[test]
     fn code_block() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         Here's some code!
 
@@ -1419,9 +1448,9 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Here's some code!  
-          
-          
+        Here's some code!<HB>
+        <HB>
+        <HB>
         ```````````python
             def main() {
                 print("hello world!")
@@ -1433,6 +1462,7 @@ mod tests {
     // `.. code:: rust` is a literal block with rust syntax highlighting
     #[test]
     fn code_block_lang() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         Here's some Rust code!
 
@@ -1445,9 +1475,9 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Here's some Rust code!  
-          
-          
+        Here's some Rust code!<HB>
+        <HB>
+        <HB>
         ```````````rust
             fn main() {
                 println!("hello world!");
@@ -1459,6 +1489,7 @@ mod tests {
     // I don't know if this is valid syntax but we preserve stuff before `..code ::`
     #[test]
     fn code_block_prefix_gunk() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         wow this is some code.. code:: abc
             x = 2
@@ -1467,7 +1498,7 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        wow this is some code  
+        wow this is some code<HB>
         ```````````abc
             x = 2
         ```````````
@@ -1477,6 +1508,7 @@ mod tests {
     // `.. asdgfhjkl-unknown::` is treated the same as `.. code::`
     #[test]
     fn unknown_block() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         Here's some code!
 
@@ -1489,9 +1521,9 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Here's some code!  
-          
-          
+        Here's some code!<HB>
+        <HB>
+        <HB>
         ```````````python
             fn main() {
                 println!("hello world!");
@@ -1503,6 +1535,7 @@ mod tests {
     // `.. asdgfhjkl-unknown:: rust` is treated the same as `.. code:: rust`
     #[test]
     fn unknown_block_lang() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         Here's some Rust code!
 
@@ -1515,9 +1548,9 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Here's some Rust code!  
-          
-          
+        Here's some Rust code!<HB>
+        <HB>
+        <HB>
         ```````````rust
             fn main() {
                 print("hello world!")
@@ -1529,6 +1562,7 @@ mod tests {
     // A nice doctest that is surrounded by prose
     #[test]
     fn doctest_simple() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         This is a function description
 
@@ -1543,14 +1577,14 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description  
-          
+        This is a function description<HB>
+        <HB>
         ```````````python
         >>> thing.do_thing()
         wow it did the thing
         >>> thing.do_other_thing()
         it sure did the thing
-        ```````````  
+        ```````````<HB>
         As you can see it did the thing!
         ");
     }
@@ -1558,6 +1592,7 @@ mod tests {
     // A nice doctest that is surrounded by prose with an indent
     #[test]
     fn doctest_simple_indent() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         This is a function description
 
@@ -1572,14 +1607,14 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description  
-          
+        This is a function description<HB>
+        <HB>
         ```````````python
             >>> thing.do_thing()
             wow it did the thing
             >>> thing.do_other_thing()
             it sure did the thing
-        ```````````  
+        ```````````<HB>
         As you can see it did the thing!
         ");
     }
@@ -1587,6 +1622,7 @@ mod tests {
     // A doctest that has nothing around it
     #[test]
     fn doctest_flush() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#">>> thing.do_thing()
         wow it did the thing
         >>> thing.do_other_thing()
@@ -1607,6 +1643,7 @@ mod tests {
     // A doctest embedded in a literal block (it's just a literal block)
     #[test]
     fn literal_doctest() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         This is a function description::
 
@@ -1621,7 +1658,7 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description:    
+        This is a function description:  <HB>
         ```````````python
             >>> thing.do_thing()
             wow it did the thing
@@ -1635,6 +1672,7 @@ mod tests {
 
     #[test]
     fn doctest_indent_flush() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         And so you can see that
             >>> thing.do_thing()
@@ -1645,7 +1683,7 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        And so you can see that  
+        And so you can see that<HB>
         ```````````python
             >>> thing.do_thing()
             wow it did the thing
@@ -1657,6 +1695,7 @@ mod tests {
 
     #[test]
     fn test_google_style_parameter_documentation() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         This is a function description.
 
@@ -1695,21 +1734,22 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description.  
-          
-        Args:  
-        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter description  
-        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter description  
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.  
-        &nbsp;&nbsp;&nbsp;&nbsp;param3: A parameter without type annotation  
-          
-        Returns:  
+        This is a function description.<HB>
+        <HB>
+        Args:<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter description<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter description<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;param3: A parameter without type annotation<HB>
+        <HB>
+        Returns:<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;str: The return value description
         ");
     }
 
     #[test]
     fn test_numpy_style_parameter_documentation() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         This is a function description.
 
@@ -1766,27 +1806,28 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description.  
-          
-        Parameters  
-        ----------  
-        param1 : str  
-        &nbsp;&nbsp;&nbsp;&nbsp;The first parameter description  
-        param2 : int  
-        &nbsp;&nbsp;&nbsp;&nbsp;The second parameter description  
-        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.  
-        param3  
-        &nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation  
-          
-        Returns  
-        -------  
-        str  
+        This is a function description.<HB>
+        <HB>
+        Parameters<HB>
+        ----------<HB>
+        param1 : str<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;The first parameter description<HB>
+        param2 : int<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;The second parameter description<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
+        param3<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation<HB>
+        <HB>
+        Returns<HB>
+        -------<HB>
+        str<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;The return value description
         ");
     }
 
     #[test]
     fn test_pep257_style_parameter_documentation() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"Insert an entry into the list of warnings filters (at the front).
 
         'param1' -- The first parameter description
@@ -1823,13 +1864,13 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @r"
-        Insert an entry into the list of warnings filters (at the front).  
-          
-        'param1' -- The first parameter description  
-        'param2' -- The second parameter description  
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.  
-        'param3' -- A parameter without type annotation  
-          
+        Insert an entry into the list of warnings filters (at the front).<HB>
+        <HB>
+        'param1' -- The first parameter description<HB>
+        'param2' -- The second parameter description<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
+        'param3' -- A parameter without type annotation<HB>
+        <HB>
         ```````````python
         >>> print repr(foo.__doc__)
         '\n    This is the second line of the docstring.\n    '
@@ -1843,6 +1884,7 @@ mod tests {
 
     #[test]
     fn test_no_parameter_documentation() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         This is a simple function description without parameter documentation.
         "#;
@@ -1858,6 +1900,7 @@ mod tests {
 
     #[test]
     fn test_mixed_style_parameter_documentation() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         This is a function description.
 
@@ -1902,21 +1945,22 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description.  
-          
-        Args:  
-        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): Google-style parameter  
-        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): Another Google-style parameter  
-          
-        Parameters  
-        ----------  
-        param3 : bool  
+        This is a function description.<HB>
+        <HB>
+        Args:<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): Google-style parameter<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): Another Google-style parameter<HB>
+        <HB>
+        Parameters<HB>
+        ----------<HB>
+        param3 : bool<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;NumPy-style parameter
         ");
     }
 
     #[test]
     fn test_rest_style_parameter_documentation() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         This is a function description.
 
@@ -1957,19 +2001,20 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description.  
-          
-        :param str param1: The first parameter description  
-        :param int param2: The second parameter description  
-        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.  
-        :param param3: A parameter without type annotation  
-        :returns: The return value description  
+        This is a function description.<HB>
+        <HB>
+        :param str param1: The first parameter description<HB>
+        :param int param2: The second parameter description<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
+        :param param3: A parameter without type annotation<HB>
+        :returns: The return value description<HB>
         :rtype: str
         ");
     }
 
     #[test]
     fn test_mixed_style_with_rest_parameter_documentation() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         This is a function description.
 
@@ -2022,23 +2067,24 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description.  
-          
-        Args:  
-        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): Google-style parameter  
-          
-        :param int param2: reST-style parameter  
-        :param param3: Another reST-style parameter  
-          
-        Parameters  
-        ----------  
-        param4 : bool  
+        This is a function description.<HB>
+        <HB>
+        Args:<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): Google-style parameter<HB>
+        <HB>
+        :param int param2: reST-style parameter<HB>
+        :param param3: Another reST-style parameter<HB>
+        <HB>
+        Parameters<HB>
+        ----------<HB>
+        param4 : bool<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;NumPy-style parameter
         ");
     }
 
     #[test]
     fn test_numpy_style_with_different_indentation() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         This is a function description.
 
@@ -2095,27 +2141,28 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description.  
-          
-        Parameters  
-        ----------  
-        param1 : str  
-        &nbsp;&nbsp;&nbsp;&nbsp;The first parameter description  
-        param2 : int  
-        &nbsp;&nbsp;&nbsp;&nbsp;The second parameter description  
-        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.  
-        param3  
-        &nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation  
-          
-        Returns  
-        -------  
-        str  
+        This is a function description.<HB>
+        <HB>
+        Parameters<HB>
+        ----------<HB>
+        param1 : str<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;The first parameter description<HB>
+        param2 : int<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;The second parameter description<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
+        param3<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation<HB>
+        <HB>
+        Returns<HB>
+        -------<HB>
+        str<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;The return value description
         ");
     }
 
     #[test]
     fn test_numpy_style_with_tabs_and_mixed_indentation() {
+        let _snap = bind_docstring_snapshot_filters();
         // Using raw strings to avoid tab/space conversion issues in the test
         let docstring = "
         This is a function description.
@@ -2163,22 +2210,23 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description.  
-          
-        Parameters  
-        ----------  
-        param1 : str  
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The first parameter description  
-        param2 : int  
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The second parameter description  
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.  
-        param3  
+        This is a function description.<HB>
+        <HB>
+        Parameters<HB>
+        ----------<HB>
+        param1 : str<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The first parameter description<HB>
+        param2 : int<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The second parameter description<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
+        param3<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation
         ");
     }
 
     #[test]
     fn test_universal_newlines() {
+        let _snap = bind_docstring_snapshot_filters();
         // Test with Windows-style line endings (\r\n)
         let docstring_windows = "This is a function description.\r\n\r\nArgs:\r\n    param1 (str): The first parameter\r\n    param2 (int): The second parameter\r\n";
 
@@ -2223,10 +2271,10 @@ mod tests {
         ");
 
         assert_snapshot!(docstring_windows.render_markdown(), @"
-        This is a function description.  
-          
-        Args:  
-        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter  
+        This is a function description.<HB>
+        <HB>
+        Args:<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
         ");
 
@@ -2239,10 +2287,10 @@ mod tests {
         ");
 
         assert_snapshot!(docstring_mac.render_markdown(), @"
-        This is a function description.  
-          
-        Args:  
-        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter  
+        This is a function description.<HB>
+        <HB>
+        Args:<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
         ");
 
@@ -2255,10 +2303,10 @@ mod tests {
         ");
 
         assert_snapshot!(docstring_unix.render_markdown(), @"
-        This is a function description.  
-          
-        Args:  
-        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter  
+        This is a function description.<HB>
+        <HB>
+        Args:<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
         ");
     }
@@ -2269,6 +2317,7 @@ mod tests {
     // See: https://github.com/astral-sh/ty/issues/2497
     #[test]
     fn doctest_then_literal_block_with_blank_lines() {
+        let _snap = bind_docstring_snapshot_filters();
         let docstring = Docstring::new(
             "\
 Example:
@@ -2292,13 +2341,13 @@ Done.
         // The blank line between foo() and bar() should be preserved inside the code block,
         // NOT cause the code block to end early with bar() rendered as regular text.
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Example:  
-          
+        Example:<HB>
+        <HB>
         ```````````python
         >>> print("hello")
         hello
-        ```````````  
-        Code example:    
+        ```````````<HB>
+        Code example:  <HB>
         ```````````python
             def foo():
                 pass

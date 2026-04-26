@@ -53,7 +53,7 @@ def unknown() -> Unknown:
     return 1
 
 d = D()
-reveal_type(d.x)  # revealed: Unknown | None
+reveal_type(d.x)  # revealed: None | Unknown
 d.x = 1
 reveal_type(d.x)  # revealed: Literal[1]
 d.x = unknown()

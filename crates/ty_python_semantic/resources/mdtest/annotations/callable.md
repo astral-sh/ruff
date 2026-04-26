@@ -52,8 +52,8 @@ def _(c: Callable[42, str]):
 Or, when one of the parameter type is invalid in the list:
 
 ```py
-# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
-# error: [invalid-type-form] "Boolean literals are not allowed in this context in a type expression"
+# error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
+# error: [invalid-type-form] "Boolean literals are not allowed in this context in a parameter annotation"
 def _(c: Callable[[int, 42, str, False], None]):
     # revealed: (int, Unknown, str, Unknown, /) -> None
     reveal_type(c)
@@ -69,7 +69,7 @@ def _(c: Callable[[...], int]):
 ```
 
 ```py
-# error: [invalid-type-form] "`...` is not allowed in this context in a type expression"
+# error: [invalid-type-form] "`...` is not allowed in this context in a parameter annotation"
 def _(c: Callable[[int, ...], int]):
     reveal_type(c)  # revealed: (int, Unknown, /) -> int
 ```
@@ -114,7 +114,7 @@ from typing import Callable
 # fmt: off
 
 def _(c: Callable[
-            # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+            # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
             {1, 2}, 2  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
         ]
     ):
@@ -143,7 +143,7 @@ from typing import Callable
 
 def _(c: Callable[
             int,  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
-            [str]  # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+            [str]  # error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
         ]
     ):
     reveal_type(c)  # revealed: (...) -> Unknown
@@ -158,7 +158,7 @@ from typing import Callable
 
 def _(c: Callable[
             int,  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
-            (str, )  # error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression"
+            (str, )  # error: [invalid-type-form] "Tuple literals are not allowed in this context in a parameter annotation"
         ]
     ):
     reveal_type(c)  # revealed: (...) -> Unknown
@@ -169,7 +169,7 @@ def _(c: Callable[
 ```py
 from typing import Callable
 
-# error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+# error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
 def _(c: Callable[[int], [str]]):
     reveal_type(c)  # revealed: (int, /) -> Unknown
 ```
@@ -184,8 +184,8 @@ from typing import Callable
 
 def _(c: Callable[  # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
             [int],
-            [str],  # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
-            [bytes]  # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+            [str],  # error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
+            [bytes]  # error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
         ]
     ):
     reveal_type(c)  # revealed: (...) -> Unknown
@@ -369,16 +369,14 @@ Using `Concatenate` as the first argument to `Callable`:
 from typing_extensions import Callable, Concatenate
 
 def _(c: Callable[Concatenate[int, str, ...], int]):
-    # TODO: Should reveal the correct signature
-    reveal_type(c)  # revealed: (...) -> int
+    reveal_type(c)  # revealed: (int, str, /, *args: Any, **kwargs: Any) -> int
 ```
 
 Other type expressions can be nested inside `Concatenate`:
 
 ```py
-def _(c: Callable[[Concatenate[int | str, type[str], ...], int], int]):
-    # TODO: Should reveal the correct signature
-    reveal_type(c)  # revealed: (...) -> int
+def _(c: Callable[Concatenate[int | str, type[str], ...], int]):
+    reveal_type(c)  # revealed: (int | str, type[str], /, *args: Any, **kwargs: Any) -> int
 ```
 
 But providing fewer than 2 arguments to `Concatenate` is an error:
@@ -387,9 +385,9 @@ But providing fewer than 2 arguments to `Concatenate` is an error:
 # fmt: off
 
 def _(
-    c: Callable[Concatenate[int], int],  # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 1"
-    d: Callable[Concatenate[(int,)], int],  # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 1"
-    e: Callable[Concatenate[()], int]  # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 0"
+    c: Callable[Concatenate[int], int],  # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
+    d: Callable[Concatenate[(int,)], int],  # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
+    e: Callable[Concatenate[()], int]  # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 0)"
 ):
     reveal_type(c)  # revealed: (...) -> int
     reveal_type(d)  # revealed: (...) -> int
@@ -516,7 +514,7 @@ def f_okay(c: Callable[[], None]):
 ### Subclasses should return themselves, not superclass
 
 ```py
-from ty_extensions import into_callable
+from ty_extensions import into_regular_callable
 
 class Base:
     def __init__(self) -> None:
@@ -526,7 +524,7 @@ class A(Base):
     pass
 
 # revealed: () -> A
-reveal_type(into_callable(A))
+reveal_type(into_regular_callable(A))
 ```
 
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

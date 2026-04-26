@@ -7,8 +7,8 @@ use ruff_db::files::{File, FilePath, FileRange, system_path_to_file, vendored_pa
 use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath, WhichError, WhichResult, WritableSystem,
+    CaseSensitivity, DirectoryEntry, MemoryFileSystem, Metadata, System, SystemPath, SystemPathBuf,
+    SystemVirtualPath, WhichError, WhichResult, WritableSystem,
 };
 use ruff_db::vendored::VendoredPath;
 use ruff_diagnostics::{Applicability, Edit};
@@ -17,16 +17,16 @@ use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_ide::{
-    InlayHintSettings, MarkupKind, RangedValue, document_highlights, find_references,
-    goto_declaration, goto_definition, goto_type_definition, hover, inlay_hints,
+    Hint as IdeHint, InlayHintSettings, MarkupKind, RangedValue, document_highlights,
+    find_references, goto_declaration, goto_definition, goto_type_definition, hover, inlay_hints,
 };
-use ty_ide::{NavigationTarget, NavigationTargets, signature_help};
+use ty_ide::{NavigationTarget, NavigationTargets, hints, signature_help};
 use ty_project::metadata::options::Options;
 use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use ty_project::{CheckMode, ProjectMetadata};
 use ty_project::{Db, ProjectDatabase};
-use ty_python_semantic::{MisconfigurationMode, Program};
+use ty_python_core::program::{FallibleStrategy, Program};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -131,11 +131,11 @@ impl Workspace {
             options,
             SystemPathBuf::from(root),
             None,
-            MisconfigurationMode::Fail,
+            &FallibleStrategy,
         )
         .map_err(into_error)?;
 
-        let mut db = ProjectDatabase::new(project, system.clone()).map_err(into_error)?;
+        let mut db = ProjectDatabase::fallible(project, system.clone()).map_err(into_error)?;
 
         // By default, it will check all files in the project but we only want to check the open
         // files in the playground.
@@ -160,12 +160,12 @@ impl Workspace {
             options,
             self.db.project().root(&self.db).to_path_buf(),
             None,
-            MisconfigurationMode::Fail,
+            &FallibleStrategy,
         )
         .map_err(into_error)?;
 
         let program_settings = project
-            .to_program_settings(&self.system, self.db.vendored())
+            .to_program_settings(&self.system, self.db.vendored(), &FallibleStrategy)
             .map_err(into_error)?;
         Program::get(&self.db).update_from_settings(&mut self.db, program_settings);
 
@@ -184,7 +184,7 @@ impl Workspace {
             .map_err(into_error)?;
 
         self.db.apply_changes(
-            vec![ChangeEvent::Created {
+            &[ChangeEvent::Created {
                 path: path.clone(),
                 kind: CreatedKind::File,
             }],
@@ -217,7 +217,7 @@ impl Workspace {
             .map_err(into_error)?;
 
         self.db.apply_changes(
-            vec![
+            &[
                 ChangeEvent::Changed {
                     path: system_path.to_path_buf(),
                     kind: ChangedKind::FileContent,
@@ -251,7 +251,7 @@ impl Workspace {
                 .map_err(into_error)?;
 
             self.db.apply_changes(
-                vec![ChangeEvent::Deleted {
+                &[ChangeEvent::Deleted {
                     path: system_path.to_path_buf(),
                     kind: DeletedKind::File,
                 }],
@@ -268,6 +268,14 @@ impl Workspace {
         let result = self.db.check_file(file_id.file);
 
         Ok(result.into_iter().map(Diagnostic::wrap).collect())
+    }
+
+    #[wasm_bindgen(js_name = "hints")]
+    pub fn hints(&self, file_id: &FileHandle) -> Result<Vec<Hint>, Error> {
+        Ok(hints(&self.db, file_id.file)
+            .into_iter()
+            .map(|hint| Hint::from_ide_hint(&self.db, file_id.file, self.position_encoding, &hint))
+            .collect())
     }
 
     /// Checks all open files
@@ -777,6 +785,33 @@ impl FileHandle {
 pub struct Diagnostic {
     #[wasm_bindgen(readonly)]
     inner: diagnostic::Diagnostic,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Hint {
+    #[wasm_bindgen(getter_with_clone)]
+    pub message: String,
+    pub range: Range,
+}
+
+impl Hint {
+    fn from_ide_hint(
+        db: &dyn Db,
+        file: File,
+        position_encoding: PositionEncoding,
+        hint: &IdeHint,
+    ) -> Self {
+        Self {
+            message: hint.message(),
+            range: Range::from_text_range(
+                hint.range,
+                &line_index(db, file),
+                &source_text(db, file),
+                position_encoding,
+            ),
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -1429,13 +1464,6 @@ impl System for WasmSystem {
 
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
         self.fs.walk_directory(path)
-    }
-
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> Result<Box<dyn Iterator<Item = Result<SystemPathBuf, GlobError>> + '_>, PatternError> {
-        Ok(Box::new(self.fs.glob(pattern)?))
     }
 
     fn as_writable(&self) -> Option<&dyn WritableSystem> {

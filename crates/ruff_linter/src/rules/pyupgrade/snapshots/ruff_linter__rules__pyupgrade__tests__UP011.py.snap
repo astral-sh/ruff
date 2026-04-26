@@ -11,13 +11,13 @@ UP011 [*] Unnecessary parentheses to `functools.lru_cache`
   |
 help: Remove unnecessary parentheses
 2 | from functools import lru_cache
-3 | 
-4 | 
+3 |
+4 |
   - @functools.lru_cache()
 5 + @functools.lru_cache
 6 | def fixme():
 7 |     pass
-8 | 
+8 |
 
 UP011 [*] Unnecessary parentheses to `functools.lru_cache`
   --> UP011.py:10:11
@@ -29,13 +29,13 @@ UP011 [*] Unnecessary parentheses to `functools.lru_cache`
    |
 help: Remove unnecessary parentheses
 7  |     pass
-8  | 
-9  | 
+8  |
+9  |
    - @lru_cache()
 10 + @lru_cache
 11 | def fixme():
 12 |     pass
-13 | 
+13 |
 
 UP011 [*] Unnecessary parentheses to `functools.lru_cache`
   --> UP011.py:16:21
@@ -47,14 +47,14 @@ UP011 [*] Unnecessary parentheses to `functools.lru_cache`
 18 |     pass
    |
 help: Remove unnecessary parentheses
-13 | 
-14 | 
+13 |
+14 |
 15 | @other_decorator
    - @functools.lru_cache()
 16 + @functools.lru_cache
 17 | def fixme():
 18 |     pass
-19 | 
+19 |
 
 UP011 [*] Unnecessary parentheses to `functools.lru_cache`
   --> UP011.py:21:21
@@ -66,8 +66,8 @@ UP011 [*] Unnecessary parentheses to `functools.lru_cache`
    |
 help: Remove unnecessary parentheses
 18 |     pass
-19 | 
-20 | 
+19 |
+20 |
    - @functools.lru_cache()
 21 + @functools.lru_cache
 22 | @other_decorator

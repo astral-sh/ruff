@@ -2,8 +2,30 @@
 
 ## Summary
 
-One major deviation from the behavior of existing Python type checkers is our handling of 'public'
-types for undeclared symbols. This is best illustrated with an example:
+A strict application of the [gradual guarantee] would suggest that all assignments to an unannotated
+attribute should be allowed; this could be implemented by unioning all such attributes' inferred
+types with `Unknown`. However, in practice this requires too many annotations to achieve sound
+typing, and we can heuristically pick the "right" type for unannotated attributes most of the time.
+
+## Promotion
+
+We promote the inferred type of an unannotated attribute to our best guess of its intended public
+type. For example, we promote literal types to their nominal supertype, because it is unlikely the
+author intended the `value` attribute to always hold the literal `0`:
+
+```py
+class Counter:
+    def __init__(self) -> None:
+        self.value = 0
+
+reveal_type(Counter().value)  # revealed: int
+```
+
+## Widening of non-literal singleton types
+
+It's similarly unlikely that an unannotated attribute initialized to a singleton type (like `None`)
+is intended to always and only hold the value `None`. But unlike literal types, `None` doesn't have
+an obvious candidate super-type to widen to. In this case, we do widen by unioning with `Unknown`:
 
 ```py
 class Wrapper:
@@ -11,27 +33,13 @@ class Wrapper:
 
 wrapper = Wrapper()
 
-reveal_type(wrapper.value)  # revealed: Unknown | None
+reveal_type(wrapper.value)  # revealed: None | Unknown
 
 wrapper.value = 1
 ```
 
-Mypy and Pyright both infer a type of `None` for the type of `wrapper.value`. Consequently, both
-tools emit an error when trying to assign `1` to `wrapper.value`. But there is nothing wrong with
-this program. Emitting an error here violates the [gradual guarantee] which states that *"Removing
-type annotations (making the program more dynamic) should not result in additional static type
-errors."*: If `value` were annotated with `int | None` here, Mypy and Pyright would not emit any
-errors.
-
-By inferring `Unknown | None` instead, we allow arbitrary values to be assigned to `wrapper.value`.
-This is a deliberate choice to prevent false positive errors on untyped code.
-
-More generally, we infer `Unknown | T_inferred` for undeclared symbols, where `T_inferred` is the
-inferred type of the right-hand side of the assignment. This gradual type represents an *unknown*
-fully-static type that is *at least as large as* `T_inferred`. It accurately describes our static
-knowledge about this type. In the example above, we don't know what values `wrapper.value` could
-possibly contain, but we *do know* that `None` is a possibility. This allows us to catch errors
-where `wrapper.value` is used in a way that is incompatible with `None`:
+In this example, the public type is `None | Unknown`, so we also catch uses that are incompatible
+with `None`:
 
 ```py
 def accepts_int(i: int) -> None:
@@ -42,64 +50,64 @@ def f(w: Wrapper) -> None:
     v: int | None = w.value
 
     # This function call is incorrect, because `w.value` could be `None`. We therefore emit the following
-    # error: "Argument to function `accepts_int` is incorrect: Expected `int`, found `Unknown | None`"
+    # error: "Argument to function `accepts_int` is incorrect: Expected `int`, found `None | Unknown`"
     c = accepts_int(w.value)
 ```
 
-## Explicit lack of knowledge
-
-The following example demonstrates how Mypy and Pyright's type inference of fully-static types in
-these situations can lead to false-negatives, even though everything appears to be (statically)
-typed. To make this a bit more realistic, imagine that `OptionalInt` is imported from an external,
-untyped module:
-
-`optional_int.py`:
+The same widening also applies to undeclared instance attributes that are only assigned inside
+`__init__`:
 
 ```py
-class OptionalInt:
-    value = 10
+class InstanceWrapper:
+    def __init__(self) -> None:
+        self.value = None
 
-def reset(o):
-    o.value = None
+reveal_type(InstanceWrapper().value)  # revealed: None | Unknown
 ```
 
-It is then used like this:
+## Declaring a wider type
+
+Users can always opt in to a wider public type by adding annotations. For the `Wrapper` class, this
+could be:
 
 ```py
-from optional_int import OptionalInt, reset
+class Wrapper:
+    value: int | None = None
 
-o = OptionalInt()
-reset(o)  # Oh no...
-
-# Mypy and Pyright infer a fully-static type of `int` here, which appears to make the
-# subsequent division operation safe -- but it is not. We infer the following type:
-reveal_type(o.value)  # revealed: Unknown | Literal[10]
-
-print(o.value // 2)  # Runtime error!
-```
-
-We do not catch this mistake either, but we accurately reflect our lack of knowledge about
-`o.value`. Together with a possible future type-checker mode that would detect the prevalence of
-dynamic types, this could help developers catch such mistakes.
-
-## Stricter behavior
-
-Users can always opt in to stricter behavior by adding type annotations. For the `OptionalInt`
-class, this would probably be:
-
-```py
-class OptionalInt:
-    value: int | None = 10
-
-o = OptionalInt()
+w = Wrapper()
 
 # The following public type is now
 # revealed: int | None
-reveal_type(o.value)
+reveal_type(w.value)
 
 # Incompatible assignments are now caught:
 # error: "Object of type `Literal["a"]` is not assignable to attribute `value` of type `int | None`"
-o.value = "a"
+w.value = "a"
+```
+
+## Declaring a narrower type to avoid promotion
+
+It's also possible to declare a narrower type to avoid promotion. For example, if we know that an
+attribute will always hold one of two literal values, we may want to avoid promotion of the literal:
+
+```py
+from typing import Literal
+
+class Constant:
+    value: Literal[0, 1] = 0
+
+# We would have promoted this to `int` without the explicit annotation:
+reveal_type(Constant().value)  # revealed: Literal[0, 1]
+```
+
+This also works to avoid widening of singleton types, if for some reason you want an attribute that
+can only ever hold that one singleton value:
+
+```py
+class NoneWrapper:
+    value: None = None
+
+reveal_type(NoneWrapper().value)  # revealed: None
 ```
 
 ## What is meant by 'public' type?
@@ -107,19 +115,17 @@ o.value = "a"
 We apply different semantics depending on whether a symbol is accessed from the same scope in which
 it was originally defined, or whether it is accessed from an external scope. External scopes will
 see the symbol's "public type", which has been discussed above. But within the same scope the symbol
-was defined in, we use a narrower type of `T_inferred` for undeclared symbols. This is because, from
-the perspective of this scope, there is no way that the value of the symbol could have been
-reassigned from external scopes. For example:
+was defined in, we can often use a narrower literal type before promotion. For example:
 
 ```py
 class Wrapper:
-    value = None
+    value = 10
 
     # Type as seen from the same scope:
-    reveal_type(value)  # revealed: None
+    reveal_type(value)  # revealed: Literal[10]
 
 # Type as seen from another scope:
-reveal_type(Wrapper.value)  # revealed: Unknown | None
+reveal_type(Wrapper.value)  # revealed: int
 ```
 
 [gradual guarantee]: https://typing.python.org/en/latest/spec/concepts.html#the-gradual-guarantee

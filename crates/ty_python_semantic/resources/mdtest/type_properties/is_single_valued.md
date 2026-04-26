@@ -47,7 +47,8 @@ static_assert(not is_single_valued(Callable[[int, str], None]))
 class A:
     def method(self): ...
 
-static_assert(is_single_valued(TypeOf[A().method]))
+# Binding the same method to different instances yields different objects: `[].sort != [].sort`
+static_assert(not is_single_valued(TypeOf[A().method]))
 static_assert(is_single_valued(TypeOf[types.FunctionType.__get__]))
 static_assert(is_single_valued(TypeOf[A.method.__get__]))
 ```

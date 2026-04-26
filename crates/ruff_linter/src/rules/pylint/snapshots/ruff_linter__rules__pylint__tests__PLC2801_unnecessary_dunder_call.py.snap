@@ -12,7 +12,7 @@ PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
   |
 help: Use `+` operator
 1 | from typing import Any
-2 | 
+2 |
 3 | a = 2
   - print((3.0).__add__(4.0))  # PLC2801
 4 + print(3.0 + 4.0)  # PLC2801
@@ -32,7 +32,7 @@ PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
 7 | print((3.0).__truediv__(4.0))  # PLC2801
   |
 help: Use `-` operator
-2 | 
+2 |
 3 | a = 2
 4 | print((3.0).__add__(4.0))  # PLC2801
   - print((3.0).__sub__(4.0))  # PLC2801
@@ -701,7 +701,7 @@ help: Use `+` operator
 44 + x = -(a + 3)  # PLC2801
 45 | x = (-a).__add__(3)  # PLC2801
 46 | x = -(-a).__add__(3)  # PLC2801
-47 | 
+47 |
 note: This is an unsafe fix and may change runtime behavior
 
 PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
@@ -720,7 +720,7 @@ help: Use `+` operator
    - x = (-a).__add__(3)  # PLC2801
 45 + x = -a + 3  # PLC2801
 46 | x = -(-a).__add__(3)  # PLC2801
-47 | 
+47 |
 48 | # Calls
 note: This is an unsafe fix and may change runtime behavior
 
@@ -740,7 +740,7 @@ help: Use `+` operator
 45 | x = (-a).__add__(3)  # PLC2801
    - x = -(-a).__add__(3)  # PLC2801
 46 + x = -(-a + 3)  # PLC2801
-47 | 
+47 |
 48 | # Calls
 49 | print(a.__call__())  # PLC2801 (no fix, intentional)
 note: This is an unsafe fix and may change runtime behavior
@@ -764,12 +764,12 @@ PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
 help: Use `+` operator
 60 |         return self.v
-61 | 
+61 |
 62 | foo = Foo(1)
    - foo.__add__(2).get_v()  # PLC2801
 63 + (foo + 2).get_v()  # PLC2801
-64 | 
-65 | 
+64 |
+65 |
 66 | # Lambda expressions
 note: This is an unsafe fix and may change runtime behavior
 
@@ -783,12 +783,12 @@ PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
 69 | # If expressions
    |
 help: Use `+` operator
-64 | 
-65 | 
+64 |
+65 |
 66 | # Lambda expressions
    - blah = lambda: a.__add__(1)  # PLC2801
 67 + blah = lambda: a + 1  # PLC2801
-68 | 
+68 |
 69 | # If expressions
 70 | print(a.__add__(1) if a > 0 else a.__sub__(1))  # PLC2801
 note: This is an unsafe fix and may change runtime behavior
@@ -804,11 +804,11 @@ PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
 help: Use `+` operator
 67 | blah = lambda: a.__add__(1)  # PLC2801
-68 | 
+68 |
 69 | # If expressions
    - print(a.__add__(1) if a > 0 else a.__sub__(1))  # PLC2801
 70 + print(a + 1 if a > 0 else a.__sub__(1))  # PLC2801
-71 | 
+71 |
 72 | # Dict/Set/List/Tuple
 73 | print({"a": a.__add__(1)})  # PLC2801
 note: This is an unsafe fix and may change runtime behavior
@@ -824,11 +824,11 @@ PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
    |
 help: Use `-` operator
 67 | blah = lambda: a.__add__(1)  # PLC2801
-68 | 
+68 |
 69 | # If expressions
    - print(a.__add__(1) if a > 0 else a.__sub__(1))  # PLC2801
 70 + print(a.__add__(1) if a > 0 else a - 1)  # PLC2801
-71 | 
+71 |
 72 | # Dict/Set/List/Tuple
 73 | print({"a": a.__add__(1)})  # PLC2801
 note: This is an unsafe fix and may change runtime behavior
@@ -844,7 +844,7 @@ PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
 help: Use `+` operator
 70 | print(a.__add__(1) if a > 0 else a.__sub__(1))  # PLC2801
-71 | 
+71 |
 72 | # Dict/Set/List/Tuple
    - print({"a": a.__add__(1)})  # PLC2801
 73 + print({"a": (a + 1)})  # PLC2801
@@ -864,14 +864,14 @@ PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
 76 | print((a.__add__(1),))  # PLC2801
    |
 help: Use `+` operator
-71 | 
+71 |
 72 | # Dict/Set/List/Tuple
 73 | print({"a": a.__add__(1)})  # PLC2801
    - print({a.__add__(1)})  # PLC2801
 74 + print({(a + 1)})  # PLC2801
 75 | print([a.__add__(1)])  # PLC2801
 76 | print((a.__add__(1),))  # PLC2801
-77 | 
+77 |
 note: This is an unsafe fix and may change runtime behavior
 
 PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
@@ -890,7 +890,7 @@ help: Use `+` operator
    - print([a.__add__(1)])  # PLC2801
 75 + print([(a + 1)])  # PLC2801
 76 | print((a.__add__(1),))  # PLC2801
-77 | 
+77 |
 78 | # Comprehension variants
 note: This is an unsafe fix and may change runtime behavior
 
@@ -910,7 +910,7 @@ help: Use `+` operator
 75 | print([a.__add__(1)])  # PLC2801
    - print((a.__add__(1),))  # PLC2801
 76 + print(((a + 1),))  # PLC2801
-77 | 
+77 |
 78 | # Comprehension variants
 79 | print({i: i.__add__(1) for i in range(5)})  # PLC2801
 note: This is an unsafe fix and may change runtime behavior
@@ -926,7 +926,7 @@ PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
 help: Use `+` operator
 76 | print((a.__add__(1),))  # PLC2801
-77 | 
+77 |
 78 | # Comprehension variants
    - print({i: i.__add__(1) for i in range(5)})  # PLC2801
 79 + print({i: (i + 1) for i in range(5)})  # PLC2801
@@ -946,14 +946,14 @@ PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
 82 | print((i.__add__(1) for i in range(5)))  # PLC2801
    |
 help: Use `+` operator
-77 | 
+77 |
 78 | # Comprehension variants
 79 | print({i: i.__add__(1) for i in range(5)})  # PLC2801
    - print({i.__add__(1) for i in range(5)})  # PLC2801
 80 + print({(i + 1) for i in range(5)})  # PLC2801
 81 | print([i.__add__(1) for i in range(5)])  # PLC2801
 82 | print((i.__add__(1) for i in range(5)))  # PLC2801
-83 | 
+83 |
 note: This is an unsafe fix and may change runtime behavior
 
 PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
@@ -972,7 +972,7 @@ help: Use `+` operator
    - print([i.__add__(1) for i in range(5)])  # PLC2801
 81 + print([(i + 1) for i in range(5)])  # PLC2801
 82 | print((i.__add__(1) for i in range(5)))  # PLC2801
-83 | 
+83 |
 84 | # Generators
 note: This is an unsafe fix and may change runtime behavior
 
@@ -992,7 +992,7 @@ help: Use `+` operator
 81 | print([i.__add__(1) for i in range(5)])  # PLC2801
    - print((i.__add__(1) for i in range(5)))  # PLC2801
 82 + print(((i + 1) for i in range(5)))  # PLC2801
-83 | 
+83 |
 84 | # Generators
 85 | gen = (i.__add__(1) for i in range(5))  # PLC2801
 note: This is an unsafe fix and may change runtime behavior
@@ -1007,12 +1007,12 @@ PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
 help: Use `+` operator
 82 | print((i.__add__(1) for i in range(5)))  # PLC2801
-83 | 
+83 |
 84 | # Generators
    - gen = (i.__add__(1) for i in range(5))  # PLC2801
 85 + gen = ((i + 1) for i in range(5))  # PLC2801
 86 | print(next(gen))
-87 | 
+87 |
 88 | # Subscripts
 note: This is an unsafe fix and may change runtime behavior
 
@@ -1027,13 +1027,13 @@ PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
 help: Use `+` operator
 86 | print(next(gen))
-87 | 
+87 |
 88 | # Subscripts
    - print({"a": a.__add__(1)}["a"])  # PLC2801
 89 + print({"a": (a + 1)}["a"])  # PLC2801
 90 | # https://github.com/astral-sh/ruff/issues/15745
 91 | print("x".__add__("y")[0])  # PLC2801
-92 | 
+92 |
 note: This is an unsafe fix and may change runtime behavior
 
 PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
@@ -1052,7 +1052,7 @@ help: Use `+` operator
 90 | # https://github.com/astral-sh/ruff/issues/15745
    - print("x".__add__("y")[0])  # PLC2801
 91 + print(("x" + "y")[0])  # PLC2801
-92 | 
+92 |
 93 | # Starred
 94 | print(*[a.__add__(1)])  # PLC2801
 note: This is an unsafe fix and may change runtime behavior
@@ -1068,11 +1068,11 @@ PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
 help: Use `+` operator
 91 | print("x".__add__("y")[0])  # PLC2801
-92 | 
+92 |
 93 | # Starred
    - print(*[a.__add__(1)])  # PLC2801
 94 + print(*[(a + 1)])  # PLC2801
-95 | 
+95 |
 96 | list1 = [1, 2, 3]
 97 | list2 = [4, 5, 6]
 note: This is an unsafe fix and may change runtime behavior
@@ -1088,12 +1088,12 @@ PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
 100 | # Slices
     |
 help: Use `+` operator
-95  | 
+95  |
 96  | list1 = [1, 2, 3]
 97  | list2 = [4, 5, 6]
     - print([*list1.__add__(list2)])  # PLC2801
 98  + print([*list1 + list2])  # PLC2801
-99  | 
+99  |
 100 | # Slices
 101 | print([a.__add__(1), a.__sub__(1)][0:1])  # PLC2801
 note: This is an unsafe fix and may change runtime behavior
@@ -1109,11 +1109,11 @@ PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
     |
 help: Use `+` operator
 98  | print([*list1.__add__(list2)])  # PLC2801
-99  | 
+99  |
 100 | # Slices
     - print([a.__add__(1), a.__sub__(1)][0:1])  # PLC2801
 101 + print([(a + 1), a.__sub__(1)][0:1])  # PLC2801
-102 | 
+102 |
 103 | # Attribute access
 104 | # https://github.com/astral-sh/ruff/issues/15745
 note: This is an unsafe fix and may change runtime behavior
@@ -1129,11 +1129,11 @@ PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
     |
 help: Use `-` operator
 98  | print([*list1.__add__(list2)])  # PLC2801
-99  | 
+99  |
 100 | # Slices
     - print([a.__add__(1), a.__sub__(1)][0:1])  # PLC2801
 101 + print([a.__add__(1), (a - 1)][0:1])  # PLC2801
-102 | 
+102 |
 103 | # Attribute access
 104 | # https://github.com/astral-sh/ruff/issues/15745
 note: This is an unsafe fix and may change runtime behavior
@@ -1149,12 +1149,12 @@ PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
 107 | class Thing:
     |
 help: Use `+` operator
-102 | 
+102 |
 103 | # Attribute access
 104 | # https://github.com/astral-sh/ruff/issues/15745
     - print(1j.__add__(1.0).real) # PLC2801
 105 + print((1j + 1.0).real) # PLC2801
-106 | 
+106 |
 107 | class Thing:
 108 |     def __init__(self, stuff: Any) -> None:
 note: This is an unsafe fix and may change runtime behavior
@@ -1181,12 +1181,12 @@ PLC2801 [*] Unnecessary dunder call to `__contains__`. Use `in` operator.
 130 | # https://github.com/astral-sh/ruff/issues/14597
     |
 help: Use `in` operator
-125 | 
+125 |
 126 | blah = dict[{"a": 1}.__delitem__("a")]  # OK
-127 | 
+127 |
     - "abc".__contains__("a")
 128 + "a" in "abc"
-129 | 
+129 |
 130 | # https://github.com/astral-sh/ruff/issues/14597
 131 | assert "abc".__str__() == "abc"
 note: This is an unsafe fix and may change runtime behavior
@@ -1202,11 +1202,11 @@ PLC2801 [*] Unnecessary dunder call to `__str__`. Use `str()` builtin.
     |
 help: Use `str()` builtin
 128 | "abc".__contains__("a")
-129 | 
+129 |
 130 | # https://github.com/astral-sh/ruff/issues/14597
     - assert "abc".__str__() == "abc"
 131 + assert str("abc") == "abc"
-132 | 
+132 |
 133 | # https://github.com/astral-sh/ruff/issues/18813
 134 | three = 1 if 1 else(3.0).__str__()
 note: This is an unsafe fix and may change runtime behavior
@@ -1220,7 +1220,7 @@ PLC2801 [*] Unnecessary dunder call to `__str__`. Use `str()` builtin.
     |
 help: Use `str()` builtin
 131 | assert "abc".__str__() == "abc"
-132 | 
+132 |
 133 | # https://github.com/astral-sh/ruff/issues/18813
     - three = 1 if 1 else(3.0).__str__()
 134 + three = 1 if 1 else str(3.0)

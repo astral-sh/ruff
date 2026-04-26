@@ -17,7 +17,7 @@ help: Remove assignment to unused variable `x`
    -         except ValueError as x:
 8  +         except ValueError:
 9  |             pass
-10 | 
+10 |
 11 |         # This should raise an F821 error, rather than resolving to the
 
 F821 Undefined name `x`

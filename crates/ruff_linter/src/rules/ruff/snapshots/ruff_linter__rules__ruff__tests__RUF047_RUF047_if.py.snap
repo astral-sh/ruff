@@ -11,13 +11,13 @@ RUF047 [*] Empty `else` clause
   | |________^
   |
 help: Remove the `else` clause
-2 | 
+2 |
 3 | if False:
 4 |     condition_is_not_evaluated()
   - else:
   -     pass
-5 | 
-6 | 
+5 |
+6 |
 7 | if this_comment():
 
 RUF047 [*] Empty `else` clause
@@ -30,13 +30,13 @@ RUF047 [*] Empty `else` clause
    | |_______^
    |
 help: Remove the `else` clause
-8  | 
+8  |
 9  | if this_comment():
 10 |     belongs_to()  # `if`
    - else:
    -     ...
-11 | 
-12 | 
+11 |
+12 |
 13 | if elif_is():
 
 RUF047 [*] Empty `else` clause
@@ -54,8 +54,8 @@ help: Remove the `else` clause
 18 |     as_if()
    - else:
    -     pass
-19 | 
-20 | 
+19 |
+20 |
 21 | if this_second_comment():
 
 RUF047 [*] Empty `else` clause
@@ -75,7 +75,7 @@ help: Remove the `else` clause
 25 |       # `if`
    - else:
    -     pass
-26 | 
+26 |
 27 | if this_second_comment():
 28 |     belongs()  # to
 
@@ -94,8 +94,8 @@ help: Remove the `else` clause
 31 |     # `if`
    - else:
    -     pass
-32 | 
-33 | 
+32 |
+33 |
 34 | if of_course():
 
 RUF047 [*] Empty `else` clause
@@ -106,12 +106,12 @@ RUF047 [*] Empty `else` clause
    | ^^^^^^^^^
    |
 help: Remove the `else` clause
-41 | 
-42 | 
+41 |
+42 |
 43 | if of_course: this()
    - else: ...
-44 | 
-45 | 
+44 |
+45 |
 46 | if of_course:
 
 RUF047 [*] Empty `else` clause
@@ -123,12 +123,12 @@ RUF047 [*] Empty `else` clause
    | ^^^^^^^^^
    |
 help: Remove the `else` clause
-46 | 
+46 |
 47 | if of_course:
 48 |     this() # comment
    - else: ...
-49 | 
-50 | 
+49 |
+50 |
 51 | def nested():
 
 RUF047 [*] Empty `else` clause
@@ -146,6 +146,6 @@ help: Remove the `else` clause
 54 |         b()
    -     else:
    -         ...
-55 | 
-56 | 
+55 |
+56 |
 57 | ### No errors

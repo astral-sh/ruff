@@ -104,8 +104,6 @@ Except for the `None` special case mentioned above, narrowing can only take plac
 the PEP-604 union are class literals. If any elements are generic aliases or other types, the
 `isinstance()` call may fail at runtime, so no narrowing can take place:
 
-<!-- snapshot-diagnostics -->
-
 ```toml
 [environment]
 python-version = "3.10"
@@ -115,13 +113,45 @@ python-version = "3.10"
 from typing import Any, Literal, NamedTuple
 
 def _(x: int | list[int] | bytes):
-    # error: [invalid-argument-type]
+    # snapshot: invalid-argument-type
     if isinstance(x, list[int] | int):
         reveal_type(x)  # revealed: int | list[int] | bytes
-    # error: [invalid-argument-type]
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid second argument to `isinstance`
+ --> src/mdtest_snippet.py:5:8
+  |
+5 |     if isinstance(x, list[int] | int):
+  |        ^^^^^^^^^^^^^^---------------^
+  |                      |
+  |                      This `UnionType` instance contains non-class elements
+  |
+info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
+info: Element `<class 'list[int]'>` in the union is not a class object
+```
+
+```py
+    # snapshot: invalid-argument-type
     elif isinstance(x, Literal[42] | list[int] | bytes):
         reveal_type(x)  # revealed: int | list[int] | bytes
-    # error: [invalid-argument-type]
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid second argument to `isinstance`
+ --> src/mdtest_snippet.py:8:10
+  |
+8 |     elif isinstance(x, Literal[42] | list[int] | bytes):
+  |          ^^^^^^^^^^^^^^-------------------------------^
+  |                        |
+  |                        This `UnionType` instance contains non-class elements
+  |
+info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
+info: Elements `<special-form 'Literal[42]'>` and `<class 'list[int]'>` in the union are not class objects
+```
+
+```py
+    # snapshot: invalid-argument-type
     elif isinstance(x, Any | NamedTuple | list[int]):
         reveal_type(x)  # revealed: int | list[int] | bytes
     # error: [invalid-argument-type]
@@ -137,26 +167,65 @@ def _(x: int | list[int] | bytes):
         reveal_type(x)  # revealed: int | list[int] | bytes
 ```
 
+```snapshot
+error[invalid-argument-type]: Invalid second argument to `isinstance`
+  --> src/mdtest_snippet.py:11:10
+   |
+11 |     elif isinstance(x, Any | NamedTuple | list[int]):
+   |          ^^^^^^^^^^^^^^----------------------------^
+   |                        |
+   |                        This `UnionType` instance contains non-class elements
+   |
+info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
+info: Element `<special-form 'typing.Any'>` in the union, and 2 more elements, are not class objects
+```
+
 The same validation also applies when an invalid `UnionType` is nested inside a tuple:
 
 ```py
 def _(x: int | list[int] | bytes):
-    # error: [invalid-argument-type]
+    # snapshot: invalid-argument-type
     if isinstance(x, (int, list[int] | bytes)):
         reveal_type(x)  # revealed: int | list[int] | bytes
     else:
         reveal_type(x)  # revealed: int | list[int] | bytes
 ```
 
+```snapshot
+error[invalid-argument-type]: Invalid second argument to `isinstance`
+  --> src/mdtest_snippet.py:17:8
+   |
+17 |     if isinstance(x, (int, list[int] | bytes)):
+   |        ^^^^^^^^^^^^^^^^^^^^-----------------^^
+   |                            |
+   |                            This `UnionType` instance contains non-class elements
+   |
+info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
+info: Element `<class 'list[int]'>` in the union is not a class object
+```
+
 Including nested tuples:
 
 ```py
 def _(x: int | list[int] | bytes):
-    # error: [invalid-argument-type]
+    # snapshot: invalid-argument-type
     if isinstance(x, (int, (str, list[int] | bytes))):
         reveal_type(x)  # revealed: int | list[int] | bytes
     else:
         reveal_type(x)  # revealed: int | list[int] | bytes
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid second argument to `isinstance`
+  --> src/mdtest_snippet.py:23:8
+   |
+23 |     if isinstance(x, (int, (str, list[int] | bytes))):
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^-----------------^^^
+   |                                  |
+   |                                  This `UnionType` instance contains non-class elements
+   |
+info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
+info: Element `<class 'list[int]'>` in the union is not a class object
 ```
 
 And non-literal tuples:
@@ -165,11 +234,22 @@ And non-literal tuples:
 classes = (int, list[int] | bytes)
 
 def _(x: int | list[int] | bytes):
-    # error: [invalid-argument-type]
+    # snapshot: invalid-argument-type
     if isinstance(x, classes):
         reveal_type(x)  # revealed: int | list[int] | bytes
     else:
         reveal_type(x)  # revealed: int | list[int] | bytes
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid second argument to `isinstance`
+  --> src/mdtest_snippet.py:31:8
+   |
+31 |     if isinstance(x, classes):
+   |        ^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
+info: Element `<class 'list[int]'>` in the union `list[int] | bytes` is not a class object
 ```
 
 ## PEP-604 unions on Python \<3.10
@@ -572,7 +652,7 @@ class Contravariant[T]:
 def _(x: object):
     if isinstance(x, Contravariant):
         reveal_type(x)  # revealed: Contravariant[Never]
-        # error: [invalid-argument-type] "Argument to bound method `push` is incorrect: Expected `Never`, found `Literal[42]`"
+        # error: [invalid-argument-type] "Argument to bound method `Contravariant.push` is incorrect: Expected `Never`, found `Literal[42]`"
         x.push(42)
 ```
 
@@ -607,7 +687,7 @@ def _(x: object):
     if isinstance(x, Invariant):
         reveal_type(x)  # revealed: Top[Invariant[Unknown]]
         reveal_type(x.get())  # revealed: object
-        # error: [invalid-argument-type] "Argument to bound method `push` is incorrect: Expected `Never`, found `Literal[42]`"
+        # error: [invalid-argument-type] "Argument to bound method `Invariant.push` is incorrect: Expected `Never`, found `Literal[42]`"
         x.push(42)
 ```
 
@@ -640,7 +720,7 @@ class ContravariantWithAny[T]:
 def _(x: object):
     if isinstance(x, ContravariantWithAny):
         reveal_type(x)  # revealed: ContravariantWithAny[Never]
-        # error: [invalid-argument-type] "Argument to bound method `push` is incorrect: Expected `Never`, found `Literal[42]`"
+        # error: [invalid-argument-type] "Argument to bound method `ContravariantWithAny.push` is incorrect: Expected `Never`, found `Literal[42]`"
         x.push(42, "hello")
 ```
 

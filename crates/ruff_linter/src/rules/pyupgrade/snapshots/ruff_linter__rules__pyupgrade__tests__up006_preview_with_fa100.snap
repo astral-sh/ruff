@@ -1,0 +1,85 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 2
+Added: 2
+
+--- Removed ---
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+ --> UP006_4.py:5:10
+  |
+5 | def f(x: typing.List[str]) -> None:
+  |          ^^^^^^^^^^^
+6 |     ...
+  |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | from typing import List
+4 |
+note: This is an unsafe fix and may change runtime behavior
+
+
+FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+  --> UP006_4.py:9:10
+   |
+ 9 | def g(x: List[str]) -> None:
+   |          ^^^^
+10 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import typing
+3 | from typing import List
+4 |
+note: This is an unsafe fix and may change runtime behavior
+
+
+
+--- Added ---
+UP006 [*] Use `list` instead of `typing.List` for type annotation
+ --> UP006_4.py:5:10
+  |
+5 | def f(x: typing.List[str]) -> None:
+  |          ^^^^^^^^^^^
+6 |     ...
+  |
+help: Replace with `list`
+1 + from __future__ import annotations
+2 | import typing
+3 | from typing import List
+4 |
+5 |
+  - def f(x: typing.List[str]) -> None:
+6 + def f(x: list[str]) -> None:
+7 |     ...
+8 |
+9 |
+note: This is an unsafe fix and may change runtime behavior
+
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> UP006_4.py:9:10
+   |
+ 9 | def g(x: List[str]) -> None:
+   |          ^^^^
+10 |     ...
+   |
+help: Replace with `list`
+1  + from __future__ import annotations
+2  | import typing
+3  | from typing import List
+4  |
+--------------------------------------------------------------------------------
+7  |     ...
+8  |
+9  |
+   - def g(x: List[str]) -> None:
+10 + def g(x: list[str]) -> None:
+11 |     ...
+note: This is an unsafe fix and may change runtime behavior

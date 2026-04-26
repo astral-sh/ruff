@@ -10,6 +10,7 @@ import {
   IPosition,
   IRange,
   languages,
+  MarkerTag,
   MarkerSeverity,
   Position,
   Range,
@@ -18,6 +19,7 @@ import {
 import { useCallback, useEffect, useRef } from "react";
 import { Theme } from "shared";
 import {
+  Hint,
   Position as TyPosition,
   Range as TyRange,
   SemanticToken,
@@ -43,6 +45,7 @@ type Props = {
   selected: FileId;
   files: ReadonlyFiles;
   diagnostics: Diagnostic[];
+  hints: Hint[];
   theme: Theme;
   workspace: Workspace;
   onChange(content: string): void;
@@ -60,6 +63,7 @@ export default function Editor({
   files,
   theme,
   diagnostics,
+  hints,
   workspace,
   onChange,
   onMount,
@@ -90,7 +94,7 @@ export default function Editor({
     isViewingVendoredFile,
   ]);
 
-  // Update the diagnostics in the editor.
+  // Update the diagnostics and hints in the editor.
   useEffect(() => {
     const server = serverRef.current;
 
@@ -98,8 +102,8 @@ export default function Editor({
       return;
     }
 
-    server.updateDiagnostics(diagnostics);
-  }, [diagnostics]);
+    server.updateMarkers(diagnostics, hints);
+  }, [diagnostics, hints]);
 
   const handleChange = useCallback(
     (value: string | undefined) => {
@@ -129,7 +133,7 @@ export default function Editor({
         onBackToUserFile,
       });
 
-      server.updateDiagnostics(diagnostics);
+      server.updateMarkers(diagnostics, hints);
       serverRef.current = server;
 
       onMount(editor, instance);
@@ -141,6 +145,7 @@ export default function Editor({
       workspace,
       onMount,
       diagnostics,
+      hints,
       onVendoredFileChange,
       onBackToUserFile,
     ],
@@ -561,7 +566,7 @@ class PlaygroundServer
     };
   }
 
-  updateDiagnostics(diagnostics: Array<Diagnostic>) {
+  updateMarkers(diagnostics: Array<Diagnostic>, hints: Array<Hint>) {
     this.diagnostics = diagnostics;
 
     if (this.props.files.selected == null) {
@@ -581,10 +586,8 @@ class PlaygroundServer
       return;
     }
 
-    editor.setModelMarkers(
-      model,
-      "owner",
-      diagnostics.map((diagnostic) => {
+    editor.setModelMarkers(model, "owner", [
+      ...diagnostics.map((diagnostic) => {
         const mapSeverity = (severity: Severity) => {
           switch (severity) {
             case Severity.Info:
@@ -611,7 +614,16 @@ class PlaygroundServer
           tags: [],
         };
       }),
-    );
+      ...hints.map((hint) => ({
+        startLineNumber: hint.range.start.line,
+        startColumn: hint.range.start.column,
+        endLineNumber: hint.range.end.line,
+        endColumn: hint.range.end.column,
+        message: hint.message,
+        severity: MarkerSeverity.Hint,
+        tags: [MarkerTag.Unnecessary],
+      })),
+    ]);
   }
 
   provideCodeActions(

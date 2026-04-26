@@ -163,7 +163,7 @@ pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]
 
         let open_args = itertools::join(
             call.arguments
-                .arguments_source_order()
+                .iter_source_order()
                 .enumerate()
                 .filter_map(|(i, arg)| args(i, arg)),
             ", ",

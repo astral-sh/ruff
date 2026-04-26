@@ -11,12 +11,12 @@ RUF023 [*] `Klass.__slots__` is not sorted
   |
 help: Apply a natural sort to `Klass.__slots__`
 3 | #########################
-4 | 
+4 |
 5 | class Klass:
   -     __slots__ = ["d", "c", "b", "a"]  # a comment that is untouched
 6 +     __slots__ = ["a", "b", "c", "d"]  # a comment that is untouched
 7 |     __slots__ = ("d", "c", "b", "a")
-8 | 
+8 |
 9 |     # Quoting style is retained,
 
 RUF023 [*] `Klass.__slots__` is not sorted
@@ -30,12 +30,12 @@ RUF023 [*] `Klass.__slots__` is not sorted
 9 |     # Quoting style is retained,
   |
 help: Apply a natural sort to `Klass.__slots__`
-4  | 
+4  |
 5  | class Klass:
 6  |     __slots__ = ["d", "c", "b", "a"]  # a comment that is untouched
    -     __slots__ = ("d", "c", "b", "a")
 7  +     __slots__ = ("a", "b", "c", "d")
-8  | 
+8  |
 9  |     # Quoting style is retained,
 10 |     # but unnecessary parens are not
 
@@ -50,7 +50,7 @@ RUF023 [*] `Klass.__slots__` is not sorted
 13 |     # (but they are in multiline definitions)
    |
 help: Apply a natural sort to `Klass.__slots__`
-8  | 
+8  |
 9  |     # Quoting style is retained,
 10 |     # but unnecessary parens are not
    -     __slots__: set = {'b', "c", ((('a')))}
@@ -75,7 +75,7 @@ help: Apply a natural sort to `Klass.__slots__`
 13 |     # (but they are in multiline definitions)
    -     __slots__: tuple = ("b", "c", "a",)
 14 +     __slots__: tuple = ("a", "b", "c")
-15 | 
+15 |
 16 | class Klass2:
 17 |     if bool():
 
@@ -90,14 +90,14 @@ RUF023 [*] `Klass2.__slots__` is not sorted
 20 |         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
    |
 help: Apply a natural sort to `Klass2.__slots__`
-15 | 
+15 |
 16 | class Klass2:
 17 |     if bool():
    -         __slots__ = {"x": "docs for x", "m": "docs for m", "a": "docs for a"}
 18 +         __slots__ = {"a": "docs for a", "m": "docs for m", "x": "docs for x"}
 19 |     else:
 20 |         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
-21 | 
+21 |
 
 RUF023 [*] `Klass2.__slots__` is not sorted
   --> RUF023.py:20:21
@@ -115,7 +115,7 @@ help: Apply a natural sort to `Klass2.__slots__`
 19 |     else:
    -         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
 20 +         __slots__ = "foo1", "foo2", "foo3"  # NB: an implicit tuple (without parens)
-21 | 
+21 |
 22 |     __slots__: list[str] = ["the", "three", "little", "pigs"]
 23 |     __slots__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
 
@@ -132,7 +132,7 @@ RUF023 [*] `Klass2.__slots__` is not sorted
 help: Apply a natural sort to `Klass2.__slots__`
 19 |     else:
 20 |         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
-21 | 
+21 |
    -     __slots__: list[str] = ["the", "three", "little", "pigs"]
 22 +     __slots__: list[str] = ["little", "pigs", "the", "three"]
 23 |     __slots__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
@@ -150,7 +150,7 @@ RUF023 [*] `Klass2.__slots__` is not sorted
    |
 help: Apply a natural sort to `Klass2.__slots__`
 20 |         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
-21 | 
+21 |
 22 |     __slots__: list[str] = ["the", "three", "little", "pigs"]
    -     __slots__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
 23 +     __slots__ = "an_unparenthesized_tuple", "in", "parenthesized_item"
@@ -174,7 +174,7 @@ help: Apply a natural sort to `Klass2.__slots__`
 25 |     # not alphabetical sort or "isort-style" sort
    -     __slots__ = {"aadvark237", "aadvark10092", "aadvark174", "aadvark532"}
 26 +     __slots__ = {"aadvark174", "aadvark237", "aadvark532", "aadvark10092"}
-27 | 
+27 |
 28 | ############################
 29 | # Neat multiline definitions
 
@@ -195,7 +195,7 @@ RUF023 [*] `Klass3.__slots__` is not sorted
 41 |           "d",
    |
 help: Apply a natural sort to `Klass3.__slots__`
-31 | 
+31 |
 32 | class Klass3:
 33 |     __slots__ = (
    -         "d0",
@@ -243,7 +243,7 @@ help: Apply a natural sort to `Klass3.__slots__`
    -         "a"
 45 +         "d"
 46 |     ]
-47 | 
+47 |
 48 | ##################################
 note: This is an unsafe fix and may change runtime behavior
 
@@ -265,7 +265,7 @@ RUF023 [*] `Klass4.__slots__` is not sorted
 62 |       # comment7
    |
 help: Apply a natural sort to `Klass4.__slots__`
-51 | 
+51 |
 52 | class Klass4:
 53 |     # comment0
    -     __slots__ = ("d", "a",  # comment1
@@ -307,7 +307,7 @@ RUF023 [*] `Klass4.__slots__` is not sorted
    |
 help: Apply a natural sort to `Klass4.__slots__`
 62 |     # comment7
-63 | 
+63 |
 64 |     __slots__ = [  # comment0
 65 +         "ax",
 66 +         "bx",
@@ -373,7 +373,7 @@ help: Apply a natural sort to `PurePath.__slots__`
     -         # The `_raw_paths` slot stores unnormalized string paths. This is set
     -         # in the `__init__()` method.
     -         '_raw_paths',
-    - 
+    -
 76  |         # The `_drv`, `_root` and `_tail_cached` slots store parsed and
 77  |         # normalized parts of the path. They are set when any of the `drive`,
 78  |         # `root` or `_tail` properties are accessed for the first time. The
@@ -382,7 +382,7 @@ help: Apply a natural sort to `PurePath.__slots__`
 81  |         # separators (i.e. it is a list of strings), and that the root and
 82  |         # tail are normalized.
     -         '_drv', '_root', '_tail_cached',
-    - 
+    -
 83  +         '_drv',
 84  +         # The `_hash` slot stores the hash of the case-normalized string
 85  +         # path. It's set when `__hash__()` is called for the first time.
@@ -400,25 +400,25 @@ help: Apply a natural sort to `PurePath.__slots__`
 97  |         # computed from the drive, root and tail when `__str__()` is called
 98  |         # for the first time. It's used to implement `_str_normcase`
 99  |         '_str',
-    - 
+    -
 100 |         # The `_str_normcase_cached` slot stores the string path with
 101 |         # normalized case. It is set when the `_str_normcase` property is
 102 |         # accessed for the first time. It's used to implement `__eq__()`
 103 |         # `__hash__()`, and `_parts_normcase`
 104 |         '_str_normcase_cached',
-    - 
+    -
     -         # The `_parts_normcase_cached` slot stores the case-normalized
     -         # string path after splitting on path separators. It's set when the
     -         # `_parts_normcase` property is accessed for the first time. It's used
     -         # to implement comparison methods like `__lt__()`.
     -         '_parts_normcase_cached',
-    - 
+    -
     -         # The `_hash` slot stores the hash of the case-normalized string
     -         # path. It's set when `__hash__()` is called for the first time.
     -         '_hash',
 105 +         '_tail_cached',
 106 |     )
-107 | 
+107 |
 108 | # From cpython/Lib/pickletools.py
 note: This is an unsafe fix and may change runtime behavior
 
@@ -455,25 +455,25 @@ help: Apply a natural sort to `ArgumentDescriptor.__slots__`
 113 |     __slots__ = (
     -         # name of descriptor record, also a module global name; a string
     -         'name',
-    - 
+    -
 114 +         # human-readable docs for this arg descriptor; a string
 115 +         'doc',
 116 |         # length of argument, in bytes; an int; UP_TO_NEWLINE and
 117 |         # TAKEN_FROM_ARGUMENT{1,4,8} are negative values for variable-length
 118 |         # cases
 119 |         'n',
-    - 
+    -
 120 +         # name of descriptor record, also a module global name; a string
 121 +         'name',
 122 |         # a function taking a file-like object, reading this kind of argument
 123 |         # from the object at the current position, advancing the current
 124 |         # position by n bytes, and returning the value of the argument
 125 |         'reader',
-    - 
+    -
     -         # human-readable docs for this arg descriptor; a string
     -         'doc',
 126 |     )
-127 | 
+127 |
 128 | ####################################
 note: This is an unsafe fix and may change runtime behavior
 
@@ -551,7 +551,7 @@ RUF023 [*] `BezierBuilder.__slots__` is not sorted
     |
 help: Apply a natural sort to `BezierBuilder.__slots__`
 159 | ############################################################
-160 | 
+160 |
 161 | class BezierBuilder:
     -     __slots__ = ('xp', 'yp',
     -                  'canvas',)
@@ -560,7 +560,7 @@ help: Apply a natural sort to `BezierBuilder.__slots__`
 164 +         'xp',
 165 +         'yp',
 166 +     )
-167 | 
+167 |
 168 | class BezierBuilder2:
 169 |     __slots__ = {'xp', 'yp',
 
@@ -577,7 +577,7 @@ RUF023 [*] `BezierBuilder2.__slots__` is not sorted
     |
 help: Apply a natural sort to `BezierBuilder2.__slots__`
 163 |                  'canvas',)
-164 | 
+164 |
 165 | class BezierBuilder2:
     -     __slots__ = {'xp', 'yp',
     -                  'canvas'      ,          }
@@ -585,7 +585,7 @@ help: Apply a natural sort to `BezierBuilder2.__slots__`
 167 +         'canvas',
 168 +         'xp',
 169 +         'yp'      ,          }
-170 | 
+170 |
 171 | class BezierBuilder3:
 172 |     __slots__ = ['xp', 'yp',
 
@@ -609,7 +609,7 @@ RUF023 [*] `BezierBuilder3.__slots__` is not sorted
     |
 help: Apply a natural sort to `BezierBuilder3.__slots__`
 167 |                  'canvas'      ,          }
-168 | 
+168 |
 169 | class BezierBuilder3:
     -     __slots__ = ['xp', 'yp',
     -                  'canvas'
@@ -617,9 +617,9 @@ help: Apply a natural sort to `BezierBuilder3.__slots__`
 171 +         'canvas',
 172 +         'xp',
 173 +         'yp'
-174 | 
+174 |
 175 |                  # very strangely placed comment
-176 | 
+176 |
 
 RUF023 [*] `BezierBuilder4.__slots__` is not sorted
    --> RUF023.py:181:17
@@ -640,7 +640,7 @@ RUF023 [*] `BezierBuilder4.__slots__` is not sorted
 191 |       __slots__ = {"foo", "bar",
     |
 help: Apply a natural sort to `BezierBuilder4.__slots__`
-179 | 
+179 |
 180 | class BezierBuilder4:
 181 |     __slots__ = (
     -         "foo"
@@ -669,7 +669,7 @@ RUF023 [*] `BezierBuilder4.__slots__` is not sorted
 help: Apply a natural sort to `BezierBuilder4.__slots__`
 188 |         ,
 189 |     )
-190 | 
+190 |
     -     __slots__ = {"foo", "bar",
     -                  "baz", "bingo"
     -                  }
@@ -679,8 +679,8 @@ help: Apply a natural sort to `BezierBuilder4.__slots__`
 194 +         "bingo",
 195 +         "foo"
 196 +     }
-197 | 
-198 | 
+197 |
+198 |
 199 | class VeryDRY:
 
 RUF023 [*] `VeryDRY.__slots__` is not sorted
@@ -699,6 +699,6 @@ help: Apply a natural sort to `VeryDRY.__slots__`
     -     __slots__ = ("foo", "bar")
 199 +     __slots__ = ("bar", "foo")
 200 |     __match_args__ = __slots__
-201 | 
-202 | 
+201 |
+202 |
 note: This is an unsafe fix and may change runtime behavior
