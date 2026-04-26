@@ -96,6 +96,27 @@ reveal_type(DC2.z)  # revealed: list[str]
 reveal_type(dc2.z)  # revealed: str
 ```
 
+## Default-less fields whose type has an unknown descriptor protocol
+
+Dataclass field annotations without defaults describe instance attributes, so they should not be
+resolved through the class-level descriptor protocol even if the annotated type inherits from an
+unknown base:
+
+```py
+from dataclasses import dataclass
+
+from unresolvable_module import UnknownBase  # error: [unresolved-import]
+
+class MyBaseClass(UnknownBase): ...
+
+@dataclass
+class C:
+    x: MyBaseClass
+
+def f(c: C):
+    reveal_type(c.x)  # revealed: MyBaseClass
+```
+
 ## `default_factory`
 
 The `default_factory` argument can be used to specify a callable that provides a default value for a

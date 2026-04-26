@@ -670,7 +670,8 @@ static_assert(not has_member(c, "dynamic_attr"))
 
 #### Basic
 
-For dataclasses, we make sure to include all synthesized members:
+For dataclasses, we make sure to include all synthesized members, but not default-less fields that
+only exist on instances:
 
 ```toml
 [environment]
@@ -686,8 +687,8 @@ class Person:
     age: int
     name: str
 
-static_assert(has_member(Person, "name"))
-static_assert(has_member(Person, "age"))
+static_assert(not has_member(Person, "name"))
+static_assert(not has_member(Person, "age"))
 
 static_assert(has_member(Person, "__dataclass_fields__"))
 static_assert(has_member(Person, "__dataclass_params__"))

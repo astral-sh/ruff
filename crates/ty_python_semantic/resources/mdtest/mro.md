@@ -807,7 +807,7 @@ class C(C.a): ...
 reveal_type(C.__class__)  # revealed: <class 'type'>
 reveal_mro(C)  # revealed: (<class 'C'>, Unknown, <class 'object'>)
 
-class D(D.a):  # error: [unsupported-base]
+class D(D.a):
     a: D
 
 reveal_type(D.__class__)  # revealed: <class 'type'>

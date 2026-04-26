@@ -1105,6 +1105,13 @@ impl<'db> StaticClassLiteral<'db> {
             return Self::implicit_attribute(db, body_scope, name, MethodDecorator::ClassMethod);
         }
 
+        // For `@dataclass class C: x: T`, no `x` value exists on `C` itself. Returning unbound
+        // here lets `C().x` resolve to the instance field, without treating `T` as a possible
+        // class-level descriptor.
+        if self.is_own_stdlib_dataclass_instance_field_without_default(db, name) {
+            return Member::unbound();
+        }
+
         // For dataclass-like classes, `KW_ONLY` sentinel fields are not real
         // class attributes; they are markers used by the dataclass decorator to
         // indicate that subsequent fields are keyword-only. Treat them as
@@ -2451,6 +2458,38 @@ impl<'db> StaticClassLiteral<'db> {
             field.kind,
             FieldKind::Dataclass {
                 init_only: false,
+                ..
+            }
+        )
+    }
+
+    /// Returns `true` if `name` is a default-less field declared directly on a stdlib dataclass.
+    ///
+    /// Unlike dataclass-transform fields, default-less stdlib dataclass fields are purely instance
+    /// attributes: they are assigned by the synthesized `__init__`, but no corresponding value is
+    /// placed in the class dictionary. Treating them as class members would incorrectly apply the
+    /// descriptor protocol to their annotated type during class-level lookup.
+    fn is_own_stdlib_dataclass_instance_field_without_default(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> bool {
+        let Some(field_policy @ CodeGeneratorKind::DataclassLike(None)) =
+            CodeGeneratorKind::from_static_class(db, self, None)
+        else {
+            return false;
+        };
+
+        let fields = self.own_fields(db, None, field_policy);
+        let Some(field) = fields.get(name) else {
+            return false;
+        };
+
+        matches!(
+            field.kind,
+            FieldKind::Dataclass {
+                init_only: false,
+                default_ty: None,
                 ..
             }
         )
