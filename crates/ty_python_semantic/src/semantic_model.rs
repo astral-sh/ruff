@@ -561,7 +561,7 @@ impl<'db> SemanticModel<'db> {
             expected_ty,
             &StringLiteralCandidatesVisitor::default(),
         );
-        candidates.sort_by(|left, right| left.value.cmp(&right.value));
+        candidates.sort_unstable_by(|left, right| left.value.cmp(&right.value));
         candidates.dedup_by(|left, right| left.value == right.value);
         candidates
     }
