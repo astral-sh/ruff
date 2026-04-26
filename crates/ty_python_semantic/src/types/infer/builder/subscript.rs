@@ -83,6 +83,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         imp(self.db(), ty, &TypedDictKeyExpectedTypeVisitor::default())
     }
 
+    fn store_typed_dict_key_expected_type(&mut self, slice: &ast::Expr, value_ty: Type<'db>) {
+        if let Some(expected_key_ty) = self.typed_dict_key_expected_type(value_ty) {
+            self.store_expected_type(slice, expected_key_ty);
+        }
+    }
+
     pub(super) fn infer_subscript_expression(
         &mut self,
         subscript: &ast::ExprSubscript,
@@ -99,12 +105,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ExprContext::Load => self.infer_subscript_load(subscript),
             ExprContext::Store => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
+                self.store_typed_dict_key_expected_type(slice, value_ty);
                 let slice_ty = self.infer_expression(slice, TypeContext::default());
                 self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
                 Type::Never
             }
             ExprContext::Del => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
+                self.store_typed_dict_key_expected_type(slice, value_ty);
                 let slice_ty = self.infer_expression(slice, TypeContext::default());
                 self.validate_subscript_deletion(subscript, value_ty, slice_ty);
                 Type::Never
@@ -146,9 +154,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ctx,
         } = subscript;
 
-        if let Some(expected_key_ty) = self.typed_dict_key_expected_type(value_ty) {
-            self.store_expected_type(slice.as_ref(), expected_key_ty);
-        }
+        self.store_typed_dict_key_expected_type(slice, value_ty);
 
         let mut constraint_keys = vec![];
 
@@ -1123,6 +1129,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = target;
 
         let object_ty = self.infer_expression(object, TypeContext::default());
+        self.store_typed_dict_key_expected_type(slice, object_ty);
         let mut infer_slice_ty = |builder: &mut Self, tcx| builder.infer_expression(slice, tcx);
 
         self.validate_subscript_assignment_impl(

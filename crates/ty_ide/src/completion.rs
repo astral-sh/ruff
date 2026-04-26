@@ -6963,6 +6963,56 @@ td["<CURSOR>"]
     }
 
     #[test]
+    fn string_literal_completions_typed_dict_keys_assignment() {
+        let builder = completion_test_builder(
+            r#"
+from typing import TypedDict
+
+class TD(TypedDict):
+    left: int
+    right: str
+
+td: TD = {"left": 1, "right": "x"}
+
+td["<CURSOR>"] = 1
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        left :: Literal["left"]
+        right :: Literal["right"]
+        "#,
+        );
+    }
+
+    #[test]
+    fn string_literal_completions_typed_dict_keys_deletion() {
+        let builder = completion_test_builder(
+            r#"
+from typing import TypedDict
+
+class TD(TypedDict):
+    left: int
+    right: str
+
+td: TD = {"left": 1, "right": "x"}
+
+del td["<CURSOR>"]
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        left :: Literal["left"]
+        right :: Literal["right"]
+        "#,
+        );
+    }
+
+    #[test]
     fn string_literal_completions_do_not_offer_typed_dict_keys_for_typed_dict_value_context() {
         let builder = completion_test_builder(
             r#"
