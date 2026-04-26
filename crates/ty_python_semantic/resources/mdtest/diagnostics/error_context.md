@@ -429,7 +429,6 @@ error[invalid-method-override]: Invalid override of method `method`
  2 |     def method(self, x: str) -> bool:
    |         ---------------------------- `Parent.method` defined here
    |
-info: the parameter named `y` does not match `x` (and can be used as a keyword parameter)
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -860,7 +859,6 @@ error[invalid-assignment]: Object of type `IncompatibleFoo` is not assignable to
    |
 info: type `IncompatibleFoo` is not assignable to protocol `SupportsFooAndBar`
 info: └── protocol member `foo` is incompatible
-info:     └── the parameter named `name_` does not match `name` (and can be used as a keyword parameter)
 ```
 
 ## Assigning to `Iterable`

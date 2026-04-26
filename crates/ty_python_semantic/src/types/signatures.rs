@@ -1237,7 +1237,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Fast path: if the target accepts positional calls that the source cannot accept, reject
         // without checking return types or individual parameter types. The full parameter
         // comparison below reaches the same result, but only after doing work that is expensive for
-        // large overload sets.
+        // large overload sets. For example, `def source(a, /)` is not a subtype of
+        // `def target(a, b, /)` or `def target(a, /, *args)`.
         if source.parameters.is_standard()
             && target.parameters.is_standard()
             && source.parameters.variadic().is_none()
@@ -1248,19 +1249,84 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 target_positional > source_positional || target.parameters.variadic().is_some();
 
             if target_accepts_extra_positionals {
-                if target_positional > source_positional
-                    && let Some(ParameterKind::KeywordOnly { name, .. }) = source
-                        .parameters
-                        .iter()
-                        .nth(source_positional)
-                        .map(Parameter::kind)
-                {
-                    self.provide_context(|| ErrorContext::ParameterMustAcceptPositionalArguments {
-                        name: name.clone(),
-                    });
-                }
-
                 return self.never();
+            }
+        }
+
+        // Fast path: if the source requires positional calls that the target does not require,
+        // the source cannot handle all call shapes accepted by the target. For example,
+        // `def source(a, b, /)` is not a subtype of `def target(a, /)`.
+        if source.parameters.is_standard()
+            && target.parameters.is_standard()
+            && target.parameters.variadic().is_none()
+        {
+            let target_positional = target.parameters.positional().count();
+            if source
+                .parameters
+                .positional()
+                .skip(target_positional)
+                .any(|parameter| match parameter.kind() {
+                    ParameterKind::PositionalOnly { default_type, .. } => default_type.is_none(),
+                    ParameterKind::PositionalOrKeyword { name, default_type } => {
+                        default_type.is_none()
+                            && target
+                                .parameters
+                                .keyword_by_name(name)
+                                .is_none_or(|(_, target)| target.default_type().is_some())
+                    }
+                    _ => false,
+                })
+            {
+                return self.never();
+            }
+        }
+
+        // Fast path: if the target accepts keyword calls that the source cannot accept, reject
+        // without checking return types or individual parameter types. For example,
+        // `def source(a, /)` is not a subtype of `def target(a)`, and `def source(a)` is not a
+        // subtype of `def target(a, **kwargs)`.
+        if source.parameters.is_standard()
+            && target.parameters.is_standard()
+            && source.parameters.keyword_variadic().is_none()
+        {
+            for target_param in &target.parameters {
+                match target_param.kind() {
+                    ParameterKind::PositionalOrKeyword {
+                        name: target_name, ..
+                    }
+                    | ParameterKind::KeywordOnly {
+                        name: target_name, ..
+                    } if source.parameters.keyword_by_name(target_name).is_none() => {
+                        return self.never();
+                    }
+                    ParameterKind::KeywordVariadic { .. } => {
+                        return self.never();
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // Fast path: if the source requires keyword calls that the target does not require, the
+        // source cannot handle all call shapes accepted by the target. For example,
+        // `def source(*, a)` is not a subtype of `def target()`.
+        if source.parameters.is_standard()
+            && target.parameters.is_standard()
+            && target.parameters.keyword_variadic().is_none()
+        {
+            for source_param in &source.parameters {
+                match source_param.kind() {
+                    ParameterKind::KeywordOnly { name, default_type } if default_type.is_none() => {
+                        if target
+                            .parameters
+                            .keyword_by_name(name)
+                            .is_none_or(|(_, target)| target.default_type().is_some())
+                        {
+                            return self.never();
+                        }
+                    }
+                    _ => {}
+                }
             }
         }
 

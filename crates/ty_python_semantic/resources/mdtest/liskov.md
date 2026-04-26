@@ -189,7 +189,6 @@ error[invalid-method-override]: Invalid override of method `method`
  2 |     def method(self, x: int, /): ...
    |         ----------------------- `Super.method` defined here
    |
-info: parameter `x` is keyword-only but must also accept positional arguments
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -237,7 +236,6 @@ error[invalid-method-override]: Invalid override of method `method2`
 46 |     def method2(self, x, /): ...  # snapshot: invalid-method-override
    |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super2.method2`
    |
-info: parameter `x` is positional-only but must also accept keyword arguments
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -261,7 +259,6 @@ error[invalid-method-override]: Invalid override of method `method2`
 48 |     def method2(self, *, x): ...  # snapshot: invalid-method-override
    |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super2.method2`
    |
-info: parameter `x` is keyword-only but must also accept positional arguments
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -544,7 +541,6 @@ error[invalid-method-override]: Invalid override of method `get`
 5 |     def get(self, default, /): ...  # snapshot: invalid-method-override
   |         ^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `A.get`
   |
-info: parameter `default` is positional-only but must also accept keyword arguments
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -746,7 +742,6 @@ error[invalid-method-override]: Invalid override of method `foo`
 2 |     def foo(self, x): ...
   |         ------------ `one.A.foo` defined here
   |
-info: the parameter named `y` does not match `x` (and can be used as a keyword parameter)
 info: This violates the Liskov Substitution Principle
 ```
 
