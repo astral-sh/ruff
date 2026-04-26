@@ -3011,7 +3011,7 @@ bad_td2: TD2 = {"optional": 42}
 Using `Unpack[TypedDict]` on a `**kwargs` parameter should expose named keyword parameters to
 callers while preserving the original `TypedDict` shape inside the function body.
 
-### Inside the function body
+### Parameter binding
 
 Inside the function, `kwargs` should still behave like the original `TypedDict`, including
 flow-sensitive access to optional keys.
@@ -3034,10 +3034,10 @@ def func(**kwargs: Unpack[TD2]) -> None:
     reveal_type(kwargs["v3"])  # revealed: str
 ```
 
-### Calling the function
+### Call-site validation
 
-At the call site, required keys must be provided, unknown keys must be rejected, and `**kwargs`
-unpacking should be validated against the `TypedDict` shape.
+At the call site, required keys must be provided, known keys must be type-checked, and extra
+keywords are accepted as `object` because ordinary `TypedDict`s are open.
 
 ```py
 from typing_extensions import NotRequired, Required, TypedDict, Unpack
@@ -3056,15 +3056,50 @@ def func(**kwargs: Unpack[TD2]) -> None:
 func()
 func(v1=1, v3="ok")
 func(v1=1, v2="optional", v3="ok")
-
-# error: [unknown-argument]
 func(v1=1, v3="ok", v4=1)
+
+# error: [invalid-argument-type]
+func(v1=1, v3=1)
 ```
 
-### Assignability from unpacked kwargs to explicit keyword-only signatures
+### Extra keyword arguments
+
+Extra keyword arguments are modeled according to the unpacked `TypedDict`'s openness and extra-item
+policy.
+
+```py
+from typing_extensions import TypedDict, Unpack
+
+class Movie(TypedDict, extra_items=bool):
+    name: str
+
+def movie(**kwargs: Unpack[Movie]) -> None:
+    pass
+
+movie(name="Blade Runner", novel_adaptation=True)
+
+# TODO: Once `extra_items` is supported, this should be an invalid-argument-type error because
+# `year` should be checked against `bool`, not `object`.
+movie(name="Blade Runner", year=1982)
+
+class ClosedMovie(TypedDict, closed=True):
+    name: str
+
+def closed_movie(**kwargs: Unpack[ClosedMovie]) -> None:
+    pass
+
+closed_movie(name="Blade Runner")
+
+# TODO: Once `closed` is supported, this should be an unknown-argument error because closed
+# TypedDicts should not add a trailing `**kwargs` parameter.
+closed_movie(name="Blade Runner", year=1982)
+```
+
+### Assignability with explicit keyword-only signatures
 
 A callable using `**kwargs: Unpack[TD2]` should line up with equivalent explicit keyword-only
-signatures when assigning to the explicit form.
+signatures when assigning to the explicit form. The reverse assignment is rejected because an open
+unpacked `TypedDict` also accepts extra keyword arguments.
 
 ```py
 from typing import Protocol
@@ -3090,6 +3125,8 @@ explicit_ok: ExplicitKwargs = func
 typed_dict_ok: TypedDictKwargs = func
 
 def _(explicit: ExplicitKwargs, typed_dict: TypedDictKwargs) -> None:
+    # error: [invalid-assignment]
+    typed_dict_2: TypedDictKwargs = explicit
     explicit_2: ExplicitKwargs = typed_dict
 
 def func7(*, v1: int, v3: str, v2: str = "") -> None:
@@ -3125,10 +3162,10 @@ class MissingRequiredKwarg(Protocol):
 missing_required: MissingRequiredKwarg = func
 ```
 
-### Optional-only unpacked kwargs are not a single keyword parameter
+### Optional-only unpacked kwargs still expose named keys
 
-An unpacked all-optional `TypedDict` still describes named keyword arguments rather than a single
-keyword whose value has that `TypedDict` type.
+An unpacked all-optional open `TypedDict` exposes its declared keys as optional named keyword
+arguments while still accepting extra keyword arguments as `object`.
 
 ```py
 from typing import Protocol
@@ -3140,11 +3177,14 @@ class OptionalOnlyKwargs(TypedDict, total=False):
 def accepts_optional_kwargs(**kwargs: Unpack[OptionalOnlyKwargs]) -> None:
     pass
 
-class WantsB(Protocol):
-    def __call__(self, *, b: OptionalOnlyKwargs) -> None: ...
+class WantsA(Protocol):
+    def __call__(self, *, a: int = 1) -> None: ...
 
-# error: [invalid-assignment]
-wants_b: WantsB = accepts_optional_kwargs
+wants_a: WantsA = accepts_optional_kwargs
+accepts_optional_kwargs(b=OptionalOnlyKwargs(a=1))
+
+# error: [invalid-argument-type]
+accepts_optional_kwargs(a="bad")
 ```
 
 ### Invalid `Unpack` signatures
