@@ -4443,50 +4443,51 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Attempt to promote any promotable types assigned to the specialization.
         // The hook receives (typevar, lower_bound, upper_bound) and returns Some(ty) to
         // override the default solution, or None to keep it.
-        let maybe_promote =
-            |typevar: BoundTypeVarInstance<'db>, lower: Type<'db>, _upper: Type<'db>| {
-                let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
+        let maybe_promote = |typevar: BoundTypeVarInstance<'db>,
+                             bounds: Option<(Type<'db>, Type<'db>)>| {
+            let (lower, _upper) = bounds?;
+            let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
 
-                // For constrained TypeVars, the inferred type is already one of the
-                // constraints. Promoting literals would produce a type that doesn't
-                // match any constraint.
-                if matches!(
-                    bound_or_constraints,
-                    Some(TypeVarBoundOrConstraints::Constraints(_))
-                ) {
-                    return None;
-                }
+            // For constrained TypeVars, the inferred type is already one of the
+            // constraints. Promoting literals would produce a type that doesn't
+            // match any constraint.
+            if matches!(
+                bound_or_constraints,
+                Some(TypeVarBoundOrConstraints::Constraints(_))
+            ) {
+                return None;
+            }
 
-                let mut variance_in_return = TypeVarVariance::Bivariant;
+            let mut variance_in_return = TypeVarVariance::Bivariant;
 
-                // Find all occurrences of the type variable in the return type.
-                self.return_ty
-                    .visit_specialization(self.db, |ty, variance| {
-                        if ty != Type::TypeVar(typevar) {
-                            return;
-                        }
-
-                        variance_in_return = variance_in_return.join(variance);
-                    });
-
-                // Promotion is only useful if the type variable is in non-covariant position
-                // in the return type.
-                if variance_in_return.is_covariant() {
-                    return None;
-                }
-
-                let promoted = lower.promote(self.db);
-
-                // If the TypeVar has an upper bound, only use the promoted type if it
-                // still satisfies the bound.
-                if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
-                    if !promoted.is_assignable_to(self.db, bound) {
-                        return None;
+            // Find all occurrences of the type variable in the return type.
+            self.return_ty
+                .visit_specialization(self.db, |ty, variance| {
+                    if ty != Type::TypeVar(typevar) {
+                        return;
                     }
-                }
 
-                Some(promoted)
-            };
+                    variance_in_return = variance_in_return.join(variance);
+                });
+
+            // Promotion is only useful if the type variable is in non-covariant position
+            // in the return type.
+            if variance_in_return.is_covariant() {
+                return None;
+            }
+
+            let promoted = lower.promote(self.db);
+
+            // If the TypeVar has an upper bound, only use the promoted type if it
+            // still satisfies the bound.
+            if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
+                if !promoted.is_assignable_to(self.db, bound) {
+                    return None;
+                }
+            }
+
+            Some(promoted)
+        };
 
         let specialization = builder.build_with(generic_context, maybe_promote);
 

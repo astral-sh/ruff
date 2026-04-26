@@ -1721,26 +1721,33 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// Build a specialization, using a caller-provided hook to select the solution for each
     /// typevar.
     ///
-    /// The `choose` hook is called for each *inferred* typevar (those with entries in the type
-    /// mappings) with the typevar's materialized lower and upper bounds. Currently, both bounds
-    /// are set to the inferred type (representing an equality constraint). Unmapped typevars
-    /// are left to `specialize_recursive` to fill in with defaults.
+    /// The `choose` hook is called for each typevar on the generic context with the typevar's
+    /// materialized lower and upper bounds. Currently, both bounds are set to the inferred type
+    /// (representing an equality constraint). Unmapped typevars have bounds of `None,` and fallback
+    /// to their default specialization if an alternative default type is not chosen.
     ///
     /// The hook should return `Some(ty)` to use `ty` as the specialization for this typevar, or
     /// `None` to use the inferred type unchanged.
     pub(crate) fn build_with(
         &mut self,
         generic_context: GenericContext<'db>,
-        mut choose: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
+        mut choose: impl FnMut(
+            BoundTypeVarInstance<'db>,
+            Option<(Type<'db>, Type<'db>)>,
+        ) -> Option<Type<'db>>,
     ) -> Specialization<'db> {
         let types = generic_context
             .variables_inner(self.db)
             .iter()
             .map(|(identity, variable)| {
-                let mapped_ty = self.types.get(identity).copied()?;
-                // The typevar was inferred — present both bounds as the inferred type.
-                let chosen = choose(*variable, mapped_ty, mapped_ty);
-                Some(chosen.unwrap_or(mapped_ty))
+                match self.types.get(identity).copied() {
+                    Some(mapped_ty) => {
+                        // The typevar was inferred — present both bounds as the inferred type.
+                        let chosen = choose(*variable, Some((mapped_ty, mapped_ty)));
+                        Some(chosen.unwrap_or(mapped_ty))
+                    }
+                    None => choose(*variable, None),
+                }
             });
 
         generic_context.specialize_recursive(self.db, types)
