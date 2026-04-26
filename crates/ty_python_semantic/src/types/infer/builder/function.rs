@@ -36,6 +36,20 @@ use ty_python_core::{
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
+fn parameters_have_annotations(parameters: &ast::Parameters) -> bool {
+    parameters
+        .iter_non_variadic_params()
+        .any(|param| param.parameter.annotation.is_some())
+        || parameters
+            .vararg
+            .as_deref()
+            .is_some_and(|param| param.annotation.is_some())
+        || parameters
+            .kwarg
+            .as_deref()
+            .is_some_and(|param| param.annotation.is_some())
+}
+
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
         fn can_implicitly_return_none<'db>(db: &'db dyn Db, use_def: &UseDefMap<'db>) -> bool {
@@ -313,12 +327,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .any(|param| param.default.is_some());
 
         // If there are type params, parameters and returns are evaluated in that scope. Otherwise,
-        // we always defer the inference of the parameters and returns. That ensures that we do not
-        // add any spurious salsa cycles when applying decorators below. (Applying a decorator
+        // we defer the inference of any parameter and return annotations. That ensures that we do
+        // not add any spurious salsa cycles when applying decorators below. (Applying a decorator
         // requires getting the signature of this function definition, which in turn requires
         // (lazily) inferring the parameter and return types.) If defaults exist, we also defer so
         // they can be inferred once with type context in the enclosing scope.
-        if type_params.is_none() || has_defaults {
+        let has_signature_annotations =
+            function.returns.is_some() || parameters_have_annotations(parameters);
+        if (type_params.is_none() && has_signature_annotations) || has_defaults {
             self.deferred.insert(definition);
         }
 
@@ -349,7 +365,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut inferred_ty =
             Type::FunctionLiteral(FunctionType::new(db, function_literal, None, None));
-        self.undecorated_type = Some(inferred_ty);
+        if !decorator_list.is_empty() {
+            self.undecorated_type = Some(inferred_ty);
+        }
 
         // Check that the function's own type parameters don't shadow
         // type variables from enclosing scopes (by name).

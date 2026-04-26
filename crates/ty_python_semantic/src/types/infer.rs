@@ -639,11 +639,7 @@ pub(crate) fn nearest_enclosing_function<'db>(
         .find_map(|(_, ancestor_scope)| {
             let func = ancestor_scope.node().as_function()?;
             let definition = semantic.expect_single_definition(func);
-            let inference = infer_definition_types(db, definition);
-            inference
-                .undecorated_type()
-                .unwrap_or_else(|| inference.declaration_type(definition).inner_type())
-                .as_function_literal()
+            infer_definition_types(db, definition).function_type(definition)
         })
 }
 
@@ -943,6 +939,12 @@ impl<'db> DefinitionInference<'db> {
 
     pub(crate) fn undecorated_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.undecorated_type)
+    }
+
+    pub(crate) fn function_type(&self, definition: Definition<'db>) -> Option<FunctionType<'db>> {
+        self.undecorated_type()
+            .unwrap_or_else(|| self.declaration_type(definition).inner_type())
+            .as_function_literal()
     }
 }
 
