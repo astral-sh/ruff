@@ -2843,7 +2843,8 @@ impl<'db> CallableBinding<'db> {
             let mut merged_argument_forms = ArgumentForms::default();
 
             // The return types of each of the expanded argument lists that evaluated successfully.
-            let mut return_types = Vec::new();
+            let mut return_type_builder = UnionBuilder::new(db);
+            let mut successful_return_types = 0;
 
             for expanded_arguments in &expanded_argument_lists {
                 let mut argument_forms = ArgumentForms::new(expanded_arguments.len());
@@ -2936,7 +2937,8 @@ impl<'db> CallableBinding<'db> {
                 }
 
                 if let Some(return_type) = return_type {
-                    return_types.push(return_type);
+                    return_type_builder.add_in_place(return_type);
+                    successful_return_types += 1;
                 } else {
                     // No need to check the remaining argument lists if the current argument list
                     // doesn't evaluate successfully. Move on to expanding the next argument type.
@@ -2944,7 +2946,7 @@ impl<'db> CallableBinding<'db> {
                 }
             }
 
-            if return_types.len() == expanded_argument_lists.len() {
+            if successful_return_types == expanded_argument_lists.len() {
                 // Restore the bindings state to the one that merges the bindings state evaluating
                 // each of the expanded argument list.
                 //
@@ -2957,10 +2959,9 @@ impl<'db> CallableBinding<'db> {
                 // If the number of return types is equal to the number of expanded argument lists,
                 // they all evaluated successfully. So, we need to combine their return types by
                 // union to determine the final return type.
-                self.overload_call_return_type =
-                    Some(OverloadCallReturnType::ArgumentTypeExpansion(
-                        UnionType::from_elements(db, return_types),
-                    ));
+                self.overload_call_return_type = Some(
+                    OverloadCallReturnType::ArgumentTypeExpansion(return_type_builder.build()),
+                );
 
                 return Some(merged_argument_forms);
             }
