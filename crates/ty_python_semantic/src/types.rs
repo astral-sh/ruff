@@ -3513,13 +3513,23 @@ impl<'db> Type<'db> {
 
                 let fallback = self.instance_member(db, name_str);
 
-                let result = self.invoke_descriptor_protocol(
-                    db,
-                    name_str,
-                    fallback,
-                    InstanceFallbackShadowsNonDataDescriptor::No,
-                    policy,
-                );
+                // Dataclass fields are modeled as instance attributes on instance access, even
+                // when the field type is or might be a descriptor.
+                let result = if let Type::NominalInstance(instance) = self
+                    && instance
+                        .class(db)
+                        .has_dataclass_instance_field(db, name_str)
+                {
+                    fallback
+                } else {
+                    self.invoke_descriptor_protocol(
+                        db,
+                        name_str,
+                        fallback,
+                        InstanceFallbackShadowsNonDataDescriptor::No,
+                        policy,
+                    )
+                };
 
                 if result.is_class_var() && self.is_typed_dict() {
                     // `ClassVar`s on `TypedDictFallback` cannot be accessed on inhabitants of `SomeTypedDict`.

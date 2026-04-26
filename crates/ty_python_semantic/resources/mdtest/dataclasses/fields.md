@@ -60,8 +60,8 @@ reveal_type(NoDefaultSpecificClass(SpecificConfiguration()).config)  # revealed:
 
 ## Descriptor-typed fields with defaults
 
-A dataclass field whose declared type is a descriptor should still resolve through the descriptor
-protocol on instance access, even when the field has a default value.
+A dataclass field whose declared type is a descriptor is still treated as an instance attribute on
+instance access, even when the field has a default value.
 
 `Desc2` has `__get__` but no `__set__`, making it a non-data descriptor.
 
@@ -90,10 +90,36 @@ dc2 = DC2(Desc2(), Desc2(), Desc2())
 # On the class, __get__(None, owner) is called, returning list[T].
 reveal_type(DC2.z)  # revealed: list[str]
 
-# On instances, __get__(instance, owner) is called, returning T.
-# The default value should not cause the declared descriptor type
-# to leak into the instance attribute type.
-reveal_type(dc2.z)  # revealed: str
+# Fields without defaults are not attributes on the class.
+# error: [unresolved-attribute]
+reveal_type(DC2.x)  # revealed: Unknown
+
+# On instances, dataclass fields are treated as ordinary instance attributes.
+reveal_type(dc2.z)  # revealed: Desc2[str]
+```
+
+## Descriptor-typed fields with unknown bases
+
+Dataclass fields are treated as instance attributes on instance access even if the field type might
+be a descriptor due to an unknown base class:
+
+```py
+from dataclasses import dataclass
+from somewhere import UnknownClass  # type: ignore
+
+class MaybeDesc(UnknownClass): ...
+
+class Desc:
+    def __get__(self, *args, **kwargs) -> int:
+        raise NotImplementedError
+
+@dataclass
+class Wrapper:
+    x: MaybeDesc
+    y: Desc
+
+reveal_type(Wrapper(MaybeDesc(), Desc()).x)  # revealed: MaybeDesc
+reveal_type(Wrapper(MaybeDesc(), Desc()).y)  # revealed: Desc
 ```
 
 ## `default_factory`
