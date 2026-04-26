@@ -10,12 +10,16 @@ use crate::types::typed_dict::{
 use crate::types::{KnownClass, Type, TypeContext};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
-    pub(super) fn infer_keyword_only_dict_call(
+    pub(super) fn infer_dict_call(
         &mut self,
         func: &ast::Expr,
         arguments: &ast::Arguments,
         call_expression_tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
+        if let Some(ty) = self.infer_typed_dict_mapping_dict_call(arguments) {
+            return Some(ty);
+        }
+
         if !arguments.args.is_empty() {
             return None;
         }
@@ -113,5 +117,34 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             &mut infer_elt_ty,
             call_expression_tcx,
         )
+    }
+
+    /// Infer `dict(<TypedDict>)` as `dict[str, object]`.
+    ///
+    /// For example, given `data: Movie`, where `Movie` is a `TypedDict`, this detects
+    /// `dict(data)`. It does not handle calls with starred arguments, keyword arguments, or
+    /// non-`TypedDict` positional arguments.
+    fn infer_typed_dict_mapping_dict_call(
+        &mut self,
+        arguments: &ast::Arguments,
+    ) -> Option<Type<'db>> {
+        let [arg] = &*arguments.args else {
+            return None;
+        };
+        if arg.is_starred_expr() || !arguments.keywords.is_empty() {
+            return None;
+        }
+
+        // Probe silently so non-TypedDict arguments fall back to normal call binding without
+        // duplicate diagnostics; merge the inference only after accepting the fast path.
+        let mut speculative_builder = self.speculate();
+        let arg_ty = speculative_builder.infer_expression(arg, TypeContext::default());
+        arg_ty.as_typed_dict()?;
+        self.extend(speculative_builder);
+
+        Some(KnownClass::Dict.to_specialized_instance(
+            self.db(),
+            &[KnownClass::Str.to_instance(self.db()), Type::object()],
+        ))
     }
 }
