@@ -880,7 +880,9 @@ impl<'db> Bindings<'db> {
         call_arguments: &'a CallArguments<'a, 'db>,
         argument_index: usize,
     ) -> Type<'db> {
-        let argument_types = &call_arguments.types()[argument_index];
+        let argument_types = call_arguments
+            .argument_types(argument_index)
+            .expect("argument index should be valid");
 
         // If there is a single matching parameter, return the argument type inferred against
         // its declared type.
@@ -3034,7 +3036,7 @@ impl<'db> CallableBinding<'db> {
                 let slots = overload
                     .argument_matches
                     .iter()
-                    .zip(arguments.types())
+                    .zip(arguments.iter_types())
                     .flat_map(move |(matched_argument, argument_types)| {
                         matched_argument.iter().map(
                             move |(parameter_index, variadic_argument_type)| {
