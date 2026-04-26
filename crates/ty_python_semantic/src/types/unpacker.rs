@@ -266,6 +266,21 @@ pub(crate) struct UnpackResult<'db> {
 }
 
 impl<'db> UnpackResult<'db> {
+    /// Returns the inferred type for a given sub-expression of the left-hand side target
+    /// of an unpacking assignment.
+    ///
+    /// # Panics
+    ///
+    /// May panic if a scoped expression ID is passed in that does not correspond to a sub-
+    /// expression of the target.
+    #[track_caller]
+    pub(crate) fn expression_type(&self, expr_id: impl Into<ExpressionNodeKey>) -> Type<'db> {
+        self.try_expression_type(expr_id).expect(
+            "expression should belong to this `UnpackResult` and \
+            `Unpacker` should have inferred a type for it",
+        )
+    }
+
     pub(crate) fn try_expression_type(
         &self,
         expr: impl Into<ExpressionNodeKey>,
@@ -274,16 +289,6 @@ impl<'db> UnpackResult<'db> {
             .get(&expr.into())
             .copied()
             .or(self.cycle_recovery)
-    }
-
-    /// Returns the type of the given expression, or `Unknown` if no type was recorded.
-    ///
-    /// This can happen for malformed unpack targets created by error recovery.
-    pub(crate) fn expression_type_or_unknown(
-        &self,
-        expr: impl Into<ExpressionNodeKey>,
-    ) -> Type<'db> {
-        self.try_expression_type(expr).unwrap_or_else(Type::unknown)
     }
 
     /// Returns the diagnostics in this unpacking assignment.
@@ -306,9 +311,7 @@ impl<'db> UnpackResult<'db> {
         cycle: &salsa::Cycle,
     ) -> Self {
         for (expr, ty) in &mut self.targets {
-            let previous_ty = previous_cycle_result
-                .try_expression_type(*expr)
-                .expect("both `UnpackResult`s derive from the same `Unpack`");
+            let previous_ty = previous_cycle_result.expression_type(*expr);
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }
 
