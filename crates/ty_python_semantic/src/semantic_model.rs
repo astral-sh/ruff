@@ -577,6 +577,12 @@ pub trait HasType {
 
 /// Returns contextual expected type information for expressions.
 ///
+/// The expected type is the type an expression is checked against based on
+/// its surrounding context. For example, in `x: Literal["a", "b"] = ""`,
+/// the string literal expression has an expected type of `Literal["a", "b"]`.
+/// Similarly, when calling `def f(x: Literal["r", "w"])`, the argument in
+/// `f("")` has an expected type of `Literal["r", "w"]`.
+///
 /// Note: This is used for implementing IDE features like string-literal
 /// completion, and is not intended to be a universal expected-type query
 /// for every expression in the program.
