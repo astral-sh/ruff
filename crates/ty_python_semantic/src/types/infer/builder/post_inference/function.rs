@@ -19,12 +19,52 @@ use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 use ty_python_core::definition::Definition;
 
+/// Whether the function has syntax that can trigger post-inference signature diagnostics.
+fn needs_signature_validation(function: &ast::StmtFunctionDef) -> bool {
+    let ast::Parameters {
+        range: _,
+        node_index: _,
+        posonlyargs,
+        args: _,
+        vararg,
+        kwonlyargs: _,
+        kwarg,
+    } = function.parameters.as_ref();
+
+    let uses_legacy_positional_only_convention = posonlyargs.is_empty()
+        && function.parameters.iter().any(|parameter| {
+            let ast::AnyParameterRef::NonVariadic(parameter) = parameter else {
+                return false;
+            };
+            parameter.uses_pep_484_positional_only_convention()
+        });
+
+    let has_signature_expression = function.returns.is_some()
+        || function
+            .parameters
+            .iter_non_variadic_params()
+            .any(|param| param.parameter.annotation.is_some() || param.default.is_some())
+        || vararg
+            .as_deref()
+            .is_some_and(|param| param.annotation.is_some())
+        || kwarg
+            .as_deref()
+            .is_some_and(|param| param.annotation.is_some());
+
+    uses_legacy_positional_only_convention || has_signature_expression
+}
+
 pub(crate) fn check_function_definition<'db>(
     context: &InferContext<'db, '_>,
     definition: Definition<'db>,
+    function: &ast::StmtFunctionDef,
     file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
 ) {
     let db = context.db();
+
+    if !needs_signature_validation(function) {
+        return;
+    }
 
     let Some(function_type) = infer_definition_types(db, definition).function_type(definition)
     else {

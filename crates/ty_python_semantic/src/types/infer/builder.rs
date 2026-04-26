@@ -719,6 +719,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         post_inference::function::check_function_definition(
                             &self.context,
                             definition,
+                            function.node(self.module()),
                             &|expr| self.file_expression_type(expr),
                         );
                         post_inference::overloaded_function::check_overloaded_function(
