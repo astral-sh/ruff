@@ -832,6 +832,52 @@ class G(A[int]):
     def method(self, x: bool) -> None: ...  # error: [invalid-method-override]
 ```
 
+## Receiver-specific overloads can split a superclass receiver condition
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing import overload
+
+class Base[T]:
+    value: T
+
+    @overload
+    def method(self: Base[str] | Base[bytes], x: int) -> str | bytes: ...
+    @overload
+    def method(self, x: str) -> object: ...
+
+class Child[T](Base[T]):
+    @overload
+    def method(self: Child[str], x: int) -> str: ...
+    @overload
+    def method(self: Child[bytes], x: int) -> bytes: ...
+    @overload
+    def method(self, x: str) -> object: ...
+
+class PartialChild[T](Base[T]):
+    @overload
+    def method(self: PartialChild[str], x: int) -> str: ...
+    @overload
+    # TODO: We should emit [invalid-method-override] here; the subclass covers `Base[str]`
+    # but not `Base[bytes]`.
+    def method(self, x: str) -> object: ...
+
+class WideBase[T]:
+    def method(self, x: int | str) -> object: ...
+
+class SplitParameterChild[T](WideBase[T]):
+    @overload
+    def method(self: SplitParameterChild[str], x: int) -> str: ...
+    @overload
+    # TODO: We should emit [invalid-method-override] here; the overload set only covers
+    # the full base signature under separate receiver conditions.
+    def method(self: SplitParameterChild[bytes], x: str) -> object: ...
+```
+
 ## Generic methods on non-generic classes work as expected
 
 ```toml
@@ -1478,12 +1524,215 @@ class Base(Generic[T]):
     def method(self, arg: Any, extra: str = "") -> None: ...
 
 class GoodChild(Base[T]):
-    def method(self, arg: T, extra: str = "") -> None: ...
+    # TODO: This is a conservative false positive. Under the receiver condition for the second
+    # base overload, `T` must be `str`, so this override is valid for the specialized receiver.
+    def method(self, arg: T, extra: str = "") -> None: ...  # error: [invalid-method-override]
+
+class GoodChildWithReceiverSpecificOverload(Base[T]):
+    @overload
+    def method(self, arg: T) -> None: ...
+    @overload
+    def method(self: GoodChildWithReceiverSpecificOverload[str], arg: str, extra: str) -> None: ...
+    def method(self, arg: Any, extra: str = "") -> None: ...
 
 class BadChild(Base[T]):
-    # TODO: We should emit [invalid-method-override] here because the override is incompatible
-    # with `Base[str].method(self: Base[str], arg: str, extra: str)`.
-    def method(self, arg: T) -> None: ...
+    def method(self, arg: T) -> None: ...  # error: [invalid-method-override]
+```
+
+The same rule applies when receiver-specific overloads are classmethods:
+
+```pyi
+from typing import Any, Generic, TypeVar, overload
+
+S = TypeVar("S")
+
+class ClassmethodBase(Generic[S]):
+    @overload
+    @classmethod
+    def method(cls, arg: S) -> None: ...
+    @overload
+    @classmethod
+    def method(cls: type[ClassmethodBase[str]], arg: str, extra: str) -> None: ...
+    @classmethod
+    def method(cls, arg: Any, extra: str = "") -> None: ...
+
+class ClassmethodGoodChild(ClassmethodBase[S]):
+    @overload
+    @classmethod
+    def method(cls, arg: S) -> None: ...
+    @overload
+    @classmethod
+    def method(cls: type[ClassmethodGoodChild[str]], arg: str, extra: str) -> None: ...
+    @classmethod
+    def method(cls, arg: Any, extra: str = "") -> None: ...
+
+class ClassmethodBadChild(ClassmethodBase[S]):
+    @classmethod
+    def method(cls, arg: S) -> None: ...  # error: [invalid-method-override]
+```
+
+Source overloads that collectively satisfy a target overload should still be considered as a full
+overload set when another target overload has a receiver-specific condition.
+
+```pyi
+from typing import Any, Generic, TypeVar, overload
+from typing_extensions import Self
+
+U = TypeVar("U")
+V = TypeVar("V")
+
+class AggregatedBase(Generic[U]):
+    @overload
+    def method(self, arg: int | str) -> int | str: ...
+    @overload
+    def method(self: AggregatedBase[bytes], arg: bytes, extra: bytes) -> bytes: ...
+    def method(self, arg: Any, extra: Any = ...) -> Any: ...
+
+class AggregatedChild(AggregatedBase[U]):
+    @overload
+    def method(self, arg: int) -> int: ...
+    @overload
+    def method(self, arg: str) -> str: ...
+    @overload
+    def method(self: AggregatedChild[bytes], arg: bytes, extra: bytes) -> bytes: ...
+    # TODO: This is a conservative false positive. Treating the receiver-specific base overload
+    # as unconditional loses the correlation that makes the overload set valid for `U = bytes`.
+    def method(self, arg: Any, extra: Any = ...) -> Any: ...  # error: [invalid-method-override]
+
+class ReceiverAggregatedBase(Generic[U]):
+    @overload
+    def method(self: ReceiverAggregatedBase[int] | ReceiverAggregatedBase[str], arg: int | str) -> int | str: ...
+    @overload
+    def method(self, arg: bytes) -> bytes: ...
+    def method(self, arg: Any) -> Any: ...
+
+class SelfReceiverAggregatedChild(ReceiverAggregatedBase[U]):
+    @overload
+    def method(self: Self, arg: int) -> int: ...
+    @overload
+    def method(self: Self, arg: str) -> str: ...
+    @overload
+    def method(self, arg: bytes) -> bytes: ...
+    def method(self, arg: Any) -> Any: ...
+
+class WideReceiverAggregatedChild(ReceiverAggregatedBase[U]):
+    @overload
+    def method(self: ReceiverAggregatedBase[U], arg: int) -> int: ...
+    @overload
+    def method(self: ReceiverAggregatedBase[U], arg: str) -> str: ...
+    @overload
+    def method(self, arg: bytes) -> bytes: ...
+    def method(self, arg: Any) -> Any: ...
+
+class MethodReceiverTypeVarBase(Generic[U]):
+    @overload
+    def method(self, arg: U) -> U: ...
+    @overload
+    def method(self, arg: bytes) -> bytes: ...
+    def method(self, arg: Any) -> Any: ...
+
+class MethodReceiverTypeVarChild(MethodReceiverTypeVarBase[U]):
+    @overload
+    def method(self: MethodReceiverTypeVarChild[V], arg: V) -> V: ...
+    @overload
+    def method(self, arg: bytes) -> bytes: ...
+    def method(self, arg: Any) -> Any: ...
+```
+
+## Receiver-specific overloads on generic protocols
+
+```py
+from typing import Generic, Protocol, TypeVar, overload
+
+T = TypeVar("T")
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class TaskStatus(Protocol[T_contra]):
+    @overload
+    def started(self: "TaskStatus[None]") -> None: ...
+    @overload
+    def started(self, value: T_contra) -> None: ...
+    def started(self, value: T_contra | None = None) -> None: ...
+
+class _TaskStatus(TaskStatus[T], Generic[T]):
+    @overload
+    def started(self: "_TaskStatus[None]") -> None: ...
+    @overload
+    def started(self: "_TaskStatus[T]", value: T) -> None: ...
+    def started(self, value: T | None = None) -> None: ...
+```
+
+## Classmethod keyword-only Liskov checks
+
+```py
+class Base:
+    @classmethod
+    def make(cls, **kwargs: object) -> object: ...
+
+class Child(Base):
+    @classmethod
+    def make(cls, value: int) -> object: ...  # error: [invalid-method-override]
+```
+
+```py
+class Base:
+    @classmethod
+    def make(cls, **kwargs: object) -> object: ...
+
+class Mixin:
+    @classmethod
+    def make(cls, value: int | None = None) -> object: ...
+
+class Child(Base, Mixin):
+    @classmethod
+    def make(cls, value: int) -> object: ...  # error: [invalid-method-override]
+```
+
+```py
+from typing_extensions import Self
+
+class EvmEventFilterQuery:
+    @classmethod
+    def make(
+        cls,
+        tx_hashes: list[bytes] | None = None,
+        counterparties: list[str] | None = None,
+        addresses: list[str] | None = None,
+    ) -> Self:
+        raise NotImplementedError
+
+class EthStakingEventFilterQuery:
+    @classmethod
+    def make(cls, validator_indices: list[int] | None = None) -> Self:
+        raise NotImplementedError
+
+class EthDepositEventFilterQuery(EvmEventFilterQuery, EthStakingEventFilterQuery):
+    @classmethod
+    def make(
+        cls,
+        tx_hashes: list[bytes] | None = None,
+        validator_indices: list[int] | None = None,
+    ) -> "EthDepositEventFilterQuery":  # type: ignore
+        raise NotImplementedError
+```
+
+## Classmethod generic Self with type ignore
+
+```py
+from typing import Any, Generic, TypeVar
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class BaseModel:
+    @classmethod
+    def model_construct(cls, _fields_set: set[str] | None = None, **values: Any) -> Self:
+        raise NotImplementedError
+
+class RootModel(BaseModel, Generic[T]):
+    @classmethod
+    def model_construct(cls, root: T, _fields_set: set[str] | None = None) -> Self:  # type: ignore
+        raise NotImplementedError
 ```
 
 ## Definitely bound members with no reachable definitions(!)

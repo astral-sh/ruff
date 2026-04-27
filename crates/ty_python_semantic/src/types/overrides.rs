@@ -14,8 +14,8 @@ use crate::{
     lint::LintId,
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
-        CallableType, ClassBase, ClassLiteral, ClassType, KnownClass, Parameter, Parameters,
-        Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
+        CallableType, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, Parameter,
+        Parameters, Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
         call::CallArguments,
         class::{CodeGeneratorKind, FieldKind},
         constraints::ConstraintSetBuilder,
@@ -123,6 +123,36 @@ fn conflicting_named_tuple_field_in_mro<'db>(
     }
 
     None
+}
+
+/// Rebinds a base method to the same receiver as the overriding method.
+///
+/// The base method has already been found on a specific superclass, so this does not look the name
+/// up on the subclass again. It only changes the receiver used for binding and receiver-specific
+/// overload filtering.
+fn bind_method_target_to_source_receiver<'db>(
+    db: &'db dyn Db,
+    source: Type<'db>,
+    target: Type<'db>,
+) -> Type<'db> {
+    if let (Type::BoundMethod(source_method), Type::BoundMethod(target_method)) = (source, target) {
+        Type::BoundMethod(target_method.with_self_instance(db, source_method.self_instance(db)))
+    } else {
+        target
+    }
+}
+
+fn try_upcast_to_callable_for_liskov<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<CallableTypes<'db>> {
+    if let Type::BoundMethod(method) = ty {
+        Some(CallableTypes::one(
+            method.into_callable_type_with_possible_self_bindings(db),
+        ))
+    } else {
+        ty.try_upcast_to_callable(db)
+    }
 }
 
 fn check_class_declaration<'db>(
@@ -520,14 +550,38 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            let Some(superclass_type_as_callable) = superclass_type.try_upcast_to_callable(db)
+            let superclass_type_bound_to_subclass = bind_method_target_to_source_receiver(
+                db,
+                type_on_subclass_instance,
+                superclass_type,
+            );
+
+            let Some(superclass_type_as_callable) =
+                try_upcast_to_callable_for_liskov(db, superclass_type_bound_to_subclass)
             else {
                 continue;
             };
 
             let superclass_type_as_type = superclass_type_as_callable.into_type(db);
 
-            if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_type) {
+            let Some(type_on_subclass_instance_as_callable) =
+                try_upcast_to_callable_for_liskov(db, type_on_subclass_instance)
+            else {
+                continue;
+            };
+
+            if type_on_subclass_instance_as_callable
+                .into_type(db)
+                .is_assignable_to(db, superclass_type_as_type)
+            {
+                continue;
+            }
+
+            // Protocol conformance is structural. If the subclass still satisfies the protocol,
+            // avoid a nominal override diagnostic for receiver-specific overload details.
+            if superclass.is_protocol(db)
+                && instance_of_class.is_assignable_to(db, Type::instance(db, superclass))
+            {
                 continue;
             }
 
@@ -541,7 +595,29 @@ fn check_class_declaration<'db>(
                     // The immediate parent already defines this method and is different from the
                     // current ancestor we're checking. Check if the immediate parent's method
                     // is also incompatible with this ancestor.
-                    if !immediate_parent_type.is_assignable_to(db, superclass_type_as_type) {
+                    let superclass_type_bound_to_immediate_parent =
+                        bind_method_target_to_source_receiver(
+                            db,
+                            immediate_parent_type,
+                            superclass_type,
+                        );
+                    let Some(superclass_type_as_callable) = try_upcast_to_callable_for_liskov(
+                        db,
+                        superclass_type_bound_to_immediate_parent,
+                    ) else {
+                        continue;
+                    };
+
+                    let Some(immediate_parent_type_as_callable) =
+                        try_upcast_to_callable_for_liskov(db, immediate_parent_type)
+                    else {
+                        continue;
+                    };
+
+                    if !immediate_parent_type_as_callable
+                        .into_type(db)
+                        .is_assignable_to(db, superclass_type_as_callable.into_type(db))
+                    {
                         // The immediate parent already has an LSP violation with this ancestor.
                         // Don't report the same violation for the child.
                         continue;

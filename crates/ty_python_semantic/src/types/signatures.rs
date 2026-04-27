@@ -10,6 +10,7 @@
 //! argument types and return types. For each callable type in the union, the call expression's
 //! arguments must match _at least one_ overload.
 
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::slice::Iter;
 
@@ -31,6 +32,8 @@ use crate::types::typed_dict::{
     UnpackedTypedDictKey, extract_unpacked_typed_dict_keys_from_kwargs_annotation,
     extract_unpacked_typed_dict_keys_from_value_type,
 };
+use crate::types::typevar::{BoundTypeVarIdentity, walk_type_var_bounds};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind,
@@ -435,6 +438,46 @@ pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     visitor.visit_type(db, signature.return_ty);
 }
 
+fn inferable_typevars_mentioned_by_type<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> InferableTypeVars<'db> {
+    #[derive(Default)]
+    struct CollectTypeVars<'db> {
+        typevars: RefCell<FxOrderSet<BoundTypeVarIdentity<'db>>>,
+        recursion_guard: TypeCollector<'db>,
+    }
+
+    impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            false
+        }
+
+        fn visit_bound_type_var_type(
+            &self,
+            db: &'db dyn Db,
+            bound_typevar: BoundTypeVarInstance<'db>,
+        ) {
+            self.typevars
+                .borrow_mut()
+                .insert(bound_typevar.identity(db));
+
+            let typevar = bound_typevar.typevar(db);
+            if let Some(bound_or_constraints) = typevar.bound_or_constraints(db) {
+                walk_type_var_bounds(db, bound_or_constraints, self);
+            }
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+    }
+
+    let visitor = CollectTypeVars::default();
+    visitor.visit_type(db, ty);
+    InferableTypeVars::from_typevars(db, visitor.typevars.into_inner())
+}
+
 impl<'db> Signature<'db> {
     pub(crate) fn new(parameters: Parameters<'db>, return_ty: Type<'db>) -> Self {
         Self {
@@ -754,24 +797,26 @@ impl<'db> Signature<'db> {
         }
     }
 
-    /// Returns `true` if this signature's first parameter can accept the bound `self` type.
-    ///
-    /// This is used to prune impossible overloads when a method is bound to a concrete receiver.
-    /// If a signature has no positional first parameter, we conservatively keep it.
-    pub(crate) fn can_bind_self_to(&self, db: &'db dyn Db, self_type: Type<'db>) -> bool {
+    fn self_binding_constraints<'c>(
+        &self,
+        db: &'db dyn Db,
+        self_type: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        inferable_typevars: InferableTypeVars<'db>,
+    ) -> ConstraintSet<'db, 'c> {
         // A dynamic receiver might be compatible with any explicit receiver annotation.
         if self_type.is_dynamic() {
-            return true;
+            return ConstraintSet::from_bool(constraints, true);
         }
 
         // Without a first parameter, there is no receiver annotation to check.
         let Some(first_parameter) = self.parameters.get(0) else {
-            return true;
+            return ConstraintSet::from_bool(constraints, true);
         };
 
         // If there is no positional receiver, this signature cannot be pruned based on `self`.
         if !first_parameter.is_positional() {
-            return true;
+            return ConstraintSet::from_bool(constraints, true);
         }
 
         let mut expected_self_ty = first_parameter.annotated_type();
@@ -781,7 +826,7 @@ impl<'db> Signature<'db> {
         // Avoid the more expensive normalization below for receiver annotations that already
         // accept all values, or already exactly match the bound receiver.
         if accepts_any_or_exact_self(expected_self_ty) {
-            return true;
+            return ConstraintSet::from_bool(constraints, true);
         }
 
         // TODO: Expand type aliases here so `type Alias = Self` in a class body
@@ -790,7 +835,7 @@ impl<'db> Signature<'db> {
 
         // `Self` binding can make the receiver annotation trivially compatible.
         if accepts_any_or_exact_self(expected_self_ty) {
-            return true;
+            return ConstraintSet::from_bool(constraints, true);
         }
 
         // A specialized receiver can make generic receiver annotations concrete enough to compare.
@@ -800,19 +845,39 @@ impl<'db> Signature<'db> {
 
             // Specialization can also make the receiver annotation trivially compatible.
             if accepts_any_or_exact_self(expected_self_ty) {
-                return true;
+                return ConstraintSet::from_bool(constraints, true);
             }
         }
 
+        self_type.when_assignable_to(db, expected_self_ty, constraints, inferable_typevars)
+    }
+
+    /// Returns `true` if this signature's first parameter can always accept the bound `self` type.
+    ///
+    /// This is used to prune impossible overloads when a method is bound for normal method access.
+    /// If a signature has no positional first parameter, we conservatively keep it.
+    pub(crate) fn can_bind_self_to(&self, db: &'db dyn Db, self_type: Type<'db>) -> bool {
         let constraints = ConstraintSetBuilder::new();
-        self_type
-            .when_assignable_to(
-                db,
-                expected_self_ty,
-                &constraints,
-                self.inferable_typevars(db),
-            )
+        self.self_binding_constraints(db, self_type, &constraints, self.inferable_typevars(db))
             .is_always_satisfied(db)
+    }
+
+    /// Returns `true` if this signature's first parameter might accept the bound `self` type.
+    ///
+    /// Liskov checks use this conservative mode for receiver-specific overloads: if an overload
+    /// might exist for some specialization of a generic receiver, we check it as part of the method
+    /// contract.
+    pub(crate) fn can_possibly_bind_self_to(&self, db: &'db dyn Db, self_type: Type<'db>) -> bool {
+        let constraints = ConstraintSetBuilder::new();
+        !self
+            .self_binding_constraints(
+                db,
+                self_type,
+                &constraints,
+                self.inferable_typevars(db)
+                    .merge(db, inferable_typevars_mentioned_by_type(db, self_type)),
+            )
+            .is_never_satisfied(db)
     }
 
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {

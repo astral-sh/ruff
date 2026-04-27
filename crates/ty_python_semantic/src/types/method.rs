@@ -64,7 +64,16 @@ impl<'db> BoundMethodType<'db> {
         db: &'db dyn Db,
         f: impl FnOnce(Type<'db>) -> Type<'db>,
     ) -> Self {
-        Self::new(db, self.function(db), f(self.self_instance(db)))
+        self.with_self_instance(db, f(self.self_instance(db)))
+    }
+
+    /// Returns this bound method's function bound to a different receiver.
+    ///
+    /// This is useful when a method is found through one class in the MRO but needs to be viewed
+    /// through a more specific receiver, such as checking a base-class method contract against an
+    /// overriding subclass method.
+    pub(crate) fn with_self_instance(self, db: &'db dyn Db, self_instance: Type<'db>) -> Self {
+        Self::new(db, self.function(db), self_instance)
     }
 
     #[salsa::tracked(cycle_initial=into_callable_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
@@ -72,6 +81,17 @@ impl<'db> BoundMethodType<'db> {
         CallableType::new(
             db,
             self.bound_signatures(db),
+            CallableTypeKind::FunctionLike,
+        )
+    }
+
+    pub(crate) fn into_callable_type_with_possible_self_bindings(
+        self,
+        db: &'db dyn Db,
+    ) -> CallableType<'db> {
+        CallableType::new(
+            db,
+            self.bound_signatures_with_possible_self_bindings(db),
             CallableTypeKind::FunctionLike,
         )
     }
@@ -88,6 +108,28 @@ impl<'db> BoundMethodType<'db> {
                     .overloads
                     .iter()
                     .filter(|signature| signature.can_bind_self_to(db, self_instance))
+                    .map(|signature| signature.bind_self(db, Some(typing_self_type))),
+            );
+        };
+
+        CallableSignature::single(signature.bind_self(db, Some(typing_self_type)))
+    }
+
+    #[salsa::tracked(cycle_initial=|_, _, _| CallableSignature::bottom(), heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn bound_signatures_with_possible_self_bindings(
+        self,
+        db: &'db dyn Db,
+    ) -> CallableSignature<'db> {
+        let function_signature = self.function(db).signature(db);
+        let typing_self_type = self.typing_self_type(db);
+
+        let [signature] = function_signature.overloads.as_slice() else {
+            let self_instance = self.self_instance(db);
+            return CallableSignature::from_overloads(
+                function_signature
+                    .overloads
+                    .iter()
+                    .filter(|signature| signature.can_possibly_bind_self_to(db, self_instance))
                     .map(|signature| signature.bind_self(db, Some(typing_self_type))),
             );
         };
