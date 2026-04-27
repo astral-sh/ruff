@@ -8179,15 +8179,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let attribute_exists = match MethodDecorator::try_from_fn_type(self.db(), function_type) {
-            Ok(MethodDecorator::ClassMethod) => !Type::instance(self.db(), class)
+            Some(MethodDecorator::ClassMethod) => !Type::instance(self.db(), class)
                 .class_member(self.db(), id.clone())
                 .place
                 .is_undefined(),
-            Ok(MethodDecorator::None) => !Type::instance(self.db(), class)
+            Some(MethodDecorator::None) => !Type::instance(self.db(), class)
                 .member(self.db(), id)
                 .place
                 .is_undefined(),
-            Ok(MethodDecorator::StaticMethod) | Err(()) => false,
+            Some(MethodDecorator::StaticMethod) | None => false,
         };
 
         if attribute_exists {
