@@ -774,23 +774,19 @@ impl<'db> Signature<'db> {
         }
 
         let mut expected_self_ty = first_parameter.annotated_type();
+        let accepts_any_or_exact_self =
+            |ty: Type<'db>| ty.is_dynamic() || ty.is_object() || ty == self_type;
 
         // Avoid the more expensive normalization below for receiver annotations that already
         // accept all values, or already exactly match the bound receiver.
-        if expected_self_ty.is_dynamic()
-            || expected_self_ty.is_object()
-            || expected_self_ty == self_type
-        {
+        if accepts_any_or_exact_self(expected_self_ty) {
             return true;
         }
 
         // `Self`-like typevars in the receiver annotation are bound using the concrete receiver.
         expected_self_ty = expected_self_ty.bind_self_typevars(db, self_type);
 
-        if expected_self_ty.is_dynamic()
-            || expected_self_ty.is_object()
-            || expected_self_ty == self_type
-        {
+        if accepts_any_or_exact_self(expected_self_ty) {
             return true;
         }
 
@@ -799,10 +795,7 @@ impl<'db> Signature<'db> {
             expected_self_ty =
                 expected_self_ty.apply_optional_specialization(db, Some(self_specialization));
 
-            if expected_self_ty.is_dynamic()
-                || expected_self_ty.is_object()
-                || expected_self_ty == self_type
-            {
+            if accepts_any_or_exact_self(expected_self_ty) {
                 return true;
             }
         }
