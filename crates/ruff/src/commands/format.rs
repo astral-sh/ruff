@@ -680,8 +680,7 @@ impl<'a> FormatResults<'a> {
                 }
             )
         } else if unchanged > 0 {
-            writeln!(
-                f,
+            let summary = format!(
                 "{} file{} {}",
                 unchanged,
                 if unchanged == 1 { "" } else { "s" },
@@ -689,7 +688,8 @@ impl<'a> FormatResults<'a> {
                     FormatMode::Write => "left unchanged",
                     FormatMode::Check | FormatMode::Diff => "already formatted",
                 },
-            )
+            );
+            writeln!(f, "{}", summary.green().bold())
         } else {
             Ok(())
         }
