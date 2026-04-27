@@ -520,18 +520,6 @@ def _():
     # dict() call with keyword args should be inferred as Dog
     animal: MaybeDog = dict(name="Buddy", breed="Labrador")
     reveal_type(animal)  # revealed: Dog
-
-def _(dog: Dog):
-    # dict() call with unpacked TypedDict kwargs should also be inferred as Dog
-    animal: MaybeDog = dict(**dog)
-    reveal_type(animal)  # revealed: Dog
-
-def returns_dog(dog: Dog) -> Dog:
-    return dict(**dog)
-
-def takes_dog(dog: Dog) -> None: ...
-def _(dog: Dog):
-    takes_dog(dict(**dog))
 ```
 
 And with set literal inference:

@@ -110,9 +110,11 @@ reveal_type(d1_dict)  # revealed: dict[str, int]
 
 d2_literal: TD = {"x": 1}
 d2_dict: TD = dict(x=1)
+d2_unpack: TD = dict(**d2_literal)
 
 reveal_type(d2_literal)  # revealed: TD
 reveal_type(d2_dict)  # revealed: TD
+reveal_type(d2_unpack)  # revealed: TD
 
 d3_literal: dict[str, int] = {"x": 1}
 d3_dict: dict[str, int] = dict(x=1)
@@ -150,6 +152,15 @@ def return_literal() -> TD:
 
 def return_dict() -> TD:
     return dict(x=1)
+
+def return_unpack(src: TD) -> TD:
+    return dict(**src)
+
+def takes_td(value: TD) -> None:
+    pass
+
+def pass_unpack(src: TD) -> None:
+    takes_td(dict(**src))
 
 def return_invalid_literal() -> TD:
     # TODO: ideally, this would only emit the first error, but not `invalid-return-type` (like the `return_invalid_dict` case below).
