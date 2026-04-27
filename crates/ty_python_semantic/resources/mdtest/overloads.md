@@ -218,7 +218,7 @@ class Reader(Generic[T_co]):
         return default
 
 def union_receiver(reader: Reader[int | str]):
-    reveal_type(reader.get)  # revealed: Overload[(default: int) -> int, (default: str) -> str]
+    reveal_type(reader.get)  # revealed: Overload[]
 ```
 
 ## Constructor
