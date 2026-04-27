@@ -18,9 +18,7 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
-  # The ecosystem-analyzer doesn't need full debug symbols, but we keep line
-  # tables so panic backtraces still report file:line. This is significantly
-  # cheaper than the `profiling` profile's default `debug = "full"`.
+  # Line-tables-only debug info: faster builds, backtraces still work.
   CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
 
 jobs:
@@ -48,6 +46,9 @@ jobs:
 
       - name: Install Rust toolchain
         run: rustup show
+
+      - name: "Install mold"
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
 
       - name: Create report
         shell: bash
