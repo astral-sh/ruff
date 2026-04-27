@@ -907,10 +907,6 @@ jobs:
       # Line-tables-only debug info: faster builds, backtraces still work.
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
-      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         name: "Checkout ruff source"
         with:
@@ -942,20 +938,24 @@ jobs:
           # installation fails on 3.13 and newer
           python-version: "3.12"
 
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+
       - name: Install ruff-lsp dependencies
         run: |
           cd ruff-lsp
-          just install
+          uv venv
+          uv pip install --no-deps -r requirements.txt
+          uv pip install --no-deps -r requirements-dev.txt
 
       - name: Run ruff-lsp tests
         run: |
           # Setup development binary
-          pip uninstall --yes ruff
           export PATH="${PWD}/target/debug:${PATH}"
           ruff version
 
           cd ruff-lsp
-          just test
+          uv pip uninstall ruff
+          uv run --no-sync pytest
 
   check-playground:
     name: "check playground"
