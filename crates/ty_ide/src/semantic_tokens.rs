@@ -50,7 +50,7 @@ use ty_python_semantic::{
         CallArgumentForm, call_argument_forms, definition_for_name,
         static_member_type_for_attribute,
     },
-    types::{SpecialFormType, Type, TypeVarKind},
+    types::{MethodDecorator, SpecialFormType, Type, TypeVarKind},
 };
 
 /// Semantic token types supported by the language server.
@@ -545,37 +545,21 @@ impl<'db> SemanticTokenVisitor<'db> {
         func: &ast::StmtFunctionDef,
     ) -> SemanticTokenType {
         if is_first && self.in_class_scope {
-            // Check if this is a classmethod (has @classmethod decorator)
-            // TODO - replace with a more robust way to check whether this is a classmethod
-            let is_classmethod =
-                func.decorator_list
-                    .iter()
-                    .any(|decorator| match &decorator.expression {
-                        ast::Expr::Name(name) => name.id.as_str() == "classmethod",
-                        ast::Expr::Attribute(attr) => attr.attr.id.as_str() == "classmethod",
-                        _ => false,
-                    });
+            let method_decorator = func
+                .inferred_type(self.model)
+                .and_then(|ty| match ty {
+                    Type::FunctionLiteral(function_ty) => Some(function_ty),
+                    _ => None,
+                })
+                .and_then(|function_ty| {
+                    MethodDecorator::try_from_fn_type(self.model.db(), function_ty).ok()
+                })
+                .unwrap_or(MethodDecorator::None);
 
-            // Check if this is a staticmethod (has @staticmethod decorator)
-            // TODO - replace with a more robust way to check whether this is a staticmethod
-            let is_staticmethod =
-                func.decorator_list
-                    .iter()
-                    .any(|decorator| match &decorator.expression {
-                        ast::Expr::Name(name) => name.id.as_str() == "staticmethod",
-                        ast::Expr::Attribute(attr) => attr.attr.id.as_str() == "staticmethod",
-                        _ => false,
-                    });
-
-            if is_staticmethod {
-                // Static methods don't have self/cls parameters
-                SemanticTokenType::Parameter
-            } else if is_classmethod {
-                // First parameter of a classmethod is cls parameter
-                SemanticTokenType::ClsParameter
-            } else {
-                // First parameter of an instance method is self parameter
-                SemanticTokenType::SelfParameter
+            match method_decorator {
+                MethodDecorator::StaticMethod => SemanticTokenType::Parameter,
+                MethodDecorator::ClassMethod => SemanticTokenType::ClsParameter,
+                MethodDecorator::None => SemanticTokenType::SelfParameter,
             }
         } else {
             SemanticTokenType::Parameter
@@ -1411,6 +1395,56 @@ class MyClass:
         "method" @ 42..48: Method [definition]
         "x" @ 49..50: Parameter [definition]
         "y" @ 52..53: Parameter [definition]
+        "#);
+    }
+
+    #[test]
+    fn semantic_tokens_aliased_staticmethod_parameter() {
+        let test = SemanticTokenTest::new(
+            "
+sm = staticmethod
+
+class MyClass:
+    @sm
+    def method(x, y): pass
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "sm" @ 1..3: Class [definition]
+        "staticmethod" @ 6..18: Class
+        "MyClass" @ 26..33: Class [definition]
+        "sm" @ 40..42: Decorator
+        "method" @ 51..57: Method [definition]
+        "x" @ 58..59: Parameter [definition]
+        "y" @ 61..62: Parameter [definition]
+        "#);
+    }
+
+    #[test]
+    fn semantic_tokens_aliased_classmethod_parameter() {
+        let test = SemanticTokenTest::new(
+            "
+cm = classmethod
+
+class MyClass:
+    @cm
+    def method(cls, x): pass
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "cm" @ 1..3: Class [definition]
+        "classmethod" @ 6..17: Class
+        "MyClass" @ 25..32: Class [definition]
+        "cm" @ 39..41: Decorator
+        "method" @ 50..56: Method [definition]
+        "cls" @ 57..60: ClsParameter [definition]
+        "x" @ 62..63: Parameter [definition]
         "#);
     }
 

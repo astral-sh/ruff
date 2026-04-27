@@ -85,8 +85,8 @@ pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;
 use crate::{Db, FxOrderSet, Program};
-pub use class::KnownClass;
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
+pub use class::{KnownClass, MethodDecorator};
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
 pub(crate) use literal::{

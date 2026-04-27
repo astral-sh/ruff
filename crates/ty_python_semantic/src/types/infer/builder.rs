@@ -8187,7 +8187,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .member(self.db(), id)
                 .place
                 .is_undefined(),
-            Ok(MethodDecorator::StaticMethod) | Err(()) => false,
+            Ok(MethodDecorator::StaticMethod) | Err(_) => false,
         };
 
         if attribute_exists {
