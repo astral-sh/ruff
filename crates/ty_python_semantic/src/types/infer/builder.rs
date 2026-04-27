@@ -9079,6 +9079,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             mut qualifiers,
             mut type_expression_flags,
             string_annotations,
+            expected_types: _,
             scope,
             bindings,
             declarations,
