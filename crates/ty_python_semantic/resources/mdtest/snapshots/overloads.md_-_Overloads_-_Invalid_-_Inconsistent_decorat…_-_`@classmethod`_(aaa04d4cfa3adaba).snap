@@ -75,20 +75,17 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 
 ```
 error[invalid-overload]: Overloaded function `try_from1` does not use the `@classmethod` decorator consistently
-  --> src/mdtest_snippet.py:13:9
+  --> src/mdtest_snippet.py:12:5
    |
-11 |     def try_from1(cls, x: int) -> CheckClassMethod: ...
 12 |     @overload
+   |     ---------
 13 |     def try_from1(cls, x: str) -> None: ...
    |         --------- Missing here
 14 |     @classmethod
 15 |     # error: [invalid-overload] "Overloaded function `try_from1` does not use the `@classmethod` decorator consistently"
 16 |     def try_from1(cls, x: int | str) -> CheckClassMethod | None:
    |         ^^^^^^^^^
-17 |         if isinstance(x, int):
-18 |             return cls(x)
    |
-info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -96,22 +93,16 @@ info: rule `invalid-overload` is enabled by default
 error[invalid-overload]: Overloaded function `try_from2` does not use the `@classmethod` decorator consistently
   --> src/mdtest_snippet.py:28:9
    |
-26 |     @classmethod
-27 |     # error: [invalid-overload]
 28 |     def try_from2(cls, x: int | str) -> CheckClassMethod | None:
    |         ^^^^^^^^^
-29 |         if isinstance(x, int):
-30 |             return cls(x)
    |
-  ::: src/mdtest_snippet.py:22:9
+  ::: src/mdtest_snippet.py:21:5
    |
 21 |     @overload
+   |     ---------
 22 |     def try_from2(cls, x: int) -> CheckClassMethod: ...
    |         --------- Missing here
-23 |     @overload
-24 |     @classmethod
    |
-info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -119,16 +110,11 @@ info: rule `invalid-overload` is enabled by default
 error[invalid-overload]: Overloaded function `try_from3` does not use the `@classmethod` decorator consistently
   --> src/mdtest_snippet.py:40:9
    |
-38 |     def try_from3(cls, x: str) -> None: ...
-39 |     # error: [invalid-overload]
 40 |     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
    |         ---------
    |         |
    |         Missing here
-41 |         if isinstance(x, int):
-42 |             # error: [call-non-callable]
    |
-info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -136,12 +122,8 @@ info: rule `invalid-overload` is enabled by default
 error[call-non-callable]: Object of type `CheckClassMethod` is not callable
   --> src/mdtest_snippet.py:43:20
    |
-41 |         if isinstance(x, int):
-42 |             # error: [call-non-callable]
 43 |             return cls(x)
    |                    ^^^^^^
-44 |         return None
    |
-info: rule `call-non-callable` is enabled by default
 
 ```

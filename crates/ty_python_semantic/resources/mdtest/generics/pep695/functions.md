@@ -137,6 +137,31 @@ reveal_type(takes_in_protocol(ExplicitSub()))  # revealed: int
 reveal_type(takes_in_protocol(ExplicitGenericSub[str]()))  # revealed: str
 ```
 
+Protocol inference should also preserve unions of structurally matching arguments:
+
+```py
+from typing import Protocol
+
+class A:
+    def foo(self) -> "A":
+        raise NotImplementedError
+
+class B:
+    def foo(self) -> "B":
+        raise NotImplementedError
+
+class SupportsFoo[T](Protocol):
+    def foo(self) -> T: ...
+
+def takes_in_supports_foo[T](obj: SupportsFoo[T]) -> T:
+    raise NotImplementedError
+
+def _(a: A, b: B, x: A | B):
+    reveal_type(takes_in_supports_foo(a))  # revealed: A
+    reveal_type(takes_in_supports_foo(b))  # revealed: B
+    reveal_type(takes_in_supports_foo(x))  # revealed: A | B
+```
+
 ## Inferring tuple parameter types
 
 ```py
@@ -175,8 +200,6 @@ reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Literal[42, 43]
 
 ## Inferring a bound typevar
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from typing_extensions import reveal_type
 
@@ -185,13 +208,26 @@ def f[T: int](x: T) -> T:
 
 reveal_type(f(1))  # revealed: Literal[1]
 reveal_type(f(True))  # revealed: Literal[True]
-# error: [invalid-argument-type]
+# snapshot: invalid-argument-type
 reveal_type(f("string"))  # revealed: Unknown
 ```
 
-## Inferring a constrained typevar
+```snapshot
+error[invalid-argument-type]: Argument to function `f` is incorrect
+ --> src/mdtest_snippet.py:9:15
+  |
+9 | reveal_type(f("string"))  # revealed: Unknown
+  |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy upper bound `int` of type variable `T`
+  |
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:7
+  |
+3 | def f[T: int](x: T) -> T:
+  |       ^^^^^^
+  |
+```
 
-<!-- snapshot-diagnostics -->
+## Inferring a constrained typevar
 
 ```py
 from typing_extensions import reveal_type
@@ -202,8 +238,23 @@ def f[T: (int, None)](x: T) -> T:
 reveal_type(f(1))  # revealed: int
 reveal_type(f(True))  # revealed: int
 reveal_type(f(None))  # revealed: None
-# error: [invalid-argument-type]
+# snapshot: invalid-argument-type
 reveal_type(f("string"))  # revealed: Unknown
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:10:15
+   |
+10 | reveal_type(f("string"))  # revealed: Unknown
+   |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy constraints (`int`, `None`) of type variable `T`
+   |
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:7
+  |
+3 | def f[T: (int, None)](x: T) -> T:
+  |       ^^^^^^^^^^^^^^
+  |
 ```
 
 ## Typevar constraints

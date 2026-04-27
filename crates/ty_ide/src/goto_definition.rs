@@ -2041,6 +2041,96 @@ p = Point<CURSOR>(1, 2)
         "#);
     }
 
+    #[test]
+    fn goto_definition_attribute_redeclarations() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                class Test:
+                    a: str
+                    a: str
+
+                test = Test()
+
+                test.a<CURSOR>
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:8:6
+          |
+        6 | test = Test()
+        7 |
+        8 | test.a
+          |      ^ Clicking here
+          |
+        info: Found 2 definitions
+         --> main.py:3:5
+          |
+        2 | class Test:
+        3 |     a: str
+          |     -
+        4 |     a: str
+          |     -
+        5 |
+        6 | test = Test()
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_property_getter_and_setter() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                class Test:
+                    @property
+                    def a(self) -> str:
+                        return ""
+
+                    @a.setter
+                    def a(self, value: str) -> None:
+                        pass
+
+                test = Test()
+
+                test.a<CURSOR>
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+          --> main.py:13:6
+           |
+        11 | test = Test()
+        12 |
+        13 | test.a
+           |      ^ Clicking here
+           |
+        info: Found 2 definitions
+         --> main.py:4:9
+          |
+        2 | class Test:
+        3 |     @property
+        4 |     def a(self) -> str:
+          |         -
+        5 |         return ""
+          |
+         ::: main.py:8:9
+          |
+        7 |     @a.setter
+        8 |     def a(self, value: str) -> None:
+          |         -
+        9 |         pass
+          |
+        "#);
+    }
+
     /// Goto-definition works when accessing type attributes on class objects.
     #[test]
     fn goto_definition_for_type_attributes_on_class_objects() {
@@ -2188,7 +2278,7 @@ while True:
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:5:5
           |
@@ -2224,7 +2314,7 @@ for x in range(10):
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:5:5
           |
@@ -2241,6 +2331,84 @@ for x in range(10):
           |     --------
         4 |
         5 |     variable
+          |
+        ");
+    }
+
+    /// Go-to-definition on `super()` should not lookup on the super class itself
+    #[test]
+    fn goto_definition_does_not_lookup_on_bound_super() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Foo:
+    def __init__(self, x: int) -> None:
+        self.x = x
+
+class Bar(Foo):
+    def __init__(self):
+        super().__init<CURSOR>__(x)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Go to definition
+         --> main.py:8:17
+          |
+        6 | class Bar(Foo):
+        7 |     def __init__(self):
+        8 |         super().__init__(x)
+          |                 ^^^^^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:3:9
+          |
+        2 | class Foo:
+        3 |     def __init__(self, x: int) -> None:
+          |         --------
+        4 |         self.x = x
+          |
+        ");
+    }
+
+    /// Go-to-definition should resolve to the parent class
+    #[test]
+    fn goto_definition_resolves_super_for_generic_class() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Base:
+    def __init__(self, x: int) -> None:
+        self.x = x
+
+class GenericFoo[T](Base):
+    def __init__(self, x: int, y: T):
+        super().__init<CURSOR>__(x)
+        self.y = y
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Go to definition
+         --> main.py:8:17
+          |
+        6 | class GenericFoo[T](Base):
+        7 |     def __init__(self, x: int, y: T):
+        8 |         super().__init__(x)
+          |                 ^^^^^^^^ Clicking here
+        9 |         self.y = y
+          |
+        info: Found 1 definition
+         --> main.py:3:9
+          |
+        2 | class Base:
+        3 |     def __init__(self, x: int) -> None:
+          |         --------
+        4 |         self.x = x
           |
         ");
     }

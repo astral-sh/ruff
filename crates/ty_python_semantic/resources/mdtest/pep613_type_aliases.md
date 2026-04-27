@@ -472,16 +472,12 @@ BadTypeAlias13: TypeAlias = f"{'int'}"  # error: [invalid-type-form]
 
 # bonus ones from Alex:
 #
-# TODO should be just one error for both of these (we currently validate type-form subscripts
-# twice, once when inferring as a value expression and again when inferring as a
-# type expression in post-inference)
-#
-# error:[invalid-type-form]
 # error:[invalid-type-form]
 BadTypeAlias14: TypeAlias = Literal[3.14]
 # error: [invalid-type-form]
-# error: [invalid-type-form]
 BadTypeAlias15: TypeAlias = Literal[-3.14]
+# error: [unsupported-operator]
+BadTypeAlias16: TypeAlias = list["int" | "str"]
 ```
 
 ## No type qualifiers

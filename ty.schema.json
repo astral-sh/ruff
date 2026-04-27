@@ -144,10 +144,10 @@
           ]
         },
         "python-version": {
-          "description": "Specifies the version of Python that will be used to analyze the source code.\nThe version should be specified as a string in the format `M.m` where `M` is the major version\nand `m` is the minor (e.g. `\"3.0\"` or `\"3.6\"`).\nIf a version is provided, ty will generate errors if the source code makes use of language features\nthat are not supported in that version.\n\nIf a version is not specified, ty will try the following techniques in order of preference\nto determine a value:\n1. Check for the `project.requires-python` setting in a `pyproject.toml` file\n   and use the minimum version from the specified range\n2. Check for an activated or configured Python environment\n   and attempt to infer the Python version of that environment\n3. Fall back to the default value (see below)\n\nFor some language features, ty can also understand conditionals based on comparisons\nwith `sys.version_info`. These are commonly found in typeshed, for example,\nto reflect the differing contents of the standard library across Python versions.",
+          "description": "Specifies the version of Python that will be used to analyze the source code.\nThe version should be specified as a string in the format `M.m` where `M` is the major version\nand `m` is the minor (e.g. `\"3.7\"` or `\"3.12\"`).\nIf a version is provided, ty will generate errors if the source code makes use of language features\nthat are not supported in that version.\n\nIf a version is not specified, ty will try the following techniques in order of preference\nto determine a value:\n1. Check for the `project.requires-python` setting in a `pyproject.toml` file\n   and use the minimum version from the specified range\n2. Check for an activated or configured Python environment\n   and attempt to infer the Python version of that environment\n3. Fall back to the default value (see below)\n\nFor some language features, ty can also understand conditionals based on comparisons\nwith `sys.version_info`. These are commonly found in typeshed, for example,\nto reflect the differing contents of the standard library across Python versions.",
           "anyOf": [
             {
-              "$ref": "#/definitions/PythonVersion"
+              "$ref": "#/definitions/SupportedPythonVersion"
             },
             {
               "type": "null"
@@ -307,50 +307,6 @@
         {
           "description": "Windows",
           "const": "win32"
-        }
-      ]
-    },
-    "PythonVersion": {
-      "anyOf": [
-        {
-          "type": "string",
-          "pattern": "^\\d+\\.\\d+$"
-        },
-        {
-          "description": "Python 3.7",
-          "const": "3.7"
-        },
-        {
-          "description": "Python 3.8",
-          "const": "3.8"
-        },
-        {
-          "description": "Python 3.9",
-          "const": "3.9"
-        },
-        {
-          "description": "Python 3.10",
-          "const": "3.10"
-        },
-        {
-          "description": "Python 3.11",
-          "const": "3.11"
-        },
-        {
-          "description": "Python 3.12",
-          "const": "3.12"
-        },
-        {
-          "description": "Python 3.13",
-          "const": "3.13"
-        },
-        {
-          "description": "Python 3.14",
-          "const": "3.14"
-        },
-        {
-          "description": "Python 3.15",
-          "const": "3.15"
         }
       ]
     },
@@ -864,6 +820,16 @@
             }
           ]
         },
+        "invalid-named-tuple-override": {
+          "title": "detects subclass members that override inherited `NamedTuple` fields",
+          "description": "## What it does\nChecks for subclass members that override inherited `NamedTuple` fields.\n\n## Why is this bad?\nReusing an inherited `NamedTuple` field name in a subclass creates a\nclass where tuple indexing and `repr()` still reflect the original\nfield, while attribute access follows the subclass member.\n\n## Default level\nThis rule is a warning by default because these overrides do not make\nthe class invalid at runtime.\n\n## Examples\n```python\nfrom typing import NamedTuple\n\nclass User(NamedTuple):\n    name: str\n\nclass Admin(User):\n    name = \"shadowed\"  # error: [invalid-named-tuple-override]\n\nadmin = Admin(\"Alice\")\nadmin.name  # \"shadowed\"\nadmin[0]  # \"Alice\"\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-newtype": {
           "title": "detects invalid NewType definitions",
           "description": "## What it does\nChecks for the creation of invalid `NewType`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a `NewType`.\n\n## Examples\n```python\nfrom typing import NewType\n\ndef get_name() -> str: ...\n\nFoo = NewType(\"Foo\", int)        # okay\nBar = NewType(get_name(), int)   # error: The first argument to `NewType` must be a string literal\nBaz = NewType(\"Baz\", int | str)  # error: invalid base for `typing.NewType`\n```",
@@ -1114,6 +1080,16 @@
             }
           ]
         },
+        "mismatched-type-name": {
+          "title": "detects functional typing definitions whose declared name does not match the assigned variable",
+          "description": "## What it does\nChecks for functional typing definitions whose declared name does not match\nthe variable they are assigned to.\n\n## Why is this bad?\nConstructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`,\n`TypedDict`, and `TypeAliasType` all take a name argument that is\nnormally expected to match the assigned variable. A mismatch is usually a\ntypo and makes later diagnostics harder to understand.\n\n## Default level\nThis rule is a warning by default because ty can usually recover and\ncontinue understanding the resulting type.\n\n## Examples\n```python\nfrom typing import NewType, TypeVar\nfrom typing_extensions import TypedDict\n\nT = TypeVar(\"U\")  # error: [mismatched-type-name]\nUserId = NewType(\"Id\", int)  # error: [mismatched-type-name]\nMovie = TypedDict(\"Film\", {\"title\": str})  # error: [mismatched-type-name]\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "missing-argument": {
           "title": "detects missing required arguments in a call",
           "description": "## What it does\nChecks for missing required arguments in a call.\n\n## Why is this bad?\nFailing to provide a required argument will raise a `TypeError` at runtime.\n\n## Examples\n```python\ndef func(x: int): ...\nfunc()  # TypeError: func() missing 1 required positional argument: 'x'\n```",
@@ -1137,6 +1113,16 @@
         "no-matching-overload": {
           "title": "detects calls that do not match any overload",
           "description": "## What it does\nChecks for calls to an overloaded function that do not match any of the overloads.\n\n## Why is this bad?\nFailing to provide the correct arguments to one of the overloads will raise a `TypeError`\nat runtime.\n\n## Examples\n```python\n@overload\ndef func(x: int): ...\n@overload\ndef func(x: bool): ...\nfunc(\"string\")  # error: [no-matching-overload]\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "non-callable-init-subclass": {
+          "title": "detects class definitions that will fail due to non-callable `__init_subclass__`",
+          "description": "## What it does\nChecks for class definitions that will fail due to non-callable `__init_subclass__`\nmethods.\n\n## Why is this bad?\nIf a class defines a non-callable `__init_subclass__` method/attribute, any attempt\nto subclass that class will raise a `TypeError` at runtime.\n\n## Examples\n```python\nclass Super:\n    __init_subclass__ = None\n\nclass Sub(Super): ...  # error: [non-callable-init-subclass]\n```\n\n## References\n- [Python data model: Customizing class creation](https://docs.python.org/3/reference/datamodel.html#customizing-class-creation)",
           "default": "error",
           "oneOf": [
             {
@@ -1565,6 +1551,56 @@
         }
       },
       "additionalProperties": false
+    },
+    "SupportedPythonVersion": {
+      "description": "A Python version explicitly supported by ty configuration and CLI parsing.",
+      "oneOf": [
+        {
+          "description": "Python 3.7",
+          "type": "string",
+          "const": "3.7"
+        },
+        {
+          "description": "Python 3.8",
+          "type": "string",
+          "const": "3.8"
+        },
+        {
+          "description": "Python 3.9",
+          "type": "string",
+          "const": "3.9"
+        },
+        {
+          "description": "Python 3.10",
+          "type": "string",
+          "const": "3.10"
+        },
+        {
+          "description": "Python 3.11",
+          "type": "string",
+          "const": "3.11"
+        },
+        {
+          "description": "Python 3.12",
+          "type": "string",
+          "const": "3.12"
+        },
+        {
+          "description": "Python 3.13",
+          "type": "string",
+          "const": "3.13"
+        },
+        {
+          "description": "Python 3.14",
+          "type": "string",
+          "const": "3.14"
+        },
+        {
+          "description": "Python 3.15",
+          "type": "string",
+          "const": "3.15"
+        }
+      ]
     },
     "SystemPathBuf": {
       "description": "An owned, mutable path on [`System`](`super::System`) (akin to [`String`]).\n\nThe path is guaranteed to be valid UTF-8.",

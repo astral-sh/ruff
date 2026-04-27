@@ -27,12 +27,19 @@ use std::{fmt, fs};
 
 mod normalizer;
 
+fn snapshot_input_file_for_test(root: &str, test_name: &str) -> String {
+    format!(
+        "crates/ruff_python_formatter/{}/{}",
+        root.trim_start_matches("./"),
+        test_name
+    )
+}
+
 #[expect(clippy::needless_pass_by_value)]
 fn black_compatibility(input_path: &Utf8Path, content: String) -> datatest_stable::Result<()> {
-    let test_name = input_path
-        .strip_prefix("./resources/test/fixtures/black")
-        .unwrap_or(input_path)
-        .as_str();
+    let root = "./resources/test/fixtures/black";
+    let test_name = input_path.strip_prefix(root).unwrap_or(input_path).as_str();
+    let snapshot_input_file = snapshot_input_file_for_test(root, test_name);
 
     let options_path = input_path.with_extension("options.json");
 
@@ -111,7 +118,7 @@ fn black_compatibility(input_path: &Utf8Path, content: String) -> datatest_stabl
     // The following code mimics insta's logic generating the snapshot name for a test.
     let workspace_path = std::env::var("CARGO_MANIFEST_DIR").unwrap();
 
-    let full_snapshot_name = format!("black_compatibility@{test_name}.snap",);
+    let full_snapshot_name = format!("black_compatibility@{test_name}.snap");
 
     let snapshot_path = Path::new(&workspace_path)
         .join("tests/snapshots")
@@ -168,7 +175,7 @@ fn black_compatibility(input_path: &Utf8Path, content: String) -> datatest_stabl
 
         let mut settings = insta::Settings::clone_current();
         settings.set_omit_expression(true);
-        settings.set_input_file(input_path);
+        settings.set_input_file(snapshot_input_file);
         settings.set_prepend_module_to_snapshot(false);
         settings.set_snapshot_suffix(test_name);
         let _settings = settings.bind_to_scope();
@@ -180,10 +187,9 @@ fn black_compatibility(input_path: &Utf8Path, content: String) -> datatest_stabl
 
 #[expect(clippy::needless_pass_by_value)]
 fn format(input_path: &Utf8Path, content: String) -> datatest_stable::Result<()> {
-    let test_name = input_path
-        .strip_prefix("./resources/test/fixtures/ruff")
-        .unwrap_or(input_path)
-        .as_str();
+    let root = "./resources/test/fixtures/ruff";
+    let test_name = input_path.strip_prefix(root).unwrap_or(input_path).as_str();
+    let snapshot_input_file = snapshot_input_file_for_test(root, test_name);
 
     let mut snapshot = format!("## Input\n{}", CodeFrame::new("python", &content));
     let options_path = input_path.with_extension("options.json");
@@ -295,7 +301,7 @@ fn format(input_path: &Utf8Path, content: String) -> datatest_stable::Result<()>
 
     let mut settings = insta::Settings::clone_current();
     settings.set_omit_expression(true);
-    settings.set_input_file(input_path);
+    settings.set_input_file(snapshot_input_file);
     settings.set_prepend_module_to_snapshot(false);
     settings.set_snapshot_suffix(test_name);
     let _settings = settings.bind_to_scope();
@@ -361,7 +367,7 @@ fn format_file(
         (Cow::Owned(without_markers), content)
     } else {
         let printed = format_module_source(source, options.clone()).unwrap_or_else(|err| {
-            panic!("Formatting `{input_path} was expected to succeed but it failed: {err}",)
+            panic!("Formatting `{input_path} was expected to succeed but it failed: {err}")
         });
         let formatted_code = printed.into_code();
 
@@ -507,8 +513,8 @@ fn ensure_unchanged_ast(
 
     if formatted_ast != unformatted_ast {
         let diff = TextDiff::from_lines(
-            &format!("{unformatted_ast:#?}"),
-            &format!("{formatted_ast:#?}"),
+            format!("{unformatted_ast:#?}"),
+            format!("{formatted_ast:#?}"),
         )
         .unified_diff()
         .header("Unformatted", "Formatted")

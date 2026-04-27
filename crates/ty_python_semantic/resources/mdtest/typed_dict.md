@@ -13,7 +13,7 @@ python-version = "3.12"
 Here, we define a `TypedDict` using the class-based syntax:
 
 ```py
-from typing import TypedDict
+from typing import Optional, TypedDict
 
 class Person(TypedDict):
     name: str
@@ -43,6 +43,17 @@ reveal_type(bob["age"])  # revealed: int | None
 
 # error: [invalid-key] " key "non_existing" for TypedDict `Person`"
 reveal_type(bob["non_existing"])  # revealed: Unknown
+```
+
+Functional `TypedDict`s with non-identifier keys should synthesize `__init__` without turning those
+keys into invalid named parameters:
+
+```py
+from typing import Optional, TypedDict
+
+Config = TypedDict("Config", {"in": int, "x-y": str, "ok": int})
+# revealed: Overload[(self: Config, map: Config, /, *, ok: int = ..., **kwargs) -> None, (self: Config, /, *, ok: int, **kwargs) -> None]
+reveal_type(Config.__init__)
 ```
 
 If a dict literal is inferred against a union containing both a `TypedDict` and a plain `dict`,
@@ -281,6 +292,20 @@ reveal_type(eve3a)  # revealed: Person
 reveal_type(eve3b)  # revealed: Person
 ```
 
+Constructor calls with multiple positional arguments should be rejected, including for empty
+`TypedDict`s:
+
+```py
+class Empty(TypedDict):
+    pass
+
+# error: [too-many-positional-arguments] "Too many positional arguments to TypedDict `Empty` constructor: expected 1, got 2"
+Empty({}, {})
+
+# error: [too-many-positional-arguments] "Too many positional arguments to TypedDict `Person` constructor: expected 1, got 2"
+Person({}, {})
+```
+
 Also, the value types ​​declared in a `TypedDict` affect generic call inference:
 
 ```py
@@ -408,6 +433,157 @@ accepts_person({"name": "Alice", "age": 30})
 house.owner = {"name": "Alice", "age": 30}
 ```
 
+TypedDict constructor validation should not duplicate diagnostics emitted by argument inference:
+
+```py
+from typing import TypedDict
+
+class TD(TypedDict):
+    x: int
+
+# error: [unresolved-reference] "Name `missing` used when not defined"
+TD(x=missing)
+```
+
+TypedDict constructor validation should respect string-valued constants used as keys in positional
+dict literals:
+
+```py
+from typing import Final, TypedDict
+
+VALUE_KEY: Final = "value"
+
+class Record(TypedDict):
+    value: str
+
+Record({VALUE_KEY: "x"})
+```
+
+TypedDict constructor validation should combine positional dict literals with keyword arguments:
+
+```py
+from typing import TypedDict
+
+class TD(TypedDict):
+    x: int
+    y: str
+
+# error: [invalid-argument-type] "Invalid argument to key "x" with declared type `int` on TypedDict `TD`: value of type `Literal["foo"]`"
+TD({"x": "foo"}, y="bar")
+```
+
+TypedDict constructor validation should preserve string-valued constant keys in mixed calls:
+
+```py
+from typing import Final, TypedDict
+
+VALUE_KEY: Final = "value"
+
+class Record(TypedDict):
+    value: str
+    count: int
+
+Record({VALUE_KEY: "x"}, count=1)
+
+# error: [invalid-argument-type] "Invalid argument to key "value" with declared type `str` on TypedDict `Record`: value of type `Literal[1]`"
+Record({VALUE_KEY: 1}, count=1)
+```
+
+Keyword arguments should override a positional mapping, and `TypedDict` constructor inputs should
+preserve shared required keys:
+
+```py
+from typing import TypedDict
+
+class ChildWithOptionalCount(TypedDict, total=False):
+    count: int
+
+ChildWithOptionalCount({"count": "wrong"}, count=1)
+
+class Base(TypedDict):
+    name: str
+
+class ChildKwargs(TypedDict):
+    name: str
+    count: int
+
+class MaybeName(TypedDict, total=False):
+    name: str
+
+def _(
+    base: Base,
+    maybe_name: MaybeName,
+):
+    ChildKwargs(base, count=1)
+    ChildKwargs(**base, count=1)
+
+    # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `ChildKwargs` constructor"
+    ChildKwargs(**maybe_name, count=1)
+```
+
+TypedDict positional arguments in mixed constructors should validate their declared keys:
+
+```py
+from typing import TypedDict
+
+class Target(TypedDict):
+    a: int
+    b: int
+
+class Source(TypedDict):
+    a: int
+
+class BadSource(TypedDict):
+    a: str
+
+class MaybeSource(TypedDict, total=False):
+    a: int
+
+class WiderSource(TypedDict):
+    a: int
+    extra: str
+
+class WiderBadSource(TypedDict):
+    a: str
+    extra: str
+
+def _(
+    source: Source,
+    bad: BadSource,
+    maybe: MaybeSource,
+    wide: WiderSource,
+    wide_bad: WiderBadSource,
+    cond: bool,
+):
+    Target(source, b=2)
+    Target(source if cond else {"a": 1}, b=2)
+    Target(source if cond else {"a": 1, "b": 0}, b=2)
+    Target(source if cond else {"a": 1, "b": "shadowed"}, b=2)
+    Target(wide, b=2)
+
+    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `Target`: value of type `str`"
+    Target(bad, b=2)
+
+    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `Target`: value of type `str`"
+    Target(wide_bad, b=2)
+
+    # error: [missing-typed-dict-key] "Missing required key 'a' in TypedDict `Target` constructor"
+    Target(maybe, b=2)
+```
+
+Mixed constructors should stay lenient for non-`TypedDict` positional mappings once the keyword
+arguments cover the full schema:
+
+```py
+from typing import TypedDict
+
+class FullFromKeywords(TypedDict):
+    a: int
+
+def _(mapping: dict[str, str]):
+    FullFromKeywords(mapping, a=1)
+```
+
 All of these are missing the required `age` field:
 
 ```py
@@ -521,6 +697,45 @@ a_person = {"name": "Alice", "age": 30, "extra": True}
 
 # error: [invalid-key] "Unknown key "extra" for TypedDict `Person`"
 (a_person := {"name": "Alice", "age": 30, "extra": True})
+```
+
+## Mixed positional and unpacked keyword constructors
+
+These calls mix a positional `TypedDict` argument with unpacked keyword arguments. They should
+validate normally and produce ordinary diagnostics:
+
+```py
+from typing import Any, TypedDict
+from typing_extensions import Never
+
+class MixedTarget(TypedDict):
+    x: int
+    y: int
+
+class MaybeY(TypedDict, total=False):
+    y: int
+
+def _(target: MixedTarget, maybe_y: MaybeY, kwargs: Any, never_kwargs: Never, cond: bool):
+    MixedTarget(target, **maybe_y)
+    MixedTarget(maybe_y if cond else {}, **kwargs)
+    MixedTarget(maybe_y if cond else {}, **never_kwargs)
+
+    # error: [missing-typed-dict-key] "Missing required key 'y' in TypedDict `MixedTarget` constructor"
+    MixedTarget({"x": 1}, **maybe_y)
+
+class TD(TypedDict):
+    a: int
+
+def _(td: TD):
+    # TODO: this should pass like the explicit-keyword and `**TypedDict` cases below.
+    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `TD`: value of type `Literal["foo"]`"
+    TD({"a": "foo"}, **{"a": 1})
+
+    TD({"a": "foo"}, a=1)
+    TD({"a": "foo"}, **td)
+
+def _(x: Any):
+    TD({"a": "foo"}, **x)
 ```
 
 ## Union of `TypedDict`
@@ -689,6 +904,44 @@ def copy_person_positional(p: PersonBase) -> PersonAlias:
     return PersonAlias(p)
 ```
 
+Optional source keys should not satisfy required constructor keys when unpacking:
+
+```py
+from typing import TypedDict
+
+class MaybeName(TypedDict, total=False):
+    name: str
+
+class NeedsName(TypedDict):
+    name: str
+
+def f(maybe: MaybeName) -> NeedsName:
+    # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `NeedsName` constructor"
+    return NeedsName(**maybe)
+```
+
+Guaranteed duplicate keys from unpacking should be rejected, matching runtime `TypeError`s:
+
+```py
+from typing import TypedDict
+
+class DuplicateHasName(TypedDict):
+    name: str
+
+class DuplicateNeedsName(TypedDict):
+    name: str
+
+def duplicate_name_keys(
+    left: DuplicateHasName,
+    right: DuplicateHasName,
+) -> DuplicateNeedsName:
+    # error: [parameter-already-assigned]
+    DuplicateNeedsName(**left, name="x")
+
+    # error: [parameter-already-assigned]
+    return DuplicateNeedsName(**left, **right)
+```
+
 Unpacking a TypedDict with extra keys flags the extra keys as errors, for consistency with the
 behavior when passing all keys as explicit keyword arguments:
 
@@ -738,6 +991,55 @@ def convert(src: Source) -> Target:
 def convert_positional(src: Source) -> Target:
     # error: [invalid-argument-type]
     return Target(src)
+```
+
+Unpacking a narrower `TypedDict` into a wider `TypedDict` literal should preserve the unpacked
+required keys:
+
+```py
+from typing import Optional, TypedDict
+
+class MyTypedDict1(TypedDict):
+    aaa: int
+    bbb: int
+
+class MyTypedDict2(TypedDict):
+    aaa: int
+    bbb: int
+    ccc: int
+
+d1: MyTypedDict1 = {
+    "aaa": 1,
+    "bbb": 2,
+}
+
+d2: MyTypedDict2 = {
+    **d1,
+    "ccc": 3,
+}
+
+d3 = MyTypedDict2({**d1, "ccc": 3})
+
+class BadTypedDict1(TypedDict):
+    aaa: str
+    bbb: int
+
+bad1: BadTypedDict1 = {
+    "aaa": "bad",
+    "bbb": 2,
+}
+
+ok1: MyTypedDict2 = {
+    **bad1,
+    "aaa": 1,
+    "ccc": 3,
+}
+
+ok2 = MyTypedDict2({**bad1, "aaa": 1, "ccc": 3})
+
+# error: [invalid-argument-type] "Invalid argument to key "aaa" with declared type `int` on TypedDict `MyTypedDict2`: value of type `str`"
+still_union: Optional[MyTypedDict2] = {**bad1, "ccc": 3}
+reveal_type(still_union)  # revealed: MyTypedDict2 | None
 ```
 
 Unpacking `Never` or a dynamic type (`Any`, `Unknown`) passes unconditionally, since these types can
@@ -1522,9 +1824,11 @@ RecursiveKey = list["RecursiveKey | None"]
 class Person(TypedDict):
     name: str
     age: int | None
+    leg: str
 
 class Animal(TypedDict):
     name: str
+    log: str
 
 class Movie(TypedDict):
     name: str
@@ -1569,8 +1873,12 @@ def _(
 
     reveal_type(being["name"])  # revealed: str
 
-    # error: [invalid-key] "Unknown key "age" for TypedDict `Animal`"
+    # error: [invalid-key] "Unknown key "age" for TypedDict `Animal` (subscripted object has type `Person | Animal`)"
     reveal_type(being["age"])  # revealed: int | None | Unknown
+
+    # error: [invalid-key]
+    # error: [invalid-key]
+    reveal_type(being["legs"])  # revealed: Unknown
 ```
 
 ### Writing
@@ -1620,7 +1928,7 @@ def _(being: Person | Animal):
     # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Animal`: value of type `Literal[1]`"
     being["name"] = 1
 
-    # error: [invalid-key] "Unknown key "leg" for TypedDict `Animal` - did you mean "legs"?"
+    # error: [invalid-key] "Unknown key "leg" for TypedDict `Animal` (subscripted object has type `Person | Animal`)"
     being["leg"] = "unknown"
 
 def _(centaur: Intersection[Person, Animal]):
@@ -1628,7 +1936,7 @@ def _(centaur: Intersection[Person, Animal]):
     centaur["age"] = 100
     centaur["legs"] = 4
 
-    # error: [invalid-key] "Unknown key "unknown" for TypedDict `Person`"
+    # error: [invalid-key] "Unknown key "unknown" for TypedDict `Person` (subscripted object has type `Person & Animal`)"
     centaur["unknown"] = "value"
 
 def _(person: Person, union_of_keys: Literal["name", "age"], unknown_value: Any):
@@ -2382,6 +2690,32 @@ def _(node: Node, person: Person):
 _: Node = Person(name="Alice", parent=Node(name="Bob", parent=Person(name="Charlie", parent=None)))
 ```
 
+TypedDict constructor calls should also use field type context when inferring nested values:
+
+```py
+from typing import TypedDict
+
+class Comparison(TypedDict):
+    field: str
+    value: object
+
+class Logical(TypedDict):
+    primary: Comparison
+    conditions: list[Comparison]
+
+logical_from_literal = Logical(
+    primary=Comparison(field="a", value="b"),
+    conditions=[Comparison(field="c", value="d")],
+)
+logical_from_dict_call = Logical(dict(primary=dict(field="a", value="b"), conditions=[dict(field="c", value="d")]))
+
+# error: [missing-typed-dict-key]
+missing_primary_from_dict_call = Logical(primary=dict(field="a"), conditions=[dict(field="c", value="d")])
+
+# error: [missing-typed-dict-key]
+missing_primary_from_literal = Logical(primary={"field": "a"}, conditions=[dict(field="c", value="d")])
+```
+
 ## Function/assignment syntax
 
 TypedDicts can be created using the functional syntax:
@@ -2739,14 +3073,15 @@ TypedDict()
 # error: [missing-argument] "No argument provided for required parameter `fields` of function `TypedDict`"
 TypedDict("Foo")
 
-# error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "Bad1", got variable of type `Literal[123]`"
+# error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
 Bad1 = TypedDict(123, {"name": str})
 
-# error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "BadTypedDict3", got "WrongName""
+# error: [mismatched-type-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "BadTypedDict3", got "WrongName""
 BadTypedDict3 = TypedDict("WrongName", {"name": str})
+reveal_type(BadTypedDict3)  # revealed: <class 'WrongName'>
 
 def f(x: str) -> None:
-    # error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "Y", got variable of type `str`"
+    # error: [mismatched-type-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "Y", got variable of type `str`"
     Y = TypedDict(x, {})
 
 def g(x: str) -> None:
@@ -4047,6 +4382,50 @@ class Baz(Bar):
     # error: [invalid-typed-dict-statement]
     def baz(self):
         pass
+```
+
+## Conditional fields in class body
+
+Conditional branches in a `TypedDict` body can declare fields. Static reachability determines
+whether those fields are part of the schema.
+
+### Python 3.12 or later
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+import sys
+from typing import TypedDict
+
+class ConditionalField(TypedDict):
+    x: int
+    if sys.version_info >= (3, 12):
+        y: str
+
+ConditionalField(x=1, y="hello")
+```
+
+### Python before 3.12
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+import sys
+from typing import TypedDict
+
+class ConditionalField(TypedDict):
+    x: int
+    if sys.version_info >= (3, 12):
+        y: str
+
+# error: [invalid-key] "Unknown key "y" for TypedDict `ConditionalField`"
+ConditionalField(x=1, y="hello")
 ```
 
 ## `TypedDict` with `@dataclass` decorator

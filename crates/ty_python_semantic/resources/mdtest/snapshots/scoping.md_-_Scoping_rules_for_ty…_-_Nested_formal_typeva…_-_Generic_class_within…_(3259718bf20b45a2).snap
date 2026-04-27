@@ -29,18 +29,13 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md
 error[shadowed-type-variable]: Generic class `Bad1` uses type variable `T` already bound by an enclosing scope
  --> src/mdtest_snippet.py:3:5
   |
-1 | from typing import Iterable
-2 |
 3 | def f[T](x: T, y: T) -> None:
   |     ------------------------ Type variable `T` is bound in this enclosing scope
 4 |     class Ok[S]: ...
 5 |     # error: [shadowed-type-variable]
 6 |     class Bad1[T]: ...
   |           ^^^^ `T` used in class definition here
-7 |     # error: [shadowed-type-variable]
-8 |     class Bad2(Iterable[T]): ...
   |
-info: rule `shadowed-type-variable` is enabled by default
 
 ```
 
@@ -48,8 +43,6 @@ info: rule `shadowed-type-variable` is enabled by default
 error[shadowed-type-variable]: Generic class `Bad2` uses type variable `T` already bound by an enclosing scope
  --> src/mdtest_snippet.py:3:5
   |
-1 | from typing import Iterable
-2 |
 3 | def f[T](x: T, y: T) -> None:
   |     ------------------------ Type variable `T` is bound in this enclosing scope
 4 |     class Ok[S]: ...
@@ -59,6 +52,5 @@ error[shadowed-type-variable]: Generic class `Bad2` uses type variable `T` alrea
 8 |     class Bad2(Iterable[T]): ...
   |           ^^^^^^^^^^^^^^^^^ `T` used in class definition here
   |
-info: rule `shadowed-type-variable` is enabled by default
 
 ```

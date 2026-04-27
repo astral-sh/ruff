@@ -13,7 +13,7 @@ import {
   Theme,
   VerticalResizeHandle,
 } from "shared";
-import { FileHandle, Workspace } from "ty_wasm";
+import { FileHandle, Hint, Workspace } from "ty_wasm";
 import {
   Panel,
   Group as PanelGroup,
@@ -35,6 +35,7 @@ const Editor = lazy(() => import("./Editor"));
 
 interface CheckResult {
   diagnostics: Diagnostic[];
+  hints: Hint[];
   error: string | null;
   secondary: SecondaryPanelResult;
 }
@@ -226,6 +227,7 @@ export default function Chrome({
                     selected={files.selected}
                     fileName={selectedFileName}
                     diagnostics={checkResult.diagnostics}
+                    hints={checkResult.hints}
                     workspace={workspace}
                     onMount={handleEditorMount}
                     onChange={handleChange}
@@ -307,6 +309,7 @@ function useCheckResult(
     ) {
       return {
         diagnostics: [],
+        hints: [],
         error: null,
         secondary: null,
       };
@@ -317,6 +320,7 @@ function useCheckResult(
       const diagnostics = isVendoredFile
         ? []
         : workspace.checkFile(currentHandle);
+      const hints = isVendoredFile ? [] : workspace.hints(currentHandle);
 
       let secondary: SecondaryPanelResult = null;
 
@@ -367,12 +371,14 @@ function useCheckResult(
 
       return {
         diagnostics: serializedDiagnostics,
+        hints,
         error: null,
         secondary,
       };
     } catch (e) {
       return {
         diagnostics: [],
+        hints: [],
         error: formatError(e),
         secondary: null,
       };

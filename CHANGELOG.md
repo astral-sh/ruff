@@ -1,5 +1,114 @@
 # Changelog
 
+## 0.15.12
+
+Released on 2026-04-24.
+
+### Preview features
+
+- Implement `#ruff:file-ignore` file-level suppressions ([#23599](https://github.com/astral-sh/ruff/pull/23599))
+- Implement `#ruff:ignore` logical-line suppressions ([#23404](https://github.com/astral-sh/ruff/pull/23404))
+- Revert preview changes to displayed diagnostic severity in LSP ([#24789](https://github.com/astral-sh/ruff/pull/24789))
+- \[`airflow`\] Implement `task-branch-as-short-circuit` (`AIR004`) ([#23579](https://github.com/astral-sh/ruff/pull/23579))
+- \[`flake8-bugbear`\] Fix `break`/`continue` handling in `loop-iterator-mutation` (`B909`) ([#24440](https://github.com/astral-sh/ruff/pull/24440))
+- \[`pylint`\] Fix `PLC2701` for type parameter scopes ([#24576](https://github.com/astral-sh/ruff/pull/24576))
+
+### Rule changes
+
+- \[`pandas-vet`\] Suggest `.array` as well in `PD011` ([#24805](https://github.com/astral-sh/ruff/pull/24805))
+
+### CLI
+
+- Respect default Unix permissions for cache files ([#24794](https://github.com/astral-sh/ruff/pull/24794))
+
+### Documentation
+
+- \[`pylint`\] Fix `PLR0124` description not to claim self-comparison always returns the same value ([#24749](https://github.com/astral-sh/ruff/pull/24749))
+- \[`pyupgrade`\] Expand docs on reusable `TypeVar`s and scoping (`UP046`) ([#24153](https://github.com/astral-sh/ruff/pull/24153))
+- Improve rules table accessibility ([#24711](https://github.com/astral-sh/ruff/pull/24711))
+
+### Contributors
+
+- [@dylwil3](https://github.com/dylwil3)
+- [@AlexWaygood](https://github.com/AlexWaygood)
+- [@woodruffw](https://github.com/woodruffw)
+- [@avasis-ai](https://github.com/avasis-ai)
+- [@Dev-iL](https://github.com/Dev-iL)
+- [@denyszhak](https://github.com/denyszhak)
+- [@ShipItAndPray](https://github.com/ShipItAndPray)
+- [@anishgirianish](https://github.com/anishgirianish)
+- [@augustelalande](https://github.com/augustelalande)
+- [@amyreese](https://github.com/amyreese)
+- [@majiayu000](https://github.com/majiayu000)
+
+## 0.15.11
+
+Released on 2026-04-16.
+
+### Preview features
+
+- \[`ruff`\] Ignore `RUF029` when function is decorated with `asynccontextmanager` ([#24642](https://github.com/astral-sh/ruff/pull/24642))
+- \[`airflow`\] Implement `airflow-xcom-pull-in-template-string` (`AIR201`) ([#23583](https://github.com/astral-sh/ruff/pull/23583))
+- \[`flake8-bandit`\] Fix `S103` false positives and negatives in mask analysis ([#24424](https://github.com/astral-sh/ruff/pull/24424))
+
+### Bug fixes
+
+- \[`flake8-async`\] Omit overridden methods for `ASYNC109` ([#24648](https://github.com/astral-sh/ruff/pull/24648))
+
+### Documentation
+
+- \[`flake8-async`\] Add override mention to `ASYNC109` docs ([#24666](https://github.com/astral-sh/ruff/pull/24666))
+- Update Neovim config examples to use `vim.lsp.config` ([#24577](https://github.com/astral-sh/ruff/pull/24577))
+
+### Contributors
+
+- [@augustelalande](https://github.com/augustelalande)
+- [@anishgirianish](https://github.com/anishgirianish)
+- [@benberryallwood](https://github.com/benberryallwood)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@Dev-iL](https://github.com/Dev-iL)
+
+## 0.15.10
+
+Released on 2026-04-09.
+
+### Preview features
+
+- \[`flake8-logging`\] Allow closures in except handlers (`LOG004`) ([#24464](https://github.com/astral-sh/ruff/pull/24464))
+- \[`flake8-self`\] Make `SLF` diagnostics robust to non-self-named variables ([#24281](https://github.com/astral-sh/ruff/pull/24281))
+- \[`flake8-simplify`\] Make the fix for `collapsible-if` safe in `preview` (`SIM102`) ([#24371](https://github.com/astral-sh/ruff/pull/24371))
+
+### Bug fixes
+
+- Avoid emitting multi-line f-string elements before Python 3.12 ([#24377](https://github.com/astral-sh/ruff/pull/24377))
+- Avoid syntax error from `E502` fixes in f-strings and t-strings ([#24410](https://github.com/astral-sh/ruff/pull/24410))
+- Strip form feeds from indent passed to `dedent_to` ([#24381](https://github.com/astral-sh/ruff/pull/24381))
+- \[`pyupgrade`\] Fix panic caused by handling of octals (`UP012`) ([#24390](https://github.com/astral-sh/ruff/pull/24390))
+- Reject multi-line f-string elements before Python 3.12 ([#24355](https://github.com/astral-sh/ruff/pull/24355))
+
+### Rule changes
+
+- \[`ruff`\] Treat f-string interpolation as potential side effect (`RUF019`) ([#24426](https://github.com/astral-sh/ruff/pull/24426))
+
+### Server
+
+- Add support for custom file extensions ([#24463](https://github.com/astral-sh/ruff/pull/24463))
+
+### Documentation
+
+- Document adding fixes in CONTRIBUTING.md ([#24393](https://github.com/astral-sh/ruff/pull/24393))
+- Fix JSON typo in settings example ([#24517](https://github.com/astral-sh/ruff/pull/24517))
+
+### Contributors
+
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@dylwil3](https://github.com/dylwil3)
+- [@silverstein](https://github.com/silverstein)
+- [@anishgirianish](https://github.com/anishgirianish)
+- [@shizukushq](https://github.com/shizukushq)
+- [@zanieb](https://github.com/zanieb)
+- [@AlexWaygood](https://github.com/AlexWaygood)
+
 ## 0.15.9
 
 Released on 2026-04-02.

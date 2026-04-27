@@ -2,12 +2,11 @@ use std::collections::HashMap;
 
 use crate::FxIndexSet;
 use crate::place::builtins_module_scope;
-use crate::semantic_index::definition::{Definition, DefinitionKind};
-use crate::semantic_index::{attribute_scopes, global_scope, semantic_index, use_def_map};
+use crate::reachability::is_range_reachable;
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
-use crate::types::class::{DynamicClassAnchor, DynamicNamedTupleAnchor};
+use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
 use crate::types::constraints::ConstraintSetBuilder;
-use crate::types::signatures::{ParameterKind, Signature};
+use crate::types::signatures::{ParameterForm, ParametersKind, Signature};
 use crate::types::{
     CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownUnion,
     Type, TypeContext, UnionType,
@@ -20,12 +19,16 @@ use ruff_db::source::source_text;
 use ruff_python_ast::{self as ast, AnyNodeRef, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
+use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::{attribute_scopes, global_scope, semantic_index, use_def_map};
 
+mod unreachable_code;
 #[path = "ide_support/unused_bindings.rs"]
 mod unused_binding_support;
 
 pub use resolve_definition::{ImportAliasResolution, ResolvedDefinition, map_stub_definition};
 use resolve_definition::{find_symbol_in_scope, resolve_definition};
+pub use unreachable_code::{UnreachableKind, UnreachableRange, unreachable_ranges};
 pub use unused_binding_support::{UnusedBinding, unused_bindings};
 
 /// Get the primary definition kind for a name expression within a specific file.
@@ -90,30 +93,21 @@ pub fn definitions_for_name<'db>(
         // If marked as global, skip to global scope
         if is_global {
             let global_scope_id = global_scope(db, file);
-            let global_place_table = crate::semantic_index::place_table(db, global_scope_id);
+            let global_place_table = ty_python_core::place_table(db, global_scope_id);
 
             if let Some(global_symbol_id) = global_place_table.symbol_id(name_str) {
-                let global_use_def_map = crate::semantic_index::use_def_map(db, global_scope_id);
-                let global_bindings =
-                    global_use_def_map.reachable_symbol_bindings(global_symbol_id);
-                let global_declarations =
-                    global_use_def_map.reachable_symbol_declarations(global_symbol_id);
-
-                for binding in global_bindings {
-                    if let Some(def) = binding.binding.definition() {
-                        if def.kind(db).is_user_visible() {
-                            all_definitions.insert(def);
-                        }
-                    }
-                }
-
-                for declaration in global_declarations {
-                    if let Some(def) = declaration.declaration.definition() {
-                        if def.kind(db).is_user_visible() {
-                            all_definitions.insert(def);
-                        }
-                    }
-                }
+                let global_use_def_map = ty_python_core::use_def_map(db, global_scope_id);
+                all_definitions.extend(reachable_definitions(
+                    db,
+                    global_use_def_map
+                        .reachable_symbol_bindings(global_symbol_id)
+                        .filter_map(|binding| binding.binding.definition())
+                        .chain(
+                            global_use_def_map
+                                .reachable_symbol_declarations(global_symbol_id)
+                                .filter_map(|declaration| declaration.declaration.definition()),
+                        ),
+                ));
             }
             break;
         }
@@ -127,24 +121,17 @@ pub fn definitions_for_name<'db>(
         let use_def_map = index.use_def_map(scope_id);
 
         // Get all definitions (both bindings and declarations) for this place
-        let bindings = use_def_map.reachable_symbol_bindings(symbol_id);
-        let declarations = use_def_map.reachable_symbol_declarations(symbol_id);
-
-        for binding in bindings {
-            if let Some(def) = binding.binding.definition() {
-                if def.kind(db).is_user_visible() {
-                    all_definitions.insert(def);
-                }
-            }
-        }
-
-        for declaration in declarations {
-            if let Some(def) = declaration.declaration.definition() {
-                if def.kind(db).is_user_visible() {
-                    all_definitions.insert(def);
-                }
-            }
-        }
+        all_definitions.extend(reachable_definitions(
+            db,
+            use_def_map
+                .reachable_symbol_bindings(symbol_id)
+                .filter_map(|binding| binding.binding.definition())
+                .chain(
+                    use_def_map
+                        .reachable_symbol_declarations(symbol_id)
+                        .filter_map(|declaration| declaration.declaration.definition()),
+                ),
+        ));
 
         // If we found definitions in this scope, we can stop searching
         if !all_definitions.is_empty() {
@@ -274,6 +261,11 @@ pub fn definitions_for_attribute<'db>(
             continue;
         }
 
+        // Prevent lookup on BoundSuper proxy object
+        if matches!(ty, Type::BoundSuper(_)) {
+            continue;
+        }
+
         let meta_type = ty.to_meta_type(db);
 
         // Look up the attribute first on the meta-type, unless it's already a class-like type.
@@ -354,36 +346,26 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
         .filter_map(|cls: ClassType<'db>| cls.static_class_literal(db).map(|(lit, _)| lit))
     {
         let class_scope = ancestor.body_scope(db);
-        let class_place_table = crate::semantic_index::place_table(db, class_scope);
+        let class_place_table = ty_python_core::place_table(db, class_scope);
 
         // Look for class-level declarations and bindings
         if let Some(place_id) = class_place_table.symbol_id(attribute_name) {
             let use_def = use_def_map(db, class_scope);
-
-            // Check declarations first
-            for decl in use_def.reachable_symbol_declarations(place_id) {
-                if let Some(def) = decl.declaration.definition() {
-                    resolved.extend(resolve_definition(
-                        db,
-                        def,
-                        Some(attribute_name),
-                        ImportAliasResolution::ResolveAliases,
-                    ));
-                    break 'scopes;
-                }
-            }
-
-            // If no declarations found, check bindings
-            for binding in use_def.reachable_symbol_bindings(place_id) {
-                if let Some(def) = binding.binding.definition() {
-                    resolved.extend(resolve_definition(
-                        db,
-                        def,
-                        Some(attribute_name),
-                        ImportAliasResolution::ResolveAliases,
-                    ));
-                    break 'scopes;
-                }
+            let resolved_in_scope = resolve_reachable_definitions(
+                db,
+                attribute_name,
+                use_def
+                    .reachable_symbol_declarations(place_id)
+                    .filter_map(|declaration| declaration.declaration.definition())
+                    .chain(
+                        use_def
+                            .reachable_symbol_bindings(place_id)
+                            .filter_map(|binding| binding.binding.definition()),
+                    ),
+            );
+            if !resolved_in_scope.is_empty() {
+                resolved.extend(resolved_in_scope);
+                break 'scopes;
             }
         }
 
@@ -397,37 +379,55 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
                 .member_id_by_instance_attribute_name(attribute_name)
             {
                 let use_def = index.use_def_map(function_scope_id);
-
-                // Check declarations first
-                for decl in use_def.reachable_member_declarations(place_id) {
-                    if let Some(def) = decl.declaration.definition() {
-                        resolved.extend(resolve_definition(
-                            db,
-                            def,
-                            Some(attribute_name),
-                            ImportAliasResolution::ResolveAliases,
-                        ));
-                        break 'scopes;
-                    }
-                }
-
-                // If no declarations found, check bindings
-                for binding in use_def.reachable_member_bindings(place_id) {
-                    if let Some(def) = binding.binding.definition() {
-                        resolved.extend(resolve_definition(
-                            db,
-                            def,
-                            Some(attribute_name),
-                            ImportAliasResolution::ResolveAliases,
-                        ));
-                        break 'scopes;
-                    }
+                let resolved_in_scope = resolve_reachable_definitions(
+                    db,
+                    attribute_name,
+                    use_def
+                        .reachable_member_declarations(place_id)
+                        .filter_map(|declaration| declaration.declaration.definition())
+                        .chain(
+                            use_def
+                                .reachable_member_bindings(place_id)
+                                .filter_map(|binding| binding.binding.definition()),
+                        ),
+                );
+                if !resolved_in_scope.is_empty() {
+                    resolved.extend(resolved_in_scope);
+                    break 'scopes;
                 }
             }
         }
     }
 
     resolved
+}
+
+fn reachable_definitions<'db>(
+    db: &'db dyn Db,
+    definitions: impl IntoIterator<Item = Definition<'db>>,
+) -> FxIndexSet<Definition<'db>> {
+    definitions
+        .into_iter()
+        .filter(|definition| definition.kind(db).is_user_visible())
+        .collect()
+}
+
+fn resolve_reachable_definitions<'db>(
+    db: &'db dyn Db,
+    symbol_name: &str,
+    definitions: impl IntoIterator<Item = Definition<'db>>,
+) -> Vec<ResolvedDefinition<'db>> {
+    reachable_definitions(db, definitions)
+        .into_iter()
+        .flat_map(|definition| {
+            resolve_definition(
+                db,
+                definition,
+                Some(symbol_name),
+                ImportAliasResolution::ResolveAliases,
+            )
+        })
+        .collect()
 }
 
 pub struct TypedDictKeyHover<'db> {
@@ -581,20 +581,8 @@ pub struct CallSignatureDetails<'db> {
     /// The display label for this signature (e.g., "(param1: str, param2: int) -> str")
     pub label: String,
 
-    /// Label offsets for each parameter in the signature string.
-    /// Each range specifies the start position and length of a parameter label
-    /// within the full signature string.
-    pub parameter_label_offsets: Vec<TextRange>,
-
-    /// The names of the parameters in the signature, in order.
-    /// This provides easy access to parameter names for documentation lookup.
-    pub parameter_names: Vec<String>,
-
-    /// Parameter kinds, useful to determine correct autocomplete suggestions.
-    pub parameter_kinds: Vec<ParameterKind<'db>>,
-
-    /// Annotated types of parameters. If no annotation was provided, this is `Unknown`.
-    pub parameter_types: Vec<Type<'db>>,
+    /// The displayed parameters for this signature, in left-to-right order.
+    pub parameters: Vec<CallSignatureParameter<'db>>,
 
     /// The definition where this callable was originally defined (useful for
     /// extracting docstrings).
@@ -603,6 +591,32 @@ pub struct CallSignatureDetails<'db> {
     /// Mapping from argument indices to parameter indices. This helps
     /// determine which parameter corresponds to which argument position.
     pub argument_to_parameter_mapping: Vec<MatchedArgument<'db>>,
+
+    /// Mapping from argument indices to displayed parameter indices. This accounts for
+    /// displayed signatures that synthesize parameters, like bare `ParamSpec` signatures.
+    pub argument_to_displayed_parameter_mapping: Vec<Option<usize>>,
+}
+
+/// A single displayed parameter in a callable signature for IDE support.
+#[derive(Debug, Clone)]
+pub struct CallSignatureParameter<'db> {
+    /// The rendered label of the parameter as shown in the signature.
+    pub label: String,
+
+    /// The rendered name of the parameter, used for downstream IDE features.
+    pub name: String,
+
+    /// Annotated type of the parameter after applying any inferred specialization.
+    pub ty: Type<'db>,
+
+    /// True if the parameter is positional-only.
+    pub is_positional_only: bool,
+
+    /// True if the parameter can absorb arbitrarily many positional arguments.
+    pub is_variadic: bool,
+
+    /// True if the parameter can absorb arbitrarily many keyword arguments.
+    pub is_keyword_variadic: bool,
 }
 
 impl<'db> CallSignatureDetails<'db> {
@@ -611,30 +625,27 @@ impl<'db> CallSignatureDetails<'db> {
         let specialization = binding.specialization();
         let signature = binding.signature.clone();
         let display_details = signature.display(db).to_string_parts();
-        let (parameter_kinds, parameter_types): (Vec<ParameterKind>, Vec<Type>) = signature
-            .parameters()
+        let (parameters, parameter_to_displayed_parameter_mapping) =
+            displayed_parameters_for_signature(db, &signature, &display_details, specialization);
+        let argument_to_displayed_parameter_mapping = argument_to_parameter_mapping
             .iter()
-            .map(|param| {
-                // Apply the inferred specialization (if any) to resolve TypeVars
-                // in the annotated type. For example, if `_KT` was inferred as
-                // `str` from the call arguments, this turns `_KT` into `str`.
-                let mut ty = param.annotated_type();
-                if let Some(spec) = specialization {
-                    ty = ty.apply_specialization(db, spec);
-                }
-                (param.kind().clone(), ty)
+            .map(|mapping| {
+                mapping.parameters.iter().find_map(|parameter_index| {
+                    parameter_to_displayed_parameter_mapping
+                        .get(*parameter_index)
+                        .copied()
+                        .flatten()
+                })
             })
-            .unzip();
+            .collect();
 
         CallSignatureDetails {
             definition: signature.definition(),
             signature,
             label: display_details.label,
-            parameter_label_offsets: display_details.parameter_ranges,
-            parameter_names: display_details.parameter_names,
-            parameter_kinds,
-            parameter_types,
+            parameters,
             argument_to_parameter_mapping,
+            argument_to_displayed_parameter_mapping,
         }
     }
 
@@ -650,6 +661,105 @@ impl<'db> CallSignatureDetails<'db> {
         };
 
         Some(FileRange::new(file, parameters.find(name)?.name().range))
+    }
+}
+
+/// Build the parameter list shown for a rendered signature.
+///
+/// Returns both the displayed parameters and a mapping from each parameter in
+/// `signature` to its displayed parameter index, if any. This accounts for
+/// rendered signatures that synthesize or omit parameters, such as bare
+/// `ParamSpec` signatures, and applies any inferred specialization to the
+/// displayed parameter types.
+fn displayed_parameters_for_signature<'db>(
+    db: &'db dyn Db,
+    signature: &Signature<'db>,
+    display_details: &crate::types::display::SignatureDisplayDetails,
+    specialization: Option<crate::types::generics::Specialization<'db>>,
+) -> (Vec<CallSignatureParameter<'db>>, Vec<Option<usize>>) {
+    // Apply any inferred specialization to displayed parameter types so
+    // call-site substitutions are reflected in the rendered signature. For
+    // example, if `_KT` was inferred as `str`, display `str` instead of `_KT`.
+    let apply_specialization =
+        |ty: Type<'db>| specialization.map_or(ty, |spec| ty.apply_specialization(db, spec));
+    let parameters = signature.parameters();
+
+    match parameters.kind() {
+        ParametersKind::Standard | ParametersKind::Concatenate(_) => {
+            let mut displayed_parameters = Vec::new();
+            let mut parameter_to_displayed_parameter_mapping = vec![None; parameters.len()];
+
+            for (parameter_index, parameter) in parameters.iter().enumerate() {
+                let Some(range) = display_details
+                    .parameter_ranges
+                    .get(parameter_index)
+                    .copied()
+                else {
+                    continue;
+                };
+                let Some(name) = display_details
+                    .parameter_names
+                    .get(parameter_index)
+                    .cloned()
+                else {
+                    continue;
+                };
+                let Some(label) = display_details
+                    .label
+                    .get(range.to_std_range())
+                    .map(ToString::to_string)
+                else {
+                    continue;
+                };
+
+                parameter_to_displayed_parameter_mapping[parameter_index] =
+                    Some(displayed_parameters.len());
+                displayed_parameters.push(CallSignatureParameter {
+                    label,
+                    name,
+                    ty: apply_specialization(parameter.annotated_type()),
+                    is_positional_only: parameter.is_positional_only(),
+                    is_variadic: parameter.is_variadic(),
+                    is_keyword_variadic: parameter.is_keyword_variadic(),
+                });
+            }
+
+            (
+                displayed_parameters,
+                parameter_to_displayed_parameter_mapping,
+            )
+        }
+        ParametersKind::ParamSpec(typevar) => {
+            let parameter_name = format!("**{}", typevar.name(db));
+            let label = display_details
+                .parameter_ranges
+                .first()
+                .and_then(|range| {
+                    display_details
+                        .label
+                        .get(range.to_std_range())
+                        .map(ToString::to_string)
+                })
+                .unwrap_or_else(|| parameter_name.clone());
+            let name = display_details
+                .parameter_names
+                .first()
+                .cloned()
+                .unwrap_or(parameter_name);
+
+            (
+                vec![CallSignatureParameter {
+                    label,
+                    name,
+                    ty: Type::TypeVar(typevar),
+                    is_positional_only: false,
+                    is_variadic: true,
+                    is_keyword_variadic: true,
+                }],
+                vec![Some(0); parameters.len()],
+            )
+        }
+        ParametersKind::Gradual | ParametersKind::Top => (Vec::new(), vec![None; parameters.len()]),
     }
 }
 
@@ -743,6 +853,134 @@ fn resolve_single_overload<'db>(
     }
 
     resolved.pop()
+}
+
+/// Whether a call argument is interpreted as a value expression or a type expression.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CallArgumentForm {
+    Unknown,
+    Value,
+    Type,
+}
+
+/// Fully binds and type-checks a call expression against the given callee type.
+///
+/// This is the expensive path for call-argument form analysis: it matches call-site arguments to
+/// parameters, checks argument types, and preserves the resulting bindings even when the call is
+/// invalid so IDE features can inspect the best available binding information.
+fn full_type_bindings_for_call<'db>(
+    model: &SemanticModel<'db>,
+    func_type: Type<'db>,
+    call_expr: &ast::ExprCall,
+) -> crate::types::call::Bindings<'db> {
+    let db = model.db();
+    let call_arguments =
+        CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
+            splatted_value
+                .inferred_type(model)
+                .unwrap_or(Type::unknown())
+        });
+    let constraints = ConstraintSetBuilder::new();
+
+    func_type
+        .bindings(db)
+        .match_parameters(db, &call_arguments)
+        .check_types(
+            db,
+            &constraints,
+            &call_arguments,
+            TypeContext::default(),
+            &[],
+        )
+        .unwrap_or_else(|CallError(_, bindings)| *bindings)
+}
+
+/// Returns the form for a single argument from a successful binding.
+fn argument_form_from_successful_binding(
+    binding: &crate::types::call::Binding<'_>,
+    argument_index: usize,
+) -> CallArgumentForm {
+    if let Some(argument_match) = binding.argument_matches().get(argument_index)
+        && argument_match.matched
+        && let [parameter_index] = argument_match.parameters.as_slice()
+    {
+        return match binding.signature.parameters()[*parameter_index].form {
+            ParameterForm::Value => CallArgumentForm::Value,
+            ParameterForm::Type => CallArgumentForm::Type,
+        };
+    }
+
+    CallArgumentForm::Unknown
+}
+
+/// Returns the form of each call-site argument in source order.
+///
+/// `CallArgumentForm::Unknown` indicates that an argument is unmatched or its form cannot be
+/// determined unambiguously, for example because a variadic argument maps to multiple parameters.
+pub fn call_argument_forms(
+    model: &SemanticModel<'_>,
+    call_expr: &ast::ExprCall,
+) -> Vec<CallArgumentForm> {
+    let Some(func_type) = call_expr.func.inferred_type(model) else {
+        return Vec::new();
+    };
+
+    let argument_count = call_expr.arguments.len();
+
+    // If the function doesn't contain any type forms, for any overloads, short-circuit.
+    if !func_type.bindings(model.db()).iter_flat().any(|binding| {
+        binding.overloads().iter().any(|overload| {
+            overload
+                .signature
+                .parameters()
+                .into_iter()
+                .any(|parameter| parameter.form == ParameterForm::Type)
+        })
+    }) {
+        return vec![CallArgumentForm::Value; argument_count];
+    }
+
+    let bindings = full_type_bindings_for_call(model, func_type, call_expr);
+
+    let mut argument_forms = vec![CallArgumentForm::Unknown; argument_count];
+
+    // If any bindings are successful, limit analysis to those bindings.
+    let successful_bindings: Vec<_> = bindings
+        .iter_flat()
+        .flatten()
+        .filter(|binding| binding.errors().is_empty())
+        .collect();
+
+    let Some((first_binding, remaining_bindings)) = successful_bindings.split_first() else {
+        // If no binding succeeds, fall back to the merged non-conflicting forms from the full
+        // binding result so callers still get the best conservative answer available.
+        for (arg_index, form) in bindings.non_conflicting_argument_forms().enumerate() {
+            let Some(argument_form) = argument_forms.get_mut(arg_index) else {
+                break;
+            };
+            *argument_form = form.map_or(CallArgumentForm::Unknown, |form| match form {
+                ParameterForm::Value => CallArgumentForm::Value,
+                ParameterForm::Type => CallArgumentForm::Type,
+            });
+        }
+        return argument_forms;
+    };
+
+    // If all successful bindings agree on the argument form, use the agreed-upon form; otherwise,
+    // fall back to `CallArgumentForm::Unknown`.
+    for (arg_index, resolved_argument_form) in argument_forms.iter_mut().enumerate() {
+        let argument_form = argument_form_from_successful_binding(first_binding, arg_index);
+        if argument_form == CallArgumentForm::Unknown {
+            continue;
+        }
+        if remaining_bindings.iter().all(|binding| {
+            argument_form_from_successful_binding(binding, arg_index) == argument_form
+        }) {
+            *resolved_argument_form = argument_form;
+        }
+    }
+
+    argument_forms
 }
 
 /// Given a call expression that has overloads, and whose overload is resolved to a
@@ -839,14 +1077,15 @@ pub fn definitions_for_unary_op<'db>(
                 Ok(bindings) => bindings,
                 Err(CallDunderError::MethodNotAvailable) => return None,
                 Err(
-                    CallDunderError::PossiblyUnbound(bindings)
+                    CallDunderError::PossiblyUnbound { bindings, .. }
                     | CallDunderError::CallError(_, bindings),
                 ) => *bindings,
             }
         }
         Err(CallDunderError::MethodNotAvailable) => return None,
         Err(
-            CallDunderError::PossiblyUnbound(bindings) | CallDunderError::CallError(_, bindings),
+            CallDunderError::PossiblyUnbound { bindings, .. }
+            | CallDunderError::CallError(_, bindings),
         ) => *bindings,
     };
 
@@ -928,7 +1167,7 @@ pub fn find_active_signature_from_details(
 /// using full type checking (not just arity matching) for overload resolution.
 ///
 /// Falls back to arity-based matching if type-based resolution fails.
-fn resolve_call_signature<'db>(
+pub fn resolved_call_signature<'db>(
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
 ) -> Option<CallSignatureDetails<'db>> {
@@ -990,7 +1229,7 @@ pub fn inlay_hint_call_argument_details<'db>(
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
 ) -> Option<InlayHintCallArgumentDetails> {
-    let resolved = resolve_call_signature(model, call_expr)?;
+    let resolved = resolved_call_signature(model, call_expr)?;
 
     let parameters = resolved.signature.parameters();
 
@@ -1071,9 +1310,11 @@ mod resolve_definition {
     use ty_module_resolver::{ModuleName, file_to_module, resolve_module, resolve_real_module};
 
     use crate::Db;
-    use crate::semantic_index::definition::{Definition, DefinitionKind, module_docstring};
-    use crate::semantic_index::scope::{NodeWithScopeKind, ScopeId};
-    use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
+    use crate::module_docstring;
+    use crate::types::binding_type;
+    use ty_python_core::definition::{Definition, DefinitionKind};
+    use ty_python_core::scope::{NodeWithScopeKind, ScopeId};
+    use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
 
     /// Represents the result of resolving an import to either a specific definition or
     /// a specific range within a file.
@@ -1114,6 +1355,55 @@ mod resolve_definition {
                 ResolvedDefinition::FileWithRange(_) => None,
             }
         }
+
+        pub fn implementation_docstring(&self, db: &'db dyn Db) -> Option<String> {
+            match self {
+                ResolvedDefinition::Definition(definition) => {
+                    implementation_docstring(db, *definition)
+                }
+                ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => None,
+            }
+        }
+    }
+
+    // Overload declarations often omit docstrings, while the runtime
+    // implementation appears as the last sibling binding for the same symbol.
+    // Fall back to that binding's docstring when the resolved overload has none.
+    //
+    // Uses type-aware matching: resolves each end-of-scope binding's type to a
+    // function literal, then checks whether that function's overloads contain the
+    // current definition. This correctly handles version-conditional branches and
+    // avoids picking up unrelated reassignments of the same name.
+    fn implementation_docstring<'db>(
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+    ) -> Option<String> {
+        let DefinitionKind::Function(_) = definition.kind(db) else {
+            return None;
+        };
+
+        let name = definition.name(db)?;
+        let scope = definition.scope(db);
+        let symbol_id = place_table(db, scope).symbol_id(&name)?;
+        let use_def = use_def_map(db, scope);
+
+        let current_overload = binding_type(db, definition)
+            .as_function_literal()?
+            .literal(db)
+            .last_definition;
+
+        // Find the last end-of-scope binding whose function type contains this overload.
+        let implementation = use_def
+            .end_of_scope_symbol_bindings(symbol_id)
+            .filter_map(|binding| {
+                let ty = binding_type(db, binding.binding.definition()?).as_function_literal()?;
+                ty.iter_overloads_and_implementation(db)
+                    .any(|overload| overload == current_overload)
+                    .then_some(ty)
+            })
+            .last()?;
+
+        implementation.definition(db).docstring(db)
     }
 
     /// Resolve import definitions to their targets.
@@ -1583,9 +1873,8 @@ mod resolve_definition {
             | DefinitionKind::DictKeyAssignment(_)
             | DefinitionKind::For(_)
             | DefinitionKind::Comprehension(_)
-            | DefinitionKind::VariadicPositionalParameter(_)
-            | DefinitionKind::VariadicKeywordParameter(_)
             | DefinitionKind::Parameter(_)
+            | DefinitionKind::LambdaParameter { .. }
             | DefinitionKind::WithItem(_)
             | DefinitionKind::MatchPattern(_)
             | DefinitionKind::ExceptHandler(_)
@@ -1714,7 +2003,8 @@ pub fn type_hierarchy_subtypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyCl
             }
 
             let file_scope_id = scope_id.file_scope_id(db);
-            if !index.is_scope_reachable(db, file_scope_id) {
+            let parsed = parsed_module(db, file).load(db);
+            if !is_range_reachable(db, index, file_scope_id, class_node.node(&parsed).range()) {
                 continue;
             }
 
@@ -1833,6 +2123,16 @@ fn class_literal_to_hierarchy_info(
             let header_range = typeddict.header_range(db);
             (header_range, header_range)
         }
+        ClassLiteral::DynamicEnum(dynamic_enum) => {
+            if let DynamicEnumAnchor::Definition { definition, .. } = dynamic_enum.anchor(db) {
+                let parsed = parsed_module(db, file).load(db);
+                let kind = definition.kind(db);
+                (kind.full_range(&parsed), kind.target_range(&parsed))
+            } else {
+                let header_range = dynamic_enum.header_range(db);
+                (header_range, header_range)
+            }
+        }
     };
 
     TypeHierarchyClass {
@@ -1886,5 +2186,276 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
         None
     } else {
         Some(all_sigs.join("\n"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CallArgumentForm, call_argument_forms};
+    use crate::SemanticModel;
+    use crate::db::tests::TestDbBuilder;
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::parsed::parsed_module;
+
+    #[test]
+    fn keyword_call_argument_forms_follow_source_order() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+from typing import cast
+
+cast(val="", typ=int)
+"#,
+            )
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let call = parsed
+            .suite()
+            .last()
+            .unwrap()
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap();
+        let model = SemanticModel::new(&db, file);
+
+        assert_eq!(
+            call_argument_forms(&model, call),
+            [CallArgumentForm::Value, CallArgumentForm::Type]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn overloaded_call_argument_forms_follow_source_order() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+from typing import overload
+
+@overload
+def f(x: int, y: str) -> None: ...
+@overload
+def f(x: str) -> None: ...
+def f(*args, **kwargs): ...
+
+f(y="", x=1)
+"#,
+            )
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let call = parsed
+            .suite()
+            .last()
+            .unwrap()
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap();
+        let model = SemanticModel::new(&db, file);
+
+        assert_eq!(
+            call_argument_forms(&model, call),
+            [CallArgumentForm::Value, CallArgumentForm::Value]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn conditional_special_forms_preserve_type_form_information() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+from typing_extensions import assert_type, cast
+
+flag = bool(input())
+f = cast if flag else assert_type
+f(val="", typ=int)
+"#,
+            )
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let call = parsed
+            .suite()
+            .last()
+            .unwrap()
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap();
+        let model = SemanticModel::new(&db, file);
+
+        assert_eq!(
+            call_argument_forms(&model, call),
+            [CallArgumentForm::Value, CallArgumentForm::Type]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn conditional_special_forms_degrade_to_unknown_for_positional_arguments() -> anyhow::Result<()>
+    {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+from typing_extensions import assert_type, cast
+
+flag = bool(input())
+f = cast if flag else assert_type
+f("", int)
+"#,
+            )
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let call = parsed
+            .suite()
+            .last()
+            .unwrap()
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap();
+        let model = SemanticModel::new(&db, file);
+
+        assert_eq!(
+            call_argument_forms(&model, call),
+            [CallArgumentForm::Unknown, CallArgumentForm::Unknown]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn successful_call_argument_forms_ignore_failed_bindings() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+from typing import cast
+
+flag = bool(input())
+def g(x):
+    return x
+
+x = ""
+f = cast if flag else g
+f(int, x)
+"#,
+            )
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let call = parsed
+            .suite()
+            .last()
+            .unwrap()
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap();
+        let model = SemanticModel::new(&db, file);
+
+        assert_eq!(
+            call_argument_forms(&model, call),
+            [CallArgumentForm::Type, CallArgumentForm::Value]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn call_argument_forms_fast_path_value_only_signatures() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+from typing import cast
+
+def f(x: type[int], y: int) -> None:
+    pass
+
+cast(int, 1)
+f(int, 1)
+"#,
+            )
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let calls: Vec<_> = parsed
+            .suite()
+            .iter()
+            .filter_map(|stmt| stmt.as_expr_stmt()?.value.as_call_expr())
+            .collect();
+        let model = SemanticModel::new(&db, file);
+
+        assert_eq!(calls.len(), 2);
+        assert_eq!(
+            call_argument_forms(&model, calls[0]),
+            [CallArgumentForm::Type, CallArgumentForm::Value]
+        );
+        assert_eq!(
+            call_argument_forms(&model, calls[1]),
+            [CallArgumentForm::Value, CallArgumentForm::Value]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn variadic_call_argument_forms_are_unknown_when_matched_to_multiple_parameters()
+    -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+from typing import cast
+
+args: tuple[str, type[int]] = ("", int)
+cast(*args)
+"#,
+            )
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let call = parsed
+            .suite()
+            .last()
+            .unwrap()
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap();
+        let model = SemanticModel::new(&db, file);
+
+        assert_eq!(
+            call_argument_forms(&model, call),
+            [CallArgumentForm::Unknown]
+        );
+
+        Ok(())
     }
 }

@@ -33,28 +33,20 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 
 ```
 error[override-of-final-method]: Cannot override `A.f`
-  --> src/mdtest_snippet.py:9:9
-   |
- 7 | class B(A):
- 8 |     @final
- 9 |     def f(self): ...  # error: [override-of-final-method]
-   |         ^ Overrides a definition from superclass `A`
-10 |
-11 | class C(B):
-   |
+ --> src/mdtest_snippet.py:9:9
+  |
+9 |     def f(self): ...  # error: [override-of-final-method]
+  |         ^ Overrides a definition from superclass `A`
+  |
 info: `A.f` is decorated with `@final`, forbidding overrides
  --> src/mdtest_snippet.py:4:5
   |
-3 | class A:
 4 |     @final
   |     ------
 5 |     def f(self): ...
   |         - `A.f` defined here
-6 |
-7 | class B(A):
   |
 help: Remove the override of `f`
-info: rule `override-of-final-method` is enabled by default
 5  |     def f(self): ...
 6  |
 7  | class B(A):
@@ -72,24 +64,18 @@ note: This is an unsafe fix and may change runtime behavior
 error[override-of-final-method]: Cannot override `B.f`
   --> src/mdtest_snippet.py:14:9
    |
-12 |     @final
-13 |     # we only emit one error here, not two
 14 |     def f(self): ...  # error: [override-of-final-method]
    |         ^ Overrides a definition from superclass `B`
    |
 info: `B.f` is decorated with `@final`, forbidding overrides
-  --> src/mdtest_snippet.py:8:5
-   |
- 7 | class B(A):
- 8 |     @final
-   |     ------
- 9 |     def f(self): ...  # error: [override-of-final-method]
-   |         - `B.f` defined here
-10 |
-11 | class C(B):
-   |
+ --> src/mdtest_snippet.py:8:5
+  |
+8 |     @final
+  |     ------
+9 |     def f(self): ...  # error: [override-of-final-method]
+  |         - `B.f` defined here
+  |
 help: Remove the override of `f`
-info: rule `override-of-final-method` is enabled by default
 9  |     def f(self): ...  # error: [override-of-final-method]
 10 |
 11 | class C(B):

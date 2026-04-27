@@ -58,13 +58,13 @@ impl<'a> FullRenderer<'a> {
             }
 
             let resolved = Resolved::new(self.resolver, diag, self.config);
-            let renderable = resolved.to_renderable(self.config.context);
+            let renderable = resolved.to_renderable(self.config);
             for diag in renderable.diagnostics.iter() {
                 writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
             }
 
             if self.config.show_fix_diff
-                && diag.has_applicable_fix(self.config)
+                && diag.has_applicable_fix(self.config.fix_applicability())
                 && let Some(diff) = Diff::from_diagnostic(diag, &stylesheet, self.resolver)
             {
                 write!(f, "{diff}")?;

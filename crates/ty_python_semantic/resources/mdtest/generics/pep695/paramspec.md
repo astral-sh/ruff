@@ -53,6 +53,10 @@ def foo3[**P = [int, str]]() -> None:
 def foo4[**P, **Q = P]():
     reveal_type(P)  # revealed: ParamSpec
     reveal_type(Q)  # revealed: ParamSpec
+
+# error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+def foo5[**Q, **P = [Q]]() -> None:
+    pass
 ```
 
 Other values are invalid.
@@ -123,6 +127,16 @@ def invalid_stringified_annotation[**P](
 def invalid_stringified_variable_annotation[**P](y: Any) -> None:
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     x: "P" = y
+
+class InvalidSpecializationTarget[**P]:
+    attr: Callable[P, None]
+
+def invalid_specialization[**Q](
+    # error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+    a: InvalidSpecializationTarget[[Q]],
+    # error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+    b: InvalidSpecializationTarget[Q,],
+) -> None: ...
 ```
 
 ## Validating `P.args` and `P.kwargs` usage
@@ -678,12 +692,12 @@ class Foo[**P]:
 
 def bar[**P](foo: Foo[P]) -> None:
     reveal_type(foo)  # revealed: Foo[P@bar]
-    reveal_type(foo.args)  # revealed: Unknown | P@bar.args
-    reveal_type(foo.kwargs)  # revealed: Unknown | P@bar.kwargs
+    reveal_type(foo.args)  # revealed: P@bar.args
+    reveal_type(foo.kwargs)  # revealed: P@bar.kwargs
 ```
 
-ty will check whether the argument after `**` is a mapping type but as instance attribute are
-unioned with `Unknown`, it shouldn't error here.
+ty will check whether the argument after `**` is a mapping type, but the inferred attribute type
+preserves the parameter pack here, so it shouldn't error.
 
 ```py
 from typing import Callable
@@ -934,7 +948,7 @@ class Container[**P]:
 
     def try_assign[**Q](self, f: Callable[Q, None]) -> Callable[Q, None]:
         # error: [invalid-return-type] "Return type does not match returned value: expected `(**Q@try_assign) -> None`, found `(**P@Container) -> None`"
-        # error: [invalid-argument-type] "Argument to bound method `method` is incorrect: Expected `(**P@Container) -> None`, found `(**Q@try_assign) -> None`"
+        # error: [invalid-argument-type] "Argument to bound method `Container.method` is incorrect: Expected `(**P@Container) -> None`, found `(**Q@try_assign) -> None`"
         return self.method(f)
 ```
 

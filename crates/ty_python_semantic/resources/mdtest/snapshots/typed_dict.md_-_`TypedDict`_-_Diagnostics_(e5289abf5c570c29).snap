@@ -76,17 +76,13 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
 
 ```
 error[invalid-key]: Unknown key "nane" for TypedDict `Person`
-  --> src/mdtest_snippet.py:8:5
-   |
- 7 | def access_invalid_literal_string_key(person: Person):
- 8 |     person["nane"]  # error: [invalid-key]
-   |     ------ ^^^^^^ Did you mean "name"?
-   |     |
-   |     TypedDict `Person`
- 9 |
-10 | NAME_KEY: Final = "nane"
-   |
-info: rule `invalid-key` is enabled by default
+ --> src/mdtest_snippet.py:8:5
+  |
+8 |     person["nane"]  # error: [invalid-key]
+  |     ------ ^^^^^^ Did you mean "name"?
+  |     |
+  |     TypedDict `Person`
+  |
 5  |     age: int | None
 6  |
 7  | def access_invalid_literal_string_key(person: Person):
@@ -103,15 +99,11 @@ note: This is an unsafe fix and may change runtime behavior
 error[invalid-key]: Unknown key "nane" for TypedDict `Person`
   --> src/mdtest_snippet.py:13:5
    |
-12 | def access_invalid_key(person: Person):
 13 |     person[NAME_KEY]  # error: [invalid-key]
    |     ------ ^^^^^^^^ Unknown key "nane" - did you mean "name"?
    |     |
    |     TypedDict `Person`
-14 |
-15 | def access_with_str_key(person: Person, str_key: str):
    |
-info: rule `invalid-key` is enabled by default
 
 ```
 
@@ -119,13 +111,9 @@ info: rule `invalid-key` is enabled by default
 error[invalid-key]: TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`
   --> src/mdtest_snippet.py:16:12
    |
-15 | def access_with_str_key(person: Person, str_key: str):
 16 |     person[str_key]  # error: [invalid-key]
    |            ^^^^^^^
-17 |
-18 | def write_to_key_with_wrong_type(person: Person):
    |
-info: rule `invalid-key` is enabled by default
 
 ```
 
@@ -133,26 +121,18 @@ info: rule `invalid-key` is enabled by default
 error[invalid-assignment]: Invalid assignment to key "age" with declared type `int | None` on TypedDict `Person`
   --> src/mdtest_snippet.py:19:5
    |
-18 | def write_to_key_with_wrong_type(person: Person):
 19 |     person["age"] = "42"  # error: [invalid-assignment]
    |     ------ -----    ^^^^ value of type `Literal["42"]`
    |     |      |
    |     |      key has declared type `int | None`
    |     TypedDict `Person`
-20 |
-21 | def write_to_non_existing_key(person: Person):
    |
 info: Item declaration
  --> src/mdtest_snippet.py:5:5
   |
-3 | class Person(TypedDict):
-4 |     name: str
 5 |     age: int | None
   |     --------------- Item declared here
-6 |
-7 | def access_invalid_literal_string_key(person: Person):
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -160,15 +140,11 @@ info: rule `invalid-assignment` is enabled by default
 error[invalid-key]: Unknown key "nane" for TypedDict `Person`
   --> src/mdtest_snippet.py:22:5
    |
-21 | def write_to_non_existing_key(person: Person):
 22 |     person["nane"] = "Alice"  # error: [invalid-key]
    |     ------ ^^^^^^ Did you mean "name"?
    |     |
    |     TypedDict `Person`
-23 |
-24 | def write_to_non_literal_string_key(person: Person, str_key: str):
    |
-info: rule `invalid-key` is enabled by default
 19 |     person["age"] = "42"  # error: [invalid-assignment]
 20 |
 21 | def write_to_non_existing_key(person: Person):
@@ -185,13 +161,9 @@ note: This is an unsafe fix and may change runtime behavior
 error[invalid-key]: TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`.
   --> src/mdtest_snippet.py:25:12
    |
-24 | def write_to_non_literal_string_key(person: Person, str_key: str):
 25 |     person[str_key] = "Alice"  # error: [invalid-key]
    |            ^^^^^^^
-26 |
-27 | def create_with_invalid_string_key():
    |
-info: rule `invalid-key` is enabled by default
 
 ```
 
@@ -199,17 +171,12 @@ info: rule `invalid-key` is enabled by default
 error[invalid-key]: Unknown key "unknown" for TypedDict `Person`
   --> src/mdtest_snippet.py:29:21
    |
-27 | def create_with_invalid_string_key():
-28 |     # error: [invalid-key]
 29 |     alice: Person = {"name": "Alice", "age": 30, "unknown": "Foo"}
    |                     -----------------------------^^^^^^^^^--------
    |                     |                            |
    |                     |                            Unknown key "unknown"
    |                     TypedDict `Person`
-30 |
-31 |     # error: [invalid-key]
    |
-info: rule `invalid-key` is enabled by default
 
 ```
 
@@ -217,12 +184,9 @@ info: rule `invalid-key` is enabled by default
 error[invalid-key]: Unknown key "unknown" for TypedDict `Person`
   --> src/mdtest_snippet.py:32:11
    |
-31 |     # error: [invalid-key]
 32 |     bob = Person(name="Bob", age=25, unknown="Bar")
    |           ------ TypedDict `Person`  ^^^^^^^^^^^^^ Unknown key "unknown"
-33 | from typing_extensions import ReadOnly
    |
-info: rule `invalid-key` is enabled by default
 
 ```
 
@@ -230,23 +194,17 @@ info: rule `invalid-key` is enabled by default
 error[invalid-assignment]: Cannot assign to key "id" on TypedDict `Employee`
   --> src/mdtest_snippet.py:40:5
    |
-39 | def write_to_readonly_key(employee: Employee):
 40 |     employee["id"] = 42  # error: [invalid-assignment]
    |     -------- ^^^^ key is marked read-only
    |     |
    |     TypedDict `Employee`
-41 | def write_to_non_existing_key_single_quotes(person: Person):
-42 |     # error: [invalid-key]
    |
 info: Item declaration
   --> src/mdtest_snippet.py:36:5
    |
-35 | class Employee(TypedDict):
 36 |     id: ReadOnly[int]
    |     ----------------- Read-only item declared here
-37 |     name: str
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -254,16 +212,11 @@ info: rule `invalid-assignment` is enabled by default
 error[invalid-key]: Unknown key "nane" for TypedDict `Person`
   --> src/mdtest_snippet.py:43:5
    |
-41 | def write_to_non_existing_key_single_quotes(person: Person):
-42 |     # error: [invalid-key]
 43 |     person['nane'] = "Alice"  # fmt: skip
    |     ------ ^^^^^^ Did you mean 'name'?
    |     |
    |     TypedDict `Person`
-44 | class MovieBase(TypedDict):
-45 |     name: str
    |
-info: rule `invalid-key` is enabled by default
 40 |     employee["id"] = 42  # error: [invalid-assignment]
 41 | def write_to_non_existing_key_single_quotes(person: Person):
 42 |     # error: [invalid-key]
@@ -280,23 +233,15 @@ note: This is an unsafe fix and may change runtime behavior
 error[invalid-typed-dict-field]: Cannot overwrite TypedDict field `name`
   --> src/mdtest_snippet.py:48:5
    |
-47 | class BadMovie(MovieBase):
 48 |     name: int  # error: [invalid-typed-dict-field]
    |     ^^^^^^^^^ Inherited mutable field type `str` is incompatible with `int`
-49 |
-50 | class LeftBase(TypedDict):
    |
 info: Field declaration
   --> src/mdtest_snippet.py:45:5
    |
-43 |     person['nane'] = "Alice"  # fmt: skip
-44 | class MovieBase(TypedDict):
 45 |     name: str
    |     --------- Inherited field `name` declared here on base `MovieBase`
-46 |
-47 | class BadMovie(MovieBase):
    |
-info: rule `invalid-typed-dict-field` is enabled by default
 
 ```
 
@@ -304,30 +249,20 @@ info: rule `invalid-typed-dict-field` is enabled by default
 error[invalid-typed-dict-field]: Cannot overwrite TypedDict field `value` while merging base classes
   --> src/mdtest_snippet.py:56:7
    |
-54 |     value: str
-55 |
 56 | class BadMerge(LeftBase, RightBase):  # error: [invalid-typed-dict-field]
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inherited mutable field type `str` is incompatible with `int`
-57 |     pass
    |
 info: Field declaration
   --> src/mdtest_snippet.py:51:5
    |
-50 | class LeftBase(TypedDict):
 51 |     value: int
    |     ---------- Field `value` already inherited from another base here
-52 |
-53 | class RightBase(TypedDict):
    |
 info: Field declaration
   --> src/mdtest_snippet.py:54:5
    |
-53 | class RightBase(TypedDict):
 54 |     value: str
    |     ---------- Inherited field `value` declared here on base `RightBase`
-55 |
-56 | class BadMerge(LeftBase, RightBase):  # error: [invalid-typed-dict-field]
    |
-info: rule `invalid-typed-dict-field` is enabled by default
 
 ```

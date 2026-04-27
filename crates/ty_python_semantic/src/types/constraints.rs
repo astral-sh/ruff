@@ -328,131 +328,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.node.is_always_satisfied(db, self.builder)
     }
 
-    /// Returns whether this constraint set contains any cycles between typevars. If it does, then
-    /// we cannot create a specialization from this constraint set.
-    ///
-    /// We have restrictions in place that ensure that there are no cycles in the _lower and upper
-    /// bounds_ of each constraint, but it's still possible for a constraint to _mention_ another
-    /// typevar without _constraining_ it. For instance, `(T ≤ int) ∧ (U ≤ list[T])` is a valid
-    /// constraint set, which we can create a specialization from (`T = int, U = list[int]`). But
-    /// `(T ≤ list[U]) ∧ (U ≤ list[T])` does not violate our lower/upper bounds restrictions, since
-    /// neither bound _is_ a typevar. And it's not something we can create a specialization from,
-    /// since we would endlessly substitute until we stack overflow.
-    pub(crate) fn is_cyclic(self, db: &'db dyn Db) -> bool {
-        self.is_cyclic_impl(db, None)
-    }
-
-    fn is_cyclic_impl(self, db: &'db dyn Db, inferable: Option<InferableTypeVars<'db>>) -> bool {
-        #[derive(Default)]
-        struct CollectReachability<'db> {
-            reachable_typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
-            recursion_guard: TypeCollector<'db>,
-        }
-
-        impl<'db> TypeVisitor<'db> for CollectReachability<'db> {
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                true
-            }
-
-            fn visit_bound_type_var_type(
-                &self,
-                db: &'db dyn Db,
-                bound_typevar: BoundTypeVarInstance<'db>,
-            ) {
-                self.reachable_typevars
-                    .borrow_mut()
-                    .insert(bound_typevar.identity(db));
-                walk_bound_type_var_type(db, bound_typevar, self);
-            }
-
-            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
-                // Override the default `walk_generic_alias` to skip walking the generic
-                // context. The generic context contains the typevar *definitions* for the
-                // specialization (the mapping keys), but those typevars are bound — they
-                // are not free occurrences in the type. Walking them here would cause false
-                // cycles: e.g. the constraint `list[int] ≤ _T@list` would appear cyclic
-                // because `_T@list` is found in the generic context of `list[int]`, even
-                // though `_T` is bound to `int` in that specialization.
-                for ty in alias.specialization(db).types(db) {
-                    self.visit_type(db, *ty);
-                }
-            }
-
-            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-            }
-        }
-
-        fn visit_dfs<'db>(
-            reachable_typevars: &mut FxHashMap<
-                BoundTypeVarIdentity<'db>,
-                FxHashSet<BoundTypeVarIdentity<'db>>,
-            >,
-            discovered: &mut FxHashSet<BoundTypeVarIdentity<'db>>,
-            bound_typevar: BoundTypeVarIdentity<'db>,
-        ) -> bool {
-            discovered.insert(bound_typevar);
-            let outgoing = reachable_typevars
-                .remove(&bound_typevar)
-                .expect("should not visit typevar twice in DFS");
-            for outgoing in outgoing {
-                if discovered.contains(&outgoing) {
-                    return true;
-                }
-                if reachable_typevars.contains_key(&outgoing) {
-                    if visit_dfs(reachable_typevars, discovered, outgoing) {
-                        return true;
-                    }
-                }
-            }
-            discovered.remove(&bound_typevar);
-            false
-        }
-
-        // First find all of the typevars that each constraint directly mentions. When `inferable`
-        // is provided, only include inferable typevars as sources and targets in the graph.
-        let mut reachable_typevars: FxHashMap<
-            BoundTypeVarIdentity<'db>,
-            FxHashSet<BoundTypeVarIdentity<'db>>,
-        > = FxHashMap::default();
-        self.node
-            .for_each_constraint(self.builder, &mut |constraint, _| {
-                let constraint = self.builder.constraint_data(constraint);
-                let identity = constraint.typevar.identity(db);
-                if inferable.is_some_and(|inferable| !identity.is_inferable(db, inferable)) {
-                    return;
-                }
-                let visitor = CollectReachability::default();
-                visitor.visit_type(db, constraint.lower);
-                visitor.visit_type(db, constraint.upper);
-                let reachable = visitor.reachable_typevars.into_inner();
-                let entry = reachable_typevars.entry(identity).or_default();
-                if let Some(inferable) = inferable {
-                    entry.extend(
-                        reachable
-                            .into_iter()
-                            .filter(|tv| tv.is_inferable(db, inferable)),
-                    );
-                } else {
-                    entry.extend(reachable);
-                }
-            });
-
-        // Then perform a depth-first search to see if there are any cycles.
-        let mut discovered: FxHashSet<BoundTypeVarIdentity<'db>> = FxHashSet::default();
-        while let Some(bound_typevar) = reachable_typevars.keys().copied().next() {
-            if !discovered.contains(&bound_typevar) {
-                let cycle_found =
-                    visit_dfs(&mut reachable_typevars, &mut discovered, bound_typevar);
-                if cycle_found {
-                    return true;
-                }
-            }
-        }
-
-        false
-    }
-
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
     /// constraints in this constraint set hold. Panics if neither of the types being compared are
     /// a typevar. (That case is handled by `Type::has_relation_to`.)
@@ -611,27 +486,30 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, self.node.exists(db, builder, to_remove))
     }
 
+    pub(crate) fn remove_noninferable(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'db>,
+    ) -> Self {
+        self.verify_builder(builder);
+        Self::from_node(
+            builder,
+            self.node.remove_noninferable(db, builder, inferable),
+        )
+    }
+
+    #[expect(dead_code)]
     pub(crate) fn solutions(
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
     ) -> Solutions<Ref<'c, Vec<Solution<'db>>>> {
         self.verify_builder(builder);
-
-        // If the constraint set is cyclic, we'll hit an infinite expansion when trying to add type
-        // mappings for it.
-        if self.is_cyclic(db) {
-            return Solutions::Unsatisfiable;
-        }
-
         self.node.solutions(db, builder)
     }
 
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
-    ///
-    /// We only consider cycles among inferable typevars. Non-inferable typevars (e.g., from outer
-    /// scopes that appear due to BDD constraint reordering) are skipped during both cycle
-    /// detection and solution extraction.
     ///
     /// The `choose` hook is called for each typevar on each BDD path with the typevar's
     /// materialized lower and upper bounds. It returns:
@@ -640,11 +518,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ///
     /// For multi-path BDDs, the hook is called per-path. The caller is responsible for combining
     /// results across paths (typically via union).
-    pub(crate) fn solutions_with_inferable(
+    pub(crate) fn solutions_with(
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
         choose: impl FnMut(
             BoundTypeVarInstance<'db>,
             TypeVarVariance,
@@ -653,11 +530,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         ) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<Vec<Solution<'db>>> {
         self.verify_builder(builder);
-
-        if self.is_cyclic_impl(db, Some(inferable)) {
-            return Solutions::Unsatisfiable;
-        }
-
         self.node.solutions_with(db, builder, choose)
     }
 
@@ -1004,6 +876,50 @@ pub struct TypeVarId;
 #[newtype_index]
 #[derive(salsa::Update, get_size2::GetSize)]
 pub struct ConstraintId;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+enum NestedSubstitutionSide {
+    Lower,
+    Upper,
+}
+
+/// Identifies one nested-typevar substitution that has been applied while saturating a single
+/// BDD path.
+///
+/// We intentionally key this by the constraint that we substitute _into_ and the typevar that we
+/// substitute _for_, but not by the replacement type. For the pathological cases that matter for
+/// performance, the same nested substitution shape can keep producing ever-deeper replacement
+/// types (for instance, repeated `Iterable[...]` wrapping). Recording only the substitution site
+/// lets [`PathAssignments`] apply that substitution at most once per path, which preserves the
+/// initial cross-typevar relationship without repeatedly unfolding the same pattern.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+struct NestedSubstitution {
+    substituted_into: ConstraintId,
+    substituted_typevar: TypeVarId,
+    side: NestedSubstitutionSide,
+}
+
+/// A constraint derived from the sequent map, optionally annotated with the nested substitution
+/// step that produced it.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+struct DerivedConstraint {
+    constraint: ConstraintId,
+    nested_substitution: Option<NestedSubstitution>,
+}
+
+fn nested_substitution<'db>(
+    db: &'db dyn Db,
+    builder: &ConstraintSetBuilder<'db>,
+    substituted_into: ConstraintId,
+    substituted_typevar: BoundTypeVarInstance<'db>,
+    side: NestedSubstitutionSide,
+) -> NestedSubstitution {
+    NestedSubstitution {
+        substituted_into,
+        substituted_typevar: builder.typevar_id(db, substituted_typevar),
+        side,
+    }
+}
 
 /// An individual constraint in a constraint set. This restricts a single typevar to be within a
 /// lower and upper bound.
@@ -2285,6 +2201,19 @@ impl NodeId {
         }
     }
 
+    fn remove_noninferable<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'db>,
+    ) -> Self {
+        match self.node() {
+            Node::AlwaysTrue => ALWAYS_TRUE,
+            Node::AlwaysFalse => ALWAYS_FALSE,
+            Node::Interior(interior) => interior.remove_noninferable(db, builder, inferable),
+        }
+    }
+
     fn abstract_one_inner<'db>(
         self,
         db: &'db dyn Db,
@@ -2640,30 +2569,30 @@ impl NodeId {
                     )?;
                     // Calling display_graph recursively here causes rustc to claim that the
                     // expect(unused) up above is unfulfilled!
-                    write!(f, "\n{prefix}┡━₁ ",)?;
+                    write!(f, "\n{prefix}┡━₁ ")?;
                     format_node(
                         db,
                         builder,
                         interior.if_true,
-                        &format_args!("{prefix}│   ",),
+                        &format_args!("{prefix}│   "),
                         seen,
                         f,
                     )?;
-                    write!(f, "\n{prefix}├─? ",)?;
+                    write!(f, "\n{prefix}├─? ")?;
                     format_node(
                         db,
                         builder,
                         interior.if_uncertain,
-                        &format_args!("{prefix}│   ",),
+                        &format_args!("{prefix}│   "),
                         seen,
                         f,
                     )?;
-                    write!(f, "\n{prefix}└─₀ ",)?;
+                    write!(f, "\n{prefix}└─₀ ")?;
                     format_node(
                         db,
                         builder,
                         interior.if_false,
-                        &format_args!("{prefix}    ",),
+                        &format_args!("{prefix}    "),
                         seen,
                         f,
                     )?;
@@ -2859,9 +2788,9 @@ impl<'db> PathBounds<'db> {
         Self(result)
     }
 
-    fn solve(&self, db: &'db dyn Db) -> Vec<Solution<'db>> {
+    fn solve(&self, db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>) -> Vec<Solution<'db>> {
         self.solve_with(|bound_typevar, _variance, lower, upper| {
-            Self::default_solve(db, bound_typevar, lower, upper)
+            Self::default_solve(db, builder, bound_typevar, lower, upper)
         })
     }
 
@@ -2925,6 +2854,7 @@ impl<'db> PathBounds<'db> {
     /// - `Err(())` if the path is invalid (bounds violate the typevar's declared constraints)
     pub(crate) fn default_solve(
         db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
         bound_typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
         upper: Type<'db>,
@@ -2932,7 +2862,8 @@ impl<'db> PathBounds<'db> {
         match bound_typevar.typevar(db).require_bound_or_constraints(db) {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
                 let bound = bound.top_materialization(db);
-                if !lower.is_assignable_to(db, bound) {
+                let when = lower.when_constraint_set_assignable_to(db, bound, builder);
+                if when.is_never_satisfied(db) {
                     // This path does not satisfy the typevar's upper bound, and is
                     // therefore not a valid specialization.
                     return Err(());
@@ -2961,8 +2892,12 @@ impl<'db> PathBounds<'db> {
                 let compatible_constraints = constraints.elements(db).iter().filter(|constraint| {
                     let constraint_lower = constraint.bottom_materialization(db);
                     let constraint_upper = constraint.top_materialization(db);
-                    lower.is_assignable_to(db, constraint_lower)
-                        && constraint_upper.is_assignable_to(db, upper)
+                    let when = lower
+                        .when_constraint_set_assignable_to(db, constraint_lower, builder)
+                        .and(db, builder, || {
+                            constraint_upper.when_constraint_set_assignable_to(db, upper, builder)
+                        });
+                    !when.is_never_satisfied(db)
                 });
 
                 // If only one constraint remains, that's our specialization for this path.
@@ -3235,6 +3170,39 @@ impl InteriorNode {
         let mut storage = builder.storage.borrow_mut();
         storage.exists_one_cache.insert(key, result);
         result
+    }
+
+    fn remove_noninferable<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'db>,
+    ) -> NodeId {
+        let mut path = self.path_assignments(builder);
+        let is_bare_inferable_typevar = |ty: Type<'db>| {
+            ty.as_typevar()
+                .is_some_and(|bound_typevar| bound_typevar.is_inferable(db, inferable))
+        };
+        self.abstract_one_inner(
+            db,
+            builder,
+            // We only want to keep constraints on inferable typevars. If the constraint's typevar
+            // is itself inferable, we keep it. We also need to keep some constraints in
+            // non-inferable typevars, if their lower or upper bound is a bare inferable typevar.
+            // This ensure that our quantification logic does not depend on typevar ordering.
+            //
+            // For example, `I ≤ N` (where I is inferable and N is non-inferable) could be encoded
+            // either as `Never ≤ I ≤ N` or `I ≤ N ≤ object`, depending on typevar ordering. If we
+            // only checked the inferability of the constrained typevar, we would keep the first
+            // encoding but remove the second.
+            &mut |constraint| {
+                let constraint = builder.constraint_data(constraint);
+                !constraint.typevar.is_inferable(db, inferable)
+                    && !is_bare_inferable_typevar(constraint.lower)
+                    && !is_bare_inferable_typevar(constraint.upper)
+            },
+            &mut path,
+        )
     }
 
     fn abstract_one_inner<'db>(
@@ -3513,7 +3481,7 @@ impl InteriorNode {
             }
 
             let path_bounds = PathBounds::compute(db, builder, interior);
-            let solutions = path_bounds.solve(db);
+            let solutions = path_bounds.solve(db, builder);
 
             let mut storage = builder.storage.borrow_mut();
             storage.solutions_cache.insert(key, solutions);
@@ -4241,7 +4209,7 @@ struct SequentMap {
     /// Sequents of the form `C₁ ∧ C₂ → false`
     pair_impossibilities: FxHashSet<(ConstraintId, ConstraintId)>,
     /// Sequents of the form `C₁ ∧ C₂ → D`
-    pair_implications: FxIndexMap<(ConstraintId, ConstraintId), FxIndexSet<ConstraintId>>,
+    pair_implications: FxIndexMap<(ConstraintId, ConstraintId), FxIndexSet<DerivedConstraint>>,
     /// Sequents of the form `C → D`
     single_implications: FxIndexMap<ConstraintId, FxIndexSet<ConstraintId>>,
 }
@@ -4386,6 +4354,18 @@ impl SequentMap {
         ante2: ConstraintId,
         post: ConstraintId,
     ) {
+        self.add_pair_implication_with_provenance(db, builder, ante1, ante2, post, None);
+    }
+
+    fn add_pair_implication_with_provenance<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        ante1: ConstraintId,
+        ante2: ConstraintId,
+        post: ConstraintId,
+        nested_substitution: Option<NestedSubstitution>,
+    ) {
         // If the post constraint is unsatisfiable, then the antecedents contradict each other.
         let post_data = builder.constraint_data(post);
         let when = post_data
@@ -4400,11 +4380,15 @@ impl SequentMap {
         if ante1.implies(db, builder, post) || ante2.implies(db, builder, post) {
             return;
         }
+        let derived = DerivedConstraint {
+            constraint: post,
+            nested_substitution,
+        };
         if self
             .pair_implications
             .entry(Self::pair_key(ante1, ante2))
             .or_default()
-            .insert(post)
+            .insert(derived)
         {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
@@ -4878,12 +4862,19 @@ impl SequentMap {
                             constrained_data.lower,
                             new_upper,
                         );
-                        self.add_pair_implication(
+                        self.add_pair_implication_with_provenance(
                             db,
                             builder,
                             bound_constraint,
                             constrained_constraint,
                             post,
+                            Some(nested_substitution(
+                                db,
+                                builder,
+                                constrained_constraint,
+                                bound_typevar,
+                                NestedSubstitutionSide::Upper,
+                            )),
                         );
                     }
                 }
@@ -4935,12 +4926,19 @@ impl SequentMap {
                             new_lower,
                             constrained_data.upper,
                         );
-                        self.add_pair_implication(
+                        self.add_pair_implication_with_provenance(
                             db,
                             builder,
                             bound_constraint,
                             constrained_constraint,
                             post,
+                            Some(nested_substitution(
+                                db,
+                                builder,
+                                constrained_constraint,
+                                bound_typevar,
+                                NestedSubstitutionSide::Lower,
+                            )),
                         );
                     }
                 }
@@ -5024,12 +5022,19 @@ impl SequentMap {
                                 constrained_data.lower,
                                 new_upper,
                             );
-                            self.add_pair_implication(
+                            self.add_pair_implication_with_provenance(
                                 db,
                                 builder,
                                 bound_constraint,
                                 constrained_constraint,
                                 post,
+                                Some(nested_substitution(
+                                    db,
+                                    builder,
+                                    constrained_constraint,
+                                    nested_typevar,
+                                    NestedSubstitutionSide::Upper,
+                                )),
                             );
                         }
                     }
@@ -5061,12 +5066,19 @@ impl SequentMap {
                                 new_lower,
                                 constrained_data.upper,
                             );
-                            self.add_pair_implication(
+                            self.add_pair_implication_with_provenance(
                                 db,
                                 builder,
                                 bound_constraint,
                                 constrained_constraint,
                                 post,
+                                Some(nested_substitution(
+                                    db,
+                                    builder,
+                                    constrained_constraint,
+                                    nested_typevar,
+                                    NestedSubstitutionSide::Lower,
+                                )),
                             );
                         }
                     }
@@ -5307,7 +5319,7 @@ impl SequentMap {
                             "{} ∧ {} → {}",
                             ante1.display(self.db, self.builder),
                             ante2.display(self.db, self.builder),
-                            post.display(self.db, self.builder),
+                            post.constraint.display(self.db, self.builder),
                         )?;
                     }
                 }
@@ -5346,6 +5358,8 @@ impl SequentMap {
 pub(crate) struct PathAssignments {
     map: SequentMap,
     assignments: FxIndexMap<ConstraintAssignment, usize>,
+    /// Nested substitutions that we have already applied on the current root→terminal path.
+    nested_substitutions: FxIndexSet<NestedSubstitution>,
     /// Constraints that we have discovered, mapped to whether we have processed them yet. (This
     /// ensures a stable order for all of the derived constraints that we create, while still
     /// letting us create them lazily.)
@@ -5361,6 +5375,7 @@ impl PathAssignments {
         Self {
             map: SequentMap::default(),
             assignments: FxIndexMap::default(),
+            nested_substitutions: FxIndexSet::default(),
             discovered,
         }
     }
@@ -5399,6 +5414,7 @@ impl PathAssignments {
         // pass along the range of which assignments are new, and so that we can reset back to this
         // point before returning.
         let start = self.assignments.len();
+        let nested_substitutions_start = self.nested_substitutions.len();
 
         // Add the new assignment and anything we can derive from it.
         tracing::trace!(
@@ -5440,6 +5456,8 @@ impl PathAssignments {
         // Reset back to where we were before following this edge, so that the caller can reuse a
         // single instance for the entire BDD traversal.
         self.assignments.truncate(start);
+        self.nested_substitutions
+            .truncate(nested_substitutions_start);
         result
     }
 
@@ -5605,11 +5623,26 @@ impl PathAssignments {
         let mut new_constraints = Vec::new();
         for ((ante1, ante2), posts) in &self.map.pair_implications {
             for post in posts {
-                if self.assignment_holds(ante1.when_true())
-                    && self.assignment_holds(ante2.when_true())
+                if !self.assignment_holds(ante1.when_true())
+                    || !self.assignment_holds(ante2.when_true())
                 {
-                    new_constraints.push(*post);
+                    continue;
                 }
+
+                // Nested-typevar sequents are the mechanism that preserves cross-typevar facts when
+                // we later existentially quantify away one of the typevars. However, once we've
+                // applied a particular substitution site on the current path, reapplying it with a
+                // newly derived replacement type does not add fundamentally new information — it
+                // just keeps unfolding the same pattern one layer deeper. Skipping repeated
+                // applications here prevents those infinite-looking expansion chains while still
+                // keeping the first derived relationship.
+                if let Some(nested_substitution) = post.nested_substitution
+                    && !self.nested_substitutions.insert(nested_substitution)
+                {
+                    continue;
+                }
+
+                new_constraints.push(post.constraint);
             }
         }
 

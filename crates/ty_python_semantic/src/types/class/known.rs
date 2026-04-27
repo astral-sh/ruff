@@ -1,10 +1,9 @@
 use crate::{
     Db, Program,
     place::{DefinedPlace, Definedness, Place, known_module_symbol},
-    semantic_index::{SemanticIndex, scope::NodeWithScopeKind},
     types::{
         Binding, ClassLiteral, ClassType, GenericContext, KnownInstanceType, StaticClassLiteral,
-        SubclassOfType, Truthiness, Type, binding_type,
+        SubclassOfType, Type, binding_type,
         bound_super::{BoundSuperError, BoundSuperType},
         class::CodeGeneratorKind,
         constraints::{ConstraintSet, ConstraintSetBuilder},
@@ -23,6 +22,7 @@ use std::{
     sync::{LazyLock, Mutex},
 };
 use ty_module_resolver::{KnownModule, file_to_module};
+use ty_python_core::{SemanticIndex, Truthiness, scope::NodeWithScopeKind};
 
 /// Non-exhaustive enumeration of known classes (e.g. `builtins.int`, `typing.Any`, ...) to allow
 /// for easier syntax when interacting with very common classes.
@@ -68,6 +68,9 @@ pub enum KnownClass {
     Member,
     Nonmember,
     StrEnum,
+    IntEnum,
+    Flag,
+    IntFlag,
     // abc
     ABCMeta,
     // Types
@@ -224,6 +227,9 @@ impl KnownClass {
             | Self::Member
             | Self::Nonmember
             | Self::StrEnum
+            | Self::IntEnum
+            | Self::Flag
+            | Self::IntFlag
             | Self::ABCMeta
             | Self::Iterable
             | Self::Iterator
@@ -292,6 +298,9 @@ impl KnownClass {
             | KnownClass::Member
             | KnownClass::Nonmember
             | KnownClass::StrEnum
+            | KnownClass::IntEnum
+            | KnownClass::Flag
+            | KnownClass::IntFlag
             | KnownClass::ABCMeta
             | KnownClass::GenericAlias
             | KnownClass::ModuleType
@@ -382,6 +391,9 @@ impl KnownClass {
             | KnownClass::Member
             | KnownClass::Nonmember
             | KnownClass::StrEnum
+            | KnownClass::IntEnum
+            | KnownClass::Flag
+            | KnownClass::IntFlag
             | KnownClass::ABCMeta
             | KnownClass::GenericAlias
             | KnownClass::ModuleType
@@ -472,6 +484,9 @@ impl KnownClass {
             | KnownClass::Member
             | KnownClass::Nonmember
             | KnownClass::StrEnum
+            | KnownClass::IntEnum
+            | KnownClass::Flag
+            | KnownClass::IntFlag
             | KnownClass::ABCMeta
             | KnownClass::GenericAlias
             | KnownClass::ModuleType
@@ -603,6 +618,9 @@ impl KnownClass {
             | Self::Member
             | Self::Nonmember
             | Self::StrEnum
+            | Self::IntEnum
+            | Self::Flag
+            | Self::IntFlag
             | Self::ABCMeta
             | Self::Super
             | Self::StdlibAlias
@@ -663,6 +681,9 @@ impl KnownClass {
             | KnownClass::Member
             | KnownClass::Nonmember
             | KnownClass::StrEnum
+            | KnownClass::IntEnum
+            | KnownClass::Flag
+            | KnownClass::IntFlag
             | KnownClass::ABCMeta
             | KnownClass::GenericAlias
             | KnownClass::ModuleType
@@ -789,6 +810,9 @@ impl KnownClass {
             Self::Member => "member",
             Self::Nonmember => "nonmember",
             Self::StrEnum => "StrEnum",
+            Self::IntEnum => "IntEnum",
+            Self::Flag => "Flag",
+            Self::IntFlag => "IntFlag",
             Self::ABCMeta => "ABCMeta",
             Self::Super => "super",
             Self::Iterable => "Iterable",
@@ -1128,7 +1152,10 @@ impl KnownClass {
             | Self::Auto
             | Self::Member
             | Self::Nonmember
-            | Self::StrEnum => KnownModule::Enum,
+            | Self::StrEnum
+            | Self::IntEnum
+            | Self::Flag
+            | Self::IntFlag => KnownModule::Enum,
             Self::GenericAlias
             | Self::ModuleType
             | Self::FunctionType
@@ -1284,6 +1311,9 @@ impl KnownClass {
             | Self::Member
             | Self::Nonmember
             | Self::StrEnum
+            | Self::IntEnum
+            | Self::Flag
+            | Self::IntFlag
             | Self::ABCMeta
             | Self::Super
             | Self::NewType
@@ -1378,6 +1408,9 @@ impl KnownClass {
             | Self::Member
             | Self::Nonmember
             | Self::StrEnum
+            | Self::IntEnum
+            | Self::Flag
+            | Self::IntFlag
             | Self::ABCMeta
             | Self::Super
             | Self::UnionType
@@ -1478,6 +1511,9 @@ impl KnownClass {
             "StrEnum" if Program::get(db).python_version(db) >= PythonVersion::PY311 => {
                 &[Self::StrEnum]
             }
+            "IntEnum" => &[Self::IntEnum],
+            "Flag" => &[Self::Flag],
+            "IntFlag" => &[Self::IntFlag],
             "auto" => &[Self::Auto],
             "member" => &[Self::Member],
             "nonmember" => &[Self::Nonmember],
@@ -1563,6 +1599,9 @@ impl KnownClass {
             | Self::Member
             | Self::Nonmember
             | Self::StrEnum
+            | Self::IntEnum
+            | Self::Flag
+            | Self::IntFlag
             | Self::ABCMeta
             | Self::Super
             | Self::NotImplementedType

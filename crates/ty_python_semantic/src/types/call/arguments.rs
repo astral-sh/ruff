@@ -73,7 +73,7 @@ impl<'db> CallArgumentTypes<'db> {
             .types
             .values()
             .exactly_one()
-            .or(self.types.values().all_equal_value())
+            .or_else(|_| self.types.values().all_equal_value())
         {
             return Some(*exact_ty);
         }
@@ -86,7 +86,7 @@ impl<'db> CallArgumentTypes<'db> {
         self.types
             .get(&tcx)
             .copied()
-            .or(self.get_default())
+            .or_else(|| self.get_default())
             .unwrap_or(Type::unknown())
     }
 
@@ -122,7 +122,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         mut infer_argument_type: impl FnMut(&ast::ArgOrKeyword, &ast::Expr) -> Type<'db>,
     ) -> Self {
         arguments
-            .arguments_source_order()
+            .iter_source_order()
             .map(|arg_or_keyword| match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
@@ -152,7 +152,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         mut infer_argument_type: impl FnMut(&ast::Expr) -> Type<'db>,
     ) -> Self {
         arguments
-            .arguments_source_order()
+            .iter_source_order()
             .map(|arg_or_keyword| match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {

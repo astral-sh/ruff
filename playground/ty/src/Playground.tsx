@@ -51,7 +51,6 @@ export default function Playground() {
   // We need useRef to avoid duplicate initialization when
   // running locally due to react rendering
   // everything twice in strict mode in debug builds.
-  // eslint-disable-next-line react-hooks/refs
   const workspacePromise = workspacePromiseRef.current;
 
   const fileName = useMemo(() => {

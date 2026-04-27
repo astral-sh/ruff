@@ -1,5 +1,4 @@
 use crate::place::PlaceAndQualifiers;
-use crate::semantic_index::definition::Definition;
 use crate::types::class::DynamicClassLiteral;
 use crate::types::constraints::ConstraintSet;
 use crate::types::protocol_class::ProtocolClass;
@@ -12,6 +11,7 @@ use crate::types::{
     TypedDictType, UnionType, todo_type,
 };
 use crate::{Db, FxOrderSet};
+use ty_python_core::definition::Definition;
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
@@ -235,6 +235,18 @@ impl<'db> SubclassOfType<'db> {
             SubclassOfInner::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type),
             SubclassOfInner::TypeVar(bound_typevar) => Type::TypeVar(bound_typevar),
         }
+    }
+
+    /// Return a type representing "the set of all instances of the metaclass of this type".
+    pub(crate) fn to_metaclass_instance(self, db: &'db dyn Db) -> Type<'db> {
+        // This kind of looks like a no-op, but it's not. For `type[C]` where `C` has metaclass
+        // `M`, `to_meta_type` transforms `type[C]` to `type[M]`, and then `to_instance` makes it
+        // just `M`. And `to_meta_type` will transpose `type[T: C]` into `T: type[C]`, collapse to
+        // the upper bound `type[C]`, and transform that to the meta-type `type[M]`, which
+        // `to_instance` then resolves to `M`.
+        self.to_meta_type(db)
+            .to_instance(db)
+            .expect("the meta-type of a SubclassOf type should always be instantiable")
     }
 
     /// Compute the metatype of this `type[T]`.

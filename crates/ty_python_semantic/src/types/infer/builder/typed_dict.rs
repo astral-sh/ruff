@@ -1,20 +1,64 @@
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, NodeIndex};
+use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, NodeIndex};
+use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 use strum::IntoEnumIterator;
 
 use super::TypeInferenceBuilder;
 use crate::TypeQualifiers;
-use crate::semantic_index::definition::Definition;
 use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
-    UNKNOWN_ARGUMENT,
+    UNKNOWN_ARGUMENT, report_mismatched_type_name,
 };
 use crate::types::infer::builder::DeferredExpressionState;
 use crate::types::special_form::TypeQualifier;
-use crate::types::typed_dict::{TypedDictSchema, functional_typed_dict_field};
-use crate::types::{IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext};
+use crate::types::typed_dict::{
+    TypedDictSchema, collect_guaranteed_keyword_keys, functional_typed_dict_field,
+    infer_unpacked_keyword_types, typed_dict_with_relaxed_keys, validate_typed_dict_constructor,
+    validate_typed_dict_dict_literal,
+};
+use crate::types::{
+    IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictType,
+};
+use ty_python_core::definition::Definition;
+
+/// The shape of a `TypedDict` constructor call that affects how we prepare it for inference.
+#[derive(Debug, Clone, Copy)]
+pub(super) enum TypedDictConstructorForm<'expr> {
+    /// // Ex) `TD(x=1)`
+    KeywordOnly,
+    /// // Ex) `TD({"x": 1})`
+    LiteralOnly(&'expr ast::Expr),
+    /// // Ex) `TD(other)`
+    SinglePositional(&'expr ast::Expr),
+    /// // Ex) `TD({"x": 1}, y=2)`
+    MixedLiteralAndKeywords(&'expr ast::ExprDict),
+    /// // Ex) `TD(other, y=2)`
+    MixedPositionalAndKeywords,
+    /// // Ex) `TD(arg1, arg2)`
+    MultiplePositionalArguments,
+}
+
+impl<'expr> TypedDictConstructorForm<'expr> {
+    /// Return the constructor form for `arguments`.
+    pub(super) fn from_arguments(arguments: &'expr ast::Arguments) -> Self {
+        let [argument] = &arguments.args[..] else {
+            return if arguments.args.is_empty() {
+                Self::KeywordOnly
+            } else {
+                Self::MultiplePositionalArguments
+            };
+        };
+
+        match (argument, arguments.keywords.is_empty()) {
+            (ast::Expr::Dict(_), true) => Self::LiteralOnly(argument),
+            (ast::Expr::Dict(dict_expr), false) => Self::MixedLiteralAndKeywords(dict_expr),
+            (_, true) => Self::SinglePositional(argument),
+            (_, false) => Self::MixedPositionalAndKeywords,
+        }
+    }
+}
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer a `TypedDict(name, fields)` call expression.
@@ -191,24 +235,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .as_string_literal()
             .map(|literal| Name::new(literal.value(db)));
 
-        if let Some(definition) = definition
-            && let Some(assigned_name) = definition.name(db)
-            && Some(assigned_name.as_str()) != name.as_deref()
-            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
-        {
-            let mut diagnostic =
-                builder.into_diagnostic("TypedDict name must match the variable it is assigned to");
-            if let Some(name) = name.as_deref() {
-                diagnostic.set_primary_message(format_args!(
-                    "Expected \"{assigned_name}\", got \"{name}\""
-                ));
-            } else {
-                diagnostic.set_primary_message(format_args!(
-                    "Expected \"{assigned_name}\", got variable of type `{}`",
-                    name_type.display(db)
-                ));
-            }
-        } else if name.is_none()
+        if name.is_none()
             && !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
             && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
         {
@@ -219,6 +246,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 "Expected `str`, found `{}`",
                 name_type.display(db)
             ));
+        } else if let Some(definition) = definition
+            && let Some(assigned_name) = definition.name(db)
+            && Some(assigned_name.as_str()) != name.as_deref()
+        {
+            report_mismatched_type_name(
+                &self.context,
+                name_arg,
+                "TypedDict",
+                &assigned_name,
+                name.as_deref(),
+                name_type,
+            );
         }
 
         let name = name.unwrap_or_else(|| Name::new_static("<unknown>"));
@@ -253,6 +292,157 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let typeddict = DynamicTypedDictLiteral::new(db, name, anchor);
         Type::ClassLiteral(ClassLiteral::DynamicTypedDict(typeddict))
+    }
+
+    pub(super) fn infer_typed_dict_expression(
+        &mut self,
+        dict: &ast::ExprDict,
+        typed_dict: TypedDictType<'db>,
+        item_types: &mut FxHashMap<NodeIndex, Type<'db>>,
+    ) -> Option<Type<'db>> {
+        let ast::ExprDict {
+            range: _,
+            node_index: _,
+            items,
+        } = dict;
+
+        let typed_dict_items = typed_dict.items(self.db());
+
+        for item in items {
+            let key_ty = self.infer_optional_expression(item.key.as_ref(), TypeContext::default());
+            if let Some((key, key_ty)) = item.key.as_ref().zip(key_ty) {
+                item_types.insert(key.node_index().load(), key_ty);
+            }
+
+            let value_ty = if let Some(key_ty) = key_ty
+                && let Some(key) = key_ty.as_string_literal()
+                && let Some(field) = typed_dict_items.get(key.value(self.db()))
+            {
+                self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)))
+            } else {
+                self.infer_expression(&item.value, TypeContext::default())
+            };
+
+            item_types.insert(item.value.node_index().load(), value_ty);
+        }
+
+        validate_typed_dict_dict_literal(&self.context, typed_dict, dict, dict.into(), |expr| {
+            item_types
+                .get(&expr.node_index().load())
+                .copied()
+                .unwrap_or(Type::unknown())
+        })
+        .ok()
+        .map(|_| Type::TypedDict(typed_dict))
+    }
+
+    /// Prepare a `TypedDict` constructor call before general argument inference.
+    ///
+    /// This gives constructor values the declared field type as context, then validates the full
+    /// call once when needed. A lone positional dict literal is inferred as a `TypedDict`
+    /// expression directly, while mixed dict-literal and keyword calls infer the nested key and
+    /// value expressions without re-inferring the outer dict literal later during argument
+    /// binding.
+    pub(super) fn prepare_typed_dict_constructor<'expr>(
+        &mut self,
+        typed_dict: TypedDictType<'db>,
+        form: TypedDictConstructorForm<'expr>,
+        arguments: &'expr ast::Arguments,
+        error_node: AnyNodeRef<'expr>,
+    ) {
+        match form {
+            TypedDictConstructorForm::LiteralOnly(argument) => {
+                let target_ty = Type::TypedDict(typed_dict);
+                self.get_or_infer_expression(argument, TypeContext::new(Some(target_ty)));
+                return;
+            }
+            TypedDictConstructorForm::SinglePositional(argument) => {
+                let target_ty = Type::TypedDict(typed_dict);
+                self.get_or_infer_expression(argument, TypeContext::new(Some(target_ty)));
+            }
+            TypedDictConstructorForm::MixedPositionalAndKeywords => {
+                let unpacked_keyword_types =
+                    infer_unpacked_keyword_types(arguments, &mut |expr, tcx| {
+                        self.get_or_infer_expression(expr, tcx)
+                    });
+                let keyword_keys = collect_guaranteed_keyword_keys(
+                    self.db(),
+                    typed_dict,
+                    arguments,
+                    &unpacked_keyword_types,
+                );
+                let positional_target =
+                    typed_dict_with_relaxed_keys(self.db(), typed_dict, &keyword_keys);
+                let target_ty = Type::TypedDict(positional_target);
+                self.get_or_infer_expression(&arguments.args[0], TypeContext::new(Some(target_ty)));
+            }
+            TypedDictConstructorForm::MixedLiteralAndKeywords(dict_expr) => {
+                self.infer_typed_dict_constructor_dict_literal_values(typed_dict, dict_expr);
+                self.store_expression_type(&arguments.args[0], Type::unknown());
+            }
+            TypedDictConstructorForm::KeywordOnly
+            | TypedDictConstructorForm::MultiplePositionalArguments => {}
+        }
+
+        if !arguments.keywords.is_empty() {
+            self.infer_typed_dict_constructor_keyword_values(typed_dict, arguments);
+        }
+
+        validate_typed_dict_constructor(
+            &self.context,
+            typed_dict,
+            arguments,
+            error_node,
+            |expr, _| self.expression_type(expr),
+        );
+    }
+
+    /// Infer keyword argument values for a `TypedDict` constructor.
+    ///
+    /// Named keywords are inferred against the declared type of the matching `TypedDict` field.
+    /// Unpacked `**kwargs` and unknown keys fall back to default inference because they do not
+    /// map to a single field declaration at this stage.
+    fn infer_typed_dict_constructor_keyword_values(
+        &mut self,
+        typed_dict: TypedDictType<'db>,
+        arguments: &ast::Arguments,
+    ) {
+        let items = typed_dict.items(self.db());
+        for keyword in &arguments.keywords {
+            let value_tcx = keyword
+                .arg
+                .as_ref()
+                .and_then(|arg_name| items.get(arg_name.id.as_str()))
+                .map(|field| TypeContext::new(Some(field.declared_ty)))
+                .unwrap_or_default();
+            self.get_or_infer_expression(&keyword.value, value_tcx);
+        }
+    }
+
+    /// Infer the key and value expressions of a positional dict literal passed to a
+    /// `TypedDict` constructor alongside keyword arguments.
+    ///
+    /// The outer dict literal is intentionally left uninferred for later call binding; this helper only
+    /// pre-infers its nested expressions so full constructor validation can still combine keys
+    /// from the dict literal and keyword arguments without double-inferring the dict itself.
+    fn infer_typed_dict_constructor_dict_literal_values(
+        &mut self,
+        typed_dict: TypedDictType<'db>,
+        dict_expr: &ast::ExprDict,
+    ) {
+        let items = typed_dict.items(self.db());
+
+        for item in &dict_expr.items {
+            let value_tcx = item
+                .key
+                .as_ref()
+                .map(|key| self.get_or_infer_expression(key, TypeContext::default()))
+                .and_then(Type::as_string_literal)
+                .and_then(|key| items.get(key.value(self.db())))
+                .map(|field| TypeContext::new(Some(field.declared_ty)))
+                .unwrap_or_default();
+            self.get_or_infer_expression(&item.value, value_tcx);
+        }
     }
 
     /// Infer the `TypedDictSchema` for an "inlined"/"dangling" functional `TypedDict` definition,

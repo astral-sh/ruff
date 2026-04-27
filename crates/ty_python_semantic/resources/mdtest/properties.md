@@ -112,8 +112,7 @@ c.my_property = "b"
 
 ## `property.deleter`
 
-We do not support `property.deleter` yet, but we make sure that it does not invalidate the getter or
-setter:
+We support `property.deleter`, and it preserves the getter and setter:
 
 ```py
 class C:
@@ -131,9 +130,56 @@ class C:
 
 c = C()
 reveal_type(c.my_property)  # revealed: int
+del c.my_property
 c.my_property = 2
 # error: [invalid-assignment]
 c.my_property = "a"
+```
+
+Direct `property.__set__` and `property.__delete__` calls return `None` for ordinary accessors, but
+preserve `Never`/`NoReturn` for typed non-returning accessors:
+
+```py
+from typing import Any, NoReturn, cast
+
+def raw_setter(obj: object, value: object) -> int:
+    return 1
+
+def raw_deleter(obj: object) -> int:
+    return 1
+
+prop = property(fset=cast(Any, raw_setter), fdel=cast(Any, raw_deleter))
+reveal_type(prop.__set__(object(), object()))  # revealed: None
+reveal_type(property.__set__(prop, object(), object()))  # revealed: None
+reveal_type(prop.__delete__(object()))  # revealed: None
+reveal_type(property.__delete__(prop, object()))  # revealed: None
+
+class NoReturnSetterAndDeleter:
+    @property
+    def x(self) -> int:
+        return 1
+
+    @x.setter
+    def x(self, value: int) -> NoReturn:
+        raise RuntimeError
+
+    @x.deleter
+    def x(self) -> NoReturn:
+        raise RuntimeError
+
+def direct_set() -> None:
+    reveal_type(NoReturnSetterAndDeleter.x.__set__(NoReturnSetterAndDeleter(), 1))  # revealed: Never
+
+def direct_set_unbound() -> None:
+    cls = NoReturnSetterAndDeleter
+    reveal_type(type(cls.x).__set__(cls.x, cls(), 1))  # revealed: Never
+
+def direct_delete() -> None:
+    reveal_type(NoReturnSetterAndDeleter.x.__delete__(NoReturnSetterAndDeleter()))  # revealed: Never
+
+def direct_delete_unbound() -> None:
+    cls = NoReturnSetterAndDeleter
+    reveal_type(type(cls.x).__delete__(cls.x, cls()))  # revealed: Never
 ```
 
 ## Conditional redefinition in class body
@@ -199,7 +245,26 @@ c.attr = 1
 
 # TODO: An error should be emitted here.
 # See https://github.com/astral-sh/ruff/issues/16298 for more details.
-reveal_type(c.attr)  # revealed: Unknown
+reveal_type(c.attr)  # revealed: Never
+```
+
+### Non-returning setter
+
+```py
+from typing import NoReturn
+
+class NoReturnSetter:
+    @property
+    def x(self) -> int:
+        return 1
+
+    @x.setter
+    def x(self, value: int) -> NoReturn:
+        raise RuntimeError
+
+no_return_setter = NoReturnSetter()
+# error: [invalid-assignment] "Cannot assign to attribute `x` on type `NoReturnSetter` whose `__set__` method returns `Never`/`NoReturn`"
+no_return_setter.x = 1
 ```
 
 ### Wrong setter signature
@@ -209,7 +274,7 @@ class C:
     @property
     def attr(self) -> int:
         return 1
-    # error: [invalid-argument-type] "Argument to bound method `setter` is incorrect: Expected `(Any, Any, /) -> None`, found `def attr(self) -> None`"
+    # error: [invalid-argument-type] "Argument to bound method `property.setter` is incorrect: Expected `(Any, Any, /) -> None`, found `def attr(self) -> None`"
     @attr.setter
     def attr(self) -> None:
         pass
@@ -225,11 +290,37 @@ class C:
         return 1
 ```
 
+### Deleting a read-only property
+
+```py
+class C:
+    @property
+    def attr(self) -> int:
+        return 1
+
+c = C()
+del c.attr  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Cannot delete read-only property `attr` on object of type `C`
+ --> src/mdtest_snippet.py:7:5
+  |
+7 | del c.attr  # snapshot
+  |     ^^^^^^ Attempted deletion of `C.attr` here
+  |
+ ::: src/mdtest_snippet.py:3:9
+  |
+3 |     def attr(self) -> int:
+  |         ---- Property `C.attr` defined here with no deleter
+  |
+```
+
 ## Limitations
 
 ### Manually constructed property
 
-Properties can also be constructed manually using the `property` class. We partially support this:
+Properties can also be constructed manually using the `property` class. We support this:
 
 ```py
 class C:
@@ -238,14 +329,12 @@ class C:
     attr = property(attr_getter)
 
 c = C()
-reveal_type(c.attr)  # revealed: Unknown | int
+reveal_type(c.attr)  # revealed: int
 ```
 
-But note that we return `Unknown | int` because we did not declare the `attr` attribute. This is
-consistent with how we usually treat attributes, but here, if we try to declare `attr` as
-`property`, we fail to understand the property, since the `property` declaration shadows the more
-precise type that we infer for `property(attr_getter)` (which includes the actual information about
-the getter).
+If we try to declare `attr` as `property`, we fail to understand the property, since the `property`
+declaration shadows the more precise type that we infer for `property(attr_getter)` (which includes
+the actual information about the getter).
 
 ```py
 class C:
@@ -255,6 +344,29 @@ class C:
 
 c = C()
 reveal_type(c.attr)  # revealed: Unknown
+```
+
+### Attempting to write to a read-only manually constructed property
+
+We should emit an error when trying to set an attribute that was created using a manually
+constructed property with `fset=None`, just like we do for decorator-based read-only properties:
+
+```py
+class Foo:
+    myprop = property(fget=lambda self: 42, fset=None)
+
+class Bar:
+    @property
+    def myprop(self) -> int:
+        return 42
+
+f = Foo()
+# error: [invalid-assignment]
+f.myprop = 56
+
+b = Bar()
+# error: [invalid-assignment]
+b.myprop = 42
 ```
 
 ## Behind the scenes
@@ -491,10 +603,12 @@ empty_b = property()
 getter_only_a = property(get_int)
 getter_only_b = property(get_int)
 getter_only_c = property(get_str)
+getter_only_d = property(get_int, None)
 
 setter_only_a = property(fset=set_int)
 setter_only_b = property(fset=set_int)
 setter_only_c = property(fset=set_str)
+setter_only_d = property(None, set_int)
 
 both_a = property(get_int, set_int)
 both_b = property(get_int, set_int)
@@ -503,7 +617,9 @@ both_d = property(get_str, set_int)
 
 static_assert(is_equivalent_to(TypeOf[empty_a], TypeOf[empty_b]))
 static_assert(is_equivalent_to(TypeOf[getter_only_a], TypeOf[getter_only_b]))
+static_assert(is_equivalent_to(TypeOf[getter_only_a], TypeOf[getter_only_d]))
 static_assert(is_equivalent_to(TypeOf[setter_only_a], TypeOf[setter_only_b]))
+static_assert(is_equivalent_to(TypeOf[setter_only_a], TypeOf[setter_only_d]))
 static_assert(is_equivalent_to(TypeOf[both_a], TypeOf[both_b]))
 
 static_assert(not is_equivalent_to(TypeOf[empty_a], TypeOf[getter_only_a]))
@@ -518,7 +634,9 @@ static_assert(not is_equivalent_to(TypeOf[both_a], TypeOf[both_d]))
 
 static_assert(not is_disjoint_from(TypeOf[empty_a], TypeOf[empty_b]))
 static_assert(not is_disjoint_from(TypeOf[getter_only_a], TypeOf[getter_only_b]))
+static_assert(not is_disjoint_from(TypeOf[getter_only_a], TypeOf[getter_only_d]))
 static_assert(not is_disjoint_from(TypeOf[setter_only_a], TypeOf[setter_only_b]))
+static_assert(not is_disjoint_from(TypeOf[setter_only_a], TypeOf[setter_only_d]))
 static_assert(not is_disjoint_from(TypeOf[both_a], TypeOf[both_b]))
 
 static_assert(is_disjoint_from(TypeOf[empty_a], TypeOf[getter_only_a]))

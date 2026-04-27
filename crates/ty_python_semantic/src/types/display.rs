@@ -19,9 +19,6 @@ use ty_module_resolver::file_to_module;
 
 use crate::Db;
 use crate::place::{DefinedPlace, Place};
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::{FileScopeId, ScopeKind};
-use crate::semantic_index::semantic_index;
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::constraints::ConstraintSetBuilder;
@@ -39,6 +36,9 @@ use crate::types::{
     ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
     Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
+use ty_python_core::definition::Definition;
+use ty_python_core::scope::{FileScopeId, ScopeKind};
+use ty_python_core::semantic_index;
 
 /// A named item that can be either a class or a type alias.
 ///
@@ -100,10 +100,10 @@ pub struct DisplaySettings<'db> {
     signature_name_display: SignatureNameDisplay,
     /// Class names that should be displayed fully qualified
     /// (e.g., `module.ClassName` instead of just `ClassName`)
-    pub qualified: Rc<FxHashMap<&'db str, QualificationLevel>>,
+    qualified: Rc<FxHashMap<&'db str, QualificationLevel>>,
     /// Type alias names that should be displayed fully qualified
     /// (e.g., `A.Alias` instead of just `Alias`)
-    pub qualified_type_aliases: Rc<FxHashMap<&'db str, QualificationLevel>>,
+    qualified_type_aliases: Rc<FxHashMap<&'db str, QualificationLevel>>,
     /// Whether long unions and literals are displayed in full
     pub preserve_full_unions: bool,
     /// Scopes that are currently active in the display context (e.g. function scopes
@@ -128,18 +128,10 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn singleline(&self) -> Self {
+    fn singleline(&self) -> Self {
         Self {
             multiline: false,
             ..self.clone()
-        }
-    }
-
-    #[must_use]
-    pub fn truncate_long_unions(self) -> Self {
-        Self {
-            preserve_full_unions: false,
-            ..self
         }
     }
 
@@ -160,7 +152,7 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn force_signature_name(&self) -> Self {
+    fn force_signature_name(&self) -> Self {
         Self {
             signature_name_display: SignatureNameDisplay::Force,
             ..self.clone()
@@ -176,7 +168,7 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn with_active_scopes(&self, scopes: impl IntoIterator<Item = Definition<'db>>) -> Self {
+    fn with_active_scopes(&self, scopes: impl IntoIterator<Item = Definition<'db>>) -> Self {
         let mut active_scopes = (*self.active_scopes).clone();
         active_scopes.extend(scopes);
         Self {
@@ -436,7 +428,7 @@ impl std::ops::DerefMut for TypeDetailGuard<'_, '_, '_, '_> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum QualificationLevel {
+enum QualificationLevel {
     ModuleName,
     FileAndLineNumber,
 }
@@ -1093,9 +1085,19 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         "property",
                         Type::PropertyInstance(property),
                         property
-                            .getter(self.db)
+                            .setter(self.db)
                             .and_then(Type::as_function_literal)
-                            .map(|getter| &**getter.name(self.db)),
+                            .map(|setter| &**setter.name(self.db)),
+                    ),
+                    KnownBoundMethodType::PropertyDunderDelete(property) => (
+                        KnownClass::Property,
+                        "__delete__",
+                        "property",
+                        Type::PropertyInstance(property),
+                        property
+                            .deleter(self.db)
+                            .and_then(Type::as_function_literal)
+                            .map(|deleter| &**deleter.name(self.db)),
                     ),
                     KnownBoundMethodType::StrStartswith(literal) => (
                         KnownClass::Property,
@@ -1161,6 +1163,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     WrapperDescriptorKind::PropertyDunderSet => {
                         ("__set__", "property", KnownClass::Property)
                     }
+                    WrapperDescriptorKind::PropertyDunderDelete => {
+                        ("__delete__", "property", KnownClass::Property)
+                    }
                 };
                 f.write_char('<')?;
                 f.with_type(KnownClass::WrapperDescriptorType.to_class_literal(self.db))
@@ -1222,7 +1227,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .enum_class(self.db)
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f)?;
-                    write!(f, ".{}", enum_literal.name(self.db))
+                    f.write_char('.')?;
+                    write!(
+                        f.with_type(Type::enum_literal(enum_literal)),
+                        "{}",
+                        enum_literal.name(self.db)
+                    )
                 }
             },
             Type::TypeVar(bound_typevar) => {
@@ -1246,7 +1256,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.write_str(", ")?;
                 bound_super
                     .owner(self.db)
-                    .owner_type(self.db)
+                    .owner_type()
                     .display_with(self.db, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(">")
@@ -1304,11 +1314,7 @@ impl<'db> BoundTypeVarIdentity<'db> {
         }
     }
 
-    pub(crate) fn display_with(
-        self,
-        db: &'db dyn Db,
-        settings: DisplaySettings<'db>,
-    ) -> impl Display {
+    fn display_with(self, db: &'db dyn Db, settings: DisplaySettings<'db>) -> impl Display {
         DisplayBoundTypeVarIdentity {
             bound_typevar_identity: self,
             db,
@@ -1341,7 +1347,7 @@ impl Display for DisplayBoundTypeVarIdentity<'_> {
 }
 
 impl<'db> TupleSpec<'db> {
-    pub(crate) fn display_with<'a>(
+    fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
         settings: DisplaySettings<'db>,
@@ -1354,7 +1360,7 @@ impl<'db> TupleSpec<'db> {
     }
 }
 
-pub(crate) struct DisplayTuple<'a, 'db> {
+struct DisplayTuple<'a, 'db> {
     tuple: &'a TupleSpec<'db>,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
@@ -1440,7 +1446,7 @@ impl<'db> OverloadLiteral<'db> {
         Self::display_with(self, db, DisplaySettings::default())
     }
 
-    pub(crate) fn display_with(
+    fn display_with(
         self,
         db: &'db dyn Db,
         settings: DisplaySettings<'db>,
@@ -1487,7 +1493,7 @@ impl Display for DisplayOverloadLiteral<'_> {
 }
 
 impl<'db> FunctionType<'db> {
-    pub(crate) fn display_with(
+    fn display_with(
         self,
         db: &'db dyn Db,
         settings: DisplaySettings<'db>,
@@ -1500,7 +1506,7 @@ impl<'db> FunctionType<'db> {
     }
 }
 
-pub(crate) struct DisplayFunctionType<'db> {
+struct DisplayFunctionType<'db> {
     ty: FunctionType<'db>,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
@@ -1643,11 +1649,11 @@ impl Display for DisplayGenericAlias<'_> {
 }
 
 impl<'db> GenericContext<'db> {
-    pub fn display<'a>(&'a self, db: &'db dyn Db) -> DisplayGenericContext<'a, 'db> {
+    fn display<'a>(&'a self, db: &'db dyn Db) -> DisplayGenericContext<'a, 'db> {
         Self::display_with(self, db, DisplaySettings::default())
     }
 
-    pub fn display_full<'a>(&'a self, db: &'db dyn Db) -> DisplayGenericContext<'a, 'db> {
+    fn display_full<'a>(&'a self, db: &'db dyn Db) -> DisplayGenericContext<'a, 'db> {
         DisplayGenericContext {
             generic_context: self,
             db,
@@ -1657,7 +1663,7 @@ impl<'db> GenericContext<'db> {
         }
     }
 
-    pub fn display_with<'a>(
+    fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
         settings: DisplaySettings<'db>,
@@ -1704,7 +1710,7 @@ impl Display for DisplayOptionalGenericContext<'_, '_> {
     }
 }
 
-pub struct DisplayGenericContext<'a, 'db> {
+struct DisplayGenericContext<'a, 'db> {
     generic_context: &'a GenericContext<'db>,
     db: &'db dyn Db,
     #[expect(dead_code)]
@@ -1785,11 +1791,7 @@ impl Display for DisplayGenericContext<'_, '_> {
 }
 
 impl<'db> Specialization<'db> {
-    pub fn display(self, db: &'db dyn Db) -> DisplaySpecialization<'db> {
-        self.display_short(db, TupleSpecialization::No, DisplaySettings::default())
-    }
-
-    pub(crate) fn display_full(self, db: &'db dyn Db) -> DisplaySpecialization<'db> {
+    fn display_full(self, db: &'db dyn Db) -> DisplaySpecialization<'db> {
         DisplaySpecialization {
             specialization: self,
             db,
@@ -1800,7 +1802,7 @@ impl<'db> Specialization<'db> {
     }
 
     /// Renders the specialization as it would appear in a subscript expression, e.g. `[int, str]`.
-    pub fn display_short(
+    fn display_short(
         self,
         db: &'db dyn Db,
         tuple_specialization: TupleSpecialization,
@@ -1816,7 +1818,7 @@ impl<'db> Specialization<'db> {
     }
 }
 
-pub struct DisplaySpecialization<'db> {
+struct DisplaySpecialization<'db> {
     specialization: Specialization<'db>,
     db: &'db dyn Db,
     tuple_specialization: TupleSpecialization,
@@ -1879,7 +1881,7 @@ impl Display for DisplaySpecialization<'_> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TupleSpecialization {
+enum TupleSpecialization {
     Yes,
     No,
 }
@@ -1903,7 +1905,7 @@ impl<'db> CallableType<'db> {
         Self::display_with(self, db, DisplaySettings::default())
     }
 
-    pub(crate) fn display_with<'a>(
+    fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
         settings: DisplaySettings<'db>,
@@ -2017,7 +2019,7 @@ impl<'db> DisplaySignature<'_, 'db> {
         }
     }
 
-    pub(crate) fn should_hide_self_from_display(&self, db: &'db dyn Db) -> bool {
+    fn should_hide_self_from_display(&self, db: &'db dyn Db) -> bool {
         !self.return_ty.contains_self(db)
             && !self
                 .parameters
@@ -2166,14 +2168,6 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
 
             for parameter in parameters {
                 // Handle special separators
-                if !star_added && parameter.is_keyword_only() {
-                    if !first {
-                        f.write_str(arg_separator)?;
-                    }
-                    f.write_char('*')?;
-                    star_added = true;
-                    first = false;
-                }
                 if parameter.is_positional_only() {
                     needs_slash = true;
                 } else if needs_slash {
@@ -2182,6 +2176,14 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                     }
                     f.write_char('/')?;
                     needs_slash = false;
+                    first = false;
+                }
+                if !star_added && parameter.is_keyword_only() {
+                    if !first {
+                        f.write_str(arg_separator)?;
+                    }
+                    f.write_char('*')?;
+                    star_added = true;
                     first = false;
                 }
 
@@ -2261,13 +2263,15 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                 display_parameters(self, f, self.parameters.as_slice(), arg_separator)?;
             }
             ParametersKind::ParamSpec(typevar) => {
-                write!(f, "**{}", typevar.name(self.db))?;
+                let parameter_name = format!("**{}", typevar.name(self.db));
+                let mut parameter = f.with_detail(TypeDetail::Parameter(parameter_name.clone()));
+                write!(parameter, "{parameter_name}")?;
                 let binding_context = typevar.binding_context(self.db);
                 if let Some(binding_context_name) = binding_context.name(self.db)
                     && let Some(definition) = binding_context.definition()
                     && !self.settings.active_scopes.contains(&definition)
                 {
-                    write!(f, "@{binding_context_name}")?;
+                    write!(parameter, "@{binding_context_name}")?;
                 }
             }
         }
@@ -2835,7 +2839,7 @@ impl Display for DisplayMaybeParenthesizedType<'_> {
     }
 }
 
-pub(crate) trait TypeArrayDisplay<'db> {
+trait TypeArrayDisplay<'db> {
     fn display_with(
         &self,
         db: &'db dyn Db,
@@ -2885,7 +2889,7 @@ impl<'db> TypeArrayDisplay<'db> for [Type<'db>] {
     }
 }
 
-pub(crate) struct DisplayTypeArray<'b, 'db> {
+struct DisplayTypeArray<'b, 'db> {
     types: &'b [Type<'db>],
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
@@ -3252,6 +3256,20 @@ mod tests {
                 Some(Type::none(&db))
             ),
             @"(x, *, y) -> None"
+        );
+
+        // '/' parameter must appear before '*' parameter
+        assert_snapshot!(
+            display_signature(
+                &db,
+                [
+                    Parameter::positional_only(Some(Name::new_static("a"))),
+                    Parameter::keyword_only(Name::new_static("x")),
+                    Parameter::keyword_only(Name::new_static("y")),
+                ],
+                Some(Type::none(&db))
+            ),
+            @"(a, /, *, x, y) -> None"
         );
 
         // A mix of all parameter kinds.

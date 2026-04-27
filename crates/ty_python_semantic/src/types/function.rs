@@ -60,10 +60,6 @@ use ruff_text_size::Ranged;
 use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module};
 
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
-use crate::semantic_index::ast_ids::HasScopedUseId;
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::{FileScopeId, SemanticIndex, semantic_index};
 use crate::types::call::{Binding, CallArguments};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::ConstraintSet;
@@ -93,6 +89,10 @@ use crate::types::{
     binding_type, definition_expression_type, infer_definition_types, walk_signature,
 };
 use crate::{Db, FxOrderSet};
+use ty_python_core::ast_ids::HasScopedUseId;
+use ty_python_core::definition::Definition;
+use ty_python_core::scope::ScopeId;
+use ty_python_core::{FileScopeId, SemanticIndex, semantic_index};
 
 /// A collection of useful spans for annotating functions.
 ///
@@ -109,6 +109,10 @@ pub(crate) struct FunctionSpans {
     pub(crate) parameters: Span,
     /// The span of the annotated return type, if present.
     pub(crate) return_type: Option<Span>,
+    /// A span that starts at the beginning of the first decorator (if any),
+    /// and ends at the end of the function signature (either the last parameter,
+    /// or the return type if present).
+    pub(crate) decorators_and_header: Span,
 }
 
 bitflags! {
@@ -276,6 +280,11 @@ impl<'db> OverloadLiteral<'db> {
     pub(crate) fn is_classmethod(self, db: &dyn Db) -> bool {
         self.has_known_decorator(db, FunctionDecorators::CLASSMETHOD)
             || is_implicit_classmethod(self.name(db))
+    }
+
+    /// Returns true if this overload has an implicit `self` or `cls` receiver parameter.
+    pub(crate) fn has_implicit_receiver(self, db: &'db dyn Db) -> bool {
+        self.body_scope(db).is_method_scope(db) && !self.is_staticmethod(db)
     }
 
     pub(crate) fn node<'ast>(
@@ -637,6 +646,7 @@ impl<'db> OverloadLiteral<'db> {
             name: span.clone().with_range(func_def.name.range),
             parameters: span.clone().with_range(func_def.parameters.range),
             return_type: return_type_range.map(|range| span.clone().with_range(range)),
+            decorators_and_header: span.with_range(signature.cover_offset(func_def.start())),
         }
     }
 }
@@ -1023,6 +1033,11 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn is_staticmethod(self, db: &'db dyn Db) -> bool {
         self.iter_overloads_and_implementation(db)
             .any(|overload| overload.is_staticmethod(db))
+    }
+
+    /// Returns true if this function has an implicit `self` or `cls` receiver parameter.
+    pub(crate) fn has_implicit_receiver(self, db: &'db dyn Db) -> bool {
+        self.literal(db).last_definition.has_implicit_receiver(db)
     }
 
     /// If the implementation of this function is deprecated, returns the `@warnings.deprecated`.
@@ -1922,7 +1937,7 @@ impl KnownFunction {
 
                     diagnostic.annotate(
                         Annotation::secondary(context.span(&call_expression.arguments.args[0]))
-                            .message(format_args!("Inferred type is `{}`", actual_ty.display(db),)),
+                            .message(format_args!("Inferred type is `{}`", actual_ty.display(db))),
                     );
 
                     if actual_ty.is_subtype_of(db, *asserted_ty) {
@@ -2207,9 +2222,10 @@ impl KnownFunction {
                 if let Type::ClassLiteral(class) = second_argument
                     && self == KnownFunction::IsInstance
                 {
-                    overload.set_return_type(
-                        is_instance_truthiness(db, *first_arg, *class).into_type(db),
-                    );
+                    overload.set_return_type(Type::from_truthiness(
+                        db,
+                        is_instance_truthiness(db, *first_arg, *class),
+                    ));
                 }
             }
 

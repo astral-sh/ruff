@@ -29,7 +29,7 @@ fn code_actions_at(
     }
 }
 
-#[allow(clippy::cast_possible_truncation)]
+#[expect(clippy::cast_possible_truncation)]
 fn full_range(input: &str) -> Range {
     let (num_lines, last_line) = input
         .lines()
@@ -61,7 +61,6 @@ unused-ignore-comment = \"warn\"
         .with_workspace(workspace_root, None)?
         .with_file(ty_toml, ty_toml_content)?
         .with_file(foo, foo_content)?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -99,7 +98,6 @@ unused-ignore-comment = \"warn\"
         .with_workspace(workspace_root, None)?
         .with_file(ty_toml, ty_toml_content)?
         .with_file(foo, foo_content)?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -138,7 +136,6 @@ x: Literal[1] = 1
         .with_workspace(workspace_root, None)?
         .with_file(ty_toml, ty_toml_content)?
         .with_file(foo, foo_content)?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -175,7 +172,6 @@ def my_func(): ...
         .with_workspace(workspace_root, None)?
         .with_file(ty_toml, ty_toml_content)?
         .with_file(foo, foo_content)?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -214,7 +210,6 @@ def my_func(): ...
         .with_workspace(workspace_root, None)?
         .with_file(ty_toml, ty_toml_content)?
         .with_file(foo, foo_content)?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -250,7 +245,6 @@ x: typing.Literal[1] = 1
         .with_workspace(workspace_root, None)?
         .with_file(ty_toml, ty_toml_content)?
         .with_file(foo, foo_content)?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -287,7 +281,6 @@ html.parser
         .with_workspace(workspace_root, None)?
         .with_file(ty_toml, ty_toml_content)?
         .with_file(foo, foo_content)?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 

@@ -80,11 +80,8 @@ fn delete_lines_pandas_html() {
         },
     ];
 
-    let mut version = 2;
-
-    for change in changes {
+    for (version, change) in (2..).zip(changes) {
         document.apply_changes(vec![change], version, PositionEncoding::UTF16);
-        version += 1;
     }
 
     insta::assert_snapshot!(document.contents());

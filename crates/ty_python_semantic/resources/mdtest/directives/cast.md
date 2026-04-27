@@ -99,12 +99,33 @@ def f(x: RecursiveAlias):
 
 ## Diagnostic snapshots
 
-<!-- snapshot-diagnostics -->
-
 ```py
 import secrets
 from typing import cast
 
-# error: [redundant-cast] "Value is already of type `int`"
+# snapshot: redundant-cast
 cast(int, secrets.randbelow(10))
+```
+
+```snapshot
+warning[redundant-cast]: Value is already of type `int`
+ --> src/mdtest_snippet.py:5:1
+  |
+5 | cast(int, secrets.randbelow(10))
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+```
+
+```py
+# snapshot: redundant-cast
+cast(val=secrets.randbelow(10), typ=int)
+```
+
+```snapshot
+warning[redundant-cast]: Value is already of type `int`
+ --> src/mdtest_snippet.py:7:1
+  |
+7 | cast(val=secrets.randbelow(10), typ=int)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 ```

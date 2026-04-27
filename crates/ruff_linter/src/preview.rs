@@ -16,6 +16,11 @@ pub(crate) const fn is_annotated_assignment_redefinition_enabled(
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/issues/18863
+pub(crate) const fn is_s103_extended_dangerous_bits_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/21382
 pub(crate) const fn is_custom_exception_checking_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
@@ -340,5 +345,10 @@ pub(crate) const fn is_trailing_pragma_in_line_length_enabled(preview: PreviewMo
 
 // https://github.com/astral-sh/ruff/pull/24371
 pub(crate) const fn is_collapsible_if_fix_safe_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/23404
+pub(crate) const fn is_ruff_ignore_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
