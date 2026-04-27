@@ -7213,6 +7213,10 @@ x: Literal["a\\b"] = "<CURSOR>"
 
     #[test]
     fn no_string_literal_completions_in_incomplete_string_without_expr_node() {
+        // TODO: Support string literal completions for incomplete strings.
+        //       While this currently passes, we actually do want completions
+        //       on incomplete strings, since completions otherwise rely on
+        //       IDEs auto-closing new strings.
         let builder = completion_test_builder(
             r#"
 from typing import Literal
