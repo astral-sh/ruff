@@ -159,7 +159,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Generic, TypeVar, overload
+from typing import Any, Callable, Generic, TypeVar, overload
 
 class Box[T]:
     # Use the class type parameter so specializations remain meaningful.
@@ -174,6 +174,38 @@ class Box[T]:
 
 reveal_type(Box[int]().specialized)  # revealed: bound method Box[int].specialized(x: int) -> int
 reveal_type(Box[str]().specialized)  # revealed: Overload[(x: str) -> str, (x: int) -> int]
+
+class BaseForAny[T]:
+    value: T
+
+    @overload
+    def g(self: "ChildForAny") -> bytes: ...
+    @overload
+    def g(self) -> int: ...
+    def g(self) -> bytes | int:
+        return 1
+
+class ChildForAny(BaseForAny[int]): ...
+
+def accepts_bytes_callback(cb: Callable[[], bytes]) -> None: ...
+def takes_base_any(base: BaseForAny[Any]) -> None:
+    reveal_type(base.g)  # revealed: bound method BaseForAny[Any].g() -> int
+    reveal_type(base.g())  # revealed: int
+    accepts_bytes_callback(base.g)  # error: [invalid-argument-type]
+
+class BaseWithNoMatchingReceiver[T]:
+    value: T
+
+    @overload
+    def g(self: "BaseWithNoMatchingReceiver[bytes]") -> bytes: ...
+    @overload
+    def g(self: "BaseWithNoMatchingReceiver[str]") -> str: ...
+    def g(self) -> str | bytes:
+        return ""
+
+def takes_str_callback(cb: Callable[[], str]) -> None: ...
+def no_matching_receiver(y: BaseWithNoMatchingReceiver[int]) -> None:
+    takes_str_callback(y.g)  # error: [invalid-argument-type]
 
 T_co = TypeVar("T_co", covariant=True)
 
