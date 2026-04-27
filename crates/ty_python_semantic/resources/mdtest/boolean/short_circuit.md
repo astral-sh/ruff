@@ -39,6 +39,44 @@ def _(flag1: bool, flag2: bool):
         reveal_type(else_or)  # revealed: Literal[False]
 ```
 
+## TODO: while loops
+
+We currently use the precise truthy and falsy snapshots from boolean operators in `if` statements,
+but not yet in `while` loops. These diagnostics should be removed when the same logic is applied to
+`while` loop bodies and exits.
+
+```py
+def returns_bool() -> bool:
+    return False
+
+def _(flag: bool):
+    while flag and (x := 1):
+        # TODO: should not emit [possibly-unresolved-reference]
+        # error: [possibly-unresolved-reference]
+        reveal_type(x)  # revealed: Literal[1]
+
+def _(flag: bool):
+    while flag and (x := returns_bool()):
+        # TODO: should not emit [possibly-unresolved-reference]
+        # error: [possibly-unresolved-reference]
+        reveal_type(x)  # revealed: Literal[True]
+
+def _(flag: bool):
+    while flag or (x := returns_bool()):
+        pass
+    # TODO: should not emit [possibly-unresolved-reference]
+    # error: [possibly-unresolved-reference]
+    reveal_type(x)  # revealed: Literal[False]
+
+def _(flag: bool):
+    while flag or (x := returns_bool()):
+        pass
+    else:
+        # TODO: should not emit [possibly-unresolved-reference]
+        # error: [possibly-unresolved-reference]
+        reveal_type(x)  # revealed: Literal[False]
+```
+
 ## First expression is always evaluated
 
 ```py
