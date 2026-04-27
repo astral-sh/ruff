@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
 use itertools::Itertools;
-use ruff_python_ast::helpers::is_dotted_name;
+use ruff_python_ast::helpers::{any_over_expr, is_dotted_name};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
@@ -105,6 +105,34 @@ struct ScopeInfo<'ast> {
     narrowing_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
 }
 
+#[derive(Clone)]
+struct BoolOpSnapshots {
+    truthy: FlowSnapshot,
+    falsy: FlowSnapshot,
+}
+
+struct BoolOpSnapshot {
+    before: FlowSnapshot,
+    after: Option<BoolOpSnapshots>,
+}
+
+impl BoolOpSnapshot {
+    fn truthy(&self) -> FlowSnapshot {
+        let Self { before, after } = self;
+        after
+            .as_ref()
+            .map_or_else(|| before, |snapshots| &snapshots.truthy)
+            .clone()
+    }
+    fn falsy(&self) -> FlowSnapshot {
+        let Self { before, after } = self;
+        after
+            .as_ref()
+            .map_or_else(|| before, |snapshots| &snapshots.falsy)
+            .clone()
+    }
+}
+
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Builder state
     db: &'db dyn Db,
@@ -147,6 +175,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     scopes_by_expression: ExpressionsScopeMapBuilder,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
+    bool_op_snapshots_by_node: FxHashMap<ExpressionNodeKey, BoolOpSnapshots>,
     statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
     enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
     imported_modules: FxHashSet<ModuleName>,
@@ -195,6 +224,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
+            bool_op_snapshots_by_node: FxHashMap::default(),
             statements_by_node: FxHashMap::default(),
             enclosing_lambda_statements: FxHashMap::default(),
 
@@ -2667,8 +2697,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
             ast::Stmt::If(node) => {
+                let flow_snapshot = |builder: &Self, test: &'ast ast::Expr| {
+                    let no_branch_taken = builder.flow_snapshot();
+                    let bool_op_snapshots = builder
+                        .bool_op_snapshots_by_node
+                        .get(&ExpressionNodeKey::from(test));
+                    BoolOpSnapshot {
+                        before: no_branch_taken,
+                        after: bool_op_snapshots.cloned(),
+                    }
+                };
+
                 self.visit_expr(&node.test);
-                let mut no_branch_taken = self.flow_snapshot();
+                let mut bool_op_snapshot = flow_snapshot(self, &node.test);
+                self.flow_restore(bool_op_snapshot.truthy());
                 let (mut last_predicate, mut last_narrowing_id) =
                     self.record_expression_narrowing_constraint(&node.test);
                 let mut last_reachability_constraint =
@@ -2709,7 +2751,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     post_clauses.push(self.flow_snapshot());
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken
-                    self.flow_restore(no_branch_taken.clone());
+                    self.flow_restore(bool_op_snapshot.falsy());
 
                     self.record_negated_narrowing_constraint(last_predicate, last_narrowing_id);
                     self.record_negated_reachability_constraint(last_reachability_constraint);
@@ -2717,7 +2759,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     if let Some(elif_test) = clause_test {
                         self.visit_expr(elif_test);
                         // A test expression is evaluated whether the branch is taken or not
-                        no_branch_taken = self.flow_snapshot();
+                        bool_op_snapshot = flow_snapshot(self, elif_test);
+                        self.flow_restore(bool_op_snapshot.truthy());
 
                         (last_predicate, last_narrowing_id) =
                             self.record_expression_narrowing_constraint(elif_test);
@@ -3686,8 +3729,22 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     }
                 }
 
+                let no_short_circuit =
+                    any_over_expr(expr, &ast::Expr::is_named_expr).then(|| self.flow_snapshot());
+
                 for snapshot in snapshots {
                     self.flow_merge(snapshot);
+                }
+
+                if let Some(no_short_circuit) = no_short_circuit {
+                    let bool_op_key = ExpressionNodeKey::from(expr);
+                    let maybe_short_circuit = self.flow_snapshot();
+                    let (truthy, falsy) = match op {
+                        ast::BoolOp::And => (no_short_circuit, maybe_short_circuit),
+                        ast::BoolOp::Or => (maybe_short_circuit, no_short_circuit),
+                    };
+                    self.bool_op_snapshots_by_node
+                        .insert(bool_op_key, BoolOpSnapshots { truthy, falsy });
                 }
             }
             ast::Expr::StringLiteral(_) => {
