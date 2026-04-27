@@ -6,10 +6,11 @@ use crate::reachability::is_range_reachable;
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
 use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::enums::enum_metadata;
 use crate::types::signatures::{ParameterForm, ParametersKind, Signature};
 use crate::types::{
-    CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownUnion,
-    Type, TypeContext, UnionType,
+    CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, EnumLiteralType,
+    KnownClass, KnownUnion, LiteralValueTypeKind, Type, TypeContext, UnionType,
 };
 use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticModel};
 use itertools::Either;
@@ -327,10 +328,52 @@ pub fn static_member_type_for_attribute<'db>(
     model: &SemanticModel<'db>,
     attribute: &ast::ExprAttribute,
 ) -> Option<Type<'db>> {
+    let db = model.db();
     let lhs_ty = attribute.value.inferred_type(model)?;
+    if let Some(enum_member_ty) = enum_member_type(db, lhs_ty, &attribute.attr.id) {
+        return Some(enum_member_ty);
+    }
+
     lhs_ty
-        .static_member(model.db(), attribute.attr.as_str())
+        .static_member(db, attribute.attr.as_str())
         .ignore_possibly_undefined()
+}
+
+/// Returns the enum-literal member type for an attribute access if the attribute name is an
+/// actual enum member on the left-hand-side type.
+fn enum_member_type<'db>(
+    db: &'db dyn Db,
+    lhs_ty: Type<'db>,
+    member_name: &Name,
+) -> Option<Type<'db>> {
+    let enum_class = match lhs_ty {
+        Type::ClassLiteral(class_literal) => Some(class_literal),
+        Type::SubclassOf(subclass) => subclass
+            .subclass_of()
+            .into_class(db)?
+            .static_class_literal(db)
+            .map(|(lit, _)| ClassLiteral::Static(lit)),
+        Type::LiteralValue(literal) => literal
+            .as_enum()
+            .map(|enum_literal| enum_literal.enum_class(db)),
+        Type::NominalInstance(instance) => Some(instance.class_literal(db)),
+        _ => None,
+    }?;
+    let resolved_name = enum_metadata(db, enum_class)?.resolve_member(member_name)?;
+
+    Some(Type::enum_literal(EnumLiteralType::new(
+        db,
+        enum_class,
+        resolved_name.clone(),
+    )))
+}
+
+/// Returns `true` if the type is a singleton enum member.
+pub fn is_enum_literal_type(ty: Type<'_>) -> bool {
+    matches!(
+        ty.as_literal_value_kind(),
+        Some(LiteralValueTypeKind::Enum(_))
+    )
 }
 
 fn definitions_for_attribute_in_class_hierarchy<'db>(

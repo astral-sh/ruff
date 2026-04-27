@@ -47,7 +47,7 @@ use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinition
 use ty_python_semantic::{
     HasType, SemanticModel,
     types::ide_support::{
-        CallArgumentForm, call_argument_forms, definition_for_name,
+        CallArgumentForm, call_argument_forms, definition_for_name, is_enum_literal_type,
         static_member_type_for_attribute,
     },
     types::{SpecialFormType, Type, TypeVarKind},
@@ -72,11 +72,12 @@ pub enum SemanticTokenType {
     Decorator,
     BuiltinConstant,
     TypeParameter,
+    EnumMember,
 }
 
 impl SemanticTokenType {
     /// Returns all supported semantic token types as enum variants.
-    pub const fn all() -> [SemanticTokenType; 15] {
+    pub const fn all() -> [SemanticTokenType; 16] {
         [
             SemanticTokenType::Namespace,
             SemanticTokenType::Class,
@@ -93,6 +94,7 @@ impl SemanticTokenType {
             SemanticTokenType::Decorator,
             SemanticTokenType::BuiltinConstant,
             SemanticTokenType::TypeParameter,
+            SemanticTokenType::EnumMember,
         ]
     }
 
@@ -120,6 +122,7 @@ impl SemanticTokenType {
             SemanticTokenType::Decorator => "decorator",
             SemanticTokenType::BuiltinConstant => "builtinConstant",
             SemanticTokenType::TypeParameter => "typeParameter",
+            SemanticTokenType::EnumMember => "enumMember",
         }
     }
 }
@@ -482,6 +485,11 @@ impl<'db> SemanticTokenVisitor<'db> {
 
         if let Some(classification) = self.classify_type_form_expr(ty) {
             return Some(classification);
+        }
+
+        if is_enum_literal_type(ty) {
+            modifiers |= SemanticTokenModifier::READONLY;
+            return Some((SemanticTokenType::EnumMember, modifiers));
         }
 
         let elements = if let Some(union) = ty.as_union() {
@@ -924,7 +932,8 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 
                 // Then add token for the attribute name (e.g., 'path' in 'os.path')
                 let ty = static_member_type_for_attribute(self.model, attr)
-                    .unwrap_or_else(|| expr.inferred_type(self.model).unwrap_or(Type::unknown()));
+                    .or_else(|| expr.inferred_type(self.model))
+                    .unwrap_or(Type::unknown());
                 if let Some((token_type, modifiers)) =
                     self.classify_from_type_for_attribute(ty, &attr.attr)
                 {
@@ -1501,6 +1510,82 @@ z = sys.version
         "z" @ 103..104: Variable [definition]
         "sys" @ 107..110: Namespace
         "version" @ 111..118: Variable
+        "#);
+    }
+
+    #[test]
+    fn semantic_tokens_enum_member() {
+        let test = SemanticTokenTest::new(
+            "
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+
+x = Color.RED
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "enum" @ 6..10: Namespace
+        "Enum" @ 18..22: Class
+        "Color" @ 30..35: Class [definition]
+        "Enum" @ 36..40: Class
+        "RED" @ 47..50: Variable [definition, readonly]
+        "1" @ 53..54: Number
+        "x" @ 56..57: Variable [definition]
+        "Color" @ 60..65: Class
+        "RED" @ 66..69: EnumMember [readonly]
+        "#);
+    }
+
+    #[test]
+    fn semantic_tokens_enum_literal_property() {
+        let test = SemanticTokenTest::new(
+            "
+from enum import Enum
+from typing import Literal
+
+class Color(Enum):
+    RED = 1
+
+class Palette:
+    @property
+    def selected(self) -> Literal[Color.RED]:
+        return Color.RED
+
+palette = Palette()
+x = palette.selected
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "enum" @ 6..10: Namespace
+        "Enum" @ 18..22: Class
+        "typing" @ 28..34: Namespace
+        "Literal" @ 42..49: Variable
+        "Color" @ 57..62: Class [definition]
+        "Enum" @ 63..67: Class
+        "RED" @ 74..77: Variable [definition, readonly]
+        "1" @ 80..81: Number
+        "Palette" @ 89..96: Class [definition]
+        "property" @ 103..111: Decorator
+        "selected" @ 120..128: Method [definition]
+        "self" @ 129..133: SelfParameter [definition]
+        "Literal" @ 138..145: Variable
+        "Color" @ 146..151: Class
+        "RED" @ 152..155: EnumMember [readonly]
+        "Color" @ 173..178: Class
+        "RED" @ 179..182: EnumMember [readonly]
+        "palette" @ 184..191: Variable [definition]
+        "Palette" @ 194..201: Class
+        "x" @ 204..205: Variable [definition]
+        "palette" @ 208..215: Variable
+        "selected" @ 216..224: Property [readonly]
         "#);
     }
 
