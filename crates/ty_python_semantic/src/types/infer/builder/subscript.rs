@@ -7,10 +7,6 @@ use ty_module_resolver::file_to_module;
 
 use super::TypeInferenceBuilder;
 use crate::place::{DefinedPlace, Definedness, Place};
-use crate::semantic_index::SemanticIndex;
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::place::{PlaceExpr, PlaceExprRef};
-use crate::semantic_index::scope::FileScopeId;
 use crate::types::call::CallErrorKind;
 use crate::types::call::bind::CallableDescription;
 use crate::types::constraints::ConstraintSetBuilder;
@@ -36,6 +32,10 @@ use crate::types::{
     TypeVarBoundOrConstraints, UnionType, UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet};
+use ty_python_core::SemanticIndex;
+use ty_python_core::definition::Definition;
+use ty_python_core::place::{PlaceExpr, PlaceExprRef};
+use ty_python_core::scope::FileScopeId;
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn typed_dict_key_expected_type(&self, ty: Type<'db>) -> Option<Type<'db>> {
@@ -459,6 +459,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         specialize: &dyn Fn(&[Option<Type<'db>>]) -> Type<'db>,
     ) -> Type<'db> {
         let previously_allowed_paramspec = self
+            .context
             .inference_flags
             .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true);
         let result = self.infer_explicit_callable_specialization_impl(
@@ -467,7 +468,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             generic_context,
             specialize,
         );
-        self.inference_flags.set(
+        self.context.inference_flags.set(
             InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
             previously_allowed_paramspec,
         );
@@ -711,11 +712,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .iter()
                         .map(|tv| tv.typevar(db).name(db))
                         .format("`, `"),
-                    if let Some(CallableDescription { kind, name }) = description {
-                        format!(" of {kind} `{name}`")
-                    } else {
-                        String::new()
-                    }
+                    description
+                        .map(|description| format!(" of {description}"))
+                        .unwrap_or_default()
                 ));
             }
             error = Some(ExplicitSpecializationError::MissingTypeVars);
@@ -759,11 +758,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let description = CallableDescription::new(db, value_ty);
                     builder.into_diagnostic(format_args!(
                         "Too many type arguments{}: expected {}, got {}",
-                        if let Some(CallableDescription { kind, name }) = description {
-                            format!(" to {kind} `{name}`")
-                        } else {
-                            String::new()
-                        },
+                        description
+                            .map(|description| format!(" to {description}"))
+                            .unwrap_or_default(),
                         if typevar_with_defaults == 0 {
                             format!("{typevars_len}")
                         } else {
@@ -845,6 +842,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let mut return_todo = false;
 
                 let previously_allowed_paramspec = self
+                    .context
                     .inference_flags
                     .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, false);
                 for param in elts {
@@ -857,7 +855,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         && matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_));
                     parameter_types.push(param_type);
                 }
-                self.inference_flags.set(
+                self.context.inference_flags.set(
                     InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
                     previously_allowed_paramspec,
                 );
@@ -897,10 +895,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 let previous_concatenate_context = self
+                    .context
                     .inference_flags
                     .replace(InferenceFlags::IN_VALID_CONCATENATE_CONTEXT, true);
                 let param_type = self.infer_type_expression(expr);
-                self.inference_flags.set(
+                self.context.inference_flags.set(
                     InferenceFlags::IN_VALID_CONCATENATE_CONTEXT,
                     previous_concatenate_context,
                 );
@@ -1659,7 +1658,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                 report_cannot_delete_typed_dict_key(
                                                     &self.context,
                                                     (&*target.slice).into(),
-                                                    object_ty,
+                                                    typed_dict,
                                                     key,
                                                     Some(field),
                                                     TypedDictDeleteErrorKind::RequiredKey,
@@ -1669,7 +1668,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                 report_cannot_delete_typed_dict_key(
                                                     &self.context,
                                                     (&*target.slice).into(),
-                                                    object_ty,
+                                                    typed_dict,
                                                     key,
                                                     None,
                                                     TypedDictDeleteErrorKind::UnknownKey,

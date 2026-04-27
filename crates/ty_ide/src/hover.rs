@@ -1,5 +1,5 @@
 use crate::docstring::Docstring;
-use crate::goto::{GotoTarget, find_goto_target};
+use crate::goto::{GotoTarget, docstring_for_call_definition, find_goto_target};
 use crate::{Db, MarkupKind, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
@@ -7,7 +7,7 @@ use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
-use ty_python_semantic::types::ide_support::typed_dict_key_hover;
+use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarVariance};
 use ty_python_semantic::{DisplaySettings, SemanticModel, TypeQualifiers};
 
@@ -32,6 +32,22 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
 
     let docs = if typed_dict_key.is_some() {
         None
+    } else if let GotoTarget::Call { call, .. } = goto_target {
+        resolved_call_signature(&model, call)
+            .and_then(|details| docstring_for_call_definition(db, details.definition?))
+            .or_else(|| {
+                // Fall back to the goto-definition targets. This is what
+                // surfaces the class docstring for a constructor call like
+                // `Foo()`, where the resolved definition is `__init__` and
+                // usually carries no docstring of its own.
+                goto_target
+                    .get_definition_targets(
+                        &model,
+                        ty_python_semantic::ImportAliasResolution::ResolveAliases,
+                    )
+                    .and_then(|definitions| definitions.docstring(db))
+            })
+            .map(HoverContent::Docstring)
     } else {
         goto_target
             .get_definition_targets(
@@ -232,7 +248,7 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::tests::CursorTest;
+    use crate::tests::{CursorTest, cursor_test};
     use crate::{MarkupKind, hover};
     use std::fmt::Write as _;
 
@@ -241,6 +257,7 @@ mod tests {
         Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, LintName,
         Severity, Span,
     };
+    use ruff_python_ast::PythonVersion;
     use ruff_text_size::{Ranged, TextRange};
 
     fn hover_test(source: &str) -> CursorTest {
@@ -992,7 +1009,7 @@ mod tests {
         )
         class S(a: int)
         ---------------------------------------------
-        new docs
+        init docs
 
         ---------------------------------------------
         ```python
@@ -1003,7 +1020,7 @@ mod tests {
         class S(a: int)
         ```
         ---
-        new docs
+        init docs
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:12:5
@@ -1098,8 +1115,6 @@ mod tests {
         ");
     }
 
-    // TODO: should show `class Color(value: object)`
-    // https://github.com/astral-sh/ruff/pull/24257#issuecomment-4164472728
     #[test]
     fn hover_enum_constructor() {
         let test = hover_test(
@@ -1114,69 +1129,12 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
-        class Color(
-            value: Any,
-            names: None = None
-        )
-        ---------------------------------------------
-        Either returns an existing member, or creates a new enum class.
-
-        This method is used both when an enum class is given a value to match
-        to an enumeration member (i.e. Color(3)) and for the functional API
-        (i.e. Color = Enum('Color', names='RED GREEN BLUE')).
-
-        The value lookup branch is chosen if the enum is final.
-
-        When used for the functional API:
-
-        `value` will be the name of the new class.
-
-        `names` should be either a string of white-space/comma delimited names
-        (values will start at `start`), or an iterator/mapping of name, value pairs.
-
-        `module` should be set to the module this class is being created in;
-        if it is not set, an attempt to find that module will be made, but if
-        it fails the class will not be picklable.
-
-        `qualname` should be set to the actual location this class can be found
-        at in its module; by default it is set to the global scope.  If this is
-        not correct, unpickling will fail in some circumstances.
-
-        `type`, if set, will be mixed in as the first base class.
-
+        assert_snapshot!(test.hover(), @r"
+        class Color(value: object)
         ---------------------------------------------
         ```python
-        class Color(
-            value: Any,
-            names: None = None
-        )
+        class Color(value: object)
         ```
-        ---
-        Either returns an existing member, or creates a new enum class.<HB>
-        <HB>
-        This method is used both when an enum class is given a value to match<HB>
-        to an enumeration member (i.e. Color(3)) and for the functional API<HB>
-        (i.e. Color = Enum('Color', names='RED GREEN BLUE')).<HB>
-        <HB>
-        The value lookup branch is chosen if the enum is final.<HB>
-        <HB>
-        When used for the functional API:<HB>
-        <HB>
-        `value` will be the name of the new class.<HB>
-        <HB>
-        `names` should be either a string of white-space/comma delimited names<HB>
-        (values will start at `start`), or an iterator/mapping of name, value pairs.<HB>
-        <HB>
-        `module` should be set to the module this class is being created in;<HB>
-        if it is not set, an attempt to find that module will be made, but if<HB>
-        it fails the class will not be picklable.<HB>
-        <HB>
-        `qualname` should be set to the actual location this class can be found<HB>
-        at in its module; by default it is set to the global scope.  If this is<HB>
-        not correct, unpickling will fail in some circumstances.<HB>
-        <HB>
-        `type`, if set, will be mixed in as the first base class.
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:8:5
@@ -1481,6 +1439,415 @@ mod tests {
            |   |    |
            |   |    Cursor offset
            |   source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_overloaded_method_implementation_docstring() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+
+        class MyTestClass:
+            @overload
+            def foo(self, x: int) -> int: ...
+            @overload
+            def foo(self, x: str) -> str: ...
+            def foo(self, x: int | str) -> int | str:
+                """Sample docstring"""
+                return x
+
+        my_class = MyTestClass()
+        my_class.f<CURSOR>oo(1)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        def foo(x: int) -> int
+        ---------------------------------------------
+        Sample docstring
+
+        ---------------------------------------------
+        ```python
+        def foo(x: int) -> int
+        ```
+        ---
+        Sample docstring
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:14:10
+           |
+        13 | my_class = MyTestClass()
+        14 | my_class.foo(1)
+           |          ^-^
+           |          ||
+           |          |Cursor offset
+           |          source
+           |
+        ");
+    }
+
+    /// When the resolved overload has no docstring and neither does the
+    /// implementation, we fall back to showing a sibling overload's docstring.
+    #[test]
+    fn hover_overloaded_function_uses_sibling_overload_docstring_as_fallback() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+
+        @overload
+        def test() -> str: ...
+
+        @overload
+        def test(arg: str) -> str:
+            """A second overload"""
+
+        def test(arg: str | None = None) -> str:
+            return "test"
+
+        t<CURSOR>est()
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        def test() -> str
+        ---------------------------------------------
+        A second overload
+
+        ---------------------------------------------
+        ```python
+        def test() -> str
+        ```
+        ---
+        A second overload
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:14:1
+           |
+        12 |     return "test"
+        13 |
+        14 | test()
+           | ^-^^
+           | ||
+           | |Cursor offset
+           | source
+           |
+        "#);
+    }
+
+    #[test]
+    fn hover_non_callable_decorated_function_shows_docstring() {
+        let test = cursor_test(
+            r#"
+        def decorator(f):
+            return 42
+
+        @decorator
+        def foo():
+            """Foo documentation"""
+            pass
+
+        f<CURSOR>oo()
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        Unknown
+        ---------------------------------------------
+        Foo documentation
+
+        ---------------------------------------------
+        ```python
+        Unknown
+        ```
+        ---
+        Foo documentation
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:10:1
+           |
+         8 |     pass
+         9 |
+        10 | foo()
+           | ^-^
+           | ||
+           | |Cursor offset
+           | source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_overloaded_function_with_conditional_definitions() {
+        let test = cursor_test(
+            r#"
+        from typing import overload, Any
+        def foo() -> bool: ...
+
+        @overload
+        def test() -> None: ...
+
+        if foo():
+            @overload
+            def test(a: str) -> str: ...
+        else:
+            @overload
+            def test(a: int) -> int: ...
+
+        def test(a: Any) -> Any:
+            """Implementation docstring"""
+            return a
+
+        t<CURSOR>est()
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        def test() -> None
+        ---------------------------------------------
+        Implementation docstring
+
+        ---------------------------------------------
+        ```python
+        def test() -> None
+        ```
+        ---
+        Implementation docstring
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:19:1
+           |
+        17 |     return a
+        18 |
+        19 | test()
+           | ^-^^
+           | ||
+           | |Cursor offset
+           | source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_overloaded_function_with_version_conditional_implementation() {
+        let test = CursorTest::builder()
+            .python_version(PythonVersion::PY310)
+            .source(
+                "main.py",
+                r#"
+        from typing import overload, Any
+        import sys
+
+        @overload
+        def test() -> None: ...
+
+        if sys.version_info >= (3, 10):
+            @overload
+            def test(a: str) -> str: ...
+
+            def test(a: Any) -> Any:
+                """Version 3.10+ implementation"""
+                return a
+        else:
+            @overload
+            def test(a: int) -> int: ...
+
+            def test(a: Any) -> Any:
+                """Fallback implementation"""
+                return a
+
+        t<CURSOR>est()
+        "#,
+            )
+            .build();
+
+        assert_snapshot!(test.hover(), @"
+        def test() -> None
+        ---------------------------------------------
+        Version 3.10+ implementation
+
+        ---------------------------------------------
+        ```python
+        def test() -> None
+        ```
+        ---
+        Version 3.10+ implementation
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:23:1
+           |
+        21 |         return a
+        22 |
+        23 | test()
+           | ^-^^
+           | ||
+           | |Cursor offset
+           | source
+           |
+        ");
+    }
+
+    /// The implementation docstring fallback uses type-aware overload matching
+    /// to avoid picking up an unrelated conditional reassignment of the same name.
+    #[test]
+    fn hover_overloaded_function_conditionally_reassigned() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+
+        @overload
+        def test(x: int) -> int: ...
+        @overload
+        def test(x: str) -> str: ...
+        def test(x):
+            return x
+
+        def flag() -> bool: ...
+        if flag():
+            def test():
+                """Unrelated docstring"""
+                pass
+
+        t<CURSOR>est(1)
+        "#,
+        );
+
+        // The type is a union because `test` is conditionally reassigned.
+        // The "Unrelated docstring" comes from the conditional reassignment's
+        // definition, which is the first definition with a docstring found
+        // by the fallback path.
+        assert_snapshot!(test.hover(), @"
+        (Overload[(x: int) -> int, (x: str) -> str]) | (def test() -> Unknown)
+        ---------------------------------------------
+        Unrelated docstring
+
+        ---------------------------------------------
+        ```python
+        (Overload[(x: int) -> int, (x: str) -> str]) | (def test() -> Unknown)
+        ```
+        ---
+        Unrelated docstring
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:17:1
+           |
+        15 |         pass
+        16 |
+        17 | test(1)
+           | ^-^^
+           | ||
+           | |Cursor offset
+           | source
+           |
+        ");
+    }
+
+    /// Like [`hover_overloaded_function_conditionally_reassigned`], but the
+    /// resolved overload itself carries a docstring. The signature path
+    /// attaches that docstring directly, so the unrelated reassignment is
+    /// never consulted.
+    #[test]
+    fn hover_overloaded_function_conditionally_reassigned_overload_has_docstring() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+
+        @overload
+        def test(x: int) -> int:
+            """The int overload"""
+        @overload
+        def test(x: str) -> str: ...
+        def test(x):
+            return x
+
+        def flag() -> bool: ...
+        if flag():
+            def test():
+                """Unrelated docstring"""
+                pass
+
+        t<CURSOR>est(1)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (Overload[(x: int) -> int, (x: str) -> str]) | (def test() -> Unknown)
+        ---------------------------------------------
+        The int overload
+
+        ---------------------------------------------
+        ```python
+        (Overload[(x: int) -> int, (x: str) -> str]) | (def test() -> Unknown)
+        ```
+        ---
+        The int overload
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:18:1
+           |
+        16 |         pass
+        17 |
+        18 | test(1)
+           | ^-^^
+           | ||
+           | |Cursor offset
+           | source
+           |
+        ");
+    }
+
+    /// Like [`hover_overloaded_function_conditionally_reassigned`], but the
+    /// implementation carries a docstring. The type-aware filter in
+    /// `implementation_docstring` keeps the real implementation (whose
+    /// overload chain contains the resolved overload) and drops the
+    /// unrelated reassignment.
+    #[test]
+    fn hover_overloaded_function_conditionally_reassigned_impl_has_docstring() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+
+        @overload
+        def test(x: int) -> int: ...
+        @overload
+        def test(x: str) -> str: ...
+        def test(x):
+            """The real implementation"""
+            return x
+
+        def flag() -> bool: ...
+        if flag():
+            def test():
+                """Unrelated docstring"""
+                pass
+
+        t<CURSOR>est(1)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (Overload[(x: int) -> int, (x: str) -> str]) | (def test() -> Unknown)
+        ---------------------------------------------
+        The real implementation
+
+        ---------------------------------------------
+        ```python
+        (Overload[(x: int) -> int, (x: str) -> str]) | (def test() -> Unknown)
+        ```
+        ---
+        The real implementation
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:18:1
+           |
+        16 |         pass
+        17 |
+        18 | test(1)
+           | ^-^^
+           | ||
+           | |Cursor offset
+           | source
            |
         ");
     }
@@ -2330,14 +2697,14 @@ def ab(a: str):
         assert_snapshot!(test.hover(), @r#"
         def ab(a: str) -> Unknown
         ---------------------------------------------
-        the int overload
+        the str overload
 
         ---------------------------------------------
         ```python
         def ab(a: str) -> Unknown
         ```
         ---
-        the int overload
+        the str overload
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1
@@ -2456,14 +2823,14 @@ def ab(a: int):
         assert_snapshot!(test.hover(), @"
         def ab(a: int) -> Unknown
         ---------------------------------------------
-        the two arg overload
+        the one arg overload
 
         ---------------------------------------------
         ```python
         def ab(a: int) -> Unknown
         ```
         ---
-        the two arg overload
+        the one arg overload
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1
@@ -2524,7 +2891,7 @@ def ab(a: int, *, c: int):
             b: int
         ) -> Unknown
         ---------------------------------------------
-        keywordless overload
+        b overload
 
         ---------------------------------------------
         ```python
@@ -2535,7 +2902,7 @@ def ab(a: int, *, c: int):
         ) -> Unknown
         ```
         ---
-        keywordless overload
+        b overload
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1
@@ -2596,7 +2963,7 @@ def ab(a: int, *, c: int):
             c: int
         ) -> Unknown
         ---------------------------------------------
-        keywordless overload
+        c overload
 
         ---------------------------------------------
         ```python
@@ -2607,7 +2974,7 @@ def ab(a: int, *, c: int):
         ) -> Unknown
         ```
         ---
-        keywordless overload
+        c overload
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1

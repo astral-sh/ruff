@@ -10,6 +10,7 @@
 //! argument types and return types. For each callable type in the union, the call expression's
 //! arguments must match _at least one_ overload.
 
+use std::collections::BTreeMap;
 use std::slice::Iter;
 
 use itertools::{EitherOrBoth, Itertools};
@@ -17,24 +18,28 @@ use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, semantic_index};
-use crate::semantic_index::definition::Definition;
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
-use crate::types::infer::infer_deferred_types;
+use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
+use crate::types::typed_dict::{
+    UnpackedTypedDictKey, extract_unpacked_typed_dict_keys_from_kwargs_annotation,
+    extract_unpacked_typed_dict_keys_from_value_type,
+};
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType,
-    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind, SelfBinding,
-    TypeContext, TypeMapping, UnionBuilder, VarianceInferable, infer_complete_scope_types,
-    todo_type,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
+    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind,
+    ParameterDescription, SelfBinding, TypeContext, TypeMapping, UnionBuilder, VarianceInferable,
+    infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
+use ty_python_core::definition::Definition;
 
 /// Infer the type of a parameter or return annotation in a function signature.
 ///
@@ -59,6 +64,24 @@ fn function_signature_expression_type<'db>(
     } else {
         // expression is in the PEP-695 type params sub-scope
         infer_complete_scope_types(db, scope).expression_type(expression)
+    }
+}
+
+fn function_signature_type_expression_flags<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    expression: &ast::Expr,
+) -> TypeExpressionFlags {
+    let file = definition.file(db);
+    let index = semantic_index(db, file);
+    let file_scope = index.expression_scope_id(expression);
+    let scope = file_scope.to_scope_id(db, file);
+    if scope == definition.scope(db) {
+        // expression is in the function definition scope, but always deferred
+        infer_deferred_types(db, definition).type_expression_flags(expression)
+    } else {
+        // expression is in the PEP-695 type params sub-scope
+        infer_complete_scope_types(db, scope).type_expression_flags(expression)
     }
 }
 
@@ -441,18 +464,6 @@ impl<'db> Signature<'db> {
             generic_context: None,
             definition: None,
             parameters: Parameters::gradual_form(),
-            return_ty: signature_type,
-        }
-    }
-
-    /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
-    #[allow(unused_variables)] // 'reason' only unused in debug builds
-    pub(crate) fn todo(reason: &'static str) -> Self {
-        let signature_type = todo_type!(reason);
-        Signature {
-            generic_context: None,
-            definition: None,
-            parameters: Parameters::todo(),
             return_ty: signature_type,
         }
     }
@@ -1016,12 +1027,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         upper,
                     );
                     let return_types_match = || {
-                        target_overloads
-                            .iter()
-                            .map(|signature| signature.return_ty)
-                            .when_any(db, self.constraints, |target_return| {
-                                self.check_type_pair(db, source_return, target_return)
-                            })
+                        // TODO: Similar to how we do this for unions, we should collect error
+                        // context for all elements and report it if *all* checks fail.
+                        self.without_context_collection(|| {
+                            target_overloads
+                                .iter()
+                                .map(|signature| signature.return_ty)
+                                .when_any(db, self.constraints, |target_return| {
+                                    self.check_type_pair(db, source_return, target_return)
+                                })
+                        })
                     };
                     return param_spec_matches.and(db, self.constraints, return_types_match);
                 }
@@ -1048,12 +1063,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         Type::object(),
                     );
                     let return_types_match = || {
-                        source_overloads
-                            .iter()
-                            .map(|signature| signature.return_ty)
-                            .when_any(db, self.constraints, |source_return| {
-                                self.check_type_pair(db, source_return, target_return)
-                            })
+                        // TODO: Similar to how we do this for unions, we should collect error
+                        // context for all elements and report it if *all* checks fail.
+                        self.without_context_collection(|| {
+                            source_overloads
+                                .iter()
+                                .map(|signature| signature.return_ty)
+                                .when_any(db, self.constraints, |source_return| {
+                                    self.check_type_pair(db, source_return, target_return)
+                                })
+                        })
                     };
                     return param_spec_matches.and(db, self.constraints, return_types_match);
                 }
@@ -1091,15 +1110,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     return aggregate_relation;
                 }
 
-                source_overloads
-                    .iter()
-                    .when_any(db, self.constraints, |self_signature| {
-                        self.check_callable_signature_pair_inner(
-                            db,
-                            std::slice::from_ref(self_signature),
-                            target_overloads,
-                        )
-                    })
+                // TODO: Similar to how we do this for unions, we should collect error
+                // context for all elements and report it if *all* checks fail.
+                self.without_context_collection(|| {
+                    source_overloads
+                        .iter()
+                        .when_any(db, self.constraints, |self_signature| {
+                            self.check_callable_signature_pair_inner(
+                                db,
+                                std::slice::from_ref(self_signature),
+                                target_overloads,
+                            )
+                        })
+                })
             }
 
             // source is definitely not overloaded while target is possibly overloaded.
@@ -1234,10 +1257,57 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
+        // Fast path: if the target accepts positional calls that the source cannot accept, reject
+        // without checking return types or individual parameter types. The full parameter
+        // comparison below reaches the same result, but only after doing work that is expensive for
+        // large overload sets.
+        if source.parameters.is_standard()
+            && target.parameters.is_standard()
+            && source.parameters.variadic().is_none()
+        {
+            let source_positional = source.parameters.positional().count();
+            let target_positional = target.parameters.positional().count();
+            let target_accepts_extra_positionals =
+                target_positional > source_positional || target.parameters.variadic().is_some();
+
+            if target_accepts_extra_positionals {
+                if target_positional > source_positional
+                    && let Some(ParameterKind::KeywordOnly { name, .. }) = source
+                        .parameters
+                        .iter()
+                        .nth(source_positional)
+                        .map(Parameter::kind)
+                {
+                    self.provide_context(|| ErrorContext::ParameterMustAcceptPositionalArguments {
+                        name: name.clone(),
+                    });
+                }
+
+                return self.never();
+            }
+        }
+
         let mut result = self.always();
 
-        let mut check_types = |type1: Type<'db>, type2: Type<'db>| {
-            match (type1, type2) {
+        // Avoid returning early after checking the return types in case there is a `ParamSpec` type
+        // variable in either signature to ensure that the `ParamSpec` binding is still applied even
+        // if the return types are incompatible.
+        let return_type_constraints = self.check_type_pair(db, source.return_ty, target.return_ty);
+        let return_type_checks = !result
+            .intersect(db, self.constraints, return_type_constraints)
+            .is_never_satisfied(db);
+        if !return_type_checks {
+            self.provide_context(|| ErrorContext::IncompatibleReturnTypes {
+                source: source.return_ty,
+                target: target.return_ty,
+            });
+        }
+
+        let mut check_types = |target_ty: Type<'db>,
+                               source_ty: Type<'db>,
+                               target_name: Option<&Name>,
+                               target_index: usize| {
+            match (target_ty, source_ty) {
                 // This is a special case where the _same_ components of two different `ParamSpec`
                 // type variables are assignable to each other when they're both in an inferable
                 // position.
@@ -1259,15 +1329,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 _ => {}
             }
 
+            let constraint_set = self.check_type_pair(db, target_ty, source_ty);
+            if constraint_set.is_never_satisfied(db) {
+                let parameter = ParameterDescription::new(target_index, target_name);
+                self.provide_context(|| ErrorContext::IncompatibleParameterTypes {
+                    source: source_ty,
+                    target: target_ty,
+                    parameter,
+                });
+            }
             !result
-                .intersect(db, self.constraints, self.check_type_pair(db, type1, type2))
+                .intersect(db, self.constraints, constraint_set)
                 .is_never_satisfied(db)
         };
-
-        // Avoid returning early after checking the return types in case there is a `ParamSpec` type
-        // variable in either signature to ensure that the `ParamSpec` binding is still applied even
-        // if the return types are incompatible.
-        let return_type_checks = check_types(source.return_ty, target.return_ty);
 
         if self.relation.is_constraint_set_assignability() {
             let source_paramspec = source.parameters.as_paramspec_with_prefix();
@@ -1375,13 +1449,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     // Here, `fn` is positional-only parameter because of the `/` while `x` is a
                     // positional-or-keyword parameter.
 
-                    loop {
-                        let Some(EitherOrBoth::Both(source_param, target_param)) =
-                            parameters.next()
-                        else {
-                            break;
-                        };
-
+                    let mut target_index = 0usize;
+                    while let Some(EitherOrBoth::Both(source_param, target_param)) =
+                        parameters.next()
+                    {
                         match (source_param.kind(), target_param.kind()) {
                             (
                                 ParameterKind::PositionalOnly {
@@ -1403,6 +1474,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 if !check_types(
                                     target_param.annotated_type(),
                                     source_param.annotated_type(),
+                                    target_param.name(),
+                                    target_index,
                                 ) {
                                     return result;
                                 }
@@ -1419,6 +1492,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 },
                             ) => {
                                 if self_name != other_name {
+                                    self.provide_context(|| ErrorContext::ParameterNameMismatch {
+                                        source_name: self_name.clone(),
+                                        target_name: other_name.clone(),
+                                    });
                                     return self.never();
                                 }
                                 // The following checks are the same as positional-only parameters.
@@ -1428,6 +1505,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 if !check_types(
                                     target_param.annotated_type(),
                                     source_param.annotated_type(),
+                                    target_param.name(),
+                                    target_index,
                                 ) {
                                     return result;
                                 }
@@ -1435,6 +1514,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                             _ => return self.never(),
                         }
+                        target_index += 1;
                     }
 
                     let (mut source_params, mut target_params) = parameters.into_remaining();
@@ -1538,11 +1618,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         target_iter: target_prefix_params.iter(),
                     };
 
-                    loop {
-                        let Some(next_parameter) = parameters.next() else {
-                            break;
-                        };
-
+                    let mut target_index = 0usize;
+                    while let Some(next_parameter) = parameters.next() {
                         match next_parameter {
                             EitherOrBoth::Left(_) => {
                                 // If the non-Concatenate callable has remaining parameters, they
@@ -1574,6 +1651,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         if !check_types(
                                             target_param.annotated_type(),
                                             source_param.annotated_type(),
+                                            target_param.name(),
+                                            target_index,
                                         ) {
                                             return result;
                                         }
@@ -1599,6 +1678,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         if !check_types(
                                             target_param.annotated_type(),
                                             source_param.annotated_type(),
+                                            target_param.name(),
+                                            target_index,
                                         ) {
                                             return result;
                                         }
@@ -1612,18 +1693,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         if !check_types(
                                             target_param.annotated_type(),
                                             source_param.annotated_type(),
+                                            target_param.name(),
+                                            target_index,
                                         ) {
                                             return result;
                                         }
 
-                                        loop {
-                                            let Some(target_param) = parameters.peek_target()
-                                            else {
-                                                break;
-                                            };
+                                        while let Some(target_param) = parameters.peek_target() {
+                                            target_index += 1;
                                             if !check_types(
                                                 target_param.annotated_type(),
                                                 source_param.annotated_type(),
+                                                target_param.name(),
+                                                target_index,
                                             ) {
                                                 return result;
                                             }
@@ -1637,6 +1719,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 }
                             }
                         }
+                        target_index += 1;
                     }
 
                     let (source_params, _) = parameters.into_remaining();
@@ -1695,11 +1778,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     };
 
                     if target.parameters.kind() != ParametersKind::Gradual {
-                        loop {
-                            let Some(next_parameter) = parameters.next() else {
-                                break;
-                            };
-
+                        let mut target_index = 0usize;
+                        while let Some(next_parameter) = parameters.next() {
                             match next_parameter {
                                 EitherOrBoth::Left(_) => {
                                     return self.never();
@@ -1732,6 +1812,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                             if !check_types(
                                                 target_param.annotated_type(),
                                                 source_param.annotated_type(),
+                                                target_param.name(),
+                                                target_index,
                                             ) {
                                                 return result;
                                             }
@@ -1758,6 +1840,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                             if !check_types(
                                                 target_param.annotated_type(),
                                                 source_param.annotated_type(),
+                                                target_param.name(),
+                                                target_index,
                                             ) {
                                                 return result;
                                             }
@@ -1767,6 +1851,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     }
                                 }
                             }
+                            target_index += 1;
                         }
                     }
 
@@ -1840,12 +1925,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let target_prefix_params =
                         &target.parameters.value[..target.parameters.len().saturating_sub(2)];
 
-                    for (source_param, target_param) in
-                        source_prefix_params.iter().zip(target_prefix_params.iter())
+                    for (target_index, (source_param, target_param)) in source_prefix_params
+                        .iter()
+                        .zip(target_prefix_params.iter())
+                        .enumerate()
                     {
                         if !check_types(
                             target_param.annotated_type(),
                             source_param.annotated_type(),
+                            target_param.name(),
+                            target_index,
                         ) {
                             return result;
                         }
@@ -1861,9 +1950,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let source_prefix_params =
                         &source.parameters.value[..source.parameters.len().saturating_sub(2)];
 
-                    for param in source_prefix_params
+                    for (target_index, param) in source_prefix_params
                         .iter()
                         .zip_longest(target.parameters.iter())
+                        .enumerate()
                     {
                         match param {
                             EitherOrBoth::Left(_) => {
@@ -1894,6 +1984,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     if !check_types(
                                         target_param.annotated_type(),
                                         source_param.annotated_type(),
+                                        target_param.name(),
+                                        target_index,
                                     ) {
                                         return result;
                                     }
@@ -1921,11 +2013,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         target_iter: target_prefix_params.iter(),
                     };
 
-                    loop {
-                        let Some(parameter) = parameters.next() else {
-                            break;
-                        };
-
+                    let mut target_index = 0usize;
+                    while let Some(parameter) = parameters.next() {
                         match parameter {
                             EitherOrBoth::Left(_) => {
                                 // Once the right (other) iterator is exhausted, all the remaining
@@ -1956,6 +2045,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         if !check_types(
                                             target_param.annotated_type(),
                                             source_param.annotated_type(),
+                                            target_param.name(),
+                                            target_index,
                                         ) {
                                             return result;
                                         }
@@ -1964,18 +2055,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         if !check_types(
                                             target_param.annotated_type(),
                                             source_param.annotated_type(),
+                                            target_param.name(),
+                                            target_index,
                                         ) {
                                             return result;
                                         }
 
-                                        loop {
-                                            let Some(target_param) = parameters.peek_target()
-                                            else {
-                                                break;
-                                            };
+                                        while let Some(target_param) = parameters.peek_target() {
+                                            target_index += 1;
                                             if !check_types(
                                                 target_param.annotated_type(),
                                                 source_param.annotated_type(),
+                                                target_param.name(),
+                                                target_index,
                                             ) {
                                                 return result;
                                             }
@@ -1990,6 +2082,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 }
                             }
                         }
+                        target_index += 1;
                     }
                 }
 
@@ -2020,6 +2113,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Collect all the standard parameters that have only been matched against a variadic
         // parameter which means that the keyword variant is still unmatched.
         let mut target_keywords = Vec::new();
+        let mut target_index = 0usize;
 
         loop {
             let Some(next_parameter) = parameters.next() else {
@@ -2088,6 +2182,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             if !check_types(
                                 target_param.annotated_type(),
                                 source_param.annotated_type(),
+                                target_param.name(),
+                                target_index,
                             ) {
                                 return result;
                             }
@@ -2104,6 +2200,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             },
                         ) => {
                             if source_name != target_name {
+                                self.provide_context(|| ErrorContext::ParameterNameMismatch {
+                                    source_name: source_name.clone(),
+                                    target_name: target_name.clone(),
+                                });
                                 return self.never();
                             }
                             // The following checks are the same as positional-only parameters.
@@ -2113,6 +2213,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             if !check_types(
                                 target_param.annotated_type(),
                                 source_param.annotated_type(),
+                                target_param.name(),
+                                target_index,
                             ) {
                                 return result;
                             }
@@ -2126,6 +2228,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             if !check_types(
                                 target_param.annotated_type(),
                                 source_param.annotated_type(),
+                                target_param.name(),
+                                target_index,
                             ) {
                                 return result;
                             }
@@ -2147,10 +2251,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             // So, any remaining positional parameters in `target` would need to be
                             // checked against the variadic parameter in `source`. This loop does
                             // that by only moving the `other` iterator forward.
-                            loop {
-                                let Some(target_parameter) = parameters.peek_target() else {
-                                    break;
-                                };
+                            while let Some(target_parameter) = parameters.peek_target() {
                                 match target_parameter.kind() {
                                     ParameterKind::PositionalOrKeyword { .. } => {
                                         target_keywords.push(target_parameter);
@@ -2163,9 +2264,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         break;
                                     }
                                 }
+                                target_index += 1;
                                 if !check_types(
                                     target_parameter.annotated_type(),
                                     source_param.annotated_type(),
+                                    target_parameter.name(),
+                                    target_index,
                                 ) {
                                     return result;
                                 }
@@ -2177,9 +2281,39 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             if !check_types(
                                 target_param.annotated_type(),
                                 source_param.annotated_type(),
+                                target_param.name(),
+                                target_index,
                             ) {
                                 return result;
                             }
+                        }
+
+                        (
+                            ParameterKind::PositionalOnly { name, .. },
+                            ParameterKind::PositionalOrKeyword {
+                                name: target_name, ..
+                            },
+                        ) => {
+                            self.provide_context(|| {
+                                ErrorContext::ParameterMustAcceptKeywordArguments {
+                                    source_name: name.clone(),
+                                    target_name: target_name.clone(),
+                                }
+                            });
+                            return self.never();
+                        }
+
+                        (
+                            ParameterKind::KeywordOnly { name, .. },
+                            ParameterKind::PositionalOnly { .. }
+                            | ParameterKind::PositionalOrKeyword { .. },
+                        ) => {
+                            self.provide_context(|| {
+                                ErrorContext::ParameterMustAcceptPositionalArguments {
+                                    name: name.clone(),
+                                }
+                            });
+                            return self.never();
                         }
 
                         (
@@ -2195,6 +2329,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                         _ => return self.never(),
                     }
+                    target_index += 1;
                 }
             }
         }
@@ -2260,6 +2395,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 if !check_types(
                                     target_param.annotated_type(),
                                     source_param.annotated_type(),
+                                    target_param.name(),
+                                    target_index,
                                 ) {
                                     return result;
                                 }
@@ -2269,7 +2406,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             ),
                         }
                     } else if let Some(source_keyword_variadic) = source_keyword_variadic {
-                        if !check_types(target_param.annotated_type(), source_keyword_variadic) {
+                        if !check_types(
+                            target_param.annotated_type(),
+                            source_keyword_variadic,
+                            target_param.name(),
+                            target_index,
+                        ) {
                             return result;
                         }
                     } else {
@@ -2282,7 +2424,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         // parameter, `source` must also have a keyword variadic parameter.
                         return self.never();
                     };
-                    if !check_types(target_param.annotated_type(), source_keyword_variadic) {
+                    if !check_types(
+                        target_param.annotated_type(),
+                        source_keyword_variadic,
+                        target_param.name(),
+                        target_index,
+                    ) {
                         return result;
                     }
                 }
@@ -2363,9 +2510,11 @@ pub(crate) enum ParametersKind<'db> {
 /// The way this is represented internally is a bit subtle given that both `value` and `kind` fields
 /// need to follow certain invariants to correctly represent the different forms of parameter lists.
 ///
-/// The `value` field should always contain the full list of parameters regardless of the `kind`
-/// variant. For example, even if this represents a `Gradual` form, the `value` field should still
-/// contain the `*args: Any` and `**kwargs: Any` parameter.
+/// The `value` field should contain the parameters that participate in the callable signature
+/// proper. For example, even if this represents a `Gradual` form, the `value` field should still
+/// contain the `*args: Any` and `**kwargs: Any` parameter. A `**kwargs: Unpack[TypedDict]`
+/// parameter is normalized to the keyword-only parameters exposed to callers plus a possible
+/// trailing `**kwargs` parameter for the extra items accepted by open `TypedDict`s.
 ///
 /// The `kind` field is used to indicate the specific form of the parameter list which can,
 /// optionally, include additional information such as the bound `ParamSpec` type variable.
@@ -2385,12 +2534,50 @@ impl<'db> Parameters<'db> {
     /// The kind of the parameter list is determined based on the provided parameters. Specifically,
     /// if the parameter list contains `*args` and `**kwargs`, then it checks their annotated types
     /// and the presence of other parameter kinds to determine if they represent a gradual form, a
-    /// `ParamSpec`, or a `Concatenate` form.
+    /// `ParamSpec`, or a `Concatenate` form. `**kwargs: Unpack[TypedDict]` is normalized here by
+    /// synthesizing keyword-only parameters for the unpacked keys and keeping a trailing
+    /// `**kwargs` parameter for extra items on open `TypedDict`s.
     pub(crate) fn new(
         db: &'db dyn Db,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
     ) -> Self {
-        let value: Vec<Parameter<'db>> = parameters.into_iter().collect();
+        let parameters = parameters.into_iter();
+        let mut value: Vec<Parameter<'db>> = Vec::with_capacity(parameters.size_hint().0);
+
+        for parameter in parameters {
+            if let Some(unpacked_keys) = parameter.unpacked_typed_dict_keys(db) {
+                let kwargs_name = parameter
+                    .name()
+                    .expect("keyword variadic parameter always has a name")
+                    .clone();
+
+                for (name, unpacked_key) in unpacked_keys {
+                    if value
+                        .iter()
+                        .any(|existing| existing.callable_by_name(name.as_str()))
+                    {
+                        continue;
+                    }
+
+                    value.push(
+                        Parameter::keyword_only(name)
+                            .with_annotated_type(unpacked_key.value_ty)
+                            .with_optional_default_type(
+                                (!unpacked_key.is_required).then_some(Type::unknown()),
+                            ),
+                    );
+                }
+
+                // TODO: Use the unpacked `TypedDict`'s `extra_items` type instead of `object`.
+                // TODO: Omit `**kwargs` here for closed `TypedDict`s.
+                value.push(
+                    Parameter::keyword_variadic(kwargs_name).with_annotated_type(Type::object()),
+                );
+            } else {
+                value.push(parameter);
+            }
+        }
+
         let mut kind = ParametersKind::Standard;
 
         let variadic_param = value
@@ -2496,6 +2683,12 @@ impl<'db> Parameters<'db> {
 
     pub(crate) const fn is_top(&self) -> bool {
         matches!(self.kind, ParametersKind::Top)
+    }
+
+    /// Returns `true` if the parameters are a standard parameter list (not gradual, top,
+    /// `ParamSpec`, or `Concatenate`).
+    pub(crate) const fn is_standard(&self) -> bool {
+        matches!(self.kind, ParametersKind::Standard)
     }
 
     /// Returns the bound `ParamSpec` type variable if the parameter list is exactly `P`.
@@ -2902,6 +3095,17 @@ pub(crate) struct Parameter<'db> {
     /// type semantics of the parameter.
     pub(crate) inferred_annotation: bool,
 
+    /// Syntax-level annotation kind for cases where the annotation has special parameter semantics.
+    annotation_kind: ParameterAnnotationKind,
+
+    kind: ParameterKind<'db>,
+    pub(crate) form: ParameterForm,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+enum ParameterAnnotationKind {
+    Normal,
+
     /// Variadic parameters can have starred annotations, e.g.
     /// - `*args: *Ts`
     /// - `*args: *tuple[int, ...]`
@@ -2909,10 +3113,10 @@ pub(crate) struct Parameter<'db> {
     ///
     /// The `*` prior to the type gives the annotation a different meaning,
     /// so this must be propagated upwards.
-    has_starred_annotation: bool,
+    Starred,
 
-    kind: ParameterKind<'db>,
-    pub(crate) form: ParameterForm,
+    /// The parameter was declared as `**kwargs: Unpack[TypedDict]`.
+    UnpackedTypedDictKwargs,
 }
 
 impl<'db> Parameter<'db> {
@@ -2920,7 +3124,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
-            has_starred_annotation: false,
+            annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::PositionalOnly {
                 name,
                 default_type: None,
@@ -2933,7 +3137,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
-            has_starred_annotation: false,
+            annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::PositionalOrKeyword {
                 name,
                 default_type: None,
@@ -2946,7 +3150,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
-            has_starred_annotation: false,
+            annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::Variadic { name },
             form: ParameterForm::Value,
         }
@@ -2956,7 +3160,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
-            has_starred_annotation: false,
+            annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::KeywordOnly {
                 name,
                 default_type: None,
@@ -2969,7 +3173,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
-            has_starred_annotation: false,
+            annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::KeywordVariadic { name },
             form: ParameterForm::Value,
         }
@@ -3026,7 +3230,7 @@ impl<'db> Parameter<'db> {
                 .kind
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             inferred_annotation: self.inferred_annotation,
-            has_starred_annotation: self.has_starred_annotation,
+            annotation_kind: self.annotation_kind,
             form: self.form,
         }
     }
@@ -3041,7 +3245,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type,
             inferred_annotation: self.inferred_annotation,
-            has_starred_annotation: self.has_starred_annotation,
+            annotation_kind: self.annotation_kind,
             kind,
             form: self.form,
         }
@@ -3055,7 +3259,7 @@ impl<'db> Parameter<'db> {
     ) -> Option<Self> {
         let Parameter {
             annotated_type,
-            has_starred_annotation,
+            annotation_kind,
             inferred_annotation,
             kind,
             form,
@@ -3116,7 +3320,7 @@ impl<'db> Parameter<'db> {
         Some(Self {
             annotated_type,
             inferred_annotation: *inferred_annotation,
-            has_starred_annotation: *has_starred_annotation,
+            annotation_kind: *annotation_kind,
             kind,
             form: *form,
         })
@@ -3138,10 +3342,26 @@ impl<'db> Parameter<'db> {
             } else {
                 (Type::unknown(), true, false)
             };
+        let is_unpacked_typed_dict_kwargs = matches!(&kind, ParameterKind::KeywordVariadic { .. })
+            && parameter.annotation().is_some_and(|annotation| {
+                extract_unpacked_typed_dict_keys_from_kwargs_annotation(
+                    db,
+                    annotated_type,
+                    function_signature_type_expression_flags(db, definition, annotation),
+                )
+                .is_some()
+            });
+        let annotation_kind = if is_unpacked_typed_dict_kwargs {
+            ParameterAnnotationKind::UnpackedTypedDictKwargs
+        } else if has_starred_annotation {
+            ParameterAnnotationKind::Starred
+        } else {
+            ParameterAnnotationKind::Normal
+        };
         Self {
             annotated_type,
             kind,
-            has_starred_annotation,
+            annotation_kind,
             form: ParameterForm::Value,
             inferred_annotation,
         }
@@ -3197,6 +3417,21 @@ impl<'db> Parameter<'db> {
         }
     }
 
+    /// Returns the unpacked `TypedDict` keys if this is a `**kwargs: Unpack[TypedDict]`
+    /// parameter.
+    pub(crate) fn unpacked_typed_dict_keys(
+        &self,
+        db: &'db dyn Db,
+    ) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
+        (self.is_keyword_variadic()
+            && matches!(
+                self.annotation_kind,
+                ParameterAnnotationKind::UnpackedTypedDictKwargs
+            ))
+        .then(|| extract_unpacked_typed_dict_keys_from_value_type(db, self.annotated_type))
+        .flatten()
+    }
+
     /// Annotated type of the parameter. If no annotation was provided, this is `Unknown`.
     pub(crate) fn annotated_type(&self) -> Type<'db> {
         self.annotated_type
@@ -3205,7 +3440,7 @@ impl<'db> Parameter<'db> {
     /// Return `true` if this parameter has a starred annotation,
     /// e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...], bytes]`
     pub(crate) fn has_starred_annotation(&self) -> bool {
-        self.has_starred_annotation
+        matches!(self.annotation_kind, ParameterAnnotationKind::Starred)
     }
 
     /// Kind of the parameter.

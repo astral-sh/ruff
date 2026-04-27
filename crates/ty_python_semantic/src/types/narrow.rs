@@ -1,12 +1,5 @@
 use crate::Db;
-use crate::semantic_index::expression::Expression;
-use crate::semantic_index::place::{PlaceExpr, PlaceTable, PlaceTableBuilder, ScopedPlaceId};
-use crate::semantic_index::place_table;
-use crate::semantic_index::predicate::{
-    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode,
-};
-use crate::semantic_index::scope::ScopeId;
+use crate::reachability::{ReachabilityConstraintsExtension, sequence_pattern_type};
 use crate::subscript::PyIndex;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
@@ -20,6 +13,14 @@ use crate::types::{
     KnownInstanceType, LiteralValueTypeKind, SpecialFormType, SubclassOfInner, SubclassOfType,
     Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
 };
+use ty_python_core::expression::Expression;
+use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
+use ty_python_core::predicate::{
+    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
+    PredicateNode,
+};
+use ty_python_core::scope::ScopeId;
+use ty_python_core::{NarrowingEvaluator, place_table, semantic_index};
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
@@ -29,16 +30,9 @@ use super::UnionType;
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 use std::collections::hash_map::Entry;
-
-/// A set of places that could possibly be narrowed by a predicate.
-///
-/// This is a conservative upper bound - all places that actually get narrowed
-/// will be in this set, but there may be additional places that end up not
-/// being narrowed after full analysis.
-pub(crate) type PossiblyNarrowedPlaces = FxHashSet<ScopedPlaceId>;
 
 /// Return the type constraint that `test` (if true) would place on `symbol`, if any.
 ///
@@ -635,7 +629,23 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         match expression_node {
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+            ast::Expr::Name(_) => {
+                let file = expression.file(self.db);
+                let index = semantic_index(self.db, file);
+                let constraints = self.evaluate_simple_expr(expression_node, is_positive);
+                if let Some(alias_predicate) = index.narrowing_alias_predicate(expression_node) {
+                    let aliased_constraints =
+                        self.evaluate_expression_predicate(alias_predicate.expression, is_positive);
+                    // For example, suppose we have an alias `is_none = x is None`.
+                    // When this alias is used for narrowing, that is, within a block like `if is_none: ...`,
+                    // both the constraint `is_none: Literal[True]` and the constraint `x: None` should be imposed.
+                    // The former is `constraints` and the latter is `aliased_constraints`.
+                    Self::merge_optional_constraints_and(constraints, aliased_constraints)
+                } else {
+                    constraints
+                }
+            }
+            ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
                 self.evaluate_simple_expr(expression_node, is_positive)
             }
             ast::Expr::Compare(expr_compare) => {
@@ -734,6 +744,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
             PatternPredicateKind::Mapping(kind) => {
                 self.evaluate_match_pattern_mapping(subject, *kind, is_positive)
+            }
+            PatternPredicateKind::Sequence(kind) => {
+                self.evaluate_match_pattern_sequence(subject, *kind, is_positive)
             }
             PatternPredicateKind::Value(expr) => {
                 self.evaluate_match_pattern_value(subject, *expr, is_positive)
@@ -1736,6 +1749,27 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         )]))
     }
 
+    fn evaluate_match_pattern_sequence(
+        &mut self,
+        subject: Expression<'db>,
+        kind: ClassPatternKind,
+        is_positive: bool,
+    ) -> Option<NarrowingConstraints<'db>> {
+        if !kind.is_irrefutable() && !is_positive {
+            return None;
+        }
+
+        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
+        let place = self.expect_place(&subject);
+
+        let sequence_type = sequence_pattern_type(self.db).negate_if(self.db, !is_positive);
+
+        Some(NarrowingConstraints::from_iter([(
+            place,
+            NarrowingConstraint::intersection(sequence_type),
+        )]))
+    }
+
     fn evaluate_match_pattern_value(
         &mut self,
         subject: Expression<'db>,
@@ -2189,205 +2223,18 @@ fn all_matching_tuple_elements_have_literal_types<'db>(
     })
 }
 
-/// Builder for computing the conservative set of places that could possibly be narrowed.
-///
-/// This mirrors the structure of `NarrowingConstraintsBuilder` but only computes which places
-/// *could* be narrowed, without performing type inference to determine the actual constraints.
-pub(crate) struct PossiblyNarrowedPlacesBuilder<'db, 'a> {
-    db: &'db dyn Db,
-    places: &'a PlaceTableBuilder,
+pub(crate) trait NarrowingEvaluatorExtension<'db> {
+    fn narrow(&self, db: &'db dyn Db, base_type: Type<'db>, place: ScopedPlaceId) -> Type<'db>;
 }
 
-impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
-    pub(crate) fn new(db: &'db dyn Db, places: &'a PlaceTableBuilder) -> Self {
-        Self { db, places }
-    }
-
-    /// Compute possibly narrowed places for an expression predicate.
-    pub(crate) fn expression(self, expr: &ast::Expr) -> PossiblyNarrowedPlaces {
-        self.expression_node(expr)
-    }
-
-    /// Compute possibly narrowed places for a pattern predicate.
-    pub(crate) fn pattern(
-        self,
-        pattern: PatternPredicate<'db>,
-        module: &ParsedModuleRef,
-    ) -> PossiblyNarrowedPlaces {
-        self.pattern_kind(pattern.kind(self.db), pattern.subject(self.db), module)
-    }
-
-    fn expression_node(&self, expr: &ast::Expr) -> PossiblyNarrowedPlaces {
-        match expr {
-            // Simple expressions that directly narrow a place
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
-                self.simple_expr(expr)
-            }
-            // Compare expressions can narrow places on either side
-            ast::Expr::Compare(expr_compare) => self.expr_compare(expr_compare),
-            // Call expressions (isinstance, issubclass, hasattr, TypeGuard, len, bool, etc.)
-            ast::Expr::Call(expr_call) => self.expr_call(expr_call),
-            // Unary not just delegates to its operand
-            ast::Expr::UnaryOp(unary_op) if unary_op.op == ast::UnaryOp::Not => {
-                self.expression_node(&unary_op.operand)
-            }
-            // Boolean operations combine places from all sub-expressions
-            ast::Expr::BoolOp(bool_op) => self.expr_bool_op(bool_op),
-            // Conditional expressions combine places from all branches and the test.
-            ast::Expr::If(expr_if) => self.expr_if(expr_if),
-            // Named expressions narrow both the target and the value
-            ast::Expr::Named(expr_named) => {
-                let mut places = self.simple_expr(&expr_named.target);
-                places.extend(self.expression_node(&expr_named.value));
-                places
-            }
-            _ => PossiblyNarrowedPlaces::default(),
-        }
-    }
-
-    /// Simple expressions that directly narrow a single place.
-    fn simple_expr(&self, expr: &ast::Expr) -> PossiblyNarrowedPlaces {
-        let mut places = PossiblyNarrowedPlaces::default();
-        if let Some(place_expr) = PlaceExpr::try_from_expr(expr) {
-            if let Some(place) = self.places.place_id((&place_expr).into()) {
-                places.insert(place);
-            }
-        }
-        places
-    }
-
-    /// Compare expressions can narrow places on either side of the comparison,
-    /// and can also narrow subscript bases (for `TypedDict` and tuple narrowing).
-    fn expr_compare(&self, expr_compare: &ast::ExprCompare) -> PossiblyNarrowedPlaces {
-        let mut places = PossiblyNarrowedPlaces::default();
-
-        // The left side can be narrowed
-        self.add_narrowing_target(&expr_compare.left, &mut places);
-
-        // Each comparator can also be narrowed
-        for comparator in &expr_compare.comparators {
-            self.add_narrowing_target(comparator, &mut places);
-        }
-
-        // For subscript expressions on either side, the subscript base can also be narrowed.
-        // (TypedDict and tuple discriminated union narrowing.)
-        for expr in std::iter::once(&*expr_compare.left).chain(&expr_compare.comparators) {
-            if let ast::Expr::Subscript(subscript) = expr
-                && let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value)
-                && let Some(place) = self.places.place_id((&place_expr).into())
-            {
-                places.insert(place);
-            }
-        }
-
-        places
-    }
-
-    /// Call expressions can narrow their first argument (isinstance, issubclass, hasattr, len)
-    /// or narrow based on TypeGuard/TypeIs return types.
-    fn expr_call(&self, expr_call: &ast::ExprCall) -> PossiblyNarrowedPlaces {
-        let mut places = PossiblyNarrowedPlaces::default();
-
-        // Most narrowing calls narrow their first argument
-        if let Some(first_arg) = expr_call.arguments.args.first() {
-            if let Some(place_expr) = PlaceExpr::try_from_expr(first_arg) {
-                if let Some(place) = self.places.place_id((&place_expr).into()) {
-                    places.insert(place);
-                }
-            }
-        }
-
-        // `bool(expr)` can delegate to narrowing `expr` itself, e.g. `bool(x is not None)`
-        if let Some(first_arg) = expr_call.arguments.args.first() {
-            if expr_call.arguments.args.len() == 1 && expr_call.arguments.keywords.is_empty() {
-                places.extend(self.expression_node(first_arg));
-            }
-        }
-
-        places
-    }
-
-    /// Boolean operations combine places from all sub-expressions.
-    fn expr_bool_op(&self, bool_op: &ast::ExprBoolOp) -> PossiblyNarrowedPlaces {
-        let mut places = PossiblyNarrowedPlaces::default();
-        for value in &bool_op.values {
-            places.extend(self.expression_node(value));
-        }
-        places
-    }
-
-    fn expr_if(&self, expr_if: &ast::ExprIf) -> PossiblyNarrowedPlaces {
-        let mut places = self.expression_node(&expr_if.test);
-        places.extend(self.expression_node(&expr_if.body));
-        places.extend(self.expression_node(&expr_if.orelse));
-        places
-    }
-
-    /// Helper to add a potential narrowing target expression to the set.
-    fn add_narrowing_target(&self, expr: &ast::Expr, places: &mut PossiblyNarrowedPlaces) {
-        match expr {
-            ast::Expr::Name(_)
-            | ast::Expr::Attribute(_)
-            | ast::Expr::Subscript(_)
-            | ast::Expr::Named(_) => {
-                if let Some(place_expr) = PlaceExpr::try_from_expr(expr) {
-                    if let Some(place) = self.places.place_id((&place_expr).into()) {
-                        places.insert(place);
-                    }
-                }
-            }
-            // type(x) is Y can narrow x
-            ast::Expr::Call(call) if call.arguments.args.len() == 1 => {
-                if let Some(first_arg) = call.arguments.args.first() {
-                    if let Some(place_expr) = PlaceExpr::try_from_expr(first_arg) {
-                        if let Some(place) = self.places.place_id((&place_expr).into()) {
-                            places.insert(place);
-                        }
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
-    /// Pattern predicates narrow the match subject.
-    fn pattern_kind(
-        &self,
-        kind: &PatternPredicateKind<'db>,
-        subject: Expression<'db>,
-        module: &ParsedModuleRef,
-    ) -> PossiblyNarrowedPlaces {
-        let mut places = PossiblyNarrowedPlaces::default();
-
-        // The match subject can always be narrowed by a pattern
-        let subject_node = subject.node_ref(self.db).node(module);
-        if let Some(subject_place_expr) = PlaceExpr::try_from_expr(subject_node) {
-            if let Some(place) = self.places.place_id((&subject_place_expr).into()) {
-                places.insert(place);
-            }
-        }
-
-        // For subscript subjects, the subscript base can also be narrowed (TypedDict/tuple narrowing)
-        if let ast::Expr::Subscript(subscript) = subject_node {
-            if let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value) {
-                if let Some(place) = self.places.place_id((&place_expr).into()) {
-                    places.insert(place);
-                }
-            }
-        }
-
-        // Handle Or patterns by recursing into each alternative
-        if let PatternPredicateKind::Or(predicates) = kind {
-            for predicate in predicates {
-                places.extend(self.pattern_kind(predicate, subject, module));
-            }
-        }
-
-        // Handle As patterns by recursing into the inner pattern
-        if let PatternPredicateKind::As(Some(inner), _) = kind {
-            places.extend(self.pattern_kind(inner, subject, module));
-        }
-
-        places
+impl<'db> NarrowingEvaluatorExtension<'db> for NarrowingEvaluator<'_, 'db> {
+    fn narrow(&self, db: &'db dyn Db, base_type: Type<'db>, place: ScopedPlaceId) -> Type<'db> {
+        self.reachability_constraints().narrow_by_constraint(
+            db,
+            self.predicates(),
+            self.constraint(),
+            base_type,
+            place,
+        )
     }
 }

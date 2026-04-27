@@ -279,7 +279,7 @@ enum DiffKind<'a> {
 }
 
 struct CodeDiff<'a> {
-    diff: TextDiff<'a, 'a, 'a, str>,
+    diff: TextDiff<'a, 'a, str>,
     header: Option<(&'a str, &'a str)>,
     missing_newline_hint: bool,
 }

@@ -33,12 +33,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
 error[not-iterable]: Object of type `Test | Literal[42]` may not be iterable
   --> src/mdtest_snippet.py:11:14
    |
- 9 | def _(flag: bool):
-10 |     # error: [not-iterable]
 11 |     for x in Test() if flag else 42:
    |              ^^^^^^^^^^^^^^^^^^^^^^
-12 |         reveal_type(x)  # revealed: int
    |
 info: It may not have an `__iter__` method and it doesn't have a `__getitem__` method
+info: `Literal[42]` does not implement `__iter__`
 
 ```

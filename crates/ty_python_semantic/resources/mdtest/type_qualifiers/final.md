@@ -584,8 +584,6 @@ class Derived(Base):
 
 ### Superclass with same name as subclass
 
-<!-- snapshot-diagnostics -->
-
 `module_a.py`:
 
 ```py
@@ -601,7 +599,23 @@ class Foo:
 from module_a import Foo as BaseFoo
 
 class Foo(BaseFoo):
-    X = 2  # error: [override-of-final-variable]
+    # snapshot: override-of-final-variable
+    X = 2
+```
+
+```snapshot
+error[override-of-final-variable]: Cannot override `module_a.Foo.X`
+ --> src/module_b.py:5:5
+  |
+5 |     X = 2
+  |     ^ Overrides a final variable from superclass `module_a.Foo`
+  |
+info: `module_a.Foo.X` is declared as `Final`, forbidding overrides
+ --> src/module_a.py:4:5
+  |
+4 |     X: Final[int] = 1
+  |     - `module_a.Foo.X` defined here
+  |
 ```
 
 ### `Final` declaration without a value
@@ -1032,6 +1046,27 @@ class D:
         # No else: y may be unbound at runtime, but there is still an assignment path
 ```
 
+### Reachable `Final` declaration wins for diagnostics
+
+If an earlier `Final` declaration is statically unreachable, diagnostics should be attached to the
+later declaration that remains visible:
+
+```py
+from typing import Final
+
+if False:
+    UNREACHABLE_MODULE_FINAL: Final[int]
+else:
+    # error: [final-without-value] "`Final` symbol `UNREACHABLE_MODULE_FINAL` is not assigned a value"
+    UNREACHABLE_MODULE_FINAL: Final[str]
+
+class C:
+    if False:
+        x: Final[int]
+    else:
+        x: Final[str]  # error: [final-without-value] "`Final` symbol `x` is not assigned a value"
+```
+
 ### Assignment in non-`__init__` method
 
 Per the typing spec, a `Final` attribute declared in a class body without a value must be
@@ -1235,8 +1270,6 @@ class Child(Base):
 
 ## Full diagnostics
 
-<!-- snapshot-diagnostics -->
-
 Annotated assignment:
 
 ```py
@@ -1246,7 +1279,22 @@ MY_CONSTANT: Final[int] = 1
 
 # more code
 
-MY_CONSTANT = 2  # error: [invalid-assignment]
+# snapshot: invalid-assignment
+MY_CONSTANT = 2
+```
+
+```snapshot
+error[invalid-assignment]: Reassignment of `Final` symbol `MY_CONSTANT` is not allowed
+ --> src/mdtest_snippet.py:8:1
+  |
+8 | MY_CONSTANT = 2
+  | ^^^^^^^^^^^^^^^ Symbol later reassigned here
+  |
+ ::: src/mdtest_snippet.py:3:14
+  |
+3 | MY_CONSTANT: Final[int] = 1
+  |              ---------- Symbol declared as `Final` here
+  |
 ```
 
 Imported `Final` symbol:

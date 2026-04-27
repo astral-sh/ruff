@@ -849,8 +849,6 @@ def _(foo: Foo, ab: A | B, a: int | Any):
 
 ### Optimization: Limit expansion size
 
-<!-- snapshot-diagnostics -->
-
 To prevent combinatorial explosion, ty limits the number of argument lists created by expanding a
 single argument.
 
@@ -879,7 +877,7 @@ from typing_extensions import reveal_type
 
 def _(a: int | None):
     reveal_type(
-        # error: [no-matching-overload]
+        # snapshot: no-matching-overload
         # revealed: Unknown
         f(
             A(),
@@ -915,6 +913,60 @@ def _(a: int | None):
             a30=a,
         )
     )
+```
+
+```snapshot
+error[no-matching-overload]: No overload of function `f` matches arguments
+  --> src/mdtest_snippet.py:8:9
+   |
+ 8 | /         f(
+ 9 | |             A(),
+10 | |             a1=a,
+11 | |             a2=a,
+12 | |             a3=a,
+13 | |             a4=a,
+14 | |             a5=a,
+15 | |             a6=a,
+16 | |             a7=a,
+17 | |             a8=a,
+18 | |             a9=a,
+19 | |             a10=a,
+20 | |             a11=a,
+21 | |             a12=a,
+22 | |             a13=a,
+23 | |             a14=a,
+24 | |             a15=a,
+25 | |             a16=a,
+26 | |             a17=a,
+27 | |             a18=a,
+28 | |             a19=a,
+29 | |             a20=a,
+30 | |             a21=a,
+31 | |             a22=a,
+32 | |             a23=a,
+33 | |             a24=a,
+34 | |             a25=a,
+35 | |             a26=a,
+36 | |             a27=a,
+37 | |             a28=a,
+38 | |             a29=a,
+39 | |             a30=a,
+40 | |         )
+   | |_________^
+   |
+info: Limit of argument type expansion reached at argument 9
+info: First overload defined here
+ --> src/overloaded.pyi:7:1
+  |
+7 | / @overload
+8 | | def f() -> None: ...
+  | |____________________^ First overload defined here
+  |
+info: Possible overloads for function `f`:
+info:   () -> None
+info:   (**kwargs: int) -> C
+info:   (x: A, /, **kwargs: int) -> A
+info:   (x: B, /, **kwargs: int) -> B
 ```
 
 ### Optimization: Limit tuple element expansion size
@@ -1670,20 +1722,54 @@ def _(args1: list[int], args2: list[Any]):
 
 reveal_type(f2())  # revealed: tuple[Any, ...]
 reveal_type(f2(1, 2))  # revealed: tuple[Literal[1], Literal[2]]
-# TODO: Should be `tuple[Literal[1], Literal[2]]`
-reveal_type(f2(x1=1, x2=2))  # revealed: Unknown
-# TODO: Should be `tuple[Literal[2], Literal[1]]`
-reveal_type(f2(x2=1, x1=2))  # revealed: Unknown
+reveal_type(f2(x1=1, x2=2))  # revealed: tuple[Literal[1], Literal[2]]
+reveal_type(f2(x2=1, x1=2))  # revealed: tuple[Literal[2], Literal[1]]
 reveal_type(f2(1, 2, z=3))  # revealed: tuple[Any, ...]
 
 reveal_type(f3(1, 2))  # revealed: tuple[Literal[1], Literal[2]]
 reveal_type(f3(1, 2, 3))  # revealed: tuple[Any, ...]
-# TODO: Should be `tuple[Literal[1], Literal[2]]`
-reveal_type(f3(x1=1, x2=2))  # revealed: Unknown
+reveal_type(f3(x1=1, x2=2))  # revealed: tuple[Literal[1], Literal[2]]
 reveal_type(f3(z=1))  # revealed: dict[str, Any]
 
 # error: [no-matching-overload]
 reveal_type(f3(1, 2, x=3))  # revealed: Unknown
+```
+
+### Varidic argument with generic iterable
+
+`overloaded.pyi`:
+
+```pyi
+from typing import TypeVar, overload
+from collections.abc import Iterable
+
+T = TypeVar("T")
+T1 = TypeVar("T1")
+T2 = TypeVar("T2")
+T3 = TypeVar("T3")
+
+@overload
+def f(x: Iterable[T1], /) -> tuple[T1]: ...
+@overload
+def f(x: Iterable[T1], y: Iterable[T2], /) -> tuple[T1, T2]: ...
+@overload
+def f(x: Iterable[T1], y: Iterable[T2], z: Iterable[T3], /) -> tuple[T1, T2, T3]: ...
+@overload
+def f(*args: Iterable[T]) -> tuple[T, ...]: ...
+```
+
+```py
+from overloaded import f
+
+class A: ...
+class B: ...
+class C: ...
+
+def _(lista: list[A], listb: list[B], listc: list[C]):
+    reveal_type(f(lista))  # revealed: tuple[A]
+    reveal_type(f(lista, listb))  # revealed: tuple[A, B]
+    reveal_type(f(lista, listb, listc))  # revealed: tuple[A, B, C]
+    reveal_type(f())  # revealed: tuple[Unknown, ...]
 ```
 
 ### Non-participating fully-static parameter

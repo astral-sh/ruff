@@ -163,8 +163,6 @@ def f(x: Foo[int]):
 
 ## Stringified values
 
-<!-- snapshot-diagnostics -->
-
 Stringifying the right-hand side of a type alias is redundant, but allowed:
 
 ```py
@@ -179,11 +177,24 @@ accesses the `.__value__` attribute. Normal runtime rules still therefore apply 
 stringified alias values:
 
 ```py
-# error: [unsupported-operator]
+# snapshot: unsupported-operator
 type Y = "int" | str
 
 def g(obj: Y):
     reveal_type(obj)  # revealed: int | str
+```
+
+```snapshot
+error[unsupported-operator]: Unsupported `|` operation
+ --> src/mdtest_snippet.py:6:10
+  |
+6 | type Y = "int" | str
+  |          -----^^^---
+  |          |       |
+  |          |       Has type `<class 'str'>`
+  |          Has type `Literal["int"]`
+  |
+info: A type alias scope is lazy but will be executed at runtime if the `__value__` property is accessed
 ```
 
 ## In unions and intersections
@@ -316,10 +327,12 @@ IntOrStr = TypeAliasType(get_name(), int | str)
 #### Name does not match variable
 
 ```py
+from typing import Union
 from typing_extensions import TypeAliasType
 
-# error: [invalid-type-alias-type] "The name of a `TypeAliasType` (`WrongName`) must match the name of the variable it is assigned to (`IntOrStr`)"
-IntOrStr = TypeAliasType("WrongName", int | str)
+# error: [mismatched-type-name] "The name passed to `TypeAliasType` must match the variable it is assigned to: Expected "IntOrStr", got "WrongName""
+IntOrStr = TypeAliasType("WrongName", Union[int, str])
+reveal_type(IntOrStr)  # revealed: TypeAliasType
 ```
 
 #### Not a simple variable assignment
@@ -644,4 +657,16 @@ type CallableGuard = TypeGuard[Callable[[], CallableGuard]]
 
 reveal_type(CallableIs)  # revealed: TypeAliasType
 reveal_type(CallableGuard)  # revealed: TypeAliasType
+```
+
+### Recursive alias in binary operators doesn't stack overflow
+
+```py
+from typing import reveal_type
+
+type A = int | A
+
+def foo(x: A):
+    reveal_type(x + 1)  # revealed: int
+    reveal_type(1 + x)  # revealed: int
 ```

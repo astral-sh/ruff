@@ -35,39 +35,22 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
-  ECOSYSTEM_ANALYZER_COMMIT: d5f1075c50e3a86f462f674f3956d447f5cd5f02
+  ECOSYSTEM_ANALYZER_COMMIT: e7576e66e8f992b057ea92c820c04313dceda755
 
 jobs:
-  record-timestamp:
-    name: Record timestamp
-    runs-on: ubuntu-latest
-    timeout-minutes: 1
-    outputs:
-      timestamp: ${{ steps.timestamp.outputs.timestamp }}
-    steps:
-      - name: Record timestamp
-        id: timestamp
-        run: echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
-
-  analyze-branches:
-    needs: [record-timestamp]
-    strategy:
-      matrix:
-        branch: [base, PR]
+  build-ty:
+    name: Build ty
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
-    timeout-minutes: 10
+    timeout-minutes: 5
+    outputs:
+      timestamp: ${{ steps.build.outputs.timestamp }}
+      merge-base: ${{ steps.build.outputs.merge-base }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           path: ruff
-          fetch-depth: ${{ matrix.branch == 'PR' && 1 || 0 }}
+          fetch-depth: 0
           persist-credentials: false
-
-      - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
-        with:
-          enable-cache: true
-          version: "0.11.3"
 
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
@@ -77,86 +60,129 @@ jobs:
       - name: Install Rust toolchain
         run: rustup show
 
-      - name: Setup configuration overrides
+      - name: Build ty for both commits
+        id: build
         working-directory: ruff
         shell: bash
         run: |
-          echo "Enabling configuration overrides (see .github/ty-ecosystem.toml)"
-          mkdir -p ~/.config/ty
-          cp .github/ty-ecosystem.toml ~/.config/ty/ty.toml
+          echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
-          # If we're testing the merge base, make sure to still use the flaky list from the PR branch
-          cp crates/ty_python_semantic/resources/primer/flaky.txt projects_flaky.txt
-
-      - name: Setup merge base
-        if: ${{ matrix.branch == 'base' }}
-        working-directory: ruff
-        shell: bash
-        run: |
-          echo "old commit (merge base)"
           MERGE_BASE="$(git merge-base "${GITHUB_SHA}" "origin/${GITHUB_BASE_REF}")"
-          git checkout -b old_commit "${MERGE_BASE}"
-          git rev-list --format=%s --max-count=1 old_commit
-          cp crates/ty_python_semantic/resources/primer/good.txt projects.txt
-          echo "COMMIT_TO_TEST=$MERGE_BASE" >> "$GITHUB_ENV"
+          echo "merge-base=${MERGE_BASE}" >> "$GITHUB_OUTPUT"
+          echo "Merge base: ${MERGE_BASE}"
+          echo "PR commit: ${GITHUB_SHA}"
 
-      - name: Setup PR branch
-        if: ${{ matrix.branch == 'PR' }}
-        working-directory: ruff
-        shell: bash
-        run: |
-          echo "new commit"
-          git checkout -b new_commit "${GITHUB_SHA}"
-          git rev-list --format=%s --max-count=1 new_commit
-          cp crates/ty_python_semantic/resources/primer/good.txt projects.txt
-          echo "COMMIT_TO_TEST=$GITHUB_SHA" >> "$GITHUB_ENV"
+          git checkout "${MERGE_BASE}"
+          cargo build --package ty --profile profiling
+          cp target/profiling/ty ../ty-base
 
-      - name: Analyze ${{ matrix.branch }} branch
+          git checkout "${GITHUB_SHA}"
+          cargo build --package ty --profile profiling
+          cp target/profiling/ty ../ty-pr
+
+          # Extract project lists and config for the shard jobs
+          git show "${MERGE_BASE}:crates/ty_python_semantic/resources/primer/good.txt" > ../projects_old.txt
+          git show "${GITHUB_SHA}:crates/ty_python_semantic/resources/primer/good.txt" > ../projects_new.txt
+          cp crates/ty_python_semantic/resources/primer/flaky.txt ../projects_flaky.txt
+          cp .github/ty-ecosystem.toml ../ty-ecosystem.toml
+
+      - name: Upload ty binaries, project lists, and config
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ty-builds
+          compression-level: 1
+          path: |
+            ty-base
+            ty-pr
+            projects_old.txt
+            projects_new.txt
+            projects_flaky.txt
+            ty-ecosystem.toml
+
+  analyze-shards:
+    needs: [build-ty]
+    strategy:
+      matrix:
+        shard: [0, 1]
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    steps:
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+          version: "0.11.7"
+
+      - name: Download ty binaries, project lists, and config
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ty-builds
+
+      - name: Analyze shard ${{ matrix.shard }}
         shell: bash
         env:
-          BRANCH: ${{ matrix.branch }}
-          EXCLUDE_NEWER: ${{ needs.record-timestamp.outputs.timestamp }}
+          SHARD: ${{ matrix.shard }}
+          EXCLUDE_NEWER: ${{ needs.build-ty.outputs.timestamp }}
+          MERGE_BASE: ${{ needs.build-ty.outputs.merge-base }}
         run: |
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@$ECOSYSTEM_ANALYZER_COMMIT"
+          mkdir -p ~/.config/ty
+          cp ty-ecosystem.toml ~/.config/ty/ty.toml
 
-          ecosystem-analyzer \
-            --repository ruff \
+          chmod +x ty-base ty-pr
+
+          uvx \
+            --from "git+https://github.com/astral-sh/ecosystem-analyzer@${ECOSYSTEM_ANALYZER_COMMIT}" \
+            ecosystem-analyzer \
             --flaky-runs 10 \
-            analyze \
-            --profile=profiling \
-            --commit "${COMMIT_TO_TEST}" \
-            --projects ruff/projects.txt \
-            --projects-flaky ruff/projects_flaky.txt \
+            diff \
+            --projects-old projects_old.txt \
+            --projects-new projects_new.txt \
+            --projects-flaky projects_flaky.txt \
+            --ty-binary-old ty-base \
+            --ty-binary-new ty-pr \
+            --old "${MERGE_BASE}" \
+            --new "${GITHUB_SHA}" \
             --exclude-newer "${EXCLUDE_NEWER}" \
-            --output "diagnostics-${BRANCH}.json"
+            --shard "${SHARD}" \
+            --num-shards 2 \
+            --output-old "diagnostics-base-${SHARD}.json" \
+            --output-new "diagnostics-PR-${SHARD}.json"
 
-      - name: Upload base diagnostics
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+      - name: Upload diagnostics
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: diagnostics-${{ matrix.branch }}
-          path: diagnostics-${{ matrix.branch }}.json
+          name: diagnostics-shard-${{ matrix.shard }}
+          path: |
+            diagnostics-base-${{ matrix.shard }}.json
+            diagnostics-PR-${{ matrix.shard }}.json
 
   generate-report:
     name: Generate diagnostic diff report
-    needs: [analyze-branches]
+    needs: [analyze-shards]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: true
-          version: "0.11.3"
+          version: "0.11.7"
 
-      - name: Download base diagnostics
+      - name: Download shard 0 diagnostics
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: diagnostics-base
+          name: diagnostics-shard-0
 
-      - name: Download PR diagnostics
+      - name: Download shard 1 diagnostics
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: diagnostics-PR
+          name: diagnostics-shard-1
+
+      - name: Merge shard diagnostics
+        shell: bash
+        run: |
+          jq -s '{ outputs: [.[].outputs[]] }' diagnostics-base-0.json diagnostics-base-1.json > diagnostics-base.json
+          jq -s '{ outputs: [.[].outputs[]] }' diagnostics-PR-0.json   diagnostics-PR-1.json   > diagnostics-PR.json
 
       - name: Generate reports
         id: generate-reports
@@ -205,7 +231,7 @@ jobs:
       # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
       # Make sure to update the bot if you rename the artifact.
       - name: "Upload full report"
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: full-report
           path: dist/
@@ -213,19 +239,19 @@ jobs:
       # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
       # Make sure to update the bot if you rename the artifact.
       - name: Upload comment
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: comment.md
           path: comment.md
 
       - name: Upload diagnostics diff
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: diff.html
           path: dist/diff.html
 
       - name: Upload timing diff
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: timing.html
           path: dist/timing.html

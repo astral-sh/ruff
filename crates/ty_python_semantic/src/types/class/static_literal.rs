@@ -15,15 +15,7 @@ use crate::{
         DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin,
         place_from_bindings, place_from_declarations,
     },
-    semantic_index::{
-        attribute_assignments, attribute_declarations, attribute_scopes,
-        definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
-        place_table,
-        scope::{Scope, ScopeId},
-        semantic_index,
-        symbol::Symbol,
-        use_def_map,
-    },
+    reachability::{DeclarationsIteratorExtension, binding_reachability},
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallArguments, CallableType, ClassBase,
         ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias,
@@ -54,11 +46,21 @@ use crate::{
         member::{Member, class_member},
         mro::{Mro, MroIterator},
         signatures::CallableSignature,
-        tuple::{Tuple, TupleSpec, TupleType},
+        tuple::{FixedLengthTuple, Tuple, TupleSpec, TupleType},
         typed_dict::{TypedDictParams, typed_dict_params_from_class_def},
         variance::VarianceInferable,
         visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },
+};
+use crate::{attribute_assignments, attribute_declarations};
+use ty_python_core::{
+    attribute_scopes,
+    definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
+    place_table,
+    scope::{Scope, ScopeId},
+    semantic_index,
+    symbol::Symbol,
+    use_def_map,
 };
 
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
@@ -216,8 +218,9 @@ impl<'db> StaticClassLiteral<'db> {
                             return Some(ty);
                         }
                     }
-                    // Dynamic namedtuples and TypedDicts don't define their own ordering methods.
-                    ClassLiteral::DynamicNamedTuple(_) | ClassLiteral::DynamicTypedDict(_) => {}
+                    ClassLiteral::DynamicNamedTuple(_)
+                    | ClassLiteral::DynamicTypedDict(_)
+                    | ClassLiteral::DynamicEnum(_) => {}
                 }
             }
         }
@@ -441,45 +444,10 @@ impl<'db> StaticClassLiteral<'db> {
         let class_definition =
             semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
 
-        match self.known(db) {
-            Some(KnownClass::VersionInfo) => {
-                let tuple_type = TupleType::new(db, &TupleSpec::version_info_spec(db))
-                    .expect("sys.version_info tuple spec should always be a valid tuple");
-
-                Box::new([
-                    definition_expression_type(db, class_definition, &class_stmt.bases()[0]),
-                    Type::from(tuple_type.to_class_type(db)),
-                ])
-            }
-            // Special-case `NotImplementedType`: typeshed says that it inherits from `Any`,
-            // but this causes more problems than it fixes.
-            Some(KnownClass::NotImplementedType) => Box::new([]),
-            _ => class_stmt
-                .bases()
-                .iter()
-                .flat_map(|base_node| {
-                    if let ast::Expr::Starred(starred) = base_node {
-                        let starred_ty =
-                            definition_expression_type(db, class_definition, &starred.value);
-                        // If the starred expression is a fixed-length tuple, unpack it.
-                        if let Some(Tuple::Fixed(tuple)) = starred_ty
-                            .tuple_instance_spec(db)
-                            .map(std::borrow::Cow::into_owned)
-                        {
-                            return Either::Left(tuple.owned_elements().into_vec().into_iter());
-                        }
-                        // Otherwise, we can't statically determine the bases.
-                        Either::Right(std::iter::once(Type::unknown()))
-                    } else {
-                        Either::Right(std::iter::once(definition_expression_type(
-                            db,
-                            class_definition,
-                            base_node,
-                        )))
-                    }
-                })
-                .collect(),
-        }
+        expanded_class_base_entries(db, self.known(db), class_stmt, class_definition)
+            .into_iter()
+            .map(ExpandedClassBaseEntry::ty)
+            .collect()
     }
 
     /// Return `Some()` if this class is known to be a [`DisjointBase`], or `None` if it is not.
@@ -487,6 +455,8 @@ impl<'db> StaticClassLiteral<'db> {
         if self
             .known_function_decorators(db)
             .contains(&KnownFunction::DisjointBase)
+            && !self.is_typed_dict(db)
+            && !self.is_protocol(db)
         {
             Some(DisjointBase::due_to_decorator(self))
         } else if SlotsKind::from(db, self) == SlotsKind::NotEmpty {
@@ -667,7 +637,9 @@ impl<'db> StaticClassLiteral<'db> {
             .filter_map(ClassBase::into_class)
             .any(|base| match base.class_literal(db) {
                 ClassLiteral::DynamicNamedTuple(_) => true,
-                ClassLiteral::Dynamic(_) | ClassLiteral::DynamicTypedDict(_) => false,
+                ClassLiteral::Dynamic(_)
+                | ClassLiteral::DynamicTypedDict(_)
+                | ClassLiteral::DynamicEnum(_) => false,
                 ClassLiteral::Static(class) => class
                     .explicit_bases(db)
                     .contains(&Type::SpecialForm(SpecialFormType::NamedTuple)),
@@ -778,6 +750,27 @@ impl<'db> StaticClassLiteral<'db> {
         let (dataclass_params, transformer_params) = self.merged_dataclass_params(db, field_policy);
         dataclass_params.is_some_and(|params| params.flags(db).contains(param))
             || transformer_params.is_some_and(|params| params.flags(db).contains(param))
+    }
+
+    /// Returns the nearest `@dataclass_transform` parameters for this class or its MRO.
+    ///
+    /// This is used for metaclass-based transforms because `__dataclass_transform__` is inherited,
+    /// so a metaclass subclass should preserve the transform metadata of its decorated base class
+    /// unless it provides its own.
+    fn inherited_dataclass_transformer_params(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Option<DataclassTransformerParams<'db>> {
+        self.dataclass_transformer_params(db).or_else(|| {
+            self.iter_mro(db, specialization).skip(1).find_map(|base| {
+                base.into_class().and_then(|class| {
+                    class
+                        .static_class_literal(db)
+                        .and_then(|(lit, _)| lit.dataclass_transformer_params(db))
+                })
+            })
+        })
     }
 
     /// Return the explicit `metaclass` of this class, if one is defined.
@@ -940,7 +933,9 @@ impl<'db> StaticClassLiteral<'db> {
         let transform_info = candidate
             .metaclass
             .static_class_literal(db)
-            .and_then(|(metaclass_literal, _)| metaclass_literal.dataclass_transformer_params(db))
+            .and_then(|(metaclass_literal, specialization)| {
+                metaclass_literal.inherited_dataclass_transformer_params(db, specialization)
+            })
             .map(|params| MetaclassTransformInfo {
                 params,
                 from_explicit_metaclass: candidate.explicit_metaclass_of == self,
@@ -1069,7 +1064,7 @@ impl<'db> StaticClassLiteral<'db> {
                     field.declared_ty,
                 );
                 let property_getter = Type::single_callable(db, property_getter_signature);
-                let property = PropertyInstanceType::new(db, Some(property_getter), None);
+                let property = PropertyInstanceType::new(db, Some(property_getter), None, None);
                 return Member::definitely_declared(Type::PropertyInstance(property));
             }
         }
@@ -1577,12 +1572,27 @@ impl<'db> StaticClassLiteral<'db> {
     /// Returns a list of all annotated attributes defined in this class, or any of its superclasses.
     ///
     /// See [`StaticClassLiteral::own_fields`] for more details.
+    pub(crate) fn fields(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        field_policy: CodeGeneratorKind<'db>,
+    ) -> &'db FxIndexMap<Name, Field<'db>> {
+        if field_policy == CodeGeneratorKind::NamedTuple {
+            // NamedTuples do not allow multiple inheritance, so it is sufficient to enumerate the
+            // fields of this class only.
+            return self.own_fields(db, specialization, field_policy);
+        }
+
+        self.fields_inner(db, specialization, field_policy)
+    }
+
     #[salsa::tracked(
         returns(ref),
         cycle_initial=|_, _, _, _, _| FxIndexMap::default(),
         heap_size=get_size2::GetSize::get_heap_size
     )]
-    pub(crate) fn fields(
+    fn fields_inner(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
@@ -1593,11 +1603,11 @@ impl<'db> StaticClassLiteral<'db> {
             DynamicTypedDict(DynamicTypedDictLiteral<'db>),
         }
 
-        if field_policy == CodeGeneratorKind::NamedTuple {
-            // NamedTuples do not allow multiple inheritance, so it is sufficient to enumerate the
-            // fields of this class only.
-            return self.own_fields(db, specialization, field_policy);
-        }
+        debug_assert_ne!(
+            field_policy,
+            CodeGeneratorKind::NamedTuple,
+            "Collecting `fields` for NamedTuples should short-circuit in `fields()`"
+        );
 
         self.iter_mro(db, specialization)
             .rev()
@@ -1622,7 +1632,8 @@ impl<'db> StaticClassLiteral<'db> {
                 FieldSource::Static(class, specialization) => Either::Left(
                     class
                         .own_fields(db, specialization, field_policy)
-                        .into_iter(),
+                        .iter()
+                        .map(|(name, field)| (name.clone(), field.clone())),
                 ),
                 FieldSource::DynamicTypedDict(typeddict) => {
                     Either::Right(typeddict.items(db).iter().map(|(name, td_field)| {
@@ -1725,11 +1736,16 @@ impl<'db> StaticClassLiteral<'db> {
     /// including properties inherited from class-level dataclass parameters (like `kw_only=True`)
     /// and dataclass-transform parameters (like `kw_only_default=True`). They do not represent
     /// only what is explicitly specified in each field definition.
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial=|_, _, _, _, _| FxIndexMap::default(),
+        heap_size=get_size2::GetSize::get_heap_size
+    )]
     pub(crate) fn own_fields(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
-        field_policy: CodeGeneratorKind,
+        field_policy: CodeGeneratorKind<'db>,
     ) -> FxIndexMap<Name, Field<'db>> {
         let mut attributes = FxIndexMap::default();
 
@@ -1739,6 +1755,8 @@ impl<'db> StaticClassLiteral<'db> {
         let use_def = use_def_map(db, class_body_scope);
 
         let typed_dict_params = self.typed_dict_params(db);
+        let dataclass_kw_only_default = matches!(field_policy, CodeGeneratorKind::DataclassLike(_))
+            .then(|| self.has_dataclass_param(db, field_policy, DataclassFlags::KW_ONLY));
         let mut kw_only_sentinel_field_seen = false;
 
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
@@ -1850,7 +1868,7 @@ impl<'db> StaticClassLiteral<'db> {
                     ..
                 } = field.kind
                 {
-                    *kw = Some(self.has_dataclass_param(db, field_policy, DataclassFlags::KW_ONLY));
+                    *kw = dataclass_kw_only_default;
                 }
 
                 attributes.insert(symbol.name().clone(), field);
@@ -2064,7 +2082,7 @@ impl<'db> StaticClassLiteral<'db> {
                         .reachable_symbol_bindings(method_place)
                         .find_map(|bind| {
                             (bind.binding.is_defined_and(|def| def == method))
-                                .then(|| class_map.binding_reachability(db, &bind))
+                                .then(|| binding_reachability(db, class_map, &bind))
                         })
                         .unwrap_or(Truthiness::AlwaysFalse)
                 } else {
@@ -2229,6 +2247,17 @@ impl<'db> StaticClassLiteral<'db> {
         // TODO: There are many things that are not yet implemented here:
         // - `typing.Final`
         // - Proper diagnostics
+
+        // NamedTuple fields are modeled via synthesized descriptors on the class. Treating them
+        // as instance attributes here causes inherited fields to leak through after a subclass
+        // shadows the name with a normal class attribute.
+        if CodeGeneratorKind::NamedTuple.matches(db, self.into(), None)
+            && self
+                .own_fields(db, None, CodeGeneratorKind::NamedTuple)
+                .contains_key(name)
+        {
+            return Member::unbound();
+        }
 
         let body_scope = self.body_scope(db);
         let table = place_table(db, body_scope);
@@ -2534,6 +2563,128 @@ impl<'db> StaticClassLiteral<'db> {
                 .unwrap_or_else(|| class_name.end()),
         )
     }
+}
+
+/// A single semantic class-base entry after expanding starred tuple bases and synthetic bases.
+#[derive(Clone, Copy)]
+pub(crate) enum ExpandedClassBaseEntry<'a, 'db> {
+    /// A base that comes from a concrete expression in the class header.
+    SourceBacked { node: &'a ast::Expr, ty: Type<'db> },
+    /// A base introduced by semantic expansion with no corresponding source expression.
+    Synthetic(Type<'db>),
+}
+
+impl<'a, 'db> ExpandedClassBaseEntry<'a, 'db> {
+    /// Returns the source expression for this base entry, if it has one.
+    pub(crate) const fn source_node(self) -> Option<&'a ast::Expr> {
+        match self {
+            Self::SourceBacked { node, .. } => Some(node),
+            Self::Synthetic(_) => None,
+        }
+    }
+
+    /// Returns the semantic type of this base entry.
+    pub(crate) const fn ty(self) -> Type<'db> {
+        match self {
+            Self::SourceBacked { ty, .. } | Self::Synthetic(ty) => ty,
+        }
+    }
+}
+
+/// Expands a class's bases into the semantic entries used by [`StaticClassLiteral::explicit_bases`].
+///
+/// Entries are source-backed when they originate from a concrete base expression in the class
+/// header, and synthetic when semantic expansion adds a base with no corresponding source span.
+pub(crate) fn expanded_class_base_entries<'a, 'db>(
+    db: &'db dyn Db,
+    known_class: Option<KnownClass>,
+    class_stmt: &'a ast::StmtClassDef,
+    class_definition: Definition<'db>,
+) -> Vec<ExpandedClassBaseEntry<'a, 'db>> {
+    match known_class {
+        Some(KnownClass::VersionInfo) => {
+            let tuple_type = TupleType::new(db, &TupleSpec::version_info_spec(db))
+                .expect("sys.version_info tuple spec should always be a valid tuple");
+
+            vec![
+                ExpandedClassBaseEntry::SourceBacked {
+                    node: &class_stmt.bases()[0],
+                    ty: definition_expression_type(db, class_definition, &class_stmt.bases()[0]),
+                },
+                ExpandedClassBaseEntry::Synthetic(Type::from(tuple_type.to_class_type(db))),
+            ]
+        }
+        // Special-case `NotImplementedType`: typeshed says that it inherits from `Any`,
+        // but this causes more problems than it fixes.
+        Some(KnownClass::NotImplementedType) => vec![],
+        _ => {
+            let mut expanded_bases = Vec::with_capacity(class_stmt.bases().len());
+
+            for base_node in class_stmt.bases() {
+                if let Some(tuple) =
+                    expanded_fixed_length_starred_class_base_tuple(db, class_definition, base_node)
+                {
+                    if let ast::Expr::Starred(starred) = base_node
+                        && let Some(tuple_literal) = starred.value.as_tuple_expr()
+                        && tuple_literal.len() == tuple.len()
+                        && tuple_literal
+                            .iter()
+                            .all(|element| !element.is_starred_expr())
+                    {
+                        expanded_bases.extend(
+                            tuple_literal
+                                .iter()
+                                .zip(tuple.owned_elements().into_vec())
+                                .map(|(node, ty)| ExpandedClassBaseEntry::SourceBacked {
+                                    node,
+                                    ty,
+                                }),
+                        );
+                        continue;
+                    }
+
+                    expanded_bases.extend(tuple.owned_elements().into_vec().into_iter().map(
+                        |ty| ExpandedClassBaseEntry::SourceBacked {
+                            node: base_node,
+                            ty,
+                        },
+                    ));
+                    continue;
+                }
+
+                let ty = if matches!(base_node, ast::Expr::Starred(_)) {
+                    Type::unknown()
+                } else {
+                    definition_expression_type(db, class_definition, base_node)
+                };
+                expanded_bases.push(ExpandedClassBaseEntry::SourceBacked {
+                    node: base_node,
+                    ty,
+                });
+            }
+
+            expanded_bases
+        }
+    }
+}
+
+/// If `base_node` is a starred class base whose value is inferred as a fixed-length tuple,
+/// returns the unpacked tuple in source order.
+fn expanded_fixed_length_starred_class_base_tuple<'db>(
+    db: &'db dyn Db,
+    class_definition: Definition<'db>,
+    base_node: &ast::Expr,
+) -> Option<FixedLengthTuple<Type<'db>>> {
+    let ast::Expr::Starred(starred) = base_node else {
+        return None;
+    };
+
+    let starred_ty = definition_expression_type(db, class_definition, &starred.value);
+    let tuple_spec = starred_ty.tuple_instance_spec(db)?;
+    let Tuple::Fixed(tuple) = tuple_spec.into_owned() else {
+        return None;
+    };
+    Some(tuple)
 }
 
 #[salsa::tracked]

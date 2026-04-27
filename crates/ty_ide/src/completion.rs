@@ -834,7 +834,7 @@ impl<'m> ContextCursor<'m> {
     }
 
     /// Returns true when the cursor sits on a binding statement.
-    /// E.g. naming a parameter, type parameter, or `for` <name>).
+    /// E.g. naming a parameter, type parameter, or `for` `<name>`).
     fn is_in_variable_binding(&self) -> bool {
         self.covering_node.ancestors().any(|node| match node {
             ast::AnyNodeRef::Parameter(param) => param.name.range.contains_range(self.range),
@@ -895,10 +895,10 @@ impl<'m> ContextCursor<'m> {
                         return Some(cause_ty);
                     }
                 }
-                ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => {
-                    if handler.type_.as_deref().is_some_and(contains) {
-                        return Some(except_ty);
-                    }
+                ast::AnyNodeRef::ExceptHandlerExceptHandler(handler)
+                    if handler.type_.as_deref().is_some_and(contains) =>
+                {
+                    return Some(except_ty);
                 }
                 _ => {}
             }
@@ -1440,6 +1440,13 @@ fn add_argument_completions<'db>(
     let mut in_arguments = false;
     for node in cursor.covering_node.ancestors() {
         match node {
+            // Do not suggest argument completions in value positions for
+            // keyword arguments
+            ast::AnyNodeRef::Keyword(kw) => {
+                if kw.value.range().contains_range(cursor.range) {
+                    return;
+                }
+            }
             ast::AnyNodeRef::Arguments(_) => {
                 in_arguments = true;
             }
@@ -9187,6 +9194,28 @@ re.match('', '', fla<CURSOR>
         assert_snapshot!(
             builder.skip_auto_import().skip_builtins().build().snapshot(),
             @"flags=",
+        );
+    }
+
+    #[test]
+    fn call_keyword_argument_at_value() {
+        let builder = completion_test_builder(
+            "\
+def bar(y_true,y_pred): ...
+
+y_true = 1
+y_pred = 2
+
+bar(y_true=y<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @r###"
+        y_pred
+        y_true
+        "###
         );
     }
 

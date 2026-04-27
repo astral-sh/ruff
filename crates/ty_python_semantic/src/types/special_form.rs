@@ -3,14 +3,6 @@
 
 use super::{ClassType, Type, class::KnownClass};
 use crate::db::Db;
-use crate::semantic_index::place::ScopedPlaceId;
-use crate::semantic_index::{
-    FileScopeId,
-    definition::{Definition, DefinitionKind},
-    place_table,
-    scope::ScopeId,
-    semantic_index, use_def_map,
-};
 use crate::types::IntersectionType;
 use crate::types::infer::InferenceFlags;
 use crate::types::{
@@ -21,6 +13,14 @@ use crate::types::{
 use ruff_db::files::File;
 use strum_macros::EnumString;
 use ty_module_resolver::{KnownModule, file_to_module, resolve_module_confident};
+use ty_python_core::{
+    FileScopeId,
+    definition::{Definition, DefinitionKind},
+    place::ScopedPlaceId,
+    place_table,
+    scope::ScopeId,
+    semantic_index, use_def_map,
+};
 
 /// Enumeration of specific runtime symbols that are special enough
 /// that they can each be considered to inhabit a unique type.

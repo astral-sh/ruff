@@ -5,12 +5,12 @@ use crate::{
     Db,
     types::{
         CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, SubclassOfInner, Truthiness, Type, TypeContext,
-        TypeVarBoundOrConstraints, UnionType, call::CallErrorKind,
-        constraints::ConstraintSetBuilder, context::InferContext,
+        LiteralValueTypeKind, SubclassOfInner, Type, TypeContext, TypeVarBoundOrConstraints,
+        UnionType, call::CallErrorKind, constraints::ConstraintSetBuilder, context::InferContext,
         diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
     },
 };
+use ty_python_core::Truthiness;
 
 impl<'db> Type<'db> {
     /// Resolves the boolean value of the type and falls back to [`Truthiness::Ambiguous`] if the type doesn't implement `__bool__` correctly.
@@ -80,7 +80,9 @@ impl<'db> Type<'db> {
                     Ok(type_to_truthiness(return_type))
                 }
 
-                Err(CallDunderError::PossiblyUnbound(outcome)) => {
+                Err(CallDunderError::PossiblyUnbound {
+                    bindings: outcome, ..
+                }) => {
                     let return_type = outcome.return_type(db);
                     if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
                         // The type has a `__bool__` method, but it doesn't return a

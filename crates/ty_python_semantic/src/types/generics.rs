@@ -7,10 +7,6 @@ use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::node_key::NodeKey;
-use crate::semantic_index::definition::{Definition, DefinitionKind};
-use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKey, NodeWithScopeKind, ScopeId};
-use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
@@ -32,9 +28,14 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
     MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, UnionType, declaration_type,
+    TypeVarKind, TypeVarVariance, UnionType, binding_type, declaration_type,
+    infer_definition_types,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
+use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::node_key::NodeKey;
+use ty_python_core::scope::{FileScopeId, NodeWithScopeKey, NodeWithScopeKind, ScopeId};
+use ty_python_core::{SemanticIndex, semantic_index};
 
 /// Returns an iterator of any generic context introduced by the given scope or any enclosing
 /// scope.
@@ -45,7 +46,7 @@ pub(crate) fn enclosing_generic_contexts<'db>(
 ) -> impl Iterator<Item = GenericContext<'db>> {
     index
         .ancestor_scopes(scope)
-        .filter_map(|(_, ancestor_scope)| ancestor_scope.node().generic_context(db, index))
+        .filter_map(|(_, ancestor_scope)| GenericContext::of_node(db, ancestor_scope.node(), index))
 }
 
 /// Binds an unbound typevar.
@@ -107,7 +108,7 @@ pub(crate) fn bind_typevar<'db>(
         // If we've already crossed a class boundary, skip class-scoped generic contexts.
         // This prevents inner classes from accessing type parameters of outer classes.
         if (!is_class_scope || !crossed_class_scope)
-            && let Some(generic_context) = ancestor_scope.node().generic_context(db, index)
+            && let Some(generic_context) = GenericContext::of_node(db, ancestor_scope.node(), index)
             && let Some(bound) = generic_context.binds_typevar(db, typevar)
         {
             return Some(bound);
@@ -319,6 +320,36 @@ impl<'db> GenericContext<'db> {
         });
 
         Self::from_typevar_instances(db, variables)
+    }
+
+    pub(crate) fn of_node(
+        db: &'db dyn Db,
+        node: &NodeWithScopeKind,
+        index: &SemanticIndex<'db>,
+    ) -> Option<Self> {
+        match node {
+            NodeWithScopeKind::Class(class) => {
+                let definition = index.expect_single_definition(class);
+                binding_type(db, definition)
+                    .as_class_literal()?
+                    .generic_context(db)
+            }
+            NodeWithScopeKind::Function(function) => {
+                let definition = index.expect_single_definition(function);
+                infer_definition_types(db, definition)
+                    .function_type(definition)?
+                    .last_definition_signature(db)
+                    .generic_context
+            }
+            NodeWithScopeKind::TypeAlias(type_alias) => {
+                let definition = index.expect_single_definition(type_alias);
+                binding_type(db, definition)
+                    .as_type_alias()?
+                    .as_pep_695_type_alias()?
+                    .generic_context(db)
+            }
+            _ => None,
+        }
     }
 
     /// Creates a generic context from a list of `BoundTypeVarInstance`s.
@@ -1690,26 +1721,33 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// Build a specialization, using a caller-provided hook to select the solution for each
     /// typevar.
     ///
-    /// The `choose` hook is called for each *inferred* typevar (those with entries in the type
-    /// mappings) with the typevar's materialized lower and upper bounds. Currently, both bounds
-    /// are set to the inferred type (representing an equality constraint). Unmapped typevars
-    /// are left to `specialize_recursive` to fill in with defaults.
+    /// The `choose` hook is called for each typevar on the generic context with the typevar's
+    /// materialized lower and upper bounds. Currently, both bounds are set to the inferred type
+    /// (representing an equality constraint). Unmapped typevars have bounds of `None,` and fallback
+    /// to their default specialization if an alternative default type is not chosen.
     ///
     /// The hook should return `Some(ty)` to use `ty` as the specialization for this typevar, or
     /// `None` to use the inferred type unchanged.
     pub(crate) fn build_with(
         &mut self,
         generic_context: GenericContext<'db>,
-        mut choose: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
+        mut choose: impl FnMut(
+            BoundTypeVarInstance<'db>,
+            Option<(Type<'db>, Type<'db>)>,
+        ) -> Option<Type<'db>>,
     ) -> Specialization<'db> {
         let types = generic_context
             .variables_inner(self.db)
             .iter()
             .map(|(identity, variable)| {
-                let mapped_ty = self.types.get(identity).copied()?;
-                // The typevar was inferred — present both bounds as the inferred type.
-                let chosen = choose(*variable, mapped_ty, mapped_ty);
-                Some(chosen.unwrap_or(mapped_ty))
+                match self.types.get(identity).copied() {
+                    Some(mapped_ty) => {
+                        // The typevar was inferred — present both bounds as the inferred type.
+                        let chosen = choose(*variable, Some((mapped_ty, mapped_ty)));
+                        Some(chosen.unwrap_or(mapped_ty))
+                    }
+                    None => choose(*variable, None),
+                }
             });
 
         generic_context.specialize_recursive(self.db, types)
@@ -1777,12 +1815,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         set: ConstraintSet<'db, 'c>,
         mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) -> Result<(), ()> {
-        let solutions = match set.solutions_with_inferable(
+        let set = set.remove_noninferable(self.db, self.constraints, self.inferable);
+        let solutions = match set.solutions_with(
             self.db,
             self.constraints,
-            self.inferable,
             |typevar, _variance, lower, upper| {
-                PathBounds::default_solve(self.db, typevar, lower, upper)
+                PathBounds::default_solve(self.db, self.constraints, typevar, lower, upper)
             },
         ) {
             Solutions::Unsatisfiable => return Err(()),
@@ -1959,6 +1997,20 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.add_type_mapping(*formal_bound_typevar, remaining_actual, polarity, f);
             }
             (Type::Union(union_formal), _) => {
+                // If the formal is a union and the actual is a bare inferable TypeVar in an
+                // invariant position, record the whole union as the mapping. Invariant matching is
+                // equality-like; probing individual union elements below can leave spurious
+                // partial mappings from non-matching elements. For example, while comparing
+                // `ClassSelector[T]` with `ClassSelector[CT | None]`, descending into `None`
+                // would map `T` to `None` before `CT` is solved from another argument.
+                if let Type::TypeVar(actual_typevar) = actual
+                    && actual_typevar.is_inferable(self.db, self.inferable)
+                    && matches!(polarity, TypeVarVariance::Invariant)
+                {
+                    self.add_type_mapping(actual_typevar, formal, polarity, f);
+                    return Ok(());
+                }
+
                 // Second, if the formal is a union, and the actual type is assignable to precisely
                 // one union element, then we don't add any type mapping. This handles a case like
                 //
@@ -2316,6 +2368,19 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         return Ok(());
                     }
                 }
+            }
+
+            // TODO: in principle this could be a generalized Union-actual arm that maps over the
+            // union, but the old solver isn't well-equipped to handle that (due to side effects
+            // from even failed matches), so for now we handle this particular case.
+            (formal @ Type::ProtocolInstance(_), actual @ Type::Union(_)) => {
+                let when =
+                    actual.when_constraint_set_assignable_to(self.db, formal, self.constraints);
+                // For protocol inference via constraint sets, keep unsatisfiable results non-fatal
+                // for now, matching the protocol constraint-set path in the nominal-instance
+                // arm above.
+                let _ = self.add_type_mappings_from_constraint_set(formal, when, &mut f);
+                return Ok(());
             }
 
             // When the formal type is a protocol with a `__call__` method, infer the specialization

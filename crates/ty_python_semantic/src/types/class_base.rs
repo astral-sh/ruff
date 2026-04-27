@@ -379,7 +379,7 @@ impl<'db> ClassBase<'db> {
         self,
         db: &'db dyn Db,
         additional_specialization: Option<Specialization<'db>>,
-    ) -> impl Iterator<Item = ClassBase<'db>> {
+    ) -> impl Iterator<Item = ClassBase<'db>> + Clone {
         match self {
             ClassBase::Protocol => ClassBaseMroIterator::length_3(db, self, ClassBase::Generic),
             ClassBase::Dynamic(_)
@@ -456,6 +456,7 @@ impl<'db> From<&ClassBase<'db>> for Type<'db> {
 }
 
 /// An iterator over the MRO of a class base.
+#[derive(Clone)]
 enum ClassBaseMroIterator<'db> {
     Length2(core::array::IntoIter<ClassBase<'db>, 2>),
     Length3(core::array::IntoIter<ClassBase<'db>, 3>),

@@ -32,6 +32,7 @@ pub(crate) use self::infer::{
 };
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
+pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
 pub(crate) use self::set_theoretic::builder::{IntersectionBuilder, UnionBuilder};
 pub use self::set_theoretic::{
@@ -45,10 +46,6 @@ use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, builtins_module_scope,
     imported_symbol, known_module_symbol,
 };
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::place::ScopedPlaceId;
-use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
 use crate::types::call::bind::ConstructorCallableKind;
@@ -72,10 +69,7 @@ use crate::types::infer::InferenceFlags;
 use crate::types::known_instance::{InternedConstraintSet, InternedType, UnionTypeInstance};
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
 use crate::types::mro::{MroIterator, StaticMroError};
-pub(crate) use crate::types::narrow::{
-    NarrowingConstraint, PossiblyNarrowedPlaces, PossiblyNarrowedPlacesBuilder,
-    infer_narrowing_constraint,
-};
+pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraint};
 use crate::types::newtype::NewType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
@@ -99,6 +93,10 @@ pub(crate) use literal::{
     BytesLiteralType, EnumLiteralType, LiteralValueType, LiteralValueTypeKind, StringLiteralType,
 };
 pub use special_form::SpecialFormType;
+use ty_python_core::definition::Definition;
+use ty_python_core::place::ScopedPlaceId;
+use ty_python_core::scope::ScopeId;
+use ty_python_core::{Truthiness, place_table, semantic_index};
 
 mod bool;
 mod bound_super;
@@ -125,11 +123,12 @@ mod literal;
 mod member;
 mod method;
 mod mro;
-mod narrow;
+pub(crate) mod narrow;
 mod newtype;
 mod overrides;
 mod protocol_class;
 pub(crate) mod relation;
+mod relation_error;
 mod set_theoretic;
 mod signatures;
 mod special_form;
@@ -543,6 +542,7 @@ pub(crate) use todo_type;
 pub struct PropertyInstanceType<'db> {
     pub getter: Option<Type<'db>>,
     pub setter: Option<Type<'db>>,
+    pub deleter: Option<Type<'db>>,
 }
 
 fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -555,6 +555,9 @@ fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     }
     if let Some(setter) = property.setter(db) {
         visitor.visit_type(db, setter);
+    }
+    if let Some(deleter) = property.deleter(db) {
+        visitor.visit_type(db, deleter);
     }
 }
 
@@ -575,7 +578,10 @@ impl<'db> PropertyInstanceType<'db> {
         let setter = self
             .setter(db)
             .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
-        Self::new(db, getter, setter)
+        let deleter = self
+            .deleter(db)
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+        Self::new(db, getter, setter, deleter)
     }
 
     fn recursive_type_normalized_impl(
@@ -600,7 +606,15 @@ impl<'db> PropertyInstanceType<'db> {
             ),
             None => None,
         };
-        Some(Self::new(db, getter, setter))
+        let deleter = match self.deleter(db) {
+            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
+            Some(ty) => Some(
+                ty.recursive_type_normalized_impl(db, div, true)
+                    .unwrap_or(div),
+            ),
+            None => None,
+        };
+        Some(Self::new(db, getter, setter, deleter))
     }
 
     fn find_legacy_typevars_impl(
@@ -614,6 +628,9 @@ impl<'db> PropertyInstanceType<'db> {
             ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
         if let Some(ty) = self.setter(db) {
+            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+        }
+        if let Some(ty) = self.deleter(db) {
             ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
     }
@@ -1550,6 +1567,14 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(crate) fn as_int_like_literal(self) -> Option<i64> {
+        match self.as_literal_value_kind() {
+            Some(LiteralValueTypeKind::Int(value)) => Some(value.as_i64()),
+            Some(LiteralValueTypeKind::Bool(value)) => Some(i64::from(value)),
+            _ => None,
+        }
+    }
+
     pub(crate) fn as_enum_literal(self) -> Option<EnumLiteralType<'db>> {
         match self {
             Type::LiteralValue(literal) => literal.as_enum(),
@@ -2411,6 +2436,12 @@ impl<'db> Type<'db> {
                         ))
                         .into(),
                     ),
+                    (Some(KnownClass::Property), "__delete__") => Some(
+                        Place::bound(Type::WrapperDescriptor(
+                            WrapperDescriptorKind::PropertyDunderDelete,
+                        ))
+                        .into(),
+                    ),
 
                     _ => Some(class.class_member(db, name, policy)),
                 }
@@ -2689,7 +2720,7 @@ impl<'db> Type<'db> {
     /// that `self` represents: (1) a data descriptor or (2) a non-data descriptor / normal attribute.
     ///
     /// If `__get__` is not defined on the meta-type, this method returns `None`.
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn try_call_dunder_get(
         self,
         db: &'db dyn Db,
@@ -3178,6 +3209,10 @@ impl<'db> Type<'db> {
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)),
             )
             .into(),
+            Type::PropertyInstance(property) if name == "__delete__" => Place::bound(
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(property)),
+            )
+            .into(),
 
             Type::LiteralValue(literal) if literal.is_string() && name == "startswith" => {
                 let string_literal = literal.as_string().unwrap();
@@ -3260,6 +3295,14 @@ impl<'db> Type<'db> {
                 ))
                 .into()
             }
+            Type::ClassLiteral(class)
+                if name == "__delete__" && class.is_known(db, KnownClass::Property) =>
+            {
+                Place::bound(Type::WrapperDescriptor(
+                    WrapperDescriptorKind::PropertyDunderDelete,
+                ))
+                .into()
+            }
             Type::BoundMethod(bound_method) => match name_str {
                 "__self__" => Place::bound(bound_method.self_instance(db)).into(),
                 "__func__" => Place::bound(Type::FunctionLiteral(bound_method.function(db))).into(),
@@ -3316,6 +3359,9 @@ impl<'db> Type<'db> {
             }
             Type::PropertyInstance(property) if name == "fset" => {
                 Place::bound(property.setter(db).unwrap_or(Type::none(db))).into()
+            }
+            Type::PropertyInstance(property) if name == "fdel" => {
+                Place::bound(property.deleter(db).unwrap_or(Type::none(db))).into()
             }
 
             Type::LiteralValue(literal)
@@ -3608,7 +3654,7 @@ impl<'db> Type<'db> {
             TypeContext::default(),
         ) {
             Ok(bindings) => bindings.return_type(db),
-            Err(CallDunderError::PossiblyUnbound(bindings)) => bindings.return_type(db),
+            Err(CallDunderError::PossiblyUnbound { bindings, .. }) => bindings.return_type(db),
 
             // TODO: emit a diagnostic
             Err(CallDunderError::MethodNotAvailable) => return None,
@@ -4155,10 +4201,6 @@ impl<'db> Type<'db> {
                     Binding::single(self, Signature::new(Parameters::empty(), Type::object()))
                         .into(),
                 )
-            }
-
-            KnownClass::Enum => {
-                Some(Binding::single(self, Signature::todo("functional `Enum` syntax")).into())
             }
 
             KnownClass::Super => {
@@ -4732,36 +4774,12 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
-        // For intersection types, call the dunder on each element separately and combine
-        // the results. This avoids intersecting bound methods (which often collapses to Never)
-        // and instead intersects the return types.
-        //
-        // TODO: we might be able to remove this after fixing
-        // https://github.com/astral-sh/ty/issues/2428.
         if let Type::Intersection(intersection) = self {
-            // Using `positive()` rather than `positive_elements_or_object()` is safe
-            // here because `object` does not define any of the dunders that are called
-            // through this path without `MRO_NO_OBJECT_FALLBACK` (e.g. `__await__`,
-            // `__iter__`, `__enter__`, `__bool__`).
-            let positive = intersection.positive(db);
+            return intersection.try_call_dunder_with_policy(db, name, argument_types, tcx, policy);
+        }
 
-            let mut successful_bindings = Vec::with_capacity(positive.len());
-            let mut last_error = None;
-
-            for element in positive {
-                match element.try_call_dunder_with_policy(db, name, argument_types, tcx, policy) {
-                    Ok(bindings) => successful_bindings.push(bindings),
-                    Err(err) => last_error = Some(err),
-                }
-            }
-
-            if successful_bindings.is_empty() {
-                // TODO we are only showing one of the errors here; should we aggregate them
-                // somehow or show all of them?
-                return Err(last_error.unwrap_or(CallDunderError::MethodNotAvailable));
-            }
-
-            return Ok(Bindings::from_intersection(self, successful_bindings));
+        if let Type::Union(union) = self {
+            return union.try_call_dunder_with_policy(db, name, argument_types, tcx, policy);
         }
 
         // Implicit calls to dunder methods never access instance members, so we pass
@@ -4786,7 +4804,10 @@ impl<'db> Type<'db> {
                     .check_types(db, &constraints, argument_types, tcx, &[])?;
 
                 if boundness == Definedness::PossiblyUndefined {
-                    return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
+                    return Err(CallDunderError::PossiblyUnbound {
+                        bindings: Box::new(bindings),
+                        unbound_on: None,
+                    });
                 }
                 Ok(bindings)
             }
@@ -4821,7 +4842,10 @@ impl<'db> Type<'db> {
                     .check_types(db, &constraints, argument_types, tcx, &[])?;
 
                 if boundness == Definedness::PossiblyUndefined {
-                    return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
+                    return Err(CallDunderError::PossiblyUnbound {
+                        bindings: Box::new(bindings),
+                        unbound_on: None,
+                    });
                 }
                 Ok(bindings)
             }
@@ -5648,6 +5672,11 @@ impl<'db> Type<'db> {
                     property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
+            Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(property)) => {
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(
+                    property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
+            }
 
             Type::Callable(callable) => {
                 Type::Callable(callable.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
@@ -5893,7 +5922,8 @@ impl<'db> Type<'db> {
 
             Type::KnownBoundMethod(
                 KnownBoundMethodType::PropertyDunderGet(property)
-                | KnownBoundMethodType::PropertyDunderSet(property),
+                | KnownBoundMethodType::PropertyDunderSet(property)
+                | KnownBoundMethodType::PropertyDunderDelete(property),
             ) => {
                 property.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
@@ -6172,16 +6202,18 @@ impl<'db> Type<'db> {
                 KnownInstanceType::TypeAliasType(type_alias) => {
                     Some(TypeDefinition::TypeAlias(type_alias.definition(db)))
                 }
-                KnownInstanceType::NewType(newtype) => Some(TypeDefinition::NewType(newtype.definition(db))),
+                KnownInstanceType::NewType(newtype) => {
+                    Some(TypeDefinition::NewType(newtype.definition(db)))
+                }
                 _ => None,
             },
 
             Self::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 SubclassOfInner::Dynamic(_) => None,
                 SubclassOfInner::Class(class) => class.type_definition(db),
-                SubclassOfInner::TypeVar(bound_typevar) => {
-                    Some(TypeDefinition::TypeVar(bound_typevar.typevar(db).definition(db)?))
-                }
+                SubclassOfInner::TypeVar(bound_typevar) => Some(TypeDefinition::TypeVar(
+                    bound_typevar.typevar(db).definition(db)?,
+                )),
             },
 
             Self::TypeAlias(alias) => alias.value_type(db).definition(db),
@@ -6189,18 +6221,29 @@ impl<'db> Type<'db> {
 
             Self::PropertyInstance(property) => property
                 .getter(db)
-                .and_then(|getter|getter.definition(db))
-                .or_else(||property.setter(db).and_then(|setter|setter.definition(db))),
+                .and_then(|getter| getter.definition(db))
+                .or_else(|| property.setter(db).and_then(|setter| setter.definition(db)))
+                .or_else(|| {
+                    property
+                        .deleter(db)
+                        .and_then(|deleter| deleter.definition(db))
+                }),
 
-            Self::LiteralValue(_)
-            // TODO: For enum literals, it would be even better to jump to the definition of the specific member
-            | Self::KnownBoundMethod(_)
+            Self::LiteralValue(literal) => literal
+                .as_enum()
+                .and_then(|enum_lit| enum_lit.definition(db))
+                .map(TypeDefinition::EnumMember)
+                .or_else(|| self.to_meta_type(db).definition(db)),
+
+            Self::KnownBoundMethod(_)
             | Self::WrapperDescriptor(_)
             | Self::DataclassDecorator(_)
             | Self::DataclassTransformer(_)
             | Self::BoundSuper(_) => self.to_meta_type(db).definition(db),
 
-            Self::TypeVar(bound_typevar) => Some(TypeDefinition::TypeVar(bound_typevar.typevar(db).definition(db)?)),
+            Self::TypeVar(bound_typevar) => Some(TypeDefinition::TypeVar(
+                bound_typevar.typevar(db).definition(db)?,
+            )),
 
             Self::ProtocolInstance(protocol) => match protocol.inner {
                 Protocol::FromClass(class) => class.type_definition(db),
@@ -6213,8 +6256,12 @@ impl<'db> Type<'db> {
 
             Self::SpecialForm(special_form) => special_form.definition(db),
             Self::Never => Type::SpecialForm(SpecialFormType::Never).definition(db),
-            Self::Dynamic(DynamicType::Any) => Type::SpecialForm(SpecialFormType::Any).definition(db),
-            Self::Dynamic(DynamicType::Unknown | DynamicType::UnknownGeneric(_)) => Type::SpecialForm(SpecialFormType::Unknown).definition(db),
+            Self::Dynamic(DynamicType::Any) => {
+                Type::SpecialForm(SpecialFormType::Any).definition(db)
+            }
+            Self::Dynamic(DynamicType::Unknown | DynamicType::UnknownGeneric(_)) => {
+                Type::SpecialForm(SpecialFormType::Unknown).definition(db)
+            }
             Self::AlwaysTruthy => Type::SpecialForm(SpecialFormType::AlwaysTruthy).definition(db),
             Self::AlwaysFalsy => Type::SpecialForm(SpecialFormType::AlwaysFalsy).definition(db),
 
@@ -6226,7 +6273,7 @@ impl<'db> Type<'db> {
                 | DynamicType::TodoStarredExpression
                 | DynamicType::TodoTypeVarTuple
                 | DynamicType::InvalidConcatenateUnknown
-                | DynamicType::UnspecializedTypeVar
+                | DynamicType::UnspecializedTypeVar,
             )
             | Self::Callable(_)
             | Self::TypeIs(_)
@@ -6321,6 +6368,129 @@ impl<'db> Type<'db> {
         let generic_context = GenericContext::from_typevar_instances(db, variables);
         self.apply_specialization(db, generic_context.default_specialization(db, None))
     }
+
+    pub(crate) fn from_truthiness(db: &'db dyn Db, truthiness: Truthiness) -> Self {
+        match truthiness {
+            Truthiness::AlwaysTrue => Type::bool_literal(true),
+            Truthiness::AlwaysFalse => Type::bool_literal(false),
+            Truthiness::Ambiguous => KnownClass::Bool.to_instance(db),
+        }
+    }
+}
+
+impl<'db> IntersectionType<'db> {
+    // Calls the dunder on each element separately and combines the results.
+    // This avoids intersecting bound methods (which often collapses to Never)
+    // and instead intersects the return types.
+    //
+    // TODO: we might be able to remove this after fixing
+    // https://github.com/astral-sh/ty/issues/2428.
+    fn try_call_dunder_with_policy(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        argument_types: &mut CallArguments<'_, 'db>,
+        tcx: TypeContext<'db>,
+        policy: MemberLookupPolicy,
+    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        // Using `positive()` rather than `positive_elements_or_object()` is safe
+        // here because `object` does not define any of the dunders that are called
+        // through this path without `MRO_NO_OBJECT_FALLBACK` (e.g. `__await__`,
+        // `__iter__`, `__enter__`, `__bool__`).
+        let positive = self.positive(db);
+        let mut successful_bindings = Vec::with_capacity(positive.len());
+        let mut last_error = None;
+
+        for element in positive {
+            match element.try_call_dunder_with_policy(db, name, argument_types, tcx, policy) {
+                Ok(bindings) => successful_bindings.push(bindings),
+                Err(err) => last_error = Some(err),
+            }
+        }
+
+        if successful_bindings.is_empty() {
+            // TODO we are only showing one of the errors here; should we aggregate
+            // them somehow or show all of them?
+            return Err(last_error.unwrap_or(CallDunderError::MethodNotAvailable));
+        }
+
+        Ok(Bindings::from_intersection(
+            Type::Intersection(self),
+            successful_bindings,
+        ))
+    }
+}
+
+impl<'db> UnionType<'db> {
+    // Performs a lookup for the dunder on each union member separately, then
+    // aggregates the results.
+    //
+    // This alternative to aggregating the dunder lookups with
+    // `UnionType.map_with_boundness_and_qualifiers` preserves the information
+    // necessary to emit more precise diagnostics for "possibly unbound" errors.
+    fn try_call_dunder_with_policy(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        argument_types: &mut CallArguments<'_, 'db>,
+        tcx: TypeContext<'db>,
+        policy: MemberLookupPolicy,
+    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        let elements = self.elements(db);
+        let mut builder = UnionBuilder::new(db);
+        let mut unbound_on: Vec<Type<'db>> = Vec::new();
+        let mut any_defined = false;
+        let mut possibly_undefined = false;
+
+        for element in elements {
+            match element
+                .member_lookup_with_policy(
+                    db,
+                    name.into(),
+                    policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .place
+            {
+                Place::Defined(DefinedPlace {
+                    ty,
+                    definedness: Definedness::PossiblyUndefined,
+                    ..
+                }) => {
+                    builder = builder.add(ty);
+                    any_defined = true;
+                    possibly_undefined = true;
+                }
+                Place::Defined(DefinedPlace { ty, .. }) => {
+                    builder = builder.add(ty);
+                    any_defined = true;
+                }
+                Place::Undefined => {
+                    unbound_on.push(*element);
+                    possibly_undefined = true;
+                }
+            }
+        }
+
+        if !any_defined {
+            return Err(CallDunderError::MethodNotAvailable);
+        }
+
+        let dunder_callable = builder.build();
+        let constraints = ConstraintSetBuilder::new();
+        let bindings = dunder_callable
+            .bindings(db)
+            .match_parameters(db, argument_types)
+            .check_types(db, &constraints, argument_types, tcx, &[])?;
+
+        if possibly_undefined {
+            return Err(CallDunderError::PossiblyUnbound {
+                bindings: Box::new(bindings),
+                unbound_on: (!unbound_on.is_empty()).then(|| unbound_on.into_boxed_slice()),
+            });
+        }
+
+        Ok(bindings)
+    }
 }
 
 impl<'db> From<&Type<'db>> for Type<'db> {
@@ -6392,6 +6562,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
                 .getter(db)
                 .iter()
                 .chain(&property_instance_type.setter(db))
+                .chain(&property_instance_type.deleter(db))
                 .map(|ty| ty.variance_of(db, typevar))
                 .collect(),
             Type::SubclassOf(subclass_of_type) => subclass_of_type.variance_of(db, typevar),
@@ -7247,8 +7418,19 @@ impl<'db> AwaitError<'db> {
                     );
                 }
             }
-            Self::Call(CallDunderError::PossiblyUnbound(bindings)) => {
+            Self::Call(CallDunderError::PossiblyUnbound {
+                bindings,
+                unbound_on,
+            }) => {
                 diag.info("`__await__` may be missing");
+                if let Some(unbound_on) = unbound_on {
+                    for ty in unbound_on {
+                        diag.info(format_args!(
+                            "`{}` does not implement `__await__`",
+                            ty.display(db)
+                        ));
+                    }
+                }
                 if let Some(definition_spans) = bindings.callable_type().function_spans(db) {
                     diag.annotate(
                         Annotation::secondary(definition_spans.signature)
@@ -7278,86 +7460,6 @@ impl<'db> AwaitError<'db> {
                     );
                 }
             }
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
-pub enum Truthiness {
-    /// For an object `x`, `bool(x)` will always return `True`
-    AlwaysTrue,
-    /// For an object `x`, `bool(x)` will always return `False`
-    AlwaysFalse,
-    /// For an object `x`, `bool(x)` could return either `True` or `False`
-    Ambiguous,
-}
-
-impl Truthiness {
-    pub(crate) const fn is_ambiguous(self) -> bool {
-        matches!(self, Truthiness::Ambiguous)
-    }
-
-    pub(crate) const fn is_always_false(self) -> bool {
-        matches!(self, Truthiness::AlwaysFalse)
-    }
-
-    pub(crate) const fn may_be_true(self) -> bool {
-        !self.is_always_false()
-    }
-
-    pub(crate) const fn is_always_true(self) -> bool {
-        matches!(self, Truthiness::AlwaysTrue)
-    }
-
-    pub(crate) const fn negate(self) -> Self {
-        match self {
-            Self::AlwaysTrue => Self::AlwaysFalse,
-            Self::AlwaysFalse => Self::AlwaysTrue,
-            Self::Ambiguous => Self::Ambiguous,
-        }
-    }
-
-    pub(crate) const fn negate_if(self, condition: bool) -> Self {
-        if condition { self.negate() } else { self }
-    }
-
-    pub(crate) fn or(self, other: Self) -> Self {
-        match self {
-            Truthiness::AlwaysTrue => self,
-            Truthiness::AlwaysFalse => other,
-            Truthiness::Ambiguous => match other {
-                Truthiness::AlwaysTrue => Truthiness::AlwaysTrue,
-                Truthiness::AlwaysFalse | Truthiness::Ambiguous => Truthiness::Ambiguous,
-            },
-        }
-    }
-
-    pub(crate) fn or_else(self, other: impl Fn() -> Self) -> Self {
-        match self {
-            Truthiness::AlwaysTrue => self,
-            Truthiness::AlwaysFalse => other(),
-            Truthiness::Ambiguous => match other() {
-                Truthiness::AlwaysTrue => Truthiness::AlwaysTrue,
-                Truthiness::AlwaysFalse | Truthiness::Ambiguous => Truthiness::Ambiguous,
-            },
-        }
-    }
-
-    fn into_type(self, db: &dyn Db) -> Type<'_> {
-        match self {
-            Self::AlwaysTrue => Type::bool_literal(true),
-            Self::AlwaysFalse => Type::bool_literal(false),
-            Self::Ambiguous => KnownClass::Bool.to_instance(db),
-        }
-    }
-}
-
-impl From<bool> for Truthiness {
-    fn from(value: bool) -> Self {
-        if value {
-            Truthiness::AlwaysTrue
-        } else {
-            Truthiness::AlwaysFalse
         }
     }
 }
@@ -7442,11 +7544,11 @@ impl<'db> ModuleLiteralType<'db> {
     /// side-effect the user actually cares about, and the `z` component may not be a submodule.
     ///
     /// We instead prefer handling most other import effects as definitions in the scope of
-    /// the current file (i.e. [`crate::semantic_index::definition::ImportFromDefinitionNodeRef`]).
+    /// the current file (i.e. `ty_python_core::definition::ImportFromDefinitionNodeRef`).
     fn available_submodule_attributes(&self, db: &'db dyn Db) -> impl Iterator<Item = Name> {
         self.importing_file(db)
             .into_iter()
-            .flat_map(|file| imported_modules(db, file))
+            .flat_map(|file| semantic_index(db, file).imported_modules())
             .filter_map(|submodule_name| submodule_name.relative_to(self.module(db).name(db)))
             .filter_map(|relative_submodule| relative_submodule.components().next().map(Name::from))
     }
@@ -7750,26 +7852,6 @@ pub(super) fn determine_upper_bound<'db>(
         .last()
         .unwrap_or_else(|| class_literal.unknown_specialization(db));
     Type::instance(db, upper_bound)
-}
-
-#[derive(Clone, Copy, Debug, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) enum EvaluationMode {
-    Sync,
-    Async,
-}
-
-impl EvaluationMode {
-    pub(crate) const fn from_is_async(is_async: bool) -> Self {
-        if is_async {
-            EvaluationMode::Async
-        } else {
-            EvaluationMode::Sync
-        }
-    }
-
-    pub(crate) const fn is_async(self) -> bool {
-        matches!(self, EvaluationMode::Async)
-    }
 }
 
 // Make sure that the `Type` enum does not grow unexpectedly.

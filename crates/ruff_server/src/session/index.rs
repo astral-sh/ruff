@@ -380,7 +380,7 @@ impl Index {
     fn settings_for_path(&self, path: &Path) -> Option<&WorkspaceSettings> {
         self.settings
             .range(..path.to_path_buf())
-            .next_back()
+            .rfind(|(root, _)| path.starts_with(root))
             .map(|(_, settings)| settings)
     }
 

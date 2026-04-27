@@ -25,7 +25,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
 error[invalid-type-form]: The special form `typing.TypedDict` is not allowed in type expressions
  --> src/mdtest_snippet.py:4:4
   |
-3 | # error: [invalid-type-form] "The special form `typing.TypedDict` is not allowed in type expressions"
 4 | x: TypedDict = {"name": "Alice"}
   |    ^^^^^^^^^
   |

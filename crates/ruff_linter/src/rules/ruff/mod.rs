@@ -489,13 +489,16 @@ mod tests {
             Path::new("ruff/suppressions.py"),
             &settings::LinterSettings::for_rules(vec![
                 Rule::UnusedVariable,
+                Rule::UnusedFunctionArgument,
+                Rule::UnusedMethodArgument,
                 Rule::AmbiguousVariableName,
                 Rule::UnusedNOQA,
                 Rule::InvalidRuleCode,
                 Rule::InvalidSuppressionComment,
                 Rule::UnmatchedSuppressionComment,
             ])
-            .with_external_rules(&["TK421"]),
+            .with_external_rules(&["TK421"])
+            .with_preview_mode(),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())

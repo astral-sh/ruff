@@ -71,48 +71,35 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/deprecated.md
 error[invalid-argument-type]: Argument to class `deprecated` is incorrect
  --> src/mdtest_snippet.py:3:1
   |
-1 | from typing_extensions import deprecated
-2 |
 3 | @deprecated  # error: [invalid-argument-type] "LiteralString"
   | ^^^^^^^^^^^ Expected `LiteralString`, found `def invalid_deco() -> Unknown`
-4 | def invalid_deco(): ...
   |
 
 ```
 
 ```
-error[missing-argument]: No argument provided for required parameter `arg` of bound method `__call__`
+error[missing-argument]: No argument provided for required parameter `arg` of bound method `deprecated.__call__`
  --> src/mdtest_snippet.py:6:1
   |
-4 | def invalid_deco(): ...
-5 |
 6 | invalid_deco()  # error: [missing-argument]
   | ^^^^^^^^^^^^^^
-7 | from typing_extensions import deprecated
   |
 info: Parameter declared here
     --> stdlib/typing_extensions.pyi:1301:28
      |
-1299 |         stacklevel: int
-1300 |         def __init__(self, message: LiteralString, /, *, category: type[Warning] | None = ..., stacklevel: int = 1) -> None: ...
 1301 |         def __call__(self, arg: _T, /) -> _T: ...
      |                            ^^^^^^^
-1302 |
-1303 |     @final
      |
 
 ```
 
 ```
 error[missing-argument]: No argument provided for required parameter `message` of class `deprecated`
-  --> src/mdtest_snippet.py:9:2
-   |
- 7 | from typing_extensions import deprecated
- 8 |
- 9 | @deprecated()  # error: [missing-argument] "message"
-   |  ^^^^^^^^^^^^
-10 | def invalid_deco(): ...
-   |
+ --> src/mdtest_snippet.py:9:2
+  |
+9 | @deprecated()  # error: [missing-argument] "message"
+  |  ^^^^^^^^^^^^
+  |
 
 ```
 
@@ -120,11 +107,8 @@ error[missing-argument]: No argument provided for required parameter `message` o
 warning[deprecated]: The function `invalid_deco` is deprecated
   --> src/mdtest_snippet.py:20:1
    |
-18 | def invalid_deco(): ...
-19 |
 20 | invalid_deco()  # error: [deprecated] "message"
    | ^^^^^^^^^^^^ message
-21 | from typing_extensions import deprecated, LiteralString
    |
 
 ```
@@ -133,11 +117,8 @@ warning[deprecated]: The function `invalid_deco` is deprecated
 warning[deprecated]: The function `valid_deco` is deprecated
   --> src/mdtest_snippet.py:29:1
    |
-27 | def valid_deco(): ...
-28 |
 29 | valid_deco()  # error: [deprecated]
    | ^^^^^^^^^^
-30 | from typing_extensions import deprecated
    |
 
 ```
@@ -146,11 +127,8 @@ warning[deprecated]: The function `valid_deco` is deprecated
 error[invalid-argument-type]: Argument to class `deprecated` is incorrect
   --> src/mdtest_snippet.py:35:13
    |
-33 |     return "message"
-34 |
 35 | @deprecated(opaque())  # error: [invalid-argument-type] "LiteralString"
    |             ^^^^^^^^ Expected `LiteralString`, found `str`
-36 | def dubious_deco(): ...
    |
 
 ```
@@ -159,11 +137,8 @@ error[invalid-argument-type]: Argument to class `deprecated` is incorrect
 error[unknown-argument]: Argument `dsfsdf` does not match any known parameter of class `deprecated`
   --> src/mdtest_snippet.py:41:29
    |
-39 | from typing_extensions import deprecated
-40 |
 41 | @deprecated("some message", dsfsdf="whatever")  # error: [unknown-argument] "dsfsdf"
    |                             ^^^^^^^^^^^^^^^^^
-42 | def invalid_deco(): ...
    |
 
 ```
@@ -172,8 +147,6 @@ error[unknown-argument]: Argument `dsfsdf` does not match any known parameter of
 warning[deprecated]: The function `valid_deco` is deprecated
   --> src/mdtest_snippet.py:50:1
    |
-48 | def valid_deco(): ...
-49 |
 50 | valid_deco()  # error: [deprecated] "some message"
    | ^^^^^^^^^^ some message
    |

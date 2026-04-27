@@ -25,11 +25,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/invalid.md
 error[invalid-type-form]: Function `callable` is not valid in a parameter annotation
  --> src/mdtest_snippet.py:3:19
   |
-1 | # error: [invalid-type-form]
-2 | # error: [invalid-type-form]
 3 | def decorator(fn: callable) -> callable:
   |                   ^^^^^^^^ Did you mean `collections.abc.Callable`?
-4 |     return fn
   |
 
 ```
@@ -38,11 +35,8 @@ error[invalid-type-form]: Function `callable` is not valid in a parameter annota
 error[invalid-type-form]: Function `callable` is not valid in a return type annotation
  --> src/mdtest_snippet.py:3:32
   |
-1 | # error: [invalid-type-form]
-2 | # error: [invalid-type-form]
 3 | def decorator(fn: callable) -> callable:
   |                                ^^^^^^^^ Did you mean `collections.abc.Callable`?
-4 |     return fn
   |
 
 ```

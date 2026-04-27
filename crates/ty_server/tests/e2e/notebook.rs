@@ -81,6 +81,31 @@ fn publish_unused_binding_diagnostics_open() -> anyhow::Result<()> {
 }
 
 #[test]
+fn publish_unreachable_code_diagnostics_open() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.initialization_result().unwrap();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    builder.add_python_cell(
+        r#"def f():
+    return 0
+    print("dead")
+    print("still dead")
+"#,
+    );
+
+    builder.open(&mut server);
+
+    let diagnostics = server.collect_publish_diagnostic_notifications(1);
+    assert_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
 fn diagnostic_end_of_file() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
         .build()

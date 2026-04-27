@@ -10,8 +10,6 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::place::PlaceAndQualifiers;
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::ScopeId;
 use crate::types::callable::CallableTypeKind;
 use crate::types::generics::GenericContext;
 use crate::types::member::Member;
@@ -26,6 +24,8 @@ use crate::types::{
     determine_upper_bound,
 };
 use crate::{Db, FxIndexMap};
+use ty_python_core::definition::Definition;
+use ty_python_core::scope::ScopeId;
 
 pub(super) fn synthesize_typed_dict_method<'db>(
     db: &'db dyn Db,
@@ -182,12 +182,12 @@ fn synthesize_typed_dict_setitem<'db>(
     instance_ty: Type<'db>,
     fields: TypedDictFields<'db>,
 ) -> Type<'db> {
-    let mut writeable_fields = fields
+    let mut writable_fields = fields
         .iter()
         .filter(|(_, field)| !field.is_read_only())
         .peekable();
 
-    if writeable_fields.peek().is_none() {
+    if writable_fields.peek().is_none() {
         let parameters = [
             Parameter::positional_only(Some(Name::new_static("self")))
                 .with_annotated_type(instance_ty),
@@ -200,7 +200,7 @@ fn synthesize_typed_dict_setitem<'db>(
         return Type::function_like_callable(db, signature);
     }
 
-    let overloads = writeable_fields.map(|(field_name, field)| {
+    let overloads = writable_fields.map(|(field_name, field)| {
         let key_type = Type::string_literal(db, field_name);
         let parameters = [
             Parameter::positional_only(Some(Name::new_static("self")))

@@ -728,14 +728,7 @@ impl<'a> SimpleTokenizer<'a> {
                     SimpleTokenKind::At
                 }
             }
-            '!' => {
-                if self.cursor.eat_char('=') {
-                    SimpleTokenKind::NotEqual
-                } else {
-                    self.bogus = true;
-                    SimpleTokenKind::Other
-                }
-            }
+            '!' if self.cursor.eat_char('=') => SimpleTokenKind::NotEqual,
             '~' => SimpleTokenKind::Tilde,
             ':' => {
                 if self.cursor.eat_char('=') {
