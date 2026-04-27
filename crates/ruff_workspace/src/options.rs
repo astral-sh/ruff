@@ -27,11 +27,12 @@ use ruff_linter::rules::isort::{ImportSection, ImportType};
 use ruff_linter::rules::pep8_naming::settings::IgnoreNames;
 use ruff_linter::rules::pydocstyle::settings::Convention;
 use ruff_linter::rules::pylint::settings::ConstantType;
+use ruff_linter::rules::ssort::settings::Order;
 use ruff_linter::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
+    pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff, ssort,
 };
 use ruff_linter::settings::types::{
     IdentifierPattern, Language, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
@@ -534,6 +535,10 @@ pub struct LintOptions {
     /// Options for the `ruff` plugin
     #[option_group]
     pub ruff: Option<RuffOptions>,
+
+    /// Options for the `ssort` plugin.
+    #[option_group]
+    pub ssort: Option<SSortOptions>,
 
     /// Whether to enable preview mode. When preview mode is enabled, Ruff will
     /// use unstable rules and fixes.
@@ -3724,6 +3729,58 @@ impl RuffOptions {
     }
 }
 
+/// Options for the `ssort` plugin.
+#[derive(
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct SSortOptions {
+    /// Controls the direction in which dependency-ordered statements are emitted.
+    ///
+    /// By default, statements are ordered so that each statement appears before any
+    /// statements that depend on it. This means helper functions, constants, and other
+    /// prerequisites are placed earlier in the file.
+    ///
+    /// When `narrative-order` is enabled, this order is simply reversed. Higher-level
+    /// statements appear first, followed by the lower-level statements they rely on.
+    ///
+    /// For example, when `narrative-order` is disabled:
+    /// ```python
+    /// def baz(): pass
+    /// def bar(): baz()
+    /// def foo(): bar()
+    /// ```
+    ///
+    /// For example, when `narrative-order` is enabled:
+    /// ```python
+    /// def foo(): bar()
+    /// def bar(): baz()
+    /// def baz(): pass
+    /// ```
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            # Emit statements in narrative order.
+            narrative-order = true
+        "#
+    )]
+    pub narrative_order: Option<bool>,
+}
+
+impl SSortOptions {
+    pub fn into_settings(self) -> ssort::settings::Settings {
+        ssort::settings::Settings {
+            order: if self.narrative_order.unwrap_or_default() {
+                Order::Narrative
+            } else {
+                Order::Newspaper
+            },
+        }
+    }
+}
+
 /// Configures the way Ruff formats your code.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Deserialize, Serialize, OptionsMetadata, CombineOptions,
@@ -4191,6 +4248,7 @@ pub struct LintOptionsWire {
     pyflakes: Option<PyflakesOptions>,
     pylint: Option<PylintOptions>,
     pyupgrade: Option<PyUpgradeOptions>,
+    ssort: Option<SSortOptions>,
     per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
     extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
 
@@ -4248,6 +4306,7 @@ impl From<LintOptionsWire> for LintOptions {
             pyflakes,
             pylint,
             pyupgrade,
+            ssort,
             per_file_ignores,
             extend_per_file_ignores,
             exclude,
@@ -4310,6 +4369,7 @@ impl From<LintOptionsWire> for LintOptions {
             exclude,
             pydoclint,
             ruff,
+            ssort,
             preview,
             typing_extensions,
             future_annotations,
