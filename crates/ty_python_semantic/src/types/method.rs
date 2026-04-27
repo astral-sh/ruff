@@ -83,35 +83,13 @@ impl<'db> BoundMethodType<'db> {
 
         let [signature] = function_signature.overloads.as_slice() else {
             let self_instance = self.self_instance(db);
-            let bind_all_overloads = || {
-                CallableSignature::from_overloads(
-                    function_signature
-                        .overloads
-                        .iter()
-                        .map(|signature| signature.bind_self(db, Some(typing_self_type))),
-                )
-            };
-
-            // A gradual receiver can satisfy any receiver-specific overload, so filtering cannot
-            // safely discard candidates.
-            if self_instance.has_dynamic(db) {
-                return bind_all_overloads();
-            }
-
-            let mut applicable_overloads = function_signature
-                .overloads
-                .iter()
-                .filter(|signature| signature.can_bind_self_to(db, self_instance))
-                .map(|signature| signature.bind_self(db, Some(typing_self_type)))
-                .peekable();
-
-            // If no overload accepts the bound receiver, keep the full overload set so a later call
-            // still reports the existing invalid-`self` diagnostic instead of becoming non-callable.
-            return if applicable_overloads.peek().is_none() {
-                bind_all_overloads()
-            } else {
-                CallableSignature::from_overloads(applicable_overloads)
-            };
+            return CallableSignature::from_overloads(
+                function_signature
+                    .overloads
+                    .iter()
+                    .filter(|signature| signature.can_bind_self_to(db, self_instance))
+                    .map(|signature| signature.bind_self(db, Some(typing_self_type))),
+            );
         };
 
         CallableSignature::single(signature.bind_self(db, Some(typing_self_type)))
