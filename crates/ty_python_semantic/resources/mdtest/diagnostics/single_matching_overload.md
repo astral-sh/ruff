@@ -25,6 +25,10 @@ f("a")  # error: [invalid-argument-type]
 
 ## Bound method overloads preserve original positions
 
+When binding `Base().f`, the first overload is filtered out because its `self` parameter only
+accepts `Other`. The remaining overloads keep their original source indexes so diagnostics can point
+at the matching declaration and list the original non-matching overloads correctly.
+
 ```py
 from typing import overload
 
