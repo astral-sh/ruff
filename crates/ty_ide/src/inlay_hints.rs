@@ -30,7 +30,7 @@ impl InlayHint {
         expr: &Expr,
         rhs: &Expr,
         ty: Type,
-        allow_edits: bool,
+        mut allow_edits: bool,
     ) -> Option<Self> {
         let InlayHintImportContext {
             db,
@@ -77,9 +77,16 @@ impl InlayHint {
                     }
 
                     // Possibly import the current type and return the qualified name
-                    let qualified_name = |dynamic_importer: &mut DynamicImporter| {
+                    let mut qualified_name = |dynamic_importer: &mut DynamicImporter| {
                         let type_definition = ty.definition(db)?;
                         let definition = type_definition.definition()?;
+
+                        // Only module-level names can be imported with `from <module> import <name>`.
+                        // If the definition lives in a class or function body we can't produce a safe edit.
+                        if !definition.file_scope(db).is_global() {
+                            allow_edits = false;
+                            return None;
+                        }
 
                         // Don't try to import symbols in scope
                         if definition.file(db) == file {
@@ -2791,7 +2798,7 @@ Source with applied edits:
             "#,
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
 
         from enum import Enum
 
@@ -2840,20 +2847,6 @@ Source with applied edits:
         8 | x[: Literal[Color.RED]] = Color.RED
           |                   ^^^
           |
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: Inlay hint edits
-        --> main.py:1:1
-        1 + from typing import Literal
-        2 |
-        3 | from enum import Enum
-        4 |
-        --------------------------------------------------------------------------------
-        6 |     RED = 1
-        7 |     BLUE = 2
-        8 |
-          - x = Color.RED
-        9 + x: Literal[Color.RED] = Color.RED
         ");
     }
 
@@ -5506,15 +5499,6 @@ Source with applied edits:
         6 | ab[: property] = F.whatever
           |      ^^^^^^^^
           |
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: Inlay hint edits
-        --> main.py:1:1
-        3 |     @property
-        4 |     def whatever(self): ...
-        5 |
-          - ab = F.whatever
-        6 + ab: property = F.whatever
         ");
     }
 
@@ -7597,6 +7581,313 @@ Source with applied edits:
            - b = B(foo.A())
         11 + b: B[foo.A] = B(x=foo.A())
         ");
+    }
+
+    #[test]
+    fn test_auto_import_enum_member() {
+        let mut test = inlay_hint_test(
+            r#"
+            from test import Color
+
+            x = Color.RED
+            "#,
+        );
+
+        test.with_extra_file(
+            "test.py",
+            r#"
+            from enum import Enum
+
+            class Color(Enum):
+                RED = 1
+                BLUE = 2
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        from test import Color
+
+        x[: Literal[Color.RED]] = Color.RED
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:487:1
+            |
+        487 | Literal: _SpecialForm
+            | ^^^^^^^
+            |
+        info: Source
+         --> main2.py:4:5
+          |
+        4 | x[: Literal[Color.RED]] = Color.RED
+          |     ^^^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> test.py:4:19
+          |
+        4 |             class Color(Enum):
+          |                   ^^^^^
+          |
+        info: Source
+         --> main2.py:4:13
+          |
+        4 | x[: Literal[Color.RED]] = Color.RED
+          |             ^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> test.py:5:17
+          |
+        5 |                 RED = 1
+          |                 ^^^
+          |
+        info: Source
+         --> main2.py:4:19
+          |
+        4 | x[: Literal[Color.RED]] = Color.RED
+          |                   ^^^
+          |
+        ");
+    }
+
+    /// Regression test for astral-sh/ty#3313: applying the inlay hint on `y`
+    /// previously added `Inner` to `from module import Outer`, but `Inner` is
+    /// a nested class inside `Outer`, not a top-level symbol of `module`.
+    #[test]
+    fn test_auto_import_nested_class() {
+        let mut test = inlay_hint_test(
+            r#"
+            from module import Outer
+
+
+            def wrap[T](x: T) -> list[T]:
+                return [x]
+
+            y = wrap(Outer.Inner())
+            "#,
+        );
+
+        test.with_extra_file(
+            "module.py",
+            r#"
+            class Outer:
+                class Inner: ...
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        from module import Outer
+
+
+        def wrap[T](x: T) -> list[T]:
+            return [x]
+
+        y[: list[Inner]] = wrap([x=]Outer.Inner())
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:2829:7
+             |
+        2829 | class list(MutableSequence[_T]):
+             |       ^^^^
+             |
+        info: Source
+         --> main2.py:8:5
+          |
+        8 | y[: list[Inner]] = wrap([x=]Outer.Inner())
+          |     ^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> module.py:3:23
+          |
+        3 |                 class Inner: ...
+          |                       ^^^^^
+          |
+        info: Source
+         --> main2.py:8:10
+          |
+        8 | y[: list[Inner]] = wrap([x=]Outer.Inner())
+          |          ^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:5:13
+          |
+        5 | def wrap[T](x: T) -> list[T]:
+          |             ^
+          |
+        info: Source
+         --> main2.py:8:26
+          |
+        8 | y[: list[Inner]] = wrap([x=]Outer.Inner())
+          |                          ^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        5 | def wrap[T](x: T) -> list[T]:
+        6 |     return [x]
+        7 |
+          - y = wrap(Outer.Inner())
+        8 + y = wrap(x=Outer.Inner())
+        ");
+    }
+
+    #[test]
+    fn test_auto_import_enum_member_unimported_class() {
+        let mut test = inlay_hint_test(
+            r#"
+            import test
+
+            x = test.Color.RED
+            "#,
+        );
+
+        test.with_extra_file(
+            "test.py",
+            r#"
+            from enum import Enum
+
+            class Color(Enum):
+                RED = 1
+                BLUE = 2
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        import test
+
+        x[: Literal[Color.RED]] = test.Color.RED
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:487:1
+            |
+        487 | Literal: _SpecialForm
+            | ^^^^^^^
+            |
+        info: Source
+         --> main2.py:4:5
+          |
+        4 | x[: Literal[Color.RED]] = test.Color.RED
+          |     ^^^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> test.py:4:19
+          |
+        4 |             class Color(Enum):
+          |                   ^^^^^
+          |
+        info: Source
+         --> main2.py:4:13
+          |
+        4 | x[: Literal[Color.RED]] = test.Color.RED
+          |             ^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> test.py:5:17
+          |
+        5 |                 RED = 1
+          |                 ^^^
+          |
+        info: Source
+         --> main2.py:4:19
+          |
+        4 | x[: Literal[Color.RED]] = test.Color.RED
+          |                   ^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_auto_import_method_returning_nested_class() {
+        let mut test = inlay_hint_test(
+            r#"
+            from module import Outer
+
+            x = Outer().make()
+            "#,
+        );
+
+        test.with_extra_file(
+            "module.py",
+            r#"
+            class Outer:
+                class Inner: ...
+
+                def make(self) -> "Outer.Inner":
+                    return Outer.Inner()
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        from module import Outer
+
+        x[: Inner] = Outer().make()
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> module.py:3:23
+          |
+        3 |                 class Inner: ...
+          |                       ^^^^^
+          |
+        info: Source
+         --> main2.py:4:5
+          |
+        4 | x[: Inner] = Outer().make()
+          |     ^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_auto_import_same_file_method_returning_nested_class() {
+        let mut test = inlay_hint_test(
+            r#"
+            class Outer:
+                class Inner: ...
+
+                def make(self) -> "Outer.Inner":
+                    return Outer.Inner()
+
+            x = Outer().make()
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        class Outer:
+            class Inner: ...
+
+            def make(self) -> "Outer.Inner":
+                return Outer.Inner()
+
+        x[: Inner] = Outer().make()
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:3:11
+          |
+        3 |     class Inner: ...
+          |           ^^^^^
+          |
+        info: Source
+         --> main2.py:8:5
+          |
+        8 | x[: Inner] = Outer().make()
+          |     ^^^^^
+          |
+        "#);
     }
 
     struct InlayHintLocationDiagnostic {
