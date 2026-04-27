@@ -5,7 +5,6 @@ use std::ops::{Deref, DerefMut};
 use bitflags::bitflags;
 use ordermap::OrderSet;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
-use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::Arguments;
 use ruff_python_ast::{self as ast, AnyNodeRef, StmtClassDef, name::Name};
@@ -17,17 +16,17 @@ use super::diagnostic::{
     self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, PARAMETER_ALREADY_ASSIGNED,
     TOO_MANY_POSITIONAL_ARGUMENTS, report_invalid_key_on_typed_dict, report_missing_typed_dict_key,
 };
-use super::infer::infer_deferred_types;
+use super::infer::{TypeExpressionFlags, infer_deferred_types};
 use super::{
-    ApplyTypeMappingVisitor, ErrorContext, IntersectionType, SpecialFormType, Type, TypeMapping,
-    TypeQualifiers, UnionBuilder, definition_expression_type, visitor,
+    ApplyTypeMappingVisitor, ErrorContext, IntersectionType, Type, TypeMapping, TypeQualifiers,
+    UnionBuilder, definition_expression_type, visitor,
 };
+use crate::Db;
 use crate::types::TypeContext;
 use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
-use crate::{Db, HasType, SemanticModel};
 use ty_python_core::definition::Definition;
 
 bitflags! {
@@ -1007,67 +1006,28 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
 /// `TypedDict` target, or a type alias resolving to one.
 pub(crate) fn extract_unpacked_typed_dict_keys_from_kwargs_annotation<'db>(
     db: &'db dyn Db,
-    file: File,
-    annotation: &ast::Expr,
     annotated_type: Type<'db>,
-    expression_type: impl FnOnce(&ast::Expr) -> Type<'db>,
+    annotation_flags: TypeExpressionFlags,
 ) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
+    let typed_dict = annotation_flags
+        .contains(TypeExpressionFlags::UNPACK)
+        .then(|| annotated_type.resolve_type_alias(db).as_typed_dict())??;
+
     Some(
-        resolve_unpacked_typed_dict_kwargs_annotation(
-            db,
-            file,
-            annotation,
-            annotated_type,
-            expression_type,
-        )?
-        .items(db)
-        .iter()
-        .map(|(name, field)| {
-            (
-                name.clone(),
-                UnpackedTypedDictKey {
-                    value_ty: field.declared_ty,
-                    is_required: field.is_required(),
-                },
-            )
-        })
-        .collect(),
+        typed_dict
+            .items(db)
+            .iter()
+            .map(|(name, field)| {
+                (
+                    name.clone(),
+                    UnpackedTypedDictKey {
+                        value_ty: field.declared_ty,
+                        is_required: field.is_required(),
+                    },
+                )
+            })
+            .collect(),
     )
-}
-
-/// Resolve the concrete `TypedDict` target of a `**kwargs` annotation that explicitly uses
-/// `Unpack[...]`.
-///
-/// This helper accepts both ordinary annotations like `Unpack[TD]` and stringized annotations
-/// that parse to the same form. It returns `None` unless the annotation syntax itself explicitly
-/// names `Unpack[...]`; a bare `TypedDict` annotation on `**kwargs` is therefore rejected here.
-///
-/// Once the annotation has been confirmed to use `Unpack[...]`, this accepts only a concrete
-/// `TypedDict` target or a type alias resolving to one.
-fn resolve_unpacked_typed_dict_kwargs_annotation<'db>(
-    db: &'db dyn Db,
-    file: File,
-    annotation: &ast::Expr,
-    annotated_type: Type<'db>,
-    expression_type: impl FnOnce(&ast::Expr) -> Type<'db>,
-) -> Option<TypedDictType<'db>> {
-    let explicitly_uses_unpack = match annotation {
-        ast::Expr::Subscript(ast::ExprSubscript { value, .. }) => {
-            expression_type(value) == Type::SpecialForm(SpecialFormType::Unpack)
-        }
-        ast::Expr::StringLiteral(string) => {
-            let model = SemanticModel::new(db, file);
-            let (parsed, string_model) = model.enter_string_annotation(string)?;
-            let ast::Expr::Subscript(ast::ExprSubscript { value, .. }) = parsed.expr() else {
-                return None;
-            };
-
-            value.inferred_type(&string_model) == Some(Type::SpecialForm(SpecialFormType::Unpack))
-        }
-        _ => false,
-    };
-
-    explicitly_uses_unpack.then(|| annotated_type.resolve_type_alias(db).as_typed_dict())?
 }
 
 /// Infers each unpacked `**kwargs` constructor argument exactly once.

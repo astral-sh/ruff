@@ -9,8 +9,8 @@ use crate::types::diagnostic::{
     note_py_version_too_old_for_pep_604, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_callable, report_invalid_concatenate_last_arg,
 };
-use crate::types::infer::InferenceFlags;
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
+use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
@@ -870,12 +870,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.string_annotations
                     .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
                 // String annotations are always evaluated in the deferred context.
-                self.infer_type_expression_with_state(
-                    parsed.expr(),
+                let parsed_expr = parsed.expr();
+                let ty = self.infer_type_expression_with_state(
+                    parsed_expr,
                     DeferredExpressionState::InStringAnnotation(
                         self.enclosing_node_key(string.into()),
                     ),
-                )
+                );
+                if self
+                    .type_expression_flags(parsed_expr)
+                    .contains(TypeExpressionFlags::UNPACK)
+                {
+                    self.store_type_expression_flags(
+                        ruff_python_ast::ExprRef::StringLiteral(string),
+                        TypeExpressionFlags::UNPACK,
+                    );
+                }
+                ty
             }
             None => Type::unknown(),
         }
@@ -2149,12 +2160,33 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::Dynamic(DynamicType::InvalidConcatenateUnknown)
             }
             SpecialFormType::Unpack => {
+                self.store_type_expression_flags(
+                    ast::ExprRef::from(subscript),
+                    TypeExpressionFlags::UNPACK,
+                );
                 let inner_ty = self.infer_type_expression(arguments_slice);
 
                 if self
                     .inference_flags()
                     .contains(InferenceFlags::IN_KWARG_ANNOTATION)
                 {
+                    if self
+                        .type_expression_flags(arguments_slice)
+                        .contains(TypeExpressionFlags::UNPACK)
+                    {
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_TYPE_FORM, arguments_slice)
+                        {
+                            diagnostic::add_type_expression_reference_link(
+                                builder.into_diagnostic(
+                                    "`Unpack` cannot be nested in a `**kwargs` annotation",
+                                ),
+                            );
+                        }
+                        return Type::unknown();
+                    }
+
                     if inner_ty
                         .resolve_type_alias(self.db())
                         .as_typed_dict()

@@ -72,6 +72,17 @@ mod comparisons;
 #[cfg(test)]
 mod tests;
 
+bitflags::bitflags! {
+    /// Metadata for expressions inferred as type expressions.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, salsa::Update)]
+    pub(crate) struct TypeExpressionFlags: u8 {
+        /// The expression is syntactically an `Unpack[...]` type expression.
+        const UNPACK = 1 << 0;
+    }
+}
+
+impl get_size2::GetSize for TypeExpressionFlags {}
+
 /// Infer all types for a [`Definition`] (including sub-expressions).
 /// Use when resolving a place use or public type of a place.
 #[salsa::tracked(
@@ -688,6 +699,9 @@ struct ScopeInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
 
+    /// Metadata for type expressions in this region.
+    type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
+
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
@@ -752,6 +766,17 @@ impl<'db> ScopeInference<'db> {
 
         extra.string_annotations.contains(&expression.into())
     }
+
+    /// Get metadata for a type expression.
+    pub(crate) fn type_expression_flags(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> TypeExpressionFlags {
+        self.extra
+            .as_ref()
+            .and_then(|extra| extra.type_expression_flags.get(&expression.into()).copied())
+            .unwrap_or_default()
+    }
 }
 
 /// The inferred types for a definition region.
@@ -788,6 +813,9 @@ struct DefinitionInferenceExtra<'db> {
 
     /// Functions called while inferring this definition.
     called_functions: Box<[FunctionType<'db>]>,
+
+    /// Metadata for type expressions in this region.
+    type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
 
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
@@ -885,6 +913,17 @@ impl<'db> DefinitionInference<'db> {
             .unwrap_or_default()
     }
 
+    /// Get metadata for a type expression.
+    pub(crate) fn type_expression_flags(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> TypeExpressionFlags {
+        self.extra
+            .as_ref()
+            .and_then(|extra| extra.type_expression_flags.get(&expression.into()).copied())
+            .unwrap_or_default()
+    }
+
     #[track_caller]
     pub(crate) fn binding_type(&self, definition: Definition<'db>) -> Type<'db> {
         self.bindings
@@ -966,6 +1005,9 @@ pub(crate) struct ExpressionInference<'db> {
 struct ExpressionInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
+
+    /// Metadata for type expressions in this region.
+    type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
 
     /// The types of every binding in this expression region.
     ///
@@ -1090,6 +1132,9 @@ struct StatementInferenceInnerExtra<'db> {
 
     /// Functions called while inferring this statement.
     called_functions: Box<[FunctionType<'db>]>,
+
+    /// Metadata for type expressions in this region.
+    type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
 
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,

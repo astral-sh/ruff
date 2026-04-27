@@ -3214,6 +3214,12 @@ TDUnion = Union[TD1, TD2]
 
 def func_union(**kwargs: Unpack[TDUnion]) -> None:  # error: [invalid-type-form]
     pass
+
+def func_nested(**kwargs: Unpack[Unpack[TD1]]) -> None:  # error: [invalid-type-form]
+    pass
+
+def func_stringified_nested(**kwargs: "Unpack[Unpack[TD1]]") -> None:  # error: [invalid-type-form]
+    pass
 ```
 
 ### Aliases are followed

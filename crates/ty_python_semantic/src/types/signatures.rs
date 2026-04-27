@@ -23,7 +23,7 @@ use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
-use crate::types::infer::infer_deferred_types;
+use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
@@ -64,6 +64,24 @@ fn function_signature_expression_type<'db>(
     } else {
         // expression is in the PEP-695 type params sub-scope
         infer_complete_scope_types(db, scope).expression_type(expression)
+    }
+}
+
+fn function_signature_type_expression_flags<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    expression: &ast::Expr,
+) -> TypeExpressionFlags {
+    let file = definition.file(db);
+    let index = semantic_index(db, file);
+    let file_scope = index.expression_scope_id(expression);
+    let scope = file_scope.to_scope_id(db, file);
+    if scope == definition.scope(db) {
+        // expression is in the function definition scope, but always deferred
+        infer_deferred_types(db, definition).type_expression_flags(expression)
+    } else {
+        // expression is in the PEP-695 type params sub-scope
+        infer_complete_scope_types(db, scope).type_expression_flags(expression)
     }
 }
 
@@ -3327,10 +3345,8 @@ impl<'db> Parameter<'db> {
             && parameter.annotation().is_some_and(|annotation| {
                 extract_unpacked_typed_dict_keys_from_kwargs_annotation(
                     db,
-                    definition.file(db),
-                    annotation,
                     annotated_type,
-                    |expr| function_signature_expression_type(db, definition, expr),
+                    function_signature_type_expression_flags(db, definition, annotation),
                 )
                 .is_some()
             });

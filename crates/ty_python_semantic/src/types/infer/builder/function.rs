@@ -597,10 +597,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let annotated_type = self.file_expression_type(annotation);
         let Some(unpacked_keys) = extract_unpacked_typed_dict_keys_from_kwargs_annotation(
             self.db(),
-            self.file(),
-            annotation,
             annotated_type,
-            |expr| self.file_expression_type(expr),
+            self.file_type_expression_flags(annotation),
         ) else {
             return;
         };
@@ -980,10 +978,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             } else if extract_unpacked_typed_dict_keys_from_kwargs_annotation(
                 db,
-                self.file(),
-                annotation,
                 annotated_type,
-                |expr| self.file_expression_type(expr),
+                self.file_type_expression_flags(annotation),
             )
             .is_some()
             {
