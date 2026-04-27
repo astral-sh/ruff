@@ -14,9 +14,6 @@
 //!
 //! TODO: Need to handle semantic tokens within quoted annotations.
 //!
-//! TODO: Need to properly handle Annotated expressions. All type arguments other
-//! than the first should be treated as value expressions, not as type expressions.
-//!
 //! TODO: Properties (or perhaps more generally, descriptor objects?) should be
 //! classified as property tokens rather than just variables.
 //!
@@ -644,6 +641,31 @@ impl<'db> SemanticTokenVisitor<'db> {
             }
         }
     }
+
+    fn visit_value_expression(&mut self, expr: &Expr) {
+        let prev_in_type_form = self.in_type_form;
+        self.in_type_form = false;
+        self.visit_expr(expr);
+        self.in_type_form = prev_in_type_form;
+    }
+
+    fn visit_annotated_arguments(&mut self, slice: &Expr) {
+        let ast::Expr::Tuple(tuple) = slice else {
+            self.visit_annotation(slice);
+            return;
+        };
+
+        let Some((annotation, metadata)) = tuple.elts.split_first() else {
+            self.visit_value_expression(slice);
+            return;
+        };
+
+        self.visit_annotation(annotation);
+
+        for metadata_element in metadata {
+            self.visit_value_expression(metadata_element);
+        }
+    }
 }
 
 impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
@@ -981,6 +1003,15 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     walk_expr(self, expr);
                 }
             }
+            ast::Expr::Subscript(subscript)
+                if matches!(
+                    subscript.value.inferred_type(self.model),
+                    Some(Type::SpecialForm(SpecialFormType::Annotated))
+                ) =>
+            {
+                self.visit_expr(subscript.value.as_ref());
+                self.visit_annotated_arguments(subscript.slice.as_ref());
+            }
             ast::Expr::Call(call) => {
                 self.visit_expr(call.func.as_ref());
 
@@ -1243,6 +1274,36 @@ mod tests {
         let tokens = test.highlight_file();
 
         assert_snapshot!(test.to_snapshot(&tokens), @r#""Foo" @ 6..9: Class [definition]"#);
+    }
+
+    #[test]
+    fn semantic_tokens_annotated_metadata() {
+        let test = SemanticTokenTest::new(
+            "
+from typing import Annotated
+
+class Metadata:
+    field = 1
+
+def f(x: Annotated[int, Metadata.field]): ...
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "typing" @ 6..12: Namespace
+        "Annotated" @ 20..29: Variable
+        "Metadata" @ 37..45: Class [definition]
+        "field" @ 51..56: Variable [definition]
+        "1" @ 59..60: Number
+        "f" @ 66..67: Function [definition]
+        "x" @ 68..69: Parameter [definition]
+        "Annotated" @ 71..80: Variable
+        "int" @ 81..84: Class
+        "Metadata" @ 86..94: Class
+        "field" @ 95..100: Variable
+        "#);
     }
 
     #[test]
