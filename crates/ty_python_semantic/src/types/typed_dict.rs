@@ -1042,9 +1042,8 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_kwargs_annotation<'db>(
 /// that parse to the same form. It returns `None` unless the annotation syntax itself explicitly
 /// names `Unpack[...]`; a bare `TypedDict` annotation on `**kwargs` is therefore rejected here.
 ///
-/// Once the annotation has been confirmed to use `Unpack[...]`, the resolved annotation type is
-/// validated via [`resolve_unpacked_typed_dict_kwargs_annotation_target`], which accepts only a
-/// concrete `TypedDict` target or a type alias resolving to one.
+/// Once the annotation has been confirmed to use `Unpack[...]`, this accepts only a concrete
+/// `TypedDict` target or a type alias resolving to one.
 fn resolve_unpacked_typed_dict_kwargs_annotation<'db>(
     db: &'db dyn Db,
     file: File,
@@ -1068,54 +1067,7 @@ fn resolve_unpacked_typed_dict_kwargs_annotation<'db>(
         _ => false,
     };
 
-    explicitly_uses_unpack
-        .then(|| resolve_unpacked_typed_dict_kwargs_annotation_target(db, annotated_type))
-        .flatten()
-}
-
-/// Resolve the `TypedDictType` target from a given `Unpack[...]` annotation.
-///
-/// Per [PEP 692](https://peps.python.org/pep-0692/#typeddict-unions), unions (for example) are not
-/// allowed in such annotations.
-pub(crate) fn resolve_unpacked_typed_dict_kwargs_annotation_target<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-) -> Option<TypedDictType<'db>> {
-    match ty {
-        Type::TypedDict(typed_dict) => Some(typed_dict),
-        Type::TypeAlias(alias) => {
-            resolve_unpacked_typed_dict_kwargs_annotation_target(db, alias.value_type(db))
-        }
-        Type::Dynamic(_)
-        | Type::Divergent(_)
-        | Type::Never
-        | Type::FunctionLiteral(_)
-        | Type::BoundMethod(_)
-        | Type::KnownBoundMethod(_)
-        | Type::WrapperDescriptor(_)
-        | Type::DataclassDecorator(_)
-        | Type::DataclassTransformer(_)
-        | Type::Callable(_)
-        | Type::ModuleLiteral(_)
-        | Type::ClassLiteral(_)
-        | Type::GenericAlias(_)
-        | Type::SubclassOf(_)
-        | Type::NominalInstance(_)
-        | Type::ProtocolInstance(_)
-        | Type::SpecialForm(_)
-        | Type::KnownInstance(_)
-        | Type::PropertyInstance(_)
-        | Type::AlwaysTruthy
-        | Type::AlwaysFalsy
-        | Type::LiteralValue(_)
-        | Type::TypeVar(_)
-        | Type::BoundSuper(_)
-        | Type::TypeIs(_)
-        | Type::TypeGuard(_)
-        | Type::NewTypeInstance(_)
-        | Type::Union(_)
-        | Type::Intersection(_) => None,
-    }
+    explicitly_uses_unpack.then(|| annotated_type.resolve_type_alias(db).as_typed_dict())?
 }
 
 /// Infers each unpacked `**kwargs` constructor argument exactly once.
