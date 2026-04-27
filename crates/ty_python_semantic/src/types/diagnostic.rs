@@ -5744,9 +5744,10 @@ pub(super) fn report_invalid_method_override<'db>(
             ty: Type::FunctionLiteral(superclass_function),
             ..
         }) = class_member(superclass)
-        && let Ok(superclass_function_kind) =
+        && let Some(superclass_function_kind) =
             MethodDecorator::try_from_fn_type(db, superclass_function)
-        && let Ok(subclass_function_kind) = MethodDecorator::try_from_fn_type(db, subclass_function)
+        && let Some(subclass_function_kind) =
+            MethodDecorator::try_from_fn_type(db, subclass_function)
         && superclass_function_kind != subclass_function_kind
     {
         diagnostic.info(format_args!(

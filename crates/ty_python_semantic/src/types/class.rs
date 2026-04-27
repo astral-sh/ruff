@@ -2112,9 +2112,10 @@ pub(super) struct AbstractMethod<'db> {
 }
 
 /// The decorator category for a method-like function.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum MethodDecorator {
     /// An instance method with an implicit instance receiver, conventionally named `self`.
+    #[default]
     None,
     /// A classmethod with an implicit class receiver, conventionally named `cls`.
     ClassMethod,
@@ -2122,23 +2123,14 @@ pub enum MethodDecorator {
     StaticMethod,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum MethodDecoratorError {
-    /// A method can't be static and a class method at the same time.
-    ConflictingDecorators,
-}
-
 impl MethodDecorator {
     /// Returns the decorator category for a function type.
-    pub fn try_from_fn_type(
-        db: &dyn Db,
-        fn_type: FunctionType,
-    ) -> Result<Self, MethodDecoratorError> {
+    pub fn try_from_fn_type(db: &dyn Db, fn_type: FunctionType) -> Option<Self> {
         match (fn_type.is_classmethod(db), fn_type.is_staticmethod(db)) {
-            (true, true) => Err(MethodDecoratorError::ConflictingDecorators),
-            (true, false) => Ok(Self::ClassMethod),
-            (false, true) => Ok(Self::StaticMethod),
-            (false, false) => Ok(Self::None),
+            (true, true) => None,
+            (true, false) => Some(Self::ClassMethod),
+            (false, true) => Some(Self::StaticMethod),
+            (false, false) => Some(Self::None),
         }
     }
 

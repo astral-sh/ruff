@@ -547,14 +547,11 @@ impl<'db> SemanticTokenVisitor<'db> {
         if is_first && self.in_class_scope {
             let method_decorator = func
                 .inferred_type(self.model)
-                .and_then(|ty| match ty {
-                    Type::FunctionLiteral(function_ty) => Some(function_ty),
-                    _ => None,
-                })
+                .and_then(Type::as_function_literal)
                 .and_then(|function_ty| {
-                    MethodDecorator::try_from_fn_type(self.model.db(), function_ty).ok()
+                    MethodDecorator::try_from_fn_type(self.model.db(), function_ty)
                 })
-                .unwrap_or(MethodDecorator::None);
+                .unwrap_or_default();
 
             match method_decorator {
                 MethodDecorator::StaticMethod => SemanticTokenType::Parameter,
