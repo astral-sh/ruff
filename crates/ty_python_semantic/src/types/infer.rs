@@ -1278,6 +1278,21 @@ bitflags::bitflags! {
 
         /// Whether the visitor is currently visiting a `**kwargs` annotation.
         const IN_KWARG_ANNOTATION = 1 << 9;
+
+        /// Whether the visitor is currently visiting a `tuple[...]` type argument.
+        const IN_TUPLE_TYPE_ARGUMENT = 1 << 10;
+
+        /// Whether the visitor is currently visiting a `Callable[[...], R]` parameter type.
+        const IN_CALLABLE_PARAMETER_TYPE = 1 << 11;
+
+        /// Whether the visitor is currently visiting a type expression.
+        const IN_TYPE_EXPRESSION = 1 << 12;
+
+        /// Whether the visitor is currently visiting a nested position in a type expression.
+        const IN_NESTED_TYPE_EXPRESSION = 1 << 13;
+
+        /// Whether the visitor is currently visiting the argument to `Unpack[...]`.
+        const IN_UNPACK_TYPE_ARGUMENT = 1 << 14;
     }
 }
 
