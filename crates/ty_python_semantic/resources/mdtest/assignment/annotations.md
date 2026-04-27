@@ -291,6 +291,45 @@ reveal_type(v4)  # revealed: list[int]
 invalid: list[str] = returns_list_int()
 ```
 
+Regular assignments to a previously declared place use the same rule:
+
+```py
+from typing import Any
+
+def returns_list_any() -> list[Any]:
+    return [1]
+
+def returns_list_int() -> list[int]:
+    return [1]
+
+def returns_any() -> Any:
+    return 1
+
+v1: Any
+v1 = 1
+reveal_type(v1)  # revealed: Any
+
+v2: int
+v2 = returns_any()
+reveal_type(v2)  # revealed: int
+
+v3: list[Any]
+v3 = returns_list_int()
+reveal_type(v3)  # revealed: list[Any]
+
+v4: list[int]
+v4 = returns_list_any()
+reveal_type(v4)  # revealed: list[int]
+
+v5: object
+v5 = returns_list_int()
+reveal_type(v5)  # revealed: list[int]
+
+invalid: list[str]
+# error: [invalid-assignment] "Object of type `list[int]` is not assignable to `list[str]`"
+invalid = returns_list_int()
+```
+
 ## Generic constructor annotations are understood
 
 ```toml

@@ -171,6 +171,21 @@ fn should_preserve_inferred_binding_type(ty: Type<'_>) -> bool {
     matches!(ty, Type::KnownInstance(KnownInstanceType::Field(_)))
 }
 
+fn should_prefer_declared_binding_type<'db>(
+    db: &'db dyn Db,
+    declared_ty: Type<'db>,
+    inferred_ty: Type<'db>,
+) -> bool {
+    // Callers must only ask this after checking that the inferred type is assignable to the
+    // declared type.
+    !should_preserve_inferred_binding_type(inferred_ty)
+        // TODO We currently can't distinguish between an explicit `Unknown` annotation and
+        // `Unknown` from a bad annotation, missing import, etc. in all callers. Ideally we would
+        // still prefer the `Unknown` declared type when it is explicit.
+        && !matches!(declared_ty, Type::Dynamic(DynamicType::Unknown))
+        && declared_ty.is_assignable_to(db, inferred_ty)
+}
+
 /// We currently store one dataclass field-specifiers inline, because that covers standard
 /// dataclasses. attrs uses 2 specifiers, pydantic and strawberry use 3 specifiers. SQLAlchemy
 /// uses 7 field specifiers. We could probably store more inline if this turns out to be a
@@ -1187,9 +1202,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             qualifiers,
         } = place_and_quals;
 
+        let declared_place_ty = resolved_place.ignore_possibly_undefined();
+
         // If the place is unbound and its an attribute or subscript place, fall back to normal
         // attribute/subscript inference on the root type.
-        let declared_ty =
+        let fallback_ty =
             if resolved_place.is_undefined() && !place_table.place(place_id).is_symbol() {
                 if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
                     let value_type =
@@ -1219,11 +1236,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             } else {
                 None
-            }
-            .or_else(|| resolved_place.ignore_possibly_undefined());
+            };
 
         AddBinding {
-            declared_ty,
+            declared_ty: fallback_ty.or(declared_place_ty),
+            should_prefer_declared_ty: declared_place_ty.is_some()
+                && binding.kind(db).is_unannotated_assignment(),
             binding,
             node,
             qualifiers,
@@ -1353,14 +1371,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 let declared_type = declared_ty.inner_type();
                 if inferred_ty.is_assignable_to(self.db(), declared_type) {
-                    if !should_preserve_inferred_binding_type(inferred_ty)
-                        // TODO We currently can't distinguish here between "no declared type" and
-                        // "declared types is `Unknown` (e.g. due to a bad annotation, missing
-                        // import, etc.)". Ideally we would still prefer `Unknown` declared type,
-                        // but use inferred type if there is no declared type.
-                        && !matches!(declared_type, Type::Dynamic(DynamicType::Unknown))
-                        && declared_type.is_assignable_to(self.db(), inferred_ty)
-                    {
+                    if should_prefer_declared_binding_type(self.db(), declared_type, inferred_ty) {
                         (declared_ty, declared_type)
                     } else {
                         (declared_ty, inferred_ty)
@@ -9827,6 +9838,7 @@ impl<V> IntoIterator for VecSet<V> {
 #[must_use]
 struct AddBinding<'db, 'ast> {
     declared_ty: Option<Type<'db>>,
+    should_prefer_declared_ty: bool,
     binding: Definition<'db>,
     node: AnyNodeRef<'ast>,
     qualifiers: TypeQualifiers,
@@ -9913,6 +9925,10 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             );
 
             // Allow declarations to override inference in case of invalid assignment.
+            bound_ty = declared_ty;
+        } else if self.should_prefer_declared_ty
+            && should_prefer_declared_binding_type(db, declared_ty, bound_ty)
+        {
             bound_ty = declared_ty;
         }
         // In the following cases, the bound type may not be the same as the RHS value type.
