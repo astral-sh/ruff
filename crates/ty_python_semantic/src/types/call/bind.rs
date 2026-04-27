@@ -651,26 +651,21 @@ impl<'db> Bindings<'db> {
             .filter_map(CallableItem::as_constructor_mut)
     }
 
-    fn collect_type_context_callables<'a>(&'a self, out: &mut Vec<&'a CallableBinding<'db>>) {
+    /// Visits the callables that should contribute argument type context, including deferred
+    /// constructor callables that are relevant to the matched upstream constructor path.
+    pub(crate) fn visit_type_context_callables<'a>(
+        &'a self,
+        visit: &mut impl FnMut(&'a CallableBinding<'db>),
+    ) {
         for item in self.iter_callable_items() {
-            out.push(item.callable());
+            visit(item.callable());
 
             if let Some(constructor) = item.as_constructor()
                 && let Some(downstream) = &constructor.downstream_constructor
             {
-                downstream.collect_type_context_callables(out);
+                downstream.visit_type_context_callables(visit);
             }
         }
-    }
-
-    /// Returns the callables that should contribute argument type context, including deferred
-    /// constructor callables that are relevant to the matched upstream constructor path.
-    pub(crate) fn iter_type_context_callables(
-        &self,
-    ) -> impl Iterator<Item = &CallableBinding<'db>> + '_ {
-        let mut callables = Vec::new();
-        self.collect_type_context_callables(&mut callables);
-        callables.into_iter()
     }
 
     /// Returns `true` if every element of the union contains an intersection element with a matching
@@ -4237,8 +4232,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         return_ty: Type<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
     ) -> Self {
-        let parameter_count = parameter_tys.len();
-
         Self {
             db,
             signature_type,
@@ -4246,9 +4239,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             arguments,
             argument_matches,
             parameter_tys,
-            parameter_ty_builders: std::iter::repeat_with(|| None)
-                .take(parameter_count)
-                .collect(),
+            parameter_ty_builders: Vec::new(),
             call_expression_tcx,
             return_ty,
             errors,
@@ -4453,50 +4444,51 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Attempt to promote any promotable types assigned to the specialization.
         // The hook receives (typevar, lower_bound, upper_bound) and returns Some(ty) to
         // override the default solution, or None to keep it.
-        let maybe_promote =
-            |typevar: BoundTypeVarInstance<'db>, lower: Type<'db>, _upper: Type<'db>| {
-                let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
+        let maybe_promote = |typevar: BoundTypeVarInstance<'db>,
+                             bounds: Option<(Type<'db>, Type<'db>)>| {
+            let (lower, _upper) = bounds?;
+            let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
 
-                // For constrained TypeVars, the inferred type is already one of the
-                // constraints. Promoting literals would produce a type that doesn't
-                // match any constraint.
-                if matches!(
-                    bound_or_constraints,
-                    Some(TypeVarBoundOrConstraints::Constraints(_))
-                ) {
-                    return None;
-                }
+            // For constrained TypeVars, the inferred type is already one of the
+            // constraints. Promoting literals would produce a type that doesn't
+            // match any constraint.
+            if matches!(
+                bound_or_constraints,
+                Some(TypeVarBoundOrConstraints::Constraints(_))
+            ) {
+                return None;
+            }
 
-                let mut variance_in_return = TypeVarVariance::Bivariant;
+            let mut variance_in_return = TypeVarVariance::Bivariant;
 
-                // Find all occurrences of the type variable in the return type.
-                self.return_ty
-                    .visit_specialization(self.db, |ty, variance| {
-                        if ty != Type::TypeVar(typevar) {
-                            return;
-                        }
-
-                        variance_in_return = variance_in_return.join(variance);
-                    });
-
-                // Promotion is only useful if the type variable is in non-covariant position
-                // in the return type.
-                if variance_in_return.is_covariant() {
-                    return None;
-                }
-
-                let promoted = lower.promote(self.db);
-
-                // If the TypeVar has an upper bound, only use the promoted type if it
-                // still satisfies the bound.
-                if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
-                    if !promoted.is_assignable_to(self.db, bound) {
-                        return None;
+            // Find all occurrences of the type variable in the return type.
+            self.return_ty
+                .visit_specialization(self.db, |ty, variance| {
+                    if ty != Type::TypeVar(typevar) {
+                        return;
                     }
-                }
 
-                Some(promoted)
-            };
+                    variance_in_return = variance_in_return.join(variance);
+                });
+
+            // Promotion is only useful if the type variable is in non-covariant position
+            // in the return type.
+            if variance_in_return.is_covariant() {
+                return None;
+            }
+
+            let promoted = lower.promote(self.db);
+
+            // If the TypeVar has an upper bound, only use the promoted type if it
+            // still satisfies the bound.
+            if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
+                if !promoted.is_assignable_to(self.db, bound) {
+                    return None;
+                }
+            }
+
+            Some(promoted)
+        };
 
         let specialization = builder.build_with(generic_context, maybe_promote);
 
@@ -4612,12 +4604,21 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
         // We still update the actual type of the parameter in this binding to match the argument,
         // even if the argument type is not assignable to the expected parameter type.
-        if let Some(builder) = &mut self.parameter_ty_builders[parameter_index] {
+        if let Some(builder) = self
+            .parameter_ty_builders
+            .get_mut(parameter_index)
+            .and_then(Option::as_mut)
+        {
             builder.add_in_place(argument_type);
         } else if let Some(existing) = self.parameter_tys[parameter_index] {
             let mut builder = UnionBuilder::new(self.db);
             builder.add_in_place(existing);
             builder.add_in_place(argument_type);
+            if self.parameter_ty_builders.is_empty() {
+                self.parameter_ty_builders = std::iter::repeat_with(|| None)
+                    .take(self.parameter_tys.len())
+                    .collect();
+            }
             self.parameter_ty_builders[parameter_index] = Some(builder);
         } else {
             self.parameter_tys[parameter_index] = Some(argument_type);

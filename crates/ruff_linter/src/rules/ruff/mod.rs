@@ -490,6 +490,7 @@ mod tests {
             &settings::LinterSettings::for_rules(vec![
                 Rule::UnusedVariable,
                 Rule::UnusedFunctionArgument,
+                Rule::UnusedMethodArgument,
                 Rule::AmbiguousVariableName,
                 Rule::UnusedNOQA,
                 Rule::InvalidRuleCode,

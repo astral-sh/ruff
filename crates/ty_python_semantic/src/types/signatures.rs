@@ -10,6 +10,7 @@
 //! argument types and return types. For each callable type in the union, the call expression's
 //! arguments must match _at least one_ overload.
 
+use std::collections::BTreeMap;
 use std::slice::Iter;
 
 use itertools::{EitherOrBoth, Itertools};
@@ -22,9 +23,13 @@ use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
-use crate::types::infer::infer_deferred_types;
+use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+};
+use crate::types::typed_dict::{
+    UnpackedTypedDictKey, extract_unpacked_typed_dict_keys_from_kwargs_annotation,
+    extract_unpacked_typed_dict_keys_from_value_type,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
@@ -59,6 +64,24 @@ fn function_signature_expression_type<'db>(
     } else {
         // expression is in the PEP-695 type params sub-scope
         infer_complete_scope_types(db, scope).expression_type(expression)
+    }
+}
+
+fn function_signature_type_expression_flags<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    expression: &ast::Expr,
+) -> TypeExpressionFlags {
+    let file = definition.file(db);
+    let index = semantic_index(db, file);
+    let file_scope = index.expression_scope_id(expression);
+    let scope = file_scope.to_scope_id(db, file);
+    if scope == definition.scope(db) {
+        // expression is in the function definition scope, but always deferred
+        infer_deferred_types(db, definition).type_expression_flags(expression)
+    } else {
+        // expression is in the PEP-695 type params sub-scope
+        infer_complete_scope_types(db, scope).type_expression_flags(expression)
     }
 }
 
@@ -1231,6 +1254,36 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.current_source.into_iter().chain(self.source_iter),
                     self.current_target.into_iter().chain(self.target_iter),
                 )
+            }
+        }
+
+        // Fast path: if the target accepts positional calls that the source cannot accept, reject
+        // without checking return types or individual parameter types. The full parameter
+        // comparison below reaches the same result, but only after doing work that is expensive for
+        // large overload sets.
+        if source.parameters.is_standard()
+            && target.parameters.is_standard()
+            && source.parameters.variadic().is_none()
+        {
+            let source_positional = source.parameters.positional().count();
+            let target_positional = target.parameters.positional().count();
+            let target_accepts_extra_positionals =
+                target_positional > source_positional || target.parameters.variadic().is_some();
+
+            if target_accepts_extra_positionals {
+                if target_positional > source_positional
+                    && let Some(ParameterKind::KeywordOnly { name, .. }) = source
+                        .parameters
+                        .iter()
+                        .nth(source_positional)
+                        .map(Parameter::kind)
+                {
+                    self.provide_context(|| ErrorContext::ParameterMustAcceptPositionalArguments {
+                        name: name.clone(),
+                    });
+                }
+
+                return self.never();
             }
         }
 
@@ -2457,9 +2510,11 @@ pub(crate) enum ParametersKind<'db> {
 /// The way this is represented internally is a bit subtle given that both `value` and `kind` fields
 /// need to follow certain invariants to correctly represent the different forms of parameter lists.
 ///
-/// The `value` field should always contain the full list of parameters regardless of the `kind`
-/// variant. For example, even if this represents a `Gradual` form, the `value` field should still
-/// contain the `*args: Any` and `**kwargs: Any` parameter.
+/// The `value` field should contain the parameters that participate in the callable signature
+/// proper. For example, even if this represents a `Gradual` form, the `value` field should still
+/// contain the `*args: Any` and `**kwargs: Any` parameter. A `**kwargs: Unpack[TypedDict]`
+/// parameter is normalized to the keyword-only parameters exposed to callers plus a possible
+/// trailing `**kwargs` parameter for the extra items accepted by open `TypedDict`s.
 ///
 /// The `kind` field is used to indicate the specific form of the parameter list which can,
 /// optionally, include additional information such as the bound `ParamSpec` type variable.
@@ -2479,12 +2534,50 @@ impl<'db> Parameters<'db> {
     /// The kind of the parameter list is determined based on the provided parameters. Specifically,
     /// if the parameter list contains `*args` and `**kwargs`, then it checks their annotated types
     /// and the presence of other parameter kinds to determine if they represent a gradual form, a
-    /// `ParamSpec`, or a `Concatenate` form.
+    /// `ParamSpec`, or a `Concatenate` form. `**kwargs: Unpack[TypedDict]` is normalized here by
+    /// synthesizing keyword-only parameters for the unpacked keys and keeping a trailing
+    /// `**kwargs` parameter for extra items on open `TypedDict`s.
     pub(crate) fn new(
         db: &'db dyn Db,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
     ) -> Self {
-        let value: Vec<Parameter<'db>> = parameters.into_iter().collect();
+        let parameters = parameters.into_iter();
+        let mut value: Vec<Parameter<'db>> = Vec::with_capacity(parameters.size_hint().0);
+
+        for parameter in parameters {
+            if let Some(unpacked_keys) = parameter.unpacked_typed_dict_keys(db) {
+                let kwargs_name = parameter
+                    .name()
+                    .expect("keyword variadic parameter always has a name")
+                    .clone();
+
+                for (name, unpacked_key) in unpacked_keys {
+                    if value
+                        .iter()
+                        .any(|existing| existing.callable_by_name(name.as_str()))
+                    {
+                        continue;
+                    }
+
+                    value.push(
+                        Parameter::keyword_only(name)
+                            .with_annotated_type(unpacked_key.value_ty)
+                            .with_optional_default_type(
+                                (!unpacked_key.is_required).then_some(Type::unknown()),
+                            ),
+                    );
+                }
+
+                // TODO: Use the unpacked `TypedDict`'s `extra_items` type instead of `object`.
+                // TODO: Omit `**kwargs` here for closed `TypedDict`s.
+                value.push(
+                    Parameter::keyword_variadic(kwargs_name).with_annotated_type(Type::object()),
+                );
+            } else {
+                value.push(parameter);
+            }
+        }
+
         let mut kind = ParametersKind::Standard;
 
         let variadic_param = value
@@ -2590,6 +2683,12 @@ impl<'db> Parameters<'db> {
 
     pub(crate) const fn is_top(&self) -> bool {
         matches!(self.kind, ParametersKind::Top)
+    }
+
+    /// Returns `true` if the parameters are a standard parameter list (not gradual, top,
+    /// `ParamSpec`, or `Concatenate`).
+    pub(crate) const fn is_standard(&self) -> bool {
+        matches!(self.kind, ParametersKind::Standard)
     }
 
     /// Returns the bound `ParamSpec` type variable if the parameter list is exactly `P`.
@@ -2996,6 +3095,17 @@ pub(crate) struct Parameter<'db> {
     /// type semantics of the parameter.
     pub(crate) inferred_annotation: bool,
 
+    /// Syntax-level annotation kind for cases where the annotation has special parameter semantics.
+    annotation_kind: ParameterAnnotationKind,
+
+    kind: ParameterKind<'db>,
+    pub(crate) form: ParameterForm,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+enum ParameterAnnotationKind {
+    Normal,
+
     /// Variadic parameters can have starred annotations, e.g.
     /// - `*args: *Ts`
     /// - `*args: *tuple[int, ...]`
@@ -3003,10 +3113,10 @@ pub(crate) struct Parameter<'db> {
     ///
     /// The `*` prior to the type gives the annotation a different meaning,
     /// so this must be propagated upwards.
-    has_starred_annotation: bool,
+    Starred,
 
-    kind: ParameterKind<'db>,
-    pub(crate) form: ParameterForm,
+    /// The parameter was declared as `**kwargs: Unpack[TypedDict]`.
+    UnpackedTypedDictKwargs,
 }
 
 impl<'db> Parameter<'db> {
@@ -3014,7 +3124,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
-            has_starred_annotation: false,
+            annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::PositionalOnly {
                 name,
                 default_type: None,
@@ -3027,7 +3137,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
-            has_starred_annotation: false,
+            annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::PositionalOrKeyword {
                 name,
                 default_type: None,
@@ -3040,7 +3150,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
-            has_starred_annotation: false,
+            annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::Variadic { name },
             form: ParameterForm::Value,
         }
@@ -3050,7 +3160,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
-            has_starred_annotation: false,
+            annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::KeywordOnly {
                 name,
                 default_type: None,
@@ -3063,7 +3173,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
-            has_starred_annotation: false,
+            annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::KeywordVariadic { name },
             form: ParameterForm::Value,
         }
@@ -3120,7 +3230,7 @@ impl<'db> Parameter<'db> {
                 .kind
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             inferred_annotation: self.inferred_annotation,
-            has_starred_annotation: self.has_starred_annotation,
+            annotation_kind: self.annotation_kind,
             form: self.form,
         }
     }
@@ -3135,7 +3245,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type,
             inferred_annotation: self.inferred_annotation,
-            has_starred_annotation: self.has_starred_annotation,
+            annotation_kind: self.annotation_kind,
             kind,
             form: self.form,
         }
@@ -3149,7 +3259,7 @@ impl<'db> Parameter<'db> {
     ) -> Option<Self> {
         let Parameter {
             annotated_type,
-            has_starred_annotation,
+            annotation_kind,
             inferred_annotation,
             kind,
             form,
@@ -3210,7 +3320,7 @@ impl<'db> Parameter<'db> {
         Some(Self {
             annotated_type,
             inferred_annotation: *inferred_annotation,
-            has_starred_annotation: *has_starred_annotation,
+            annotation_kind: *annotation_kind,
             kind,
             form: *form,
         })
@@ -3232,10 +3342,26 @@ impl<'db> Parameter<'db> {
             } else {
                 (Type::unknown(), true, false)
             };
+        let is_unpacked_typed_dict_kwargs = matches!(&kind, ParameterKind::KeywordVariadic { .. })
+            && parameter.annotation().is_some_and(|annotation| {
+                extract_unpacked_typed_dict_keys_from_kwargs_annotation(
+                    db,
+                    annotated_type,
+                    function_signature_type_expression_flags(db, definition, annotation),
+                )
+                .is_some()
+            });
+        let annotation_kind = if is_unpacked_typed_dict_kwargs {
+            ParameterAnnotationKind::UnpackedTypedDictKwargs
+        } else if has_starred_annotation {
+            ParameterAnnotationKind::Starred
+        } else {
+            ParameterAnnotationKind::Normal
+        };
         Self {
             annotated_type,
             kind,
-            has_starred_annotation,
+            annotation_kind,
             form: ParameterForm::Value,
             inferred_annotation,
         }
@@ -3291,6 +3417,21 @@ impl<'db> Parameter<'db> {
         }
     }
 
+    /// Returns the unpacked `TypedDict` keys if this is a `**kwargs: Unpack[TypedDict]`
+    /// parameter.
+    pub(crate) fn unpacked_typed_dict_keys(
+        &self,
+        db: &'db dyn Db,
+    ) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
+        (self.is_keyword_variadic()
+            && matches!(
+                self.annotation_kind,
+                ParameterAnnotationKind::UnpackedTypedDictKwargs
+            ))
+        .then(|| extract_unpacked_typed_dict_keys_from_value_type(db, self.annotated_type))
+        .flatten()
+    }
+
     /// Annotated type of the parameter. If no annotation was provided, this is `Unknown`.
     pub(crate) fn annotated_type(&self) -> Type<'db> {
         self.annotated_type
@@ -3299,7 +3440,7 @@ impl<'db> Parameter<'db> {
     /// Return `true` if this parameter has a starred annotation,
     /// e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...], bytes]`
     pub(crate) fn has_starred_annotation(&self) -> bool {
-        self.has_starred_annotation
+        matches!(self.annotation_kind, ParameterAnnotationKind::Starred)
     }
 
     /// Kind of the parameter.

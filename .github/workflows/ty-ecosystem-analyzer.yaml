@@ -35,7 +35,9 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
-  ECOSYSTEM_ANALYZER_COMMIT: bea89c6205aa21eede8f18fa8d5e28c7803c9e2a
+  # Line-tables-only debug info: faster builds, backtraces still work.
+  CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
+  ECOSYSTEM_ANALYZER_COMMIT: e7576e66e8f992b057ea92c820c04313dceda755
 
 jobs:
   build-ty:
@@ -59,6 +61,9 @@ jobs:
 
       - name: Install Rust toolchain
         run: rustup show
+
+      - name: "Install mold"
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
 
       - name: Build ty for both commits
         id: build
@@ -135,7 +140,6 @@ jobs:
             ecosystem-analyzer \
             --flaky-runs 10 \
             diff \
-            --dynamic-flaky \
             --projects-old projects_old.txt \
             --projects-new projects_new.txt \
             --projects-flaky projects_flaky.txt \

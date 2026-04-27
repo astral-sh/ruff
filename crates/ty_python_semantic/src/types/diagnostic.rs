@@ -5106,12 +5106,20 @@ pub(crate) fn report_invalid_or_unsupported_base(
 
             match mro_entries_call_error {
                 CallDunderError::MethodNotAvailable => {}
-                CallDunderError::PossiblyUnbound { .. } => {
+                CallDunderError::PossiblyUnbound { unbound_on, .. } => {
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` may have an `__mro_entries__` attribute, but it may be missing",
                         base_type.display(db)
                     ));
+                    if let Some(unbound_on) = unbound_on {
+                        for ty in unbound_on {
+                            diagnostic.info(format_args!(
+                                "`{}` does not implement `__mro_entries__`",
+                                ty.display(db)
+                            ));
+                        }
+                    }
                 }
                 CallDunderError::CallError(CallErrorKind::NotCallable, _) => {
                     explain_mro_entries(&mut diagnostic);
@@ -5248,9 +5256,16 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                     ));
                 } else {
                     diagnostic.set_primary_message(format_args!("Unknown key \"{key}\""));
-                    diagnostic.set_concise_message(format_args!(
-                        "Unknown key \"{key}\" for TypedDict `{typed_dict_name}`",
-                    ));
+                    if let Some(full_ty) = full_object_ty {
+                        diagnostic.set_concise_message(format_args!(
+                            "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` (subscripted object has type `{full_ty}`)",
+                            full_ty = full_ty.display(db),
+                        ));
+                    } else {
+                        diagnostic.set_concise_message(format_args!(
+                            "Unknown key \"{key}\" for TypedDict `{typed_dict_name}`",
+                        ));
+                    }
                 }
             }
             _ => {

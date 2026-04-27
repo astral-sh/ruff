@@ -18,6 +18,8 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
+  # Line-tables-only debug info: faster builds, backtraces still work.
+  CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
 
 jobs:
   ty-ecosystem-report:
@@ -45,6 +47,9 @@ jobs:
       - name: Install Rust toolchain
         run: rustup show
 
+      - name: "Install mold"
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
+
       - name: Create report
         shell: bash
         run: |
@@ -56,7 +61,7 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@bea89c6205aa21eede8f18fa8d5e28c7803c9e2a"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@e7576e66e8f992b057ea92c820c04313dceda755"
 
           ecosystem-analyzer \
             --verbose \

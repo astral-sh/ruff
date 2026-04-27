@@ -197,6 +197,16 @@ enum UnionElement<'db> {
 }
 
 impl<'db> UnionElement<'db> {
+    fn type_count(&self) -> usize {
+        match self {
+            UnionElement::Type(_) => 1,
+            UnionElement::IntLiterals(literals) => literals.len(),
+            UnionElement::StringLiterals(literals) => literals.len(),
+            UnionElement::BytesLiterals(literals) => literals.len(),
+            UnionElement::EnumLiterals { literals, .. } => literals.len(),
+        }
+    }
+
     /// Try reducing this `UnionElement` given the presence in the same union of `other_type`.
     fn try_reduce(&mut self, db: &'db dyn Db, other_type: Type<'db>) -> ReduceResult<'db> {
         let mut other_type_negated_cache = None;
@@ -823,7 +833,8 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn try_build(self) -> Option<Type<'db>> {
-        let mut types = vec![];
+        let type_count = self.elements.iter().map(UnionElement::type_count).sum();
+        let mut types = Vec::with_capacity(type_count);
         for element in self.elements {
             match element {
                 UnionElement::IntLiterals(literals) => {
