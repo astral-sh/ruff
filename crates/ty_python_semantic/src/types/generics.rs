@@ -1848,7 +1848,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             Solutions::Unconstrained => return Ok(()),
             Solutions::Constrained(solutions) => solutions,
         };
-        for solution in solutions {
+        for solution in &solutions {
             for binding in solution {
                 let variance = formal.variance_of(self.db, binding.bound_typevar);
                 self.add_type_mapping(binding.bound_typevar, binding.solution, variance, &mut f);

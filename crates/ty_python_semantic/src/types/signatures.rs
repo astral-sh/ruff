@@ -905,10 +905,12 @@ impl<'db> Signature<'db> {
     /// This is used to prune impossible overloads when a method is bound to a concrete receiver.
     /// If a signature has no positional first parameter, we conservatively keep it.
     pub(crate) fn can_bind_self_to(&self, db: &'db dyn Db, self_type: Type<'db>) -> bool {
+        // A dynamic receiver might be compatible with any explicit receiver annotation.
         if self_type.is_dynamic() {
             return true;
         }
 
+        // Without a first parameter, there is no receiver annotation to check.
         let Some(first_parameter) = self.parameters.get(0) else {
             return true;
         };
@@ -932,6 +934,7 @@ impl<'db> Signature<'db> {
         // participates in receiver-specific overload pruning.
         expected_self_ty = expected_self_ty.bind_self_typevars(db, self_type);
 
+        // `Self` binding can make the receiver annotation trivially compatible.
         if accepts_any_or_exact_self(expected_self_ty) {
             return true;
         }
@@ -941,20 +944,14 @@ impl<'db> Signature<'db> {
             expected_self_ty =
                 expected_self_ty.apply_optional_specialization(db, Some(self_specialization));
 
+            // Specialization can also make the receiver annotation trivially compatible.
             if accepts_any_or_exact_self(expected_self_ty) {
                 return true;
             }
         }
 
-        let constraints = ConstraintSetBuilder::new();
-        self_type
-            .when_assignable_to(
-                db,
-                expected_self_ty,
-                &constraints,
-                self.inferable_typevars(db),
-            )
-            .is_always_satisfied(db)
+        let when = self_type.when_constraint_set_assignable_to_owned(db, expected_self_ty);
+        when.query(|_, when| when.is_always_satisfied(db))
     }
 
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
@@ -1142,6 +1139,8 @@ impl<'db> Signature<'db> {
                 .any(|(_, parameter)| parameter.annotated_type().contains_self(db))
     }
 
+    /// Returns the type variables introduced by this signature that should be existentially
+    /// quantified when checking callable compatibility.
     fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {
         match self.generic_context {
             Some(generic_context) => generic_context.inferable_typevars(db),

@@ -3374,8 +3374,8 @@ impl<'db> CallableBinding<'db> {
             .max()
             .unwrap_or(0);
 
-        let mut participating_slot_indices = HashSet::new();
-        for slot_index in 0..max_slot_count {
+        let mut participating_slot_indices = vec![false; max_slot_count];
+        for (slot_index, is_participating) in participating_slot_indices.iter_mut().enumerate() {
             let mut first_parameter_type: Option<Type<'db>> = None;
             for (_, overload_slots) in &matching_overload_slots {
                 let current_parameter_type =
@@ -3386,11 +3386,11 @@ impl<'db> CallableBinding<'db> {
                             .when_equivalent_to(db, current_parameter_type, constraints)
                             .is_always_satisfied(db)
                         {
-                            participating_slot_indices.insert(slot_index);
+                            *is_participating = true;
                         }
                     }
                     (Some(_), None) => {
-                        participating_slot_indices.insert(slot_index);
+                        *is_participating = true;
                     }
                     (None, Some(current_parameter_type)) => {
                         first_parameter_type = Some(current_parameter_type);
@@ -3403,6 +3403,7 @@ impl<'db> CallableBinding<'db> {
         // A flag to indicate whether we've found the overload that makes the remaining overloads
         // unmatched for the given argument types.
         let mut filter_remaining_overloads = false;
+        let mut assignability_cache = FxHashMap::default();
 
         for (upto, current_index) in matching_overload_indexes.iter().enumerate() {
             if filter_remaining_overloads {
@@ -3418,7 +3419,7 @@ impl<'db> CallableBinding<'db> {
 
             for (_, slots) in &matching_overload_slots {
                 for (slot_index, slot) in slots.iter().enumerate() {
-                    if participating_slot_indices.contains(&slot_index) {
+                    if participating_slot_indices[slot_index] {
                         let argument_type = slot.variadic_argument.unwrap_or_else(|| {
                             current_slots
                                 .get(slot_index)
@@ -3448,7 +3449,7 @@ impl<'db> CallableBinding<'db> {
                 .collect::<Vec<_>>();
             for (_, slots) in &matching_overload_slots[..=upto] {
                 for (slot_index, slot) in slots.iter().enumerate() {
-                    if participating_slot_indices.contains(&slot_index) {
+                    if participating_slot_indices[slot_index] {
                         union_parameter_types[slot_index].add_in_place(slot.parameter);
                     }
                 }
@@ -3465,7 +3466,13 @@ impl<'db> CallableBinding<'db> {
                 }),
             );
 
-            if top_materialized_argument_type.is_assignable_to(db, parameter_types) {
+            let is_assignable = *assignability_cache
+                .entry((top_materialized_argument_type, parameter_types))
+                .or_insert_with(|| {
+                    top_materialized_argument_type.is_assignable_to(db, parameter_types)
+                });
+
+            if is_assignable {
                 filter_remaining_overloads = true;
             }
         }

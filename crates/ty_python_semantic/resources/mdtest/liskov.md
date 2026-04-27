@@ -1477,8 +1477,13 @@ class Base(Generic[T]):
     def method(self: Base[str], arg: str, extra: str) -> None: ...
     def method(self, arg: Any, extra: str = "") -> None: ...
 
-class Child(Base[T]):
+class GoodChild(Base[T]):
     def method(self, arg: T, extra: str = "") -> None: ...
+
+class BadChild(Base[T]):
+    # TODO: We should emit [invalid-method-override] here because the override is incompatible
+    # with `Base[str].method(self: Base[str], arg: str, extra: str)`.
+    def method(self, arg: T) -> None: ...
 ```
 
 ## Definitely bound members with no reachable definitions(!)
