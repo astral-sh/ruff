@@ -162,15 +162,30 @@ fn synthesize_typed_dict_getitem<'db>(
     instance_ty: Type<'db>,
     fields: TypedDictFields<'db>,
 ) -> Type<'db> {
-    let overloads = fields.iter().map(|(field_name, field)| {
-        let key_type = Type::string_literal(db, field_name);
-        let parameters = [
-            Parameter::positional_only(Some(Name::new_static("self")))
-                .with_annotated_type(instance_ty),
-            Parameter::positional_only(Some(Name::new_static("key"))).with_annotated_type(key_type),
-        ];
-        Signature::new(Parameters::new(db, parameters), field.declared_ty)
-    });
+    let overloads = fields
+        .iter()
+        .map(|(field_name, field)| {
+            let key_type = Type::string_literal(db, field_name);
+            let parameters = [
+                Parameter::positional_only(Some(Name::new_static("self")))
+                    .with_annotated_type(instance_ty),
+                Parameter::positional_only(Some(Name::new_static("key")))
+                    .with_annotated_type(key_type),
+            ];
+            Signature::new(Parameters::new(db, parameters), field.declared_ty)
+        })
+        .chain(std::iter::once(Signature::new(
+            Parameters::new(
+                db,
+                [
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(instance_ty),
+                    Parameter::positional_only(Some(Name::new_static("key")))
+                        .with_annotated_type(KnownClass::Str.to_instance(db)),
+                ],
+            ),
+            Type::object(),
+        )));
 
     Type::Callable(CallableType::new(
         db,

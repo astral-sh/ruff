@@ -2217,6 +2217,42 @@ def _(p: Person) -> None:
     reveal_type(p.__class__)  # revealed: <class 'dict[str, object]'>
 ```
 
+Passing a `TypedDict` to `dict()` copies it into a regular dictionary:
+
+```py
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title: str
+    year: int
+
+def takes_dict(value: dict[str, object]) -> None: ...
+def _(movie: Movie) -> None:
+    reveal_type(dict(movie))  # revealed: dict[str, object]
+    takes_dict(dict(movie))
+```
+
+Generic protocols that use `keys()` and `__getitem__()` can infer their type variables from a
+`TypedDict`:
+
+```py
+from _typeshed import SupportsKeysAndGetItem
+from typing import TypeVar, TypedDict
+
+class Movie(TypedDict):
+    title: str
+    year: int
+
+KT = TypeVar("KT")
+VT = TypeVar("VT")
+
+def copy(value: SupportsKeysAndGetItem[KT, VT]) -> dict[KT, VT]:
+    return dict(value)
+
+def _(movie: Movie) -> None:
+    reveal_type(copy(movie))  # revealed: dict[str, object]
+```
+
 Also, the "attributes" on the class definition cannot be accessed. Neither on the class itself, nor
 on inhabitants of the type defined by the class:
 
