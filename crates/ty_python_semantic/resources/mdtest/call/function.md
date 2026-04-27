@@ -1444,6 +1444,22 @@ def _(good: GoodA | GoodB, bad: BadA | BadB) -> None:
     takes_int_kwargs(**bad)
 ```
 
+`TypedDict` precision should be preserved after truthiness narrowing.
+
+```py
+from typing_extensions import TypedDict
+
+class Config(TypedDict, total=False):
+    name: str
+
+def configure(*, name: str = "", fallback: str = "") -> None: ...
+def _(config: Config) -> None:
+    if not config:
+        return
+
+    configure(**config)
+```
+
 ### Keys must be strings
 
 The keys of the mapping passed to a double-starred argument must be strings.
