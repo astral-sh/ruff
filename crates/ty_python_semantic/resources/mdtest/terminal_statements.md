@@ -545,8 +545,12 @@ def raise_in_both_nested_branches(cond1: bool, cond2: bool):
 
 ## Terminal in `try` with `finally` clause
 
-TODO: we don't yet model that terminal control flow in a `try`, `except`, or `else` block will jump
-to a `finally` clause before it terminates the current scope or jumps to its final destination.
+We model terminal control flow in a `try`, `except`, or `else` block as jumping to a `finally`
+clause before it terminates the current scope or jumps to its final destination when there are no
+normal paths into the `finally` block.
+
+TODO: we don't yet consider both normal and terminal entry states when checking a `finally` block
+that has a mix of normal and terminal entry paths.
 
 ```py
 def finally_runs_after_return():
@@ -555,8 +559,7 @@ def finally_runs_after_return():
         x = "return"
         return
     finally:
-        # TODO: should include `Literal["return"]`
-        reveal_type(x)  # revealed: Never
+        reveal_type(x)  # revealed: Literal["return"]
 
 def finally_runs_after_try_and_except_are_terminal(cond: bool):
     x = "before"
@@ -571,8 +574,7 @@ def finally_runs_after_try_and_except_are_terminal(cond: bool):
         x = "except-return"
         return
     finally:
-        # TODO: should include terminal states from both the `try` and `except` blocks
-        reveal_type(x)  # revealed: Never
+        reveal_type(x)  # revealed: Literal["try-return", "try-raise", "except-return"]
 
 def finally_runs_after_except_and_else_are_terminal():
     x = "before"
@@ -585,8 +587,7 @@ def finally_runs_after_except_and_else_are_terminal():
         x = "else-return"
         return
     finally:
-        # TODO: should include terminal states from both the `except` and `else` blocks
-        reveal_type(x)  # revealed: Never
+        reveal_type(x)  # revealed: Literal["except-return", "else-return"]
 
 def finally_runs_after_mixed_except_paths(cond: bool):
     x = "before"
@@ -632,8 +633,7 @@ def finally_runs_before_break():
             x = "break"
             break
         finally:
-            # TODO: should include `Literal["break"]`
-            reveal_type(x)  # revealed: Never
+            reveal_type(x)  # revealed: Literal["break"]
 
 def finally_runs_before_continue(cond: bool):
     while cond:
@@ -642,8 +642,7 @@ def finally_runs_before_continue(cond: bool):
             x = "continue"
             continue
         finally:
-            # TODO: should include `Literal["continue"]`
-            reveal_type(x)  # revealed: Never
+            reveal_type(x)  # revealed: Literal["continue"]
 
 def nested_finally_runs_after_return():
     x = "before"
@@ -652,11 +651,9 @@ def nested_finally_runs_after_return():
             x = "return"
             return
         finally:
-            # TODO: should include `Literal["return"]`
-            reveal_type(x)  # revealed: Never
+            reveal_type(x)  # revealed: Literal["return"]
     finally:
-        # TODO: should include `Literal["return"]`
-        reveal_type(x)  # revealed: Never
+        reveal_type(x)  # revealed: Literal["return"]
 
 def nested_outer_finally_sees_inner_finally_assignments():
     x = "before"
@@ -667,8 +664,7 @@ def nested_outer_finally_sees_inner_finally_assignments():
         finally:
             x = "inner-finally"
     finally:
-        # TODO: should include `Literal["inner-finally"]`
-        reveal_type(x)  # revealed: Never
+        reveal_type(x)  # revealed: Literal["inner-finally"]
 
 def finally_assignment_runs_before_break():
     x = 1
