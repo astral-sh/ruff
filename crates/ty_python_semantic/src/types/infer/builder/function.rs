@@ -570,30 +570,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         if let Some(vararg) = vararg {
             self.context.inference_flags |= InferenceFlags::IN_VARARG_ANNOTATION;
-            let previously_allowed_unpack = self
-                .context
-                .inference_flags
-                .replace(InferenceFlags::ALLOW_UNPACK_TYPE_EXPR, true);
             self.infer_parameter(vararg);
-            self.context.inference_flags.set(
-                InferenceFlags::ALLOW_UNPACK_TYPE_EXPR,
-                previously_allowed_unpack,
-            );
             self.context
                 .inference_flags
                 .remove(InferenceFlags::IN_VARARG_ANNOTATION);
         }
         if let Some(kwarg) = kwarg {
             self.context.inference_flags |= InferenceFlags::IN_KWARG_ANNOTATION;
-            let previously_allowed_unpack = self
-                .context
-                .inference_flags
-                .replace(InferenceFlags::ALLOW_UNPACK_TYPE_EXPR, true);
             self.infer_parameter(kwarg);
-            self.context.inference_flags.set(
-                InferenceFlags::ALLOW_UNPACK_TYPE_EXPR,
-                previously_allowed_unpack,
-            );
             self.context
                 .inference_flags
                 .remove(InferenceFlags::IN_KWARG_ANNOTATION);
@@ -633,13 +617,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
+        // Legacy PEP 484 positional-only parameters like `def f(__x: int, **kwargs:
+        // Unpack[TD])` are not callable by keyword, so they do not overlap with keys
+        // accepted through `**kwargs`. The convention only applies to the leading
+        // positional-or-keyword parameters that are actually converted to positional-only
+        // parameters by `Parameters::from_parameters`.
+        let pep_484_positional_only_count = if parameters.posonlyargs.is_empty() {
+            parameters
+                .args
+                .iter()
+                .take_while(|parameter| parameter.uses_pep_484_positional_only_convention())
+                .count()
+        } else {
+            0
+        };
+
         let overlapping = parameters
             .iter_non_variadic_params()
-            .skip(parameters.posonlyargs.len())
-            // Legacy PEP 484 positional-only parameters like `def f(__x: int, **kwargs:
-            // Unpack[TD])` are not callable by keyword, so they do not overlap with keys
-            // accepted through `**kwargs`.
-            .filter(|parameter| !parameter.uses_pep_484_positional_only_convention())
+            .skip(parameters.posonlyargs.len() + pep_484_positional_only_count)
             .map(|parameter| &parameter.parameter)
             .filter(|parameter| unpacked_keys.contains_key(&parameter.name.id))
             .collect::<Vec<_>>();

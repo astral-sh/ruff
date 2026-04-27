@@ -3202,6 +3202,9 @@ class TD1(TypedDict):
 class TD2(TypedDict):
     v3: str
 
+class DunderTD(TypedDict):
+    __x: int
+
 def func5(v1: int, **kwargs: Unpack[TD1]) -> None:  # error: [invalid-type-form]
     pass
 
@@ -3219,6 +3222,25 @@ def func_nested(**kwargs: Unpack[Unpack[TD1]]) -> None:  # error: [invalid-type-
     pass
 
 def func_stringified_nested(**kwargs: "Unpack[Unpack[TD1]]") -> None:  # error: [invalid-type-form]
+    pass
+
+# TODO: These should emit `invalid-type-form`; `Unpack` is only valid as the top-level
+# `**kwargs` annotation form, not nested inside a larger type expression.
+def func_union_nested(**kwargs: Unpack[TD1] | None) -> None:
+    pass
+
+def func_list_nested(**kwargs: list[Unpack[TD1]]) -> None:
+    pass
+
+def func_stringified_list_nested(**kwargs: "list[Unpack[TD1]]") -> None:
+    pass
+
+def func_keyword_only_overlap(*, v1: int, **kwargs: Unpack[TD1]) -> None:  # error: [invalid-type-form]
+    pass
+
+# error: [invalid-legacy-positional-parameter]
+# error: [invalid-type-form]
+def func_keyword_only_dunder_overlap(*, __x: int, **kwargs: Unpack[DunderTD]) -> None:
     pass
 ```
 
