@@ -962,6 +962,66 @@ impl<'db> Signature<'db> {
         }
     }
 
+    /// Returns the constraints under which this signature's first parameter can accept the bound
+    /// `self` type.
+    ///
+    /// This is the constraint-preserving form of [`Signature::can_bind_self_to`]. Callers that
+    /// need to validate another relationship under the receiver match can use the returned
+    /// constraint set as an implication guard.
+    pub(crate) fn when_self_bindable_to<'c>(
+        &self,
+        db: &'db dyn Db,
+        self_type: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        // A dynamic receiver might be compatible with any explicit receiver annotation.
+        if self_type.is_dynamic() {
+            return ConstraintSet::from_bool(constraints, true);
+        }
+
+        // Without a first parameter, there is no receiver annotation to check.
+        let Some(first_parameter) = self.parameters.get(0) else {
+            return ConstraintSet::from_bool(constraints, true);
+        };
+
+        // If there is no positional receiver, this signature cannot be pruned based on `self`.
+        if !first_parameter.is_positional() {
+            return ConstraintSet::from_bool(constraints, true);
+        }
+
+        let mut expected_self_ty = first_parameter.annotated_type();
+        let accepts_any_or_exact_self =
+            |ty: Type<'db>| ty.is_dynamic() || ty.is_object() || ty == self_type;
+
+        // Avoid the more expensive normalization below for receiver annotations that already
+        // accept all values, or already exactly match the bound receiver.
+        if accepts_any_or_exact_self(expected_self_ty) {
+            return ConstraintSet::from_bool(constraints, true);
+        }
+
+        // TODO: Expand type aliases here so `type Alias = Self` in a class body
+        // participates in receiver-specific overload pruning.
+        expected_self_ty = expected_self_ty.bind_self_typevars(db, self_type);
+
+        // `Self` binding can make the receiver annotation trivially compatible.
+        if accepts_any_or_exact_self(expected_self_ty) {
+            return ConstraintSet::from_bool(constraints, true);
+        }
+
+        // A specialized receiver can make generic receiver annotations concrete enough to compare.
+        if let Some(self_specialization) = self_type.class_specialization(db) {
+            expected_self_ty =
+                expected_self_ty.apply_optional_specialization(db, Some(self_specialization));
+
+            // Specialization can also make the receiver annotation trivially compatible.
+            if accepts_any_or_exact_self(expected_self_ty) {
+                return ConstraintSet::from_bool(constraints, true);
+            }
+        }
+
+        self_type.when_constraint_set_assignable_to(db, expected_self_ty, constraints)
+    }
+
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
         if !self.needs_self_mapping(db, false) {
             return self.clone();
@@ -1149,7 +1209,7 @@ impl<'db> Signature<'db> {
 
     /// Returns the type variables introduced by this signature that should be existentially
     /// quantified when checking callable compatibility.
-    fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {
+    pub(crate) fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {
         match self.generic_context {
             Some(generic_context) => generic_context.inferable_typevars(db),
             None => InferableTypeVars::None,

@@ -14,11 +14,11 @@ use crate::{
     lint::LintId,
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
-        CallableType, ClassBase, ClassLiteral, ClassType, KnownClass, Parameter, Parameters,
-        Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
+        BoundMethodType, CallableType, ClassBase, ClassLiteral, ClassType, KnownClass, Parameter,
+        Parameters, Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
         call::CallArguments,
         class::{CodeGeneratorKind, FieldKind},
-        constraints::ConstraintSetBuilder,
+        constraints::{ConstraintSetBuilder, IteratorConstraintsExtension},
         context::InferContext,
         diagnostic::{
             INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_OVERRIDE, INVALID_DATACLASS,
@@ -29,7 +29,9 @@ use crate::{
         },
         enums::{EnumMetadata, enum_metadata},
         function::{FunctionDecorators, FunctionType, KnownFunction},
+        generics::InferableTypeVars,
         list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
+        signatures::CallableSignature,
         tuple::Tuple,
     },
 };
@@ -123,6 +125,139 @@ fn conflicting_named_tuple_field_in_mro<'db>(
     }
 
     None
+}
+
+/// Returns whether the source method type satisfies the target method contract for Liskov checks.
+///
+/// Bound methods need special handling because normal binding prunes receiver-specific overloads
+/// before the override check can account for generic subclass specializations.
+fn method_type_is_liskov_assignable_to<'db>(
+    db: &'db dyn Db,
+    source_type: Type<'db>,
+    target_type: Type<'db>,
+    target_callable_type: Type<'db>,
+) -> bool {
+    if let (Type::BoundMethod(source_method), Type::BoundMethod(target_method)) =
+        (source_type, target_type)
+        && bound_method_needs_conditional_liskov_check(db, target_method)
+    {
+        return bound_method_is_liskov_assignable_to(db, source_method, target_method);
+    }
+
+    source_type.is_assignable_to(db, target_callable_type)
+}
+
+fn bound_method_needs_conditional_liskov_check<'db>(
+    db: &'db dyn Db,
+    target_method: BoundMethodType<'db>,
+) -> bool {
+    let target_function_signature = target_method.function(db).signature(db);
+    let target_self_instance = target_method.self_instance(db);
+
+    target_function_signature.iter().any(|target_signature| {
+        let constraints = ConstraintSetBuilder::new();
+        let receiver_bindable =
+            target_signature.when_self_bindable_to(db, target_self_instance, &constraints);
+
+        !receiver_bindable.is_never_satisfied(db)
+            && !receiver_bindable.satisfied_by_all_typevars(
+                db,
+                &constraints,
+                InferableTypeVars::None,
+            )
+    })
+}
+
+/// Returns whether a bound source method satisfies every applicable bound target overload.
+///
+/// Receiver-specific target overloads are checked under their receiver-binding condition so that a
+/// generic subclass must satisfy contracts that apply to some, but not all, of its specializations.
+fn bound_method_is_liskov_assignable_to<'db>(
+    db: &'db dyn Db,
+    source_method: BoundMethodType<'db>,
+    target_method: BoundMethodType<'db>,
+) -> bool {
+    let source_function_signature = source_method.function(db).signature(db);
+    let source_self_instance = source_method.self_instance(db);
+    let source_typing_self_type = source_method.typing_self_type(db);
+    let target_function_signature = target_method.function(db).signature(db);
+    let target_self_instance = target_method.self_instance(db);
+    let target_typing_self_type = target_method.typing_self_type(db);
+
+    target_function_signature.iter().all(|target_signature| {
+        let constraints = ConstraintSetBuilder::new();
+        let target_receiver_bindable =
+            target_signature.when_self_bindable_to(db, target_self_instance, &constraints);
+
+        // If the target overload cannot bind to the superclass receiver at all, it is not part of
+        // the contract that this override needs to satisfy.
+        if target_receiver_bindable.is_never_satisfied(db) {
+            return true;
+        }
+
+        let target_bound_signature = target_signature.bind_self(db, Some(target_typing_self_type));
+        let target_bound_callable = CallableSignature::single(target_bound_signature);
+
+        let available_source_bound_callable =
+            CallableSignature::from_overloads(source_function_signature.iter().filter_map(
+                |source_signature| {
+                    let source_receiver_bindable = source_signature.when_self_bindable_to(
+                        db,
+                        source_self_instance,
+                        &constraints,
+                    );
+
+                    let available_when_target_applies = target_receiver_bindable
+                        .implies(db, &constraints, || source_receiver_bindable)
+                        .satisfied_by_all_typevars(
+                            db,
+                            &constraints,
+                            target_signature
+                                .inferable_typevars(db)
+                                .merge(db, source_signature.inferable_typevars(db)),
+                        );
+
+                    available_when_target_applies
+                        .then(|| source_signature.bind_self(db, Some(source_typing_self_type)))
+                },
+            ));
+
+        let available_source_assignable = available_source_bound_callable
+            .when_constraint_set_assignable_to(db, &target_bound_callable, &constraints);
+
+        // A disjunctive target receiver can be covered by distinct source overloads that are each
+        // available for only one branch of the target condition.
+        let guarded_source_assignable =
+            source_function_signature
+                .iter()
+                .when_any(db, &constraints, |source_signature| {
+                    let source_receiver_bindable = source_signature.when_self_bindable_to(
+                        db,
+                        source_self_instance,
+                        &constraints,
+                    );
+
+                    source_receiver_bindable.and(db, &constraints, || {
+                        let source_bound_signature =
+                            source_signature.bind_self(db, Some(source_typing_self_type));
+                        let source_bound_callable =
+                            CallableSignature::single(source_bound_signature);
+
+                        source_bound_callable.when_constraint_set_assignable_to(
+                            db,
+                            &target_bound_callable,
+                            &constraints,
+                        )
+                    })
+                });
+
+        let source_assignable =
+            available_source_assignable.or(db, &constraints, || guarded_source_assignable);
+
+        target_receiver_bindable
+            .implies(db, &constraints, || source_assignable)
+            .satisfied_by_all_typevars(db, &constraints, target_signature.inferable_typevars(db))
+    })
 }
 
 fn check_class_declaration<'db>(
@@ -527,7 +662,12 @@ fn check_class_declaration<'db>(
 
             let superclass_type_as_type = superclass_type_as_callable.into_type(db);
 
-            if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_type) {
+            if method_type_is_liskov_assignable_to(
+                db,
+                type_on_subclass_instance,
+                superclass_type,
+                superclass_type_as_type,
+            ) {
                 continue;
             }
 
@@ -541,7 +681,12 @@ fn check_class_declaration<'db>(
                     // The immediate parent already defines this method and is different from the
                     // current ancestor we're checking. Check if the immediate parent's method
                     // is also incompatible with this ancestor.
-                    if !immediate_parent_type.is_assignable_to(db, superclass_type_as_type) {
+                    if !method_type_is_liskov_assignable_to(
+                        db,
+                        immediate_parent_type,
+                        superclass_type,
+                        superclass_type_as_type,
+                    ) {
                         // The immediate parent already has an LSP violation with this ancestor.
                         // Don't report the same violation for the child.
                         continue;

@@ -832,6 +832,39 @@ class G(A[int]):
     def method(self, x: bool) -> None: ...  # error: [invalid-method-override]
 ```
 
+## Receiver-specific overloads can split a superclass receiver condition
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing import overload
+
+class Base[T]:
+    value: T
+
+    @overload
+    def method(self: Base[str] | Base[bytes], x: int) -> str | bytes: ...
+    @overload
+    def method(self, x: str) -> object: ...
+
+class Child[T](Base[T]):
+    @overload
+    def method(self: Child[str], x: int) -> str: ...
+    @overload
+    def method(self: Child[bytes], x: int) -> bytes: ...
+    @overload
+    def method(self, x: str) -> object: ...
+
+class PartialChild[T](Base[T]):
+    @overload
+    def method(self: PartialChild[str], x: int) -> str: ...
+    @overload
+    def method(self, x: str) -> object: ...  # error: [invalid-method-override]
+```
+
 ## Generic methods on non-generic classes work as expected
 
 ```toml
@@ -1480,10 +1513,72 @@ class Base(Generic[T]):
 class GoodChild(Base[T]):
     def method(self, arg: T, extra: str = "") -> None: ...
 
-class BadChild(Base[T]):
-    # TODO: We should emit [invalid-method-override] here because the override is incompatible
-    # with `Base[str].method(self: Base[str], arg: str, extra: str)`.
+class GoodChildWithReceiverSpecificOverload(Base[T]):
+    @overload
     def method(self, arg: T) -> None: ...
+    @overload
+    def method(self: GoodChildWithReceiverSpecificOverload[str], arg: str, extra: str) -> None: ...
+    def method(self, arg: Any, extra: str = "") -> None: ...
+
+class BadChild(Base[T]):
+    def method(self, arg: T) -> None: ...  # error: [invalid-method-override]
+```
+
+The same rule applies when receiver-specific overloads are classmethods:
+
+```pyi
+from typing import Any, Generic, TypeVar, overload
+
+S = TypeVar("S")
+
+class ClassmethodBase(Generic[S]):
+    @overload
+    @classmethod
+    def method(cls, arg: S) -> None: ...
+    @overload
+    @classmethod
+    def method(cls: type[ClassmethodBase[str]], arg: str, extra: str) -> None: ...
+    @classmethod
+    def method(cls, arg: Any, extra: str = "") -> None: ...
+
+class ClassmethodGoodChild(ClassmethodBase[S]):
+    @overload
+    @classmethod
+    def method(cls, arg: S) -> None: ...
+    @overload
+    @classmethod
+    def method(cls: type[ClassmethodGoodChild[str]], arg: str, extra: str) -> None: ...
+    @classmethod
+    def method(cls, arg: Any, extra: str = "") -> None: ...
+
+class ClassmethodBadChild(ClassmethodBase[S]):
+    @classmethod
+    def method(cls, arg: S) -> None: ...  # error: [invalid-method-override]
+```
+
+Source overloads that collectively satisfy a target overload should still be considered as a full
+overload set when another target overload has a receiver-specific condition.
+
+```pyi
+from typing import Any, Generic, TypeVar, overload
+
+U = TypeVar("U")
+
+class AggregatedBase(Generic[U]):
+    @overload
+    def method(self, arg: int | str) -> int | str: ...
+    @overload
+    def method(self: AggregatedBase[bytes], arg: bytes, extra: bytes) -> bytes: ...
+    def method(self, arg: Any, extra: Any = ...) -> Any: ...
+
+class AggregatedChild(AggregatedBase[U]):
+    @overload
+    def method(self, arg: int) -> int: ...
+    @overload
+    def method(self, arg: str) -> str: ...
+    @overload
+    def method(self: AggregatedChild[bytes], arg: bytes, extra: bytes) -> bytes: ...
+    def method(self, arg: Any, extra: Any = ...) -> Any: ...
 ```
 
 ## Definitely bound members with no reachable definitions(!)
