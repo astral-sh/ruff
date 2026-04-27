@@ -590,7 +590,7 @@ uses the same rule as normal classes: an unannotated class-body assignment over 
 `ClassVar` provides a value while preserving the inherited declaration.
 
 ```py
-from typing import ClassVar, Protocol
+from typing import ClassVar, Generic, Protocol, TypeVar, overload
 
 class ProtocolBase(Protocol):
     class_attr: ClassVar[int]
@@ -612,6 +612,22 @@ class MethodProtocol(Protocol):
 class InvalidMethodProtocolImpl(MethodProtocol):
     def method(self, x: str) -> str:  # error: [invalid-method-override]
         return ""
+
+S = TypeVar("S")
+
+class ReceiverSpecificProtocol(Protocol[S]):
+    @overload
+    def method(self: "ReceiverSpecificProtocol[str]", value: str) -> str: ...
+    @overload
+    def method(self: "ReceiverSpecificProtocol[int]", value: int) -> int: ...
+    def method(self, value: object) -> object: ...
+
+class InvalidReceiverSpecificProtocolImpl(ReceiverSpecificProtocol[S], Generic[S]):
+    @overload
+    def method(self: "InvalidReceiverSpecificProtocolImpl[int]", value: str) -> str: ...
+    @overload
+    def method(self: "InvalidReceiverSpecificProtocolImpl[int]", value: int) -> int: ...
+    def method(self, value: object) -> object: ...  # error: [invalid-method-override]
 ```
 
 ## The entire class hierarchy is checked

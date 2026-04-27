@@ -559,13 +559,14 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            // Protocol conformance is structural. If the only failed check is the
-            // receiver-specific callable-contract path and the subclass still satisfies the
-            // protocol structurally, avoid a nominal override diagnostic. Do not use this for
-            // ordinary method incompatibility: explicit protocol subclasses should still report
-            // invalid overrides.
+            // Protocol conformance is structural, but the assignability check can succeed via
+            // explicit protocol inheritance. Only use it as a fallback when the source method has
+            // source receiver annotations covering the target's receiver-specific overloads.
             if uses_receiver_specific_contract
                 && superclass.is_protocol(db)
+                && let (Type::BoundMethod(source_method), Some(target_method)) =
+                    (type_on_subclass_instance, target_method)
+                && source_method.covers_receiver_specific_overloads(db, target_method)
                 && instance_of_class.is_assignable_to(db, Type::instance(db, superclass))
             {
                 continue;

@@ -3818,9 +3818,21 @@ impl<'db> Type<'db> {
                 let indexed_overloads = if signature.overloads.len() == 1 {
                     indexed_overloads.collect_vec()
                 } else {
-                    indexed_overloads
+                    let receiver_applicable = indexed_overloads
                         .filter(|(_, signature)| signature.can_bind_self_to(db, self_instance))
-                        .collect_vec()
+                        .collect_vec();
+                    if receiver_applicable.is_empty() {
+                        // Keep calls diagnostic as overload mismatches instead of treating a
+                        // pruned overload set as a non-callable object.
+                        signature
+                            .overloads
+                            .iter()
+                            .cloned()
+                            .enumerate()
+                            .collect_vec()
+                    } else {
+                        receiver_applicable
+                    }
                 };
 
                 CallableBinding::from_indexed_overloads(self, indexed_overloads)

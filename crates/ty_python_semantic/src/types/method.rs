@@ -158,6 +158,44 @@ impl<'db> BoundMethodType<'db> {
         })
     }
 
+    /// Returns `true` if every receiver-specific target overload has a source overload whose
+    /// receiver annotation covers the same specialization.
+    ///
+    /// For example, a source overload guarded by `self: Child[str]` covers a target overload
+    /// guarded by `self: Base[str]` if `Child[str]` has `Base[str]` in its MRO. A source overload
+    /// guarded by `self: Child[int]` does not cover `self: Base[str]`.
+    pub(crate) fn covers_receiver_specific_overloads(
+        self,
+        db: &'db dyn Db,
+        target: BoundMethodType<'db>,
+    ) -> bool {
+        let source_function_signature = self.function(db).signature(db);
+        let target_function_signature = target.function(db).signature(db);
+        let target_self_instance = target.self_instance(db);
+        let target_typing_self_type = target.typing_self_type(db);
+
+        target_function_signature
+            .iter()
+            .filter(|target_signature| {
+                !target_signature.has_unconditional_receiver(
+                    db,
+                    target_self_instance,
+                    target_typing_self_type,
+                )
+            })
+            .all(|target_signature| {
+                let Some(target_receiver) = explicit_receiver_annotation(target_signature) else {
+                    return true;
+                };
+
+                source_function_signature.iter().any(|source_signature| {
+                    explicit_receiver_annotation(source_signature).is_none_or(|source_receiver| {
+                        receiver_annotation_covers(db, source_receiver, target_receiver)
+                    })
+                })
+            })
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -172,6 +210,62 @@ impl<'db> BoundMethodType<'db> {
                 .recursive_type_normalized_impl(db, div, true)?,
         ))
     }
+}
+
+/// Returns the explicit annotation on the first positional parameter of `signature`, if any.
+///
+/// For example, this returns `Some(Child[str])` for `def method(self: Child[str], x: int)`,
+/// and `None` for `def method(self, x: int)` or a signature whose first parameter is not a
+/// positional receiver.
+fn explicit_receiver_annotation<'db>(signature: &Signature<'db>) -> Option<Type<'db>> {
+    let first_parameter = signature.parameters().get(0)?;
+
+    if !first_parameter.is_positional() || !first_parameter.should_annotation_be_displayed() {
+        return None;
+    }
+
+    Some(first_parameter.annotated_type())
+}
+
+/// Returns `true` if `source_receiver` covers the same specialization as `target_receiver`.
+///
+/// For example, `Child[str]` covers `Base[str]` when `Child[str]` inherits from `Base[str]`.
+/// `Child[int]` does not cover `Base[str]`, even if `Child` nominally inherits from `Base`.
+fn receiver_annotation_covers<'db>(
+    db: &'db dyn Db,
+    source_receiver: Type<'db>,
+    target_receiver: Type<'db>,
+) -> bool {
+    if source_receiver == target_receiver {
+        return true;
+    }
+
+    if let Some(source_class) = source_receiver.nominal_class(db)
+        && source_class
+            .iter_mro(db)
+            .filter_map(|base| {
+                base.into_class()
+                    .map(|base_class| Type::instance(db, base_class))
+            })
+            .any(|base| receiver_base_matches_target(base, target_receiver))
+    {
+        return true;
+    }
+
+    false
+}
+
+/// Returns `true` if an MRO entry from a source receiver matches a target receiver annotation.
+///
+/// For example, an MRO entry for `Base[str]` matches `Base[str]` directly. It also matches the
+/// protocol-instance form of `Base[str]`, since protocol receiver annotations are represented as
+/// protocol instances while MRO entries are nominal class types.
+fn receiver_base_matches_target<'db>(base: Type<'db>, target_receiver: Type<'db>) -> bool {
+    base == target_receiver
+        || target_receiver
+            .as_protocol_instance()
+            .and_then(|protocol| protocol.to_nominal_instance())
+            .is_some_and(|nominal| base == Type::NominalInstance(nominal))
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
