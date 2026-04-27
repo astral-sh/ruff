@@ -1530,6 +1530,7 @@ pub enum SemanticTokenKind {
     Decorator,
     BuiltinConstant,
     TypeParameter,
+    EnumMember,
 }
 
 impl From<ty_ide::SemanticTokenType> for SemanticTokenKind {
@@ -1550,6 +1551,7 @@ impl From<ty_ide::SemanticTokenType> for SemanticTokenKind {
             ty_ide::SemanticTokenType::Decorator => Self::Decorator,
             ty_ide::SemanticTokenType::BuiltinConstant => Self::BuiltinConstant,
             ty_ide::SemanticTokenType::TypeParameter => Self::TypeParameter,
+            ty_ide::SemanticTokenType::EnumMember => Self::EnumMember,
         }
     }
 }
