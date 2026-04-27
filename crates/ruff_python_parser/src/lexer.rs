@@ -659,9 +659,7 @@ impl<'src> Lexer<'src> {
         // NFKC normalization unconditionally is extremely expensive. If we know
         // an identifier is ASCII-only (by far the most common case), the parser
         // can skip NFKC normalization.
-        let mut is_ascii = first.is_ascii();
-        self.cursor
-            .eat_while(|c| is_identifier_continuation(c, &mut is_ascii));
+        let is_ascii = self.eat_identifier_continuation(first.is_ascii());
 
         if !is_ascii {
             self.current_flags |= TokenFlags::NON_ASCII_NAME;
@@ -716,6 +714,38 @@ impl<'src> Lexer<'src> {
             "with" => TokenKind::With,
             "yield" => TokenKind::Yield,
             _ => TokenKind::Name,
+        }
+    }
+
+    fn eat_identifier_continuation(&mut self, is_ascii: bool) -> bool {
+        self.eat_ascii_identifier_continuation();
+
+        let first = self.cursor.first();
+        if !first.is_ascii() && is_xid_continue(first) {
+            self.eat_unicode_identifier_continuation();
+            false
+        } else {
+            is_ascii
+        }
+    }
+
+    fn eat_ascii_identifier_continuation(&mut self) {
+        let bytes = self.cursor.rest().as_bytes();
+        let ascii_len = bytes
+            .iter()
+            .take_while(|&&byte| byte.is_ascii_alphanumeric() || byte == b'_')
+            .count();
+
+        if ascii_len > 0 {
+            self.cursor.skip_bytes(ascii_len);
+        }
+    }
+
+    #[cold]
+    fn eat_unicode_identifier_continuation(&mut self) {
+        while is_xid_continue(self.cursor.first()) {
+            self.cursor.bump();
+            self.eat_ascii_identifier_continuation();
         }
     }
 
@@ -1579,26 +1609,6 @@ const fn is_ascii_identifier_start(c: char) -> bool {
 // in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
 fn is_unicode_identifier_start(c: char) -> bool {
     is_xid_start(c)
-}
-
-/// Checks if the character c is a valid continuation character as described
-/// in <https://docs.python.org/3/reference/lexical_analysis.html#identifiers>.
-///
-/// Additionally, this function also keeps track of whether or not the total
-/// identifier is ASCII-only or not by mutably altering a reference to a
-/// boolean value passed in.
-fn is_identifier_continuation(c: char, identifier_is_ascii_only: &mut bool) -> bool {
-    // Arrange things such that ASCII codepoints never
-    // result in the slower `is_xid_continue` getting called.
-    if c.is_ascii() {
-        matches!(c, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9')
-    } else {
-        let is_continuation = is_xid_continue(c);
-        if is_continuation {
-            *identifier_is_ascii_only = false;
-        }
-        is_continuation
-    }
 }
 
 /// Create a new [`Lexer`] for the given source code and [`Mode`].
