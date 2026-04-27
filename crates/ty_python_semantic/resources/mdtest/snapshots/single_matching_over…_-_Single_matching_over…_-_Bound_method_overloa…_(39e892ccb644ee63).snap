@@ -51,7 +51,6 @@ info: Matching overload defined here
    |         ^               ------ Parameter declared here
    |
 info: Non-matching overloads for bound method `f`:
-info:   (self: Other, x: bytes) -> bytes
 info:   (self, x: int) -> int
 
 ```

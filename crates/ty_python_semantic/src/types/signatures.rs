@@ -36,8 +36,8 @@ use crate::types::typed_dict::{
 };
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
-    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ClassBase,
+    ErrorContext, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind,
     ParameterDescription, SelfBinding, TypeContext, TypeMapping, UnionBuilder, VarianceInferable,
     infer_complete_scope_types, todo_type,
 };
@@ -904,6 +904,10 @@ impl<'db> Signature<'db> {
     ///
     /// This is used to prune impossible overloads when a method is bound to a concrete receiver.
     /// If a signature has no positional first parameter, we conservatively keep it.
+    ///
+    /// For example, when binding a method to `Base[int]`, a signature whose receiver annotation is
+    /// `self: Base[str]` can be pruned, while a signature whose receiver is unannotated or
+    /// annotated as `self: Base[int]` can remain.
     pub(crate) fn can_bind_self_to(&self, db: &'db dyn Db, self_type: Type<'db>) -> bool {
         // A dynamic receiver might be compatible with any explicit receiver annotation.
         if self_type.is_dynamic() {
@@ -968,6 +972,9 @@ impl<'db> Signature<'db> {
     /// This is the constraint-preserving form of [`Signature::can_bind_self_to`]. Callers that
     /// need to validate another relationship under the receiver match can use the returned
     /// constraint set as an implication guard.
+    ///
+    /// For example, checking whether `Base[T]` can bind to `self: Base[str]` returns the condition
+    /// `T == str` instead of immediately reducing the answer to `false`.
     pub(crate) fn when_self_bindable_to<'c>(
         &self,
         db: &'db dyn Db,
@@ -1020,6 +1027,61 @@ impl<'db> Signature<'db> {
         }
 
         self_type.when_constraint_set_assignable_to(db, expected_self_ty, constraints)
+    }
+
+    /// Returns `true` if this signature's receiver is not specialized to a narrower receiver than
+    /// the bound method receiver.
+    ///
+    /// For example, when binding a method on `Base[T]`, receiver annotations like `self`,
+    /// `self: Self`, or `self: Base[T]` are unconditional. A receiver annotation like
+    /// `self: Base[str]` is conditional because it only applies to some specializations of
+    /// `Base[T]`. A receiver annotation like `self: WideBase[T]` is also unconditional for a
+    /// method bound to `Child[T]` if `Child` inherits from `WideBase`.
+    pub(crate) fn has_unconditional_receiver(
+        &self,
+        db: &'db dyn Db,
+        self_instance: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) -> bool {
+        if self_instance.is_dynamic() {
+            return true;
+        }
+
+        let Some(first_parameter) = self.parameters().get(0) else {
+            return true;
+        };
+
+        if !first_parameter.is_positional() {
+            return true;
+        }
+
+        if !first_parameter.should_annotation_be_displayed() {
+            return true;
+        }
+
+        let self_annotation = first_parameter.annotated_type();
+        if self_annotation.is_dynamic()
+            || self_annotation.is_object()
+            || matches!(self_annotation, Type::TypeVar(typevar) if typevar.typevar(db).is_self(db))
+            || self_annotation == self_instance
+            || self_annotation == typing_self_type
+        {
+            return true;
+        }
+
+        if let (Some(self_class), Some(annotation_class)) = (
+            self_instance.nominal_class(db),
+            self_annotation.nominal_class(db),
+        ) {
+            // Compare full `ClassType`s from the specialized MRO, not just class literals, so
+            // `Child[str]` remains receiver-specific for a method bound to `Child[T]`.
+            return self_class
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .any(|base| base == annotation_class);
+        }
+
+        false
     }
 
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {

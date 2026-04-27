@@ -3813,9 +3813,18 @@ impl<'db> Type<'db> {
 
             Type::BoundMethod(bound_method) => {
                 let signature = bound_method.function(db).signature(db);
-                CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
-                    .with_bound_type(bound_method.self_instance(db))
-                    .into()
+                let self_instance = bound_method.self_instance(db);
+                CallableBinding::from_indexed_overloads(
+                    self,
+                    signature
+                        .overloads
+                        .iter()
+                        .cloned()
+                        .enumerate()
+                        .filter(|(_, signature)| signature.can_bind_self_to(db, self_instance)),
+                )
+                .with_bound_type(self_instance)
+                .into()
             }
 
             Type::KnownBoundMethod(method) => {

@@ -605,6 +605,13 @@ class ProtocolImpl(ProtocolBase):
 class ProtocolWithClassVarImpl(ProtocolBase):
     class_attr = 0
     instance_attr = 0
+
+class MethodProtocol(Protocol):
+    def method(self, x: int) -> int: ...
+
+class InvalidMethodProtocolImpl(MethodProtocol):
+    def method(self, x: str) -> str:  # error: [invalid-method-override]
+        return ""
 ```
 
 ## The entire class hierarchy is checked
@@ -864,6 +871,12 @@ class PartialChild[T](Base[T]):
     @overload
     def method(self, x: str) -> object: ...  # error: [invalid-method-override]
 
+class MismatchedChild[T](Base[T]):
+    @overload
+    def method(self: MismatchedChild[int], x: int) -> str: ...
+    @overload
+    def method(self, x: str) -> object: ...  # error: [invalid-method-override]
+
 class WideBase[T]:
     def method(self, x: int | str) -> object: ...
 
@@ -872,6 +885,12 @@ class SplitParameterChild[T](WideBase[T]):
     def method(self: SplitParameterChild[str], x: int) -> str: ...
     @overload
     def method(self: SplitParameterChild[bytes], x: str) -> object: ...  # error: [invalid-method-override]
+
+class WiderReceiverChild[T](WideBase[T]):
+    @overload
+    def method(self: WideBase[T], x: int) -> object: ...
+    @overload
+    def method(self: WideBase[T], x: str) -> object: ...
 ```
 
 ## Generic methods on non-generic classes work as expected
@@ -1629,6 +1648,102 @@ class MethodReceiverTypeVarChild(MethodReceiverTypeVarBase[U]):
     @overload
     def method(self, arg: bytes) -> bytes: ...
     def method(self, arg: Any) -> Any: ...
+```
+
+## Receiver-specific overloads on generic protocols
+
+```py
+from typing import Generic, Protocol, TypeVar, overload
+
+T = TypeVar("T")
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class TaskStatus(Protocol[T_contra]):
+    @overload
+    def started(self: "TaskStatus[None]") -> None: ...
+    @overload
+    def started(self, value: T_contra) -> None: ...
+    def started(self, value: T_contra | None = None) -> None: ...
+
+class _TaskStatus(TaskStatus[T], Generic[T]):
+    @overload
+    def started(self: "_TaskStatus[None]") -> None: ...
+    @overload
+    def started(self: "_TaskStatus[T]", value: T) -> None: ...
+    def started(self, value: T | None = None) -> None: ...
+```
+
+## Classmethod keyword-only Liskov checks
+
+```py
+class Base:
+    @classmethod
+    def make(cls, **kwargs: object) -> object: ...
+
+class Child(Base):
+    @classmethod
+    def make(cls, value: int) -> object: ...  # error: [invalid-method-override]
+```
+
+```py
+class Base:
+    @classmethod
+    def make(cls, **kwargs: object) -> object: ...
+
+class Mixin:
+    @classmethod
+    def make(cls, value: int | None = None) -> object: ...
+
+class Child(Base, Mixin):
+    @classmethod
+    def make(cls, value: int) -> object: ...  # error: [invalid-method-override]
+```
+
+```py
+from typing_extensions import Self
+
+class EvmEventFilterQuery:
+    @classmethod
+    def make(
+        cls,
+        tx_hashes: list[bytes] | None = None,
+        counterparties: list[str] | None = None,
+        addresses: list[str] | None = None,
+    ) -> Self:
+        raise NotImplementedError
+
+class EthStakingEventFilterQuery:
+    @classmethod
+    def make(cls, validator_indices: list[int] | None = None) -> Self:
+        raise NotImplementedError
+
+class EthDepositEventFilterQuery(EvmEventFilterQuery, EthStakingEventFilterQuery):
+    @classmethod
+    def make(
+        cls,
+        tx_hashes: list[bytes] | None = None,
+        validator_indices: list[int] | None = None,
+    ) -> "EthDepositEventFilterQuery":  # type: ignore
+        raise NotImplementedError
+```
+
+## Classmethod generic Self with type ignore
+
+```py
+from typing import Any, Generic, TypeVar
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class BaseModel:
+    @classmethod
+    def model_construct(cls, _fields_set: set[str] | None = None, **values: Any) -> Self:
+        raise NotImplementedError
+
+class RootModel(BaseModel, Generic[T]):
+    @classmethod
+    def model_construct(cls, root: T, _fields_set: set[str] | None = None) -> Self:  # type: ignore
+        raise NotImplementedError
 ```
 
 ## Definitely bound members with no reachable definitions(!)

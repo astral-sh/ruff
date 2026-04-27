@@ -356,6 +356,44 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db)
     }
 
+    /// Return true if this type is assignable to the callable contract represented by
+    /// `target_method`.
+    ///
+    /// For bound methods, this preserves receiver-specific overload conditions from the unbound
+    /// method signatures before comparing the resulting callable types. Other source types use
+    /// normal assignability to the already-bound callable type.
+    ///
+    /// For example, a subclass method with separate `Child[str]` and `Child[bytes]` overloads can
+    /// satisfy a base method overload guarded by `Base[str] | Base[bytes]`, even though normal
+    /// bound-callable conversion would erase those receiver guards.
+    pub(crate) fn is_assignable_to_bound_method_callable_contract(
+        self,
+        db: &'db dyn Db,
+        target_method: crate::types::BoundMethodType<'db>,
+        target_callable: Type<'db>,
+    ) -> bool {
+        if let Type::BoundMethod(source_method) = self
+            && (source_method.has_receiver_specific_overloads(db)
+                || target_method.has_conditionally_applicable_receiver_overloads(db))
+        {
+            let constraints = ConstraintSetBuilder::new();
+            let relation_visitor = HasRelationToVisitor::default(&constraints);
+            let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+            let materialization_visitor = ApplyTypeMappingVisitor::default();
+            let checker = TypeRelationChecker::constraint_set_assignability(
+                &constraints,
+                &relation_visitor,
+                &disjointness_visitor,
+                &materialization_visitor,
+            );
+            checker
+                .check_bound_method_callable_contract_pair(db, source_method, target_method)
+                .is_always_satisfied(db)
+        } else {
+            self.is_assignable_to(db, target_callable)
+        }
+    }
+
     /// Re-run the assignability check with error context collection enabled.
     ///
     /// This should normally be called when `is_assignable_to` has returned `false` and we
