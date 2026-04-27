@@ -14,17 +14,29 @@ def _(flag1: bool, flag2: bool):
         # error: [possibly-unresolved-reference]
         reveal_type(x)  # revealed: Literal[1]
 
+def _(flag1: bool):
     if flag1 or (x := 1):
         # error: [possibly-unresolved-reference]
         reveal_type(x)  # revealed: Literal[1]
 
+def _(flag1: bool, flag2: bool):
     if flag1:
         pass
     elif flag2 and (x := 1):
         reveal_type(x)  # revealed: Literal[1]
 
+def _(flag1: bool):
     if flag1 and (x := 1):
         reveal_type(x)  # revealed: Literal[1]
+
+def _(flag1: bool, flag2: bool):
+    if flag1 and flag2 and (multi := 1):
+        reveal_type(multi)  # revealed: Literal[1]
+
+    if flag1 or (else_or := flag2):
+        pass
+    else:
+        reveal_type(else_or)  # revealed: Literal[False]
 ```
 
 ## First expression is always evaluated
