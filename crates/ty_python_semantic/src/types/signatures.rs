@@ -960,9 +960,16 @@ impl<'db> Signature<'db> {
             when.query(|_, when| when.is_always_satisfied(db))
         } else {
             let constraints = ConstraintSetBuilder::new();
-            self_type
-                .when_assignable_to(db, expected_self_ty, &constraints, inferable_typevars)
-                .is_always_satisfied(db)
+            let bindable = self_type.when_assignable_to(
+                db,
+                expected_self_ty,
+                &constraints,
+                inferable_typevars,
+            );
+
+            !bindable
+                .reduce_inferable(db, &constraints, inferable_typevars.iter(db))
+                .is_never_satisfied(db)
         }
     }
 
