@@ -17,7 +17,7 @@ use crate::{
         },
         generics::{enclosing_generic_contexts, typing_self},
         infer::{
-            InferenceFlags, TypeInferenceBuilder,
+            InferenceFlags, TypeExpressionFlags, TypeInferenceBuilder,
             builder::{
                 DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
                 validate_paramspec_components,
@@ -25,6 +25,7 @@ use crate::{
             function_known_decorators, infer_statement_types, nearest_enclosing_function,
         },
         infer_definition_types, infer_scope_types, todo_type,
+        typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation,
     },
 };
 use ty_python_core::{
@@ -75,6 +76,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         validate_paramspec_components(&self.context, &function.parameters, |expr| {
             self.file_expression_type(expr)
         });
+        self.validate_unpacked_typed_dict_kwargs(&function.parameters);
 
         self.infer_body(&function.body);
 
@@ -574,11 +576,95 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .remove(InferenceFlags::IN_VARARG_ANNOTATION);
         }
         if let Some(kwarg) = kwarg {
+            self.context.inference_flags |= InferenceFlags::IN_KWARG_ANNOTATION;
             self.infer_parameter(kwarg);
+            self.context
+                .inference_flags
+                .remove(InferenceFlags::IN_KWARG_ANNOTATION);
         }
         self.context
             .inference_flags
             .remove(InferenceFlags::IN_PARAMETER_ANNOTATION);
+    }
+
+    fn validate_unpacked_typed_dict_kwargs(&mut self, parameters: &ast::Parameters) {
+        let Some(kwargs) = parameters.kwarg.as_ref() else {
+            return;
+        };
+        let Some(annotation) = kwargs.annotation.as_deref() else {
+            return;
+        };
+        let annotation_flags = self.file_type_expression_flags(annotation);
+        if !annotation_flags.contains(TypeExpressionFlags::UNPACK) {
+            return;
+        }
+
+        let annotated_type = self.file_expression_type(annotation);
+        let Some(unpacked_keys) = extract_unpacked_typed_dict_keys_from_kwargs_annotation(
+            self.db(),
+            annotated_type,
+            annotation_flags,
+        ) else {
+            if !annotated_type.is_unknown()
+                && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, annotation)
+            {
+                let diag = builder.into_diagnostic(format_args!(
+                    "Unpacked value for `**kwargs` must be a TypedDict, not `{}`",
+                    annotated_type.display(self.db())
+                ));
+                add_type_expression_reference_link(diag);
+            }
+            return;
+        };
+
+        // Legacy PEP 484 positional-only parameters like `def f(__x: int, **kwargs:
+        // Unpack[TD])` are not callable by keyword, so they do not overlap with keys
+        // accepted through `**kwargs`. The convention only applies to the leading
+        // positional-or-keyword parameters that are actually converted to positional-only
+        // parameters by `Parameters::from_parameters`.
+        let pep_484_positional_only_count = if parameters.posonlyargs.is_empty() {
+            parameters
+                .args
+                .iter()
+                .take_while(|parameter| parameter.uses_pep_484_positional_only_convention())
+                .count()
+        } else {
+            0
+        };
+
+        let overlapping = parameters
+            .iter_non_variadic_params()
+            .skip(parameters.posonlyargs.len() + pep_484_positional_only_count)
+            .map(|parameter| &parameter.parameter)
+            .filter(|parameter| unpacked_keys.contains_key(&parameter.name.id))
+            .collect::<Vec<_>>();
+
+        if overlapping.is_empty() {
+            return;
+        }
+
+        let overlapping_names = overlapping
+            .iter()
+            .map(|parameter| format!("`{}`", parameter.name.id))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        if let Some(builder) = self
+            .context
+            .report_lint(&INVALID_TYPE_FORM, kwargs.as_ref())
+        {
+            if overlapping.len() == 1 {
+                builder.into_diagnostic(format_args!(
+                    "Parameter {overlapping_names} overlaps with unpacked TypedDict key in \
+                     `**kwargs` annotation",
+                ));
+            } else {
+                builder.into_diagnostic(format_args!(
+                    "Parameters {overlapping_names} overlap with unpacked TypedDict keys in \
+                     `**kwargs` annotation",
+                ));
+            }
+        }
     }
 
     fn infer_parameter_with_default(&mut self, parameter_with_default: &ast::ParameterWithDefault) {
@@ -915,6 +1001,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         )
                     }
                 }
+            } else if extract_unpacked_typed_dict_keys_from_kwargs_annotation(
+                db,
+                annotated_type,
+                self.file_type_expression_flags(annotation),
+            )
+            .is_some()
+            {
+                annotated_type
             } else {
                 KnownClass::Dict
                     .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), annotated_type])
