@@ -2758,7 +2758,7 @@ impl<'db> Type<'db> {
             let when = source.when_constraint_set_assignable_to_owned(db, target);
             when.query(|builder, when| {
                 let when = when.remove_noninferable(db, builder, inferable);
-                PathBounds::compute(db, &builder, when.node)
+                PathBounds::compute(db, builder, when.node)
             })
         }
 
