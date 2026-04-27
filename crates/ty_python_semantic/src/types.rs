@@ -161,7 +161,7 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     for scope_id in index.scope_ids() {
         // Scopes that may require type context are inferred during the inference of
         // their outer scope.
-        if !scope_id.accepts_type_context(db) {
+        if scope_id.accepts_type_context(db) {
             continue;
         }
 
