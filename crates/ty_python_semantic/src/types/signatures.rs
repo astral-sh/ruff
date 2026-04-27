@@ -35,7 +35,6 @@ use crate::types::typed_dict::{
     extract_unpacked_typed_dict_keys_from_value_type,
 };
 use crate::types::typevar::BoundTypeVarIdentity;
-use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind,
@@ -946,19 +945,9 @@ impl<'db> Signature<'db> {
             }
         }
 
-        let inferable = self.inferable_typevars(db);
         let constraints = ConstraintSetBuilder::new();
-        if any_over_type(db, self_type, false, Type::is_union) {
-            // A union receiver can bind an overload that accepts any possible receiver
-            // alternative; whole-type assignability would only keep overloads that accept all of
-            // them.
-            return !self_type
-                .when_disjoint_from(db, expected_self_ty, &constraints, inferable)
-                .is_always_satisfied(db);
-        }
-
         self_type
-            .when_assignable_to(db, expected_self_ty, &constraints, inferable)
+            .when_assignable_to(db, expected_self_ty, &constraints, self.inferable_typevars(db))
             .is_always_satisfied(db)
     }
 
