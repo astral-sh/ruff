@@ -642,11 +642,15 @@ impl<'db> SemanticTokenVisitor<'db> {
         }
     }
 
-    fn visit_value_expression(&mut self, expr: &Expr) {
+    fn visit_expr_with_type_form(&mut self, expr: &Expr, in_type_form: bool) {
         let prev_in_type_form = self.in_type_form;
-        self.in_type_form = false;
+        self.in_type_form = in_type_form;
         self.visit_expr(expr);
         self.in_type_form = prev_in_type_form;
+    }
+
+    fn visit_value_expression(&mut self, expr: &Expr) {
+        self.visit_expr_with_type_form(expr, false);
     }
 
     fn visit_annotated_arguments(&mut self, slice: &Expr) {
@@ -923,10 +927,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 
     /// Visit an annotation or other expression that should be interpreted as a type form.
     fn visit_annotation(&mut self, expr: &'_ Expr) {
-        let prev_in_type_form = self.in_type_form;
-        self.in_type_form = true;
-        self.visit_expr(expr);
-        self.in_type_form = prev_in_type_form;
+        self.visit_expr_with_type_form(expr, true);
     }
 
     fn visit_expr(&mut self, expr: &Expr) {
