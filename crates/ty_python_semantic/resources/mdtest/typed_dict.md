@@ -3145,14 +3145,12 @@ form.
 from typing import Protocol
 from typing_extensions import NotRequired, Required, TypedDict, Unpack
 
-class TD1(TypedDict):
+class TD(TypedDict):
     v1: Required[int]
     v2: NotRequired[str]
-
-class TD2(TD1):
     v3: Required[str]
 
-def func(**kwargs: Unpack[TD2]) -> None:
+def func(**kwargs: Unpack[TD]) -> None:
     pass
 
 class MissingRequiredKwarg(Protocol):
@@ -3181,7 +3179,7 @@ class WantsA(Protocol):
     def __call__(self, *, a: int = 1) -> None: ...
 
 wants_a: WantsA = accepts_optional_kwargs
-accepts_optional_kwargs(b=OptionalOnlyKwargs(a=1))
+accepts_optional_kwargs(b="whatever")
 
 # error: [invalid-argument-type]
 accepts_optional_kwargs(a="bad")
@@ -3195,19 +3193,19 @@ unpacked names, using a type variable, or using a union instead of a concrete `T
 
 ```py
 from typing import TypeVar, Union
-from typing_extensions import NotRequired, Required, TypedDict, Unpack
+from typing_extensions import NotRequired, TypedDict, Unpack
 
 class TD1(TypedDict):
-    v1: Required[int]
+    v1: int
     v2: NotRequired[str]
 
-class TD2(TD1):
-    v3: Required[str]
+class TD2(TypedDict):
+    v3: str
 
-def func5(v1: int, **kwargs: Unpack[TD2]) -> None:  # error: [invalid-type-form]
+def func5(v1: int, **kwargs: Unpack[TD1]) -> None:  # error: [invalid-type-form]
     pass
 
-T = TypeVar("T", bound=TD2)
+T = TypeVar("T", bound=TD1)
 
 def func6(**kwargs: Unpack[T]) -> None:  # error: [invalid-type-form]
     pass
@@ -3233,6 +3231,31 @@ class TD2(TD1):
     v3: Required[str]
 
 TD2Alias = TD2
+
+def func_alias(**kwargs: Unpack[TD2Alias]) -> None:
+    reveal_type(kwargs)  # revealed: TD2
+```
+
+### PEP 695 aliases are followed
+
+PEP 695 type aliases to a `TypedDict` should still be accepted in `Unpack`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import NotRequired, Required, TypedDict, Unpack
+
+class TD1(TypedDict):
+    v1: Required[int]
+    v2: NotRequired[str]
+
+class TD2(TD1):
+    v3: Required[str]
+
+type TD2Alias = TD2
 
 def func_alias(**kwargs: Unpack[TD2Alias]) -> None:
     reveal_type(kwargs)  # revealed: TD2
