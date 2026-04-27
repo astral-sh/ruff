@@ -29,6 +29,10 @@ concurrency:
   group: ty-ecosystem-analyzer-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+defaults:
+  run:
+    shell: bash
+
 env:
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
@@ -40,23 +44,53 @@ env:
   ECOSYSTEM_ANALYZER_COMMIT: e7576e66e8f992b057ea92c820c04313dceda755
 
 jobs:
-  build-ty:
-    name: Build ty
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+  determine-merge-base:
+    name: Determine merge base
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      timestamp: ${{ steps.build.outputs.timestamp }}
-      merge-base: ${{ steps.build.outputs.merge-base }}
+      merge-base: ${{ steps.merge-base.outputs.sha }}
+      timestamp: ${{ steps.merge-base.outputs.timestamp }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Determine merge base
+        id: merge-base
+        run: |
+          # Faster by 5-6s to do this separately than to use `fetch-depth: 0`
+          # and `filter: blob:none` with `actions/checkout`
+          git fetch --no-tags --filter=blob:none --unshallow origin
+          echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          MERGE_BASE="$(git merge-base "${GITHUB_SHA}" "origin/${GITHUB_BASE_REF}")"
+          echo "sha=${MERGE_BASE}" >> "$GITHUB_OUTPUT"
+          echo "Merge base: ${MERGE_BASE}"
+          echo "PR commit: ${GITHUB_SHA}"
+
+  build-ty:
+    name: Build ty (${{ matrix.label }})
+    needs: [determine-merge-base]
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    strategy:
+      matrix:
+        include:
+          - label: merge-base
+            ref: ${{ needs.determine-merge-base.outputs.merge-base }}
+          - label: pr
+            ref: ${{ github.sha }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           path: ruff
-          fetch-depth: 0
+          ref: ${{ matrix.ref }}
           persist-credentials: false
 
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: "ruff"
+          shared-key: "ty-build-${{ matrix.label }}"
           lookup-only: false
 
       - name: Install Rust toolchain
@@ -65,47 +99,44 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
 
-      - name: Build ty for both commits
-        id: build
+      - name: Build ty
         working-directory: ruff
-        shell: bash
         run: |
-          echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
-
-          MERGE_BASE="$(git merge-base "${GITHUB_SHA}" "origin/${GITHUB_BASE_REF}")"
-          echo "merge-base=${MERGE_BASE}" >> "$GITHUB_OUTPUT"
-          echo "Merge base: ${MERGE_BASE}"
-          echo "PR commit: ${GITHUB_SHA}"
-
-          git checkout "${MERGE_BASE}"
           cargo build --package ty --profile profiling
-          cp target/profiling/ty ../ty-base
+          cp target/profiling/ty ../ty
+          cp crates/ty_python_semantic/resources/primer/good.txt ../projects.txt
 
-          git checkout "${GITHUB_SHA}"
-          cargo build --package ty --profile profiling
-          cp target/profiling/ty ../ty-pr
-
-          # Extract project lists and config for the shard jobs
-          git show "${MERGE_BASE}:crates/ty_python_semantic/resources/primer/good.txt" > ../projects_old.txt
-          git show "${GITHUB_SHA}:crates/ty_python_semantic/resources/primer/good.txt" > ../projects_new.txt
+      - name: Copy config files
+        if: matrix.label == 'pr'
+        working-directory: ruff
+        run: |
           cp crates/ty_python_semantic/resources/primer/flaky.txt ../projects_flaky.txt
           cp .github/ty-ecosystem.toml ../ty-ecosystem.toml
 
-      - name: Upload ty binaries, project lists, and config
+      - name: Upload artifacts
+        if: matrix.label == 'merge-base'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ty-builds
+          name: ty-build-merge-base
           compression-level: 1
           path: |
-            ty-base
-            ty-pr
-            projects_old.txt
-            projects_new.txt
+            ty
+            projects.txt
+
+      - name: Upload artifacts
+        if: matrix.label == 'pr'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ty-build-pr
+          compression-level: 1
+          path: |
+            ty
+            projects.txt
             projects_flaky.txt
             ty-ecosystem.toml
 
   analyze-shards:
-    needs: [build-ty]
+    needs: [determine-merge-base, build-ty]
     strategy:
       matrix:
         shard: [0, 1]
@@ -118,33 +149,39 @@ jobs:
           enable-cache: true
           version: "0.11.7"
 
-      - name: Download ty binaries, project lists, and config
+      - name: Download merge-base build
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: ty-builds
+          name: ty-build-merge-base
+          path: base
+
+      - name: Download PR build
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ty-build-pr
+          path: pr
 
       - name: Analyze shard ${{ matrix.shard }}
-        shell: bash
         env:
           SHARD: ${{ matrix.shard }}
-          EXCLUDE_NEWER: ${{ needs.build-ty.outputs.timestamp }}
-          MERGE_BASE: ${{ needs.build-ty.outputs.merge-base }}
+          EXCLUDE_NEWER: ${{ needs.determine-merge-base.outputs.timestamp }}
+          MERGE_BASE: ${{ needs.determine-merge-base.outputs.merge-base }}
         run: |
           mkdir -p ~/.config/ty
-          cp ty-ecosystem.toml ~/.config/ty/ty.toml
+          cp pr/ty-ecosystem.toml ~/.config/ty/ty.toml
 
-          chmod +x ty-base ty-pr
+          chmod +x base/ty pr/ty
 
           uvx \
             --from "git+https://github.com/astral-sh/ecosystem-analyzer@${ECOSYSTEM_ANALYZER_COMMIT}" \
             ecosystem-analyzer \
             --flaky-runs 10 \
             diff \
-            --projects-old projects_old.txt \
-            --projects-new projects_new.txt \
-            --projects-flaky projects_flaky.txt \
-            --ty-binary-old ty-base \
-            --ty-binary-new ty-pr \
+            --projects-old base/projects.txt \
+            --projects-new pr/projects.txt \
+            --projects-flaky pr/projects_flaky.txt \
+            --ty-binary-old base/ty \
+            --ty-binary-new pr/ty \
             --old "${MERGE_BASE}" \
             --new "${GITHUB_SHA}" \
             --exclude-newer "${EXCLUDE_NEWER}" \
@@ -184,14 +221,12 @@ jobs:
           name: diagnostics-shard-1
 
       - name: Merge shard diagnostics
-        shell: bash
         run: |
           jq -s '{ outputs: [.[].outputs[]] }' diagnostics-base-0.json diagnostics-base-1.json > diagnostics-base.json
           jq -s '{ outputs: [.[].outputs[]] }' diagnostics-PR-0.json   diagnostics-PR-1.json   > diagnostics-PR.json
 
       - name: Generate reports
         id: generate-reports
-        shell: bash
         env:
           REF_NAME: ${{ github.ref_name }}
         run: |
