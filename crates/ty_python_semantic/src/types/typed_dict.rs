@@ -16,10 +16,10 @@ use super::diagnostic::{
     self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, PARAMETER_ALREADY_ASSIGNED,
     TOO_MANY_POSITIONAL_ARGUMENTS, report_invalid_key_on_typed_dict, report_missing_typed_dict_key,
 };
-use super::infer::infer_deferred_types;
+use super::infer::{TypeExpressionFlags, infer_deferred_types};
 use super::{
-    ApplyTypeMappingVisitor, IntersectionType, Type, TypeMapping, TypeQualifiers, UnionBuilder,
-    definition_expression_type, visitor,
+    ApplyTypeMappingVisitor, ErrorContext, IntersectionType, Type, TypeMapping, TypeQualifiers,
+    UnionBuilder, definition_expression_type, visitor,
 };
 use crate::Db;
 use crate::types::TypeContext;
@@ -275,10 +275,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // required target fields
                 let Some(source_item_field) = source_items.get(target_item_name) else {
                     // Self is missing a required field.
+                    self.provide_context(|| ErrorContext::TypedDictFieldMissing {
+                        field_name: target_item_name.clone(),
+                        source,
+                    });
                     return self.never();
                 };
                 if !source_item_field.is_required() {
                     // A required field is not required in self.
+                    self.provide_context(|| ErrorContext::TypedDictFieldNotRequiredInSource {
+                        field_name: target_item_name.clone(),
+                        source,
+                        target,
+                    });
                     return self.never();
                 }
                 if target_item_field.is_read_only() {
@@ -294,6 +303,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 } else {
                     if source_item_field.is_read_only() {
                         // A read-only field can't be assigned to a mutable target.
+                        self.provide_context(|| ErrorContext::TypedDictFieldReadOnlyInSource {
+                            field_name: target_item_name.clone(),
+                            source,
+                            target,
+                        });
                         return self.never();
                     }
                     // For mutable fields in the target, the relation needs to apply both
@@ -350,11 +364,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     if let Some(source_item_field) = source_items.get(target_item_name) {
                         if source_item_field.is_read_only() {
                             // A read-only field can't be assigned to a mutable target.
+                            self.provide_context(|| ErrorContext::TypedDictFieldReadOnlyInSource {
+                                field_name: target_item_name.clone(),
+                                source,
+                                target,
+                            });
                             return self.never();
                         }
                         if source_item_field.is_required() {
                             // A required field can't be assigned to a not-required, mutable field
                             // in the target, because `del` is allowed on the target field.
+                            self.provide_context(|| {
+                                ErrorContext::TypedDictFieldNotRequiredAndMutableInTarget {
+                                    field_name: target_item_name.clone(),
+                                    source,
+                                    target,
+                                }
+                            });
                             return self.never();
                         }
 
@@ -386,6 +412,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             };
             result.intersect(db, self.constraints, field_constraints);
             if result.is_never_satisfied(db) {
+                if let Some(source_item_field) = source_items.get(target_item_name) {
+                    self.provide_context(|| ErrorContext::TypedDictFieldIncompatible {
+                        field_name: target_item_name.clone(),
+                        source,
+                        target,
+                        source_field: source_item_field.declared_ty,
+                        target_field: target_item_field.declared_ty,
+                    });
+                }
                 return result;
             }
         }
@@ -816,14 +851,14 @@ pub(super) fn validate_typed_dict_required_keys<'db, 'ast>(
     !has_missing_key
 }
 
-#[derive(Debug, Clone, Copy)]
-struct UnpackedTypedDictKey<'db> {
-    value_ty: Type<'db>,
-    is_required: bool,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct UnpackedTypedDictKey<'db> {
+    pub(crate) value_ty: Type<'db>,
+    pub(crate) is_required: bool,
 }
 
-/// Extracts `TypedDict` keys, their value types, and whether they are required when unpacked as
-/// `**kwargs`, resolving type aliases and handling intersections and unions.
+/// Extracts `TypedDict` keys, their value types, and whether they are required when an unpacked
+/// `**kwargs` value has this type, resolving type aliases and handling intersections and unions.
 ///
 /// For intersections, returns ALL declared keys from ALL `TypedDict` types (union of keys),
 /// because unpacking a value of an intersection type may expose any key declared by any
@@ -831,7 +866,7 @@ struct UnpackedTypedDictKey<'db> {
 /// intersected, and the key is considered required if any constituent `TypedDict` requires it.
 /// For unions, returns all keys that may appear in any arm, unioning value types for shared keys,
 /// and a key is only considered required if every arm requires it.
-fn extract_unpacked_typed_dict_keys<'db>(
+pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
 ) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
@@ -857,7 +892,9 @@ fn extract_unpacked_typed_dict_keys<'db>(
             let all_key_maps: Vec<_> = intersection
                 .positive(db)
                 .iter()
-                .filter_map(|element| extract_unpacked_typed_dict_keys(db, *element))
+                .filter_map(|element| {
+                    extract_unpacked_typed_dict_keys_from_value_type(db, *element)
+                })
                 .collect();
 
             if all_key_maps.is_empty() {
@@ -889,7 +926,7 @@ fn extract_unpacked_typed_dict_keys<'db>(
             let key_maps: Vec<_> = union
                 .elements(db)
                 .iter()
-                .map(|element| extract_unpacked_typed_dict_keys(db, *element))
+                .map(|element| extract_unpacked_typed_dict_keys_from_value_type(db, *element))
                 .collect::<Option<_>>()?;
 
             let all_keys: OrderSet<Name> = key_maps
@@ -926,7 +963,9 @@ fn extract_unpacked_typed_dict_keys<'db>(
 
             Some(result)
         }
-        Type::TypeAlias(alias) => extract_unpacked_typed_dict_keys(db, alias.value_type(db)),
+        Type::TypeAlias(alias) => {
+            extract_unpacked_typed_dict_keys_from_value_type(db, alias.value_type(db))
+        }
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)
         | Type::Divergent(_)
@@ -956,6 +995,37 @@ fn extract_unpacked_typed_dict_keys<'db>(
         | Type::TypeGuard(_)
         | Type::NewTypeInstance(_) => None,
     }
+}
+
+/// Extracts unpacked `TypedDict` keys for a `**kwargs` annotation only when the annotation
+/// explicitly uses `Unpack[...]`.
+///
+/// Per [PEP 692](https://peps.python.org/pep-0692/#typeddict-unions), this accepts only a concrete
+/// `TypedDict` target, or a type alias resolving to one.
+pub(crate) fn extract_unpacked_typed_dict_keys_from_kwargs_annotation<'db>(
+    db: &'db dyn Db,
+    annotated_type: Type<'db>,
+    annotation_flags: TypeExpressionFlags,
+) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
+    let typed_dict = annotation_flags
+        .contains(TypeExpressionFlags::UNPACK)
+        .then(|| annotated_type.resolve_type_alias(db).as_typed_dict())??;
+
+    Some(
+        typed_dict
+            .items(db)
+            .iter()
+            .map(|(name, field)| {
+                (
+                    name.clone(),
+                    UnpackedTypedDictKey {
+                        value_ty: field.declared_ty,
+                        is_required: field.is_required(),
+                    },
+                )
+            })
+            .collect(),
+    )
 }
 
 /// Infers each unpacked `**kwargs` constructor argument exactly once.
@@ -1007,7 +1077,9 @@ pub(super) fn collect_guaranteed_keyword_keys<'db>(
         // TODO: also extract guaranteed keys from unpacked dict literals like `**{"a": 1}`.
         // Today we only suppress positional-key diagnostics for explicit keywords and unpacked
         // TypedDicts, which makes those literal-unpack cases inconsistent with equivalent calls.
-        } else if let Some(unpacked_keys) = extract_unpacked_typed_dict_keys(db, unpacked_type) {
+        } else if let Some(unpacked_keys) =
+            extract_unpacked_typed_dict_keys_from_value_type(db, unpacked_type)
+        {
             provided_keys.extend(
                 unpacked_keys
                     .into_iter()
@@ -1156,7 +1228,7 @@ fn validate_from_typed_dict_argument<'db, 'ast>(
 ) -> Option<OrderSet<Name>> {
     let db = context.db();
     let typed_dict_items = typed_dict.items(db);
-    let unpacked_keys = extract_unpacked_typed_dict_keys(db, arg_ty)?
+    let unpacked_keys = extract_unpacked_typed_dict_keys_from_value_type(db, arg_ty)?
         .into_iter()
         .filter(|(key_name, _)| typed_dict_items.contains_key(key_name))
         .collect();
@@ -1421,7 +1493,7 @@ fn validate_from_dict_literal<'db, 'ast>(
             } else if dict_item.key.is_none() {
                 let unpacked_ty = expression_type_fn(&dict_item.value, TypeContext::default());
                 if let Some(unpacked_keys) =
-                    extract_unpacked_typed_dict_keys(context.db(), unpacked_ty)
+                    extract_unpacked_typed_dict_keys_from_value_type(context.db(), unpacked_ty)
                 {
                     let (unpacked_provided_keys, _) = validate_extracted_typed_dict_keys(
                         context,
@@ -1516,7 +1588,8 @@ fn validate_from_keywords<'db, 'ast>(
                         guaranteed_keys.entry(key_name.clone()).or_insert(None);
                     }
                 }
-            } else if let Some(unpacked_keys) = extract_unpacked_typed_dict_keys(db, unpacked_type)
+            } else if let Some(unpacked_keys) =
+                extract_unpacked_typed_dict_keys_from_value_type(db, unpacked_type)
             {
                 for key_name in validate_extracted_typed_dict_keys(
                     context,
@@ -1589,7 +1662,8 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
             .validate();
         } else if item.key.is_none() {
             let unpacked_ty = expression_type_fn(&item.value);
-            if let Some(unpacked_keys) = extract_unpacked_typed_dict_keys(context.db(), unpacked_ty)
+            if let Some(unpacked_keys) =
+                extract_unpacked_typed_dict_keys_from_value_type(context.db(), unpacked_ty)
             {
                 let (unpacked_provided_keys, unpacked_valid) = validate_extracted_typed_dict_keys(
                     context,

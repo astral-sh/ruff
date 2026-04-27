@@ -43,7 +43,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
-use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_semantic::{
     HasType, SemanticModel,
     types::ide_support::{
@@ -314,7 +314,7 @@ impl<'db> SemanticTokenVisitor<'db> {
             }
             DefinitionKind::Class(_) => Some((SemanticTokenType::Class, modifiers)),
             DefinitionKind::TypeVar(_) => Some((SemanticTokenType::TypeParameter, modifiers)),
-            DefinitionKind::Parameter(parameter) => {
+            DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) => {
                 let parsed = parsed_module(db, definition.file(db));
                 let ty = parameter.node(&parsed.load(db)).inferred_type(&model);
 
@@ -342,12 +342,7 @@ impl<'db> SemanticTokenVisitor<'db> {
 
                 Some((SemanticTokenType::Parameter, modifiers))
             }
-            DefinitionKind::VariadicPositionalParameter(_) => {
-                Some((SemanticTokenType::Parameter, modifiers))
-            }
-            DefinitionKind::VariadicKeywordParameter(_) => {
-                Some((SemanticTokenType::Parameter, modifiers))
-            }
+            DefinitionKind::Parameter(_) => Some((SemanticTokenType::Parameter, modifiers)),
             DefinitionKind::TypeAlias(_) => Some((SemanticTokenType::TypeParameter, modifiers)),
             DefinitionKind::Import(_)
             | DefinitionKind::ImportFrom(_)

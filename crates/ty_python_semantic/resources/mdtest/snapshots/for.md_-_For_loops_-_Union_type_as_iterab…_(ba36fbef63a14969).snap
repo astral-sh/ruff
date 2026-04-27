@@ -37,5 +37,6 @@ error[not-iterable]: Object of type `Test | Literal[42]` may not be iterable
    |              ^^^^^^^^^^^^^^^^^^^^^^
    |
 info: It may not have an `__iter__` method and it doesn't have a `__getitem__` method
+info: `Literal[42]` does not implement `__iter__`
 
 ```

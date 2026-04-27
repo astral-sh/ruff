@@ -1211,7 +1211,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .positive(db)
                 .iter()
                 .when_all(db, self.constraints, |&pos_ty| {
-                    self.check_type_pair(db, source, pos_ty)
+                    let constraint_set = self.check_type_pair(db, source, pos_ty);
+                    if constraint_set.is_never_satisfied(db) {
+                        self.provide_context(|| ErrorContext::NotAssignableToIntersectionElement {
+                            source,
+                            element: pos_ty,
+                            intersection: target,
+                        });
+                    }
+                    constraint_set
                 })
                 .and(db, self.constraints, || {
                     // For subtyping, we would want to check whether the *top materialization* of `source`
@@ -1258,27 +1266,48 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // positive elements is a subtype of that type. If there are no positive elements,
                 // we treat `object` as the implicit positive element (e.g., `~str` is semantically
                 // `object & ~str`).
-                // TODO: Similar to how we do this for unions, we should collect error
-                // context for all elements and report it if *all* checks fail.
 
-                self.without_context_collection(|| {
-                    intersection
-                        .positive_elements_or_object(db)
-                        .when_any(db, self.constraints, |elem_ty| {
-                            self.check_type_pair(db, elem_ty, target)
-                        })
-                        .or(db, self.constraints, || {
-                            if should_expand_intersection(intersection) {
-                                self.check_type_pair(
-                                    db,
-                                    intersection.with_expanded_typevars_and_newtypes(db),
-                                    target,
-                                )
-                            } else {
-                                self.never()
+                let mut elements_context = vec![];
+                let context_collection_enabled = self.is_context_collection_enabled();
+
+                let result = intersection
+                    .positive_elements_or_object(db)
+                    .when_any(db, self.constraints, |elem_ty| {
+                        let result = self.check_type_pair(db, elem_ty, target);
+                        if context_collection_enabled {
+                            let ctx = self.context_tree.take();
+                            if !ctx.is_empty() {
+                                elements_context.push(ctx);
                             }
-                        })
-                })
+                        }
+                        result
+                    })
+                    .or(db, self.constraints, || {
+                        if should_expand_intersection(intersection) {
+                            self.check_type_pair(
+                                db,
+                                intersection.with_expanded_typevars_and_newtypes(db),
+                                target,
+                            )
+                        } else {
+                            self.never()
+                        }
+                    });
+
+                if context_collection_enabled
+                    && !elements_context.is_empty()
+                    && result.is_never_satisfied(db)
+                {
+                    self.set_context(
+                        ErrorContext::NoIntersectionElementAssignableToTarget {
+                            intersection: source,
+                            target,
+                        },
+                        elements_context,
+                    );
+                }
+
+                result
             }
 
             // `Never` is the bottom type, the empty set.

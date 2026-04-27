@@ -499,6 +499,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         )
     }
 
+    #[expect(dead_code)]
     pub(crate) fn solutions(
         self,
         db: &'db dyn Db,

@@ -6202,16 +6202,18 @@ impl<'db> Type<'db> {
                 KnownInstanceType::TypeAliasType(type_alias) => {
                     Some(TypeDefinition::TypeAlias(type_alias.definition(db)))
                 }
-                KnownInstanceType::NewType(newtype) => Some(TypeDefinition::NewType(newtype.definition(db))),
+                KnownInstanceType::NewType(newtype) => {
+                    Some(TypeDefinition::NewType(newtype.definition(db)))
+                }
                 _ => None,
             },
 
             Self::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 SubclassOfInner::Dynamic(_) => None,
                 SubclassOfInner::Class(class) => class.type_definition(db),
-                SubclassOfInner::TypeVar(bound_typevar) => {
-                    Some(TypeDefinition::TypeVar(bound_typevar.typevar(db).definition(db)?))
-                }
+                SubclassOfInner::TypeVar(bound_typevar) => Some(TypeDefinition::TypeVar(
+                    bound_typevar.typevar(db).definition(db)?,
+                )),
             },
 
             Self::TypeAlias(alias) => alias.value_type(db).definition(db),
@@ -6221,17 +6223,27 @@ impl<'db> Type<'db> {
                 .getter(db)
                 .and_then(|getter| getter.definition(db))
                 .or_else(|| property.setter(db).and_then(|setter| setter.definition(db)))
-                .or_else(|| property.deleter(db).and_then(|deleter| deleter.definition(db))),
+                .or_else(|| {
+                    property
+                        .deleter(db)
+                        .and_then(|deleter| deleter.definition(db))
+                }),
 
-            Self::LiteralValue(_)
-            // TODO: For enum literals, it would be even better to jump to the definition of the specific member
-            | Self::KnownBoundMethod(_)
+            Self::LiteralValue(literal) => literal
+                .as_enum()
+                .and_then(|enum_lit| enum_lit.definition(db))
+                .map(TypeDefinition::EnumMember)
+                .or_else(|| self.to_meta_type(db).definition(db)),
+
+            Self::KnownBoundMethod(_)
             | Self::WrapperDescriptor(_)
             | Self::DataclassDecorator(_)
             | Self::DataclassTransformer(_)
             | Self::BoundSuper(_) => self.to_meta_type(db).definition(db),
 
-            Self::TypeVar(bound_typevar) => Some(TypeDefinition::TypeVar(bound_typevar.typevar(db).definition(db)?)),
+            Self::TypeVar(bound_typevar) => Some(TypeDefinition::TypeVar(
+                bound_typevar.typevar(db).definition(db)?,
+            )),
 
             Self::ProtocolInstance(protocol) => match protocol.inner {
                 Protocol::FromClass(class) => class.type_definition(db),
@@ -6244,8 +6256,12 @@ impl<'db> Type<'db> {
 
             Self::SpecialForm(special_form) => special_form.definition(db),
             Self::Never => Type::SpecialForm(SpecialFormType::Never).definition(db),
-            Self::Dynamic(DynamicType::Any) => Type::SpecialForm(SpecialFormType::Any).definition(db),
-            Self::Dynamic(DynamicType::Unknown | DynamicType::UnknownGeneric(_)) => Type::SpecialForm(SpecialFormType::Unknown).definition(db),
+            Self::Dynamic(DynamicType::Any) => {
+                Type::SpecialForm(SpecialFormType::Any).definition(db)
+            }
+            Self::Dynamic(DynamicType::Unknown | DynamicType::UnknownGeneric(_)) => {
+                Type::SpecialForm(SpecialFormType::Unknown).definition(db)
+            }
             Self::AlwaysTruthy => Type::SpecialForm(SpecialFormType::AlwaysTruthy).definition(db),
             Self::AlwaysFalsy => Type::SpecialForm(SpecialFormType::AlwaysFalsy).definition(db),
 
@@ -6257,7 +6273,7 @@ impl<'db> Type<'db> {
                 | DynamicType::TodoStarredExpression
                 | DynamicType::TodoTypeVarTuple
                 | DynamicType::InvalidConcatenateUnknown
-                | DynamicType::UnspecializedTypeVar
+                | DynamicType::UnspecializedTypeVar,
             )
             | Self::Callable(_)
             | Self::TypeIs(_)
@@ -7402,8 +7418,19 @@ impl<'db> AwaitError<'db> {
                     );
                 }
             }
-            Self::Call(CallDunderError::PossiblyUnbound { bindings, .. }) => {
+            Self::Call(CallDunderError::PossiblyUnbound {
+                bindings,
+                unbound_on,
+            }) => {
                 diag.info("`__await__` may be missing");
+                if let Some(unbound_on) = unbound_on {
+                    for ty in unbound_on {
+                        diag.info(format_args!(
+                            "`{}` does not implement `__await__`",
+                            ty.display(db)
+                        ));
+                    }
+                }
                 if let Some(definition_spans) = bindings.callable_type().function_spans(db) {
                     diag.annotate(
                         Annotation::secondary(definition_spans.signature)

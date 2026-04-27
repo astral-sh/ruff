@@ -17,14 +17,15 @@ use crate::{
         },
         generics::{enclosing_generic_contexts, typing_self},
         infer::{
-            InferenceFlags, TypeInferenceBuilder,
+            InferenceFlags, TypeExpressionFlags, TypeInferenceBuilder,
             builder::{
                 DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
                 validate_paramspec_components,
             },
-            function_known_decorators, nearest_enclosing_function,
+            function_known_decorators, infer_statement_types, nearest_enclosing_function,
         },
         infer_definition_types, infer_scope_types, todo_type,
+        typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation,
     },
 };
 use ty_python_core::{
@@ -35,6 +36,20 @@ use ty_python_core::{
 
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
+
+fn parameters_have_annotations(parameters: &ast::Parameters) -> bool {
+    parameters
+        .iter_non_variadic_params()
+        .any(|param| param.parameter.annotation.is_some())
+        || parameters
+            .vararg
+            .as_deref()
+            .is_some_and(|param| param.annotation.is_some())
+        || parameters
+            .kwarg
+            .as_deref()
+            .is_some_and(|param| param.annotation.is_some())
+}
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
@@ -61,6 +76,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         validate_paramspec_components(&self.context, &function.parameters, |expr| {
             self.file_expression_type(expr)
         });
+        self.validate_unpacked_typed_dict_kwargs(&function.parameters);
 
         self.infer_body(&function.body);
 
@@ -229,17 +245,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
 
-        let decorator_inference = function_known_decorators(db, definition);
-        self.context.extend(decorator_inference.diagnostics());
-        self.expressions.extend(
-            decorator_inference
-                .expression_types()
-                .iter()
-                .map(|(expression, ty)| (*expression, *ty)),
-        );
-        self.bindings.extend(decorator_inference.bindings());
-        self.called_functions
-            .extend(decorator_inference.called_functions().iter().copied());
+        let decorator_inference =
+            (!decorator_list.is_empty()).then(|| function_known_decorators(db, definition));
+        if let Some(decorator_inference) = decorator_inference.as_ref() {
+            self.context.extend(decorator_inference.diagnostics());
+            self.expressions.extend(
+                decorator_inference
+                    .expression_types()
+                    .iter()
+                    .map(|(expression, ty)| (*expression, *ty)),
+            );
+            self.bindings.extend(decorator_inference.bindings());
+            self.called_functions
+                .extend(decorator_inference.called_functions().iter().copied());
+        }
 
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
         let mut function_decorators = FunctionDecorators::empty();
@@ -249,7 +268,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for decorator in decorator_list {
             let decorator_type = decorator_inference
-                .expression_type(&decorator.expression)
+                .as_ref()
+                .and_then(|decorator_inference| {
+                    decorator_inference.expression_type(&decorator.expression)
+                })
                 .unwrap_or_else(Type::unknown);
             let decorator_function_decorator =
                 FunctionDecorators::from_decorator_type(db, decorator_type);
@@ -307,12 +329,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .any(|param| param.default.is_some());
 
         // If there are type params, parameters and returns are evaluated in that scope. Otherwise,
-        // we always defer the inference of the parameters and returns. That ensures that we do not
-        // add any spurious salsa cycles when applying decorators below. (Applying a decorator
+        // we defer the inference of any parameter and return annotations. That ensures that we do
+        // not add any spurious salsa cycles when applying decorators below. (Applying a decorator
         // requires getting the signature of this function definition, which in turn requires
         // (lazily) inferring the parameter and return types.) If defaults exist, we also defer so
         // they can be inferred once with type context in the enclosing scope.
-        if type_params.is_none() || has_defaults {
+        let has_signature_annotations =
+            function.returns.is_some() || parameters_have_annotations(parameters);
+        if (type_params.is_none() && has_signature_annotations) || has_defaults {
             self.deferred.insert(definition);
         }
 
@@ -343,7 +367,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut inferred_ty =
             Type::FunctionLiteral(FunctionType::new(db, function_literal, None, None));
-        self.undecorated_type = Some(inferred_ty);
+        if !decorator_list.is_empty() {
+            self.undecorated_type = Some(inferred_ty);
+        }
 
         // Check that the function's own type parameters don't shadow
         // type variables from enclosing scopes (by name).
@@ -550,11 +576,95 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .remove(InferenceFlags::IN_VARARG_ANNOTATION);
         }
         if let Some(kwarg) = kwarg {
+            self.context.inference_flags |= InferenceFlags::IN_KWARG_ANNOTATION;
             self.infer_parameter(kwarg);
+            self.context
+                .inference_flags
+                .remove(InferenceFlags::IN_KWARG_ANNOTATION);
         }
         self.context
             .inference_flags
             .remove(InferenceFlags::IN_PARAMETER_ANNOTATION);
+    }
+
+    fn validate_unpacked_typed_dict_kwargs(&mut self, parameters: &ast::Parameters) {
+        let Some(kwargs) = parameters.kwarg.as_ref() else {
+            return;
+        };
+        let Some(annotation) = kwargs.annotation.as_deref() else {
+            return;
+        };
+        let annotation_flags = self.file_type_expression_flags(annotation);
+        if !annotation_flags.contains(TypeExpressionFlags::UNPACK) {
+            return;
+        }
+
+        let annotated_type = self.file_expression_type(annotation);
+        let Some(unpacked_keys) = extract_unpacked_typed_dict_keys_from_kwargs_annotation(
+            self.db(),
+            annotated_type,
+            annotation_flags,
+        ) else {
+            if !annotated_type.is_unknown()
+                && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, annotation)
+            {
+                let diag = builder.into_diagnostic(format_args!(
+                    "Unpacked value for `**kwargs` must be a TypedDict, not `{}`",
+                    annotated_type.display(self.db())
+                ));
+                add_type_expression_reference_link(diag);
+            }
+            return;
+        };
+
+        // Legacy PEP 484 positional-only parameters like `def f(__x: int, **kwargs:
+        // Unpack[TD])` are not callable by keyword, so they do not overlap with keys
+        // accepted through `**kwargs`. The convention only applies to the leading
+        // positional-or-keyword parameters that are actually converted to positional-only
+        // parameters by `Parameters::from_parameters`.
+        let pep_484_positional_only_count = if parameters.posonlyargs.is_empty() {
+            parameters
+                .args
+                .iter()
+                .take_while(|parameter| parameter.uses_pep_484_positional_only_convention())
+                .count()
+        } else {
+            0
+        };
+
+        let overlapping = parameters
+            .iter_non_variadic_params()
+            .skip(parameters.posonlyargs.len() + pep_484_positional_only_count)
+            .map(|parameter| &parameter.parameter)
+            .filter(|parameter| unpacked_keys.contains_key(&parameter.name.id))
+            .collect::<Vec<_>>();
+
+        if overlapping.is_empty() {
+            return;
+        }
+
+        let overlapping_names = overlapping
+            .iter()
+            .map(|parameter| format!("`{}`", parameter.name.id))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        if let Some(builder) = self
+            .context
+            .report_lint(&INVALID_TYPE_FORM, kwargs.as_ref())
+        {
+            if overlapping.len() == 1 {
+                builder.into_diagnostic(format_args!(
+                    "Parameter {overlapping_names} overlaps with unpacked TypedDict key in \
+                     `**kwargs` annotation",
+                ));
+            } else {
+                builder.into_diagnostic(format_args!(
+                    "Parameters {overlapping_names} overlap with unpacked TypedDict keys in \
+                     `**kwargs` annotation",
+                ));
+            }
+        }
     }
 
     fn infer_parameter_with_default(&mut self, parameter_with_default: &ast::ParameterWithDefault) {
@@ -891,6 +1001,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         )
                     }
                 }
+            } else if extract_unpacked_typed_dict_keys_from_kwargs_annotation(
+                db,
+                annotated_type,
+                self.file_type_expression_flags(annotation),
+            )
+            .is_some()
+            {
+                annotated_type
             } else {
                 KnownClass::Dict
                     .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), annotated_type])
@@ -906,6 +1024,97 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             self.add_binding(parameter.into(), definition)
                 .insert(self, inferred_ty);
+        }
+    }
+
+    /// Set initial declared type (if annotated) and inferred type for a lambda-parameter symbol,
+    /// in the lambda body scope.
+    pub(super) fn infer_lambda_parameter_definition(
+        &mut self,
+        index: usize,
+        parameter_with_default: &'ast ast::ParameterWithDefault,
+        lambda: &'ast ast::ExprLambda,
+        definition: Definition<'db>,
+    ) {
+        let ast::ParameterWithDefault {
+            parameter,
+            default,
+            range: _,
+            node_index: _,
+        } = parameter_with_default;
+
+        let default_expr = default.as_ref();
+        let ty = if let Some(parameter_type) = self.annotated_lambda_parameter_type(index, lambda) {
+            parameter_type
+        } else if let Some(default_expr) = default_expr {
+            let default_ty = self.file_expression_type(default_expr);
+            UnionType::from_two_elements(self.db(), Type::unknown(), default_ty)
+        } else {
+            Type::unknown()
+        };
+
+        self.add_binding(parameter.into(), definition)
+            .insert(self, ty);
+    }
+
+    /// Set initial declared/inferred types for a `*args` variadic positional parameter
+    /// in a lambda expression.
+    pub(super) fn infer_variadic_positional_lambda_parameter_definition(
+        &mut self,
+        index: usize,
+        parameter: &'ast ast::Parameter,
+        lambda: &'ast ast::ExprLambda,
+        definition: Definition<'db>,
+    ) {
+        // Note that this currently always returns `None` because we do not support `Unpack`
+        // annotations for callable types.
+        let ty = if let Some(parameter_type) = self.annotated_lambda_parameter_type(index, lambda) {
+            parameter_type
+        } else {
+            Type::homogeneous_tuple(self.db(), Type::unknown())
+        };
+        self.add_binding(parameter.into(), definition)
+            .insert(self, ty);
+    }
+
+    /// Set initial declared/inferred types for a `**kwargs` keyword-variadic parameter
+    /// in a lambda expression.
+    pub(super) fn infer_variadic_keyword_lambda_parameter_definition(
+        &mut self,
+        parameter: &'ast ast::Parameter,
+        definition: Definition<'db>,
+    ) {
+        let inferred_ty = KnownClass::Dict.to_specialized_instance(
+            self.db(),
+            &[KnownClass::Str.to_instance(self.db()), Type::unknown()],
+        );
+
+        self.add_binding(parameter.into(), definition)
+            .insert(self, inferred_ty);
+    }
+
+    /// Returns the annotated type of the lambda parameter at the given index in the provided
+    /// lambda expression, based on a `Callable` type annotation, if present.
+    fn annotated_lambda_parameter_type(
+        &mut self,
+        index: usize,
+        lambda: &'ast ast::ExprLambda,
+    ) -> Option<Type<'db>> {
+        let enclosing_stmt = infer_statement_types(
+            self.db(),
+            self.index.enclosing_lambda_statement(lambda.into())?,
+        );
+        let callable = enclosing_stmt.expression_type(lambda).as_callable()?;
+        let [signature] = callable.signatures(self.db()).overloads.as_slice() else {
+            // TODO: If there are multiple applicable overloads, we could attempt multi-inference.
+            return None;
+        };
+
+        let parameter_type = signature.parameters().as_slice()[index].annotated_type();
+        if parameter_type.is_unknown() || parameter_type.has_unspecialized_type_var(self.db()) {
+            None
+        } else {
+            Some(parameter_type)
         }
     }
 }
