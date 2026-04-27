@@ -8,10 +8,6 @@ always currently combine multiple constraints that we infer when calling a gener
 The generic protocol overload for `Series.mul` can infer multiple correlated specializations for
 `(T_contra, S2)`.
 
-TODO: We currently collapse those disjunctive solutions into independent unions in
-`SpecializationBuilder.types`, which can produce an impossible pair and reject the overload. This
-should be fixed once we are using a constraint set for our internal state.
-
 ```toml
 [environment]
 python-version = "3.13"
@@ -26,9 +22,9 @@ S2 = TypeVar("S2")
 
 class ElementOpsMixin(Generic[S2]):
     @overload
-    def _proto_mul(self, other: bool) -> "ElementOpsMixin[bool]": ...
+    def _proto_mul(self: "ElementOpsMixin[bool]", other: bool) -> "ElementOpsMixin[bool]": ...
     @overload
-    def _proto_mul(self, other: str) -> "ElementOpsMixin[str]": ...
+    def _proto_mul(self: "ElementOpsMixin[str]", other: str) -> "ElementOpsMixin[str]": ...
     def _proto_mul(self, other):
         raise NotImplementedError
 
@@ -44,9 +40,6 @@ class Series(ElementOpsMixin[T], Generic[T]):
         raise NotImplementedError
 
 def _(left: Series[bool]):
-    # TODO: no error
-    # TODO: revealed: Series[bool]
-    # error: [no-matching-overload]
-    # revealed: Unknown
+    # revealed: Series[bool]
     reveal_type(left.mul(True))
 ```
