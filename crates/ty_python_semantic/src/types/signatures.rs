@@ -2495,8 +2495,8 @@ pub(crate) enum ParametersKind<'db> {
 /// The `value` field should contain the parameters that participate in the callable signature
 /// proper. For example, even if this represents a `Gradual` form, the `value` field should still
 /// contain the `*args: Any` and `**kwargs: Any` parameter. A `**kwargs: Unpack[TypedDict]`
-/// parameter is normalized to the keyword-only parameters exposed to callers plus a trailing
-/// `**kwargs: object` parameter for the extra items accepted by open `TypedDict`s.
+/// parameter is normalized to the keyword-only parameters exposed to callers plus a possible
+/// trailing `**kwargs` parameter for the extra items accepted by open `TypedDict`s.
 ///
 /// The `kind` field is used to indicate the specific form of the parameter list which can,
 /// optionally, include additional information such as the bound `ParamSpec` type variable.
@@ -2518,7 +2518,7 @@ impl<'db> Parameters<'db> {
     /// and the presence of other parameter kinds to determine if they represent a gradual form, a
     /// `ParamSpec`, or a `Concatenate` form. `**kwargs: Unpack[TypedDict]` is normalized here by
     /// synthesizing keyword-only parameters for the unpacked keys and keeping a trailing
-    /// `**kwargs: object` parameter for extra items on open `TypedDict`s.
+    /// `**kwargs` parameter for extra items on open `TypedDict`s.
     pub(crate) fn new(
         db: &'db dyn Db,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
