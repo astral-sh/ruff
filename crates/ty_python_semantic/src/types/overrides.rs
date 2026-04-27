@@ -14,10 +14,9 @@ use crate::{
     lint::LintId,
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
-        BoundMethodType, CallableType, ClassBase, ClassLiteral, ClassType, KnownClass, Parameter,
-        Parameters, Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
+        CallableType, ClassBase, ClassLiteral, ClassType, KnownClass, Parameter, Parameters,
+        Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
         call::CallArguments,
-        callable::CallableTypeKind,
         class::{CodeGeneratorKind, FieldKind},
         constraints::ConstraintSetBuilder,
         context::InferContext,
@@ -31,7 +30,6 @@ use crate::{
         enums::{EnumMetadata, enum_metadata},
         function::{FunctionDecorators, FunctionType, KnownFunction},
         list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
-        signatures::CallableSignature,
         tuple::Tuple,
     },
 };
@@ -125,89 +123,6 @@ fn conflicting_named_tuple_field_in_mro<'db>(
     }
 
     None
-}
-
-/// Returns whether the source method type satisfies the target method contract for Liskov checks.
-///
-/// Bound methods need special handling because normal binding prunes receiver-specific target
-/// overloads before the override check can account for generic subclass specializations.
-fn method_type_is_liskov_assignable_to<'db>(
-    db: &'db dyn Db,
-    source_type: Type<'db>,
-    target_type: Type<'db>,
-    target_callable_type: Type<'db>,
-) -> bool {
-    // Bound methods may contain receiver-specific overloads that need constraint-aware checking.
-    if let (Type::BoundMethod(source_method), Type::BoundMethod(target_method)) =
-        (source_type, target_type)
-    {
-        return bound_method_is_liskov_assignable_to(db, source_method, target_method);
-    }
-
-    // Non-bound-method member types can use the ordinary callable assignability check.
-    source_type.is_assignable_to(db, target_callable_type)
-}
-
-/// Returns whether a bound source method satisfies every applicable bound target overload.
-///
-/// Receiver-specific target overloads are checked under their receiver-binding condition so that a
-/// generic subclass must satisfy contracts that apply to some, but not all, of its specializations.
-fn bound_method_is_liskov_assignable_to<'db>(
-    db: &'db dyn Db,
-    source_method: BoundMethodType<'db>,
-    target_method: BoundMethodType<'db>,
-) -> bool {
-    let source_signatures = source_method.bound_signatures(db);
-    let source_callable = Type::Callable(CallableType::new(
-        db,
-        source_signatures.clone(),
-        CallableTypeKind::FunctionLike,
-    ));
-    let target_function_signature = target_method.function(db).signature(db);
-    let target_self_instance = target_method.self_instance(db);
-    let target_typing_self_type = target_method.typing_self_type(db);
-
-    target_function_signature.iter().all(|target_signature| {
-        let constraints = ConstraintSetBuilder::new();
-        let target_bound_signature = target_signature.bind_self(db, Some(target_typing_self_type));
-        let target_bound_callable = CallableSignature::single(target_bound_signature);
-        let target_callable = Type::Callable(CallableType::new(
-            db,
-            target_bound_callable.clone(),
-            CallableTypeKind::FunctionLike,
-        ));
-        let receiver_bindable =
-            target_signature.when_self_bindable_to(db, target_self_instance, &constraints);
-
-        // If the target overload cannot bind to the superclass receiver at all, it is not part of
-        // the contract that this override needs to satisfy.
-        if receiver_bindable.is_never_satisfied(db) {
-            return true;
-        }
-
-        // If the target overload binds for every relevant receiver specialization, normal callable
-        // assignability already captures the full contract.
-        if receiver_bindable.satisfied_by_all_typevars(
-            db,
-            &constraints,
-            target_signature.inferable_typevars(db),
-        ) {
-            return source_callable.is_assignable_to(db, target_callable);
-        }
-
-        // A receiver-specific overload can be applicable for only some specializations of a
-        // generic subclass. In that case, validate the callable contract only under the receiver
-        // binding condition instead of dropping the overload from the superclass contract.
-        receiver_bindable
-            .implies(db, &constraints, || {
-                source_signatures.when_constraint_set_assignable_to(
-                    db,
-                    &target_bound_callable,
-                    &constraints,
-                )
-            })
-            .satisfied_by_all_typevars(db, &constraints, target_signature.inferable_typevars(db))
-    })
 }
 
 fn check_class_declaration<'db>(
@@ -612,12 +527,7 @@ fn check_class_declaration<'db>(
 
             let superclass_type_as_type = superclass_type_as_callable.into_type(db);
 
-            if method_type_is_liskov_assignable_to(
-                db,
-                type_on_subclass_instance,
-                superclass_type,
-                superclass_type_as_type,
-            ) {
+            if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_type) {
                 continue;
             }
 
@@ -631,12 +541,7 @@ fn check_class_declaration<'db>(
                     // The immediate parent already defines this method and is different from the
                     // current ancestor we're checking. Check if the immediate parent's method
                     // is also incompatible with this ancestor.
-                    if !method_type_is_liskov_assignable_to(
-                        db,
-                        immediate_parent_type,
-                        superclass_type,
-                        superclass_type_as_type,
-                    ) {
+                    if !immediate_parent_type.is_assignable_to(db, superclass_type_as_type) {
                         // The immediate parent already has an LSP violation with this ancestor.
                         // Don't report the same violation for the child.
                         continue;

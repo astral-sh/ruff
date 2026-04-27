@@ -1481,7 +1481,9 @@ class GoodChild(Base[T]):
     def method(self, arg: T, extra: str = "") -> None: ...
 
 class BadChild(Base[T]):
-    def method(self, arg: T) -> None: ...  # error: [invalid-method-override]
+    # TODO: We should emit [invalid-method-override] here because the override is incompatible
+    # with `Base[str].method(self: Base[str], arg: str, extra: str)`.
+    def method(self, arg: T) -> None: ...
 ```
 
 ## Definitely bound members with no reachable definitions(!)

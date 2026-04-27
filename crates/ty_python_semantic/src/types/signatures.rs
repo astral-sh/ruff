@@ -759,46 +759,29 @@ impl<'db> Signature<'db> {
     /// This is used to prune impossible overloads when a method is bound to a concrete receiver.
     /// If a signature has no positional first parameter, we conservatively keep it.
     pub(crate) fn can_bind_self_to(&self, db: &'db dyn Db, self_type: Type<'db>) -> bool {
-        let constraints = ConstraintSetBuilder::new();
-        self.when_self_bindable_to(db, self_type, &constraints)
-            .satisfied_by_all_typevars(db, &constraints, self.inferable_typevars(db))
-    }
-
-    /// Returns the constraints under which this signature's first parameter can accept the bound
-    /// `self` type.
-    ///
-    /// This is the constraint-preserving form of [`Signature::can_bind_self_to`]. Callers that
-    /// need to validate another relationship under the receiver match can use the returned
-    /// constraint set as an implication guard.
-    pub(crate) fn when_self_bindable_to<'c>(
-        &self,
-        db: &'db dyn Db,
-        self_type: Type<'db>,
-        constraints: &'c ConstraintSetBuilder<'db>,
-    ) -> ConstraintSet<'db, 'c> {
         // A dynamic receiver might be compatible with any explicit receiver annotation.
         if self_type.is_dynamic() {
-            return ConstraintSet::from_bool(constraints, true);
+            return true;
         }
 
         // Without a first parameter, there is no receiver annotation to check.
         let Some(first_parameter) = self.parameters.get(0) else {
-            return ConstraintSet::from_bool(constraints, true);
+            return true;
         };
 
         // If there is no positional receiver, this signature cannot be pruned based on `self`.
         if !first_parameter.is_positional() {
-            return ConstraintSet::from_bool(constraints, true);
+            return true;
         }
 
         let mut expected_self_ty = first_parameter.annotated_type();
         let accepts_any_or_exact_self =
             |ty: Type<'db>| ty.is_dynamic() || ty.is_object() || ty == self_type;
 
-        // Avoid normalization for receiver annotations that already accept all values, or already
-        // exactly match the bound receiver.
+        // Avoid the more expensive normalization below for receiver annotations that already
+        // accept all values, or already exactly match the bound receiver.
         if accepts_any_or_exact_self(expected_self_ty) {
-            return ConstraintSet::from_bool(constraints, true);
+            return true;
         }
 
         // TODO: Expand type aliases here so `type Alias = Self` in a class body
@@ -807,7 +790,7 @@ impl<'db> Signature<'db> {
 
         // `Self` binding can make the receiver annotation trivially compatible.
         if accepts_any_or_exact_self(expected_self_ty) {
-            return ConstraintSet::from_bool(constraints, true);
+            return true;
         }
 
         // A specialized receiver can make generic receiver annotations concrete enough to compare.
@@ -817,11 +800,19 @@ impl<'db> Signature<'db> {
 
             // Specialization can also make the receiver annotation trivially compatible.
             if accepts_any_or_exact_self(expected_self_ty) {
-                return ConstraintSet::from_bool(constraints, true);
+                return true;
             }
         }
 
-        self_type.when_constraint_set_assignable_to(db, expected_self_ty, constraints)
+        let constraints = ConstraintSetBuilder::new();
+        self_type
+            .when_assignable_to(
+                db,
+                expected_self_ty,
+                &constraints,
+                self.inferable_typevars(db),
+            )
+            .is_always_satisfied(db)
     }
 
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
@@ -865,7 +856,7 @@ impl<'db> Signature<'db> {
 
     /// Returns the type variables introduced by this signature that should be existentially
     /// quantified when checking callable compatibility.
-    pub(crate) fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {
+    fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {
         match self.generic_context {
             Some(generic_context) => generic_context.inferable_typevars(db),
             None => InferableTypeVars::None,
