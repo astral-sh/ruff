@@ -7,6 +7,10 @@ pub(crate) const EOF_CHAR: char = '\0';
 /// A cursor represents a pointer in the source code.
 ///
 /// Based on [`rustc`'s `Cursor`](https://github.com/rust-lang/rust/blob/d1b7355d3d7b4ead564dbecb1d240fcc74fff21b/compiler/rustc_lexer/src/cursor.rs)
+///
+/// The cursor holds only the text of a single cell. For regular Python files,
+/// this is the entire source. For Jupyter notebooks, the lexer creates a new
+/// cursor for each cell when transitioning between cells.
 #[derive(Clone, Debug)]
 pub(super) struct Cursor<'src> {
     /// An iterator over the [`char`]'s of the source code.
