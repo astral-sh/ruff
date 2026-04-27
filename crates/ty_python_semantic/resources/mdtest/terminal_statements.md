@@ -545,11 +545,132 @@ def raise_in_both_nested_branches(cond1: bool, cond2: bool):
 
 ## Terminal in `try` with `finally` clause
 
-TODO: we don't yet model that a `break` or `continue` in a `try` block will jump to a `finally`
-clause before it jumps to end/start of the loop.
+TODO: we don't yet model that terminal control flow in a `try`, `except`, or `else` block will jump
+to a `finally` clause before it terminates the current scope or jumps to its final destination.
 
 ```py
-def f():
+def finally_runs_after_return():
+    x = "before"
+    try:
+        x = "return"
+        return
+    finally:
+        # TODO: should include `Literal["return"]`
+        reveal_type(x)  # revealed: Never
+
+def finally_runs_after_try_and_except_are_terminal(cond: bool):
+    x = "before"
+    try:
+        if cond:
+            x = "try-return"
+            return
+        else:
+            x = "try-raise"
+            raise ValueError
+    except ValueError:
+        x = "except-return"
+        return
+    finally:
+        # TODO: should include terminal states from both the `try` and `except` blocks
+        reveal_type(x)  # revealed: Never
+
+def finally_runs_after_except_and_else_are_terminal():
+    x = "before"
+    try:
+        x = "try-normal"
+    except ValueError:
+        x = "except-return"
+        return
+    else:
+        x = "else-return"
+        return
+    finally:
+        # TODO: should include terminal states from both the `except` and `else` blocks
+        reveal_type(x)  # revealed: Never
+
+def finally_runs_after_mixed_except_paths(cond: bool):
+    x = "before"
+    try:
+        raise ValueError
+    except ValueError:
+        if cond:
+            x = "except-return"
+            return
+        x = "except-normal"
+    finally:
+        # TODO: should also include `Literal["except-return"]`
+        reveal_type(x)  # revealed: Literal["except-normal"]
+
+def finally_runs_after_mixed_try_paths(cond: bool):
+    x = "before"
+    try:
+        if cond:
+            x = "try-return"
+            return
+        x = "try-normal"
+    finally:
+        # TODO: should also include `Literal["try-return"]`
+        reveal_type(x)  # revealed: Literal["try-normal"]
+
+def finally_runs_after_mixed_break_paths(cond: bool):
+    x = "before"
+    while True:
+        try:
+            if cond:
+                x = "break"
+                break
+            x = "normal"
+        finally:
+            # TODO: should also include `Literal["break"]`
+            reveal_type(x)  # revealed: Literal["normal"]
+        break
+
+def finally_runs_before_break():
+    x = "before"
+    while True:
+        try:
+            x = "break"
+            break
+        finally:
+            # TODO: should include `Literal["break"]`
+            reveal_type(x)  # revealed: Never
+
+def finally_runs_before_continue(cond: bool):
+    while cond:
+        x = "before"
+        try:
+            x = "continue"
+            continue
+        finally:
+            # TODO: should include `Literal["continue"]`
+            reveal_type(x)  # revealed: Never
+
+def nested_finally_runs_after_return():
+    x = "before"
+    try:
+        try:
+            x = "return"
+            return
+        finally:
+            # TODO: should include `Literal["return"]`
+            reveal_type(x)  # revealed: Never
+    finally:
+        # TODO: should include `Literal["return"]`
+        reveal_type(x)  # revealed: Never
+
+def nested_outer_finally_sees_inner_finally_assignments():
+    x = "before"
+    try:
+        try:
+            x = "return"
+            return
+        finally:
+            x = "inner-finally"
+    finally:
+        # TODO: should include `Literal["inner-finally"]`
+        reveal_type(x)  # revealed: Never
+
+def finally_assignment_runs_before_break():
     x = 1
     while True:
         try:
