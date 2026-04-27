@@ -928,7 +928,8 @@ impl<'db> Signature<'db> {
             return true;
         }
 
-        // `Self`-like typevars in the receiver annotation are bound using the concrete receiver.
+        // TODO: Expand type aliases here so `type Alias = Self` in a class body
+        // participates in receiver-specific overload pruning.
         expected_self_ty = expected_self_ty.bind_self_typevars(db, self_type);
 
         if accepts_any_or_exact_self(expected_self_ty) {
@@ -947,7 +948,12 @@ impl<'db> Signature<'db> {
 
         let constraints = ConstraintSetBuilder::new();
         self_type
-            .when_assignable_to(db, expected_self_ty, &constraints, self.inferable_typevars(db))
+            .when_assignable_to(
+                db,
+                expected_self_ty,
+                &constraints,
+                self.inferable_typevars(db),
+            )
             .is_always_satisfied(db)
     }
 
@@ -1125,6 +1131,8 @@ impl<'db> Signature<'db> {
     }
 
     fn needs_self_mapping(&self, db: &'db dyn Db, receiver_is_removed: bool) -> bool {
+        // TODO: Expand type aliases here so `type Alias = Self` in parameters or returns
+        // triggers binding when a method is accessed on a concrete receiver.
         self.return_ty.contains_self(db)
             || self
                 .parameters
