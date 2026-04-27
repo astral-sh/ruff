@@ -2127,7 +2127,7 @@ impl MethodDecorator {
     /// Returns the decorator category for a function type.
     pub fn try_from_fn_type(db: &dyn Db, fn_type: FunctionType) -> Option<Self> {
         match (fn_type.is_classmethod(db), fn_type.is_staticmethod(db)) {
-            (true, true) => None,  // A method can't be static and class method at the same time.
+            (true, true) => None, // A method can't be static and class method at the same time.
             (true, false) => Some(Self::ClassMethod),
             (false, true) => Some(Self::StaticMethod),
             (false, false) => Some(Self::None),
