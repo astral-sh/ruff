@@ -268,6 +268,9 @@ jobs:
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
+    env:
+      # Line-tables-only debug info: faster builds, backtraces still work.
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -334,6 +337,9 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'no-test') &&
       (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main')
     timeout-minutes: 20
+    env:
+      # Line-tables-only debug info: faster builds, backtraces still work.
+      CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -370,6 +376,9 @@ jobs:
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
+    env:
+      # Line-tables-only debug info: faster builds, backtraces still work.
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -431,6 +440,9 @@ jobs:
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
+    env:
+      # Line-tables-only debug info: faster builds, backtraces still work.
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -500,7 +512,12 @@ jobs:
           save-if: false
       - name: "Install Rust toolchain"
         run: rustup show
+      - name: "Install mold"
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
       - name: Build Ruff binary
+        env:
+          # Line-tables-only debug info: faster builds, backtraces still work.
+          CARGO_PROFILE_DEV_DEBUG: line-tables-only
         run: cargo build --bin ruff
       - name: Fuzz
         run: |
@@ -564,6 +581,9 @@ jobs:
         needs.determine_changes.outputs.formatter == 'true'
       )
     timeout-minutes: 20
+    env:
+      # Line-tables-only debug info: faster builds, backtraces still work.
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -697,6 +717,8 @@ jobs:
       - name: Fuzz
         env:
           FORCE_COLOR: 1
+          # Line-tables-only debug info: faster builds, backtraces still work.
+          CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
         run: |
           echo "new commit"
           git rev-list --format=%s --max-count=1 "$GITHUB_SHA"
@@ -741,6 +763,9 @@ jobs:
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.ty == 'true' || github.ref == 'refs/heads/main' }}
+    env:
+      # Line-tables-only debug info: faster builds, backtraces still work.
+      CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -878,6 +903,9 @@ jobs:
     timeout-minutes: 5
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
+    env:
+      # Line-tables-only debug info: faster builds, backtraces still work.
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
       - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
         env:
@@ -895,6 +923,9 @@ jobs:
 
       - name: "Install Rust toolchain"
         run: rustup show
+
+      - name: "Install mold"
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
 
       - name: Build Ruff binary
         run: cargo build -p ruff --bin ruff

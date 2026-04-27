@@ -20,6 +20,8 @@ env:
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
+  # Line-tables-only debug info: faster builds, backtraces still work.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
   PACKAGE_NAME: ruff
   FORCE_COLOR: 1
 

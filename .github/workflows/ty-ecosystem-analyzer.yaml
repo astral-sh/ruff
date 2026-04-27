@@ -35,6 +35,8 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
+  # Line-tables-only debug info: faster builds, backtraces still work.
+  CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
   ECOSYSTEM_ANALYZER_COMMIT: e7576e66e8f992b057ea92c820c04313dceda755
 
 jobs:
@@ -59,6 +61,9 @@ jobs:
 
       - name: Install Rust toolchain
         run: rustup show
+
+      - name: "Install mold"
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
 
       - name: Build ty for both commits
         id: build
