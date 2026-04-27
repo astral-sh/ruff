@@ -1059,6 +1059,22 @@ impl<'db> UseDefMapBuilder<'db> {
         binding: Definition<'db>,
         previous_definitions: PreviousDefinitions,
     ) {
+        let def_id = self.push_definition(DefinitionState::Defined(binding));
+        self.record_binding_with_definition_id(place, binding, def_id, previous_definitions);
+    }
+
+    pub(super) fn record_binding_with_definition_id(
+        &mut self,
+        place: ScopedPlaceId,
+        binding: Definition<'db>,
+        def_id: ScopedDefinitionId,
+        previous_definitions: PreviousDefinitions,
+    ) {
+        debug_assert_eq!(
+            self.all_definitions[def_id],
+            DefinitionState::Defined(binding)
+        );
+
         let bindings = match place {
             ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
             ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
@@ -1067,7 +1083,6 @@ impl<'db> UseDefMapBuilder<'db> {
         self.bindings_by_definition
             .insert(binding, bindings.clone());
 
-        let def_id = self.push_definition(DefinitionState::Defined(binding));
         let place_state = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
             ScopedPlaceId::Member(member) => &mut self.member_states[member],
@@ -1316,6 +1331,19 @@ impl<'db> UseDefMapBuilder<'db> {
         declaration: Definition<'db>,
     ) {
         let def_id = self.push_definition(DefinitionState::Defined(declaration));
+        self.record_declaration_with_definition_id(place, declaration, def_id);
+    }
+
+    pub(super) fn record_declaration_with_definition_id(
+        &mut self,
+        place: ScopedPlaceId,
+        declaration: Definition<'db>,
+        def_id: ScopedDefinitionId,
+    ) {
+        debug_assert_eq!(
+            self.all_definitions[def_id],
+            DefinitionState::Defined(declaration)
+        );
 
         let place_state = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
@@ -1346,6 +1374,20 @@ impl<'db> UseDefMapBuilder<'db> {
         // We don't need to store anything in self.bindings_by_declaration or
         // self.declarations_by_binding.
         let def_id = self.push_definition(DefinitionState::Defined(definition));
+        self.record_declaration_and_binding_with_definition_id(place, definition, def_id);
+    }
+
+    pub(super) fn record_declaration_and_binding_with_definition_id(
+        &mut self,
+        place: ScopedPlaceId,
+        definition: Definition<'db>,
+        def_id: ScopedDefinitionId,
+    ) {
+        debug_assert_eq!(
+            self.all_definitions[def_id],
+            DefinitionState::Defined(definition)
+        );
+
         let place_state = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
             ScopedPlaceId::Member(member) => &mut self.member_states[member],
@@ -1380,6 +1422,16 @@ impl<'db> UseDefMapBuilder<'db> {
 
     pub(super) fn delete_binding(&mut self, place: ScopedPlaceId) {
         let def_id = self.push_definition(DefinitionState::Deleted);
+        self.delete_binding_with_definition_id(place, def_id);
+    }
+
+    pub(super) fn delete_binding_with_definition_id(
+        &mut self,
+        place: ScopedPlaceId,
+        def_id: ScopedDefinitionId,
+    ) {
+        debug_assert_eq!(self.all_definitions[def_id], DefinitionState::Deleted);
+
         let place_state = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
             ScopedPlaceId::Member(member) => &mut self.member_states[member],
@@ -1401,6 +1453,15 @@ impl<'db> UseDefMapBuilder<'db> {
         };
 
         self.record_use_bindings(bindings.clone(), use_id);
+    }
+
+    pub(super) fn replay_use(&mut self, place: ScopedPlaceId, use_id: ScopedUseId) {
+        let bindings = match place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
+            ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
+        };
+
+        self.replay_use_bindings(bindings.clone(), use_id);
     }
 
     pub(super) fn record_multi_use(
@@ -1428,6 +1489,35 @@ impl<'db> UseDefMapBuilder<'db> {
         self.record_use_bindings(Bindings::default(), use_id);
     }
 
+    pub(super) fn replay_multi_use(
+        &mut self,
+        places: impl Iterator<Item = ScopedPlaceId>,
+        use_id: ScopedUseId,
+    ) {
+        let mut multi_bindings = Vec::new();
+        for place in places {
+            let bindings = match place {
+                ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
+                ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
+            }
+            .clone();
+
+            let binding_definition_ids = bindings.iter().map(LiveBinding::binding);
+            self.mark_definition_ids_used(binding_definition_ids);
+
+            multi_bindings.push(bindings);
+        }
+
+        if multi_bindings.is_empty() {
+            self.multi_bindings_by_use.remove(&use_id);
+        } else {
+            self.multi_bindings_by_use.insert(use_id, multi_bindings);
+        }
+
+        // Preserve the placeholder use recorded for the parent expression.
+        self.replay_use_bindings(Bindings::default(), use_id);
+    }
+
     fn record_use_bindings(&mut self, bindings: Bindings, use_id: ScopedUseId) {
         let binding_definition_ids = bindings.iter().map(LiveBinding::binding);
         self.mark_definition_ids_used(binding_definition_ids);
@@ -1436,6 +1526,13 @@ impl<'db> UseDefMapBuilder<'db> {
         // as the live bindings for this use.
         let new_use = self.bindings_by_use.push(bindings);
         debug_assert_eq!(use_id, new_use);
+    }
+
+    fn replay_use_bindings(&mut self, bindings: Bindings, use_id: ScopedUseId) {
+        let binding_definition_ids = bindings.iter().map(LiveBinding::binding);
+        self.mark_definition_ids_used(binding_definition_ids);
+
+        self.bindings_by_use[use_id] = bindings;
     }
 
     pub(super) fn mark_enclosing_snapshot_bindings_used(
@@ -1926,5 +2023,52 @@ impl<'db> UseDefMapBuilder<'db> {
 
         interned_ids_by_snapshot.shrink_to_fit();
         interned_ids_by_snapshot
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn replay_use_replaces_existing_use_state() {
+        let symbol = ScopedSymbolId::from_u32(0);
+        let use_id = ScopedUseId::from_u32(0);
+
+        let mut builder = UseDefMapBuilder::new(false);
+        builder.add_place(symbol.into());
+        builder.record_use(symbol.into(), use_id);
+
+        builder.delete_binding(symbol.into());
+        builder.replay_use(symbol.into(), use_id);
+
+        let map = builder.finish();
+        let bindings: Vec<_> = map
+            .bindings_at_use(use_id)
+            .map(|binding| binding.binding)
+            .collect();
+        assert_eq!(bindings, [DefinitionState::Deleted]);
+    }
+
+    #[test]
+    fn replay_multi_use_replaces_existing_use_state() {
+        let symbol0 = ScopedSymbolId::from_u32(0);
+        let symbol1 = ScopedSymbolId::from_u32(1);
+        let use_id = ScopedUseId::from_u32(0);
+
+        let mut builder = UseDefMapBuilder::new(false);
+        builder.add_place(symbol0.into());
+        builder.add_place(symbol1.into());
+        builder.record_multi_use([symbol0.into()].into_iter(), use_id);
+
+        builder.delete_binding(symbol1.into());
+        builder.replay_multi_use([symbol1.into()].into_iter(), use_id);
+
+        let map = builder.finish();
+        let multi_bindings: Vec<Vec<_>> = map
+            .multi_bindings_at_use(use_id)
+            .map(|bindings| bindings.map(|binding| binding.binding).collect())
+            .collect();
+        assert_eq!(multi_bindings, [vec![DefinitionState::Deleted]]);
     }
 }
