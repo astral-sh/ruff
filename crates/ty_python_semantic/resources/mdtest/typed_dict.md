@@ -1863,6 +1863,11 @@ def _(
     # error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`"
     reveal_type(person[str_key])  # revealed: Unknown
 
+    # Direct calls to the synthesized method accept any string key, including keys not declared
+    # by the TypedDict.
+    reveal_type(movie.__getitem__("anything"))  # revealed: object
+    reveal_type(movie.__getitem__(str_key))  # revealed: object
+
     # No error here:
     reveal_type(person[unknown_key])  # revealed: Unknown
 
