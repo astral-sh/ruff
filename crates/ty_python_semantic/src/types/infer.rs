@@ -1278,6 +1278,9 @@ bitflags::bitflags! {
 
         /// Whether the visitor is currently visiting a `**kwargs` annotation.
         const IN_KWARG_ANNOTATION = 1 << 9;
+
+        /// Whether `Unpack[...]` is allowed in the current type expression position.
+        const ALLOW_UNPACK_TYPE_EXPR = 1 << 10;
     }
 }
 

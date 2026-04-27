@@ -17,7 +17,7 @@ use crate::{
         },
         generics::{enclosing_generic_contexts, typing_self},
         infer::{
-            InferenceFlags, TypeInferenceBuilder,
+            InferenceFlags, TypeExpressionFlags, TypeInferenceBuilder,
             builder::{
                 DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
                 validate_paramspec_components,
@@ -570,14 +570,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         if let Some(vararg) = vararg {
             self.context.inference_flags |= InferenceFlags::IN_VARARG_ANNOTATION;
+            let previously_allowed_unpack = self
+                .context
+                .inference_flags
+                .replace(InferenceFlags::ALLOW_UNPACK_TYPE_EXPR, true);
             self.infer_parameter(vararg);
+            self.context.inference_flags.set(
+                InferenceFlags::ALLOW_UNPACK_TYPE_EXPR,
+                previously_allowed_unpack,
+            );
             self.context
                 .inference_flags
                 .remove(InferenceFlags::IN_VARARG_ANNOTATION);
         }
         if let Some(kwarg) = kwarg {
             self.context.inference_flags |= InferenceFlags::IN_KWARG_ANNOTATION;
+            let previously_allowed_unpack = self
+                .context
+                .inference_flags
+                .replace(InferenceFlags::ALLOW_UNPACK_TYPE_EXPR, true);
             self.infer_parameter(kwarg);
+            self.context.inference_flags.set(
+                InferenceFlags::ALLOW_UNPACK_TYPE_EXPR,
+                previously_allowed_unpack,
+            );
             self.context
                 .inference_flags
                 .remove(InferenceFlags::IN_KWARG_ANNOTATION);
@@ -594,12 +610,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some(annotation) = kwargs.annotation.as_deref() else {
             return;
         };
+        let annotation_flags = self.file_type_expression_flags(annotation);
+        if !annotation_flags.contains(TypeExpressionFlags::UNPACK) {
+            return;
+        }
+
         let annotated_type = self.file_expression_type(annotation);
         let Some(unpacked_keys) = extract_unpacked_typed_dict_keys_from_kwargs_annotation(
             self.db(),
             annotated_type,
-            self.file_type_expression_flags(annotation),
+            annotation_flags,
         ) else {
+            if !annotated_type.is_unknown()
+                && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, annotation)
+            {
+                let diag = builder.into_diagnostic(format_args!(
+                    "Unpacked value for `**kwargs` must be a TypedDict, not `{}`",
+                    annotated_type.display(self.db())
+                ));
+                add_type_expression_reference_link(diag);
+            }
             return;
         };
 

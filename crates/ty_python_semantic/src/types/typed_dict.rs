@@ -914,9 +914,7 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
                                 existing.value_ty,
                                 unpacked_key.value_ty,
                             );
-                            if unpacked_key.is_required {
-                                existing.is_required = true;
-                            }
+                            existing.is_required |= unpacked_key.is_required;
                         })
                         .or_insert(unpacked_key);
                 }

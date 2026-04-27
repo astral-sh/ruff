@@ -900,6 +900,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         tuple: &ast::ExprSubscript,
     ) -> Option<TupleType<'db>> {
+        fn infer_tuple_element_type<'db>(
+            builder: &mut TypeInferenceBuilder<'db, '_>,
+            element: &ast::Expr,
+        ) -> Type<'db> {
+            let previously_allowed_unpack = builder
+                .context
+                .inference_flags
+                .replace(InferenceFlags::ALLOW_UNPACK_TYPE_EXPR, true);
+            let ty = builder.infer_type_expression(element);
+            builder.context.inference_flags.set(
+                InferenceFlags::ALLOW_UNPACK_TYPE_EXPR,
+                previously_allowed_unpack,
+            );
+            ty
+        }
+
         /// In most cases, if a subelement of the tuple is inferred as `Todo`,
         /// we should only infer `Todo` for that specific subelement.
         /// Certain specific AST nodes can however change the meaning of the entire tuple,
@@ -943,7 +959,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     self.infer_expression(ellipsis, TypeContext::default());
                     let result =
-                        TupleType::homogeneous(self.db(), self.infer_type_expression(element));
+                        TupleType::homogeneous(self.db(), infer_tuple_element_type(self, element));
                     self.store_expression_type(&tuple.slice, Type::tuple(Some(result)));
                     return Some(result);
                 }
@@ -970,7 +986,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         element_types.push(Type::unknown());
                         continue;
                     }
-                    let element_ty = self.infer_type_expression(element);
+                    let element_ty = infer_tuple_element_type(self, element);
                     return_todo |=
                         element_could_alter_type_of_whole_tuple(element, element_ty, self);
 
@@ -1064,7 +1080,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.store_expression_type(single_element, Type::unknown());
                     return TupleType::heterogeneous(self.db(), std::iter::once(Type::unknown()));
                 }
-                let single_element_ty = self.infer_type_expression(single_element);
+                let single_element_ty = infer_tuple_element_type(self, single_element);
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty, self)
                 {
                     Some(TupleType::homogeneous(
@@ -2164,45 +2180,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ast::ExprRef::from(subscript),
                     TypeExpressionFlags::UNPACK,
                 );
+
+                if !self
+                    .inference_flags()
+                    .contains(InferenceFlags::ALLOW_UNPACK_TYPE_EXPR)
+                {
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        diagnostic::add_type_expression_reference_link(builder.into_diagnostic(
+                            format_args!(
+                                "`Unpack` is not allowed in {}s",
+                                self.type_expression_context()
+                            ),
+                        ));
+                    }
+                    return Type::unknown();
+                }
+
+                let previously_allowed_unpack = self
+                    .context
+                    .inference_flags
+                    .replace(InferenceFlags::ALLOW_UNPACK_TYPE_EXPR, false);
                 let inner_ty = self.infer_type_expression(arguments_slice);
+                self.context.inference_flags.set(
+                    InferenceFlags::ALLOW_UNPACK_TYPE_EXPR,
+                    previously_allowed_unpack,
+                );
 
                 if self
                     .inference_flags()
                     .contains(InferenceFlags::IN_KWARG_ANNOTATION)
                 {
-                    if self
-                        .type_expression_flags(arguments_slice)
-                        .contains(TypeExpressionFlags::UNPACK)
-                    {
-                        if let Some(builder) = self
-                            .context
-                            .report_lint(&INVALID_TYPE_FORM, arguments_slice)
-                        {
-                            diagnostic::add_type_expression_reference_link(
-                                builder.into_diagnostic(
-                                    "`Unpack` cannot be nested in a `**kwargs` annotation",
-                                ),
-                            );
-                        }
-                        return Type::unknown();
-                    }
-
-                    if inner_ty
-                        .resolve_type_alias(self.db())
-                        .as_typed_dict()
-                        .is_some()
-                    {
-                        return inner_ty;
-                    }
-
-                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                        let diag = builder.into_diagnostic(format_args!(
-                            "Unpacked value for `**kwargs` must be a TypedDict, not `{}`",
-                            inner_ty.display(self.db())
-                        ));
-                        diagnostic::add_type_expression_reference_link(diag);
-                    }
-                    return Type::unknown();
+                    return inner_ty;
                 }
 
                 // When the argument is a tuple type, return it directly so that
@@ -2461,6 +2469,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // Whether to infer `Todo` for the parameters
                 let mut return_todo = false;
 
+                let previously_allowed_unpack = self
+                    .context
+                    .inference_flags
+                    .replace(InferenceFlags::ALLOW_UNPACK_TYPE_EXPR, true);
                 for param in params {
                     let param_type = self.infer_type_expression(param);
                     // This is similar to what we currently do for inferring tuple type expression.
@@ -2471,6 +2483,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         && matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_));
                     parameter_types.push(param_type);
                 }
+                self.context.inference_flags.set(
+                    InferenceFlags::ALLOW_UNPACK_TYPE_EXPR,
+                    previously_allowed_unpack,
+                );
 
                 return Some(if return_todo {
                     // TODO: `Unpack`

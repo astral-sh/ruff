@@ -2541,7 +2541,8 @@ impl<'db> Parameters<'db> {
         db: &'db dyn Db,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
     ) -> Self {
-        let mut value: Vec<Parameter<'db>> = Vec::new();
+        let parameters = parameters.into_iter();
+        let mut value: Vec<Parameter<'db>> = Vec::with_capacity(parameters.size_hint().0);
 
         for parameter in parameters {
             if let Some(unpacked_keys) = parameter.unpacked_typed_dict_keys(db) {
