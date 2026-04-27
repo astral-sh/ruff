@@ -2738,28 +2738,11 @@ pub(crate) struct TypeVarBounds<'db> {
 impl<'db> Type<'db> {
     /// Calculates the [`PathBounds`] that represent the valid solutions for when `self` is
     /// constraint-set assignable to `target`.
-    pub(crate) fn assignable_solutions(
-        self,
-        db: &'db dyn Db,
-        target: Type<'db>,
-    ) -> &'db PathBounds<'db> {
-        self.assignable_solutions_inner(db, target, None)
-    }
-
     pub(crate) fn assignable_solutions_with_inferable(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
         inferable: InferableTypeVars<'db>,
-    ) -> &'db PathBounds<'db> {
-        self.assignable_solutions_inner(db, target, Some(inferable))
-    }
-
-    fn assignable_solutions_inner(
-        self,
-        db: &'db dyn Db,
-        target: Type<'db>,
-        inferable: Option<InferableTypeVars<'db>>,
     ) -> &'db PathBounds<'db> {
         #[salsa::tracked(
             returns(ref),
@@ -2770,13 +2753,11 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             source: Type<'db>,
             target: Type<'db>,
-            inferable: Option<InferableTypeVars<'db>>,
+            inferable: InferableTypeVars<'db>,
         ) -> PathBounds<'db> {
             let when = source.when_constraint_set_assignable_to_owned(db, target);
-            when.query(|builder, mut when| {
-                if let Some(inferable) = inferable {
-                    when = when.remove_noninferable(db, builder, inferable);
-                }
+            when.query(|builder, when| {
+                let when = when.remove_noninferable(db, builder, inferable);
                 PathBounds::compute(db, &builder, when.node)
             })
         }
