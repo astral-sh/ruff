@@ -406,6 +406,8 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Returns an _owned_ (i.e. salsa-cached) constraint set that describes when `self` is
+    /// constraint-set assignable to `target`.
     pub(super) fn when_constraint_set_assignable_to_owned(
         self,
         db: &'db dyn Db,
