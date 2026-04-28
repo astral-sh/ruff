@@ -971,7 +971,7 @@ impl Session {
                 }
 
                 tracing::debug!("Replacing project settings for {}", root);
-                db.project().replace_settings(db, metadata);
+                db.project().reload(db, metadata);
             }
             _ => {
                 tracing::debug!(
