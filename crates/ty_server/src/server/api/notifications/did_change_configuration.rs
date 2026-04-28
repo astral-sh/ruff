@@ -1,5 +1,6 @@
 use crate::server::Action;
 use crate::server::Result;
+use crate::server::api::diagnostics::publish_diagnostics_if_needed;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::client::Client;
 use crate::session::{ClientOptions, Session};
@@ -81,6 +82,10 @@ impl SyncNotificationHandler for DidChangeConfiguration {
                 client.queue_action(Action::UpdateWorkspaceConfigs(workspaces_with_options));
             },
         );
+
+        for key in session.text_document_handles() {
+            publish_diagnostics_if_needed(&key, session, client);
+        }
 
         Ok(())
     }
