@@ -31,6 +31,7 @@ import {
   DocumentHighlightKind,
   InlayHintKind,
   LocationLink,
+  RenameEdit,
   TextEdit,
 } from "ty_wasm";
 import { FileId, ReadonlyFiles } from "../Playground";
@@ -198,24 +199,12 @@ class PlaygroundServer
     languages.DocumentRangeSemanticTokensProvider,
     languages.SignatureHelpProvider,
     languages.DocumentHighlightProvider,
-    languages.CodeActionProvider
+    languages.CodeActionProvider,
+    languages.RenameProvider
 {
   private diagnostics: Diagnostic[] = [];
 
-  private typeDefinitionProviderDisposable: IDisposable;
-  private declarationProviderDisposable: IDisposable;
-  private definitionProviderDisposable: IDisposable;
-  private referenceProviderDisposable: IDisposable;
-  private editorOpenerDisposable: IDisposable;
-  private hoverDisposable: IDisposable;
-  private inlayHintsDisposable: IDisposable;
-  private formatDisposable: IDisposable;
-  private completionDisposable: IDisposable;
-  private semanticTokensDisposable: IDisposable;
-  private rangeSemanticTokensDisposable: IDisposable;
-  private signatureHelpDisposable: IDisposable;
-  private documentHighlightDisposable: IDisposable;
-  private codeActionDisposable: IDisposable;
+  private providerDisposables: IDisposable[];
   private inVendoredFileCondition: editor.IContextKey<boolean>;
   // Cache for vendored file handles
   private vendoredFileHandles = new Map<string, FileHandle>();
@@ -231,44 +220,26 @@ class PlaygroundServer
     private editor: IStandaloneCodeEditor,
     private props: PlaygroundServerProps,
   ) {
-    this.typeDefinitionProviderDisposable =
-      monaco.languages.registerTypeDefinitionProvider("python", this);
-    this.declarationProviderDisposable =
-      monaco.languages.registerDeclarationProvider("python", this);
-    this.definitionProviderDisposable =
-      monaco.languages.registerDefinitionProvider("python", this);
-    this.referenceProviderDisposable =
-      monaco.languages.registerReferenceProvider("python", this);
-    this.hoverDisposable = monaco.languages.registerHoverProvider(
-      "python",
-      this,
-    );
-    this.inlayHintsDisposable = monaco.languages.registerInlayHintsProvider(
-      "python",
-      this,
-    );
-    this.completionDisposable = monaco.languages.registerCompletionItemProvider(
-      "python",
-      this,
-    );
-    this.semanticTokensDisposable =
-      monaco.languages.registerDocumentSemanticTokensProvider("python", this);
-    this.rangeSemanticTokensDisposable =
+    this.providerDisposables = [
+      monaco.languages.registerTypeDefinitionProvider("python", this),
+      monaco.languages.registerDeclarationProvider("python", this),
+      monaco.languages.registerDefinitionProvider("python", this),
+      monaco.languages.registerReferenceProvider("python", this),
+      monaco.languages.registerHoverProvider("python", this),
+      monaco.languages.registerInlayHintsProvider("python", this),
+      monaco.languages.registerCompletionItemProvider("python", this),
+      monaco.languages.registerDocumentSemanticTokensProvider("python", this),
       monaco.languages.registerDocumentRangeSemanticTokensProvider(
         "python",
         this,
-      );
-    this.editorOpenerDisposable = monaco.editor.registerEditorOpener(this);
-    this.formatDisposable =
-      monaco.languages.registerDocumentFormattingEditProvider("python", this);
-    this.signatureHelpDisposable =
-      monaco.languages.registerSignatureHelpProvider("python", this);
-    this.documentHighlightDisposable =
-      monaco.languages.registerDocumentHighlightProvider("python", this);
-    this.codeActionDisposable = monaco.languages.registerCodeActionProvider(
-      "python",
-      this,
-    );
+      ),
+      monaco.editor.registerEditorOpener(this),
+      monaco.languages.registerDocumentFormattingEditProvider("python", this),
+      monaco.languages.registerSignatureHelpProvider("python", this),
+      monaco.languages.registerDocumentHighlightProvider("python", this),
+      monaco.languages.registerCodeActionProvider("python", this),
+      monaco.languages.registerRenameProvider("python", this),
+    ];
 
     this.inVendoredFileCondition = editor.createContextKey<boolean>(
       "inVendoredFile",
@@ -505,6 +476,25 @@ class PlaygroundServer
         return Uri.file(file.name).toString() === uri.toString();
       })?.id ?? null
     );
+  }
+
+  private getPlaygroundFileForPath(path: string): PlaygroundFile | null {
+    return (
+      Object.values(this.props.files.metadata).find((file) => {
+        return (
+          file.handle?.path() === path ||
+          file.name === path ||
+          `/${file.name}` === path ||
+          file.uri.toString() === path
+        );
+      }) ?? null
+    );
+  }
+
+  private modelForPlaygroundFile(
+    file: PlaygroundFile,
+  ): editor.ITextModel | null {
+    return this.monaco.editor.getModel(file.uri);
   }
 
   private getOrCreateVendoredFileHandle(vendoredPath: string): FileHandle {
@@ -864,6 +854,88 @@ class PlaygroundServer
     return null;
   }
 
+  resolveRenameLocation(
+    model: editor.ITextModel,
+    position: Position,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _token: CancellationToken,
+  ): languages.ProviderResult<languages.RenameLocation> {
+    const fileHandle = this.getFileHandleForModel(model);
+    if (fileHandle == null || model.uri.scheme === "vendored") {
+      return undefined;
+    }
+
+    const range = this.props.workspace.prepareRename(
+      fileHandle,
+      new TyPosition(position.lineNumber, position.column),
+    );
+
+    if (range == null) {
+      return undefined;
+    }
+
+    const monacoRange = tyRangeToMonacoRange(range);
+
+    return {
+      range: monacoRange,
+      text: model.getValueInRange(monacoRange),
+    };
+  }
+
+  provideRenameEdits(
+    model: editor.ITextModel,
+    position: Position,
+    newName: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _token: CancellationToken,
+  ): languages.ProviderResult<languages.WorkspaceEdit> {
+    const fileHandle = this.getFileHandleForModel(model);
+    if (fileHandle == null || model.uri.scheme === "vendored") {
+      return undefined;
+    }
+
+    const renameEdits = this.props.workspace.rename(
+      fileHandle,
+      new TyPosition(position.lineNumber, position.column),
+      newName,
+    );
+
+    if (renameEdits.length === 0) {
+      return null;
+    }
+
+    const edits = renameEdits.flatMap((edit: RenameEdit) => {
+      const file = this.getPlaygroundFileForPath(edit.path);
+
+      if (file == null) {
+        return [];
+      }
+
+      const targetModel = this.modelForPlaygroundFile(file);
+
+      if (targetModel == null) {
+        return [];
+      }
+
+      return [
+        {
+          resource: targetModel.uri,
+          textEdit: {
+            range: tyRangeToMonacoRange(edit.range),
+            text: edit.new_text,
+          },
+          versionId: targetModel.getVersionId(),
+        },
+      ];
+    });
+
+    if (edits.length === 0) {
+      return null;
+    }
+
+    return { edits };
+  }
+
   private mapNavigationTarget(link: LocationLink): languages.LocationLink {
     const uri = Uri.parse(link.path);
 
@@ -918,20 +990,10 @@ class PlaygroundServer
   }
 
   dispose() {
-    this.hoverDisposable.dispose();
-    this.editorOpenerDisposable.dispose();
-    this.typeDefinitionProviderDisposable.dispose();
-    this.declarationProviderDisposable.dispose();
-    this.definitionProviderDisposable.dispose();
-    this.referenceProviderDisposable.dispose();
-    this.inlayHintsDisposable.dispose();
-    this.formatDisposable.dispose();
-    this.rangeSemanticTokensDisposable.dispose();
-    this.semanticTokensDisposable.dispose();
-    this.completionDisposable.dispose();
-    this.signatureHelpDisposable.dispose();
-    this.documentHighlightDisposable.dispose();
-    this.codeActionDisposable.dispose();
+    for (const disposable of this.providerDisposables) {
+      disposable.dispose();
+    }
+    this.providerDisposables = [];
   }
 }
 
