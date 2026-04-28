@@ -1626,6 +1626,16 @@ class AggregatedChild(AggregatedBase[U]):
     def method(self: AggregatedChild[bytes], arg: bytes, extra: bytes) -> bytes: ...
     def method(self, arg: Any, extra: Any = ...) -> Any: ...
 
+class AnyReceiverAggregatedBase(Generic[U]):
+    def method(self, arg: int | str) -> int | str: ...
+
+class AnyReceiverAggregatedChild(AnyReceiverAggregatedBase[U]):
+    @overload
+    def method(self: AnyReceiverAggregatedChild[Any], arg: int) -> int: ...
+    @overload
+    def method(self: AnyReceiverAggregatedChild[Any], arg: str) -> str: ...
+    def method(self, arg: Any) -> Any: ...
+
 class ReceiverAggregatedBase(Generic[U]):
     @overload
     def method(self: ReceiverAggregatedBase[int] | ReceiverAggregatedBase[str], arg: int | str) -> int | str: ...
@@ -1687,6 +1697,15 @@ class _TaskStatus(TaskStatus[T], Generic[T]):
     @overload
     def started(self: "_TaskStatus[T]", value: T) -> None: ...
     def started(self, value: T | None = None) -> None: ...
+
+def task_status_object(status: TaskStatus[object]) -> None:
+    reveal_type(status.started)  # revealed: bound method TaskStatus[object].started(value: object) -> None
+    status.started()  # error: [missing-argument]
+    status.started(object())
+
+def task_status_none(status: TaskStatus[None]) -> None:
+    reveal_type(status.started)  # revealed: Overload[() -> None, (value: None) -> None]
+    status.started()
 ```
 
 ## Classmethod keyword-only Liskov checks

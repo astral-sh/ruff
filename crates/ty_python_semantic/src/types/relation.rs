@@ -379,11 +379,13 @@ impl<'db> Type<'db> {
             let constraints = ConstraintSetBuilder::new();
             let relation_visitor = HasRelationToVisitor::default(&constraints);
             let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+            let signature_relation_visitor = SignatureRelationVisitor::default();
             let materialization_visitor = ApplyTypeMappingVisitor::default();
             let checker = TypeRelationChecker::constraint_set_assignability(
                 &constraints,
                 &relation_visitor,
                 &disjointness_visitor,
+                &signature_relation_visitor,
                 &materialization_visitor,
             );
             checker

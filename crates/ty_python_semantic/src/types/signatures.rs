@@ -37,9 +37,9 @@ use crate::types::typed_dict::{
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ClassBase,
-    ErrorContext, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind,
-    ParameterDescription, SelfBinding, TypeContext, TypeMapping, UnionBuilder, VarianceInferable,
-    infer_complete_scope_types, todo_type,
+    ClassType, ErrorContext, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind,
+    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping, UnionBuilder,
+    VarianceInferable, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -87,6 +87,105 @@ fn function_signature_type_expression_flags<'db>(
         // expression is in the PEP-695 type params sub-scope
         infer_complete_scope_types(db, scope).type_expression_flags(expression)
     }
+}
+
+/// Returns the specialization of `target` that appears in `class`'s MRO.
+///
+/// This is stricter than nominal assignability: it only matches a base with the
+/// same class literal as `target`, and returns the specialization that the MRO
+/// gives for `class`.
+///
+/// # Examples
+///
+/// When checking `Child[int]` against `Base[T]`, this returns the `Base[int]`
+/// entry from `Child[int]`'s MRO.
+///
+/// When checking `Child[int]` against an unrelated `Other[T]`, this returns
+/// `None`.
+fn matching_mro_base<'db>(
+    db: &'db dyn Db,
+    class: ClassType<'db>,
+    target: ClassType<'db>,
+) -> Option<ClassType<'db>> {
+    class
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .find(|base| base.class_literal(db) == target.class_literal(db))
+}
+
+/// Returns whether a receiver annotation applies to every instance of the receiver base.
+///
+/// Receiver-specific overloads are only conditional when their receiver narrows
+/// the specialization from the corresponding MRO base. Wildcard-like
+/// annotations are unconditional because they accept every specialization of
+/// the receiver base.
+///
+/// # Examples
+///
+/// For an MRO base of `Child[T]`, annotations like `Child[T]` and `Child[Any]`
+/// are unconditional.
+///
+/// An annotation like `Child[int]` is conditional because it only applies to
+/// `Child[int]`, not to `Child[str]`.
+fn receiver_annotation_applies_to_all_specializations<'db>(
+    db: &'db dyn Db,
+    receiver_base: ClassType<'db>,
+    annotation: ClassType<'db>,
+) -> bool {
+    if receiver_base == annotation {
+        return true;
+    }
+
+    let Some((receiver_specialization, annotation_specialization)) = receiver_base
+        .class_literal_and_specialization(db)
+        .1
+        .zip(annotation.class_literal_and_specialization(db).1)
+    else {
+        return false;
+    };
+
+    receiver_specialization
+        .types(db)
+        .iter()
+        .zip_eq(annotation_specialization.types(db))
+        .all(|(receiver_ty, annotation_ty)| {
+            annotation_ty.is_dynamic()
+                || annotation_ty.is_type_var()
+                || receiver_ty == annotation_ty
+        })
+}
+
+/// Returns the receiver bindability condition for receiver-specific protocol overloads.
+///
+/// Protocol receiver checks use the specialization from the receiver's MRO instead of
+/// variance-aware assignability. This keeps overload pruning aligned with the protocol
+/// specialization the receiver actually implements.
+///
+/// # Examples
+///
+/// If `TaskStatus[T]` is contravariant and the bound receiver has MRO base
+/// `TaskStatus[object]`, an overload annotated with `self: TaskStatus[None]` should not apply.
+/// Even though `TaskStatus[object]` is assignable to `TaskStatus[None]`, the receiver's protocol
+/// specialization is not equivalent to `TaskStatus[None]`.
+fn protocol_receiver_bindability<'db, 'c>(
+    db: &'db dyn Db,
+    self_type: Type<'db>,
+    expected_self_ty: Type<'db>,
+    constraints: &'c ConstraintSetBuilder<'db>,
+) -> Option<ConstraintSet<'db, 'c>> {
+    let (Some(self_class), Some(expected_class)) = (
+        self_type.nominal_class(db),
+        expected_self_ty.nominal_class(db),
+    ) else {
+        return None;
+    };
+
+    if !expected_class.is_protocol(db) {
+        return None;
+    }
+
+    matching_mro_base(db, self_class, expected_class)
+        .map(|base| Type::instance(db, base).when_equivalent_to(db, expected_self_ty, constraints))
 }
 
 /// The signature of a single callable. If the callable is overloaded, there is a separate
@@ -954,18 +1053,38 @@ impl<'db> Signature<'db> {
             }
         }
 
+        if let (Some(self_class), Some(expected_class)) = (
+            self_type.nominal_class(db),
+            expected_self_ty.nominal_class(db),
+        ) && matching_mro_base(db, self_class, expected_class).is_some_and(|base| {
+            receiver_annotation_applies_to_all_specializations(db, base, expected_class)
+        }) {
+            return true;
+        }
+
         let inferable_typevars = self.inferable_typevars(db);
         if inferable_typevars == InferableTypeVars::None {
-            let when = self_type.when_constraint_set_assignable_to_owned(db, expected_self_ty);
-            when.query(|_, when| when.is_always_satisfied(db))
+            let constraints = ConstraintSetBuilder::new();
+            if let Some(bindable) =
+                protocol_receiver_bindability(db, self_type, expected_self_ty, &constraints)
+            {
+                bindable.is_always_satisfied(db)
+            } else {
+                let when = self_type.when_constraint_set_assignable_to_owned(db, expected_self_ty);
+                when.query(|_, when| when.is_always_satisfied(db))
+            }
         } else {
             let constraints = ConstraintSetBuilder::new();
-            let bindable = self_type.when_assignable_to(
-                db,
-                expected_self_ty,
-                &constraints,
-                inferable_typevars,
-            );
+            let bindable =
+                protocol_receiver_bindability(db, self_type, expected_self_ty, &constraints)
+                    .unwrap_or_else(|| {
+                        self_type.when_assignable_to(
+                            db,
+                            expected_self_ty,
+                            &constraints,
+                            inferable_typevars,
+                        )
+                    });
 
             !bindable
                 .reduce_inferable(db, &constraints, inferable_typevars.iter(db))
@@ -1033,6 +1152,17 @@ impl<'db> Signature<'db> {
             }
         }
 
+        // Receiver-specific protocol overloads should be guarded by the specialization that the
+        // receiver actually has for that protocol, not by variance-aware assignability. For
+        // example, if `TaskStatus[T]` is contravariant and the bound receiver has MRO base
+        // `TaskStatus[object]`, an overload annotated with `self: TaskStatus[None]` should not
+        // apply just because `TaskStatus[object]` is assignable to `TaskStatus[None]`.
+        if let Some(bindable) =
+            protocol_receiver_bindability(db, self_type, expected_self_ty, constraints)
+        {
+            return bindable;
+        }
+
         self_type.when_constraint_set_assignable_to(db, expected_self_ty, constraints)
     }
 
@@ -1082,10 +1212,9 @@ impl<'db> Signature<'db> {
         ) {
             // Compare full `ClassType`s from the specialized MRO, not just class literals, so
             // `Child[str]` remains receiver-specific for a method bound to `Child[T]`.
-            return self_class
-                .iter_mro(db)
-                .filter_map(ClassBase::into_class)
-                .any(|base| base == annotation_class);
+            return matching_mro_base(db, self_class, annotation_class).is_some_and(|base| {
+                receiver_annotation_applies_to_all_specializations(db, base, annotation_class)
+            });
         }
 
         false
