@@ -31,7 +31,6 @@ import {
   DocumentHighlightKind,
   InlayHintKind,
   LocationLink,
-  RenameEdit,
   TextEdit,
 } from "ty_wasm";
 import { FileId, ReadonlyFiles } from "../Playground";
@@ -478,25 +477,6 @@ class PlaygroundServer
     );
   }
 
-  private getPlaygroundFileForPath(path: string): PlaygroundFile | null {
-    return (
-      Object.values(this.props.files.metadata).find((file) => {
-        return (
-          file.handle?.path() === path ||
-          file.name === path ||
-          `/${file.name}` === path ||
-          file.uri.toString() === path
-        );
-      }) ?? null
-    );
-  }
-
-  private modelForPlaygroundFile(
-    file: PlaygroundFile,
-  ): editor.ITextModel | null {
-    return this.monaco.editor.getModel(file.uri);
-  }
-
   private getOrCreateVendoredFileHandle(vendoredPath: string): FileHandle {
     const cachedHandle = this.vendoredFileHandles.get(vendoredPath);
     // Check if we already have a handle for this vendored file
@@ -904,33 +884,23 @@ class PlaygroundServer
       return null;
     }
 
-    const edits = renameEdits.flatMap((edit: RenameEdit) => {
-      const file = this.getPlaygroundFileForPath(edit.path);
+    const edits: languages.IWorkspaceTextEdit[] = [];
 
-      if (file == null) {
-        return [];
-      }
-
-      const targetModel = this.modelForPlaygroundFile(file);
+    for (const edit of renameEdits) {
+      const targetModel = this.monaco.editor.getModel(Uri.file(edit.path));
 
       if (targetModel == null) {
-        return [];
+        return null;
       }
 
-      return [
-        {
-          resource: targetModel.uri,
-          textEdit: {
-            range: tyRangeToMonacoRange(edit.range),
-            text: edit.new_text,
-          },
-          versionId: targetModel.getVersionId(),
+      edits.push({
+        resource: targetModel.uri,
+        textEdit: {
+          range: tyRangeToMonacoRange(edit.range),
+          text: edit.new_text,
         },
-      ];
-    });
-
-    if (edits.length === 0) {
-      return null;
+        versionId: targetModel.getVersionId(),
+      });
     }
 
     return { edits };
