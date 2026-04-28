@@ -1171,6 +1171,124 @@ instance = ExampleClass(old_name="test")
     }
 
     #[test]
+    fn references_keyword_argument_typeddict_field() {
+        let test = cursor_test(
+            "
+from typing import TypedDict
+
+class TD(TypedDict):
+    f<CURSOR>: int
+    g: str
+
+TD(f=1)
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> main.py:5:5
+          |
+        4 | class TD(TypedDict):
+        5 |     f: int
+          |     ^
+        6 |     g: str
+        7 |
+        8 | TD(f=1)
+          |    -
+          |
+        ");
+    }
+
+    #[test]
+    fn references_typeddict_field_from_keyword_argument() {
+        let test = cursor_test(
+            "
+from typing import TypedDict
+
+class TD(TypedDict):
+    f: int
+    g: str
+
+TD(f<CURSOR>=1)
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> main.py:5:5
+          |
+        4 | class TD(TypedDict):
+        5 |     f: int
+          |     -
+        6 |     g: str
+        7 |
+        8 | TD(f=1)
+          |    ^
+          |
+        ");
+    }
+
+    #[test]
+    fn references_keyword_argument_namedtuple_field() {
+        let test = cursor_test(
+            "
+from typing import NamedTuple
+
+class NT(NamedTuple):
+    f<CURSOR>: int
+    g: str
+
+NT(f=1)
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> main.py:5:5
+          |
+        4 | class NT(NamedTuple):
+        5 |     f: int
+          |     ^
+        6 |     g: str
+        7 |
+        8 | NT(f=1)
+          |    -
+          |
+        ");
+    }
+
+    #[test]
+    fn references_keyword_argument_dataclass_field() {
+        let test = cursor_test(
+            "
+from dataclasses import dataclass
+
+@dataclass
+class DC:
+    f<CURSOR>: int
+    g: str
+
+DC(f=1)
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> main.py:6:5
+          |
+        4 | @dataclass
+        5 | class DC:
+        6 |     f: int
+          |     ^
+        7 |     g: str
+        8 |
+        9 | DC(f=1)
+          |    -
+          |
+        ");
+    }
+
+    #[test]
     fn multi_file_function_parameter_references_include_keyword_argument_labels() {
         let test = CursorTest::builder()
             .source(

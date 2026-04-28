@@ -114,6 +114,7 @@ fn synthesize_typed_dict_init<'db>(
         Parameter::keyword_only((*name).clone())
             .with_annotated_type(field.declared_ty)
             .with_default_type(field.declared_ty)
+            .with_origin_definition(field.first_declaration())
     });
 
     let map_overload = Signature::new(
@@ -128,7 +129,9 @@ fn synthesize_typed_dict_init<'db>(
     );
 
     let keyword_field_params = keyword_fields.iter().map(|(name, field)| {
-        let param = Parameter::keyword_only((*name).clone()).with_annotated_type(field.declared_ty);
+        let param = Parameter::keyword_only((*name).clone())
+            .with_annotated_type(field.declared_ty)
+            .with_origin_definition(field.first_declaration());
         if field.is_required() {
             param
         } else {

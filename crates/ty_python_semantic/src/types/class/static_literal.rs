@@ -1293,7 +1293,8 @@ impl<'db> StaticClassLiteral<'db> {
                 } else {
                     Parameter::positional_or_keyword(parameter_name)
                 }
-                .with_annotated_type(field_ty);
+                .with_annotated_type(field_ty)
+                .with_origin_definition(field.first_declaration);
 
                 parameter = if matches!(name, "__replace__" | "_replace") {
                     // When replacing, we know there is a default value for the field
@@ -1369,6 +1370,7 @@ impl<'db> StaticClassLiteral<'db> {
                         name: name.clone(),
                         ty: field.declared_ty,
                         default: default_ty,
+                        origin_definition: field.first_declaration,
                     }
                 });
                 synthesize_namedtuple_class_member(

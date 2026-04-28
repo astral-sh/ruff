@@ -2090,6 +2090,203 @@ while True:
         ");
     }
 
+    #[test]
+    fn goto_definition_keyword_argument_typeddict() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from typing import TypedDict
+
+class TD(TypedDict):
+    f: int
+    g: str
+
+TD(f<CURSOR>=1)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:8:4
+          |
+        6 |     g: str
+        7 |
+        8 | TD(f=1)
+          |    ^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:5:5
+          |
+        4 | class TD(TypedDict):
+        5 |     f: int
+          |     -
+        6 |     g: str
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_keyword_argument_namedtuple() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from typing import NamedTuple
+
+class NT(NamedTuple):
+    f: int
+    g: str
+
+NT(f<CURSOR>=1)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:8:4
+          |
+        6 |     g: str
+        7 |
+        8 | NT(f=1)
+          |    ^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:5:5
+          |
+        4 | class NT(NamedTuple):
+        5 |     f: int
+          |     -
+        6 |     g: str
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_keyword_argument_dataclass() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from dataclasses import dataclass
+
+@dataclass
+class DC:
+    f: int
+    g: str
+
+DC(f<CURSOR>=1)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:9:4
+          |
+        7 |     g: str
+        8 |
+        9 | DC(f=1)
+          |    ^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:6:5
+          |
+        4 | @dataclass
+        5 | class DC:
+        6 |     f: int
+          |     -
+        7 |     g: str
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_keyword_argument_dataclass_custom_init() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from dataclasses import dataclass
+
+@dataclass
+class DC:
+    f: int
+    g: str
+
+    def __init__(self, f: int) -> None: ...
+
+DC(f<CURSOR>=1)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:11:4
+           |
+         9 |     def __init__(self, f: int) -> None: ...
+        10 |
+        11 | DC(f=1)
+           |    ^ Clicking here
+           |
+        info: Found 1 definition
+          --> main.py:9:24
+           |
+         7 |     g: str
+         8 |
+         9 |     def __init__(self, f: int) -> None: ...
+           |                        -
+        10 |
+        11 | DC(f=1)
+           |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_keyword_argument_dataclass_transform_alias() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from typing import dataclass_transform
+
+def Field(alias: str = ...): ...
+
+@dataclass_transform(field_specifiers=(Field,))
+class MyDataclass: ...
+
+class DC(MyDataclass):
+    f: int = Field(alias='g')
+
+DC(g<CURSOR>=1)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:12:4
+           |
+        10 |     f: int = Field(alias='g')
+        11 |
+        12 | DC(g=1)
+           |    ^ Clicking here
+           |
+        info: Found 1 definition
+          --> main.py:10:5
+           |
+         9 | class DC(MyDataclass):
+        10 |     f: int = Field(alias='g')
+           |     -
+        11 |
+        12 | DC(g=1)
+           |
+        ");
+    }
+
     /// Go-to-definition should not point to for-loop header definitions.
     #[test]
     fn goto_definition_does_not_point_to_for_loop_header() {

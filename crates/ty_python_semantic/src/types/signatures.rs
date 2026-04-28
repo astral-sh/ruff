@@ -3088,6 +3088,9 @@ pub(crate) struct Parameter<'db> {
     /// Annotated type of the parameter. If no annotation was provided, this is `Unknown`.
     annotated_type: Type<'db>,
 
+    /// Source definition that this parameter was synthesized from, if any.
+    origin_definition: Option<Definition<'db>>,
+
     /// Does the type of this parameter come from an explicit annotation, or was it inferred from
     /// the context, like `Unknown` for any normal un-annotated parameter, `Self` for the `self`
     /// parameter of instance method, or `type[Self]` for `cls` parameter of classmethods. This
@@ -3123,6 +3126,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn positional_only(name: Option<Name>) -> Self {
         Self {
             annotated_type: Type::unknown(),
+            origin_definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::PositionalOnly {
@@ -3136,6 +3140,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn positional_or_keyword(name: Name) -> Self {
         Self {
             annotated_type: Type::unknown(),
+            origin_definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::PositionalOrKeyword {
@@ -3149,6 +3154,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn variadic(name: Name) -> Self {
         Self {
             annotated_type: Type::unknown(),
+            origin_definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::Variadic { name },
@@ -3159,6 +3165,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn keyword_only(name: Name) -> Self {
         Self {
             annotated_type: Type::unknown(),
+            origin_definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::KeywordOnly {
@@ -3172,6 +3179,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn keyword_variadic(name: Name) -> Self {
         Self {
             annotated_type: Type::unknown(),
+            origin_definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::KeywordVariadic { name },
@@ -3207,6 +3215,11 @@ impl<'db> Parameter<'db> {
         }
     }
 
+    pub(crate) fn with_origin_definition(mut self, definition: Option<Definition<'db>>) -> Self {
+        self.origin_definition = definition;
+        self
+    }
+
     pub(crate) fn type_form(mut self) -> Self {
         self.form = ParameterForm::Type;
         self
@@ -3226,6 +3239,7 @@ impl<'db> Parameter<'db> {
                 tcx,
                 visitor,
             ),
+            origin_definition: self.origin_definition,
             kind: self
                 .kind
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -3244,6 +3258,7 @@ impl<'db> Parameter<'db> {
 
         Self {
             annotated_type,
+            origin_definition: self.origin_definition,
             inferred_annotation: self.inferred_annotation,
             annotation_kind: self.annotation_kind,
             kind,
@@ -3259,6 +3274,7 @@ impl<'db> Parameter<'db> {
     ) -> Option<Self> {
         let Parameter {
             annotated_type,
+            origin_definition,
             annotation_kind,
             inferred_annotation,
             kind,
@@ -3319,6 +3335,7 @@ impl<'db> Parameter<'db> {
 
         Some(Self {
             annotated_type,
+            origin_definition: *origin_definition,
             inferred_annotation: *inferred_annotation,
             annotation_kind: *annotation_kind,
             kind,
@@ -3360,6 +3377,7 @@ impl<'db> Parameter<'db> {
         };
         Self {
             annotated_type,
+            origin_definition: None,
             kind,
             annotation_kind,
             form: ParameterForm::Value,
@@ -3435,6 +3453,10 @@ impl<'db> Parameter<'db> {
     /// Annotated type of the parameter. If no annotation was provided, this is `Unknown`.
     pub(crate) fn annotated_type(&self) -> Type<'db> {
         self.annotated_type
+    }
+
+    pub(crate) fn origin_definition(&self) -> Option<Definition<'db>> {
+        self.origin_definition
     }
 
     /// Return `true` if this parameter has a starred annotation,

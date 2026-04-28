@@ -1191,6 +1191,124 @@ result = func(10, y=20)
     }
 
     #[test]
+    fn rename_keyword_argument_typeddict_field() {
+        let test = cursor_test(
+            "
+from typing import TypedDict
+
+class TD(TypedDict):
+    f<CURSOR>: int
+    g: str
+
+TD(f=1)
+",
+        );
+
+        assert_snapshot!(test.rename("z"), @"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:5:5
+          |
+        4 | class TD(TypedDict):
+        5 |     f: int
+          |     ^
+        6 |     g: str
+        7 |
+        8 | TD(f=1)
+          |    -
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_typeddict_field_from_keyword_argument() {
+        let test = cursor_test(
+            "
+from typing import TypedDict
+
+class TD(TypedDict):
+    f: int
+    g: str
+
+TD(f<CURSOR>=1)
+",
+        );
+
+        assert_snapshot!(test.rename("z"), @"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:5:5
+          |
+        4 | class TD(TypedDict):
+        5 |     f: int
+          |     -
+        6 |     g: str
+        7 |
+        8 | TD(f=1)
+          |    ^
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_keyword_argument_namedtuple_field() {
+        let test = cursor_test(
+            "
+from typing import NamedTuple
+
+class NT(NamedTuple):
+    f<CURSOR>: int
+    g: str
+
+NT(f=1)
+",
+        );
+
+        assert_snapshot!(test.rename("z"), @"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:5:5
+          |
+        4 | class NT(NamedTuple):
+        5 |     f: int
+          |     ^
+        6 |     g: str
+        7 |
+        8 | NT(f=1)
+          |    -
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_keyword_argument_dataclass_field() {
+        let test = cursor_test(
+            "
+from dataclasses import dataclass
+
+@dataclass
+class DC:
+    f<CURSOR>: int
+    g: str
+
+DC(f=1)
+",
+        );
+
+        assert_snapshot!(test.rename("z"), @"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:6:5
+          |
+        4 | @dataclass
+        5 | class DC:
+        6 |     f: int
+          |     ^
+        7 |     g: str
+        8 |
+        9 | DC(f=1)
+          |    -
+          |
+        ");
+    }
+
+    #[test]
     fn import_alias() {
         let test = CursorTest::builder()
             .source(
