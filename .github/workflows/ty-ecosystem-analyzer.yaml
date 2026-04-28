@@ -29,6 +29,10 @@ concurrency:
   group: ty-ecosystem-analyzer-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+defaults:
+  run:
+    shell: bash
+
 env:
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
@@ -67,7 +71,6 @@ jobs:
       - name: Build ty for both commits
         id: build
         working-directory: ruff
-        shell: bash
         run: |
           echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
@@ -126,7 +129,6 @@ jobs:
           name: ty-builds
 
       - name: Analyze shard ${{ matrix.shard }}
-        shell: bash
         env:
           SHARD: ${{ matrix.shard }}
           EXCLUDE_NEWER: ${{ needs.build-ty.outputs.timestamp }}
@@ -197,7 +199,6 @@ jobs:
 
       - name: Generate reports
         id: generate-reports
-        shell: bash
         env:
           REF_NAME: ${{ github.ref_name }}
         run: |
