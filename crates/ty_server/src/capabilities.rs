@@ -258,14 +258,15 @@ impl ResolvedClientCapabilities {
 
         if text_document
             .and_then(|text_document| {
-                Some(
-                    text_document
-                        .hover
-                        .as_ref()?
-                        .content_format
-                        .as_ref()?
-                        .contains(&MarkupKind::Markdown),
-                )
+                let formats = text_document.hover.as_ref()?.content_format.as_ref()?;
+                // Per LSP spec, `contentFormat` is an ordered list of formats the
+                // client prefers, with the first entry being the most preferred.
+                // The server is expected to pick the first format from that list
+                // that it can produce. We support both `PlainText` and `Markdown`,
+                // so the client's first entry wins — falling back to `PlainText`
+                // (i.e. don't set this flag) when the list is empty or its first
+                // entry isn't `Markdown`.
+                Some(formats.first()? == &MarkupKind::Markdown)
             })
             .unwrap_or_default()
         {
@@ -492,5 +493,80 @@ pub(crate) fn server_rename_options() -> RenameOptions {
     RenameOptions {
         prepare_provider: Some(true),
         work_done_progress_options: WorkDoneProgressOptions::default(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lsp_types::{HoverClientCapabilities, TextDocumentClientCapabilities};
+
+    fn capabilities_with_hover_formats(formats: Option<Vec<MarkupKind>>) -> ClientCapabilities {
+        ClientCapabilities {
+            text_document: Some(TextDocumentClientCapabilities {
+                hover: Some(HoverClientCapabilities {
+                    content_format: formats,
+                    ..HoverClientCapabilities::default()
+                }),
+                ..TextDocumentClientCapabilities::default()
+            }),
+            ..ClientCapabilities::default()
+        }
+    }
+
+    #[test]
+    fn hover_prefers_markdown_when_listed_first() {
+        let caps = capabilities_with_hover_formats(Some(vec![
+            MarkupKind::Markdown,
+            MarkupKind::PlainText,
+        ]));
+        let resolved = ResolvedClientCapabilities::new(&caps);
+        assert!(resolved.prefers_markdown_in_hover());
+    }
+
+    #[test]
+    fn hover_prefers_plaintext_when_listed_first() {
+        // Regression test: when the client lists `plaintext` ahead of
+        // `markdown`, the server must respect that priority and respond
+        // with PlainText. Previously, `content_format` was scanned with
+        // `.contains(&MarkupKind::Markdown)`, which ignored ordering and
+        // always picked Markdown whenever it appeared anywhere in the list.
+        let caps = capabilities_with_hover_formats(Some(vec![
+            MarkupKind::PlainText,
+            MarkupKind::Markdown,
+        ]));
+        let resolved = ResolvedClientCapabilities::new(&caps);
+        assert!(
+            !resolved.prefers_markdown_in_hover(),
+            "client preferred plaintext over markdown; server should not flip to markdown",
+        );
+    }
+
+    #[test]
+    fn hover_uses_plaintext_when_only_plaintext_offered() {
+        let caps = capabilities_with_hover_formats(Some(vec![MarkupKind::PlainText]));
+        let resolved = ResolvedClientCapabilities::new(&caps);
+        assert!(!resolved.prefers_markdown_in_hover());
+    }
+
+    #[test]
+    fn hover_uses_markdown_when_only_markdown_offered() {
+        let caps = capabilities_with_hover_formats(Some(vec![MarkupKind::Markdown]));
+        let resolved = ResolvedClientCapabilities::new(&caps);
+        assert!(resolved.prefers_markdown_in_hover());
+    }
+
+    #[test]
+    fn hover_falls_back_to_plaintext_when_format_list_empty() {
+        let caps = capabilities_with_hover_formats(Some(vec![]));
+        let resolved = ResolvedClientCapabilities::new(&caps);
+        assert!(!resolved.prefers_markdown_in_hover());
+    }
+
+    #[test]
+    fn hover_falls_back_to_plaintext_when_format_unspecified() {
+        let caps = capabilities_with_hover_formats(None);
+        let resolved = ResolvedClientCapabilities::new(&caps);
+        assert!(!resolved.prefers_markdown_in_hover());
     }
 }
