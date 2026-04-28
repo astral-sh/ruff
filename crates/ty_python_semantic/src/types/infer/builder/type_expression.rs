@@ -981,14 +981,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             .set_primary_message("`...` cannot be used after an unpacked element");
                     }
                     self.infer_expression(ellipsis, TypeContext::default());
-                    let previously_in_tuple_type_argument = self
+                    let previously_in_valid_unpack_context = self
                         .context
                         .inference_flags
-                        .replace(InferenceFlags::IN_TUPLE_TYPE_ARGUMENT, true);
+                        .replace(InferenceFlags::IN_VALID_UNPACK_CONTEXT, true);
                     let element_ty = self.infer_type_expression(element);
                     self.context.inference_flags.set(
-                        InferenceFlags::IN_TUPLE_TYPE_ARGUMENT,
-                        previously_in_tuple_type_argument,
+                        InferenceFlags::IN_VALID_UNPACK_CONTEXT,
+                        previously_in_valid_unpack_context,
                     );
                     let result = TupleType::homogeneous(self.db(), element_ty);
                     self.store_expression_type(&tuple.slice, Type::tuple(Some(result)));
@@ -1017,14 +1017,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         element_types.push(Type::unknown());
                         continue;
                     }
-                    let previously_in_tuple_type_argument = self
+                    let previously_in_valid_unpack_context = self
                         .context
                         .inference_flags
-                        .replace(InferenceFlags::IN_TUPLE_TYPE_ARGUMENT, true);
+                        .replace(InferenceFlags::IN_VALID_UNPACK_CONTEXT, true);
                     let element_ty = self.infer_type_expression(element);
                     self.context.inference_flags.set(
-                        InferenceFlags::IN_TUPLE_TYPE_ARGUMENT,
-                        previously_in_tuple_type_argument,
+                        InferenceFlags::IN_VALID_UNPACK_CONTEXT,
+                        previously_in_valid_unpack_context,
                     );
                     return_todo |=
                         element_could_alter_type_of_whole_tuple(element, element_ty, self);
@@ -1119,14 +1119,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.store_expression_type(single_element, Type::unknown());
                     return TupleType::heterogeneous(self.db(), std::iter::once(Type::unknown()));
                 }
-                let previously_in_tuple_type_argument = self
+                let previously_in_valid_unpack_context = self
                     .context
                     .inference_flags
-                    .replace(InferenceFlags::IN_TUPLE_TYPE_ARGUMENT, true);
+                    .replace(InferenceFlags::IN_VALID_UNPACK_CONTEXT, true);
                 let single_element_ty = self.infer_type_expression(single_element);
                 self.context.inference_flags.set(
-                    InferenceFlags::IN_TUPLE_TYPE_ARGUMENT,
-                    previously_in_tuple_type_argument,
+                    InferenceFlags::IN_VALID_UNPACK_CONTEXT,
+                    previously_in_valid_unpack_context,
                 );
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty, self)
                 {
@@ -2260,9 +2260,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 if !self.inference_flags().intersects(
                     InferenceFlags::IN_VARARG_ANNOTATION
-                        | InferenceFlags::IN_PARAMETER_ANNOTATION
-                        | InferenceFlags::IN_TUPLE_TYPE_ARGUMENT
-                        | InferenceFlags::IN_CALLABLE_PARAMETER_TYPE,
+                        | InferenceFlags::IN_KWARG_ANNOTATION
+                        | InferenceFlags::IN_VALID_UNPACK_CONTEXT,
                 ) {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         diagnostic::add_type_expression_reference_link(builder.into_diagnostic(
@@ -2288,12 +2287,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if self
                     .inference_flags()
                     .contains(InferenceFlags::IN_KWARG_ANNOTATION)
-                    || (self
-                        .inference_flags()
-                        .contains(InferenceFlags::IN_PARAMETER_ANNOTATION)
-                        && !self
-                            .inference_flags()
-                            .contains(InferenceFlags::IN_VARARG_ANNOTATION))
                 {
                     return inner_ty;
                 }
@@ -2554,10 +2547,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // Whether to infer `Todo` for the parameters
                 let mut return_todo = false;
 
-                let previously_in_callable_parameter_type = self
+                let previously_in_valid_unpack_context = self
                     .context
                     .inference_flags
-                    .replace(InferenceFlags::IN_CALLABLE_PARAMETER_TYPE, true);
+                    .replace(InferenceFlags::IN_VALID_UNPACK_CONTEXT, true);
                 for param in params {
                     let param_type = self.infer_type_expression(param);
                     // This is similar to what we currently do for inferring tuple type expression.
@@ -2569,8 +2562,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     parameter_types.push(param_type);
                 }
                 self.context.inference_flags.set(
-                    InferenceFlags::IN_CALLABLE_PARAMETER_TYPE,
-                    previously_in_callable_parameter_type,
+                    InferenceFlags::IN_VALID_UNPACK_CONTEXT,
+                    previously_in_valid_unpack_context,
                 );
 
                 return Some(if return_todo {
