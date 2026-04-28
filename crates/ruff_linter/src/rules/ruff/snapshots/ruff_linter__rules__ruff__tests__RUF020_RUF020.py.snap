@@ -13,7 +13,7 @@ RUF020 [*] `Union[Never, T]` is equivalent to `T`
   |
 help: Remove `Never`
 1 | from typing import Never, NoReturn, Union
-2 | 
+2 |
   - Union[Never, int]
 3 + int
 4 | Union[NoReturn, int]
@@ -31,7 +31,7 @@ RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
   |
 help: Remove `NoReturn`
 1 | from typing import Never, NoReturn, Union
-2 | 
+2 |
 3 | Union[Never, int]
   - Union[NoReturn, int]
 4 + int
@@ -50,7 +50,7 @@ RUF020 [*] `Never | T` is equivalent to `T`
 7 | Union[Union[Never, int], Union[NoReturn, int]]
   |
 help: Remove `Never`
-2 | 
+2 |
 3 | Union[Never, int]
 4 | Union[NoReturn, int]
   - Never | int
@@ -77,7 +77,7 @@ help: Remove `NoReturn`
 6 + int
 7 | Union[Union[Never, int], Union[NoReturn, int]]
 8 | Union[NoReturn, int, float]
-9 | 
+9 |
 
 RUF020 [*] `Union[Never, T]` is equivalent to `T`
  --> RUF020.py:7:13
@@ -95,8 +95,8 @@ help: Remove `Never`
    - Union[Union[Never, int], Union[NoReturn, int]]
 7  + Union[int, Union[NoReturn, int]]
 8  | Union[NoReturn, int, float]
-9  | 
-10 | 
+9  |
+10 |
 
 RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
  --> RUF020.py:7:32
@@ -114,8 +114,8 @@ help: Remove `NoReturn`
    - Union[Union[Never, int], Union[NoReturn, int]]
 7  + Union[Union[Never, int], int]
 8  | Union[NoReturn, int, float]
-9  | 
-10 | 
+9  |
+10 |
 
 RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
  --> RUF020.py:8:7
@@ -131,8 +131,8 @@ help: Remove `NoReturn`
 7  | Union[Union[Never, int], Union[NoReturn, int]]
    - Union[NoReturn, int, float]
 8  + Union[int, float]
-9  | 
-10 | 
+9  |
+10 |
 11 | # Regression tests for https://github.com/astral-sh/ruff/issues/14567
 
 RUF020 `Never | T` is equivalent to `T`
@@ -208,14 +208,14 @@ RUF020 [*] `Never | T` is equivalent to `T`
 23 |         int
    |
 help: Remove `Never`
-18 | 
-19 | 
+18 |
+19 |
 20 | def func() -> (
    -         Never  # text
    -         | # text
 21 |         int
 22 | ): ...
-23 | 
+23 |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF020 [*] `Union[Never, T]` is equivalent to `T`
@@ -230,7 +230,7 @@ RUF020 [*] `Union[Never, T]` is equivalent to `T`
 help: Remove `Never`
 28 | # Multi-line single-remaining-element Union should be wrapped in parentheses
 29 | from typing import Literal
-30 | 
+30 |
    - x: Union[
    -     Never,
    -     Literal["LongLiteralNumberOne"]

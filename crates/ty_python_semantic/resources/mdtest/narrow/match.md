@@ -151,6 +151,32 @@ def test_match_refutable(x: dict | int) -> None:
             reveal_type(x)  # revealed: dict[Unknown, Unknown] | int
 ```
 
+## Sequence patterns
+
+```py
+from collections.abc import Sequence
+
+def test_match_star(x: Sequence[int] | int) -> None:
+    match x:
+        case [*rest]:
+            reveal_type(x)  # revealed: (Sequence[int] & ~str & ~bytes & ~bytearray) | (int & Sequence[object])
+        case _:
+            # `str`, `bytes`, and `bytearray` are subtypes of `Sequence`, but
+            # sequence patterns explicitly do not match them. `bytes` and
+            # `bytearray` are possible inhabitants of `Sequence[int]`.
+            # TODO: After https://github.com/astral-sh/ty/issues/3314 is
+            # fixed, the `Sequence[int] & str` intersection should simplify to
+            # `Never`.
+            reveal_type(x)  # revealed: (int & ~Sequence[object]) | (Sequence[int] & str) | bytes | bytearray
+
+def test_match_star_excludes_text_and_bytes(x: str | bytes | bytearray | list[int]) -> None:
+    match x:
+        case [*rest]:
+            reveal_type(x)  # revealed: list[int]
+        case _:
+            reveal_type(x)  # revealed: str | bytes | bytearray
+```
+
 ## Value patterns
 
 Value patterns are evaluated by equality, which is overridable. Therefore successfully matching on
@@ -294,24 +320,16 @@ def _(x: Literal["foo", b"bar"] | int):
 ## Narrowing due to guard
 
 ```py
-def get_object() -> object:
-    return object()
-
-x = get_object()
-
-reveal_type(x)  # revealed: object
-
-match x:
-    case str() | float() if type(x) is str:
-        reveal_type(x)  #  revealed: str
-    case "foo" | 42 | None if isinstance(x, int):
-        reveal_type(x)  #  revealed: int
-    case False if x:
-        reveal_type(x)  #  revealed: Never
-    case "foo" if x := "bar":
-        reveal_type(x)  # revealed: Literal["bar"]
-
-reveal_type(x)  # revealed: object
+def _(x: object):
+    match x:
+        case str() | float() if type(x) is str:
+            reveal_type(x)  #  revealed: str
+        case "foo" | 42 | None if isinstance(x, int):
+            reveal_type(x)  #  revealed: int
+        case False if x:
+            reveal_type(x)  #  revealed: Never
+        case "foo" if x := "bar":
+            reveal_type(x)  # revealed: Literal["bar"]
 ```
 
 ## Guard and reveal_type in guard

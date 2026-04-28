@@ -1164,8 +1164,7 @@ class Bad(Base):  # error: [abstract-method-in-final-class]
     pass
 ```
 
-Similarly, a property with an abstract deleter is also abstract. However, we don't yet support
-property deleters, so this is a TODO test:
+Similarly, a property with an abstract deleter (but concrete getter and setter) is also abstract:
 
 ```py
 from abc import ABC, abstractmethod
@@ -1185,8 +1184,13 @@ class Base(ABC):
     def value(self) -> None: ...
 
 @final
-# TODO: should emit [abstract-method-in-final-class]
-class Bad(Base):
+class Good(Base):
+    @Base.value.deleter
+    def value(self) -> None:
+        pass
+
+@final
+class Bad(Base):  # error: [abstract-method-in-final-class]
     pass
 ```
 
@@ -1325,7 +1329,7 @@ class Base(ABC):
     @abstractproperty  # error: [deprecated]
     def value(self) -> int:
         return 0
-
+    # error: [invalid-argument-type]
     @abstractclassmethod  # error: [deprecated]
     def make(cls) -> "Base":
         raise NotImplementedError

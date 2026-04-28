@@ -1127,15 +1127,15 @@ required-version = "0.1.0"
         .pass_stdin(r#"
 import os
 "#), @"
-    success: false
-    exit_code: 2
-    ----- stdout -----
+        success: false
+        exit_code: 2
+        ----- stdout -----
 
-    ----- stderr -----
-    ruff failed
-      Cause: Failed to load configuration `[TMP]/ruff.toml`
-      Cause: Required version `==0.1.0` does not match the running version `[VERSION]`
-    ");
+        ----- stderr -----
+        ruff failed
+          Cause: Failed to load configuration `[TMP]/ruff.toml`
+          Cause: Required version `==0.1.0` does not match the running version `[VERSION]`
+        ");
     });
 
     Ok(())
@@ -1203,15 +1203,15 @@ required-version = ">{version}"
         .pass_stdin(r#"
 import os
 "#), @"
-    success: false
-    exit_code: 2
-    ----- stdout -----
+        success: false
+        exit_code: 2
+        ----- stdout -----
 
-    ----- stderr -----
-    ruff failed
-      Cause: Failed to load configuration `[TMP]/ruff.toml`
-      Cause: Required version `>[VERSION]` does not match the running version `[VERSION]`
-    ");
+        ----- stderr -----
+        ruff failed
+          Cause: Failed to load configuration `[TMP]/ruff.toml`
+          Cause: Required version `>[VERSION]` does not match the running version `[VERSION]`
+        ");
     });
 
     Ok(())
@@ -1244,15 +1244,15 @@ select = ["RUF999"]
         .pass_stdin(r#"
 import os
 "#), @"
-    success: false
-    exit_code: 2
-    ----- stdout -----
+        success: false
+        exit_code: 2
+        ----- stdout -----
 
-    ----- stderr -----
-    ruff failed
-      Cause: Failed to load configuration `[TMP]/ruff.toml`
-      Cause: Required version `>[VERSION]` does not match the running version `[VERSION]`
-    ");
+        ----- stderr -----
+        ruff failed
+          Cause: Failed to load configuration `[TMP]/ruff.toml`
+          Cause: Required version `>[VERSION]` does not match the running version `[VERSION]`
+        ");
     });
 
     Ok(())
@@ -2728,7 +2728,7 @@ fn nested_implicit_namespace_package() -> Result<()> {
         .arg("--select")
         .arg("INP")
         .arg("--preview")
-        , @r###"
+        , @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2736,7 +2736,7 @@ fn nested_implicit_namespace_package() -> Result<()> {
     Found 1 error.
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -3113,7 +3113,7 @@ class Foo[_T, __T]:
     pass
 "#
         ),
-        @r###"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3124,7 +3124,7 @@ class Foo[_T, __T]:
     ----- stderr -----
     test.py:2:14: error[UP049] Generic class uses private type parameters
     Found 2 errors (1 fixed, 1 remaining).
-    "###
+    "
     );
 }
 
@@ -3264,7 +3264,7 @@ T = TypeVar("T")
 class A(Generic[T]):
     var: T
 "#),
-        @r###"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3273,7 +3273,7 @@ class A(Generic[T]):
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
-    "###
+    "
     );
 
     // with per-file-target-version, there should be no errors because the new generic syntax is
@@ -3406,7 +3406,7 @@ match 2:
         print("it's one")
 "#
         ),
-        @r###"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3414,7 +3414,7 @@ match 2:
     Found 1 error.
 
     ----- stderr -----
-    "###
+    "
     );
 }
 
@@ -3432,27 +3432,27 @@ fn cache_syntax_errors() -> Result<()> {
 
     assert_cmd_snapshot!(
         cmd,
-        @r###"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
     main.py:1:1: error[invalid-syntax] Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
 
     ----- stderr -----
-    "###
+    "
     );
 
     // this should *not* be cached, like normal parse errors
     assert_cmd_snapshot!(
         cmd,
-        @r###"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
     main.py:1:1: error[invalid-syntax] Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
 
     ----- stderr -----
-    "###
+    "
     );
 
     Ok(())
@@ -3553,7 +3553,7 @@ fn semantic_syntax_errors() -> Result<()> {
 
     assert_cmd_snapshot!(
         cmd,
-        @r###"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3561,13 +3561,13 @@ fn semantic_syntax_errors() -> Result<()> {
     main.py:1:20: error[F821] Undefined name `foo`
 
     ----- stderr -----
-    "###
+    "
     );
 
     // this should *not* be cached, like normal parse errors
     assert_cmd_snapshot!(
         cmd,
-        @r###"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3575,7 +3575,7 @@ fn semantic_syntax_errors() -> Result<()> {
     main.py:1:20: error[F821] Undefined name `foo`
 
     ----- stderr -----
-    "###
+    "
     );
 
     // ensure semantic errors are caught even without AST-based rules selected
@@ -3585,7 +3585,7 @@ fn semantic_syntax_errors() -> Result<()> {
             .arg("--preview")
             .arg("-")
             .pass_stdin(contents),
-        @r###"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3593,7 +3593,7 @@ fn semantic_syntax_errors() -> Result<()> {
     Found 1 error.
 
     ----- stderr -----
-    "###
+    "
     );
 
     Ok(())
@@ -3742,7 +3742,7 @@ fn show_fixes_in_full_output_with_preview_enabled() {
             .arg("--preview")
             .arg("-")
             .pass_stdin("import math"),
-        @r###"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3759,7 +3759,7 @@ fn show_fixes_in_full_output_with_preview_enabled() {
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    "###,
+    ",
     );
 }
 
@@ -3773,7 +3773,7 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
         fixture.check_command()
             .args(["--select", "RUF9", "--preview"])
             .args(["normal.py", "panic.py"]),
-        @r###"
+        @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -3793,7 +3793,7 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
     https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
 
     ...with the relevant file contents, the `pyproject.toml` settings, and the stack trace above, we'd be very appreciative!
-    "###);
+    ");
 
     Ok(())
 }
@@ -3808,7 +3808,7 @@ fn rule_panic_mixed_results_full() -> Result<()> {
         fixture.command()
             .args(["check", "--select", "RUF9", "--preview", "--output-format=full", "--no-cache"])
             .args(["normal.py", "panic.py"]),
-        @r###"
+        @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -3847,7 +3847,7 @@ fn rule_panic_mixed_results_full() -> Result<()> {
     https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
 
     ...with the relevant file contents, the `pyproject.toml` settings, and the stack trace above, we'd be very appreciative!
-    "###);
+    ");
 
     Ok(())
 }
@@ -3997,7 +3997,7 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
         fixture.check_command()
             .args(["--select", "F401", "--preview"])
             .arg("src"),
-        @r###"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -4009,7 +4009,7 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
     [*] 4 fixable with the `--fix` option.
 
     ----- stderr -----
-    "###);
+    ");
     Ok(())
 }
 

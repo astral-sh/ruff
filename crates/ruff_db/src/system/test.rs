@@ -1,4 +1,3 @@
-use glob::PatternError;
 use ruff_notebook::{Notebook, NotebookError};
 use rustc_hash::FxHashMap;
 use std::panic::RefUnwindSafe;
@@ -7,8 +6,8 @@ use std::sync::{Arc, Mutex};
 use crate::Db;
 use crate::files::File;
 use crate::system::{
-    CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, Result, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath, WhichError, WhichResult,
+    CaseSensitivity, DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath,
+    SystemPathBuf, SystemVirtualPath, WhichError, WhichResult,
 };
 
 use super::WritableSystem;
@@ -146,16 +145,6 @@ impl System for TestSystem {
 
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
         self.system().walk_directory(path)
-    }
-
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_>,
-        PatternError,
-    > {
-        self.system().glob(pattern)
     }
 
     fn as_writable(&self) -> Option<&dyn WritableSystem> {
@@ -417,17 +406,6 @@ impl System for InMemorySystem {
 
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
         self.memory_fs.walk_directory(path)
-    }
-
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_>,
-        PatternError,
-    > {
-        let iterator = self.memory_fs.glob(pattern)?;
-        Ok(Box::new(iterator))
     }
 
     fn as_writable(&self) -> Option<&dyn WritableSystem> {

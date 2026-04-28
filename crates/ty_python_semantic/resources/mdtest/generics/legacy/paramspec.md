@@ -51,12 +51,17 @@ reveal_type(tuple_with_typevar[1])  # revealed: ParamSpec
 ### `ParamSpec` parameter must match variable name
 
 ```py
-from typing import ParamSpec
+from typing import Callable, Generic, ParamSpec
 
 P1 = ParamSpec("P1")
 
-# error: [invalid-paramspec]
+# error: [mismatched-type-name]
 P2 = ParamSpec("P3")
+
+class Wrapper(Generic[P2]): ...
+
+def decorator(f: Callable[P2, int]) -> Callable[P2, int]:
+    return f
 ```
 
 ### Accepts only a single `name` argument
@@ -93,6 +98,10 @@ from typing import ParamSpec
 P1 = ParamSpec("P1", default=[int, str])
 P2 = ParamSpec("P2", default=...)
 P3 = ParamSpec("P3", default=P2)
+Q = ParamSpec("Q")
+
+# error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+P5 = ParamSpec("P5", default=[Q])
 ```
 
 Other values are invalid.
@@ -170,6 +179,7 @@ import library
 from typing import Any, Final, ParamSpec, Callable, Concatenate, Protocol, Generic, Union, Optional, Annotated
 
 P = ParamSpec("P")
+Q = ParamSpec("Q")
 
 class ValidProtocol(Protocol[P]):
     def method(self, c: Callable[P, int]) -> None: ...
@@ -232,6 +242,16 @@ def invalid_stringified_annotation(
 def invalid_stringified_variable_annotation(y: Any) -> None:
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     x: "P" = y
+
+class InvalidSpecializationTarget(Generic[P]):
+    attr: Callable[P, None]
+
+def invalid_specialization(
+    # error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+    a: InvalidSpecializationTarget[[Q]],
+    # error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+    b: InvalidSpecializationTarget[Q,],
+) -> None: ...
 ```
 
 ## Validating `P.args` and `P.kwargs` usage
@@ -347,6 +367,9 @@ class TwoParamSpec(Generic[P1, P2]):
 
 class TypeVarAndParamSpec(Generic[T1, P1]):
     attr: Callable[P1, T1]
+
+class ParamSpecAndTypeVar(Generic[P1, T1]):
+    attr: Callable[P1, T1]
 ```
 
 Explicit specialization of a generic class involving `ParamSpec` is done by providing either a list
@@ -403,6 +426,7 @@ reveal_type(TypeVarAndParamSpec[int, []]().attr)  # revealed: () -> int
 reveal_type(TypeVarAndParamSpec[int, [int, str]]().attr)  # revealed: (int, str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, [str]]().attr)  # revealed: (str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, ...]().attr)  # revealed: (...) -> int
+reveal_type(ParamSpecAndTypeVar[[int, str], str]().attr)  # revealed: (int, str, /) -> str
 
 # error: [invalid-type-arguments] "ParamSpec `P2` is unbound"
 reveal_type(TypeVarAndParamSpec[int, P2]().attr)  # revealed: (...) -> int

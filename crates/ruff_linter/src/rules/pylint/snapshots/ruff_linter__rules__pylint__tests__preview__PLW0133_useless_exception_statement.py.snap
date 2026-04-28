@@ -28,7 +28,7 @@ help: Add `raise` keyword
 27 +     raise MyError("This is a custom error")  # PLW0133
 28 |     MySubError("This is a custom error")  # PLW0133
 29 |     MyValueError("This is a custom value error")  # PLW0133
-30 | 
+30 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -48,8 +48,8 @@ help: Add `raise` keyword
    -     MySubError("This is a custom error")  # PLW0133
 28 +     raise MySubError("This is a custom error")  # PLW0133
 29 |     MyValueError("This is a custom value error")  # PLW0133
-30 | 
-31 | 
+30 |
+31 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -67,8 +67,8 @@ help: Add `raise` keyword
 28 |     MySubError("This is a custom error")  # PLW0133
    -     MyValueError("This is a custom value error")  # PLW0133
 29 +     raise MyValueError("This is a custom value error")  # PLW0133
-30 | 
-31 | 
+30 |
+31 |
 32 | # Test case 2: Useless exception statement in try-except block
 note: This is an unsafe fix and may change runtime behavior
 
@@ -135,7 +135,7 @@ help: Add `raise` keyword
 38 +         raise MyValueError("This is an exception")  # PLW0133
 39 |     except Exception as err:
 40 |         pass
-41 | 
+41 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -157,7 +157,7 @@ help: Add `raise` keyword
 47 +         raise MyError("This is an exception")  # PLW0133
 48 |         MySubError("This is an exception")  # PLW0133
 49 |         MyValueError("This is an exception")  # PLW0133
-50 | 
+50 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -177,8 +177,8 @@ help: Add `raise` keyword
    -         MySubError("This is an exception")  # PLW0133
 48 +         raise MySubError("This is an exception")  # PLW0133
 49 |         MyValueError("This is an exception")  # PLW0133
-50 | 
-51 | 
+50 |
+51 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -196,8 +196,8 @@ help: Add `raise` keyword
 48 |         MySubError("This is an exception")  # PLW0133
    -         MyValueError("This is an exception")  # PLW0133
 49 +         raise MyValueError("This is an exception")  # PLW0133
-50 | 
-51 | 
+50 |
+51 |
 52 | # Test case 4: Useless exception statement in class
 note: This is an unsafe fix and may change runtime behavior
 
@@ -220,7 +220,7 @@ help: Add `raise` keyword
 57 +             raise MyError("This is an exception")  # PLW0133
 58 |             MySubError("This is an exception")  # PLW0133
 59 |             MyValueError("This is an exception")  # PLW0133
-60 | 
+60 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -240,8 +240,8 @@ help: Add `raise` keyword
    -             MySubError("This is an exception")  # PLW0133
 58 +             raise MySubError("This is an exception")  # PLW0133
 59 |             MyValueError("This is an exception")  # PLW0133
-60 | 
-61 | 
+60 |
+61 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -259,8 +259,8 @@ help: Add `raise` keyword
 58 |             MySubError("This is an exception")  # PLW0133
    -             MyValueError("This is an exception")  # PLW0133
 59 +             raise MyValueError("This is an exception")  # PLW0133
-60 | 
-61 | 
+60 |
+61 |
 62 | # Test case 5: Useless exception statement in function
 note: This is an unsafe fix and may change runtime behavior
 
@@ -283,7 +283,7 @@ help: Add `raise` keyword
 66 +         raise MyError("This is an exception")  # PLW0133
 67 |         MySubError("This is an exception")  # PLW0133
 68 |         MyValueError("This is an exception")  # PLW0133
-69 | 
+69 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -303,7 +303,7 @@ help: Add `raise` keyword
    -         MySubError("This is an exception")  # PLW0133
 67 +         raise MySubError("This is an exception")  # PLW0133
 68 |         MyValueError("This is an exception")  # PLW0133
-69 | 
+69 |
 70 |     inner()
 note: This is an unsafe fix and may change runtime behavior
 
@@ -324,9 +324,9 @@ help: Add `raise` keyword
 67 |         MySubError("This is an exception")  # PLW0133
    -         MyValueError("This is an exception")  # PLW0133
 68 +         raise MyValueError("This is an exception")  # PLW0133
-69 | 
+69 |
 70 |     inner()
-71 | 
+71 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -348,7 +348,7 @@ help: Add `raise` keyword
 77 +         raise MyError("This is an exception")  # PLW0133
 78 |         MySubError("This is an exception")  # PLW0133
 79 |         MyValueError("This is an exception")  # PLW0133
-80 | 
+80 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -368,8 +368,8 @@ help: Add `raise` keyword
    -         MySubError("This is an exception")  # PLW0133
 78 +         raise MySubError("This is an exception")  # PLW0133
 79 |         MyValueError("This is an exception")  # PLW0133
-80 | 
-81 | 
+80 |
+81 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -387,8 +387,8 @@ help: Add `raise` keyword
 78 |         MySubError("This is an exception")  # PLW0133
    -         MyValueError("This is an exception")  # PLW0133
 79 +         raise MyValueError("This is an exception")  # PLW0133
-80 | 
-81 | 
+80 |
+81 |
 82 | # Test case 7: Useless exception statement in abstract class
 note: This is an unsafe fix and may change runtime behavior
 
@@ -411,7 +411,7 @@ help: Add `raise` keyword
 88 +             raise MyError("This is an exception")  # PLW0133
 89 |             MySubError("This is an exception")  # PLW0133
 90 |             MyValueError("This is an exception")  # PLW0133
-91 | 
+91 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -431,8 +431,8 @@ help: Add `raise` keyword
    -             MySubError("This is an exception")  # PLW0133
 89 +             raise MySubError("This is an exception")  # PLW0133
 90 |             MyValueError("This is an exception")  # PLW0133
-91 | 
-92 | 
+91 |
+92 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -450,8 +450,8 @@ help: Add `raise` keyword
 89 |             MySubError("This is an exception")  # PLW0133
    -             MyValueError("This is an exception")  # PLW0133
 90 +             raise MyValueError("This is an exception")  # PLW0133
-91 | 
-92 | 
+91 |
+92 |
 93 | # Test case 8: Useless exception statement inside context manager
 note: This is an unsafe fix and may change runtime behavior
 
@@ -474,7 +474,7 @@ help: Add `raise` keyword
 97  +         raise MyError("This is an exception")  # PLW0133
 98  |         MySubError("This is an exception")  # PLW0133
 99  |         MyValueError("This is an exception")  # PLW0133
-100 | 
+100 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -494,8 +494,8 @@ help: Add `raise` keyword
     -         MySubError("This is an exception")  # PLW0133
 98  +         raise MySubError("This is an exception")  # PLW0133
 99  |         MyValueError("This is an exception")  # PLW0133
-100 | 
-101 | 
+100 |
+101 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -513,8 +513,8 @@ help: Add `raise` keyword
 98  |         MySubError("This is an exception")  # PLW0133
     -         MyValueError("This is an exception")  # PLW0133
 99  +         raise MyValueError("This is an exception")  # PLW0133
-100 | 
-101 | 
+100 |
+101 |
 102 | # Test case 9: Useless exception statement in parentheses
 note: This is an unsafe fix and may change runtime behavior
 
@@ -537,7 +537,7 @@ help: Add `raise` keyword
 105 +     raise (MyError("This is an exception"))  # PLW0133
 106 |     (MySubError("This is an exception"))  # PLW0133
 107 |     (MyValueError("This is an exception"))  # PLW0133
-108 | 
+108 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -557,8 +557,8 @@ help: Add `raise` keyword
     -     (MySubError("This is an exception"))  # PLW0133
 106 +     raise (MySubError("This is an exception"))  # PLW0133
 107 |     (MyValueError("This is an exception"))  # PLW0133
-108 | 
-109 | 
+108 |
+109 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -576,8 +576,8 @@ help: Add `raise` keyword
 106 |     (MySubError("This is an exception"))  # PLW0133
     -     (MyValueError("This is an exception"))  # PLW0133
 107 +     raise (MyValueError("This is an exception"))  # PLW0133
-108 | 
-109 | 
+108 |
+109 |
 110 | # Test case 10: Useless exception statement in continuation
 note: This is an unsafe fix and may change runtime behavior
 
@@ -600,7 +600,7 @@ help: Add `raise` keyword
 113 +     x = 1; raise (MyError("This is an exception")); y = 2  # PLW0133
 114 |     x = 1; (MySubError("This is an exception")); y = 2  # PLW0133
 115 |     x = 1; (MyValueError("This is an exception")); y = 2  # PLW0133
-116 | 
+116 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -620,8 +620,8 @@ help: Add `raise` keyword
     -     x = 1; (MySubError("This is an exception")); y = 2  # PLW0133
 114 +     x = 1; raise (MySubError("This is an exception")); y = 2  # PLW0133
 115 |     x = 1; (MyValueError("This is an exception")); y = 2  # PLW0133
-116 | 
-117 | 
+116 |
+117 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -639,8 +639,8 @@ help: Add `raise` keyword
 114 |     x = 1; (MySubError("This is an exception")); y = 2  # PLW0133
     -     x = 1; (MyValueError("This is an exception")); y = 2  # PLW0133
 115 +     x = 1; raise (MyValueError("This is an exception")); y = 2  # PLW0133
-116 | 
-117 | 
+116 |
+117 |
 118 | # Test case 11: Useless warning statement
 note: This is an unsafe fix and may change runtime behavior
 
@@ -659,8 +659,8 @@ help: Add `raise` keyword
 120 |     UserWarning("This is a user warning")  # PLW0133
     -     MyUserWarning("This is a custom user warning")  # PLW0133
 121 +     raise MyUserWarning("This is a custom user warning")  # PLW0133
-122 | 
-123 | 
+122 |
+123 |
 124 | # Test case 12: Useless exception statement at module level
 note: This is an unsafe fix and may change runtime behavior
 
@@ -676,14 +676,14 @@ PLW0133 [*] Missing `raise` statement on exception
 133 | MySubError("This is an exception")  # PLW0133
     |
 help: Add `raise` keyword
-128 | 
+128 |
 129 | PythonFinalizationError("Added in Python 3.13")  # PLW0133
-130 | 
+130 |
     - MyError("This is an exception")  # PLW0133
 131 + raise MyError("This is an exception")  # PLW0133
-132 | 
+132 |
 133 | MySubError("This is an exception")  # PLW0133
-134 | 
+134 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -698,14 +698,14 @@ PLW0133 [*] Missing `raise` statement on exception
 135 | MyValueError("This is an exception")  # PLW0133
     |
 help: Add `raise` keyword
-130 | 
+130 |
 131 | MyError("This is an exception")  # PLW0133
-132 | 
+132 |
     - MySubError("This is an exception")  # PLW0133
 133 + raise MySubError("This is an exception")  # PLW0133
-134 | 
+134 |
 135 | MyValueError("This is an exception")  # PLW0133
-136 | 
+136 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -720,14 +720,14 @@ PLW0133 [*] Missing `raise` statement on exception
 137 | UserWarning("This is a user warning")  # PLW0133
     |
 help: Add `raise` keyword
-132 | 
+132 |
 133 | MySubError("This is an exception")  # PLW0133
-134 | 
+134 |
     - MyValueError("This is an exception")  # PLW0133
 135 + raise MyValueError("This is an exception")  # PLW0133
-136 | 
+136 |
 137 | UserWarning("This is a user warning")  # PLW0133
-138 | 
+138 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -740,12 +740,12 @@ PLW0133 [*] Missing `raise` statement on exception
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Add `raise` keyword
-136 | 
+136 |
 137 | UserWarning("This is a user warning")  # PLW0133
-138 | 
+138 |
     - MyUserWarning("This is a custom user warning")  # PLW0133
 139 + raise MyUserWarning("This is a custom user warning")  # PLW0133
-140 | 
-141 | 
+140 |
+141 |
 142 | # Non-violation test cases: PLW0133
 note: This is an unsafe fix and may change runtime behavior

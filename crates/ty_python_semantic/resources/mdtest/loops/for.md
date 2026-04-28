@@ -105,8 +105,6 @@ reveal_type(x)
 
 ## With non-callable iterator
 
-<!-- snapshot-diagnostics -->
-
 ```py
 def _(flag: bool):
     class NotIterable:
@@ -115,28 +113,55 @@ def _(flag: bool):
         else:
             __iter__: None = None
 
-    # error: [not-iterable]
+    # snapshot: not-iterable
     for x in NotIterable():
         pass
+```
 
+```snapshot
+error[not-iterable]: Object of type `NotIterable` is not iterable
+ --> src/mdtest_snippet.py:9:14
+  |
+9 |     for x in NotIterable():
+  |              ^^^^^^^^^^^^^
+  |
+info: Its `__iter__` attribute has type `int | None`, which is not callable
+```
+
+```py
     # revealed: Unknown
-    # error: [possibly-unresolved-reference]
+    # snapshot: possibly-unresolved-reference
     reveal_type(x)
+```
+
+```snapshot
+info[possibly-unresolved-reference]: Name `x` used when possibly not defined
+  --> src/mdtest_snippet.py:13:17
+   |
+13 |     reveal_type(x)
+   |                 ^
+   |
 ```
 
 ## Invalid iterable
 
-<!-- snapshot-diagnostics -->
-
 ```py
 nonsense = 123
-for x in nonsense:  # error: [not-iterable]
+for x in nonsense:  # snapshot: not-iterable
     pass
 ```
 
-## New over old style iteration protocol
+```snapshot
+error[not-iterable]: Object of type `Literal[123]` is not iterable
+ --> src/mdtest_snippet.py:2:10
+  |
+2 | for x in nonsense:  # snapshot: not-iterable
+  |          ^^^^^^^^
+  |
+info: It doesn't have an `__iter__` method or a `__getitem__` method
+```
 
-<!-- snapshot-diagnostics -->
+## New over old style iteration protocol
 
 ```py
 class NotIterable:
@@ -144,8 +169,18 @@ class NotIterable:
         return 42
     __iter__: None = None
 
-for x in NotIterable():  # error: [not-iterable]
+for x in NotIterable():  # snapshot: not-iterable
     pass
+```
+
+```snapshot
+error[not-iterable]: Object of type `NotIterable` is not iterable
+ --> src/mdtest_snippet.py:6:10
+  |
+6 | for x in NotIterable():  # snapshot: not-iterable
+  |          ^^^^^^^^^^^^^
+  |
+info: Its `__iter__` attribute has type `None`, which is not callable
 ```
 
 ## Union type as iterable
@@ -278,9 +313,37 @@ def f(x: Literal["foo", b"bar"], y: Literal["foo"] | range):
         reveal_type(item)  # revealed: Literal["f", "o"] | int
 ```
 
-## Union type as iterable where one union element has no `__iter__` method
+## Attribute errors from iterated aliased unions
 
-<!-- snapshot-diagnostics -->
+We should still report missing attributes when a loop variable comes from an aliased union element:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class A:
+    pass
+
+class B:
+    def do_b_thing(self) -> None:
+        pass
+
+type U = A | B
+
+class C:
+    def __init__(self, values: list[U]) -> None:
+        self.values = values
+
+    def f(self) -> None:
+        for item in self.values:
+            reveal_type(item)  # revealed: A | B
+            # error: [unresolved-attribute] "Attribute `do_b_thing` is not defined on `A` in union `U`"
+            item.do_b_thing()
+```
+
+## Union type as iterable where one union element has no `__iter__` method
 
 ```py
 class TestIter:
@@ -292,14 +355,23 @@ class Test:
         return TestIter()
 
 def _(flag: bool):
-    # error: [not-iterable]
+    # snapshot: not-iterable
     for x in Test() if flag else 42:
         reveal_type(x)  # revealed: int
 ```
 
-## Union type as iterable where one union element has invalid `__iter__` method
+```snapshot
+error[not-iterable]: Object of type `Test | Literal[42]` may not be iterable
+  --> src/mdtest_snippet.py:11:14
+   |
+11 |     for x in Test() if flag else 42:
+   |              ^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: It may not have an `__iter__` method and it doesn't have a `__getitem__` method
+info: `Literal[42]` does not implement `__iter__`
+```
 
-<!-- snapshot-diagnostics -->
+## Union type as iterable where one union element has invalid `__iter__` method
 
 ```py
 class TestIter:
@@ -316,9 +388,55 @@ class Test2:
 
 def _(flag: bool):
     # TODO: Improve error message to state which union variant isn't iterable (https://github.com/astral-sh/ruff/issues/13989)
-    # error: [not-iterable]
+    # snapshot: not-iterable
     for x in Test() if flag else Test2():
         reveal_type(x)  # revealed: int
+```
+
+```snapshot
+error[not-iterable]: Object of type `Test | Test2` may not be iterable
+  --> src/mdtest_snippet.py:16:14
+   |
+16 |     for x in Test() if flag else Test2():
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: Its `__iter__` method returns an object of type `TestIter | int`, which may not have a `__next__` method
+```
+
+## Union type as iterable where one union element has a non-callable `__iter__`
+
+When one union element has a callable `__iter__` and another has a non-callable `__iter__`
+attribute, the error should be "may not be iterable" (hedged), not "is not iterable" (definitive) —
+because at runtime the value might be the iterable variant.
+
+```py
+class TestIter:
+    def __next__(self) -> int:
+        return 42
+
+class Test:
+    def __iter__(self) -> TestIter:
+        return TestIter()
+
+class NotIter:
+    # `__iter__` is present but not callable
+    __iter__: int = 32
+
+def _(flag: bool):
+    iterable = Test() if flag else NotIter()
+    # snapshot: not-iterable
+    for x in iterable:
+        reveal_type(x)  # revealed: int | Unknown
+```
+
+```snapshot
+error[not-iterable]: Object of type `Test | NotIter` may not be iterable
+  --> src/mdtest_snippet.py:16:14
+   |
+16 |     for x in iterable:
+   |              ^^^^^^^^
+   |
+info: Its `__iter__` attribute (with type `(bound method Test.__iter__() -> TestIter) | int`) may not be callable
 ```
 
 ## Union type as iterator where one union element has no `__next__` method
@@ -540,8 +658,6 @@ def _(flag: bool):
 
 ## `__iter__` method with a bad signature
 
-<!-- snapshot-diagnostics -->
-
 ```py
 class Iterator:
     def __next__(self) -> int:
@@ -551,23 +667,42 @@ class Iterable:
     def __iter__(self, extra_arg) -> Iterator:
         return Iterator()
 
-# error: [not-iterable]
+# snapshot: not-iterable
 for x in Iterable():
     reveal_type(x)  # revealed: int
 ```
 
-## `__iter__` does not return an iterator
+```snapshot
+error[not-iterable]: Object of type `Iterable` is not iterable
+  --> src/mdtest_snippet.py:10:10
+   |
+10 | for x in Iterable():
+   |          ^^^^^^^^^^
+   |
+info: Its `__iter__` method has an invalid signature
+info: Expected signature `def __iter__(self): ...`
+```
 
-<!-- snapshot-diagnostics -->
+## `__iter__` does not return an iterator
 
 ```py
 class Bad:
     def __iter__(self) -> int:
         return 42
 
-# error: [not-iterable]
+# snapshot: not-iterable
 for x in Bad():
     reveal_type(x)  # revealed: Unknown
+```
+
+```snapshot
+error[not-iterable]: Object of type `Bad` is not iterable
+ --> src/mdtest_snippet.py:6:10
+  |
+6 | for x in Bad():
+  |          ^^^^^
+  |
+info: Its `__iter__` method returns an object of type `int`, which has no `__next__` method
 ```
 
 ## `__iter__` returns an object with a possibly missing `__next__` method
@@ -590,8 +725,6 @@ def _(flag: bool):
 
 ## `__iter__` returns an iterator with an invalid `__next__` method
 
-<!-- snapshot-diagnostics -->
-
 ```py
 class Iterator1:
     def __next__(self, extra_arg) -> int:
@@ -608,18 +741,39 @@ class Iterable2:
     def __iter__(self) -> Iterator2:
         return Iterator2()
 
-# error: [not-iterable]
+# snapshot: not-iterable
 for x in Iterable1():
     reveal_type(x)  # revealed: int
+```
 
-# error: [not-iterable]
+```snapshot
+error[not-iterable]: Object of type `Iterable1` is not iterable
+  --> src/mdtest_snippet.py:17:10
+   |
+17 | for x in Iterable1():
+   |          ^^^^^^^^^^^
+   |
+info: Its `__iter__` method returns an object of type `Iterator1`, which has an invalid `__next__` method
+info: Expected signature for `__next__` is `def __next__(self): ...`
+```
+
+```py
+# snapshot: not-iterable
 for y in Iterable2():
     reveal_type(y)  # revealed: Unknown
 ```
 
-## Possibly missing `__iter__` and bad `__getitem__` method
+```snapshot
+error[not-iterable]: Object of type `Iterable2` is not iterable
+  --> src/mdtest_snippet.py:20:10
+   |
+20 | for y in Iterable2():
+   |          ^^^^^^^^^^^
+   |
+info: Its `__iter__` method returns an object of type `Iterator2`, which has a `__next__` attribute that is not callable
+```
 
-<!-- snapshot-diagnostics -->
+## Possibly missing `__iter__` and bad `__getitem__` method
 
 ```py
 def _(flag: bool):
@@ -636,9 +790,20 @@ def _(flag: bool):
         def __getitem__(self, key: str) -> bytes:
             return bytes()
 
-    # error: [not-iterable]
+    # snapshot: not-iterable
     for x in Iterable():
         reveal_type(x)  # revealed: int | bytes
+```
+
+```snapshot
+error[not-iterable]: Object of type `Iterable` may not be iterable
+  --> src/mdtest_snippet.py:16:14
+   |
+16 |     for x in Iterable():
+   |              ^^^^^^^^^^
+   |
+info: It may not have an `__iter__` method and its `__getitem__` method has an incorrect signature for the old-style iteration protocol
+info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol
 ```
 
 ## Possibly missing `__iter__` and not-callable `__getitem__`
@@ -671,8 +836,6 @@ def _(flag: bool):
 
 ## Possibly missing `__iter__` and possibly missing `__getitem__`
 
-<!-- snapshot-diagnostics -->
-
 ```py
 class Iterator:
     def __next__(self) -> int:
@@ -687,27 +850,43 @@ def _(flag1: bool, flag2: bool):
             def __getitem__(self, key: int) -> bytes:
                 return bytes()
 
-    # error: [not-iterable]
+    # snapshot: not-iterable
     for x in Iterable():
         reveal_type(x)  # revealed: int | bytes
 ```
 
-## No `__iter__` method and `__getitem__` is not callable
+```snapshot
+error[not-iterable]: Object of type `Iterable` may not be iterable
+  --> src/mdtest_snippet.py:15:14
+   |
+15 |     for x in Iterable():
+   |              ^^^^^^^^^^
+   |
+info: It may not have an `__iter__` method or a `__getitem__` method
+```
 
-<!-- snapshot-diagnostics -->
+## No `__iter__` method and `__getitem__` is not callable
 
 ```py
 class Bad:
     __getitem__: None = None
 
-# error: [not-iterable]
+# snapshot: not-iterable
 for x in Bad():
     reveal_type(x)  # revealed: Unknown
 ```
 
-## Possibly-not-callable `__getitem__` method
+```snapshot
+error[not-iterable]: Object of type `Bad` is not iterable
+ --> src/mdtest_snippet.py:5:10
+  |
+5 | for x in Bad():
+  |          ^^^^^
+  |
+info: It has no `__iter__` method and its `__getitem__` attribute has type `None`, which is not callable
+```
 
-<!-- snapshot-diagnostics -->
+## Possibly-not-callable `__getitem__` method
 
 ```py
 def _(flag: bool):
@@ -730,20 +909,42 @@ def _(flag: bool):
         else:
             __getitem__: None = None
 
-    # error: [not-iterable]
+    # snapshot: not-iterable
     for x in Iterable1():
         # TODO... `int` might be ideal here?
         reveal_type(x)  # revealed: int | Unknown
+```
 
-    # error: [not-iterable]
+```snapshot
+error[not-iterable]: Object of type `Iterable1` may not be iterable
+  --> src/mdtest_snippet.py:22:14
+   |
+22 |     for x in Iterable1():
+   |              ^^^^^^^^^^^
+   |
+info: It has no `__iter__` method and its `__getitem__` attribute is invalid
+info: `__getitem__` has type `CustomCallable`, which is not callable
+```
+
+```py
+    # snapshot: not-iterable
     for y in Iterable2():
         # TODO... `int` might be ideal here?
         reveal_type(y)  # revealed: int | Unknown
 ```
 
-## Bad `__getitem__` method
+```snapshot
+error[not-iterable]: Object of type `Iterable2` may not be iterable
+  --> src/mdtest_snippet.py:26:14
+   |
+26 |     for y in Iterable2():
+   |              ^^^^^^^^^^^
+   |
+info: It has no `__iter__` method and its `__getitem__` attribute is invalid
+info: `__getitem__` has type `(bound method Iterable2.__getitem__(key: int) -> int) | None`, which is not callable
+```
 
-<!-- snapshot-diagnostics -->
+## Bad `__getitem__` method
 
 ```py
 class Iterable:
@@ -752,9 +953,20 @@ class Iterable:
     def __getitem__(self, key: str) -> int:
         return 42
 
-# error: [not-iterable]
+# snapshot: not-iterable
 for x in Iterable():
     reveal_type(x)  # revealed: int
+```
+
+```snapshot
+error[not-iterable]: Object of type `Iterable` is not iterable
+ --> src/mdtest_snippet.py:8:10
+  |
+8 | for x in Iterable():
+  |          ^^^^^^^^^^
+  |
+info: It has no `__iter__` method and its `__getitem__` method has an incorrect signature for the old-style iteration protocol
+info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol
 ```
 
 ## Possibly missing `__iter__` but definitely bound `__getitem__`
@@ -782,8 +994,6 @@ def _(flag: bool):
 
 ## Possibly invalid `__iter__` methods
 
-<!-- snapshot-diagnostics -->
-
 ```py
 class Iterator:
     def __next__(self) -> int:
@@ -799,10 +1009,24 @@ def _(flag: bool):
             def __iter__(self, invalid_extra_arg) -> Iterator:
                 return Iterator()
 
-    # error: [not-iterable]
+    # snapshot: not-iterable
     for x in Iterable1():
         reveal_type(x)  # revealed: int
+```
 
+```snapshot
+error[not-iterable]: Object of type `Iterable1` may not be iterable
+  --> src/mdtest_snippet.py:16:14
+   |
+16 |     for x in Iterable1():
+   |              ^^^^^^^^^^^
+   |
+info: Its `__iter__` method may have an invalid signature
+info: Type of `__iter__` is `(bound method Iterable1.__iter__() -> Iterator) | (bound method Iterable1.__iter__(invalid_extra_arg) -> Iterator)`
+info: Expected signature for `__iter__` is `def __iter__(self): ...`
+```
+
+```py
     class Iterable2:
         if flag:
             def __iter__(self) -> Iterator:
@@ -811,15 +1035,23 @@ def _(flag: bool):
         else:
             __iter__: None = None
 
-    # error: [not-iterable]
+    # snapshot: not-iterable
     for x in Iterable2():
         # TODO: `int` would probably be better here:
         reveal_type(x)  # revealed: int | Unknown
 ```
 
-## Possibly invalid `__next__` method
+```snapshot
+error[not-iterable]: Object of type `Iterable2` may not be iterable
+  --> src/mdtest_snippet.py:27:14
+   |
+27 |     for x in Iterable2():
+   |              ^^^^^^^^^^^
+   |
+info: Its `__iter__` attribute (with type `(bound method Iterable2.__iter__() -> Iterator) | None`) may not be callable
+```
 
-<!-- snapshot-diagnostics -->
+## Possibly invalid `__next__` method
 
 ```py
 def _(flag: bool):
@@ -848,19 +1080,40 @@ def _(flag: bool):
         def __iter__(self) -> Iterator2:
             return Iterator2()
 
-    # error: [not-iterable]
+    # snapshot: not-iterable
     for x in Iterable1():
         reveal_type(x)  # revealed: int | str
+```
 
-    # error: [not-iterable]
+```snapshot
+error[not-iterable]: Object of type `Iterable1` may not be iterable
+  --> src/mdtest_snippet.py:28:14
+   |
+28 |     for x in Iterable1():
+   |              ^^^^^^^^^^^
+   |
+info: Its `__iter__` method returns an object of type `Iterator1`, which may have an invalid `__next__` method
+info: Expected signature for `__next__` is `def __next__(self): ...`
+```
+
+```py
+    # snapshot: not-iterable
     for y in Iterable2():
         # TODO: `int` would probably be better here:
         reveal_type(y)  # revealed: int | Unknown
 ```
 
-## Possibly invalid `__getitem__` methods
+```snapshot
+error[not-iterable]: Object of type `Iterable2` may not be iterable
+  --> src/mdtest_snippet.py:31:14
+   |
+31 |     for y in Iterable2():
+   |              ^^^^^^^^^^^
+   |
+info: Its `__iter__` method returns an object of type `Iterator2`, which has a `__next__` attribute that may not be callable
+```
 
-<!-- snapshot-diagnostics -->
+## Possibly invalid `__getitem__` methods
 
 ```py
 def _(flag: bool):
@@ -881,19 +1134,41 @@ def _(flag: bool):
             def __getitem__(self, item: str) -> int:
                 return 42
 
-    # error: [not-iterable]
+    # snapshot: not-iterable
     for x in Iterable1():
         # TODO: `str` might be better
         reveal_type(x)  # revealed: str | Unknown
+```
 
-    # error: [not-iterable]
+```snapshot
+error[not-iterable]: Object of type `Iterable1` may not be iterable
+  --> src/mdtest_snippet.py:20:14
+   |
+20 |     for x in Iterable1():
+   |              ^^^^^^^^^^^
+   |
+info: It has no `__iter__` method and its `__getitem__` attribute is invalid
+info: `__getitem__` has type `(bound method Iterable1.__getitem__(item: int) -> str) | None`, which is not callable
+```
+
+```py
+    # snapshot: not-iterable
     for y in Iterable2():
         reveal_type(y)  # revealed: str | int
 ```
 
-## Possibly missing `__iter__` and possibly invalid `__getitem__`
+```snapshot
+error[not-iterable]: Object of type `Iterable2` may not be iterable
+  --> src/mdtest_snippet.py:24:14
+   |
+24 |     for y in Iterable2():
+   |              ^^^^^^^^^^^
+   |
+info: It has no `__iter__` method and its `__getitem__` method (with type `(bound method Iterable2.__getitem__(item: int) -> str) | (bound method Iterable2.__getitem__(item: str) -> int)`) may have an incorrect signature for the old-style iteration protocol
+info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol
+```
 
-<!-- snapshot-diagnostics -->
+## Possibly missing `__iter__` and possibly invalid `__getitem__`
 
 ```py
 class Iterator:
@@ -925,14 +1200,37 @@ def _(flag: bool, flag2: bool):
             def __iter__(self) -> Iterator:
                 return Iterator()
 
-    # error: [not-iterable]
+    # snapshot: not-iterable
     for x in Iterable1():
         # TODO: `bytes | str` might be better
         reveal_type(x)  # revealed: bytes | str | Unknown
+```
 
-    # error: [not-iterable]
+```snapshot
+error[not-iterable]: Object of type `Iterable1` may not be iterable
+  --> src/mdtest_snippet.py:31:14
+   |
+31 |     for x in Iterable1():
+   |              ^^^^^^^^^^^
+   |
+info: It may not have an `__iter__` method and its `__getitem__` attribute (with type `(bound method Iterable1.__getitem__(item: int) -> str) | None`) may not be callable
+```
+
+```py
+    # snapshot: not-iterable
     for y in Iterable2():
         reveal_type(y)  # revealed: bytes | str | int
+```
+
+```snapshot
+error[not-iterable]: Object of type `Iterable2` may not be iterable
+  --> src/mdtest_snippet.py:35:14
+   |
+35 |     for y in Iterable2():
+   |              ^^^^^^^^^^^
+   |
+info: It may not have an `__iter__` method and its `__getitem__` method (with type `(bound method Iterable2.__getitem__(item: int) -> str) | (bound method Iterable2.__getitem__(item: str) -> int)`) may have an incorrect signature for the old-style iteration protocol
+info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol
 ```
 
 ## Empty tuple is iterable

@@ -1,41 +1,40 @@
-use crate::config::Log;
+use crate::config::{Log, MarkdownTestConfig, SystemKind};
 use crate::db::Db;
-use crate::parser::{BacktickOffsets, EmbeddedFileSourceMap};
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use camino::Utf8Path;
 use colored::Colorize;
-use config::SystemKind;
-use parser as test_parser;
+use mdtest::matcher::{self, Failure};
+use mdtest::parser::{self, EmbeddedFileSourceMap};
+use mdtest::{Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, TestFile, output_format};
 use ruff_db::Db as _;
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, DisplayDiagnosticConfig};
+use ruff_db::cancellation::CancellationTokenSource;
+use ruff_db::diagnostic::DiagnosticId;
 use ruff_db::files::{File, FileRootKind, system_path_to_file};
 use ruff_db::panic::{PanicError, catch_unwind};
-use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_diagnostics::Applicability;
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
-use std::fmt::{Display, Write};
+use std::fmt::Write;
 use ty_module_resolver::{
     Module, SearchPath, SearchPathSettings, list_modules, resolve_module_confident,
 };
+use ty_python_core::platform::PythonPlatform;
+use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::types::{UNDEFINED_REVEAL, check_types};
+use ty_python_semantic::types::UNDEFINED_REVEAL;
 use ty_python_semantic::{
-    FallibleStrategy, Program, ProgramSettings, PythonEnvironment, PythonPlatform,
-    PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
+    PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
+    fix_all_diagnostics,
 };
 
-mod assertion;
 mod config;
 mod db;
-mod diagnostic;
 mod external_dependencies;
-mod matcher;
-mod parser;
 
-use ty_static::EnvVars;
+/// If set to a value other than "0", runs tests that include external dependencies.
+const MDTEST_EXTERNAL: &str = "MDTEST_EXTERNAL";
 
 /// Run `path` as a markdown test suite with given `title`.
 ///
@@ -47,14 +46,16 @@ pub fn run(
     snapshot_path: &Utf8Path,
     short_title: &str,
     test_name: &str,
-    output_format: OutputFormat,
 ) -> anyhow::Result<()> {
-    let suite = test_parser::parse(short_title, source)
-        .map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
+    let output_format = output_format();
 
-    let mut db = db::Db::setup();
+    let suite =
+        parse(short_title, source).map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
 
-    let filter = std::env::var(EnvVars::MDTEST_TEST_FILTER).ok();
+    let mut db = Db::setup();
+    let mut markdown_edits = vec![];
+
+    let filter = std::env::var(MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
     let mut assertion = String::new();
     for test in suite.tests() {
@@ -77,7 +78,11 @@ pub fn run(
             snapshot_path,
             &test,
         );
-        let inconsistencies = if result.as_ref().is_ok_and(|t| t.has_been_skipped()) {
+
+        let inconsistencies = if result
+            .as_ref()
+            .is_ok_and(|(outcome, _)| outcome.has_been_skipped())
+        {
             Ok(())
         } else {
             run_module_resolution_consistency_test(&db)
@@ -90,40 +95,45 @@ pub fn run(
             let _ = writeln!(assertion, "\n\n{}\n", test.name().bold().underline());
         }
 
-        if let Err(failures) = result {
-            let md_index = LineIndex::from_source_text(source);
+        match result {
+            Ok((_, edits)) => markdown_edits.extend(edits),
+            Err(failures) => {
+                let md_index = LineIndex::from_source_text(source);
 
-            for test_failures in failures {
-                let source_map =
-                    EmbeddedFileSourceMap::new(&md_index, test_failures.backtick_offsets);
+                for test_failures in failures {
+                    let source_map =
+                        EmbeddedFileSourceMap::new(&md_index, test_failures.backtick_offsets);
 
-                for (relative_line_number, failures) in test_failures.by_line.iter() {
-                    let file = relative_fixture_path.as_str();
+                    for (relative_line_number, failures) in test_failures.by_line.iter() {
+                        let file = relative_fixture_path.as_str();
 
-                    let absolute_line_number =
-                        match source_map.to_absolute_line_number(relative_line_number) {
-                            Ok(line_number) => line_number,
-                            Err(last_line_number) => {
-                                output_format.write_error(
-                                    &mut assertion,
-                                    file,
-                                    last_line_number,
-                                    "Found a trailing assertion comment \
-                                        (e.g., `# revealed:` or `# error:`) \
-                                        not followed by any statement.",
-                                );
+                        let absolute_line_number =
+                            match source_map.to_absolute_line_number(relative_line_number) {
+                                Ok(line_number) => line_number,
+                                Err(last_line_number) => {
+                                    output_format.write_error(
+                                        &mut assertion,
+                                        file,
+                                        last_line_number,
+                                        &Failure::new(
+                                            "Found a trailing assertion comment \
+                                            (e.g., `# revealed:` or `# error:`) \
+                                            not followed by any statement.",
+                                        ),
+                                    );
 
-                                continue;
-                            }
-                        };
+                                    continue;
+                                }
+                            };
 
-                    for failure in failures {
-                        output_format.write_error(
-                            &mut assertion,
-                            file,
-                            absolute_line_number,
-                            failure,
-                        );
+                        for failure in failures {
+                            output_format.write_error(
+                                &mut assertion,
+                                file,
+                                absolute_line_number,
+                                failure,
+                            );
+                        }
                     }
                 }
             }
@@ -144,92 +154,25 @@ pub fn run(
             let _ = writeln!(
                 assertion,
                 "\nTo rerun this specific test, \
-                set the environment variable: {}='{escaped_test_name}'",
-                EnvVars::MDTEST_TEST_FILTER,
+                set the environment variable: {MDTEST_TEST_FILTER}='{escaped_test_name}'",
             );
             let _ = writeln!(
                 assertion,
-                "{}='{escaped_test_name}' cargo test -p ty_python_semantic \
+                "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p ty_python_semantic \
                 --test mdtest -- {test_name}",
-                EnvVars::MDTEST_TEST_FILTER,
             );
 
             let _ = writeln!(assertion, "\n{}", "-".repeat(50));
         }
     }
 
+    if !markdown_edits.is_empty() {
+        mdtest::try_apply_markdown_edits(absolute_fixture_path, source, markdown_edits);
+    }
+
     assert!(!any_failures, "{}", &assertion);
 
     Ok(())
-}
-
-/// Defines the format in which mdtest should print an error to the terminal
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OutputFormat {
-    /// The format `cargo test` should use by default.
-    Cli,
-    /// A format that will provide annotations from GitHub Actions
-    /// if mdtest fails on a PR.
-    /// See <https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/workflow-commands-for-github-actions#setting-an-error-message>
-    GitHub,
-}
-
-impl OutputFormat {
-    const fn is_cli(self) -> bool {
-        matches!(self, OutputFormat::Cli)
-    }
-
-    /// Write a test error in the appropriate format.
-    ///
-    /// For CLI format, errors are appended to `assertion_buf` so they appear
-    /// in the assertion-failure message.
-    ///
-    /// For GitHub format, errors are printed directly to stdout so that GitHub
-    /// Actions can detect them as workflow commands. Workflow commands must
-    /// appear at the beginning of a line in stdout to be parsed by GitHub.
-    #[expect(clippy::print_stdout)]
-    fn write_error(
-        self,
-        assertion_buf: &mut String,
-        file: &str,
-        line: OneIndexed,
-        failure: impl Display,
-    ) {
-        match self {
-            OutputFormat::Cli => {
-                let _ = writeln!(
-                    assertion_buf,
-                    "  {file_line} {failure}",
-                    file_line = format!("{file}:{line}").cyan()
-                );
-            }
-            OutputFormat::GitHub => {
-                println!("::error file={file},line={line}::{failure}");
-            }
-        }
-    }
-
-    /// Write a module-resolution inconsistency in the appropriate format.
-    ///
-    /// See [`write_error`](Self::write_error) for details on why GitHub-format
-    /// messages must be printed directly to stdout.
-    #[expect(clippy::print_stdout)]
-    fn write_inconsistency(
-        self,
-        assertion_buf: &mut String,
-        fixture_path: &Utf8Path,
-        inconsistency: &impl Display,
-    ) {
-        match self {
-            OutputFormat::Cli => {
-                let info = fixture_path.to_string().cyan();
-                let _ = writeln!(assertion_buf, "  {info} {inconsistency}");
-            }
-            OutputFormat::GitHub => {
-                println!("::error file={fixture_path}::{inconsistency}");
-            }
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -249,8 +192,8 @@ fn run_test(
     absolute_fixture_path: &Utf8Path,
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
-    test: &parser::MarkdownTest,
-) -> Result<TestOutcome, Failures> {
+    test: &parser::MarkdownTest<'_, '_, MarkdownTestConfig>,
+) -> Result<(TestOutcome, Vec<MarkdownEdit>), Failures> {
     // Initialize the system and remove all files and directories to reset the system to a clean state.
     match test.configuration().system.unwrap_or_default() {
         SystemKind::InMemory => {
@@ -284,8 +227,8 @@ fn run_test(
     // Setup virtual environment with dependencies if specified
     let venv_for_external_dependencies = SystemPathBuf::from("/.venv");
     if let Some(dependencies) = test.configuration().dependencies() {
-        if !std::env::var("MDTEST_EXTERNAL").is_ok_and(|v| v == "1") {
-            return Ok(TestOutcome::Skipped);
+        if !std::env::var(MDTEST_EXTERNAL).is_ok_and(|v| v == "1") {
+            return Ok((TestOutcome::Skipped, vec![]));
         }
 
         let python_platform = test.configuration().python_platform().expect(
@@ -378,7 +321,7 @@ fn run_test(
 
             Some(TestFile {
                 file,
-                backtick_offsets: embedded.backtick_offsets.clone(),
+                code_blocks: embedded.python_code_blocks.clone(),
             })
         })
         .collect();
@@ -468,9 +411,10 @@ fn run_test(
     db.update_analysis_options(configuration.analysis.as_ref());
     db.set_verbosity(test.configuration().verbose());
 
-    // When snapshot testing is enabled, this is populated with
-    // all diagnostics. Otherwise it remains empty.
-    let mut snapshot_diagnostics = vec![];
+    let mut all_diagnostics = vec![];
+
+    // Edits for updating changed inline snapshots.
+    let mut markdown_edits = vec![];
 
     let mut any_pull_types_failures = false;
     let mut panic_info = None;
@@ -478,23 +422,8 @@ fn run_test(
     let mut failures: Failures = test_files
         .iter()
         .filter_map(|test_file| {
-            let parsed = parsed_module(db, test_file.file).load(db);
-
-            let mut diagnostics: Vec<Diagnostic> = parsed
-                .errors()
-                .iter()
-                .map(|error| Diagnostic::invalid_syntax(test_file.file, &error.error, error))
-                .collect();
-
-            diagnostics.extend(
-                parsed
-                    .unsupported_syntax_errors()
-                    .iter()
-                    .map(|error| Diagnostic::invalid_syntax(test_file.file, error, error)),
-            );
-
-            let mdtest_result = attempt_test(db, check_types, test_file);
-            let type_diagnostics = match mdtest_result {
+            let mdtest_result = attempt_test(db, ty_python_semantic::Db::check_file, test_file);
+            let diagnostics = match mdtest_result {
                 Ok(diagnostics) => diagnostics,
                 Err(failures) => {
                     if test.should_expect_panic().is_ok() {
@@ -506,28 +435,25 @@ fn run_test(
                 }
             };
 
-            diagnostics.extend(type_diagnostics);
-            diagnostics.sort_by(|left, right| {
-                left.rendering_sort_key(db)
-                    .cmp(&right.rendering_sort_key(db))
-            });
-
-            let failure = match matcher::match_file(db, test_file.file, &diagnostics) {
+            let failure = match matcher::match_file(db, test_file.file, &diagnostics).and_then(
+                |inline_diagnostics| {
+                    mdtest::validate_inline_snapshot(
+                        db,
+                        "ty",
+                        test_file,
+                        &inline_diagnostics,
+                        &mut markdown_edits,
+                    )
+                },
+            ) {
                 Ok(()) => None,
                 Err(line_failures) => Some(FileFailures {
-                    backtick_offsets: test_file.backtick_offsets.clone(),
+                    backtick_offsets: test_file.to_code_block_backtick_offsets(),
                     by_line: line_failures,
                 }),
             };
 
-            // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
-            // since they make snapshots very noisy!
-            if test.should_snapshot_diagnostics() {
-                snapshot_diagnostics.extend(diagnostics.into_iter().filter(|diagnostic| {
-                    diagnostic.id() != DiagnosticId::RevealedType
-                        && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
-                }));
-            }
+            all_diagnostics.extend(diagnostics);
 
             let pull_types_result = attempt_test(db, pull_types, test_file);
             match pull_types_result {
@@ -557,17 +483,12 @@ fn run_test(
                 .should_expect_panic()
                 .expect("panic_info is only set when `should_expect_panic` is `Ok`");
 
-            let message = panic_info
-                .payload
-                .as_str()
-                .unwrap_or("Box<dyn Any>")
-                .to_string();
-
             if let Some(expected_message) = expected_message {
+                let message = panic_info.payload.to_string();
                 assert!(
                     message.contains(expected_message),
                     "Test `{}` is expected to panic with `{expected_message}`, but panicked with `{message}` instead.",
-                    test.name()
+                    test.name(),
                 );
             }
         }
@@ -588,27 +509,38 @@ fn run_test(
         let mut by_line = matcher::FailuresByLine::default();
         by_line.push(
             OneIndexed::from_zero_indexed(0),
-            vec![
+            vec![Failure::new(
                 "Remove the `<!-- pull-types:skip -->` directive from this test: pulling types \
-                 succeeded for all files in the test."
-                    .to_string(),
-            ],
+                 succeeded for all files in the test.",
+            )],
         );
         let failure = FileFailures {
-            backtick_offsets: test_files[0].backtick_offsets.clone(),
+            backtick_offsets: test_files[0].to_code_block_backtick_offsets(),
             by_line,
         };
         failures.push(failure);
     }
 
-    if snapshot_diagnostics.is_empty() && test.should_snapshot_diagnostics() {
-        panic!(
+    if test.should_snapshot_diagnostics() {
+        assert!(
+            !all_diagnostics.is_empty(),
             "Test `{}` requested snapshotting diagnostics but it didn't produce any.",
             test.name()
         );
-    } else if !snapshot_diagnostics.is_empty() {
-        let snapshot =
-            create_diagnostic_snapshot(db, relative_fixture_path, test, snapshot_diagnostics);
+
+        // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
+        // since they make snapshots very noisy!
+        let snapshot = mdtest::create_diagnostic_snapshot(
+            db,
+            "ty",
+            relative_fixture_path,
+            test,
+            all_diagnostics.iter().filter(|diagnostic| {
+                diagnostic.id() != DiagnosticId::RevealedType
+                    && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
+            }),
+        );
+
         let name = test.name().replace(' ', "_").replace(':', "__");
         insta::with_settings!(
             {
@@ -621,8 +553,49 @@ fn run_test(
         );
     }
 
+    // Test to fix all fixable diagnostics and verify that they don't introduce any syntax errors.
+    // But don't try to run fixes for tests that are expected to panic.
+    if test.should_expect_panic().is_err() {
+        let token_source = CancellationTokenSource::new();
+        let result = fix_all_diagnostics(
+            db,
+            all_diagnostics,
+            Applicability::Unsafe,
+            &token_source.token(),
+        )
+        .expect("to succeed because fixing is never cancelled");
+
+        tracing::debug!("Fixed {} diagnostics", result.count);
+
+        let mut fatals = result.diagnostics;
+        fatals.retain(|diagnostic| diagnostic.id() == DiagnosticId::InternalError);
+
+        for diagnostic in fatals {
+            let ty_file = diagnostic.expect_primary_span().expect_ty_file();
+
+            let test_file = test_files
+                .iter()
+                .find(|test_file| test_file.file == ty_file)
+                .unwrap_or(&test_files[0]);
+
+            let mut by_line = matcher::FailuresByLine::default();
+            by_line.push(
+                OneIndexed::from_zero_indexed(0),
+                vec![Failure::new(format_args!(
+                    "Fixing the diagnostics caused a fatal error:\n{}",
+                    mdtest::render_diagnostic(db, "ty", &diagnostic)
+                ))],
+            );
+            let failure = FileFailures {
+                backtick_offsets: test_file.to_code_block_backtick_offsets(),
+                by_line,
+            };
+            failures.push(failure);
+        }
+    }
+
     if failures.is_empty() {
-        Ok(TestOutcome::Success)
+        Ok((TestOutcome::Success, markdown_edits))
     } else {
         Err(failures)
     }
@@ -708,84 +681,12 @@ impl std::fmt::Display for ModuleInconsistency<'_> {
                 " when listing modules, but `resolve_module` returned `None`",
             )?,
             Some(ref got) => {
-                write!(f, " when listing modules, but `resolve_module` returned ",)?;
+                write!(f, " when listing modules, but `resolve_module` returned ")?;
                 fmt_module(self.db, f, got)?;
             }
         }
         Ok(())
     }
-}
-
-type Failures = Vec<FileFailures>;
-
-/// The failures for a single file in a test by line number.
-struct FileFailures {
-    /// Positional information about the code block(s) to reconstruct absolute line numbers.
-    backtick_offsets: Vec<BacktickOffsets>,
-
-    /// The failures by lines in the file.
-    by_line: matcher::FailuresByLine,
-}
-
-/// File in a test.
-struct TestFile {
-    file: File,
-
-    /// Positional information about the code block(s) to reconstruct absolute line numbers.
-    backtick_offsets: Vec<BacktickOffsets>,
-}
-
-fn create_diagnostic_snapshot(
-    db: &mut db::Db,
-    relative_fixture_path: &Utf8Path,
-    test: &parser::MarkdownTest,
-    diagnostics: impl IntoIterator<Item = Diagnostic>,
-) -> String {
-    let display_config = DisplayDiagnosticConfig::new("ty")
-        .color(false)
-        .show_fix_diff(true)
-        .with_fix_applicability(Applicability::DisplayOnly);
-
-    let mut snapshot = String::new();
-    writeln!(snapshot).unwrap();
-    writeln!(snapshot, "---").unwrap();
-    writeln!(snapshot, "mdtest name: {}", test.uncontracted_name()).unwrap();
-    writeln!(snapshot, "mdtest path: {relative_fixture_path}").unwrap();
-    writeln!(snapshot, "---").unwrap();
-    writeln!(snapshot).unwrap();
-
-    writeln!(snapshot, "# Python source files").unwrap();
-    writeln!(snapshot).unwrap();
-    for file in test.files() {
-        writeln!(snapshot, "## {}", file.relative_path()).unwrap();
-        writeln!(snapshot).unwrap();
-        // Note that we don't use ```py here because the line numbering
-        // we add makes it invalid Python. This sacrifices syntax
-        // highlighting when you look at the snapshot on GitHub,
-        // but the line numbers are extremely useful for analyzing
-        // snapshots. So we keep them.
-        writeln!(snapshot, "```").unwrap();
-
-        let line_number_width = file.code.lines().count().to_string().len();
-        for (i, line) in file.code.lines().enumerate() {
-            let line_number = i + 1;
-            writeln!(snapshot, "{line_number:>line_number_width$} | {line}").unwrap();
-        }
-        writeln!(snapshot, "```").unwrap();
-        writeln!(snapshot).unwrap();
-    }
-
-    writeln!(snapshot, "# Diagnostics").unwrap();
-    writeln!(snapshot).unwrap();
-    for (i, diag) in diagnostics.into_iter().enumerate() {
-        if i > 0 {
-            writeln!(snapshot).unwrap();
-        }
-        writeln!(snapshot, "```").unwrap();
-        write!(snapshot, "{}", diag.display(db, &display_config)).unwrap();
-        writeln!(snapshot, "```").unwrap();
-    }
-    snapshot
 }
 
 /// Run a function over an embedded test file, catching any panics that occur in the process.
@@ -797,7 +698,7 @@ fn create_diagnostic_snapshot(
 fn attempt_test<'db, 'a, T, F>(
     db: &'db Db,
     test_fn: F,
-    test_file: &'a TestFile,
+    test_file: &'a TestFile<'a>,
 ) -> Result<T, AttemptTestError<'a>>
 where
     F: FnOnce(&'db dyn ty_python_semantic::Db, File) -> T + std::panic::UnwindSafe,
@@ -808,7 +709,7 @@ where
 
 struct AttemptTestError<'a> {
     info: PanicError,
-    test_file: &'a TestFile,
+    test_file: &'a TestFile<'a>,
 }
 
 impl AttemptTestError<'_> {
@@ -823,34 +724,29 @@ impl AttemptTestError<'_> {
         let mut by_line = matcher::FailuresByLine::default();
         let mut messages = vec![];
         match info.location {
-            Some(location) => messages.push(format!(
+            Some(location) => messages.push(Failure::new(format_args!(
                 "Attempting to {action} caused a panic at {location}"
-            )),
-            None => messages.push(format!(
+            ))),
+            None => messages.push(Failure::new(format_args!(
                 "Attempting to {action} caused a panic at an unknown location",
-            )),
+            ))),
         }
         if let Some(clarification) = clarification {
-            messages.push(clarification.to_string());
+            messages.push(Failure::new(clarification));
         }
-        messages.push(String::new());
-        match info.payload.as_str() {
-            Some(message) => messages.push(message.to_string()),
-            // Mimic the default panic hook's rendering of the panic payload if it's
-            // not a string.
-            None => messages.push("Box<dyn Any>".to_string()),
-        }
-        messages.push(String::new());
+        messages.push(Failure::new(""));
+        messages.push(Failure::new(info.payload));
+        messages.push(Failure::new(""));
 
         if let Some(backtrace) = info.backtrace {
             match backtrace.status() {
                 BacktraceStatus::Disabled => {
-                    let msg =
-                        "run with `RUST_BACKTRACE=1` environment variable to display a backtrace";
-                    messages.push(msg.to_string());
+                    let msg = "run with `RUST_BACKTRACE=1` environment variable to \
+                         a backtrace";
+                    messages.push(Failure::new(msg));
                 }
                 BacktraceStatus::Captured => {
-                    messages.extend(backtrace.to_string().split('\n').map(String::from));
+                    messages.extend(backtrace.to_string().split('\n').map(Failure::new));
                 }
                 _ => {}
             }
@@ -858,15 +754,74 @@ impl AttemptTestError<'_> {
 
         if let Some(backtrace) = info.salsa_backtrace {
             salsa::attach(db, || {
-                messages.extend(format!("{backtrace:#}").split('\n').map(String::from));
+                messages.extend(format!("{backtrace:#}").split('\n').map(Failure::new));
             });
         }
 
         by_line.push(OneIndexed::from_zero_indexed(0), messages);
 
         FileFailures {
-            backtick_offsets: self.test_file.backtick_offsets.clone(),
+            backtick_offsets: self.test_file.to_code_block_backtick_offsets(),
             by_line,
         }
+    }
+}
+
+fn parse<'s>(
+    short_title: &'s str,
+    source: &'s str,
+) -> anyhow::Result<parser::MarkdownTestSuite<'s, MarkdownTestConfig>> {
+    let mut file_has_dependencies = false;
+    parser::parse::<MarkdownTestConfig>(short_title, source, |config| {
+        if config.dependencies().is_some() {
+            if file_has_dependencies {
+                bail!(
+                    "Multiple sections with `[project]` dependencies in the same file are not allowed. \
+                     External dependencies must be specified in a single top-level configuration block."
+                );
+            }
+            file_has_dependencies = true;
+        }
+        Ok(())
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_python_trivia::textwrap::dedent;
+
+    #[test]
+    fn multiple_sections_with_dependencies_not_allowed() {
+        let source = dedent(
+            r#"
+            # First section
+
+            ```toml
+            [project]
+            dependencies = ["pydantic==2.12.2"]
+            ```
+
+            ```py
+            x = 1
+            ```
+
+            # Second section
+
+            ```toml
+            [project]
+            dependencies = ["numpy==2.0.0"]
+            ```
+
+            ```py
+            y = 2
+            ```
+            "#,
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            err.to_string(),
+            "Multiple sections with `[project]` dependencies in the same file are not allowed. \
+             External dependencies must be specified in a single top-level configuration block."
+        );
     }
 }

@@ -12,7 +12,6 @@ str
 info[hover]: Hovered content is
  --> main.py:3:5
   |
-2 | def f(s: str):
 3 |     s[1:-1]
   |     ^^-^^^^
   |     | |
@@ -32,7 +31,6 @@ str
 info[hover]: Hovered content is
  --> main.py:3:5
   |
-2 | def f(s: str):
 3 |     s[1:-1]
   |     ^^^^-^^
   |     |   |
@@ -52,7 +50,6 @@ str
 info[hover]: Hovered content is
  --> main.py:3:5
   |
-2 | def f(s: str):
 3 |     s[1:-1]
   |     ^^^^^-^
   |     |    |

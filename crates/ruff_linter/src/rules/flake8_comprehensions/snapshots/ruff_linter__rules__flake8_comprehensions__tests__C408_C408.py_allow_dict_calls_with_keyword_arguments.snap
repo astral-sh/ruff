@@ -52,7 +52,7 @@ help: Rewrite as a literal
 3 + d1 = {}
 4 | d2 = dict(a=1)
 5 | d3 = dict(**d2)
-6 | 
+6 |
 note: This is an unsafe fix and may change runtime behavior
 
 C408 [*] Unnecessary `dict()` call (rewrite as a literal)
@@ -65,13 +65,13 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
 17 | f"a {dict()} b"
    |
 help: Rewrite as a literal
-13 | 
+13 |
 14 | f"{dict(x='y')}"
 15 | f'{dict(x="y")}'
    - f"{dict()}"
 16 + f"{ {} }"
 17 | f"a {dict()} b"
-18 | 
+18 |
 19 | f"{dict(x='y') | dict(y='z')}"
 note: This is an unsafe fix and may change runtime behavior
 
@@ -91,7 +91,7 @@ help: Rewrite as a literal
 16 | f"{dict()}"
    - f"a {dict()} b"
 17 + f"a { {} } b"
-18 | 
+18 |
 19 | f"{dict(x='y') | dict(y='z')}"
 20 | f"{ dict(x='y') | dict(y='z') }"
 note: This is an unsafe fix and may change runtime behavior
@@ -111,13 +111,13 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
 help: Rewrite as a literal
 21 | f"a {dict(x='y') | dict(y='z')} b"
 22 | f"a { dict(x='y') | dict(y='z') } b"
-23 | 
+23 |
    - dict(
 24 + {
 25 |     # comment
    - )
 26 + }
-27 | 
+27 |
 28 | tuple(  # comment
 29 | )
 note: This is an unsafe fix and may change runtime behavior
@@ -136,11 +136,11 @@ C408 [*] Unnecessary `tuple()` call (rewrite as a literal)
 help: Rewrite as a literal
 25 |     # comment
 26 | )
-27 | 
+27 |
    - tuple(  # comment
 28 + (  # comment
 29 | )
-30 | 
+30 |
 31 | t"{dict(x='y')}"
 note: This is an unsafe fix and may change runtime behavior
 
@@ -154,13 +154,13 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
 34 | t"a {dict()} b"
    |
 help: Rewrite as a literal
-30 | 
+30 |
 31 | t"{dict(x='y')}"
 32 | t'{dict(x="y")}'
    - t"{dict()}"
 33 + t"{ {} }"
 34 | t"a {dict()} b"
-35 | 
+35 |
 36 | t"{dict(x='y') | dict(y='z')}"
 note: This is an unsafe fix and may change runtime behavior
 
@@ -180,7 +180,7 @@ help: Rewrite as a literal
 33 | t"{dict()}"
    - t"a {dict()} b"
 34 + t"a { {} } b"
-35 | 
+35 |
 36 | t"{dict(x='y') | dict(y='z')}"
 37 | t"{ dict(x='y') | dict(y='z') }"
 note: This is an unsafe fix and may change runtime behavior

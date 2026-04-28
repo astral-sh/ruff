@@ -49,6 +49,71 @@ first_arg_int("not an int", "42", "42")  # TODO: should error
 first_arg_int(56, "42", 56)  # TODO: should error
 ```
 
+## Allowed `Unpack` contexts
+
+We do not yet model every `Unpack` form precisely, but we should not emit false-positive diagnostics
+in contexts where `Unpack` is allowed.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import Callable, Generic, TypeVar, TypeVarTuple, Unpack
+
+T = TypeVar("T")
+U = TypeVar("U")
+Ts = TypeVarTuple("Ts")
+Us = TypeVarTuple("Us")
+
+class Variadic(Generic[Unpack[Ts]]): ...
+class Prefix(Generic[T, Unpack[Ts]]): ...
+class Suffix(Generic[Unpack[Ts], T]): ...
+class Pair(Generic[T, U]): ...
+class Triple(Generic[T, U, Unpack[Us]]): ...
+
+def variadic_typevartuple(*args: Unpack[Ts]) -> None:
+    reveal_type(args)  # revealed: tuple[@Todo(`Unpack[]` special form), ...]
+
+def variadic_tuple(*args: Unpack[tuple[int, str]]) -> None:
+    reveal_type(args)  # revealed: tuple[@Todo(`Unpack[]` special form), ...]
+
+def allowed(
+    tuple_fixed: tuple[int, Unpack[tuple[str, bytes]]],
+    tuple_variadic: tuple[int, Unpack[tuple[str, ...]], bytes],
+    callable_typevartuple: Callable[[int, Unpack[Ts]], None],
+    callable_tuple: Callable[[Unpack[tuple[int, str]]], None],
+    variadic: Variadic[Unpack[tuple[int, str]]],
+    prefix: Prefix[int, Unpack[tuple[str, bytes]]],
+    suffix: Suffix[Unpack[tuple[int, str]], bytes],
+    pair: Pair[Unpack[tuple[int, str]]],
+    quoted_pair_argument: Pair["Unpack[tuple[int, str]]"],
+    triple: Triple[int, Unpack[tuple[str, bytes]]],
+    quoted_tuple: "tuple[int, Unpack[tuple[str, bytes]]]",
+    quoted_pair: "Pair[Unpack[tuple[int, str]]]",
+) -> None:
+    reveal_type(tuple_fixed)  # revealed: tuple[int, str, bytes]
+    reveal_type(tuple_variadic)  # revealed: tuple[int, *tuple[str, ...], bytes]
+    reveal_type(callable_typevartuple)  # revealed: (...) -> None
+    reveal_type(callable_tuple)  # revealed: (tuple[int, str], /) -> None
+    reveal_type(pair)  # revealed: Pair[int, str]
+    reveal_type(quoted_pair_argument)  # revealed: Pair[int, str]
+    reveal_type(quoted_tuple)  # revealed: tuple[int, str, bytes]
+    reveal_type(quoted_pair)  # revealed: Pair[int, str]
+
+def invalid_parameter(invalid: Unpack[tuple[int, str]]) -> None:  # error: [invalid-type-form]
+    pass
+
+def invalid_generic(
+    non_tuple: Pair[Unpack[int], str],  # error: [invalid-type-form]
+    quoted_non_tuple: Pair["Unpack[int]", str],  # error: [invalid-type-form]
+    variadic_tuple: Pair[Unpack[tuple[int, ...]], str],  # error: [invalid-type-form]
+    quoted_variadic_tuple: Pair["Unpack[tuple[int, ...]]", str],  # error: [invalid-type-form]
+) -> None:
+    pass
+```
+
 ## Type expressions
 
 One thing that is supported is error messages for using special forms in type expressions.
@@ -57,19 +122,19 @@ One thing that is supported is error messages for using special forms in type ex
 from typing_extensions import Unpack, TypeGuard, TypeIs, Concatenate, ParamSpec, Generic
 
 def _(
-    a: Unpack,  # error: [invalid-type-form] "`typing.Unpack` requires exactly one argument when used in a type expression"
-    b: TypeGuard,  # error: [invalid-type-form] "`typing.TypeGuard` requires exactly one argument when used in a type expression"
-    c: TypeIs,  # error: [invalid-type-form] "`typing.TypeIs` requires exactly one argument when used in a type expression"
-    d: Concatenate,  # error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
+    a: Unpack,  # error: [invalid-type-form] "`typing.Unpack` requires exactly one argument when used in a parameter annotation"
+    b: TypeGuard,  # error: [invalid-type-form] "`typing.TypeGuard` requires exactly one argument when used in a parameter annotation"
+    c: TypeIs,  # error: [invalid-type-form] "`typing.TypeIs` requires exactly one argument when used in a parameter annotation"
+    d: Concatenate,  # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a parameter annotation"
     e: ParamSpec,
-    f: Generic,  # error: [invalid-type-form] "`typing.Generic` is not allowed in type expressions"
+    f: Generic,  # error: [invalid-type-form] "`typing.Generic` is not allowed in parameter annotations"
 ) -> None:
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
     reveal_type(c)  # revealed: Unknown
     reveal_type(d)  # revealed: Unknown
 
-    # error: [invalid-type-form] "Variable of type `ParamSpec` is not allowed in a type expression"
+    # error: [invalid-type-form] "Variable of type `ParamSpec` is not allowed in a parameter annotation"
     def foo(a_: e) -> None:
         reveal_type(a_)  # revealed: Unknown
 ```
@@ -109,7 +174,6 @@ from typing_extensions import Self, TypeAlias, TypeVar
 T = TypeVar("T")
 
 # error: [invalid-type-form] "Special form `typing.TypeAlias` expected no type parameter"
-# error: [unbound-type-variable]
 X: TypeAlias[T] = int
 
 class Foo[T]:

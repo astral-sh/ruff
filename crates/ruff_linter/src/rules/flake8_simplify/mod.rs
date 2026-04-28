@@ -6,13 +6,14 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
     use crate::settings::types::PreviewMode;
     use crate::test::test_path;
-    use crate::{assert_diagnostics, settings};
+    use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::DuplicateIsinstanceCall, Path::new("SIM101.py"))]
     #[test_case(Rule::CollapsibleIf, Path::new("SIM102.py"))]
@@ -74,6 +75,20 @@ mod tests {
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::SuppressibleException, Path::new("SIM105_5.py"))]
+    fn version_specific_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("diff_{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("flake8_simplify").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code)
+                .with_target_version(PythonVersion::PY311),
+            &settings::LinterSettings::for_rule(rule_code)
+                .with_target_version(PythonVersion::PY312)
+        );
         Ok(())
     }
 }

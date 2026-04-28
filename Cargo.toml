@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 # Please update rustfmt.toml when bumping the Rust edition
 edition = "2024"
-rust-version = "1.92"
+rust-version = "1.93"
 homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
@@ -50,11 +50,14 @@ ty_ide = { path = "crates/ty_ide" }
 ty_module_resolver = { path = "crates/ty_module_resolver" }
 ty_project = { path = "crates/ty_project", default-features = false }
 ty_python_semantic = { path = "crates/ty_python_semantic" }
+ty_python_core = { path = "crates/ty_python_core" }
 ty_server = { path = "crates/ty_server" }
 ty_site_packages = { path = "crates/ty_site_packages" }
 ty_static = { path = "crates/ty_static" }
 ty_test = { path = "crates/ty_test" }
 ty_vendored = { path = "crates/ty_vendored" }
+
+mdtest = { path = "crates/mdtest" }
 
 aho-corasick = { version = "1.1.3" }
 anstream = { version = "1.0.0" }
@@ -74,7 +77,7 @@ camino = { version = "1.1.7" }
 clap = { version = "4.5.3", features = ["derive"] }
 clap_complete_command = { version = "0.6.0" }
 clearscreen = { version = "4.0.0" }
-codspeed-criterion-compat = { version = "4.0.4", default-features = false }
+codspeed-criterion-compat = { version = "4.4.1", default-features = false }
 colored = { version = "3.0.0" }
 compact_str = "0.9.0"
 console_error_panic_hook = { version = "0.1.7" }
@@ -85,13 +88,13 @@ crossbeam = { version = "0.8.4" }
 csv = { version = "1.3.1" }
 dashmap = { version = "6.0.1" }
 datatest-stable = { version = "0.3.3" }
-divan = { package = "codspeed-divan-compat", version = "4.0.4" }
+divan = { package = "codspeed-divan-compat", version = "4.4.1" }
 drop_bomb = { version = "0.1.5" }
 dunce = { version = "1.0.5" }
 etcetera = { version = "0.11.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
-get-size2 = { version = "0.7.3", features = [
+get-size2 = { version = "0.8.0", features = [
     "derive",
     "smallvec",
     "hashbrown",
@@ -102,14 +105,15 @@ getrandom = { version = "0.4.1" }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 globwalk = { version = "0.9.1" }
-hashbrown = { version = "0.16.0", default-features = false, features = [
+hashbrown = { version = "0.17.0", default-features = false, features = [
     "raw-entry",
     "equivalent",
     "inline-more",
 ] }
 heck = "0.5.0"
+icu_properties = { version = "2.1.2" }
 ignore = { version = "0.4.24" }
-imara-diff = { version = "0.1.5" }
+imara-diff = { version = "0.2.0" }
 imperative = { version = "1.0.4" }
 indexmap = { version = "2.6.0" }
 indicatif = { version = "0.18.0" }
@@ -130,7 +134,7 @@ lsp-types = { git = "https://github.com/astral-sh/lsp-types.git", rev = "e15db05
 ] }
 matchit = { version = "0.9.0" }
 memchr = { version = "2.7.1" }
-mimalloc = { version = "0.1.39" }
+mimalloc = { version = "0.1.49", features = ["v2"] }
 natord = { version = "1.0.9" }
 notify = { version = "8.0.0" }
 ordermap = { version = "1.0.0" }
@@ -141,7 +145,7 @@ pep440_rs = { version = "0.7.1" }
 pretty_assertions = "1.3.0"
 proc-macro2 = { version = "1.0.79" }
 pyproject-toml = { version = "0.13.4" }
-quick-junit = { version = "0.5.0" }
+quick-junit = { version = "0.6.0" }
 quickcheck = { version = "1.0.3", default-features = false }
 quickcheck_macros = { version = "1.0.0" }
 quote = { version = "1.0.23" }
@@ -153,7 +157,7 @@ regex-syntax = { version = "0.8.8" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "2f687a17ceea8ec7aaa605561ccbde938ccef086", default-features = false, features = [
+salsa = { version="0.26.1", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",
@@ -169,7 +173,7 @@ serde_with = { version = "3.6.0", default-features = false, features = [
     "macros",
 ] }
 shellexpand = { version = "3.0.0" }
-similar = { version = "2.4.0", features = ["inline"] }
+similar = { version = "3.0.0", features = ["inline"] }
 smallvec = { version = "1.13.2", features = ["union", "const_generics", "const_new"] }
 snapbox = { version = "1.0.0", features = [
     "diff",
@@ -199,7 +203,6 @@ tracing-subscriber = { version = "0.3.18", default-features = false, features = 
 ] }
 tryfn = { version = "1.0.0" }
 typed-arena = { version = "2.0.2" }
-unic-ucd-category = { version = "0.9" }
 unicode-ident = { version = "1.0.12" }
 unicode-normalization = { version = "0.1.23" }
 unicode-width = { version = "0.2.0" }
@@ -216,9 +219,6 @@ zip = { version = "0.6.6", default-features = false }
 [workspace.metadata.cargo-shear]
 ignored = [
     "getrandom",
-    "ruff_options_metadata",
-    "uuid",
-    "get-size2",
     "ty_completion_bench",
     "ty_completion_eval",
 ]
@@ -249,6 +249,7 @@ must_use_candidate = "allow"
 similar_names = "allow"
 single_match_else = "allow"
 too_many_lines = "allow"
+collapsible_match = "allow"  # Not always an improvement in readability, quite opinionated
 needless_continue = "allow" # An explicit continue can be more readable, especially if the alternative is an empty block.
 unnecessary_debug_formatting = "allow" # too many instances, the display also doesn't quote the path which is often desired in logs where we use them the most often.
 # Without the hashes we run into a `rustfmt` bug in some snapshot tests, see #13250

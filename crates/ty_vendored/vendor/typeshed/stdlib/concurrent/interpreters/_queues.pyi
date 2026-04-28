@@ -5,7 +5,7 @@ import sys
 from typing import Final, SupportsIndex
 from typing_extensions import Self
 
-if sys.version_info >= (3, 13):  # needed to satisfy pyright checks for Python <3.13
+if sys.version_info >= (3, 14):  # needed to satisfy pyright checks for Python <= 3.13
     from _interpqueues import QueueError as QueueError, QueueNotFoundError as QueueNotFoundError
 
     from . import _crossinterp

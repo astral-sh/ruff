@@ -317,7 +317,7 @@ help: Add missing whitespace
     - c = (a+ b)*(a - b)
 100 + c = (a + b)*(a - b)
 101 | #:
-102 | 
+102 |
 103 | #: E226
 
 E226 [*] Missing whitespace around arithmetic operator
@@ -336,7 +336,7 @@ help: Add missing whitespace
     - c = (a+ b)*(a - b)
 100 + c = (a+ b) * (a - b)
 101 | #:
-102 | 
+102 |
 103 | #: E226
 
 E226 [*] Missing whitespace around arithmetic operator
@@ -350,7 +350,7 @@ E226 [*] Missing whitespace around arithmetic operator
     |
 help: Add missing whitespace
 101 | #:
-102 | 
+102 |
 103 | #: E226
     - z = 2//30
 104 + z = 2 // 30

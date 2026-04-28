@@ -306,7 +306,7 @@ support needs to be explicitly included by adding it to `types_or`:
 ```yaml title=".pre-commit-config.yaml"
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.7
+    rev: v0.15.12
     hooks:
       - id: ruff-format
         types_or: [python, pyi, jupyter, markdown]
@@ -553,8 +553,9 @@ f'{1=:"foo}'
 f"{1=:"foo}"
 ```
 
-For nested f-strings, Ruff alternates quote styles, starting with the [configured quote style] for the
-outermost f-string. For example, consider the following f-string:
+By default, or when targeting Python versions below 3.12, Ruff alternates quote styles for nested
+f-strings, starting with the [configured quote style] for the outermost f-string.
+For example, consider the following f-string:
 
 ```python
 # format.quote-style = "double"
@@ -562,10 +563,17 @@ outermost f-string. For example, consider the following f-string:
 f"outer f-string {f"nested f-string {f"another nested f-string"} end"} end"
 ```
 
-Ruff formats it as:
+With default settings, Ruff formats it as:
 
 ```python
 f"outer f-string {f'nested f-string {f"another nested f-string"} end'} end"
+```
+
+When targeting Python 3.12+ and with `nested-string-quote-style = "preferred"`,
+Ruff will use the configured quote style for nested strings:
+
+```python
+f"outer f-string {f"nested f-string {f"another nested f-string"} end"} end"
 ```
 
 #### Line breaks

@@ -486,12 +486,43 @@ def i[T: (int, str)](x: T) -> T:
             assert_never(x)
 
     return x
+
+def eq_narrow_match_constrained[T: (Literal["foo"], Literal["bar"])](x: T) -> T:
+    match x:
+        case "foo":
+            pass
+        case "bar":
+            pass
+        case _:
+            assert_never(x)
+
+    return x
+
+def eq_narrow_if_bounded[T: Literal["foo", "bar"]](x: T) -> T:
+    if x == "foo":
+        pass
+    elif x == "bar":
+        pass
+    else:
+        assert_never(x)
+
+    return x
+
+def eq_narrow_if_constrained[T: (Literal["foo"], Literal["bar"])](x: T) -> T:
+    if x == "foo":
+        pass
+    elif x == "bar":
+        pass
+    else:
+        assert_never(x)
+
+    return x
 ```
 
-In this example, no `invalid-return-type` is emitted, despite the fact there is no `else` clause.
-Note that this example deliberately also does *not* have any `assert_never` or `assert_type` calls,
-since these call expressions can create their own `IsNonTerminalCall` predicates in our reachability
-infrastructure!
+In these examples, no `invalid-return-type` diagnostics are emitted, despite the fact there are no
+`else` clauses. Note that these examples deliberately also do *not* have any `assert_never` or
+`assert_type` calls, since these call expressions can create their own `IsNonTerminalCall`
+predicates in our reachability infrastructure!
 
 ```py
 class A: ...
@@ -527,6 +558,32 @@ def n[T: (A, B)](x: T) -> bool:
         case A():
             return True
         case B():
+            return False
+
+def o[T: Literal["foo", "bar"]](x: T) -> bool:
+    if x == "foo":
+        return True
+    elif x == "bar":
+        return False
+
+def p[T: Literal["foo", "bar"]](x: T) -> bool:
+    match x:
+        case "foo":
+            return True
+        case "bar":
+            return False
+
+def q[T: (Literal["foo"], Literal["bar"])](x: T) -> bool:
+    if x == "foo":
+        return True
+    elif x == "bar":
+        return False
+
+def r[T: (Literal["foo"], Literal["bar"])](x: T) -> bool:
+    match x:
+        case "foo":
+            return True
+        case "bar":
             return False
 ```
 

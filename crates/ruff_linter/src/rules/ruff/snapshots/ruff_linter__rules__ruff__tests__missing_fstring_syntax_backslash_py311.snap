@@ -29,7 +29,7 @@ help: Add `f` prefix
 41 +     multi_line = a = f"""b { # comment
 42 |     c}  d
 43 |     """
-44 | 
+44 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -52,7 +52,7 @@ help: Add `f` prefix
 49 +     b = f" {\
 50 |     a} \
 51 |     "
-52 | 
+52 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -72,7 +72,7 @@ help: Add `f` prefix
 91 |     x = "test"
    -     print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
 92 +     print(f"Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
-93 | 
+93 |
 94 | # Test case for comment handling in f-string interpolations
 95 | # Should not trigger RUF027 for Python < 3.12 due to comments in interpolations
 note: This is an unsafe fix and may change runtime behavior
@@ -97,6 +97,6 @@ help: Add `f` prefix
     -     print("""{x  # }
 98  +     print(f"""{x  # }
 99  | }""")
-100 | 
+100 |
 101 | # Test case for `#` inside a nested string literal in interpolation
 note: This is an unsafe fix and may change runtime behavior

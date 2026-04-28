@@ -38,6 +38,7 @@
 
 use super::RecursivelyDefined;
 use crate::types::enums::{enum_member_literals, enum_metadata};
+use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType, Type,
@@ -196,6 +197,16 @@ enum UnionElement<'db> {
 }
 
 impl<'db> UnionElement<'db> {
+    fn type_count(&self) -> usize {
+        match self {
+            UnionElement::Type(_) => 1,
+            UnionElement::IntLiterals(literals) => literals.len(),
+            UnionElement::StringLiterals(literals) => literals.len(),
+            UnionElement::BytesLiterals(literals) => literals.len(),
+            UnionElement::EnumLiterals { literals, .. } => literals.len(),
+        }
+    }
+
     /// Try reducing this `UnionElement` given the presence in the same union of `other_type`.
     fn try_reduce(&mut self, db: &'db dyn Db, other_type: Type<'db>) -> ReduceResult<'db> {
         let mut other_type_negated_cache = None;
@@ -337,6 +348,62 @@ pub(crate) struct UnionBuilder<'db> {
     /// execution of `is_redundant_with` is skipped.
     cycle_recovery: bool,
     recursively_defined: RecursivelyDefined,
+}
+
+/// Accumulates types into a union.
+///
+/// Most real-world type variables only accumulate one or two constraints. We keep those cases as
+/// plain `Type`s and only allocate a `UnionBuilder` once we know the accumulation is larger.
+pub(crate) enum UnionAccumulator<'db> {
+    One(Type<'db>),
+    Two(Type<'db>, Type<'db>),
+    Deferred(UnionBuilder<'db>),
+}
+
+impl<'db> UnionAccumulator<'db> {
+    pub(crate) fn new(ty: Type<'db>) -> Self {
+        UnionAccumulator::One(ty)
+    }
+
+    pub(crate) fn add(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+        match self {
+            UnionAccumulator::One(existing) => {
+                *self = UnionAccumulator::Two(*existing, ty);
+            }
+            UnionAccumulator::Two(first, second) => {
+                let mut builder = UnionBuilder::new(db);
+                builder.add_in_place(*first);
+                builder.add_in_place(*second);
+                builder.add_in_place(ty);
+                *self = UnionAccumulator::Deferred(builder);
+            }
+            UnionAccumulator::Deferred(builder) => builder.add_in_place(ty),
+        }
+    }
+
+    pub(crate) fn get_or_build(&mut self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            UnionAccumulator::One(ty) => *ty,
+            UnionAccumulator::Two(first, second) => {
+                let ty = UnionType::from_two_elements(db, *first, *second);
+                *self = UnionAccumulator::One(ty);
+                ty
+            }
+            UnionAccumulator::Deferred(_) => {
+                let ty = std::mem::replace(self, UnionAccumulator::new(Type::Never)).into_type(db);
+                *self = UnionAccumulator::new(ty);
+                ty
+            }
+        }
+    }
+
+    pub(crate) fn into_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            UnionAccumulator::One(ty) => ty,
+            UnionAccumulator::Two(first, second) => UnionType::from_two_elements(db, first, second),
+            UnionAccumulator::Deferred(builder) => builder.build(),
+        }
+    }
 }
 
 impl<'db> UnionBuilder<'db> {
@@ -822,7 +889,8 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn try_build(self) -> Option<Type<'db>> {
-        let mut types = vec![];
+        let type_count = self.elements.iter().map(UnionElement::type_count).sum();
+        let mut types = Vec::with_capacity(type_count);
         for element in self.elements {
             match element {
                 UnionElement::IntLiterals(literals) => {
@@ -1343,10 +1411,20 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
     /// Adds a negative type to this intersection.
     fn add_negative(&mut self, db: &'db dyn Db, new_negative: Type<'db>) {
-        // `Divergent & ~T` -> `Divergent`. Note that `~Divergent` becomes `Divergent` via the
-        // `Type::Dynamic` branch below, so we don't need a special case for that.
+        // `Never & ~T` -> `Never`.
+        if self.positive.contains(&Type::Never) {
+            return;
+        }
+
+        // `Divergent & ~T` -> `Divergent`.
         if self.positive.iter().any(Type::is_divergent) {
             debug_assert_eq!(self.positive.len(), 1, "`Divergent` should be alone");
+            return;
+        }
+
+        if let Some(negated_divergent) = new_negative.negated_divergent() {
+            *self = Self::default();
+            self.positive.insert(negated_divergent);
             return;
         }
 
@@ -1516,32 +1594,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
             .iter()
             .any(|ty| matches!(ty, Type::TypeVar(_) | Type::NewTypeInstance(_)))
         {
-            let mut speculative = IntersectionBuilder::new(db);
-            for pos in &self.positive {
-                match pos {
-                    Type::TypeVar(type_var) => {
-                        match type_var.typevar(db).bound_or_constraints(db) {
-                            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                                speculative = speculative.add_positive(bound);
-                            }
-                            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                                speculative = speculative.add_positive(constraints.as_type(db));
-                            }
-                            // TypeVars without a bound or constraint implicitly have `object` as their
-                            // upper bound, and it is always a no-op to add `object` to an intersection.
-                            None => {}
-                        }
-                    }
-                    Type::NewTypeInstance(newtype) => {
-                        speculative = speculative.add_positive(newtype.concrete_base_type(db));
-                    }
-                    _ => speculative = speculative.add_positive(*pos),
-                }
-            }
-            for neg in &self.negative {
-                speculative = speculative.add_negative(*neg);
-            }
-            if speculative.build().is_never() {
+            let speculative =
+                expand_intersection_typevars_and_newtypes(db, &self.positive, &self.negative);
+            if speculative.is_never() {
                 return Type::Never;
             }
         }

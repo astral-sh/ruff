@@ -29,3 +29,28 @@ pub fn is_pragma_comment(comment: &str) -> bool {
         .split_once(':')
         .is_some_and(|(maybe_pragma, _)| matches!(maybe_pragma, "isort" | "type" | "pyright" | "pyrefly" | "pylint" | "flake8" | "ruff" | "ty"))
 }
+
+/// Returns the byte offset within `comment` where a trailing pragma comment starts,
+/// or `None` if no pragma is found.
+///
+/// For a plain pragma like `# noqa: F401`, returns `Some(0)`.
+/// For a nested pragma like `# some text # noqa: F401`, returns the offset of the
+/// trailing `#` that begins the pragma (i.e., the start of `# noqa: F401`).
+///
+/// ```
+/// assert_eq!(ruff_python_trivia::find_trailing_pragma_offset("# noqa: F401"), Some(0));
+/// assert_eq!(ruff_python_trivia::find_trailing_pragma_offset("# type: ignore"), Some(0));
+/// assert_eq!(ruff_python_trivia::find_trailing_pragma_offset("# some comment # noqa: F401"), Some(15));
+/// assert_eq!(ruff_python_trivia::find_trailing_pragma_offset("## noqa: F401"), Some(1));
+/// assert_eq!(ruff_python_trivia::find_trailing_pragma_offset("# just a comment"), None);
+/// ```
+pub fn find_trailing_pragma_offset(comment: &str) -> Option<usize> {
+    comment.match_indices('#').find_map(|(offset, _)| {
+        let sub_comment = &comment[offset..];
+        if is_pragma_comment(sub_comment) {
+            Some(offset)
+        } else {
+            None
+        }
+    })
+}

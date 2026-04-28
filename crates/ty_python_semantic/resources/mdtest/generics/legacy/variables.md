@@ -69,10 +69,35 @@ reveal_type(tuple_with_typevar[1])  # revealed: TypeVar
 > The argument to `TypeVar()` must be a string equal to the variable name to which it is assigned.
 
 ```py
-from typing import TypeVar
+from typing import Generic, TypeVar
 
-# error: [invalid-legacy-type-variable]
+# error: [mismatched-type-name]
 T = TypeVar("Q")
+
+class Box(Generic[T]): ...
+
+reveal_type(Box[int]())  # revealed: Box[int]
+```
+
+### Shadowing checks use the binding name
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import Generic, TypeVar
+
+S = TypeVar("S")
+T = TypeVar("T")
+
+# This recovers as the `Q` binding for source-level name resolution.
+# error: [mismatched-type-name]
+Q = TypeVar("T")
+
+class Outer(Generic[Q]):
+    class Ok(Generic[S]): ...
+    # error: [shadowed-type-variable]
+    # error: [shadowed-type-variable]
+    class Bad(Generic[Q]): ...
 ```
 
 ### No redefinition

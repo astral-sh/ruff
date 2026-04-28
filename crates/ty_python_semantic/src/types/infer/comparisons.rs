@@ -10,9 +10,10 @@ use crate::types::cyclic::CycleDetector;
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
-    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Truthiness, Type, TypeContext,
+    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Type, TypeContext,
     TypeVarBoundOrConstraints, UnionBuilder,
 };
+use ty_python_core::Truthiness;
 
 /// Whether the intersection type is on the left or right side of the comparison.
 #[derive(Debug, Clone, Copy)]
@@ -186,6 +187,31 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 )?);
             }
             Some(Ok(builder.build()))
+        }
+
+        (Type::Intersection(intersection), right)
+            if intersection.positive(db).iter().copied().any(Type::is_type_var) =>
+        {
+            Some(infer_binary_type_comparison(
+                context,
+                intersection.with_expanded_typevars_and_newtypes(db),
+                op,
+                right,
+                range,
+                visitor
+            ))
+        }
+        (left, Type::Intersection(intersection))
+            if intersection.positive(db).iter().copied().any(Type::is_type_var) =>
+        {
+            Some(infer_binary_type_comparison(
+                context,
+                left,
+                op,
+                intersection.with_expanded_typevars_and_newtypes(db),
+                range,
+                visitor
+            ))
         }
 
         (Type::Intersection(intersection), right) => {
@@ -868,7 +894,7 @@ fn infer_membership_test_comparison<'db>(
         Ok(bindings) => Some(bindings.return_type(db)),
         // If `__contains__` is not available or possibly unbound,
         // fall back to iteration-based membership test.
-        Err(CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound(_)) => right
+        Err(CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound { .. }) => right
             .try_iterate(db)
             .map(|_| KnownClass::Bool.to_instance(db))
             .ok(),
@@ -888,8 +914,10 @@ fn infer_membership_test_comparison<'db>(
             });
 
             match op {
-                MembershipTestCompareOperator::In => truthiness.into_type(db),
-                MembershipTestCompareOperator::NotIn => truthiness.negate().into_type(db),
+                MembershipTestCompareOperator::In => Type::from_truthiness(db, truthiness),
+                MembershipTestCompareOperator::NotIn => {
+                    Type::from_truthiness(db, truthiness.negate())
+                }
             }
         })
         .ok_or_else(|| UnsupportedComparisonError {

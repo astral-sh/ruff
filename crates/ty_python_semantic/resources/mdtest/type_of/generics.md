@@ -170,7 +170,7 @@ from typing import Self
 class B:
     def __init__(self, x: int) -> None: ...
     def clone(self: Self) -> Self:
-        # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `int`, found `Literal["x"]`"
+        # error: [invalid-argument-type] "Argument to `B.__init__` is incorrect: Expected `int`, found `Literal["x"]`"
         self.__class__("x")
         return self.__class__(1)
 ```
@@ -284,6 +284,27 @@ def _[T: (int | str, int)](_: T):
     static_assert(not is_disjoint_from(type[int], type[T]))
 ```
 
+## Metaclass instances
+
+```py
+class Meta3(type): ...
+class Base(metaclass=Meta3): ...
+class Derived(Base): ...
+class Other: ...
+
+def unbounded[T](x: type[T], y: Meta3):
+    y = x  # error: [invalid-assignment]
+
+def bounded[T: Base](x: type[T], y: Meta3):
+    y = x
+
+def constrained[T: (Base, Derived)](x: type[T], y: Meta3):
+    y = x
+
+def mixed_constraints[T: (Base, Other)](x: type[T], y: Meta3):
+    y = x  # error: [invalid-assignment]
+```
+
 ```py
 class X[T]:
     value: T
@@ -318,6 +339,16 @@ def f3[T](x: type[T]) -> T:
 
 reveal_type(f3(int))  # revealed: int
 reveal_type(f3(object))  # revealed: object
+
+class NeedsArgument:
+    def __new__[T: NeedsArgument](cls: type[T]) -> T:
+        return super().__new__(cls)
+
+    def __init__(self, value: str) -> None: ...
+
+def f4[T: NeedsArgument](x: type[T]) -> T:
+    # error: [missing-argument]
+    return x()
 ```
 
 ## Default Parameter

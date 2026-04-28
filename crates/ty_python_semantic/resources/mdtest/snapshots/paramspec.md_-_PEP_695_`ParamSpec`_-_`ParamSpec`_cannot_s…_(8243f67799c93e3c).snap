@@ -50,25 +50,17 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/paramspe
 error[invalid-type-arguments]: ParamSpec `P` cannot be used to specialize type variable `T`
   --> src/mdtest_snippet.py:9:9
    |
- 7 |     attr: Callable[P, T]
- 8 |
  9 | def f[**P, T]():
    |         - ParamSpec `P` defined here
 10 |     # error: [invalid-type-arguments] "ParamSpec `P` cannot be used to specialize type variable `T`"
 11 |     a: OnlyTypeVar[P]
    |                    ^
-12 |
-13 |     # error: [invalid-type-arguments] "ParamSpec `P` cannot be used to specialize type variable `T`"
    |
   ::: src/mdtest_snippet.py:3:19
    |
- 1 | from typing import Callable
- 2 |
  3 | class OnlyTypeVar[T]:
    |                   - Type variable `T` defined here
- 4 |     attr: T
    |
-info: rule `invalid-type-arguments` is enabled by default
 
 ```
 
@@ -76,26 +68,18 @@ info: rule `invalid-type-arguments` is enabled by default
 error[invalid-type-arguments]: ParamSpec `P` cannot be used to specialize type variable `T`
   --> src/mdtest_snippet.py:14:28
    |
-13 |     # error: [invalid-type-arguments] "ParamSpec `P` cannot be used to specialize type variable `T`"
 14 |     b: TypeVarAndParamSpec[P, [int]]
    |                            ^
-15 |
-16 | class OnlyParamSpec[**P]:
    |
   ::: src/mdtest_snippet.py:6:27
    |
- 4 |     attr: T
- 5 |
  6 | class TypeVarAndParamSpec[T, **P]:
    |                           - Type variable `T` defined here
  7 |     attr: Callable[P, T]
  8 |
  9 | def f[**P, T]():
    |         - ParamSpec `P` defined here
-10 |     # error: [invalid-type-arguments] "ParamSpec `P` cannot be used to specialize type variable `T`"
-11 |     a: OnlyTypeVar[P]
    |
-info: rule `invalid-type-arguments` is enabled by default
 
 ```
 
@@ -103,10 +87,8 @@ info: rule `invalid-type-arguments` is enabled by default
 error[invalid-type-arguments]: Type argument for `ParamSpec` must be either a list of types, `ParamSpec`, `Concatenate`, or `...`
   --> src/mdtest_snippet.py:29:37
    |
-28 | # error: [invalid-type-arguments] "Type argument for `ParamSpec` must be either a list of types, `ParamSpec`, `Concatenate`, or `...`"
 29 | def func3[T](c: ParamSpecAndTypeVar[T, int], other: T): ...
    |                                     ^
    |
-info: rule `invalid-type-arguments` is enabled by default
 
 ```

@@ -10,7 +10,7 @@ from importlib.abc import MetaPathFinder
 from os import PathLike
 from pathlib import Path
 from re import Pattern
-from typing import Any, ClassVar, Generic, NamedTuple, TypeVar, overload
+from typing import Any, ClassVar, Generic, NamedTuple, TypeVar, overload, type_check_only
 from typing_extensions import Self, TypeAlias, deprecated, disjoint_base
 
 _T = TypeVar("_T")
@@ -78,6 +78,7 @@ elif sys.version_info >= (3, 11):
 
     _EntryPointBase = DeprecatedTuple
 else:
+    @type_check_only
     class _EntryPointBase(NamedTuple):
         name: str
         value: str

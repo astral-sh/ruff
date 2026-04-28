@@ -49,7 +49,7 @@ expression: "[cell1_diagnostics, cell2_diagnostics, cell3_diagnostics]"
           "href": "https://ty.dev/rules#invalid-argument-type"
         },
         "source": "ty",
-        "message": "Argument to function `with_style` is incorrect: Expected `Style`, found `Literal[/"underlined/"]`",
+        "message": "Argument to function `with_style` is incorrect: Expected `Style`, found `Literal[\"underlined\"]`",
         "relatedInformation": [
           {
             "location": {

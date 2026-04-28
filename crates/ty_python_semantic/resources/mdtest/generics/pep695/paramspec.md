@@ -53,6 +53,10 @@ def foo3[**P = [int, str]]() -> None:
 def foo4[**P, **Q = P]():
     reveal_type(P)  # revealed: ParamSpec
     reveal_type(Q)  # revealed: ParamSpec
+
+# error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+def foo5[**Q, **P = [Q]]() -> None:
+    pass
 ```
 
 Other values are invalid.
@@ -123,6 +127,16 @@ def invalid_stringified_annotation[**P](
 def invalid_stringified_variable_annotation[**P](y: Any) -> None:
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     x: "P" = y
+
+class InvalidSpecializationTarget[**P]:
+    attr: Callable[P, None]
+
+def invalid_specialization[**Q](
+    # error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+    a: InvalidSpecializationTarget[[Q]],
+    # error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+    b: InvalidSpecializationTarget[Q,],
+) -> None: ...
 ```
 
 ## Validating `P.args` and `P.kwargs` usage
@@ -287,6 +301,9 @@ class TwoParamSpec[**P1, **P2]:
 
 class TypeVarAndParamSpec[T1, **P1]:
     attr: Callable[P1, T1]
+
+class ParamSpecAndTypeVar[**P1, T1]:
+    attr: Callable[P1, T1]
 ```
 
 Explicit specialization of a generic class involving `ParamSpec` is done by providing either a list
@@ -345,6 +362,7 @@ reveal_type(TypeVarAndParamSpec[int, []]().attr)  # revealed: () -> int
 reveal_type(TypeVarAndParamSpec[int, [int, str]]().attr)  # revealed: (int, str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, [str]]().attr)  # revealed: (str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, ...]().attr)  # revealed: (...) -> int
+reveal_type(ParamSpecAndTypeVar[[int, str], str]().attr)  # revealed: (int, str, /) -> str
 
 # error: [invalid-type-arguments] "ParamSpec `P2` is unbound"
 reveal_type(TypeVarAndParamSpec[int, P2]().attr)  # revealed: (...) -> int
@@ -678,12 +696,12 @@ class Foo[**P]:
 
 def bar[**P](foo: Foo[P]) -> None:
     reveal_type(foo)  # revealed: Foo[P@bar]
-    reveal_type(foo.args)  # revealed: Unknown | P@bar.args
-    reveal_type(foo.kwargs)  # revealed: Unknown | P@bar.kwargs
+    reveal_type(foo.args)  # revealed: P@bar.args
+    reveal_type(foo.kwargs)  # revealed: P@bar.kwargs
 ```
 
-ty will check whether the argument after `**` is a mapping type but as instance attribute are
-unioned with `Unknown`, it shouldn't error here.
+ty will check whether the argument after `**` is a mapping type, but the inferred attribute type
+preserves the parameter pack here, so it shouldn't error.
 
 ```py
 from typing import Callable
@@ -934,7 +952,7 @@ class Container[**P]:
 
     def try_assign[**Q](self, f: Callable[Q, None]) -> Callable[Q, None]:
         # error: [invalid-return-type] "Return type does not match returned value: expected `(**Q@try_assign) -> None`, found `(**P@Container) -> None`"
-        # error: [invalid-argument-type] "Argument to bound method `method` is incorrect: Expected `(**P@Container) -> None`, found `(**Q@try_assign) -> None`"
+        # error: [invalid-argument-type] "Argument to bound method `Container.method` is incorrect: Expected `(**P@Container) -> None`, found `(**Q@try_assign) -> None`"
         return self.method(f)
 ```
 
@@ -1181,8 +1199,5 @@ class Factory[**P](Protocol):
 def call_factory[**P](ctr: Factory[P], *args: P.args, **kwargs: P.kwargs) -> int:
     return ctr("", *args, **kwargs)
 
-# TODO: This should be OK - P should be inferred as [] since my_factory only has `arg: str`
-# which matches the prefix. Currently this is a false positive.
-# error: [invalid-argument-type]
 call_factory(my_factory)
 ```

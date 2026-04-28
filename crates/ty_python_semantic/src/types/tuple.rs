@@ -22,18 +22,18 @@ use std::hash::Hash;
 use itertools::{Either, EitherOrBoth, Itertools};
 use smallvec::{SmallVec, smallvec_inline};
 
-use crate::semantic_index::definition::Definition;
 use crate::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, IntersectionType,
-    Type, TypeMapping, UnionBuilder, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
+    IntersectionType, Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
 };
-use crate::types::{Truthiness, TypeContext};
 use crate::{Db, FxOrderSet, Program};
+use ty_python_core::Truthiness;
+use ty_python_core::definition::Definition;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum TupleLength {
@@ -285,27 +285,55 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     fn check_fixed_length_tuple_vs_tuple_spec(
         &self,
         db: &'db dyn Db,
-        source: &FixedLengthTuple<Type<'db>>,
-        target: &TupleSpec<'db>,
+        source_tuple: &FixedLengthTuple<Type<'db>>,
+        target_tuple: &TupleSpec<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        match target {
-            Tuple::Fixed(target) => ConstraintSet::from_bool(
-                self.constraints,
-                source.0.len() == target.0.len(),
-            )
-            .and(db, self.constraints, || {
-                (source.0.iter().zip(&target.0)).when_all(
+        match target_tuple {
+            Tuple::Fixed(target) => {
+                let equal_length = source_tuple.0.len() == target.0.len();
+
+                if !equal_length && self.relation.is_assignability() {
+                    self.provide_context(|| ErrorContext::TupleLengthMismatch {
+                        source_len: source_tuple.0.len(),
+                        target_len: target_tuple.len(),
+                    });
+                }
+
+                let mut n = 1;
+                ConstraintSet::from_bool(self.constraints, equal_length).and(
                     db,
                     self.constraints,
-                    |(&source, &target)| self.check_type_pair(db, source, target),
+                    || {
+                        (source_tuple.0.iter().zip(&target.0)).when_all(
+                            db,
+                            self.constraints,
+                            |(&source, &target)| {
+                                let constraint_set = self.check_type_pair(db, source, target);
+                                if constraint_set.is_never_satisfied(db) {
+                                    self.provide_context(|| {
+                                        ErrorContext::TupleElementNotCompatible {
+                                            source,
+                                            target,
+                                            element_index: n,
+                                            element_count: source_tuple.0.len(),
+                                        }
+                                    });
+                                }
+
+                                n += 1;
+
+                                constraint_set
+                            },
+                        )
+                    },
                 )
-            }),
+            }
 
             Tuple::Variable(target) => {
                 // This tuple must have enough elements to match up with the other tuple's prefix
                 // and suffix, and each of those elements must pairwise satisfy the relation.
                 let mut result = self.always();
-                let mut source_iter = source.0.iter();
+                let mut source_iter = source_tuple.0.iter();
                 for &target_ty in target.prefix_elements() {
                     let Some(&source_ty) = source_iter.next() else {
                         return self.never();

@@ -37,29 +37,22 @@ class World:
           |
         2 | def hello():
           |     ^^^^^
-        3 |     pass
           |
         info: Function hello
 
         info[document-symbols]: SymbolInfo
          --> main.py:5:7
           |
-        3 |     pass
-        4 |
         5 | class World:
           |       ^^^^^
-        6 |     def method(self):
-        7 |         pass
           |
         info: Class World
 
         info[document-symbols]: SymbolInfo
          --> main.py:6:9
           |
-        5 | class World:
         6 |     def method(self):
           |         ^^^^^^
-        7 |         pass
           |
         info: Method method
         ");
@@ -101,137 +94,96 @@ def standalone_function():
         info[document-symbols]: SymbolInfo
          --> main.py:5:1
           |
-        3 | from typing import List
-        4 |
         5 | CONSTANT = 42
           | ^^^^^^^^
-        6 | variable = 'hello'
-        7 | typed_global: str = 'typed'
           |
         info: Constant CONSTANT
 
         info[document-symbols]: SymbolInfo
          --> main.py:6:1
           |
-        5 | CONSTANT = 42
         6 | variable = 'hello'
           | ^^^^^^^^
-        7 | typed_global: str = 'typed'
-        8 | annotated_only: int
           |
         info: Variable variable
 
         info[document-symbols]: SymbolInfo
          --> main.py:7:1
           |
-        5 | CONSTANT = 42
-        6 | variable = 'hello'
         7 | typed_global: str = 'typed'
           | ^^^^^^^^^^^^
-        8 | annotated_only: int
           |
         info: Variable typed_global
 
         info[document-symbols]: SymbolInfo
-          --> main.py:8:1
-           |
-         6 | variable = 'hello'
-         7 | typed_global: str = 'typed'
-         8 | annotated_only: int
-           | ^^^^^^^^^^^^^^
-         9 |
-        10 | class MyClass:
-           |
+         --> main.py:8:1
+          |
+        8 | annotated_only: int
+          | ^^^^^^^^^^^^^^
+          |
         info: Variable annotated_only
 
         info[document-symbols]: SymbolInfo
           --> main.py:10:7
            |
-         8 | annotated_only: int
-         9 |
         10 | class MyClass:
            |       ^^^^^^^
-        11 |     class_var = 100
-        12 |     typed_class_var: str = 'class_typed'
            |
         info: Class MyClass
 
         info[document-symbols]: SymbolInfo
           --> main.py:11:5
            |
-        10 | class MyClass:
         11 |     class_var = 100
            |     ^^^^^^^^^
-        12 |     typed_class_var: str = 'class_typed'
-        13 |     annotated_class_var: float
            |
         info: Field class_var
 
         info[document-symbols]: SymbolInfo
           --> main.py:12:5
            |
-        10 | class MyClass:
-        11 |     class_var = 100
         12 |     typed_class_var: str = 'class_typed'
            |     ^^^^^^^^^^^^^^^
-        13 |     annotated_class_var: float
            |
         info: Field typed_class_var
 
         info[document-symbols]: SymbolInfo
           --> main.py:13:5
            |
-        11 |     class_var = 100
-        12 |     typed_class_var: str = 'class_typed'
         13 |     annotated_class_var: float
            |     ^^^^^^^^^^^^^^^^^^^
-        14 |
-        15 |     def __init__(self):
            |
         info: Field annotated_class_var
 
         info[document-symbols]: SymbolInfo
           --> main.py:15:9
            |
-        13 |     annotated_class_var: float
-        14 |
         15 |     def __init__(self):
            |         ^^^^^^^^
-        16 |         self.instance_var = 0
            |
         info: Constructor __init__
 
         info[document-symbols]: SymbolInfo
           --> main.py:18:9
            |
-        16 |         self.instance_var = 0
-        17 |
         18 |     def public_method(self):
            |         ^^^^^^^^^^^^^
-        19 |         return self.instance_var
            |
         info: Method public_method
 
         info[document-symbols]: SymbolInfo
           --> main.py:21:9
            |
-        19 |         return self.instance_var
-        20 |
         21 |     def _private_method(self):
            |         ^^^^^^^^^^^^^^^
-        22 |         pass
            |
         info: Method _private_method
 
         info[document-symbols]: SymbolInfo
           --> main.py:24:5
            |
-        22 |         pass
-        23 |
         24 | def standalone_function():
            |     ^^^^^^^^^^^^^^^^^^^
-        25 |     local_var = 10
-        26 |     return local_var
            |
         info: Function standalone_function
         ");
@@ -259,52 +211,39 @@ class OuterClass:
           |
         2 | class OuterClass:
           |       ^^^^^^^^^^
-        3 |     OUTER_CONSTANT = 100
           |
         info: Class OuterClass
 
         info[document-symbols]: SymbolInfo
          --> main.py:3:5
           |
-        2 | class OuterClass:
         3 |     OUTER_CONSTANT = 100
           |     ^^^^^^^^^^^^^^
-        4 |
-        5 |     def outer_method(self):
           |
         info: Constant OUTER_CONSTANT
 
         info[document-symbols]: SymbolInfo
          --> main.py:5:9
           |
-        3 |     OUTER_CONSTANT = 100
-        4 |
         5 |     def outer_method(self):
           |         ^^^^^^^^^^^^
-        6 |         return self.OUTER_CONSTANT
           |
         info: Method outer_method
 
         info[document-symbols]: SymbolInfo
-          --> main.py:8:11
-           |
-         6 |         return self.OUTER_CONSTANT
-         7 |
-         8 |     class InnerClass:
-           |           ^^^^^^^^^^
-         9 |         def inner_method(self):
-        10 |             pass
-           |
+         --> main.py:8:11
+          |
+        8 |     class InnerClass:
+          |           ^^^^^^^^^^
+          |
         info: Class InnerClass
 
         info[document-symbols]: SymbolInfo
-          --> main.py:9:13
-           |
-         8 |     class InnerClass:
-         9 |         def inner_method(self):
-           |             ^^^^^^^^^^^^
-        10 |             pass
-           |
+         --> main.py:9:13
+          |
+        9 |         def inner_method(self):
+          |             ^^^^^^^^^^^^
+          |
         info: Method inner_method
         ");
     }

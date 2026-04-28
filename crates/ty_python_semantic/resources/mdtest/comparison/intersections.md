@@ -109,8 +109,6 @@ def _(o: object):
 
 ### Unsupported operators for positive contributions
 
-<!-- snapshot-diagnostics -->
-
 Raise an error if the given operator is unsupported for all positive contributions to the
 intersection type:
 
@@ -123,8 +121,20 @@ def _(x: object):
         if isinstance(x, NonContainer2):
             reveal_type(x)  # revealed: NonContainer1 & NonContainer2
 
-            # error: [unsupported-operator] "Operator `in` is not supported between objects of type `Literal[2]` and `NonContainer1 & NonContainer2`"
+            # snapshot: unsupported-operator
             reveal_type(2 in x)  # revealed: bool
+```
+
+```snapshot
+error[unsupported-operator]: Unsupported `in` operation
+  --> src/mdtest_snippet.py:10:25
+   |
+10 |             reveal_type(2 in x)  # revealed: bool
+   |                         -^^^^-
+   |                         |    |
+   |                         |    Has type `NonContainer1 & NonContainer2`
+   |                         Has type `Literal[2]`
+   |
 ```
 
 Do not raise an error if at least one of the positive contributions to the intersection type support
@@ -151,10 +161,22 @@ def _(x: object):
     if not isinstance(x, NonContainer1):
         reveal_type(x)  # revealed: ~NonContainer1
 
-        # error: [unsupported-operator] "Operator `in` is not supported between objects of type `Literal[2]` and `~NonContainer1`"
+        # snapshot: unsupported-operator
         reveal_type(2 in x)  # revealed: bool
 
         reveal_type(2 is x)  # revealed: bool
+```
+
+```snapshot
+error[unsupported-operator]: Unsupported `in` operation
+  --> src/mdtest_snippet.py:26:21
+   |
+26 |         reveal_type(2 in x)  # revealed: bool
+   |                     -^^^^-
+   |                     |    |
+   |                     |    Has type `~NonContainer1`
+   |                     Has type `Literal[2]`
+   |
 ```
 
 ### Unsupported operators for negative contributions

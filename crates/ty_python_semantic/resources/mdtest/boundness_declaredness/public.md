@@ -29,6 +29,9 @@ In particular, we should raise errors in the "possibly-undeclared-and-unbound" a
 | possibly-unbound |          | `possibly-missing-import` | ?                   |
 | unbound          |          | ?                         | `unresolved-import` |
 
+When the declared and inferred types are mutually assignable, we use `T_declared` directly instead
+of unioning it with `T_inferred`.
+
 ## Declared
 
 ### Declared and bound
@@ -137,8 +140,7 @@ Public.a = None
 
 If a symbol is possibly undeclared and possibly unbound, we also use the union of the declared and
 inferred types. This case is interesting because the "possibly declared" definition might not be the
-same as the "possibly bound" definition (symbol `b`). Note that we raise a `possibly-missing-import`
-error for both `a` and `b`:
+same as the "possibly bound" definition:
 
 ```py
 from typing import Any
@@ -148,13 +150,10 @@ def flag() -> bool:
 
 class Public:
     if flag():
-        a: Any = 1
         b = 2
     else:
         b: str
 
-# error: [possibly-missing-attribute]
-reveal_type(Public.a)  # revealed: Literal[1] | Any
 # error: [possibly-missing-attribute]
 reveal_type(Public.b)  # revealed: Literal[2] | str
 
@@ -190,9 +189,9 @@ Public.a = None
 
 ### Undeclared but bound
 
-If a symbol is *undeclared*, we use the union of `Unknown` with the inferred type. Note that we
-treat this case differently from the case where a symbol is implicitly declared with `Unknown`,
-possibly due to the usage of an unknown name in the annotation:
+If a symbol is *undeclared*, we use the inferred type directly. Note that we treat this case
+differently from the case where a symbol is implicitly declared with `Unknown`, possibly due to the
+usage of an unknown name in the annotation:
 
 ```py
 class Public:
@@ -202,10 +201,11 @@ class Public:
     # Implicitly declared with `Unknown`, due to the usage of an unknown name in the annotation:
     b: SomeUnknownName = 1  # error: [unresolved-reference]
 
-reveal_type(Public.a)  # revealed: Unknown | Literal[1]
+reveal_type(Public.a)  # revealed: int
 reveal_type(Public.b)  # revealed: Unknown
 
-# All external modifications of `a` are allowed:
+# External modifications of `a` are checked against the inferred type:
+# error: [invalid-assignment]
 Public.a = None
 ```
 
@@ -225,10 +225,11 @@ class Public:
 
 # TODO: these should raise an error. Once we fix this, update the section description and the table
 # on top of this document.
-reveal_type(Public.a)  # revealed: Unknown | Literal[1]
+reveal_type(Public.a)  # revealed: int
 reveal_type(Public.b)  # revealed: Unknown
 
-# All external modifications of `a` are allowed:
+# External modifications of `a` are checked against the inferred type:
+# error: [invalid-assignment]
 Public.a = None
 ```
 

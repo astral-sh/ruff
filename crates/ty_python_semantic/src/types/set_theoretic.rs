@@ -1,9 +1,11 @@
 use itertools::Either;
 
-use crate::place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, Widening};
+use crate::place::{
+    DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin,
+};
 use crate::types::class::KnownClass;
-use crate::types::visitor;
 use crate::types::{Type, TypeQualifiers};
+use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet};
 
 pub(crate) mod builder;
@@ -234,7 +236,7 @@ impl<'db> UnionType<'db> {
                 } else {
                     Definedness::AlwaysDefined
                 },
-                widening: Widening::None,
+                public_type_policy: PublicTypePolicy::Raw,
             })
         }
     }
@@ -290,7 +292,7 @@ impl<'db> UnionType<'db> {
                     } else {
                         Definedness::AlwaysDefined
                     },
-                    widening: Widening::None,
+                    public_type_policy: PublicTypePolicy::Raw,
                 })
             },
             qualifiers,
@@ -312,7 +314,7 @@ impl<'db> UnionType<'db> {
             if nested {
                 // list[T | Divergent] => list[Divergent]
                 let ty = ty.recursive_type_normalized_impl(db, div, nested)?;
-                if ty == div {
+                if ty.same_divergent_marker(div) {
                     return Some(ty);
                 }
                 builder = builder.add(ty);
@@ -320,7 +322,7 @@ impl<'db> UnionType<'db> {
             } else {
                 // `Divergent` in a union type does not mean true divergence, so we skip it if not nested.
                 // e.g. T | Divergent == T | (T | (T | (T | ...))) == T
-                if ty == &div {
+                if (*ty).same_divergent_marker(div) {
                     builder = builder.recursively_defined(RecursivelyDefined::Yes);
                     continue;
                 }
@@ -779,7 +781,7 @@ impl<'db> IntersectionType<'db> {
                 } else {
                     Definedness::PossiblyUndefined
                 },
-                widening: Widening::None,
+                public_type_policy: PublicTypePolicy::Raw,
             })
         }
     }
@@ -832,11 +834,18 @@ impl<'db> IntersectionType<'db> {
                     } else {
                         Definedness::PossiblyUndefined
                     },
-                    widening: Widening::None,
+                    public_type_policy: PublicTypePolicy::Raw,
                 })
             },
             qualifiers,
         }
+    }
+
+    /// Return a version of this intersection type where any type variables in the positive elements
+    /// have been replaced by their bounds or constraints, and where any newtypes in the positive elements
+    /// have been replaced by their concrete base types.
+    pub(crate) fn with_expanded_typevars_and_newtypes(self, db: &'db dyn Db) -> Type<'db> {
+        expand_intersection_typevars_and_newtypes(db, self.positive(db), self.negative(db))
     }
 
     pub fn iter_positive(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
@@ -854,6 +863,41 @@ impl<'db> IntersectionType<'db> {
     pub(crate) fn is_simple_negation(self, db: &'db dyn Db) -> bool {
         self.positive(db).is_empty() && self.negative(db).len() == 1
     }
+}
+
+fn expand_intersection_typevars_and_newtypes<'db>(
+    db: &'db dyn Db,
+    positive: &FxOrderSet<Type<'db>>,
+    negative: &NegativeIntersectionElements<'db>,
+) -> Type<'db> {
+    let mut builder = IntersectionBuilder::new(db);
+    for &element in positive {
+        match element {
+            Type::TypeVar(tvar) => {
+                match tvar.typevar(db).bound_or_constraints(db) {
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        builder = builder.add_positive(bound);
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        builder = builder.add_positive(constraints.as_type(db));
+                    }
+                    // Type variables without bounds or constraints implicitly have `object`
+                    // as their upper bound, and adding `object` to an intersection is always a no-op
+                    None => {}
+                }
+            }
+            Type::NewTypeInstance(newtype) => {
+                builder = builder.add_positive(newtype.concrete_base_type(db));
+            }
+            _ => builder = builder.add_positive(element),
+        }
+    }
+
+    for &element in negative {
+        builder = builder.add_negative(element);
+    }
+
+    builder.build()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]

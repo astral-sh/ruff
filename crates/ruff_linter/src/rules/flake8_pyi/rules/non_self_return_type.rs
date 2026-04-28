@@ -207,19 +207,17 @@ pub(crate) fn non_self_return_type(
     }
 
     match name {
-        "__iter__" => {
+        "__iter__"
             if is_iterable_or_iterator(returns, semantic)
-                && subclasses_iterator(class_def, semantic)
-            {
-                add_diagnostic(checker, stmt, returns, class_def, name);
-            }
+                && subclasses_iterator(class_def, semantic) =>
+        {
+            add_diagnostic(checker, stmt, returns, class_def, name);
         }
-        "__aiter__" => {
+        "__aiter__"
             if is_async_iterable_or_iterator(returns, semantic)
-                && subclasses_async_iterator(class_def, semantic)
-            {
-                add_diagnostic(checker, stmt, returns, class_def, name);
-            }
+                && subclasses_async_iterator(class_def, semantic) =>
+        {
+            add_diagnostic(checker, stmt, returns, class_def, name);
         }
         _ => {}
     }
@@ -341,7 +339,7 @@ fn is_self(expr: &ast::Expr, checker: &Checker) -> bool {
 
 /// Return `true` if the given class extends `collections.abc.Iterator`.
 fn subclasses_iterator(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
+    analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
         matches!(
             qualified_name.segments(),
             ["typing", "Iterator"] | ["collections", "abc", "Iterator"]
@@ -364,7 +362,7 @@ fn is_iterable_or_iterator(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
 
 /// Return `true` if the given class extends `collections.abc.AsyncIterator`.
 fn subclasses_async_iterator(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
+    analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
         matches!(
             qualified_name.segments(),
             ["typing", "AsyncIterator"] | ["collections", "abc", "AsyncIterator"]

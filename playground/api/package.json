@@ -4,7 +4,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20230801.0",
     "miniflare": "^4.0.0",
-    "typescript": "^5.1.6",
+    "typescript": "^6.0.0",
     "wrangler": "^4.1.0"
   },
   "private": true,
@@ -15,6 +15,6 @@
   "dependencies": {
     "@miniflare/kv": "^2.14.0",
     "@miniflare/storage-memory": "^2.14.0",
-    "uuid": "^13.0.0"
+    "uuid": "^14.0.0"
   }
 }

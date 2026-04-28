@@ -10,13 +10,13 @@ PYI036 [*] Star-args in `__exit__` should be annotated with `object`
 55 |     async def __aexit__(self) -> None: ... # PYI036: Missing args
    |
 help: Annotate star-args with `object`
-51 | 
-52 | 
+51 |
+52 |
 53 | class BadOne:
    -     def __exit__(self, *args: Any) -> None: ... # PYI036: Bad star-args annotation
 54 +     def __exit__(self, *args: object) -> None: ... # PYI036: Bad star-args annotation
 55 |     async def __aexit__(self) -> None: ... # PYI036: Missing args
-56 | 
+56 |
 57 | class BadTwo:
 
 PYI036 If there are no star-args, `__aexit__` should have at least 3 non-keyword-only args (excluding `self`)
@@ -131,12 +131,12 @@ PYI036 [*] Star-args in `__exit__` should be annotated with `object`
    |
 help: Annotate star-args with `object`
 67 |     async def __aexit__(self, __typ: type[BaseException] | None, __exc: BaseException | None, __tb: typing.Union[TracebackType, None, int]) -> bool | None: ... # PYI036: Third arg has bad annotation
-68 | 
+68 |
 69 | class BadFive:
    -     def __exit__(self, typ: BaseException | None, *args: list[str]) -> bool: ... # PYI036: Bad star-args annotation
 70 +     def __exit__(self, typ: BaseException | None, *args: object) -> bool: ... # PYI036: Bad star-args annotation
 71 |     async def __aexit__(self, /, typ: type[BaseException] | None, *args: Any) -> Awaitable[None]: ... # PYI036: Bad star-args annotation
-72 | 
+72 |
 73 | class BadSix:
 
 PYI036 [*] Star-args in `__aexit__` should be annotated with `object`
@@ -150,12 +150,12 @@ PYI036 [*] Star-args in `__aexit__` should be annotated with `object`
 73 | class BadSix:
    |
 help: Annotate star-args with `object`
-68 | 
+68 |
 69 | class BadFive:
 70 |     def __exit__(self, typ: BaseException | None, *args: list[str]) -> bool: ... # PYI036: Bad star-args annotation
    -     async def __aexit__(self, /, typ: type[BaseException] | None, *args: Any) -> Awaitable[None]: ... # PYI036: Bad star-args annotation
 71 +     async def __aexit__(self, /, typ: type[BaseException] | None, *args: object) -> Awaitable[None]: ... # PYI036: Bad star-args annotation
-72 | 
+72 |
 73 | class BadSix:
 74 |     def __exit__(self, typ, exc, tb, weird_extra_arg, extra_arg2 = None) -> None: ... # PYI036: Extra arg must have default
 

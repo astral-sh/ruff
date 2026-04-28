@@ -428,7 +428,7 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
 
     @overload
     def get_charsets(self, failobj: _T) -> list[str | _T]: ...
-    def walk(self) -> Generator[Self, None, None]:
+    def walk(self) -> Generator[Self]:
         """Walk over the message tree, yielding each subpart.
 
         The walk is performed in depth-first order.  This method is a

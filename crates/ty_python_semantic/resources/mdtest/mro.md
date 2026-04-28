@@ -208,6 +208,20 @@ if not isinstance(DoesNotExist, type):
 
 ## Inheritance from `type[Any]` and `type[Unknown]`
 
+Using `type[T]` for a non-dynamic `T` as a base keeps the class analyzable, even though the exact
+MRO cannot be determined:
+
+```py
+from ty_extensions import reveal_mro
+
+class Base:
+    base_attr: int = 1
+
+def f(x: type[Base]):
+    class Foo(x): ...  # error: [unsupported-base]
+    reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
+```
+
 Inheritance from `type[Any]` and `type[Unknown]` is also permitted, in keeping with the gradual
 guarantee:
 
@@ -317,7 +331,7 @@ class Foo(EitherOr): ...
 ## `__bases__` is a union of a dynamic type and valid bases
 
 If a dynamic type such as `Any` or `Unknown` is one of the elements in the union, and all other
-types *would be* valid class bases, we do not emit an `invalid-base` or `unsupported-base`
+types _would be_ valid class bases, we do not emit an `invalid-base` or `unsupported-base`
 diagnostic, and we use the dynamic type as a base to prevent further downstream errors.
 
 ```py
@@ -443,6 +457,22 @@ class BadSub1(Bad1()): ...  # error: [invalid-base]
 class BadSub2(Bad2()): ...  # error: [invalid-base]
 ```
 
+For a union base where one member lacks `__mro_entries__`, `invalid-base` should be emitted with a
+sub-diagnostic identifying the problematic union member:
+
+```py
+def _(flag: bool):
+    class HasMroEntries:
+        def __mro_entries__(self, bases: tuple[type, ...]) -> tuple[type, ...]:
+            return ()
+
+    class NoMroEntries: ...
+
+    base = HasMroEntries() if flag else NoMroEntries()
+
+    class Foo(base): ...  # error: [invalid-base]
+```
+
 ## `__bases__` lists with duplicate bases
 
 <!-- snapshot-diagnostics -->
@@ -507,7 +537,7 @@ the class "header":
 
 class A: ...
 
-class B(  # type: ignore[duplicate-base]
+class B(  # type: ignore[ty:duplicate-base]
     A,
     A,
 ): ...
@@ -515,7 +545,7 @@ class B(  # type: ignore[duplicate-base]
 class C(
     A,
     A
-):  # type: ignore[duplicate-base]
+):  # type: ignore[ty:duplicate-base]
     x: int
 
 # fmt: on
@@ -532,7 +562,7 @@ exception at runtime, not a sub-expression in the class's bases list.
 class D(
     A,
     # error: [unused-type-ignore-comment]
-    A,  # type: ignore[duplicate-base]
+    A,  # type: ignore[ty:duplicate-base]
 ): ...
 
 # error: [duplicate-base]
@@ -541,7 +571,7 @@ class E(
     A
 ):
     # error: [unused-type-ignore-comment]
-    x: int  # type: ignore[duplicate-base]
+    x: int  # type: ignore[ty:duplicate-base]
 
 # fmt: on
 ```
@@ -576,6 +606,69 @@ bases materialize to:
 class Bar(UnknownBase1, Foo, UnknownBase2, Foo): ...
 
 reveal_mro(Bar)  # revealed: (<class 'Bar'>, Unknown, <class 'object'>)
+```
+
+Starred bases that expand to fixed-length tuples still report diagnostics for the unpacked base
+entries:
+
+```py
+from ty_extensions import reveal_mro
+
+duplicate_bases = (int, int)
+invalid_bases = (int, 1)
+
+# error: [duplicate-base] "Duplicate base class `int`"
+class InlineDuplicateBases(*(int, int)): ...
+
+# error: [duplicate-base] "Duplicate base class `int`"
+class NameDuplicateBases(*duplicate_bases): ...
+
+reveal_mro(InlineDuplicateBases)  # revealed: (<class 'InlineDuplicateBases'>, Unknown, <class 'object'>)
+reveal_mro(NameDuplicateBases)  # revealed: (<class 'NameDuplicateBases'>, Unknown, <class 'object'>)
+
+# error: [invalid-base] "Invalid class base with type `Literal[1]`"
+class StarredInvalidBases(*invalid_bases): ...
+```
+
+Per-base lint checks also see the unpacked entries:
+
+```py
+from typing import Generic, NamedTuple, Protocol
+
+# error: [inconsistent-mro]
+# error: [subclass-of-final-class]
+class InheritsFromFinalViaStarred(*(int, bool)): ...
+
+final_bases = (int, bool)
+
+# error: [inconsistent-mro]
+# error: [subclass-of-final-class]
+class InheritsFromFinalViaNamedStarred(*final_bases): ...
+
+# error: [instance-layout-conflict]
+# error: [invalid-named-tuple]
+# error: [invalid-named-tuple]
+class NamedTupleWithStarredBases(NamedTuple, *(int, str)): ...
+
+# error: [inconsistent-mro]
+# error: [invalid-protocol]
+# error: [invalid-protocol]
+class ProtocolWithStarredBases(Protocol, *(int, str)): ...
+
+# error: [invalid-base]
+class BareGenericInStarred(*(int, Generic)): ...
+```
+
+## Inline tuple-literal starred bases point diagnostics at unpacked elements
+
+<!-- snapshot-diagnostics -->
+
+```py
+# error: [duplicate-base]
+class InlineTupleDuplicateBases(*(int, int)): ...
+
+# error: [invalid-base]
+class InlineTupleInvalidBases(*(int, 1)): ...
 ```
 
 ## Unrelated objects inferred as `Any`/`Unknown` do not have special `__mro__` attributes

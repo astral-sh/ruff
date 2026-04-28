@@ -286,6 +286,7 @@ formatter.line_ending = auto
 formatter.indent_style = space
 formatter.indent_width = 4
 formatter.quote_style = double
+formatter.nested_string_quote_style = alternating
 formatter.magic_trailing_comma = respect
 formatter.docstring_code_format = disabled
 formatter.docstring_code_line_width = dynamic

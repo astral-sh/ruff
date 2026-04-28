@@ -26,6 +26,7 @@ Foo = NewType("Foo", int)
 Bar = NewType("Bar", Foo)
 
 static_assert(is_subtype_of(Foo, int))
+static_assert(is_subtype_of(Foo, int | None))
 static_assert(not is_equivalent_to(Foo, int))
 
 static_assert(is_subtype_of(Bar, Foo))
@@ -57,14 +58,23 @@ h(Bar(Foo(42)))
 FloatNewType = NewType("FloatNewType", float)
 
 static_assert(is_subtype_of(FloatNewType, float))
+static_assert(is_subtype_of(FloatNewType, FloatNewType | None))
 static_assert(is_subtype_of(Intersection[FloatNewType, AlwaysFalsy], float))
+static_assert(is_subtype_of(Intersection[FloatNewType, AlwaysFalsy], FloatNewType))
+static_assert(is_subtype_of(Intersection[FloatNewType, AlwaysFalsy], FloatNewType | None))
 static_assert(is_subtype_of(Intersection[FloatNewType, Not[AlwaysFalsy]], float))
+static_assert(is_subtype_of(Intersection[FloatNewType, Not[AlwaysFalsy]], FloatNewType))
+static_assert(is_subtype_of(Intersection[FloatNewType, Not[AlwaysFalsy]], FloatNewType | None))
 
 ComplexNewType = NewType("ComplexNewType", complex)
 
 static_assert(is_subtype_of(ComplexNewType, complex))
 static_assert(is_subtype_of(Intersection[ComplexNewType, AlwaysFalsy], complex))
+static_assert(is_subtype_of(Intersection[ComplexNewType, AlwaysFalsy], ComplexNewType))
+static_assert(is_subtype_of(Intersection[ComplexNewType, AlwaysFalsy], ComplexNewType | None))
 static_assert(is_subtype_of(Intersection[ComplexNewType, Not[AlwaysFalsy]], complex))
+static_assert(is_subtype_of(Intersection[ComplexNewType, Not[AlwaysFalsy]], ComplexNewType))
+static_assert(is_subtype_of(Intersection[ComplexNewType, Not[AlwaysFalsy]], ComplexNewType | None))
 static_assert(not is_assignable_to(ComplexNewType, float))
 static_assert(not is_assignable_to(Intersection[ComplexNewType, AlwaysFalsy], float))
 static_assert(not is_assignable_to(Intersection[ComplexNewType, Not[AlwaysFalsy]], float))
@@ -159,6 +169,43 @@ However, the literal doesn't necessarily need to be inline, as long as we infer 
 name = "Foo"
 Foo = NewType(name, int)
 reveal_type(Foo)  # revealed: <NewType pseudo-class 'Foo'>
+```
+
+## The assigned name should match the constructor name
+
+```py
+from typing_extensions import NewType
+from ty_extensions import is_subtype_of
+
+# snapshot: mismatched-type-name
+UserId = NewType("Id", int)
+reveal_type(UserId)  # revealed: <NewType pseudo-class 'Id'>
+reveal_type(is_subtype_of(UserId, int))  # revealed: ConstraintSet[Literal[True]]
+```
+
+```snapshot
+warning[mismatched-type-name]: The name passed to `NewType` must match the variable it is assigned to
+ --> src/mdtest_snippet.py:5:18
+  |
+5 | UserId = NewType("Id", int)
+  |                  ^^^^ Expected "UserId", got "Id"
+  |
+```
+
+```py
+Id = int
+# snapshot: mismatched-type-name
+UsesExistingId = NewType("Id", "Id")
+UsesExistingId(1)
+```
+
+```snapshot
+warning[mismatched-type-name]: The name passed to `NewType` must match the variable it is assigned to
+  --> src/mdtest_snippet.py:10:26
+   |
+10 | UsesExistingId = NewType("Id", "Id")
+   |                          ^^^^ Expected "UsesExistingId", got "Id"
+   |
 ```
 
 ## The base must be a class type or another newtype
@@ -569,14 +616,24 @@ def f(x: N | str):
 
 ## Trying to subclass a `NewType` produces an error matching CPython
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from typing import NewType
 
 X = NewType("X", int)
 
-class Foo(X): ...  # error: [invalid-base]
+# snapshot: invalid-base
+class Foo(X): ...
+```
+
+```snapshot
+error[invalid-base]: Cannot subclass an instance of NewType
+ --> src/mdtest_snippet.py:6:11
+  |
+6 | class Foo(X): ...
+  |           ^
+  |
+info: Perhaps you were looking for: `Foo = NewType('Foo', X)`
+info: Definition of class `Foo` will raise `TypeError` at runtime
 ```
 
 ## Don't narrow `NewType`-wrapped `Enum`s inside of match arms
@@ -631,20 +688,42 @@ reveal_type(Bar(42))  # revealed: Bar
 
 ## The base of a `NewType` can't be a protocol class or a `TypedDict`
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from typing import NewType, Protocol, TypedDict
 
 class Id(Protocol):
     code: int
 
-UserId = NewType("UserId", Id)  # error: [invalid-newtype]
+# snapshot: invalid-newtype
+UserId = NewType("UserId", Id)
+```
 
+```snapshot
+error[invalid-newtype]: invalid base for `typing.NewType`
+ --> src/mdtest_snippet.py:7:28
+  |
+7 | UserId = NewType("UserId", Id)
+  |                            ^^ type `Id`
+  |
+info: The base of a `NewType` is not allowed to be a protocol class.
+```
+
+```py
 class Foo(TypedDict):
     a: int
 
-Bar = NewType("Bar", Foo)  # error: [invalid-newtype]
+# snapshot: invalid-newtype
+Bar = NewType("Bar", Foo)
+```
+
+```snapshot
+error[invalid-newtype]: invalid base for `typing.NewType`
+  --> src/mdtest_snippet.py:12:22
+   |
+12 | Bar = NewType("Bar", Foo)
+   |                      ^^^ type `Foo`
+   |
+info: The base of a `NewType` is not allowed to be a `TypedDict`.
 ```
 
 ## A `NewType` cannot be generic
@@ -716,4 +795,38 @@ NT = NewType("NT", C)
 
 x = NT(C())
 reveal_type(x.copy())  # revealed: NT
+```
+
+## TypeVar solving for `NewType`s in combination with generic `Protocol`s
+
+In an early version of <https://github.com/astral-sh/ruff/pull/24109>, we revealed `F[Baz]` on the
+final line here, rather than `F[N]`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import NewType, Protocol, overload
+
+class Foo: ...
+class Bar: ...
+class Baz: ...
+
+N = NewType("N", Baz)
+
+class I[T](Protocol):
+    def f(self) -> T: ...
+
+class F[T]:
+    @overload
+    def __new__(cls, xs: I[T | Foo]): ...
+    @overload
+    def __new__(cls, xs: I[T]): ...
+    def __new__(cls, xs):
+        raise NotImplementedError
+
+def taxa(xs: I[N]):
+    reveal_type(F(xs))  # revealed: F[N]
 ```

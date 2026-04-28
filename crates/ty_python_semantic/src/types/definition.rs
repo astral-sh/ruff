@@ -1,10 +1,10 @@
 use crate::Db;
-use crate::semantic_index::definition::Definition;
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_text_size::{TextLen, TextRange};
 use ty_module_resolver::Module;
+use ty_python_core::definition::Definition;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum TypeDefinition<'db> {
@@ -18,6 +18,7 @@ pub enum TypeDefinition<'db> {
     TypeAlias(Definition<'db>),
     NewType(Definition<'db>),
     SpecialForm(Definition<'db>),
+    EnumMember(Definition<'db>),
 }
 
 impl TypeDefinition<'_> {
@@ -30,7 +31,8 @@ impl TypeDefinition<'_> {
             | Self::TypeVar(definition)
             | Self::TypeAlias(definition)
             | Self::SpecialForm(definition)
-            | Self::NewType(definition) => {
+            | Self::NewType(definition)
+            | Self::EnumMember(definition) => {
                 let module = parsed_module(db, definition.file(db)).load(db);
                 Some(definition.focus_range(db, &module))
             }
@@ -50,7 +52,8 @@ impl TypeDefinition<'_> {
             | Self::TypeVar(definition)
             | Self::TypeAlias(definition)
             | Self::SpecialForm(definition)
-            | Self::NewType(definition) => {
+            | Self::NewType(definition)
+            | Self::EnumMember(definition) => {
                 let module = parsed_module(db, definition.file(db)).load(db);
                 Some(definition.full_range(db, &module))
             }
@@ -66,7 +69,8 @@ impl TypeDefinition<'_> {
             | Self::TypeVar(definition)
             | Self::TypeAlias(definition)
             | Self::SpecialForm(definition)
-            | Self::NewType(definition) => Some(definition.file(db)),
+            | Self::NewType(definition)
+            | Self::EnumMember(definition) => Some(definition.file(db)),
         }
     }
 }
@@ -81,7 +85,8 @@ impl<'db> TypeDefinition<'db> {
             | Self::TypeVar(definition)
             | Self::TypeAlias(definition)
             | Self::SpecialForm(definition)
-            | Self::NewType(definition) => Some(definition),
+            | Self::NewType(definition)
+            | Self::EnumMember(definition) => Some(definition),
         }
     }
 }

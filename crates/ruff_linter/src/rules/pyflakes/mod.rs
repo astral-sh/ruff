@@ -750,6 +750,19 @@ mod tests {
     }
 
     #[test]
+    fn f811_annotated_assignment_redefinition() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyflakes/F811_34.py"),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(Rule::RedefinedWhileUnused)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn extend_generics() -> Result<()> {
         let snapshot = "extend_immutable_calls".to_string();
         let diagnostics = test_path(
@@ -1015,7 +1028,8 @@ mod tests {
             &locator,
             &indexer,
         );
-        let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
+        let suppressions =
+            Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer, &settings);
         let mut messages = check_path(
             Path::new("<filename>"),
             None,

@@ -22,7 +22,7 @@ def _(flag: bool):
 
     reveal_type(A.always_bound)  # revealed: int
 
-    reveal_type(A.union)  # revealed: Unknown | Literal[1, "abc"]
+    reveal_type(A.union)  # revealed: int | str
 
     reveal_type(A.union_declared)  # revealed: int | str
 
@@ -31,4 +31,19 @@ def _(flag: bool):
 
     # error: [unresolved-attribute] "Class `A` has no attribute `non_existent`"
     reveal_type(A.non_existent)  # revealed: Unknown
+```
+
+## Walrus attribute access after later rebinding
+
+```py
+class IntBox:
+    attr: int
+
+class StrBox:
+    attr: str
+
+def f() -> None:
+    (box := IntBox()).attr = 1
+    box = StrBox()
+    reveal_type(box.attr)  # revealed: str
 ```

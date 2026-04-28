@@ -18,12 +18,24 @@ x: int = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]` i
 
 ## Numbers special case
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from numbers import Number
 
-a: Number = 1  # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `Number`"
+# snapshot: invalid-assignment
+a: Number = 1
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Literal[1]` is not assignable to `Number`
+ --> src/mdtest_snippet.py:4:4
+  |
+4 | a: Number = 1
+  |    ------   ^ Incompatible value of type `Literal[1]`
+  |    |
+  |    Declared type
+  |
+info: Types from the `numbers` module aren't supported for static type checking
+help: Consider using a protocol instead, such as `typing.SupportsFloat`
 ```
 
 ## Violates previous annotation
@@ -239,6 +251,46 @@ a: list[str] = [1, 2, 3]
 b: set[int] = {1, 2, "3"}
 ```
 
+## Mutually assignable annotated assignments use the declared type
+
+When an annotated assignment has a value whose inferred type is assignable to the declared type, the
+binding uses the declared type if the declared type is also assignable back to the inferred type.
+This indicates that we are dealing with difference in precision (graduality) rather than a narrowed
+static type; in that case we want to prefer the user's annotation.
+
+The actual inferred type of the right-hand side is still used to validate the assignment.
+
+```py
+from typing import Any
+
+def returns_list_any() -> list[Any]:
+    return [1]
+
+def returns_list_int() -> list[int]:
+    return [1]
+
+def returns_any() -> Any:
+    return 1
+
+v1: Any = 1
+reveal_type(v1)  # revealed: Any
+
+v2: int = returns_any()
+reveal_type(v2)  # revealed: int
+
+v3: list[Any] = returns_list_int()
+reveal_type(v3)  # revealed: list[Any]
+
+v4: list[int] = returns_list_any()
+reveal_type(v4)  # revealed: list[int]
+
+v4: object = returns_list_int()
+reveal_type(v4)  # revealed: list[int]
+
+# error: [invalid-assignment] "Object of type `list[int]` is not assignable to `list[str]`"
+invalid: list[str] = returns_list_int()
+```
+
 ## Generic constructor annotations are understood
 
 ```toml
@@ -326,16 +378,28 @@ IntOrStr = int | str
 
 ### Earlier versions
 
-<!-- snapshot-diagnostics -->
-
 ```toml
 [environment]
 python-version = "3.9"
 ```
 
 ```py
-# error: [unsupported-operator]
+# snapshot: unsupported-operator
 IntOrStr = int | str
+```
+
+```snapshot
+error[unsupported-operator]: Unsupported `|` operation
+ --> src/mdtest_snippet.py:2:12
+  |
+2 | IntOrStr = int | str
+  |            ---^^^---
+  |            |     |
+  |            |     Has type `<class 'str'>`
+  |            Has type `<class 'int'>`
+  |
+info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
+info: Python 3.9 was assumed when resolving types because it was specified on the command line
 ```
 
 ## Attribute expressions in type annotations are understood
@@ -507,28 +571,28 @@ class TD2(TypedDict):
 
 def _(dt: dict[str, Any], key: str):
     x1: TD = dt.get(key, {})
-    reveal_type(x1)  # revealed: Any
+    reveal_type(x1)  # revealed: TD
 
     x2: TD = dt.get(key, {"x": 0})
-    reveal_type(x2)  # revealed: Any
+    reveal_type(x2)  # revealed: TD
 
     x3: TD | None = dt.get(key, {})
-    reveal_type(x3)  # revealed: Any
+    reveal_type(x3)  # revealed: TD | None
 
     x4: TD | None = dt.get(key, {"x": 0})
-    reveal_type(x4)  # revealed: Any
+    reveal_type(x4)  # revealed: TD | None
 
     x5: TD2 = dt.get(key, {})
-    reveal_type(x5)  # revealed: Any
+    reveal_type(x5)  # revealed: TD2
 
     x6: TD2 = dt.get(key, {"x": 0})
-    reveal_type(x6)  # revealed: Any
+    reveal_type(x6)  # revealed: TD2
 
     x7: TD2 | None = dt.get(key, {})
-    reveal_type(x7)  # revealed: Any
+    reveal_type(x7)  # revealed: TD2 | None
 
     x8: TD2 | None = dt.get(key, {"x": 0})
-    reveal_type(x8)  # revealed: Any
+    reveal_type(x8)  # revealed: TD2 | None
 ```
 
 Partially specialized type context is not ignored:
@@ -580,7 +644,7 @@ def _():
     reveal_type(x4)  # revealed: X
 ```
 
-## Prefer the declared type of generic classes
+## Prefer the declared type of generic classes and callables
 
 ```toml
 [environment]
@@ -615,15 +679,15 @@ e: list[Any] | None = [1]
 reveal_type(e)  # revealed: list[Any]
 
 f: list[Any] | None = f2(1)
-# TODO: Better constraint solver.
-reveal_type(f)  # revealed: list[int] | None
+reveal_type(f)  # revealed: list[Any] | None
 
 g: list[Any] | dict[Any, Any] = f3(1)
-# TODO: Better constraint solver.
-reveal_type(g)  # revealed: list[int] | dict[int, int]
+reveal_type(g)  # revealed: list[Any] | dict[Any, Any]
 ```
 
-We only prefer the declared type if it is in non-covariant position.
+When inferring a generic call, we only use the declared type as type context if it is in
+non-covariant position. The final annotated assignment binding still uses the declared type if the
+inferred and declared types are mutually assignable.
 
 ```py
 class Bivariant[T]:
@@ -662,15 +726,25 @@ reveal_type(x2)  # revealed: Covariant[Literal[1]]
 reveal_type(x3)  # revealed: Contravariant[int]
 reveal_type(x4)  # revealed: Invariant[int]
 
-x5: Bivariant[Any] = bivariant(1)
-x6: Covariant[Any] = covariant(1)
-x7: Contravariant[Any] = contravariant(1)
-x8: Invariant[Any] = invariant(1)
+x5: Bivariant[int | None] = bivariant(1)
+x6: Covariant[int | None] = covariant(1)
+x7: Contravariant[int | None] = contravariant(1)
+x8: Invariant[int | None] = invariant(1)
 
-reveal_type(x5)  # revealed: Bivariant[Literal[1]]
+reveal_type(x5)  # revealed: Bivariant[int | None]
 reveal_type(x6)  # revealed: Covariant[Literal[1]]
-reveal_type(x7)  # revealed: Contravariant[Any]
-reveal_type(x8)  # revealed: Invariant[Any]
+reveal_type(x7)  # revealed: Contravariant[int | None]
+reveal_type(x8)  # revealed: Invariant[int | None]
+
+x9: Bivariant[Any] = bivariant(1)
+x10: Covariant[Any] = covariant(1)
+x11: Contravariant[Any] = contravariant(1)
+x12: Invariant[Any] = invariant(1)
+
+reveal_type(x9)  # revealed: Bivariant[Any]
+reveal_type(x10)  # revealed: Covariant[Any]
+reveal_type(x11)  # revealed: Contravariant[Any]
+reveal_type(x12)  # revealed: Invariant[Any]
 ```
 
 ```py
@@ -681,6 +755,38 @@ class X[T]:
 
 x1: X[int | None] = X()
 reveal_type(x1)  # revealed: X[None]
+```
+
+We also prefer the declared type of `Callable` parameters, which are in contravariant position:
+
+```py
+from typing import Callable
+
+type AnyToBool = Callable[[Any], bool]
+
+def wrap[**P, T](f: Callable[P, T]) -> Callable[P, T]:
+    return f
+
+def make_callable[T](x: T) -> Callable[[T], bool]:
+    raise NotImplementedError
+
+def maybe_make_callable[T](x: T) -> Callable[[T], bool] | None:
+    raise NotImplementedError
+
+x1: Callable[[Any], bool] = make_callable(0)
+reveal_type(x1)  # revealed: (Any, /) -> bool
+
+x2: AnyToBool = make_callable(0)
+reveal_type(x2)  # revealed: (Any, /) -> bool
+
+x3: Callable[[list[Any]], bool] = make_callable([0])
+reveal_type(x3)  # revealed: (list[Any], /) -> bool
+
+x4: Callable[[Any], bool] = wrap(make_callable(0))
+reveal_type(x4)  # revealed: (Any, /) -> bool
+
+x5: Callable[[Any], bool] | None = maybe_make_callable(0)
+reveal_type(x5)  # revealed: ((Any, /) -> bool) | None
 ```
 
 ## Declared type preference sees through subtyping
@@ -776,33 +882,48 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import reveal_type, TypedDict
+from typing import reveal_type, Any, Callable, TypedDict
 
 def identity[T](x: T) -> T:
     return x
 
-def _(narrow: dict[str, str], target: list[str] | dict[str, str] | None):
+type Target = Any | list[str] | dict[str, str] | Callable[[str], None] | None
+
+def _(narrow: dict[str, str], target: Target):
     target = identity(narrow)
     reveal_type(target)  # revealed: dict[str, str]
 
-def _(narrow: list[str], target: list[str] | dict[str, str] | None):
+def _(narrow: list[str], target: Target):
     target = identity(narrow)
     reveal_type(target)  # revealed: list[str]
 
-def _(narrow: list[str] | dict[str, str], target: list[str] | dict[str, str] | None):
+def _(narrow: Callable[[str], None], target: Target):
+    target = identity(narrow)
+    reveal_type(target)  # revealed: (str, /) -> None
+
+def _(narrow: list[str] | dict[str, str], target: Target):
     target = identity(narrow)
     reveal_type(target)  # revealed: list[str] | dict[str, str]
 
 class TD(TypedDict):
     x: int
 
-def _(target: list[TD] | dict[str, TD] | None):
+type TargetWithTD = Any | list[TD] | dict[str, TD] | Callable[[TD], None] | None
+
+def _(target: TargetWithTD):
     target = identity([{"x": 1}])
     reveal_type(target)  # revealed: list[TD]
 
-def _(target: list[TD] | dict[str, TD] | None):
+def _(target: TargetWithTD):
     target = identity({"x": {"x": 1}})
     reveal_type(target)  # revealed: dict[str, TD]
+
+def _(target: TargetWithTD):
+    def make_callable[T](x: T) -> Callable[[T], None]:
+        raise NotImplementedError
+
+    target = identity(make_callable({"x": 1}))
+    reveal_type(target)  # revealed: (TD, /) -> None
 ```
 
 ## Prefer the inferred type of non-generic classes
@@ -887,7 +1008,7 @@ def _(a: int, b: str, c: int | str):
     reveal_type(x10)  # revealed: int | str | None
 ```
 
-## Assignability diagnostics ignore declared type of generic classes
+## Assignability diagnostics ignore declared type
 
 ```toml
 [environment]
@@ -913,19 +1034,27 @@ class A(TypedDict):
 x2: list[A | bool] = [{"bar": 1}, 1]
 ```
 
-However, the declared type of generic classes should be ignored if the specialization is not
-solvable:
+However, the declared type should be ignored if the specialization is not solvable:
 
 ```py
+from typing import Any, Callable
+
 def g[T](x: list[T]) -> T:
     return x[0]
 
 def _(a: int | None):
     # error: [invalid-assignment] "Object of type `list[int | None]` is not assignable to `list[str]`"
-    y1: list[str] = f(a)
+    x1: list[str] = f(a)
 
     # error: [invalid-assignment] "Object of type `int | None` is not assignable to `str`"
-    y2: str = g(f(a))
+    x2: str = g(f(a))
+
+def make_callable[T](x: T) -> Callable[[T], bool]:
+    raise NotImplementedError
+
+def _(a: int | None):
+    # error: [invalid-assignment] "Object of type `(int | None, /) -> bool` is not assignable to `(str, /) -> bool`"
+    x1: Callable[[str], bool] = make_callable(a)
 ```
 
 ## Forward annotation with unclosed string literal

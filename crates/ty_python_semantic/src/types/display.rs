@@ -19,9 +19,6 @@ use ty_module_resolver::file_to_module;
 
 use crate::Db;
 use crate::place::{DefinedPlace, Place};
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::{FileScopeId, ScopeKind};
-use crate::semantic_index::semantic_index;
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::constraints::ConstraintSetBuilder;
@@ -39,6 +36,9 @@ use crate::types::{
     ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
     Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
+use ty_python_core::definition::Definition;
+use ty_python_core::scope::{FileScopeId, ScopeKind};
+use ty_python_core::semantic_index;
 
 /// A named item that can be either a class or a type alias.
 ///
@@ -100,10 +100,10 @@ pub struct DisplaySettings<'db> {
     signature_name_display: SignatureNameDisplay,
     /// Class names that should be displayed fully qualified
     /// (e.g., `module.ClassName` instead of just `ClassName`)
-    pub qualified: Rc<FxHashMap<&'db str, QualificationLevel>>,
+    qualified: Rc<FxHashMap<&'db str, QualificationLevel>>,
     /// Type alias names that should be displayed fully qualified
     /// (e.g., `A.Alias` instead of just `Alias`)
-    pub qualified_type_aliases: Rc<FxHashMap<&'db str, QualificationLevel>>,
+    qualified_type_aliases: Rc<FxHashMap<&'db str, QualificationLevel>>,
     /// Whether long unions and literals are displayed in full
     pub preserve_full_unions: bool,
     /// Scopes that are currently active in the display context (e.g. function scopes
@@ -113,6 +113,9 @@ pub struct DisplaySettings<'db> {
     /// Function types that are currently being displayed.
     /// Used to prevent infinite recursion when displaying self-referential function types.
     pub visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
+    /// Whether to hide the return type of the outermost signature.
+    /// Return types of nested callable types inside parameters are still shown.
+    pub hide_return_type: bool,
 }
 
 impl<'db> DisplaySettings<'db> {
@@ -125,18 +128,10 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn singleline(&self) -> Self {
+    fn singleline(&self) -> Self {
         Self {
             multiline: false,
             ..self.clone()
-        }
-    }
-
-    #[must_use]
-    pub fn truncate_long_unions(self) -> Self {
-        Self {
-            preserve_full_unions: false,
-            ..self
         }
     }
 
@@ -157,7 +152,7 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn force_signature_name(&self) -> Self {
+    fn force_signature_name(&self) -> Self {
         Self {
             signature_name_display: SignatureNameDisplay::Force,
             ..self.clone()
@@ -165,7 +160,15 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn with_active_scopes(&self, scopes: impl IntoIterator<Item = Definition<'db>>) -> Self {
+    pub fn hide_return_type(&self) -> Self {
+        Self {
+            hide_return_type: true,
+            ..self.clone()
+        }
+    }
+
+    #[must_use]
+    fn with_active_scopes(&self, scopes: impl IntoIterator<Item = Definition<'db>>) -> Self {
         let mut active_scopes = (*self.active_scopes).clone();
         active_scopes.extend(scopes);
         Self {
@@ -425,7 +428,7 @@ impl std::ops::DerefMut for TypeDetailGuard<'_, '_, '_, '_> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum QualificationLevel {
+enum QualificationLevel {
     ModuleName,
     FileAndLineNumber,
 }
@@ -865,6 +868,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 }
                 write!(f.with_type(self.ty), "{dynamic}")
             }
+            Type::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
             Type::Never => f.with_type(self.ty).write_str("Never"),
             Type::NominalInstance(instance) => {
                 let class = instance.class(self.db);
@@ -1081,9 +1085,19 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         "property",
                         Type::PropertyInstance(property),
                         property
-                            .getter(self.db)
+                            .setter(self.db)
                             .and_then(Type::as_function_literal)
-                            .map(|getter| &**getter.name(self.db)),
+                            .map(|setter| &**setter.name(self.db)),
+                    ),
+                    KnownBoundMethodType::PropertyDunderDelete(property) => (
+                        KnownClass::Property,
+                        "__delete__",
+                        "property",
+                        Type::PropertyInstance(property),
+                        property
+                            .deleter(self.db)
+                            .and_then(Type::as_function_literal)
+                            .map(|deleter| &**deleter.name(self.db)),
                     ),
                     KnownBoundMethodType::StrStartswith(literal) => (
                         KnownClass::Property,
@@ -1149,6 +1163,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     WrapperDescriptorKind::PropertyDunderSet => {
                         ("__set__", "property", KnownClass::Property)
                     }
+                    WrapperDescriptorKind::PropertyDunderDelete => {
+                        ("__delete__", "property", KnownClass::Property)
+                    }
                 };
                 f.write_char('<')?;
                 f.with_type(KnownClass::WrapperDescriptorType.to_class_literal(self.db))
@@ -1210,7 +1227,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .enum_class(self.db)
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f)?;
-                    write!(f, ".{}", enum_literal.name(self.db))
+                    f.write_char('.')?;
+                    write!(
+                        f.with_type(Type::enum_literal(enum_literal)),
+                        "{}",
+                        enum_literal.name(self.db)
+                    )
                 }
             },
             Type::TypeVar(bound_typevar) => {
@@ -1234,7 +1256,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.write_str(", ")?;
                 bound_super
                     .owner(self.db)
-                    .owner_type(self.db)
+                    .owner_type()
                     .display_with(self.db, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(">")
@@ -1292,11 +1314,7 @@ impl<'db> BoundTypeVarIdentity<'db> {
         }
     }
 
-    pub(crate) fn display_with(
-        self,
-        db: &'db dyn Db,
-        settings: DisplaySettings<'db>,
-    ) -> impl Display {
+    fn display_with(self, db: &'db dyn Db, settings: DisplaySettings<'db>) -> impl Display {
         DisplayBoundTypeVarIdentity {
             bound_typevar_identity: self,
             db,
@@ -1329,7 +1347,7 @@ impl Display for DisplayBoundTypeVarIdentity<'_> {
 }
 
 impl<'db> TupleSpec<'db> {
-    pub(crate) fn display_with<'a>(
+    fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
         settings: DisplaySettings<'db>,
@@ -1342,7 +1360,7 @@ impl<'db> TupleSpec<'db> {
     }
 }
 
-pub(crate) struct DisplayTuple<'a, 'db> {
+struct DisplayTuple<'a, 'db> {
     tuple: &'a TupleSpec<'db>,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
@@ -1428,7 +1446,7 @@ impl<'db> OverloadLiteral<'db> {
         Self::display_with(self, db, DisplaySettings::default())
     }
 
-    pub(crate) fn display_with(
+    fn display_with(
         self,
         db: &'db dyn Db,
         settings: DisplaySettings<'db>,
@@ -1475,7 +1493,7 @@ impl Display for DisplayOverloadLiteral<'_> {
 }
 
 impl<'db> FunctionType<'db> {
-    pub(crate) fn display_with(
+    fn display_with(
         self,
         db: &'db dyn Db,
         settings: DisplaySettings<'db>,
@@ -1488,7 +1506,7 @@ impl<'db> FunctionType<'db> {
     }
 }
 
-pub(crate) struct DisplayFunctionType<'db> {
+struct DisplayFunctionType<'db> {
     ty: FunctionType<'db>,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
@@ -1631,11 +1649,11 @@ impl Display for DisplayGenericAlias<'_> {
 }
 
 impl<'db> GenericContext<'db> {
-    pub fn display<'a>(&'a self, db: &'db dyn Db) -> DisplayGenericContext<'a, 'db> {
+    fn display<'a>(&'a self, db: &'db dyn Db) -> DisplayGenericContext<'a, 'db> {
         Self::display_with(self, db, DisplaySettings::default())
     }
 
-    pub fn display_full<'a>(&'a self, db: &'db dyn Db) -> DisplayGenericContext<'a, 'db> {
+    fn display_full<'a>(&'a self, db: &'db dyn Db) -> DisplayGenericContext<'a, 'db> {
         DisplayGenericContext {
             generic_context: self,
             db,
@@ -1645,7 +1663,7 @@ impl<'db> GenericContext<'db> {
         }
     }
 
-    pub fn display_with<'a>(
+    fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
         settings: DisplaySettings<'db>,
@@ -1692,7 +1710,7 @@ impl Display for DisplayOptionalGenericContext<'_, '_> {
     }
 }
 
-pub struct DisplayGenericContext<'a, 'db> {
+struct DisplayGenericContext<'a, 'db> {
     generic_context: &'a GenericContext<'db>,
     db: &'db dyn Db,
     #[expect(dead_code)]
@@ -1773,11 +1791,7 @@ impl Display for DisplayGenericContext<'_, '_> {
 }
 
 impl<'db> Specialization<'db> {
-    pub fn display(self, db: &'db dyn Db) -> DisplaySpecialization<'db> {
-        self.display_short(db, TupleSpecialization::No, DisplaySettings::default())
-    }
-
-    pub(crate) fn display_full(self, db: &'db dyn Db) -> DisplaySpecialization<'db> {
+    fn display_full(self, db: &'db dyn Db) -> DisplaySpecialization<'db> {
         DisplaySpecialization {
             specialization: self,
             db,
@@ -1788,7 +1802,7 @@ impl<'db> Specialization<'db> {
     }
 
     /// Renders the specialization as it would appear in a subscript expression, e.g. `[int, str]`.
-    pub fn display_short(
+    fn display_short(
         self,
         db: &'db dyn Db,
         tuple_specialization: TupleSpecialization,
@@ -1804,7 +1818,7 @@ impl<'db> Specialization<'db> {
     }
 }
 
-pub struct DisplaySpecialization<'db> {
+struct DisplaySpecialization<'db> {
     specialization: Specialization<'db>,
     db: &'db dyn Db,
     tuple_specialization: TupleSpecialization,
@@ -1867,7 +1881,7 @@ impl Display for DisplaySpecialization<'_> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TupleSpecialization {
+enum TupleSpecialization {
     Yes,
     No,
 }
@@ -1891,7 +1905,7 @@ impl<'db> CallableType<'db> {
         Self::display_with(self, db, DisplaySettings::default())
     }
 
-    pub(crate) fn display_with<'a>(
+    fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
         settings: DisplaySettings<'db>,
@@ -2005,7 +2019,7 @@ impl<'db> DisplaySignature<'_, 'db> {
         }
     }
 
-    pub(crate) fn should_hide_self_from_display(&self, db: &'db dyn Db) -> bool {
+    fn should_hide_self_from_display(&self, db: &'db dyn Db) -> bool {
         !self.return_ty.contains_self(db)
             && !self
                 .parameters
@@ -2070,23 +2084,29 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
         }
 
         // Parameters
+        let param_settings = DisplaySettings {
+            hide_return_type: false,
+            ..settings.clone()
+        };
         self.parameters
-            .display_with(self.db, settings.clone())
+            .display_with(self.db, param_settings)
             .fmt_detailed(&mut f)?;
 
         // Return type
-        f.write_str(" -> ")?;
+        if !self.settings.hide_return_type {
+            f.write_str(" -> ")?;
 
-        let should_parenthesize_return_type =
-            should_parenthesize_callable_type(self.return_ty, self.db);
-        if should_parenthesize_return_type {
-            f.write_char('(')?;
-        }
-        self.return_ty
-            .display_with(self.db, settings.singleline())
-            .fmt_detailed(&mut f)?;
-        if should_parenthesize_return_type {
-            f.write_char(')')?;
+            let should_parenthesize_return_type =
+                should_parenthesize_callable_type(self.return_ty, self.db);
+            if should_parenthesize_return_type {
+                f.write_char('(')?;
+            }
+            self.return_ty
+                .display_with(self.db, settings.singleline())
+                .fmt_detailed(&mut f)?;
+            if should_parenthesize_return_type {
+                f.write_char(')')?;
+            }
         }
 
         if self.parameters.is_top() {
@@ -2136,92 +2156,130 @@ struct DisplayParameters<'a, 'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        fn display_parameters<'db>(
+            display: &DisplayParameters<'_, 'db>,
+            f: &mut TypeWriter<'_, '_, 'db>,
+            parameters: &[Parameter<'db>],
+            arg_separator: &str,
+        ) -> fmt::Result {
+            let mut star_added = false;
+            let mut needs_slash = false;
+            let mut first = true;
+
+            for parameter in parameters {
+                // Handle special separators
+                if parameter.is_positional_only() {
+                    needs_slash = true;
+                } else if needs_slash {
+                    if !first {
+                        f.write_str(arg_separator)?;
+                    }
+                    f.write_char('/')?;
+                    needs_slash = false;
+                    first = false;
+                }
+                if !star_added && parameter.is_keyword_only() {
+                    if !first {
+                        f.write_str(arg_separator)?;
+                    }
+                    f.write_char('*')?;
+                    star_added = true;
+                    first = false;
+                }
+
+                // Add comma before parameter if not first
+                if !first {
+                    f.write_str(arg_separator)?;
+                }
+
+                // Write parameter with range tracking
+                let param_name = parameter
+                    .display_name()
+                    .map(|name| name.to_string())
+                    .unwrap_or_default();
+                parameter
+                    .display_with(display.db, display.settings.singleline())
+                    .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;
+
+                first = false;
+            }
+
+            if needs_slash {
+                if !first {
+                    f.write_str(arg_separator)?;
+                }
+                f.write_char('/')?;
+            }
+
+            Ok(())
+        }
+
         // For `ParamSpec` kind, the parameters still contain `*args` and `**kwargs`, but we
         // display them as `**P` instead, so avoid multiline in that case.
-        // TODO: This might change once we support `Concatenate`
-        let multiline = self.settings.multiline
-            && self.parameters.len() > 1
-            && !matches!(
-                self.parameters.kind(),
-                ParametersKind::Gradual | ParametersKind::ParamSpec(_)
-            );
+        // For `Concatenate` kind, use multiline only if there are more than 1 prefix parameters.
+        // For `Gradual` kind without prefix params (len <= 2), display as `...`.
+        let multiline = if self.settings.multiline {
+            match self.parameters.kind() {
+                ParametersKind::Standard => self.parameters.len() > 1,
+                ParametersKind::Gradual | ParametersKind::Top | ParametersKind::ParamSpec(_) => {
+                    false
+                }
+                ParametersKind::Concatenate(_) => {
+                    // The tail already represents 2 parameters. Additionally, there should be more
+                    // than 1 prefix parameters to use multiline, so the limit becomes 3.
+                    self.parameters.len() > 3
+                }
+            }
+        } else {
+            false
+        };
+
         // Opening parenthesis
         f.write_char('(')?;
         if multiline {
             f.write_str("\n    ")?;
         }
+
+        let arg_separator = if multiline { ",\n    " } else { ", " };
+
         match self.parameters.kind() {
-            ParametersKind::Standard => {
-                let mut star_added = false;
-                let mut needs_slash = false;
-                let mut first = true;
-                let arg_separator = if multiline { ",\n    " } else { ", " };
-
-                for parameter in self.parameters.as_slice() {
-                    // Handle special separators
-                    if !star_added && parameter.is_keyword_only() {
-                        if !first {
-                            f.write_str(arg_separator)?;
-                        }
-                        f.write_char('*')?;
-                        star_added = true;
-                        first = false;
-                    }
-                    if parameter.is_positional_only() {
-                        needs_slash = true;
-                    } else if needs_slash {
-                        if !first {
-                            f.write_str(arg_separator)?;
-                        }
-                        f.write_char('/')?;
-                        needs_slash = false;
-                        first = false;
-                    }
-
-                    // Add comma before parameter if not first
-                    if !first {
-                        f.write_str(arg_separator)?;
-                    }
-
-                    // Write parameter with range tracking
-                    let param_name = parameter
-                        .display_name()
-                        .map(|name| name.to_string())
-                        .unwrap_or_default();
-                    parameter
-                        .display_with(self.db, self.settings.singleline())
-                        .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;
-
-                    first = false;
-                }
-
-                if needs_slash {
-                    if !first {
-                        f.write_str(arg_separator)?;
-                    }
-                    f.write_char('/')?;
-                }
+            ParametersKind::Standard | ParametersKind::Concatenate(_) => {
+                display_parameters(self, f, self.parameters.as_slice(), arg_separator)?;
             }
-            ParametersKind::Gradual | ParametersKind::Top => {
-                // We represent gradual form as `...` in the signature, internally the parameters still
-                // contain `(*args, **kwargs)` parameters. (Top parameters are displayed the same
-                // as gradual parameters, we just wrap the entire signature in `Top[]`.)
+            ParametersKind::Top => {
+                // TODO: Remove `...`, always display all the parameters
+                // Top parameters are displayed the same as gradual parameters, we just wrap the
+                // entire signature in `Top[]`
                 f.write_str("...")?;
             }
+            ParametersKind::Gradual if self.parameters.len() == 2 => {
+                // TODO: Remove `...`, always display all the parameters
+                // For gradual parameters with only `(*args, **kwargs)`, display as `...` for
+                // simplicity ...
+                f.write_str("...")?;
+            }
+            ParametersKind::Gradual => {
+                // ... but otherwise display all the parameters as normal.
+                display_parameters(self, f, self.parameters.as_slice(), arg_separator)?;
+            }
             ParametersKind::ParamSpec(typevar) => {
-                write!(f, "**{}", typevar.name(self.db))?;
+                let parameter_name = format!("**{}", typevar.name(self.db));
+                let mut parameter = f.with_detail(TypeDetail::Parameter(parameter_name.clone()));
+                write!(parameter, "{parameter_name}")?;
                 let binding_context = typevar.binding_context(self.db);
                 if let Some(binding_context_name) = binding_context.name(self.db)
                     && let Some(definition) = binding_context.definition()
                     && !self.settings.active_scopes.contains(&definition)
                 {
-                    write!(f, "@{binding_context_name}")?;
+                    write!(parameter, "@{binding_context_name}")?;
                 }
             }
         }
+
         if multiline {
             f.write_char('\n')?;
         }
+
         // Closing parenthesis
         f.write_char(')')
     }
@@ -2781,7 +2839,7 @@ impl Display for DisplayMaybeParenthesizedType<'_> {
     }
 }
 
-pub(crate) trait TypeArrayDisplay<'db> {
+trait TypeArrayDisplay<'db> {
     fn display_with(
         &self,
         db: &'db dyn Db,
@@ -2831,7 +2889,7 @@ impl<'db> TypeArrayDisplay<'db> for [Type<'db>] {
     }
 }
 
-pub(crate) struct DisplayTypeArray<'b, 'db> {
+struct DisplayTypeArray<'b, 'db> {
     types: &'b [Type<'db>],
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
@@ -2959,9 +3017,15 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             KnownInstanceType::Deprecated(_) => f.write_str("warnings.deprecated"),
             KnownInstanceType::Field(field) => {
                 f.with_type(ty).write_str("dataclasses.Field")?;
-                if let Some(default_ty) = field.default_type(self.db) {
+
+                let field_type = field
+                    .converter(self.db)
+                    .map(|(_, converter_output)| converter_output)
+                    .or(field.default_type(self.db));
+
+                if let Some(field_ty) = field_type {
                     f.write_char('[')?;
-                    write!(f.with_type(default_ty), "{}", default_ty.display(self.db))?;
+                    write!(f.with_type(field_ty), "{}", field_ty.display(self.db))?;
                     f.write_char(']')?;
                 }
                 Ok(())
@@ -3192,6 +3256,20 @@ mod tests {
                 Some(Type::none(&db))
             ),
             @"(x, *, y) -> None"
+        );
+
+        // '/' parameter must appear before '*' parameter
+        assert_snapshot!(
+            display_signature(
+                &db,
+                [
+                    Parameter::positional_only(Some(Name::new_static("a"))),
+                    Parameter::keyword_only(Name::new_static("x")),
+                    Parameter::keyword_only(Name::new_static("y")),
+                ],
+                Some(Type::none(&db))
+            ),
+            @"(a, /, *, x, y) -> None"
         );
 
         // A mix of all parameter kinds.

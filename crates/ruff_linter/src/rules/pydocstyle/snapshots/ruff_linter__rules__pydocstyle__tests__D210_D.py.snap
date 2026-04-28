@@ -10,13 +10,13 @@ D210 [*] No whitespaces allowed surrounding docstring text
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Trim surrounding whitespace
-285 | 
+285 |
 286 | @expect('D210: No whitespaces allowed surrounding docstring text')
 287 | def endswith():
     -     """Whitespace at the end. """
 288 +     """Whitespace at the end."""
-289 | 
-290 | 
+289 |
+290 |
 291 | @expect('D210: No whitespaces allowed surrounding docstring text')
 
 D210 [*] No whitespaces allowed surrounding docstring text
@@ -28,13 +28,13 @@ D210 [*] No whitespaces allowed surrounding docstring text
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Trim surrounding whitespace
-290 | 
+290 |
 291 | @expect('D210: No whitespaces allowed surrounding docstring text')
 292 | def around():
     -     """ Whitespace at everywhere. """
 293 +     """Whitespace at everywhere."""
-294 | 
-295 | 
+294 |
+295 |
 296 | @expect('D210: No whitespaces allowed surrounding docstring text')
 
 D210 [*] No whitespaces allowed surrounding docstring text
@@ -54,7 +54,7 @@ help: Trim surrounding whitespace
 298 | def multiline():
     -     """ Whitespace at the beginning.
 299 +     """Whitespace at the beginning.
-300 | 
+300 |
 301 |     This is the end.
 302 |     """
 

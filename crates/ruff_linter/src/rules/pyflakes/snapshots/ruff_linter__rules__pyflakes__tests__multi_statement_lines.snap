@@ -14,7 +14,7 @@ help: Remove unused import: `foo1`
   -     import foo1; x = 1
 2 +     x = 1
 3 |     import foo2;     x = 1
-4 | 
+4 |
 5 | if True:
 
 F401 [*] `foo2` imported but unused
@@ -32,7 +32,7 @@ help: Remove unused import: `foo2`
 2 |     import foo1; x = 1
   -     import foo2;     x = 1
 3 +     x = 1
-4 | 
+4 |
 5 | if True:
 6 |     import foo3; \
 
@@ -46,12 +46,12 @@ F401 [*] `foo3` imported but unused
   |
 help: Remove unused import: `foo3`
 3 |     import foo2;     x = 1
-4 | 
+4 |
 5 | if True:
   -     import foo3; \
   - x = 1
 6 +     x = 1
-7 | 
+7 |
 8 | if True:
 9 |     import foo4 \
 
@@ -65,12 +65,12 @@ F401 [*] `foo4` imported but unused
    |
 help: Remove unused import: `foo4`
 7  | x = 1
-8  | 
+8  |
 9  | if True:
    -     import foo4 \
    -         ; x = 1
 10 +     x = 1
-11 | 
+11 |
 12 | if True:
 13 |     x = 1; import foo5
 
@@ -83,12 +83,12 @@ F401 [*] `foo5` imported but unused
    |
 help: Remove unused import: `foo5`
 11 |         ; x = 1
-12 | 
+12 |
 13 | if True:
    -     x = 1; import foo5
 14 +     x = 1; 
-15 | 
-16 | 
+15 |
+16 |
 17 | if True:
 
 F401 [*] `foo6` imported but unused
@@ -102,13 +102,13 @@ F401 [*] `foo6` imported but unused
 21 | if True:
    |
 help: Remove unused import: `foo6`
-15 | 
-16 | 
+15 |
+16 |
 17 | if True:
    -     x = 1; \
    -          import foo6
 18 +     x = 1; 
-19 | 
+19 |
 20 | if True:
 21 |     x = 1 \
 
@@ -123,12 +123,12 @@ F401 [*] `foo7` imported but unused
 25 | if True:
    |
 help: Remove unused import: `foo7`
-20 | 
+20 |
 21 | if True:
 22 |     x = 1 \
    -         ; import foo7
 23 +         ; 
-24 | 
+24 |
 25 | if True:
 26 |     x = 1; import foo8; x = 1
 
@@ -142,12 +142,12 @@ F401 [*] `foo8` imported but unused
    |
 help: Remove unused import: `foo8`
 23 |         ; import foo7
-24 | 
+24 |
 25 | if True:
    -     x = 1; import foo8; x = 1
 26 +     x = 1; x = 1
 27 |     x = 1;     import foo9;     x = 1
-28 | 
+28 |
 29 | if True:
 
 F401 [*] `foo9` imported but unused
@@ -161,12 +161,12 @@ F401 [*] `foo9` imported but unused
 29 | if True:
    |
 help: Remove unused import: `foo9`
-24 | 
+24 |
 25 | if True:
 26 |     x = 1; import foo8; x = 1
    -     x = 1;     import foo9;     x = 1
 27 +     x = 1;     x = 1
-28 | 
+28 |
 29 | if True:
 30 |     x = 1; \
 
@@ -180,13 +180,13 @@ F401 [*] `foo10` imported but unused
 32 |     x = 1
    |
 help: Remove unused import: `foo10`
-28 | 
+28 |
 29 | if True:
 30 |     x = 1; \
    -         import foo10; \
    -     x = 1
 31 +         x = 1
-32 | 
+32 |
 33 | if True:
 34 |     x = 1 \
 
@@ -200,12 +200,12 @@ F401 [*] `foo11` imported but unused
 37 |         ;x = 1
    |
 help: Remove unused import: `foo11`
-33 | 
+33 |
 34 | if True:
 35 |     x = 1 \
    -         ;import foo11 \
 36 |         ;x = 1
-37 | 
+37 |
 38 | if True:
 
 F401 [*] `foo12` imported but unused
@@ -220,13 +220,13 @@ F401 [*] `foo12` imported but unused
    |
 help: Remove unused import: `foo12`
 37 |         ;x = 1
-38 | 
+38 |
 39 | if True:
    -     x = 1; \
    -         \
    -         import foo12
 40 +     x = 1; 
-41 | 
+41 |
 42 | if True:
 43 |     x = 1; \
 
@@ -240,14 +240,14 @@ F401 [*] `foo13` imported but unused
    |
 help: Remove unused import: `foo13`
 42 |         import foo12
-43 | 
+43 |
 44 | if True:
    -     x = 1; \
    - \
    -     import foo13
 45 +     x = 1; 
-46 | 
-47 | 
+46 |
+47 |
 48 | if True:
 
 F401 [*] `foo14` imported but unused
@@ -265,7 +265,7 @@ help: Remove unused import: `foo14`
 51 |     x = 1; \
 52 |     #    \
    -     import foo14
-53 | 
+53 |
 54 | # Continuation, but not as the last content in the file.
 55 | x = 1; \
 
@@ -281,12 +281,12 @@ F401 [*] `foo15` imported but unused
    |
 help: Remove unused import: `foo15`
 53 |     import foo14
-54 | 
+54 |
 55 | # Continuation, but not as the last content in the file.
    - x = 1; \
    - import foo15
 56 + x = 1; 
-57 | 
+57 |
 58 | # Continuation, followed by end-of-file. (Removing `import foo` would cause a syntax
 59 | # error.)
 
@@ -299,7 +299,7 @@ F401 [*] `foo16` imported but unused
    |        ^^^^^
    |
 help: Remove unused import: `foo16`
-58 | 
+58 |
 59 | # Continuation, followed by end-of-file. (Removing `import foo` would cause a syntax
 60 | # error.)
    - x = 1; \

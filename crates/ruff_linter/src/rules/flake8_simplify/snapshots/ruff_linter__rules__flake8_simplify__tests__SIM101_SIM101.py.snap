@@ -12,7 +12,7 @@ help: Merge `isinstance` calls for `a`
   - if isinstance(a, int) or isinstance(a, float):  # SIM101
 1 + if isinstance(a, (int, float)):  # SIM101
 2 |     pass
-3 | 
+3 |
 4 | if isinstance(a, (int, float)) or isinstance(a, bool):  # SIM101
 note: This is an unsafe fix and may change runtime behavior
 
@@ -28,11 +28,11 @@ SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
 help: Merge `isinstance` calls for `a`
 1 | if isinstance(a, int) or isinstance(a, float):  # SIM101
 2 |     pass
-3 | 
+3 |
   - if isinstance(a, (int, float)) or isinstance(a, bool):  # SIM101
 4 + if isinstance(a, (int, float, bool)):  # SIM101
 5 |     pass
-6 | 
+6 |
 7 | if isinstance(a, int) or isinstance(a, float) or isinstance(b, bool):  # SIM101
 note: This is an unsafe fix and may change runtime behavior
 
@@ -48,11 +48,11 @@ SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
 help: Merge `isinstance` calls for `a`
 4  | if isinstance(a, (int, float)) or isinstance(a, bool):  # SIM101
 5  |     pass
-6  | 
+6  |
    - if isinstance(a, int) or isinstance(a, float) or isinstance(b, bool):  # SIM101
 7  + if isinstance(a, (int, float)) or isinstance(b, bool):  # SIM101
 8  |     pass
-9  | 
+9  |
 10 | if isinstance(b, bool) or isinstance(a, int) or isinstance(a, float):  # SIM101
 note: This is an unsafe fix and may change runtime behavior
 
@@ -68,11 +68,11 @@ SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
 help: Merge `isinstance` calls for `a`
 7  | if isinstance(a, int) or isinstance(a, float) or isinstance(b, bool):  # SIM101
 8  |     pass
-9  | 
+9  |
    - if isinstance(b, bool) or isinstance(a, int) or isinstance(a, float):  # SIM101
 10 + if isinstance(b, bool) or isinstance(a, (int, float)):  # SIM101
 11 |     pass
-12 | 
+12 |
 13 | if isinstance(a, int) or isinstance(b, bool) or isinstance(a, float):  # SIM101
 note: This is an unsafe fix and may change runtime behavior
 
@@ -88,11 +88,11 @@ SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
 help: Merge `isinstance` calls for `a`
 13 | if isinstance(a, int) or isinstance(b, bool) or isinstance(a, float):  # SIM101
 14 |     pass
-15 | 
+15 |
    - if (isinstance(a, int) or isinstance(a, float)) and isinstance(b, bool):  # SIM101
 16 + if (isinstance(a, (int, float))) and isinstance(b, bool):  # SIM101
 17 |     pass
-18 | 
+18 |
 19 | if isinstance(a.b, int) or isinstance(a.b, float):  # SIM101
 note: This is an unsafe fix and may change runtime behavior
 
@@ -108,11 +108,11 @@ SIM101 [*] Multiple `isinstance` calls for expression, merge into a single call
 help: Merge `isinstance` calls
 16 | if (isinstance(a, int) or isinstance(a, float)) and isinstance(b, bool):  # SIM101
 17 |     pass
-18 | 
+18 |
    - if isinstance(a.b, int) or isinstance(a.b, float):  # SIM101
 19 + if isinstance(a.b, (int, float)):  # SIM101
 20 |     pass
-21 | 
+21 |
 22 | if isinstance(a(), int) or isinstance(a(), float):  # SIM101
 note: This is an unsafe fix and may change runtime behavior
 
@@ -139,11 +139,11 @@ SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
 help: Merge `isinstance` calls for `a`
 35 | if isinstance(a, int) or unrelated_condition or isinstance(a, float):
 36 |     pass
-37 | 
+37 |
    - if x or isinstance(a, int) or isinstance(a, float):
 38 + if x or isinstance(a, (int, float)):
 39 |     pass
-40 | 
+40 |
 41 | if x or y or isinstance(a, int) or isinstance(a, float) or z:
 note: This is an unsafe fix and may change runtime behavior
 
@@ -159,11 +159,11 @@ SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
 help: Merge `isinstance` calls for `a`
 38 | if x or isinstance(a, int) or isinstance(a, float):
 39 |     pass
-40 | 
+40 |
    - if x or y or isinstance(a, int) or isinstance(a, float) or z:
 41 + if x or y or isinstance(a, (int, float)) or z:
 42 |     pass
-43 | 
+43 |
 44 | def f():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -177,7 +177,7 @@ SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
    |
 help: Merge `isinstance` calls for `a`
 50 |         pass
-51 | 
+51 |
 52 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722460483
    - if(isinstance(a, int)) or (isinstance(a, float)):
 53 + if isinstance(a, (int, float)):

@@ -221,7 +221,7 @@ impl std::fmt::Display for ParseErrorType {
         match self {
             ParseErrorType::OtherError(msg) => write!(f, "{msg}"),
             ParseErrorType::ExpectedToken { found, expected } => {
-                write!(f, "Expected {expected}, found {found}",)
+                write!(f, "Expected {expected}, found {found}")
             }
             ParseErrorType::Lexical(lex_error) => write!(f, "{lex_error}"),
             ParseErrorType::SimpleStatementsOnSameLine => {
@@ -501,6 +501,7 @@ pub enum StarTupleKind {
 pub enum FStringKind {
     Backslash,
     Comment,
+    LineBreak,
     NestedQuote,
 }
 
@@ -731,6 +732,11 @@ pub enum UnsupportedSyntaxErrorKind {
     /// f'''A complex trick: {
     ///     bag['bag']  # recursive bags!
     /// }'''
+    ///
+    /// # line breaks in a non-triple-quoted replacement field
+    /// f"{
+    ///     1
+    /// }"
     ///
     /// # arbitrary nesting
     /// f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"
@@ -990,6 +996,9 @@ impl Display for UnsupportedSyntaxError {
             }
             UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment) => {
                 "Cannot use comments in f-strings"
+            }
+            UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::LineBreak) => {
+                "Cannot use line breaks in non-triple-quoted f-string replacement fields"
             }
             UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote) => {
                 "Cannot reuse outer quote character in f-strings"

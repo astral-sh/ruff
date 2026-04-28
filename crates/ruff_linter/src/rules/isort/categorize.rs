@@ -63,7 +63,7 @@ pub enum ImportSection {
 impl fmt::Display for ImportSection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Known(import_type) => write!(f, "known {{ type = {import_type} }}",),
+            Self::Known(import_type) => write!(f, "known {{ type = {import_type} }}"),
             Self::UserDefined(string) => fmt::Debug::fmt(string, f),
         }
     }

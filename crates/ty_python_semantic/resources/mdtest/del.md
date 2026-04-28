@@ -169,6 +169,179 @@ c = C()
 reveal_type(c.x)  # revealed: int
 ```
 
+### Property deleters
+
+```py
+from typing import NoReturn
+
+class ReadOnlyProperty:
+    @property
+    def x(self) -> int:
+        return 1
+
+class SupportsDelete:
+    @property
+    def x(self) -> int:
+        return 1
+
+    @x.deleter
+    def x(self) -> None:
+        pass
+
+class RejectsDescriptorDelete:
+    @property
+    def x(self) -> int:
+        return 1
+
+    @x.deleter
+    def x(self) -> NoReturn:
+        raise AttributeError("x")
+
+class ExplicitNoneDeleter:
+    def get(self) -> int:
+        return 1
+
+    keyword = property(get, fdel=None)
+    positional = property(get, None, None)
+
+read_only = ReadOnlyProperty()
+# error: [invalid-assignment] "Cannot delete read-only property `x` on object of type `ReadOnlyProperty`"
+del read_only.x
+
+supports_delete = SupportsDelete()
+del supports_delete.x
+
+rejects_descriptor_delete = RejectsDescriptorDelete()
+# error: [invalid-assignment] "Cannot delete attribute `x` on type `RejectsDescriptorDelete` whose `__delete__` method returns `Never`/`NoReturn`"
+del rejects_descriptor_delete.x
+
+explicit_none_deleter = ExplicitNoneDeleter()
+# error: [invalid-assignment] "Cannot delete read-only property `keyword` on object of type `ExplicitNoneDeleter`"
+del explicit_none_deleter.keyword
+# error: [invalid-assignment] "Cannot delete read-only property `positional` on object of type `ExplicitNoneDeleter`"
+del explicit_none_deleter.positional
+```
+
+### Instance `__delattr__`
+
+```py
+from typing import NamedTuple, NoReturn
+
+class SupportsCustomDelete:
+    @property
+    def x(self) -> int:
+        return 1
+
+    def __delattr__(self, name: str) -> None:
+        pass
+
+class RejectsDelete:
+    @property
+    def x(self) -> int:
+        return 1
+
+    def __delattr__(self, name: str) -> NoReturn:
+        raise AttributeError(name)
+
+class BadDelAttr:
+    x: int = 1
+
+    # error: [invalid-method-override] "Invalid override of method `__delattr__`: Definition is incompatible with `object.__delattr__`"
+    def __delattr__(self, name: int) -> None:
+        pass
+
+class DeletableNamedTuple(NamedTuple):
+    x: int
+
+    def __delattr__(self, name: str) -> None:
+        pass
+
+supports_custom_delete = SupportsCustomDelete()
+del supports_custom_delete.x
+
+rejects_delete = RejectsDelete()
+# error: [invalid-assignment] "Cannot delete attribute `x` on type `RejectsDelete` whose `__delattr__` method returns `Never`/`NoReturn`"
+del rejects_delete.x
+
+bad_delattr = BadDelAttr()
+# error: [invalid-assignment] "Cannot delete attribute `x` on type `BadDelAttr` with custom `__delattr__` method"
+del bad_delattr.x
+
+deletable_namedtuple = DeletableNamedTuple(1)
+del deletable_namedtuple.x
+```
+
+### Descriptor `__delete__`
+
+```py
+class Weird:
+    def __delete__(self, instance: object, extra: object) -> None:
+        pass
+
+class FallbackInstanceAttribute:
+    def __init__(self) -> None:
+        self.x = Weird()
+
+fallback_instance_attribute = FallbackInstanceAttribute()
+del fallback_instance_attribute.x
+```
+
+### Final attributes
+
+```py
+from typing import Final
+
+class FinalAttribute:
+    def __init__(self) -> None:
+        self.x: Final[int] = 1
+
+class FinalAttributeWithDelAttr:
+    def __init__(self) -> None:
+        self.x: Final[int] = 1
+
+    def __delattr__(self, name: str) -> None:
+        pass
+
+class FinalClassAttribute:
+    x: Final[int] = 1
+
+final_attribute = FinalAttribute()
+# error: [invalid-assignment] "Cannot delete final attribute `x` on type `FinalAttribute`"
+del final_attribute.x
+
+final_attribute_with_delattr = FinalAttributeWithDelAttr()
+# error: [invalid-assignment] "Cannot delete final attribute `x` on type `FinalAttributeWithDelAttr`"
+del final_attribute_with_delattr.x
+
+# error: [invalid-assignment] "Cannot delete final attribute `x` on type `<class 'FinalClassAttribute'>`"
+del FinalClassAttribute.x
+```
+
+### Metaclass `__delattr__`
+
+```py
+from typing import NoReturn
+
+class SupportsClassDeleteMeta(type):
+    def __delattr__(self, name: str) -> None:
+        pass
+
+class SupportsClassDelete(metaclass=SupportsClassDeleteMeta):
+    x: int = 1
+
+class RejectsClassDeleteMeta(type):
+    def __delattr__(self, name: str) -> NoReturn:
+        raise AttributeError(name)
+
+class RejectsClassDelete(metaclass=RejectsClassDeleteMeta):
+    x: int = 1
+
+del SupportsClassDelete.x
+
+# error: [invalid-assignment] "Cannot delete attribute `x` on type `<class 'RejectsClassDelete'>` whose `__delattr__` method returns `Never`/`NoReturn`"
+del RejectsClassDelete.x
+```
+
 ## Delete items
 
 ### Basic item deletion
@@ -242,8 +415,6 @@ Deleting a required key from a TypedDict is a type error because it would make t
 a valid instance of that TypedDict type. However, deleting `NotRequired` keys (or keys in
 `total=False` TypedDicts) is allowed.
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from typing_extensions import TypedDict, NotRequired
 
@@ -262,22 +433,88 @@ class MixedMovie(TypedDict):
 m: Movie = {"name": "Blade Runner", "year": 1982}
 p: PartialMovie = {"name": "Test"}
 mixed: MixedMovie = {"name": "Test"}
+```
 
-# Required keys cannot be deleted.
-# error: [invalid-argument-type]
+Required keys cannot be deleted.
+
+```py
+# snapshot: invalid-argument-type
 del m["name"]
+```
 
-# In a partial TypedDict (`total=False`), all keys can be deleted.
+```snapshot
+error[invalid-argument-type]: Cannot delete required key "name" from TypedDict `Movie`
+  --> src/mdtest_snippet.py:19:7
+   |
+19 | del m["name"]
+   |       ^^^^^^
+   |
+info: Field defined here
+ --> src/mdtest_snippet.py:3:7
+  |
+3 | class Movie(TypedDict):
+  |       ---------------- `Movie` defined here
+4 |     name: str
+  |     ---------
+  |     |
+  |     `name` declared as required here
+  |     Consider making it `NotRequired`
+  |
+info: Only keys marked as `NotRequired` (or in a TypedDict with `total=False`) can be deleted
+```
+
+In a partial TypedDict (`total=False`), all keys can be deleted.
+
+```py
 del p["name"]
+```
 
-# `NotRequired` keys can always be deleted.
+`NotRequired` keys can always be deleted.
+
+```py
 del mixed["year"]
+```
 
-# But required keys in mixed `TypedDict` still cannot be deleted.
-# error: [invalid-argument-type]
+But required keys in mixed `TypedDict` still cannot be deleted.
+
+```py
+# snapshot: invalid-argument-type
 del mixed["name"]
+```
 
-# And keys that don't exist cannot be deleted.
-# error: [invalid-argument-type]
+```snapshot
+error[invalid-argument-type]: Cannot delete required key "name" from TypedDict `MixedMovie`
+  --> src/mdtest_snippet.py:23:11
+   |
+23 | del mixed["name"]
+   |           ^^^^^^
+   |
+info: Field defined here
+  --> src/mdtest_snippet.py:11:7
+   |
+11 | class MixedMovie(TypedDict):
+   |       --------------------- `MixedMovie` defined here
+12 |     name: str
+   |     ---------
+   |     |
+   |     `name` declared as required here
+   |     Consider making it `NotRequired`
+   |
+info: Only keys marked as `NotRequired` (or in a TypedDict with `total=False`) can be deleted
+```
+
+And keys that don't exist cannot be deleted.
+
+```py
+# snapshot: invalid-argument-type
 del mixed["non_existent"]
+```
+
+```snapshot
+error[invalid-argument-type]: Cannot delete unknown key "non_existent" from TypedDict `MixedMovie`
+  --> src/mdtest_snippet.py:25:11
+   |
+25 | del mixed["non_existent"]
+   |           ^^^^^^^^^^^^^^
+   |
 ```

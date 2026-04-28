@@ -623,7 +623,7 @@ enum ImportModuleKind<'db> {
 /// to augment an `__all__` definition. For example, as found in
 /// `matplotlib`:
 ///
-/// ```ignore
+/// ```python
 /// import numpy as np
 /// __all__ = ['rand', 'randn', 'repmat']
 /// __all__ += np.__all__
@@ -680,7 +680,7 @@ impl Ranged for AstImport<'_> {
 ///
 /// This guarantees that child symbols have a symbol ID greater
 /// than all of its parents.
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 struct SymbolVisitor<'db> {
     db: &'db dyn Db,
     file: File,
@@ -2921,7 +2921,7 @@ class C: ...
                 .iter()
                 .map(|(_, symbol)| {
                     let mut snapshot =
-                        format!("{name} :: {kind:?}", name = symbol.name, kind = symbol.kind,);
+                        format!("{name} :: {kind:?}", name = symbol.name, kind = symbol.kind);
                     if let Some(ref imported_from) = symbol.imported_from {
                         snapshot = format!(
                             "{snapshot} :: Re-exported from `{module_name}`",

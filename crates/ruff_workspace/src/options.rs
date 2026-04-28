@@ -3843,6 +3843,27 @@ pub struct FormatOptions {
     )]
     pub quote_style: Option<QuoteStyle>,
 
+    /// Controls the quote style for nested strings inside interpolated string expressions.
+    ///
+    /// - `alternating` (default): Use alternating quotes.
+    /// - `preferred`: Use the configured [`quote-style`](#format_quote-style).
+    ///
+    /// ```python
+    /// f"{data['key']}"  # alternating (default)
+    /// f"{data["key"]}"  # preferred
+    /// ```
+    ///
+    /// Note: This setting has no effect when targeting Python versions below 3.12.
+    #[option(
+        default = r#""alternating""#,
+        value_type = r#""alternating" | "preferred""#,
+        example = r#"
+            # Use the configured quote style for nested strings (Python 3.12+ only).
+            nested-string-quote-style = "preferred"
+        "#
+    )]
+    pub nested_string_quote_style: Option<ruff_python_formatter::NestedStringQuoteStyle>,
+
     /// Ruff uses existing trailing commas as an indication that short lines should be left separate.
     /// If this option is set to `true`, the magic trailing comma is ignored.
     ///

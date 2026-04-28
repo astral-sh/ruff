@@ -14,10 +14,10 @@ TC004 [*] Move import `typing.List` out of type-checking block. Import is used f
 help: Move out of type-checking block
 1 | from typing import TYPE_CHECKING
 2 + from typing import List
-3 | 
+3 |
 4 | if TYPE_CHECKING:
   -     from typing import List
 5 +     pass
-6 | 
+6 |
 7 | __all__ = ("List",)
 note: This is an unsafe fix and may change runtime behavior

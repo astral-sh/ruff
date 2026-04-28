@@ -6,12 +6,12 @@ use rustc_hash::FxHashMap;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use crate::Db;
-use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
-use crate::semantic_index::scope::ScopeId;
 use crate::types::infer::ExpressionInference;
 use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
 use crate::types::{Type, TypeCheckDiagnostics, TypeContext, infer_expression_types};
-use crate::unpack::{UnpackKind, UnpackValue};
+use ty_python_core::ExpressionNodeKey;
+use ty_python_core::scope::ScopeId;
+use ty_python_core::unpack::{UnpackKind, UnpackValue};
 
 use super::context::InferContext;
 use super::diagnostic::INVALID_ASSIGNMENT;
@@ -51,7 +51,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
         let value_inference =
             infer_expression_types(self.db(), value.expression(), TypeContext::default());
-        let value_expr = value.expression().node_ref(self.db(), self.module());
+        let value_expr = value.expression().node_ref(self.db()).node(self.module());
 
         if matches!(value.kind(), UnpackKind::Assign)
             && self.unpack_assignment_sequence_from_inference(target, value_expr, value_inference)
