@@ -96,8 +96,7 @@ export default function Chrome({
       const selectedFile = files.metadata[files.selected];
       if (selectedFile != null) {
         const monaco = editorRef.current.monaco;
-        const fileUri = monaco.Uri.parse(selectedFile.name);
-        const userModel = monaco.editor.getModel(fileUri);
+        const userModel = monaco.editor.getModel(selectedFile.uri);
 
         if (userModel != null) {
           onClearVendoredFile();

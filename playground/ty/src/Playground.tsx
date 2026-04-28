@@ -31,7 +31,7 @@ import Chrome, { formatError } from "./Editor/Chrome";
 import { isPythonFile } from "./Editor/Files";
 import { runPython } from "./Editor/runPython";
 import type { Monaco } from "@monaco-editor/react";
-import type { editor } from "monaco-editor";
+import type { editor, Uri } from "monaco-editor";
 
 export const SETTINGS_FILE_NAME = "ty.json";
 
@@ -150,8 +150,13 @@ export default function Playground() {
       handle = workspace.openFile(name, "");
     }
 
-    documentStore.openDocument(name, "", handle);
-    dispatchFiles({ type: "add", name, handle });
+    const model = documentStore.openDocument(name, "", handle);
+    dispatchFiles({
+      type: "add",
+      name,
+      uri: model.uri,
+      handle,
+    });
   }, []);
 
   const handleFileRenamed = useCallback(
@@ -187,8 +192,14 @@ export default function Playground() {
         newHandle = workspace.openFile(newName, content);
       }
 
-      documentStore.renameDocument(oldName, newName, newHandle);
-      dispatchFiles({ type: "rename", id: file, to: newName, newHandle });
+      const model = documentStore.renameDocument(oldName, newName, newHandle);
+      dispatchFiles({
+        type: "rename",
+        id: file,
+        to: newName,
+        newUri: model.uri,
+        newHandle,
+      });
     },
     [files.metadata],
   );
@@ -369,6 +380,7 @@ export type FileId = number;
 export interface PlaygroundFile {
   id: FileId;
   name: string;
+  uri: Readonly<Uri>;
   handle: FileHandle | null;
 }
 
@@ -417,8 +429,15 @@ export type FileAction =
       handle: FileHandle | null;
       /// The file name
       name: string;
+      uri: Readonly<Uri>;
     }
-  | { type: "rename"; id: FileId; to: string; newHandle: FileHandle | null }
+  | {
+      type: "rename";
+      id: FileId;
+      to: string;
+      newUri: Readonly<Uri>;
+      newHandle: FileHandle | null;
+    }
   | {
       type: "remove";
       id: FileId;
@@ -448,13 +467,13 @@ function filesReducer(
 ): FilesState {
   switch (action.type) {
     case "add": {
-      const { handle, name } = action;
+      const { handle, name, uri } = action;
       const id = state.nextId;
       return {
         ...state,
         selected: id,
         order: [...state.order, id],
-        metadata: { ...state.metadata, [id]: { id, name, handle } },
+        metadata: { ...state.metadata, [id]: { id, name, uri, handle } },
         nextId: state.nextId + 1,
         revision: state.revision + 1,
         currentVendoredFile: null, // Clear vendored file when adding new file
@@ -488,14 +507,14 @@ function filesReducer(
       };
     }
     case "rename": {
-      const { id, to, newHandle } = action;
+      const { id, to, newUri, newHandle } = action;
       const file = state.metadata[id];
 
       return {
         ...state,
         metadata: {
           ...state.metadata,
-          [id]: { ...file, name: to, handle: newHandle },
+          [id]: { ...file, name: to, uri: newUri, handle: newHandle },
         },
       };
     }
@@ -784,8 +803,13 @@ function restoreWorkspace(
       handle = workspace.openFile(name, content);
     }
 
-    documentStore.openDocument(name, content, handle);
-    dispatchFiles({ type: "add", handle, name });
+    const model = documentStore.openDocument(name, content, handle);
+    dispatchFiles({
+      type: "add",
+      handle,
+      name,
+      uri: model.uri,
+    });
   }
 
   if (!hasSettings) {

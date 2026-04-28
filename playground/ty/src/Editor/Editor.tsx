@@ -485,7 +485,7 @@ class PlaygroundServer
   private getPlaygroundFileIdForUri(uri: Uri): FileId | null {
     return (
       Object.values(this.props.files.metadata).find((file) => {
-        return isUriForPlaygroundFile(uri, file.name);
+        return file.uri.toString() === uri.toString();
       })?.id ?? null
     );
   }
@@ -561,11 +561,8 @@ class PlaygroundServer
       return;
     }
 
-    const handle = selectedFile.handle;
     const editor = this.monaco.editor;
-    const model =
-      editor.getModel(Uri.parse(handle.path())) ??
-      editor.getModel(Uri.parse(selectedFile.name));
+    const model = editor.getModel(selectedFile.uri);
 
     if (model == null) {
       return;
@@ -870,8 +867,8 @@ class PlaygroundServer
           } as languages.LocationLink;
         }
 
-        const fileName = this.props.files.metadata[fileId].name;
-        const model = this.monaco.editor.getModel(Uri.parse(fileName));
+        const file = this.props.files.metadata[fileId];
+        const model = this.monaco.editor.getModel(file.uri);
         if (model != null) {
           uri = model.uri;
         }
@@ -933,14 +930,6 @@ function monacoRangeToTyRange(range: IRange): TyRange {
   return new TyRange(
     new TyPosition(range.startLineNumber, range.startColumn),
     new TyPosition(range.endLineNumber, range.endColumn),
-  );
-}
-
-function isUriForPlaygroundFile(uri: Uri, fileName: string): boolean {
-  return (
-    Uri.parse(fileName).toString() === uri.toString() ||
-    uri.path === fileName ||
-    uri.path === `/${fileName}`
   );
 }
 
