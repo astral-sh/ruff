@@ -534,14 +534,6 @@ fn check_class_declaration<'db>(
                 _ => None,
             };
 
-            let uses_receiver_specific_contract = match (type_on_subclass_instance, target_method) {
-                (Type::BoundMethod(source_method), Some(target_method)) => {
-                    source_method.has_receiver_specific_overloads(db)
-                        || target_method.has_conditionally_applicable_receiver_overloads(db)
-                }
-                _ => false,
-            };
-
             // Use the conditional bound-method contract path when there is a target bound method;
             // otherwise, fall back to normal assignability to the upcast callable.
             let method_is_assignable = target_method.map_or_else(
@@ -556,19 +548,6 @@ fn check_class_declaration<'db>(
             );
 
             if method_is_assignable {
-                continue;
-            }
-
-            // Protocol conformance is structural, but the assignability check can succeed via
-            // explicit protocol inheritance. Only use it as a fallback when the source method has
-            // source receiver annotations covering the target's receiver-specific overloads.
-            if uses_receiver_specific_contract
-                && superclass.is_protocol(db)
-                && let (Type::BoundMethod(source_method), Some(target_method)) =
-                    (type_on_subclass_instance, target_method)
-                && source_method.covers_receiver_specific_overloads(db, target_method)
-                && instance_of_class.is_assignable_to(db, Type::instance(db, superclass))
-            {
                 continue;
             }
 
