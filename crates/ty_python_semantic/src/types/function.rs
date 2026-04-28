@@ -996,6 +996,21 @@ impl<'db> FunctionType<'db> {
         }
     }
 
+    /// Applies a type mapping, without forcing lazy signatures for returned-callable rescoping.
+    pub(crate) fn apply_type_mapping_preserving_return_callable_laziness_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        if type_mapping.is_return_callable_specialization() {
+            self.apply_type_mapping_to_updated_signatures_impl(db, type_mapping, tcx, visitor)
+        } else {
+            self.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+        }
+    }
+
     pub(crate) fn with_dataclass_transformer_params(
         self,
         db: &'db dyn Db,

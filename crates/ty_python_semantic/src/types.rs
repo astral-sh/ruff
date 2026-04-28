@@ -5675,16 +5675,13 @@ impl<'db> Type<'db> {
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
             Type::FunctionLiteral(function) => visitor.visit(self, type_mapping, || {
-                if matches!(
-                    type_mapping,
-                    TypeMapping::ApplySpecialization(ApplySpecialization::ReturnCallables(_))
-                ) {
+                if type_mapping.is_return_callable_specialization() {
                     // Avoid forcing lazy function signatures while rescoping returned callables.
                     // Recursive `TypeOf[foo]` references can otherwise expand indefinitely, but
                     // already-specialized function literals may still need this mapping if their
                     // updated signatures mention moved typevars.
                     return Type::FunctionLiteral(
-                        function.apply_type_mapping_to_updated_signatures_impl(
+                        function.apply_type_mapping_preserving_return_callable_laziness_impl(
                             db,
                             type_mapping,
                             tcx,
@@ -5716,7 +5713,14 @@ impl<'db> Type<'db> {
 
             Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
                 db,
-                method.function(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                method
+                    .function(db)
+                    .apply_type_mapping_preserving_return_callable_laziness_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    ),
                 method.self_instance(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             )),
 
@@ -5759,13 +5763,23 @@ impl<'db> Type<'db> {
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
-                    function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    function.apply_type_mapping_preserving_return_callable_laziness_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    ),
                 ))
             }
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)) => {
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(
-                    function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    function.apply_type_mapping_preserving_return_callable_laziness_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    ),
                 ))
             }
 
@@ -6005,7 +6019,7 @@ impl<'db> Type<'db> {
                 });
             }
 
-            Type::BoundMethod(method) => {
+            Type::BoundMethod(method) => visitor.visit(self, || {
                 method.self_instance(db).find_legacy_typevars_impl(
                     db,
                     binding_context,
@@ -6018,22 +6032,22 @@ impl<'db> Type<'db> {
                     typevars,
                     visitor,
                 );
-            }
+            }),
 
             Type::KnownBoundMethod(
                 KnownBoundMethodType::FunctionTypeDunderGet(function)
                 | KnownBoundMethodType::FunctionTypeDunderCall(function),
-            ) => {
+            ) => visitor.visit(self, || {
                 function.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
-            }
+            }),
 
             Type::KnownBoundMethod(
                 KnownBoundMethodType::PropertyDunderGet(property)
                 | KnownBoundMethodType::PropertyDunderSet(property)
                 | KnownBoundMethodType::PropertyDunderDelete(property),
-            ) => {
+            ) => visitor.visit(self, || {
                 property.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
-            }
+            }),
 
             Type::Callable(callable) => {
                 callable.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
@@ -6859,6 +6873,13 @@ pub enum TypeMapping<'a, 'db> {
 }
 
 impl<'db> TypeMapping<'_, 'db> {
+    pub(crate) fn is_return_callable_specialization(&self) -> bool {
+        matches!(
+            self,
+            TypeMapping::ApplySpecialization(ApplySpecialization::ReturnCallables(_))
+        )
+    }
+
     /// Update the generic context of a [`Signature`] according to the current type mapping
     pub(crate) fn update_signature_generic_context(
         &self,

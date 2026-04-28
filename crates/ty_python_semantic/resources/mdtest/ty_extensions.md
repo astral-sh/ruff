@@ -597,6 +597,28 @@ reveal_type(generic_context(Foo.method))  # revealed: ty_extensions.GenericConte
 reveal_type(generic_context(Bar.method))  # revealed: ty_extensions.GenericContext[T@method]
 ```
 
+## Self-referential function `__get__` `TypeOf` in returned callables
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Concatenate
+from ty_extensions import TypeOf, generic_context
+
+def foo[**P, T](
+    x: "Callable[Concatenate[TypeOf[foo.__get__], ...], T]",
+) -> "Callable[Concatenate[TypeOf[foo.__get__], P], T]":
+    return x
+
+reveal_type(generic_context(foo))  # revealed: ty_extensions.GenericContext[T@foo]
+```
+
 ## Deeply nested `TypeOf` chains
 
 Multiple redefinitions of a function with `TypeOf[foo]` as the return type create a chain of
