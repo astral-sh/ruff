@@ -42,13 +42,11 @@ import CompletionItemKind = languages.CompletionItemKind;
 type Props = {
   visible: boolean;
   fileName: string;
-  selected: FileId;
   files: ReadonlyFiles;
   diagnostics: Diagnostic[];
   hints: Hint[];
   theme: Theme;
   workspace: Workspace;
-  onChange(content: string): void;
   onMount(editor: IStandaloneCodeEditor, monaco: Monaco): void;
   onOpenFile(file: FileId): void;
   onVendoredFileChange: (vendoredFileHandle: FileHandle) => void;
@@ -59,13 +57,11 @@ type Props = {
 export default function Editor({
   visible,
   fileName,
-  selected,
   files,
   theme,
   diagnostics,
   hints,
   workspace,
-  onChange,
   onMount,
   onOpenFile,
   onVendoredFileChange,
@@ -104,16 +100,6 @@ export default function Editor({
 
     server.updateMarkers(diagnostics, hints);
   }, [diagnostics, hints]);
-
-  const handleChange = useCallback(
-    (value: string | undefined) => {
-      // Don't update file content when viewing vendored files
-      if (!isViewingVendoredFile) {
-        onChange(value ?? "");
-      }
-    },
-    [onChange, isViewingVendoredFile],
-  );
 
   useEffect(() => {
     return () => {
@@ -169,8 +155,6 @@ export default function Editor({
       path={fileName}
       wrapperProps={visible ? {} : { style: { display: "none" } }}
       theme={theme === "light" ? "Ayu-Light" : "Ayu-Dark"}
-      value={files.contents[selected]}
-      onChange={handleChange}
     />
   );
 }
@@ -502,7 +486,7 @@ class PlaygroundServer
   private getPlaygroundFileIdForUri(uri: Uri): FileId | null {
     return (
       this.props.files.index.find((file) => {
-        return Uri.file(file.name).toString() === uri.toString();
+        return isUriForPlaygroundFile(uri, file.name);
       })?.id ?? null
     );
   }
@@ -580,7 +564,14 @@ class PlaygroundServer
     }
 
     const editor = this.monaco.editor;
-    const model = editor.getModel(Uri.parse(handle.path()));
+    const selectedFileName = this.props.files.index.find(
+      (file) => file.id === this.props.files.selected,
+    )?.name;
+    const model =
+      editor.getModel(Uri.parse(handle.path())) ??
+      (selectedFileName == null
+        ? null
+        : editor.getModel(Uri.parse(selectedFileName)));
 
     if (model == null) {
       return;
@@ -865,7 +856,7 @@ class PlaygroundServer
   }
 
   private mapNavigationTarget(link: LocationLink): languages.LocationLink {
-    const uri = Uri.parse(link.path);
+    let uri = Uri.parse(link.path);
 
     // Pre-create models to ensure peek definition works
     if (this.monaco.editor.getModel(uri) == null) {
@@ -876,19 +867,24 @@ class PlaygroundServer
         const content = this.props.workspace.sourceText(fileHandle);
         this.monaco.editor.createModel(content, "python", uri);
       } else {
-        // Handle regular files
+        // Regular file models are owned by Monaco and created by the playground.
         const fileId = this.getPlaygroundFileIdForUri(uri);
+        if (fileId == null) {
+          return {
+            uri,
+            range: tyRangeToMonacoRange(link.full_range),
+          } as languages.LocationLink;
+        }
 
-        if (fileId != null) {
-          const handle = this.props.files.handles[fileId];
-          if (handle != null) {
-            const language = isPythonFile(handle) ? "python" : undefined;
-            this.monaco.editor.createModel(
-              this.props.files.contents[fileId],
-              language,
-              uri,
-            );
-          }
+        const fileName = this.props.files.index.find(
+          (file) => file.id === fileId,
+        )?.name;
+        const model =
+          fileName == null
+            ? null
+            : this.monaco.editor.getModel(Uri.parse(fileName));
+        if (model != null) {
+          uri = model.uri;
         }
       }
     }
@@ -948,6 +944,14 @@ function monacoRangeToTyRange(range: IRange): TyRange {
   return new TyRange(
     new TyPosition(range.startLineNumber, range.startColumn),
     new TyPosition(range.endLineNumber, range.endColumn),
+  );
+}
+
+function isUriForPlaygroundFile(uri: Uri, fileName: string): boolean {
+  return (
+    Uri.parse(fileName).toString() === uri.toString() ||
+    uri.path === fileName ||
+    uri.path === `/${fileName}`
   );
 }
 

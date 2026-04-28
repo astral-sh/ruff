@@ -45,10 +45,10 @@ export interface Props {
   files: ReadonlyFiles;
   theme: Theme;
   selectedFileName: string;
+  documentRevision: number;
+  onRun(): Promise<string>;
 
   onAddFile(workspace: Workspace, name: string): void;
-
-  onChangeFile(workspace: Workspace, content: string): void;
 
   onRenameFile(workspace: Workspace, file: FileId, newName: string): void;
 
@@ -66,11 +66,12 @@ export default function Chrome({
   selectedFileName,
   workspacePromise,
   theme,
+  documentRevision,
+  onRun,
   onAddFile,
   onRenameFile,
   onRemoveFile,
   onSelectFile,
-  onChangeFile,
   onSelectVendoredFile,
   onClearVendoredFile,
 }: Props) {
@@ -97,7 +98,7 @@ export default function Chrome({
       );
       if (selectedFile != null) {
         const monaco = editorRef.current.monaco;
-        const fileUri = monaco.Uri.file(selectedFile.name);
+        const fileUri = monaco.Uri.parse(selectedFile.name);
         const userModel = monaco.editor.getModel(fileUri);
 
         if (userModel != null) {
@@ -146,29 +147,10 @@ export default function Chrome({
   }, []);
 
   const handleRemoved = useCallback(
-    async (id: FileId) => {
-      const name = files.index.find((file) => file.id === id)?.name;
-
-      if (name != null && editorRef.current != null) {
-        // Remove the file from the monaco state to avoid that monaco "restores" the old content.
-        // An alternative is to use a `key` on the `Editor` but that means we lose focus and selection
-        // range when changing between tabs.
-        const monaco = await import("monaco-editor");
-        editorRef.current.monaco.editor
-          .getModel(monaco.Uri.file(name))
-          ?.dispose();
-      }
-
+    (id: FileId) => {
       onRemoveFile(workspace, id);
     },
-    [workspace, files.index, onRemoveFile],
-  );
-
-  const handleChange = useCallback(
-    (content: string) => {
-      onChangeFile(workspace, content);
-    },
-    [onChangeFile, workspace],
+    [workspace, onRemoveFile],
   );
 
   const { defaultLayout, onLayoutChange } = useDefaultLayout({
@@ -181,6 +163,7 @@ export default function Chrome({
     workspace,
     secondaryTool,
     files.currentVendoredFile ?? null,
+    documentRevision,
   );
 
   return (
@@ -224,13 +207,11 @@ export default function Chrome({
                     theme={theme}
                     visible={true}
                     files={files}
-                    selected={files.selected}
                     fileName={selectedFileName}
                     diagnostics={checkResult.diagnostics}
                     hints={checkResult.hints}
                     workspace={workspace}
                     onMount={handleEditorMount}
-                    onChange={handleChange}
                     onOpenFile={onSelectFile}
                     onVendoredFileChange={onSelectVendoredFile}
                     onBackToUserFile={handleBackToUserFile}
@@ -265,6 +246,8 @@ export default function Chrome({
                 <Panel id="secondary-panel" minSize={100}>
                   <SecondaryPanel
                     files={files}
+                    documentRevision={documentRevision}
+                    onRun={onRun}
                     theme={theme}
                     tool={secondaryTool}
                     result={checkResult.secondary}
@@ -288,10 +271,9 @@ function useCheckResult(
   workspace: Workspace,
   secondaryTool: SecondaryTool | null,
   currentVendoredFileHandle: FileHandle | null,
+  documentRevision: number,
 ): CheckResult {
-  const deferredContent = useDeferredValue(
-    files.selected == null ? null : files.contents[files.selected],
-  );
+  const deferredDocumentRevision = useDeferredValue(documentRevision);
 
   return useMemo(() => {
     // Determine which file handle to use
@@ -304,7 +286,6 @@ function useCheckResult(
     // Regular file handling
     if (
       currentHandle == null ||
-      deferredContent == null ||
       !isPythonFile(currentHandle)
     ) {
       return {
@@ -384,7 +365,7 @@ function useCheckResult(
       };
     }
   }, [
-    deferredContent,
+    deferredDocumentRevision,
     workspace,
     files.selected,
     files.handles,
