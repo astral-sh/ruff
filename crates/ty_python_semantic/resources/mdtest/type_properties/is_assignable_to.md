@@ -1504,6 +1504,50 @@ static_assert(not is_subtype_of(Command[int, [str], object], Command[Any, ..., A
 static_assert(not is_subtype_of(Command[Any, ..., Any], Command[int, [str], object]))
 ```
 
+`ParamSpec` specializations in generic classes are compared using the callable parameter relation.
+This avoids rejecting wrappers around callbacks that are safe to use with a positional-only callback
+protocol.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable, Coroutine
+from datetime import datetime
+from typing import Any, Final
+from ty_extensions import TypeOf, static_assert, is_assignable_to
+
+class Job[**P, R]:
+    target: Final[Callable[P, R]]
+
+    def __init__(self, target: Callable[P, R]) -> None:
+        self.target = target
+
+def named(now: datetime) -> None:
+    pass
+
+def defaulted(now: datetime | None = None) -> None:
+    pass
+
+async def async_callback(now: datetime) -> None:
+    pass
+
+def exception_callback(_: Exception | None = None) -> None:
+    pass
+
+named_job = Job(named)
+defaulted_job = Job(defaulted)
+async_job = Job(async_callback)
+exception_job = Job(exception_callback)
+
+static_assert(is_assignable_to(TypeOf[named_job], Job[[datetime], None]))
+static_assert(is_assignable_to(TypeOf[defaulted_job], Job[[datetime], None]))
+static_assert(is_assignable_to(TypeOf[async_job], Job[[datetime], Coroutine[Any, Any, None] | None]))
+static_assert(not is_assignable_to(TypeOf[exception_job], Job[[datetime], None]))
+```
+
 ## `Concatenate`
 
 ### Self-assignability
