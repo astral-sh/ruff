@@ -97,10 +97,14 @@ x: list[int | str] = list1(42) * 3
 `typed_dict.py`:
 
 ```py
-from typing import Callable, Hashable, Mapping, TypedDict
+from typing import Any, Callable, Hashable, Mapping, TypedDict
+from typing_extensions import Never
 
 class TD(TypedDict):
     x: int
+
+class BadTD(TypedDict):
+    x: str
 
 d1_literal = {"x": 1}
 d1_dict = dict(x=1)
@@ -127,6 +131,19 @@ d4_invalid_dict: TD = dict(x="1")  # error: [invalid-argument-type]
 
 reveal_type(d4_invalid_literal)  # revealed: TD
 reveal_type(d4_invalid_dict)  # revealed: TD
+
+def unpack_invalid_typed_dict(src: BadTD) -> TD:
+    # The fast path should validate TypedDict-shaped unpacks even when they are not assignable to
+    # the target. That preserves the key-level TypedDict diagnostic instead of falling back to a
+    # broad `dict[str, str]` assignment error.
+    # error: [invalid-argument-type] "Invalid argument to key "x" with declared type `int` on TypedDict `TD`: value of type `str`"
+    return dict(**src)
+
+def return_any_unpack(src: Any) -> TD:
+    return dict(**src)
+
+def pass_never_unpack(src: Never) -> None:
+    takes_td(dict(**src))
 
 def takes_mapping(value: Mapping[str, object]) -> None:
     pass

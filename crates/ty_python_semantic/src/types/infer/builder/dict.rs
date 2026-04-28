@@ -28,9 +28,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .filter_union(self.db(), Type::is_typed_dict)
                 .as_typed_dict()
         {
-            // Only speculate the `**kwargs` applicability check. Named keyword values are inferred
-            // on the real builder so their diagnostics are either committed with the fast path or
-            // left for ordinary `dict(...)` inference when we fall back.
+            // Only speculate the `**kwargs` applicability check. Assignability handles inputs that
+            // are already valid for the target, including gradual and bottom types. The additional
+            // TypedDict-shape check keeps invalid-but-analyzable unpacks on this path so validation
+            // can emit key-level diagnostics instead of falling back to a broad `dict[...]`
+            // assignment error. Unsupported unpacks still fall back to ordinary `dict(...)`
+            // inference.
+            //
+            // Named keyword values are inferred on the real builder so their diagnostics are either
+            // committed with the fast path or left for ordinary `dict(...)` inference when we fall
+            // back.
             let supports_typed_dict_context = {
                 let mut speculative_builder = self.speculate();
                 infer_unpacked_keyword_types(arguments, &mut |expr, tcx| {
@@ -39,8 +46,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .into_iter()
                 .flatten()
                 .all(|keyword_ty| {
-                    keyword_ty.is_dynamic()
-                        || keyword_ty.is_never()
+                    keyword_ty
+                        .is_assignable_to(speculative_builder.db(), Type::TypedDict(typed_dict))
                         || extract_unpacked_typed_dict_keys_from_value_type(
                             speculative_builder.db(),
                             keyword_ty,
