@@ -33,8 +33,7 @@ import {
   LocationLink,
   TextEdit,
 } from "ty_wasm";
-import { FileId, ReadonlyFiles } from "../Playground";
-import { isPythonFile } from "./Files";
+import { FileId, PlaygroundFile, ReadonlyFiles } from "../Playground";
 import { Diagnostic } from "./Diagnostics";
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 import CompletionItemKind = languages.CompletionItemKind;
@@ -42,13 +41,11 @@ import CompletionItemKind = languages.CompletionItemKind;
 type Props = {
   visible: boolean;
   fileName: string;
-  selected: FileId;
   files: ReadonlyFiles;
   diagnostics: Diagnostic[];
   hints: Hint[];
   theme: Theme;
   workspace: Workspace;
-  onChange(content: string): void;
   onMount(editor: IStandaloneCodeEditor, monaco: Monaco): void;
   onOpenFile(file: FileId): void;
   onVendoredFileChange: (vendoredFileHandle: FileHandle) => void;
@@ -59,13 +56,11 @@ type Props = {
 export default function Editor({
   visible,
   fileName,
-  selected,
   files,
   theme,
   diagnostics,
   hints,
   workspace,
-  onChange,
   onMount,
   onOpenFile,
   onVendoredFileChange,
@@ -104,16 +99,6 @@ export default function Editor({
 
     server.updateMarkers(diagnostics, hints);
   }, [diagnostics, hints]);
-
-  const handleChange = useCallback(
-    (value: string | undefined) => {
-      // Don't update file content when viewing vendored files
-      if (!isViewingVendoredFile) {
-        onChange(value ?? "");
-      }
-    },
-    [onChange, isViewingVendoredFile],
-  );
 
   useEffect(() => {
     return () => {
@@ -169,8 +154,6 @@ export default function Editor({
       path={fileName}
       wrapperProps={visible ? {} : { style: { display: "none" } }}
       theme={theme === "light" ? "Ayu-Light" : "Ayu-Dark"}
-      value={files.contents[selected]}
-      onChange={handleChange}
     />
   );
 }
@@ -499,11 +482,11 @@ class PlaygroundServer
     this.inVendoredFileCondition.set(isViewingVendoredFile);
   }
 
-  private getPlaygroundFileIdForUri(uri: Uri): FileId | null {
+  private getPlaygroundFileForUri(uri: Uri): PlaygroundFile | null {
     return (
-      this.props.files.index.find((file) => {
-        return Uri.file(file.name).toString() === uri.toString();
-      })?.id ?? null
+      Object.values(this.props.files.metadata).find((file) => {
+        return file.uri.toString() === uri.toString();
+      }) ?? null
     );
   }
 
@@ -529,12 +512,12 @@ class PlaygroundServer
       return this.getOrCreateVendoredFileHandle(vendoredPath);
     }
 
-    const fileId = this.getPlaygroundFileIdForUri(model.uri);
-    if (fileId == null) {
+    const file = this.getPlaygroundFileForUri(model.uri);
+    if (file == null) {
       return null;
     }
 
-    return this.props.files.handles[fileId] ?? null;
+    return file.handle;
   }
 
   private formatSignatureHelp(
@@ -573,14 +556,13 @@ class PlaygroundServer
       return;
     }
 
-    const handle = this.props.files.handles[this.props.files.selected];
-
-    if (handle == null) {
+    const selectedFile = this.props.files.metadata[this.props.files.selected];
+    if (selectedFile.handle == null) {
       return;
     }
 
     const editor = this.monaco.editor;
-    const model = editor.getModel(Uri.parse(handle.path()));
+    const model = editor.getModel(selectedFile.uri);
 
     if (model == null) {
       return;
@@ -816,15 +798,15 @@ class PlaygroundServer
       this.props.onVendoredFileChange(fileHandle);
     } else {
       // Handle regular files
-      const fileId = this.getPlaygroundFileIdForUri(resource);
+      const file = this.getPlaygroundFileForUri(resource);
 
-      if (fileId == null) {
+      if (file == null) {
         return false;
       }
 
       // Set the model and trigger UI updates
-      if (files.selected !== fileId) {
-        this.props.onOpenFile(fileId);
+      if (files.selected !== file.id) {
+        this.props.onOpenFile(file.id);
       }
     }
 
@@ -865,7 +847,7 @@ class PlaygroundServer
   }
 
   private mapNavigationTarget(link: LocationLink): languages.LocationLink {
-    const uri = Uri.parse(link.path);
+    let uri = Uri.parse(link.path);
 
     // Pre-create models to ensure peek definition works
     if (this.monaco.editor.getModel(uri) == null) {
@@ -876,19 +858,18 @@ class PlaygroundServer
         const content = this.props.workspace.sourceText(fileHandle);
         this.monaco.editor.createModel(content, "python", uri);
       } else {
-        // Handle regular files
-        const fileId = this.getPlaygroundFileIdForUri(uri);
+        // Regular file models are owned by Monaco and created by the playground.
+        const file = this.getPlaygroundFileForUri(uri);
+        if (file == null) {
+          return {
+            uri,
+            range: tyRangeToMonacoRange(link.full_range),
+          } as languages.LocationLink;
+        }
 
-        if (fileId != null) {
-          const handle = this.props.files.handles[fileId];
-          if (handle != null) {
-            const language = isPythonFile(handle) ? "python" : undefined;
-            this.monaco.editor.createModel(
-              this.props.files.contents[fileId],
-              language,
-              uri,
-            );
-          }
+        const model = this.monaco.editor.getModel(file.uri);
+        if (model != null) {
+          uri = model.uri;
         }
       }
     }
