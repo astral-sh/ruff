@@ -54,12 +54,10 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          path: ruff
           persist-credentials: false
 
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          workspaces: "ruff"
           lookup-only: false
 
       - name: Install Rust toolchain
@@ -70,7 +68,6 @@ jobs:
 
       - name: Build ty for both commits
         id: build
-        working-directory: ruff
         run: |
           echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
@@ -84,17 +81,17 @@ jobs:
 
           git checkout "${MERGE_BASE}"
           cargo build --package ty --profile profiling
-          cp target/profiling/ty ../ty-base
+          cp target/profiling/ty ty-base
 
           git checkout "${GITHUB_SHA}"
           cargo build --package ty --profile profiling
-          cp target/profiling/ty ../ty-pr
+          cp target/profiling/ty ty-pr
 
           # Extract project lists and config for the shard jobs
-          git show "${MERGE_BASE}:crates/ty_python_semantic/resources/primer/good.txt" > ../projects_old.txt
-          git show "${GITHUB_SHA}:crates/ty_python_semantic/resources/primer/good.txt" > ../projects_new.txt
-          cp crates/ty_python_semantic/resources/primer/flaky.txt ../projects_flaky.txt
-          cp .github/ty-ecosystem.toml ../ty-ecosystem.toml
+          git show "${MERGE_BASE}:crates/ty_python_semantic/resources/primer/good.txt" > projects_old.txt
+          cp crates/ty_python_semantic/resources/primer/good.txt projects_new.txt
+          cp crates/ty_python_semantic/resources/primer/flaky.txt projects_flaky.txt
+          cp .github/ty-ecosystem.toml ty-ecosystem.toml
 
       - name: Upload ty binaries, project lists, and config
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
