@@ -679,7 +679,7 @@ export class PlaygroundSession {
     const model = this.monaco.editor.createModel(
       content,
       languageForFile(handle ?? name),
-      this.uri(name),
+      this.monaco.Uri.file(name),
     );
     this.registerModelChanged(name, handle, model);
 
@@ -731,11 +731,7 @@ export class PlaygroundSession {
   }
 
   private model(name: string): editor.ITextModel | null {
-    return this.monaco.editor.getModel(this.uri(name));
-  }
-
-  private uri(name: string) {
-    return this.monaco.Uri.parse(name);
+    return this.monaco.editor.getModel(this.monaco.Uri.file(name));
   }
 }
 

@@ -889,7 +889,9 @@ class PlaygroundServer
   }
 
   private mapNavigationTarget(link: LocationLink): languages.LocationLink {
-    let uri = Uri.parse(link.path);
+    let uri = link.path.startsWith("vendored:")
+      ? Uri.parse(link.path)
+      : Uri.file(link.path);
 
     // Pre-create models to ensure peek definition works
     if (this.monaco.editor.getModel(uri) == null) {
