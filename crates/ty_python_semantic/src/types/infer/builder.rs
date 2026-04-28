@@ -5473,7 +5473,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn store_expected_type(&mut self, expression: impl Into<ExpressionNodeKey>, ty: Type<'db>) {
+        if !self.has_string_literal_completion_candidates(ty) {
+            return;
+        }
         self.expected_types.insert(expression.into(), ty);
+    }
+
+    fn has_string_literal_completion_candidates(&self, ty: Type<'db>) -> bool {
+        matches!(
+            ty,
+            Type::Union(_) | Type::Intersection(_) | Type::TypeAlias(_)
+        ) || matches!(ty, Type::LiteralValue(literal) if literal.as_string().is_some())
     }
 
     fn union_expected_types(&mut self, expected_types: &FxHashMap<ExpressionNodeKey, Type<'db>>) {
