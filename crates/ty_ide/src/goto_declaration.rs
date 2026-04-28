@@ -2148,6 +2148,164 @@ class MyClass:
     }
 
     #[test]
+    fn goto_declaration_keyword_argument_typeddict() {
+        let test = cursor_test(
+            r#"
+        from typing import TypedDict
+
+        class TD(TypedDict):
+            f: int
+            g: str
+
+        TD(f<CURSOR>=1)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+         --> main.py:8:4
+          |
+        8 | TD(f=1)
+          |    ^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:5:5
+          |
+        5 |     f: int
+          |     -
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_keyword_argument_namedtuple() {
+        let test = cursor_test(
+            r#"
+        from typing import NamedTuple
+
+        class NT(NamedTuple):
+            f: int
+            g: str
+
+        NT(f<CURSOR>=1)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+         --> main.py:8:4
+          |
+        8 | NT(f=1)
+          |    ^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:5:5
+          |
+        5 |     f: int
+          |     -
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_keyword_argument_dataclass() {
+        let test = cursor_test(
+            r#"
+        from dataclasses import dataclass
+
+        @dataclass
+        class DC:
+            f: int
+            g: str
+
+        DC(f<CURSOR>=1)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+         --> main.py:9:4
+          |
+        9 | DC(f=1)
+          |    ^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:6:5
+          |
+        6 |     f: int
+          |     -
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_keyword_argument_dataclass_custom_init() {
+        let test = cursor_test(
+            r#"
+        from dataclasses import dataclass
+
+        @dataclass
+        class DC:
+            f: int
+            g: str
+
+            def __init__(self, f: int) -> None: ...
+
+        DC(f<CURSOR>=1)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+          --> main.py:11:4
+           |
+        11 | DC(f=1)
+           |    ^ Clicking here
+           |
+        info: Found 1 declaration
+         --> main.py:9:24
+          |
+        9 |     def __init__(self, f: int) -> None: ...
+          |                        -
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_keyword_argument_dataclass_transform_alias() {
+        let test = cursor_test(
+            r#"
+        from typing import dataclass_transform
+
+        def Field(alias: str = ...): ...
+
+        @dataclass_transform(field_specifiers=(Field,))
+        class MyDataclass: ...
+
+        class DC(MyDataclass):
+            f: int = Field(alias='g')
+
+        DC(g<CURSOR>=1)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+          --> main.py:12:4
+           |
+        12 | DC(g=1)
+           |    ^ Clicking here
+           |
+        info: Found 1 declaration
+          --> main.py:10:5
+           |
+        10 |     f: int = Field(alias='g')
+           |     -
+           |
+        ");
+    }
+
+    #[test]
     fn goto_declaration_overload_type_disambiguated1() {
         let test = CursorTest::builder()
             .source(
