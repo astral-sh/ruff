@@ -41,6 +41,16 @@ use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 use ty_python_core::definition::Definition;
 
+/// Selects which binding context to use for type variables that only appear in a return-position
+/// `Callable`.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub(super) enum ReturnCallableTypeVarScope {
+    /// Keep the type variables bound to the function's lexical generic context.
+    Lexical,
+    /// Move the type variables to the returned `Callable`'s generic context.
+    Public,
+}
+
 /// Infer the type of a parameter or return annotation in a function signature.
 ///
 /// This is very similar to `definition_expression_type`, but knows that `TypeInferenceBuilder`
@@ -475,6 +485,7 @@ impl<'db> Signature<'db> {
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
         has_implicitly_positional_first_parameter: bool,
+        return_callable_typevar_scope: ReturnCallableTypeVarScope,
     ) -> Self {
         let parameters = Parameters::from_parameters(
             db,
@@ -495,16 +506,21 @@ impl<'db> Signature<'db> {
             legacy_generic_context,
         );
 
-        // Look for any typevars bound by this function that are only mentioned in a Callable
-        // return type. (We do this after merging the legacy and PEP-695 contexts because we need
-        // to apply this heuristic to PEP-695 typevars as well.)
-        let (generic_context, return_ty) = GenericContext::remove_callable_only_typevars(
-            db,
-            full_generic_context,
-            &parameters,
-            return_ty,
-            definition,
-        );
+        let (generic_context, return_ty) = match return_callable_typevar_scope {
+            ReturnCallableTypeVarScope::Lexical => (full_generic_context, return_ty),
+            ReturnCallableTypeVarScope::Public => {
+                // Look for any typevars bound by this function that are only mentioned in a
+                // Callable return type. (We do this after merging the legacy and PEP-695 contexts
+                // because we need to apply this heuristic to PEP-695 typevars as well.)
+                GenericContext::remove_callable_only_typevars(
+                    db,
+                    full_generic_context,
+                    &parameters,
+                    return_ty,
+                    definition,
+                )
+            }
+        };
 
         Self {
             generic_context,
