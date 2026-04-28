@@ -166,7 +166,7 @@ jobs:
   generate-report:
     name: Generate diagnostic diff report
     needs: [analyze-shards]
-    runs-on: depot-ubuntu-24.04-4
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Install the latest version of uv
