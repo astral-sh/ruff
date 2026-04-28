@@ -27,7 +27,7 @@ import SecondaryPanel, {
 } from "./SecondaryPanel";
 import Diagnostics, { Diagnostic } from "./Diagnostics";
 import VendoredFileBanner from "./VendoredFileBanner";
-import { FileId, ReadonlyFiles } from "../Playground";
+import type { FileId, PlaygroundSession, ReadonlyFiles } from "../Playground";
 import type { editor } from "monaco-editor";
 import type { Monaco } from "@monaco-editor/react";
 
@@ -41,17 +41,17 @@ interface CheckResult {
 }
 
 export interface Props {
-  workspacePromise: Promise<Workspace>;
+  sessionPromise: Promise<PlaygroundSession>;
   files: ReadonlyFiles;
   theme: Theme;
   selectedFileName: string;
   onRun(): Promise<string>;
 
-  onAddFile(workspace: Workspace, name: string): void;
+  onAddFile(session: PlaygroundSession, name: string): void;
 
-  onRenameFile(workspace: Workspace, file: FileId, newName: string): void;
+  onRenameFile(session: PlaygroundSession, file: FileId, newName: string): void;
 
-  onRemoveFile(workspace: Workspace, file: FileId): void;
+  onRemoveFile(session: PlaygroundSession, file: FileId): void;
 
   onSelectFile(id: FileId): void;
 
@@ -63,7 +63,7 @@ export interface Props {
 export default function Chrome({
   files,
   selectedFileName,
-  workspacePromise,
+  sessionPromise,
   theme,
   onRun,
   onAddFile,
@@ -73,7 +73,8 @@ export default function Chrome({
   onSelectVendoredFile,
   onClearVendoredFile,
 }: Props) {
-  const workspace = use(workspacePromise);
+  const session = use(sessionPromise);
+  const workspace = session.workspace;
 
   const [secondaryTool, setSecondaryTool] = useState<SecondaryTool | null>(
     null,
@@ -85,9 +86,16 @@ export default function Chrome({
   } | null>(null);
 
   const handleFileRenamed = (file: FileId, newName: string) => {
-    onRenameFile(workspace, file, newName);
+    onRenameFile(session, file, newName);
     editorRef.current?.editor.focus();
   };
+
+  const handleAdd = useCallback(
+    (name: string) => {
+      onAddFile(session, name);
+    },
+    [session, onAddFile],
+  );
 
   const handleBackToUserFile = useCallback(() => {
     if (editorRef.current && files.selected != null) {
@@ -143,9 +151,9 @@ export default function Chrome({
 
   const handleRemoved = useCallback(
     (id: FileId) => {
-      onRemoveFile(workspace, id);
+      onRemoveFile(session, id);
     },
-    [workspace, onRemoveFile],
+    [session, onRemoveFile],
   );
 
   const { defaultLayout, onLayoutChange } = useDefaultLayout({
@@ -170,7 +178,7 @@ export default function Chrome({
             metadata={files.metadata}
             theme={theme}
             selected={files.selected}
-            onAdd={(name) => onAddFile(workspace, name)}
+            onAdd={handleAdd}
             onRename={handleFileRenamed}
             onSelect={onSelectFile}
             onRemove={handleRemoved}

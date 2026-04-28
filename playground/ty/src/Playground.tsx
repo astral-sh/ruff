@@ -1,6 +1,5 @@
 import {
   ActionDispatch,
-  RefObject,
   Suspense,
   useCallback,
   useDeferredValue,
@@ -39,38 +38,30 @@ export default function Playground() {
   const [theme, setTheme] = useTheme();
   const [version, setVersion] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [files, dispatchFiles] = useReducer(filesReducer, INIT_FILES_STATE);
-  const documentStoreRef = useRef<MonacoDocumentStore | null>(null);
+  const [session, setSession] = useState<PlaygroundSession | null>(null);
 
-  const workspacePromiseRef = useRef<Promise<Workspace> | null>(null);
-  if (workspacePromiseRef.current == null) {
-    workspacePromiseRef.current = startPlayground().then((fetched) => {
+  const sessionPromiseRef = useRef<Promise<PlaygroundSession> | null>(null);
+  if (sessionPromiseRef.current == null) {
+    sessionPromiseRef.current = startPlayground().then((fetched) => {
       setVersion(fetched.version);
       const workspace = new Workspace("/", PositionEncoding.Utf16, {});
-      const documentStore = new MonacoDocumentStore(
+      const session = new PlaygroundSession(
         fetched.monaco,
         workspace,
         setError,
         () => dispatchFiles({ type: "documentChanged" }),
       );
-      documentStoreRef.current = documentStore;
-      restoreWorkspace(
-        workspace,
-        documentStore,
-        fetched.workspace,
-        dispatchFiles,
-        setError,
-      );
-      setWorkspace(workspace);
-      return workspace;
+      restoreWorkspace(session, fetched.workspace, dispatchFiles, setError);
+      setSession(session);
+      return session;
     });
   }
   // This is safe as this is only called once on startup.
   // We need useRef to avoid duplicate initialization when
   // running locally due to react rendering
   // everything twice in strict mode in debug builds.
-  const workspacePromise = workspacePromiseRef.current;
+  const sessionPromise = sessionPromiseRef.current;
 
   const fileName = useMemo(() => {
     return files.selected == null
@@ -78,34 +69,34 @@ export default function Playground() {
       : files.metadata[files.selected].name;
   }, [files.metadata, files.selected]);
 
-  usePersistLocally(files, documentStoreRef);
+  usePersistLocally(files, session);
 
   const handleShare = useCallback(async () => {
-    const serializedFiles = serializeFiles(files, documentStoreRef.current);
+    const serializedFiles = serializeFiles(files, session);
 
     if (serializedFiles != null) {
       await persist(serializedFiles);
     }
-  }, [files]);
+  }, [session, files]);
 
   const handleCopyMarkdown = useCallback(async () => {
-    const serializedFiles = serializeFiles(files, documentStoreRef.current);
+    const serializedFiles = serializeFiles(files, session);
 
     if (serializedFiles != null) {
       await copyAsMarkdown(serializedFiles);
     }
-  }, [files]);
+  }, [session, files]);
 
   const handleCopyMarkdownLink = useCallback(async () => {
-    const serializedFiles = serializeFiles(files, documentStoreRef.current);
+    const serializedFiles = serializeFiles(files, session);
 
     if (serializedFiles != null) {
       await copyAsMarkdownLink(serializedFiles);
     }
-  }, [files]);
+  }, [session, files]);
 
   const handleDownload = useCallback(async () => {
-    const serializedFiles = serializeFiles(files, documentStoreRef.current);
+    const serializedFiles = serializeFiles(files, session);
 
     if (serializedFiles != null) {
       const downloadFiles = { ...serializedFiles.files };
@@ -125,38 +116,37 @@ export default function Playground() {
 
       await downloadZip(downloadFiles, "ty-playground");
     }
-  }, [files]);
+  }, [session, files]);
 
   const handleRun = useCallback(async () => {
-    const serializedFiles = serializeFiles(files, documentStoreRef.current);
+    const serializedFiles = serializeFiles(files, session);
     return serializedFiles == null ? "" : runPython(serializedFiles);
-  }, [files]);
+  }, [session, files]);
 
-  const handleFileAdded = useCallback((workspace: Workspace, name: string) => {
-    const documentStore = documentStoreRef.current;
-    if (documentStore == null) {
-      return;
-    }
+  const handleFileAdded = useCallback(
+    (session: PlaygroundSession, name: string) => {
+      const workspace = session.workspace;
+      let handle = null;
 
-    let handle = null;
+      if (name === SETTINGS_FILE_NAME) {
+        updateOptions(workspace, "{}", setError);
+      } else {
+        handle = workspace.openFile(name, "");
+      }
 
-    if (name === SETTINGS_FILE_NAME) {
-      updateOptions(workspace, "{}", setError);
-    } else {
-      handle = workspace.openFile(name, "");
-    }
-
-    const model = documentStore.openDocument(name, "", handle);
-    dispatchFiles({
-      type: "add",
-      name,
-      uri: model.uri,
-      handle,
-    });
-  }, []);
+      const model = session.openDocument(name, "", handle);
+      dispatchFiles({
+        type: "add",
+        name,
+        uri: model.uri,
+        handle,
+      });
+    },
+    [],
+  );
 
   const handleFileRenamed = useCallback(
-    (workspace: Workspace, file: FileId, newName: string) => {
+    (session: PlaygroundSession, file: FileId, newName: string) => {
       if (newName.startsWith("/")) {
         setError("File names cannot start with '/'.");
         return;
@@ -166,14 +156,10 @@ export default function Playground() {
         return;
       }
 
-      const documentStore = documentStoreRef.current;
-      if (documentStore == null) {
-        return;
-      }
-
+      const workspace = session.workspace;
       const oldFile = files.metadata[file];
       const oldName = oldFile.name;
-      const content = documentStore.text(oldName) ?? "";
+      const content = session.text(oldName) ?? "";
       const handle = oldFile.handle;
       let newHandle: FileHandle | null = null;
       if (handle == null) {
@@ -188,7 +174,7 @@ export default function Playground() {
         newHandle = workspace.openFile(newName, content);
       }
 
-      const model = documentStore.renameDocument(oldName, newName, newHandle);
+      const model = session.renameDocument(oldName, newName, newHandle);
       dispatchFiles({
         type: "rename",
         id: file,
@@ -201,8 +187,8 @@ export default function Playground() {
   );
 
   const handleFileRemoved = useCallback(
-    (workspace: Workspace, file: FileId) => {
-      const documentStore = documentStoreRef.current;
+    (session: PlaygroundSession, file: FileId) => {
+      const workspace = session.workspace;
       const removedFile = files.metadata[file];
       const { handle, name } = removedFile;
       if (handle == null) {
@@ -211,7 +197,7 @@ export default function Playground() {
         workspace.closeFile(handle);
       }
 
-      documentStore?.closeDocument(name);
+      session.closeDocument(name);
       dispatchFiles({ type: "remove", id: file });
     },
     [files.metadata],
@@ -230,9 +216,11 @@ export default function Playground() {
   }, []);
 
   const handleReset = useCallback(() => {
-    if (workspace == null) {
+    if (session == null) {
       return;
     }
+
+    const workspace = session.workspace;
 
     // Close all open files
     for (const file of Object.values(files.metadata)) {
@@ -245,22 +233,13 @@ export default function Playground() {
       }
     }
 
-    documentStoreRef.current?.closeDocuments(
+    session.closeDocuments(
       Object.values(files.metadata).map((file) => file.name),
     );
     dispatchFiles({ type: "reset" });
 
-    const documentStore = documentStoreRef.current;
-    if (documentStore != null) {
-      restoreWorkspace(
-        workspace,
-        documentStore,
-        DEFAULT_WORKSPACE,
-        dispatchFiles,
-        setError,
-      );
-    }
-  }, [files, workspace]);
+    restoreWorkspace(session, DEFAULT_WORKSPACE, dispatchFiles, setError);
+  }, [session, files]);
 
   return (
     <main className="flex flex-col h-full bg-ayu-background dark:bg-ayu-background-dark">
@@ -274,13 +253,13 @@ export default function Playground() {
         onCopyMarkdownLink={handleCopyMarkdownLink}
         onCopyMarkdown={handleCopyMarkdown}
         onDownload={handleDownload}
-        onReset={workspace == null ? undefined : handleReset}
+        onReset={session == null ? undefined : handleReset}
       />
 
       <Suspense fallback={<Loading />}>
         <Chrome
           files={files}
-          workspacePromise={workspacePromise}
+          sessionPromise={sessionPromise}
           theme={theme}
           selectedFileName={fileName}
           onAddFile={handleFileAdded}
@@ -356,16 +335,16 @@ const DEFAULT_WORKSPACE = {
  */
 function usePersistLocally(
   files: FilesState,
-  documentStoreRef: RefObject<MonacoDocumentStore | null>,
+  session: PlaygroundSession | null,
 ): void {
   const deferredFiles = useDeferredValue(files);
 
   useEffect(() => {
-    const serialized = serializeFiles(deferredFiles, documentStoreRef.current);
+    const serialized = serializeFiles(deferredFiles, session);
     if (serialized != null) {
       persistLocal(serialized);
     }
-  }, [deferredFiles, documentStoreRef]);
+  }, [deferredFiles, session]);
 }
 
 export type FileId = number;
@@ -578,9 +557,9 @@ export interface SerializedFiles {
 
 function serializeFiles(
   files: FilesState,
-  documentStore: MonacoDocumentStore | null,
+  session: PlaygroundSession | null,
 ): SerializedFiles | null {
-  if (documentStore == null) {
+  if (session == null) {
     return null;
   }
 
@@ -589,7 +568,7 @@ function serializeFiles(
 
   for (const id of files.order) {
     const { name } = files.metadata[id];
-    const text = documentStore.text(name);
+    const text = session.text(name);
     if (text == null) {
       return null;
     }
@@ -675,10 +654,15 @@ function updateFile(
   }
 }
 
-class MonacoDocumentStore {
+/**
+ * Owns the mutable playground state: the ty workspace, Monaco models, and the
+ * synchronization from Monaco document edits into the workspace. Immutable UI
+ * metadata, like file names and selection, lives in `FilesState`.
+ */
+export class PlaygroundSession {
   constructor(
     private monaco: Monaco,
-    private workspace: Workspace,
+    readonly workspace: Workspace,
     private setError: (error: string | null) => void,
     private onChanged: () => void,
   ) {}
@@ -776,8 +760,7 @@ function Loading() {
 }
 
 function restoreWorkspace(
-  workspace: Workspace,
-  documentStore: MonacoDocumentStore,
+  session: PlaygroundSession,
   state: {
     files: { [name: string]: string };
     current: string;
@@ -785,6 +768,7 @@ function restoreWorkspace(
   dispatchFiles: ActionDispatch<[FileAction]>,
   setError: (error: string | null) => void,
 ) {
+  const workspace = session.workspace;
   let hasSettings = false;
 
   // eslint-disable-next-line prefer-const
@@ -805,7 +789,7 @@ function restoreWorkspace(
       handle = workspace.openFile(name, content);
     }
 
-    const model = documentStore.openDocument(name, content, handle);
+    const model = session.openDocument(name, content, handle);
     dispatchFiles({
       type: "add",
       handle,
