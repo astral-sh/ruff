@@ -230,14 +230,14 @@ where
 /// An owned copy of a [`ConstraintSet`]. Unlike [`ConstraintSet`], this type owns the storage
 /// arenas that hold its BDD.
 ///
-/// This type is never created as part of the core type inference algorithms; it is only used by
-/// the [`InternedConstraintSet`][crate::types::InternedConstraintSet] type, which is the wrapper
-/// type that lets us create and operate on constraint sets in our mdtests. That means we don't
-/// have to be overly worried about the efficiency of this type.
+/// Owned constraint sets are immutable snapshots of a builder's arenas. They are used by
+/// Salsa-cached relation queries, and by the
+/// [`InternedConstraintSet`][crate::types::InternedConstraintSet] wrapper that lets us create and
+/// operate on constraint sets in mdtests.
 ///
-/// Note that you cannot interrogate an owned constraint set in any useful way. Instead, you must
-/// use [`query`][OwnedConstraintSet::query] or [`load`][ConstraintSetBuilder::load] to load it
-/// into a new builder, and query the result.
+/// Note that you cannot interrogate an owned constraint set directly. Instead, use
+/// [`query`][OwnedConstraintSet::query] to query it in a builder with matching arenas, or
+/// [`load`][ConstraintSetBuilder::load] to remap it into an existing builder.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub struct OwnedConstraintSet<'db> {
     node: NodeId,
@@ -696,7 +696,8 @@ impl<'db> ConstraintSetBuilder<'db> {
         // typevars.) There is no guarantee that the `OwnedConstraintSet` and this builder have
         // consistent orderings, so we have to just reload everything, standardizing on _this_
         // builder's orderings. That's not the quickest thing in the world, but that's fine, since
-        // `OwnedConstraintSet` is only used in mdtests, and not in type inference of user code.
+        // Prefer `OwnedConstraintSet::query` when you only need to query a single owned set; that
+        // avoids remapping and preserves the original TDD structure.
 
         fn rebuild_node<'db>(
             builder: &ConstraintSetBuilder<'db>,
@@ -714,9 +715,8 @@ impl<'db> ConstraintSetBuilder<'db> {
 
             // Absorb the uncertain branch into both true and false branches. This collapses
             // the TDD back to a binary structure, which is correct but loses the TDD laziness for
-            // unions. This is acceptable since `load` is only used for `OwnedConstraintSet` in
-            // mdtests.
-            // TODO: A 4-arg `ite_uncertain` could preserve TDD structure if `load` ever becomes
+            // unions.
+            // TODO: A 4-arg `ite_uncertain` could preserve TDD structure if `load` becomes
             // performance-sensitive.
             let old_interior = other.nodes[old_node];
             let if_true = rebuild_node(builder, other, constraints, cache, old_interior.if_true);
@@ -730,7 +730,11 @@ impl<'db> ConstraintSetBuilder<'db> {
             let if_false = rebuild_node(builder, other, constraints, cache, old_interior.if_false);
             let if_true_merged = if_true.or(builder, if_uncertain);
             let if_false_merged = if_false.or(builder, if_uncertain);
-            let condition = constraints[old_interior.constraint];
+            // `Constraint::new_node` creates standalone nodes whose source order starts at 1.
+            // Shift the reloaded condition back to the source order recorded in the owned set;
+            // solution extraction uses this order for deterministic unions and intersections.
+            let condition = constraints[old_interior.constraint]
+                .with_adjusted_source_order(builder, old_interior.source_order.saturating_sub(1));
             let remapped = condition.ite(builder, if_true_merged, if_false_merged);
 
             cache.insert(old_node, remapped);
@@ -6271,7 +6275,7 @@ mod tests {
             &builder,
             loaded,
             indoc! {r#"
-                <0> (U = str) 1/1
+                <0> (U = str) 2/2
                 ┡━₁ <1> (T = int) 1/1
                 │   ┡━₁ never
                 │   ├─? always
