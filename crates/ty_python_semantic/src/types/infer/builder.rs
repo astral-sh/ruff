@@ -9011,7 +9011,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             qualifiers: _,
             mut type_expression_flags,
             string_annotations,
-            expected_types,
+            mut expected_types,
             scope,
             bindings,
             declarations,
@@ -9060,6 +9060,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 type_expression_flags.shrink_to_fit();
+                expected_types.shrink_to_fit();
                 Box::new(ExpressionInferenceExtra {
                     string_annotations,
                     expected_types,
@@ -9316,7 +9317,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             context,
             string_annotations,
-            expected_types,
+            mut expected_types,
             mut type_expression_flags,
             mut expressions,
             scope,
@@ -9352,6 +9353,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || cycle_recovery.is_some())
         .then(|| {
             type_expression_flags.shrink_to_fit();
+            expected_types.shrink_to_fit();
             Box::new(ScopeInferenceExtra {
                 string_annotations,
                 expected_types,
