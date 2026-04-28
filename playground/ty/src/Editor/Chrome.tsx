@@ -93,9 +93,7 @@ export default function Chrome({
 
   const handleBackToUserFile = useCallback(() => {
     if (editorRef.current && files.selected != null) {
-      const selectedFile = files.index.find(
-        (file) => file.id === files.selected,
-      );
+      const selectedFile = files.metadata[files.selected];
       if (selectedFile != null) {
         const monaco = editorRef.current.monaco;
         const fileUri = monaco.Uri.parse(selectedFile.name);
@@ -107,7 +105,7 @@ export default function Chrome({
         }
       }
     }
-  }, [files.selected, files.index, onClearVendoredFile]);
+  }, [files.selected, files.metadata, onClearVendoredFile]);
 
   const handleSecondaryToolSelected = useCallback(
     (tool: SecondaryTool | null) => {
@@ -171,7 +169,8 @@ export default function Chrome({
       {files.selected != null ? (
         <>
           <Files
-            files={files.index}
+            order={files.order}
+            metadata={files.metadata}
             theme={theme}
             selected={files.selected}
             onAdd={(name) => onAddFile(workspace, name)}
@@ -279,15 +278,12 @@ function useCheckResult(
     // Determine which file handle to use
     const currentHandle =
       currentVendoredFileHandle ??
-      (files.selected == null ? null : files.handles[files.selected]);
+      (files.selected == null ? null : files.metadata[files.selected].handle);
 
     const isVendoredFile = currentVendoredFileHandle != null;
 
     // Regular file handling
-    if (
-      currentHandle == null ||
-      !isPythonFile(currentHandle)
-    ) {
+    if (currentHandle == null || !isPythonFile(currentHandle)) {
       return {
         diagnostics: [],
         hints: [],
@@ -364,13 +360,15 @@ function useCheckResult(
         secondary: null,
       };
     }
+    // Monaco document edits mutate the workspace in place. The deferred
+    // revision is an invalidation token for this memoized check.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    deferredDocumentRevision,
+    files,
     workspace,
-    files.selected,
-    files.handles,
     secondaryTool,
     currentVendoredFileHandle,
+    deferredDocumentRevision,
   ]);
 }
 

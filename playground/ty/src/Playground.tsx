@@ -29,6 +29,7 @@ import { loader } from "@monaco-editor/react";
 import tySchema from "../../../ty.schema.json";
 import Chrome, { formatError } from "./Editor/Chrome";
 import { isPythonFile } from "./Editor/Files";
+import { runPython } from "./Editor/runPython";
 import type { Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 
@@ -76,10 +77,10 @@ export default function Playground() {
   const workspacePromise = workspacePromiseRef.current;
 
   const fileName = useMemo(() => {
-    return (
-      files.index.find((file) => file.id === files.selected)?.name ?? "lib.py"
-    );
-  }, [files.index, files.selected]);
+    return files.selected == null
+      ? "lib.py"
+      : files.metadata[files.selected].name;
+  }, [files.metadata, files.selected]);
 
   usePersistLocally(files, documentStoreRef, documentRevision);
 
@@ -169,13 +170,10 @@ export default function Playground() {
         return;
       }
 
-      const oldName = files.index.find(({ id }) => id === file)?.name;
-      if (oldName == null) {
-        return;
-      }
-
+      const oldFile = files.metadata[file];
+      const oldName = oldFile.name;
       const content = documentStore.text(oldName) ?? "";
-      const handle = files.handles[file];
+      const handle = oldFile.handle;
       let newHandle: FileHandle | null = null;
       if (handle == null) {
         updateOptions(workspace, null, setError);
@@ -192,26 +190,24 @@ export default function Playground() {
       documentStore.renameDocument(oldName, newName, newHandle);
       dispatchFiles({ type: "rename", id: file, to: newName, newHandle });
     },
-    [files.handles, files.index],
+    [files.metadata],
   );
 
   const handleFileRemoved = useCallback(
     (workspace: Workspace, file: FileId) => {
       const documentStore = documentStoreRef.current;
-      const name = files.index.find(({ id }) => id === file)?.name;
-      const handle = files.handles[file];
+      const removedFile = files.metadata[file];
+      const { handle, name } = removedFile;
       if (handle == null) {
         updateOptions(workspace, null, setError);
       } else {
         workspace.closeFile(handle);
       }
 
-      if (name != null) {
-        documentStore?.closeDocument(name);
-      }
+      documentStore?.closeDocument(name);
       dispatchFiles({ type: "remove", id: file });
     },
-    [files.handles, files.index],
+    [files.metadata],
   );
 
   const handleFileSelected = useCallback((file: FileId) => {
@@ -232,12 +228,10 @@ export default function Playground() {
     }
 
     // Close all open files
-    for (const file of files.index) {
-      const handle = files.handles[file.id];
-
-      if (handle != null) {
+    for (const file of Object.values(files.metadata)) {
+      if (file.handle != null) {
         try {
-          workspace.closeFile(handle);
+          workspace.closeFile(file.handle);
         } catch (e) {
           setError(formatError(e));
         }
@@ -245,7 +239,7 @@ export default function Playground() {
     }
 
     documentStoreRef.current?.closeDocuments(
-      files.index.map((file) => file.name),
+      Object.values(files.metadata).map((file) => file.name),
     );
     dispatchFiles({ type: "reset" });
 
@@ -259,7 +253,7 @@ export default function Playground() {
         setError,
       );
     }
-  }, [files.handles, files.index, workspace]);
+  }, [files, workspace]);
 
   return (
     <main className="flex flex-col h-full bg-ayu-background dark:bg-ayu-background-dark">
@@ -372,6 +366,14 @@ function usePersistLocally(
 
 export type FileId = number;
 
+export interface PlaygroundFile {
+  id: FileId;
+  name: string;
+  handle: FileHandle | null;
+}
+
+export type FileMetadata = Readonly<Record<FileId, PlaygroundFile>>;
+
 export type ReadonlyFiles = Readonly<FilesState>;
 
 interface FilesState {
@@ -383,15 +385,12 @@ interface FilesState {
   /**
    * The files in display order (ordering is sensitive)
    */
-  index: ReadonlyArray<{ id: FileId; name: string }>;
+  order: ReadonlyArray<FileId>;
 
   /**
-   * The database file handles by file id.
-   *
-   * Files without a file handle are well-known files that are only handled by the
-   * playground (e.g. ty.json)
+   * File metadata by file id.
    */
-  handles: Readonly<{ [id: FileId]: FileHandle | null }>;
+  metadata: FileMetadata;
 
   /**
    * The revision. Gets incremented every time files changes.
@@ -434,8 +433,8 @@ export type FileAction =
   | { type: "clearVendoredFile" };
 
 const INIT_FILES_STATE: ReadonlyFiles = {
-  index: [],
-  handles: Object.create(null),
+  order: [],
+  metadata: Object.create(null),
   nextId: 0,
   revision: 0,
   selected: null,
@@ -454,8 +453,8 @@ function filesReducer(
       return {
         ...state,
         selected: id,
-        index: [...state.index, { id, name }],
-        handles: { ...state.handles, [id]: handle },
+        order: [...state.order, id],
+        metadata: { ...state.metadata, [id]: { id, name, handle } },
         nextId: state.nextId + 1,
         revision: state.revision + 1,
         currentVendoredFile: null, // Clear vendored file when adding new file
@@ -465,38 +464,39 @@ function filesReducer(
     case "remove": {
       const { id } = action;
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { [id]: _handle, ...handles } = state.handles;
-
       let selected = state.selected;
 
       if (state.selected === id) {
-        const index = state.index.findIndex((file) => file.id === id);
+        const position = state.order.indexOf(id);
 
         selected =
-          index > 0 ? state.index[index - 1].id : state.index[index + 1].id;
+          (position > 0
+            ? state.order[position - 1]
+            : state.order[position + 1]) ?? null;
       }
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { [id]: _metadata, ...metadata } = state.metadata;
 
       return {
         ...state,
         selected,
-        index: state.index.filter((file) => file.id !== id),
-        handles,
+        order: state.order.filter((fileId) => fileId !== id),
+        metadata,
         revision: state.revision + 1,
         currentVendoredFile: null, // Clear vendored file when removing file
       };
     }
     case "rename": {
       const { id, to, newHandle } = action;
-
-      const index = state.index.findIndex((file) => file.id === id);
-      const newIndex = [...state.index];
-      newIndex.splice(index, 1, { id, name: to });
+      const file = state.metadata[id];
 
       return {
         ...state,
-        index: newIndex,
-        handles: { ...state.handles, [id]: newHandle },
+        metadata: {
+          ...state.metadata,
+          [id]: { ...file, name: to, handle: newHandle },
+        },
       };
     }
 
@@ -513,12 +513,13 @@ function filesReducer(
     case "selectFileByName": {
       const { name } = action;
 
-      const selected =
-        state.index.find((file) => file.name === name)?.id ?? null;
+      const selected = state.order.find(
+        (id) => state.metadata[id].name === name,
+      );
 
       return {
         ...state,
-        selected,
+        selected: selected ?? null,
         currentVendoredFile: null, // Clear vendored file when selecting regular file
       };
     }
@@ -565,7 +566,8 @@ function serializeFiles(
   const serializedFiles = Object.create(null);
   let selected = null;
 
-  for (const { id, name } of files.index) {
+  for (const id of files.order) {
+    const { name } = files.metadata[id];
     const text = documentStore.text(name);
     if (text == null) {
       return null;
@@ -583,67 +585,6 @@ function serializeFiles(
   }
 
   return { files: serializedFiles, current: selected };
-}
-
-const SANDBOX_BASE_DIRECTORY = "/playground/";
-
-async function runPython(workspace: SerializedFiles): Promise<string> {
-  const { loadPyodide } = await import("pyodide");
-  const pyodide = await loadPyodide({
-    env: {
-      HOME: SANDBOX_BASE_DIRECTORY,
-    },
-  });
-
-  let combinedOutput = "";
-
-  const outputHandler = (output: string) => {
-    combinedOutput += output + "\n";
-  };
-
-  pyodide.setStdout({ batched: outputHandler });
-  pyodide.setStderr({ batched: outputHandler });
-
-  for (const [fileName, content] of Object.entries(workspace.files)) {
-    const lastSeparator = fileName.lastIndexOf("/");
-
-    if (lastSeparator !== -1) {
-      const directory =
-        SANDBOX_BASE_DIRECTORY + fileName.slice(0, lastSeparator);
-      pyodide.FS.mkdirTree(directory);
-    }
-
-    pyodide.FS.writeFile(SANDBOX_BASE_DIRECTORY + fileName, content);
-  }
-
-  const dict = pyodide.globals.get("dict");
-  const globals = dict();
-
-  try {
-    // Patch `reveal_type` to print runtime values
-    pyodide.runPython(`
-        import builtins
-
-        def reveal_type(obj):
-          import typing
-          print(f"Runtime value is '{obj}'")
-          return typing.reveal_type(obj)
-
-        builtins.reveal_type = reveal_type`);
-
-    pyodide.runPython(workspace.files[workspace.current] ?? "", {
-      globals,
-      locals: globals,
-      filename: workspace.current,
-    });
-
-    return combinedOutput;
-  } catch (error) {
-    return `Failed to run Python script: ${error}`;
-  } finally {
-    globals.destroy();
-    dict.destroy();
-  }
 }
 
 export interface InitializedPlayground {
@@ -795,7 +736,9 @@ class MonacoDocumentStore {
 
 function languageForFile(file: FileHandle | string): string | undefined {
   if (typeof file === "string") {
-    return file.endsWith(".py") || file.endsWith(".pyi") || file.endsWith(".pyw")
+    return file.endsWith(".py") ||
+      file.endsWith(".pyi") ||
+      file.endsWith(".pyw")
       ? "python"
       : undefined;
   }

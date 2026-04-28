@@ -34,7 +34,6 @@ import {
   TextEdit,
 } from "ty_wasm";
 import { FileId, ReadonlyFiles } from "../Playground";
-import { isPythonFile } from "./Files";
 import { Diagnostic } from "./Diagnostics";
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 import CompletionItemKind = languages.CompletionItemKind;
@@ -485,7 +484,7 @@ class PlaygroundServer
 
   private getPlaygroundFileIdForUri(uri: Uri): FileId | null {
     return (
-      this.props.files.index.find((file) => {
+      Object.values(this.props.files.metadata).find((file) => {
         return isUriForPlaygroundFile(uri, file.name);
       })?.id ?? null
     );
@@ -518,7 +517,7 @@ class PlaygroundServer
       return null;
     }
 
-    return this.props.files.handles[fileId] ?? null;
+    return this.props.files.metadata[fileId].handle;
   }
 
   private formatSignatureHelp(
@@ -557,21 +556,16 @@ class PlaygroundServer
       return;
     }
 
-    const handle = this.props.files.handles[this.props.files.selected];
-
-    if (handle == null) {
+    const selectedFile = this.props.files.metadata[this.props.files.selected];
+    if (selectedFile.handle == null) {
       return;
     }
 
+    const handle = selectedFile.handle;
     const editor = this.monaco.editor;
-    const selectedFileName = this.props.files.index.find(
-      (file) => file.id === this.props.files.selected,
-    )?.name;
     const model =
       editor.getModel(Uri.parse(handle.path())) ??
-      (selectedFileName == null
-        ? null
-        : editor.getModel(Uri.parse(selectedFileName)));
+      editor.getModel(Uri.parse(selectedFile.name));
 
     if (model == null) {
       return;
@@ -876,13 +870,8 @@ class PlaygroundServer
           } as languages.LocationLink;
         }
 
-        const fileName = this.props.files.index.find(
-          (file) => file.id === fileId,
-        )?.name;
-        const model =
-          fileName == null
-            ? null
-            : this.monaco.editor.getModel(Uri.parse(fileName));
+        const fileName = this.props.files.metadata[fileId].name;
+        const model = this.monaco.editor.getModel(Uri.parse(fileName));
         if (model != null) {
           uri = model.uri;
         }

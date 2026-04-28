@@ -38,7 +38,6 @@ export default function SecondaryPanel({
         tool={tool}
         result={result}
         theme={theme}
-        files={files}
         onRun={onRun}
         revision={files.revision + documentRevision}
       />
@@ -47,7 +46,6 @@ export default function SecondaryPanel({
 }
 
 function Content({
-  files,
   tool,
   result,
   theme,
@@ -55,7 +53,6 @@ function Content({
   onRun,
 }: {
   tool: SecondaryTool;
-  files: ReadonlyFiles;
   onRun(): Promise<string>;
   revision: number;
   result: SecondaryPanelResult;
@@ -77,9 +74,7 @@ function Content({
             break;
 
           case "Run":
-            return (
-              <Run theme={theme} onRun={onRun} key={`${revision}`} />
-            );
+            return <Run theme={theme} onRun={onRun} key={`${revision}`} />;
         }
 
         return (
@@ -111,13 +106,7 @@ function Content({
   }
 }
 
-function Run({
-  onRun,
-  theme,
-}: {
-  onRun(): Promise<string>;
-  theme: Theme;
-}) {
+function Run({ onRun, theme }: { onRun(): Promise<string>; theme: Theme }) {
   const [runOutput, setRunOutput] = useState<Promise<string> | null>(null);
   const handleRun = () => {
     setRunOutput(onRun());
