@@ -855,6 +855,7 @@ pub(super) fn validate_typed_dict_required_keys<'db, 'ast>(
 pub(crate) struct UnpackedTypedDictKey<'db> {
     pub(crate) value_ty: Type<'db>,
     pub(crate) is_required: bool,
+    pub(crate) definition: Option<Definition<'db>>,
 }
 
 /// Extracts `TypedDict` keys, their value types, and whether they are required when an unpacked
@@ -881,6 +882,7 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
                         UnpackedTypedDictKey {
                             value_ty: field.declared_ty,
                             is_required: field.is_required(),
+                            definition: field.first_declaration(),
                         },
                     )
                 })
@@ -915,6 +917,10 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
                                 unpacked_key.value_ty,
                             );
                             existing.is_required |= unpacked_key.is_required;
+                            existing.definition = merge_unpacked_key_definitions(
+                                existing.definition,
+                                unpacked_key.definition,
+                            );
                         })
                         .or_insert(unpacked_key);
                 }
@@ -938,6 +944,7 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
             for key in all_keys {
                 let mut value_ty = UnionBuilder::new(db);
                 let mut is_required = true;
+                let mut definition = None;
                 let mut saw_key = false;
 
                 for key_map in &key_maps {
@@ -945,8 +952,14 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
                         saw_key = true;
                         value_ty = value_ty.add(unpacked_key.value_ty);
                         is_required &= unpacked_key.is_required;
+                        definition = Some(if let Some(definition) = definition {
+                            merge_unpacked_key_definitions(definition, unpacked_key.definition)
+                        } else {
+                            unpacked_key.definition
+                        });
                     } else {
                         is_required = false;
+                        definition = Some(None);
                     }
                 }
 
@@ -956,6 +969,7 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
                         UnpackedTypedDictKey {
                             value_ty: value_ty.build(),
                             is_required,
+                            definition: definition.flatten(),
                         },
                     );
                 }
@@ -997,6 +1011,13 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
     }
 }
 
+fn merge_unpacked_key_definitions<'db>(
+    existing: Option<Definition<'db>>,
+    new: Option<Definition<'db>>,
+) -> Option<Definition<'db>> {
+    if existing == new { existing } else { None }
+}
+
 /// Extracts unpacked `TypedDict` keys for a `**kwargs` annotation only when the annotation
 /// explicitly uses `Unpack[...]`.
 ///
@@ -1021,6 +1042,7 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_kwargs_annotation<'db>(
                     UnpackedTypedDictKey {
                         value_ty: field.declared_ty,
                         is_required: field.is_required(),
+                        definition: field.first_declaration(),
                     },
                 )
             })

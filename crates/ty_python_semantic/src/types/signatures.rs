@@ -2564,7 +2564,8 @@ impl<'db> Parameters<'db> {
                             .with_annotated_type(unpacked_key.value_ty)
                             .with_optional_default_type(
                                 (!unpacked_key.is_required).then_some(Type::unknown()),
-                            ),
+                            )
+                            .with_definition(unpacked_key.definition),
                     );
                 }
 
@@ -3088,8 +3089,13 @@ pub(crate) struct Parameter<'db> {
     /// Annotated type of the parameter. If no annotation was provided, this is `Unknown`.
     annotated_type: Type<'db>,
 
-    /// Source definition that this parameter was synthesized from, if any.
-    origin_definition: Option<Definition<'db>>,
+    /// The source definition represented by this parameter, if any.
+    ///
+    /// For source-backed signatures, this is the definition of the parameter itself. For
+    /// synthesized signatures, this can point to the field or declaration that the synthesized
+    /// parameter represents, such as a dataclass field or `TypedDict` item. IDE features use this to
+    /// navigate from keyword arguments back to the declaration that defines the accepted keyword.
+    definition: Option<Definition<'db>>,
 
     /// Does the type of this parameter come from an explicit annotation, or was it inferred from
     /// the context, like `Unknown` for any normal un-annotated parameter, `Self` for the `self`
@@ -3126,7 +3132,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn positional_only(name: Option<Name>) -> Self {
         Self {
             annotated_type: Type::unknown(),
-            origin_definition: None,
+            definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::PositionalOnly {
@@ -3140,7 +3146,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn positional_or_keyword(name: Name) -> Self {
         Self {
             annotated_type: Type::unknown(),
-            origin_definition: None,
+            definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::PositionalOrKeyword {
@@ -3154,7 +3160,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn variadic(name: Name) -> Self {
         Self {
             annotated_type: Type::unknown(),
-            origin_definition: None,
+            definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::Variadic { name },
@@ -3165,7 +3171,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn keyword_only(name: Name) -> Self {
         Self {
             annotated_type: Type::unknown(),
-            origin_definition: None,
+            definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::KeywordOnly {
@@ -3179,7 +3185,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn keyword_variadic(name: Name) -> Self {
         Self {
             annotated_type: Type::unknown(),
-            origin_definition: None,
+            definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::KeywordVariadic { name },
@@ -3215,8 +3221,9 @@ impl<'db> Parameter<'db> {
         }
     }
 
-    pub(crate) fn with_origin_definition(mut self, definition: Option<Definition<'db>>) -> Self {
-        self.origin_definition = definition;
+    /// Set the source definition represented by this parameter.
+    pub(crate) fn with_definition(mut self, definition: Option<Definition<'db>>) -> Self {
+        self.definition = definition;
         self
     }
 
@@ -3239,7 +3246,7 @@ impl<'db> Parameter<'db> {
                 tcx,
                 visitor,
             ),
-            origin_definition: self.origin_definition,
+            definition: self.definition,
             kind: self
                 .kind
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -3258,7 +3265,7 @@ impl<'db> Parameter<'db> {
 
         Self {
             annotated_type,
-            origin_definition: self.origin_definition,
+            definition: self.definition,
             inferred_annotation: self.inferred_annotation,
             annotation_kind: self.annotation_kind,
             kind,
@@ -3274,7 +3281,7 @@ impl<'db> Parameter<'db> {
     ) -> Option<Self> {
         let Parameter {
             annotated_type,
-            origin_definition,
+            definition,
             annotation_kind,
             inferred_annotation,
             kind,
@@ -3335,7 +3342,7 @@ impl<'db> Parameter<'db> {
 
         Some(Self {
             annotated_type,
-            origin_definition: *origin_definition,
+            definition: *definition,
             inferred_annotation: *inferred_annotation,
             annotation_kind: *annotation_kind,
             kind,
@@ -3345,14 +3352,17 @@ impl<'db> Parameter<'db> {
 
     fn from_node_and_kind(
         db: &'db dyn Db,
-        definition: Definition<'db>,
+        function_definition: Definition<'db>,
         parameter: &ast::Parameter,
         kind: ParameterKind<'db>,
     ) -> Self {
+        let index = semantic_index(db, function_definition.file(db));
+        let definition = Some(index.expect_single_definition(parameter));
+
         let (annotated_type, inferred_annotation, has_starred_annotation) =
             if let Some(annotation) = parameter.annotation() {
                 (
-                    function_signature_expression_type(db, definition, annotation),
+                    function_signature_expression_type(db, function_definition, annotation),
                     false,
                     annotation.is_starred_expr(),
                 )
@@ -3364,7 +3374,7 @@ impl<'db> Parameter<'db> {
                 extract_unpacked_typed_dict_keys_from_kwargs_annotation(
                     db,
                     annotated_type,
-                    function_signature_type_expression_flags(db, definition, annotation),
+                    function_signature_type_expression_flags(db, function_definition, annotation),
                 )
                 .is_some()
             });
@@ -3377,7 +3387,7 @@ impl<'db> Parameter<'db> {
         };
         Self {
             annotated_type,
-            origin_definition: None,
+            definition,
             kind,
             annotation_kind,
             form: ParameterForm::Value,
@@ -3455,8 +3465,9 @@ impl<'db> Parameter<'db> {
         self.annotated_type
     }
 
-    pub(crate) fn origin_definition(&self) -> Option<Definition<'db>> {
-        self.origin_definition
+    /// Returns the source definition represented by this parameter, if any.
+    pub(crate) fn definition(&self) -> Option<Definition<'db>> {
+        self.definition
     }
 
     /// Return `true` if this parameter has a starred annotation,
@@ -3660,7 +3671,58 @@ mod tests {
 
     #[track_caller]
     fn assert_params<'db>(signature: &Signature<'db>, expected: &[Parameter<'db>]) {
-        assert_eq!(signature.parameters.value.as_slice(), expected);
+        assert_eq!(
+            signature
+                .parameters
+                .value
+                .iter()
+                .map(ParameterWithoutDefinition::from)
+                .collect::<Vec<_>>(),
+            expected
+                .iter()
+                .map(ParameterWithoutDefinition::from)
+                .collect::<Vec<_>>(),
+        );
+    }
+
+    #[derive(Debug, Eq, PartialEq)]
+    struct ParameterWithoutDefinition<'a, 'db> {
+        annotated_type: &'a Type<'db>,
+        annotation_kind: ParameterAnnotationKind,
+        inferred_annotation: bool,
+        kind: &'a ParameterKind<'db>,
+        form: ParameterForm,
+    }
+
+    impl<'a, 'db> From<&'a Parameter<'db>> for ParameterWithoutDefinition<'a, 'db> {
+        fn from(parameter: &'a Parameter<'db>) -> Self {
+            let Parameter {
+                annotated_type,
+                definition: _,
+                annotation_kind,
+                inferred_annotation,
+                kind,
+                form,
+            } = parameter;
+
+            Self {
+                annotated_type,
+                annotation_kind: *annotation_kind,
+                inferred_annotation: *inferred_annotation,
+                kind,
+                form: *form,
+            }
+        }
+    }
+
+    #[track_caller]
+    fn assert_params_have_definitions(signature: &Signature<'_>) {
+        for parameter in &signature.parameters.value {
+            assert!(
+                parameter.definition().is_some(),
+                "source-backed parameter should have a definition"
+            );
+        }
     }
 
     #[test]
@@ -3699,6 +3761,7 @@ mod tests {
         let sig = func.signature(&db);
 
         assert_eq!(sig.return_ty.display(&db).to_string(), "bytes");
+        assert_params_have_definitions(&sig);
         assert_params(
             &sig,
             &[

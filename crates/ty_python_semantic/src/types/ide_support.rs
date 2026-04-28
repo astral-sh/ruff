@@ -502,26 +502,9 @@ pub fn definitions_for_keyword_argument<'db>(
         for signature in signatures {
             if let Some((_param_index, param)) =
                 signature.parameters().keyword_by_name(keyword_name_str)
+                && let Some(definition) = param.definition()
             {
-                if let Some(definition) = param.origin_definition() {
-                    resolved_definitions.push(ResolvedDefinition::Definition(definition));
-                } else if let Some(function_definition) = signature.definition() {
-                    let function_file = function_definition.file(db);
-                    let module = parsed_module(db, function_file).load(db);
-                    let def_kind = function_definition.kind(db);
-
-                    if let DefinitionKind::Function(function_ast_ref) = def_kind {
-                        let function_node = function_ast_ref.node(&module);
-
-                        if let Some(parameter_range) =
-                            find_parameter_range(&function_node.parameters, keyword_name_str)
-                        {
-                            resolved_definitions.push(ResolvedDefinition::FileWithRange(
-                                FileRange::new(function_file, parameter_range),
-                            ));
-                        }
-                    }
-                }
+                resolved_definitions.push(ResolvedDefinition::Definition(definition));
             }
         }
     }
@@ -1272,18 +1255,6 @@ pub fn inlay_hint_call_argument_details<'db>(
     }
 
     Some(InlayHintCallArgumentDetails { argument_names })
-}
-
-/// Find the text range of a specific parameter in function parameters by name.
-/// Only searches for parameters that can be addressed by name in keyword arguments.
-fn find_parameter_range(parameters: &ast::Parameters, parameter_name: &str) -> Option<TextRange> {
-    // Check regular positional and keyword-only parameters
-    parameters
-        .args
-        .iter()
-        .chain(&parameters.kwonlyargs)
-        .find(|param| param.parameter.name.as_str() == parameter_name)
-        .map(|param| param.parameter.name.range())
 }
 
 mod resolve_definition {

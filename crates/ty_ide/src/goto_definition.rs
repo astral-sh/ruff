@@ -2128,6 +2128,82 @@ TD(f<CURSOR>=1)
     }
 
     #[test]
+    fn goto_definition_keyword_argument_typeddict_update() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from typing import TypedDict
+
+class TD(TypedDict):
+    f: int
+    g: str
+
+td = TD(f=1, g=\"\")
+td.update(f<CURSOR>=2)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:9:11
+          |
+        8 | td = TD(f=1, g=\"\")
+        9 | td.update(f=2)
+          |           ^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:5:5
+          |
+        4 | class TD(TypedDict):
+        5 |     f: int
+          |     -
+        6 |     g: str
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_keyword_argument_unpack_typeddict() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from typing import TypedDict, Unpack
+
+class TD(TypedDict):
+    f: int
+    g: str
+
+def func(**kwargs: Unpack[TD]): ...
+
+func(f<CURSOR>=1)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:10:6
+           |
+         8 | def func(**kwargs: Unpack[TD]): ...
+         9 |
+        10 | func(f=1)
+           |      ^ Clicking here
+           |
+        info: Found 1 definition
+         --> main.py:5:5
+          |
+        4 | class TD(TypedDict):
+        5 |     f: int
+          |     -
+        6 |     g: str
+          |
+        ");
+    }
+
+    #[test]
     fn goto_definition_keyword_argument_namedtuple() {
         let test = CursorTest::builder()
             .source(

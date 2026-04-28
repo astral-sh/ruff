@@ -1190,7 +1190,7 @@ TD(f=1)
           |
         4 | class TD(TypedDict):
         5 |     f: int
-          |     ^
+          |     -
         6 |     g: str
         7 |
         8 | TD(f=1)
@@ -1223,7 +1223,7 @@ TD(f<CURSOR>=1)
         6 |     g: str
         7 |
         8 | TD(f=1)
-          |    ^
+          |    -
           |
         ");
     }
@@ -1248,7 +1248,7 @@ NT(f=1)
           |
         4 | class NT(NamedTuple):
         5 |     f: int
-          |     ^
+          |     -
         6 |     g: str
         7 |
         8 | NT(f=1)
@@ -1279,7 +1279,7 @@ DC(f=1)
         4 | @dataclass
         5 | class DC:
         6 |     f: int
-          |     ^
+          |     -
         7 |     g: str
         8 |
         9 | DC(f=1)

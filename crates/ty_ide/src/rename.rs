@@ -1239,11 +1239,11 @@ TD(f<CURSOR>=1)
           |
         4 | class TD(TypedDict):
         5 |     f: int
-          |     -
+          |     ^
         6 |     g: str
         7 |
         8 | TD(f=1)
-          |    ^
+          |    -
           |
         ");
     }
