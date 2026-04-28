@@ -6037,19 +6037,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let db = self.db();
                 let collection_instance = Type::instance(db, ClassType::Generic(collection_alias));
 
-                let set = collection_instance
-                    .when_constraint_set_assignable_to(db, tcx, &constraints)
-                    .remove_noninferable(db, &constraints, inferable);
-
-                let solutions =
-                    set.solutions_with(db, &constraints, |typevar, variance, lower, upper| {
-                        let identity = typevar.identity(db);
-                        elt_tcx_variance
-                            .entry(identity)
-                            .and_modify(|current| *current = current.join(variance))
-                            .or_insert(variance);
-                        PathBounds::default_solve(db, &constraints, typevar, lower, upper)
-                    });
+                let path_bounds =
+                    collection_instance.assignable_solutions_with_inferable(db, tcx, inferable);
+                let solutions = path_bounds.solve_with(|typevar, variance, lower, upper| {
+                    let identity = typevar.identity(db);
+                    elt_tcx_variance
+                        .entry(identity)
+                        .and_modify(|current| *current = current.join(variance))
+                        .or_insert(variance);
+                    PathBounds::default_solve(db, &constraints, typevar, lower, upper)
+                });
 
                 match solutions {
                     // If the type context is not compatible with the collection type (e.g., a
