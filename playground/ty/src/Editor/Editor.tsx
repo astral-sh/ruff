@@ -239,6 +239,14 @@ class PlaygroundServer
   signatureHelpTriggerCharacters: string[] = ["(", ","];
   signatureHelpRetriggerCharacters: string[] = [")"];
 
+  private renameRejection<T>(): T & languages.Rejection {
+    // This assertion is intentionally unchecked: Monaco checks `rejectReason`
+    // before reading the success fields, but its RenameProvider declaration
+    // models rejections as part of the success type.
+    return { rejectReason: "this element can't be renamed" } as T &
+      languages.Rejection;
+  }
+
   getLegend(): languages.SemanticTokensLegend {
     return {
       tokenTypes: SemanticToken.kinds(),
@@ -821,10 +829,10 @@ class PlaygroundServer
     position: Position,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _token: CancellationToken,
-  ): languages.ProviderResult<languages.RenameLocation | languages.Rejection> {
+  ): languages.ProviderResult<languages.RenameLocation & languages.Rejection> {
     const fileHandle = this.getFileHandleForModel(model);
     if (fileHandle == null || model.uri.scheme === "vendored") {
-      return { rejectReason: "this element can't be renamed" };
+      return this.renameRejection();
     }
 
     const range = this.props.workspace.prepareRename(
@@ -833,7 +841,7 @@ class PlaygroundServer
     );
 
     if (range == null) {
-      return { rejectReason: "this element can't be renamed" };
+      return this.renameRejection();
     }
 
     const monacoRange = tyRangeToMonacoRange(range);
@@ -850,10 +858,10 @@ class PlaygroundServer
     newName: string,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _token: CancellationToken,
-  ): languages.ProviderResult<languages.WorkspaceEdit | languages.Rejection> {
+  ): languages.ProviderResult<languages.WorkspaceEdit & languages.Rejection> {
     const fileHandle = this.getFileHandleForModel(model);
     if (fileHandle == null || model.uri.scheme === "vendored") {
-      return { rejectReason: "this element can't be renamed" };
+      return this.renameRejection();
     }
 
     const renameEdits = this.props.workspace.rename(
@@ -863,7 +871,7 @@ class PlaygroundServer
     );
 
     if (renameEdits.length === 0) {
-      return { rejectReason: "this element can't be renamed" };
+      return this.renameRejection();
     }
 
     const edits: languages.IWorkspaceTextEdit[] = [];
