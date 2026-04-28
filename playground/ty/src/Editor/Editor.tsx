@@ -821,10 +821,10 @@ class PlaygroundServer
     position: Position,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _token: CancellationToken,
-  ): languages.ProviderResult<languages.RenameLocation> {
+  ): languages.ProviderResult<languages.RenameLocation | languages.Rejection> {
     const fileHandle = this.getFileHandleForModel(model);
     if (fileHandle == null || model.uri.scheme === "vendored") {
-      return undefined;
+      return { rejectReason: "this element can't be renamed" };
     }
 
     const range = this.props.workspace.prepareRename(
@@ -833,7 +833,7 @@ class PlaygroundServer
     );
 
     if (range == null) {
-      return undefined;
+      return { rejectReason: "this element can't be renamed" };
     }
 
     const monacoRange = tyRangeToMonacoRange(range);
@@ -850,10 +850,10 @@ class PlaygroundServer
     newName: string,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _token: CancellationToken,
-  ): languages.ProviderResult<languages.WorkspaceEdit> {
+  ): languages.ProviderResult<languages.WorkspaceEdit | languages.Rejection> {
     const fileHandle = this.getFileHandleForModel(model);
     if (fileHandle == null || model.uri.scheme === "vendored") {
-      return undefined;
+      return { rejectReason: "this element can't be renamed" };
     }
 
     const renameEdits = this.props.workspace.rename(
@@ -863,7 +863,7 @@ class PlaygroundServer
     );
 
     if (renameEdits.length === 0) {
-      return null;
+      return { rejectReason: "this element can't be renamed" };
     }
 
     const edits: languages.IWorkspaceTextEdit[] = [];
