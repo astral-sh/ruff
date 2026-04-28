@@ -437,76 +437,7 @@ impl<'db> SemanticModel<'db> {
             _ => TypeQualifiers::empty(),
         }
     }
-}
 
-/// The type and definition of a symbol.
-#[derive(Clone, Debug)]
-pub struct MemberDefinition<'db> {
-    pub ty: Type<'db>,
-    pub first_reachable_definition: Definition<'db>,
-}
-
-/// A classification of symbol names.
-///
-/// The ordering here is used for sorting completions.
-///
-/// This sorts "normal" names first, then dunder names and finally
-/// single-underscore names. This matches the order of the variants defined for
-/// this enum, which is in turn picked up by the derived trait implementation
-/// for `Ord`.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
-pub enum NameKind {
-    Normal,
-    Dunder,
-    Sunder,
-}
-
-impl NameKind {
-    pub fn classify(name: &Name) -> NameKind {
-        // Dunder needs a prefix and suffix double underscore.
-        // When there's only a prefix double underscore, this
-        // results in explicit name mangling. We let that be
-        // classified as-if they were single underscore names.
-        //
-        // Ref: <https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers>
-        if name.starts_with("__") && name.ends_with("__") {
-            NameKind::Dunder
-        } else if name.starts_with('_') {
-            NameKind::Sunder
-        } else {
-            NameKind::Normal
-        }
-    }
-}
-
-/// A suggestion for code completion.
-#[derive(Clone, Debug)]
-pub struct Completion<'db> {
-    /// The label shown to the user for this suggestion.
-    pub name: Name,
-    /// The type of this completion, if available.
-    ///
-    /// Generally speaking, this is always available
-    /// *unless* this was a completion corresponding to
-    /// an unimported symbol. In that case, computing the
-    /// type of all such symbols could be quite expensive.
-    pub ty: Option<Type<'db>>,
-    /// Whether this suggestion came from builtins or not.
-    ///
-    /// At time of writing (2025-06-26), this information
-    /// doesn't make it into the LSP response. Instead, we
-    /// use it mainly in tests so that we can write less
-    /// noisy tests.
-    pub builtin: bool,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExpectedStringLiteralCompletion<'db> {
-    pub value: String,
-    pub ty: Type<'db>,
-}
-
-impl<'db> SemanticModel<'db> {
     /// Returns completion candidates for a string-literal expression based on its expected type.
     pub fn expected_string_literal_completions(
         &self,
@@ -577,6 +508,73 @@ impl<'db> SemanticModel<'db> {
 
         infer_complete_scope_types(self.db, scope).try_expected_type(expr)
     }
+}
+
+/// The type and definition of a symbol.
+#[derive(Clone, Debug)]
+pub struct MemberDefinition<'db> {
+    pub ty: Type<'db>,
+    pub first_reachable_definition: Definition<'db>,
+}
+
+/// A classification of symbol names.
+///
+/// The ordering here is used for sorting completions.
+///
+/// This sorts "normal" names first, then dunder names and finally
+/// single-underscore names. This matches the order of the variants defined for
+/// this enum, which is in turn picked up by the derived trait implementation
+/// for `Ord`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
+pub enum NameKind {
+    Normal,
+    Dunder,
+    Sunder,
+}
+
+impl NameKind {
+    pub fn classify(name: &Name) -> NameKind {
+        // Dunder needs a prefix and suffix double underscore.
+        // When there's only a prefix double underscore, this
+        // results in explicit name mangling. We let that be
+        // classified as-if they were single underscore names.
+        //
+        // Ref: <https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers>
+        if name.starts_with("__") && name.ends_with("__") {
+            NameKind::Dunder
+        } else if name.starts_with('_') {
+            NameKind::Sunder
+        } else {
+            NameKind::Normal
+        }
+    }
+}
+
+/// A suggestion for code completion.
+#[derive(Clone, Debug)]
+pub struct Completion<'db> {
+    /// The label shown to the user for this suggestion.
+    pub name: Name,
+    /// The type of this completion, if available.
+    ///
+    /// Generally speaking, this is always available
+    /// *unless* this was a completion corresponding to
+    /// an unimported symbol. In that case, computing the
+    /// type of all such symbols could be quite expensive.
+    pub ty: Option<Type<'db>>,
+    /// Whether this suggestion came from builtins or not.
+    ///
+    /// At time of writing (2025-06-26), this information
+    /// doesn't make it into the LSP response. Instead, we
+    /// use it mainly in tests so that we can write less
+    /// noisy tests.
+    pub builtin: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExpectedStringLiteralCompletion<'db> {
+    pub value: String,
+    pub ty: Type<'db>,
 }
 
 pub trait HasType {
