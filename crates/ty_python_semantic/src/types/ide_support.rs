@@ -633,20 +633,6 @@ impl<'db> CallSignatureDetails<'db> {
             argument_to_displayed_parameter_mapping,
         }
     }
-
-    fn get_definition_parameter_range(&self, db: &dyn Db, name: &str) -> Option<FileRange> {
-        let definition = self.signature.definition()?;
-        let file = definition.file(db);
-        let module_ref = parsed_module(db, file).load(db);
-
-        let parameters = match definition.kind(db) {
-            DefinitionKind::Function(node) => &node.node(&module_ref).parameters,
-            // TODO: lambda functions
-            _ => return None,
-        };
-
-        Some(FileRange::new(file, parameters.find(name)?.name().range))
-    }
 }
 
 /// Build the parameter list shown for a rendered signature.
@@ -1243,7 +1229,11 @@ pub fn inlay_hint_call_argument_details<'db>(
             continue;
         };
 
-        let parameter_label_offset = resolved.get_definition_parameter_range(db, param.name()?);
+        let parameter_label_offset = param.definition().map(|definition| {
+            let param_file = definition.file(db);
+            let module = parsed_module(db, param_file).load(db);
+            definition.focus_range(db, &module)
+        });
 
         // Only add hints for parameters that can be specified by name
         if !param.is_positional_only() && !param.is_variadic() && !param.is_keyword_variadic() {
