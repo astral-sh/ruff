@@ -367,6 +367,9 @@ class TwoParamSpec(Generic[P1, P2]):
 
 class TypeVarAndParamSpec(Generic[T1, P1]):
     attr: Callable[P1, T1]
+
+class ParamSpecAndTypeVar(Generic[P1, T1]):
+    attr: Callable[P1, T1]
 ```
 
 Explicit specialization of a generic class involving `ParamSpec` is done by providing either a list
@@ -423,6 +426,7 @@ reveal_type(TypeVarAndParamSpec[int, []]().attr)  # revealed: () -> int
 reveal_type(TypeVarAndParamSpec[int, [int, str]]().attr)  # revealed: (int, str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, [str]]().attr)  # revealed: (str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, ...]().attr)  # revealed: (...) -> int
+reveal_type(ParamSpecAndTypeVar[[int, str], str]().attr)  # revealed: (int, str, /) -> str
 
 # error: [invalid-type-arguments] "ParamSpec `P2` is unbound"
 reveal_type(TypeVarAndParamSpec[int, P2]().attr)  # revealed: (...) -> int

@@ -1278,6 +1278,18 @@ bitflags::bitflags! {
 
         /// Whether the visitor is currently visiting a `**kwargs` annotation.
         const IN_KWARG_ANNOTATION = 1 << 9;
+
+        /// Whether we're in a context where `Unpack` can be legal.
+        const IN_VALID_UNPACK_CONTEXT = 1 << 10;
+
+        /// Whether the visitor is currently visiting a type expression.
+        const IN_TYPE_EXPRESSION = 1 << 12;
+
+        /// Whether the visitor is currently visiting a nested position in a type expression.
+        const IN_NESTED_TYPE_EXPRESSION = 1 << 13;
+
+        /// Whether the visitor is currently visiting the argument to `Unpack[...]`.
+        const IN_UNPACK_TYPE_ARGUMENT = 1 << 14;
     }
 }
 

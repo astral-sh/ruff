@@ -3224,15 +3224,13 @@ def func_nested(**kwargs: Unpack[Unpack[TD1]]) -> None:  # error: [invalid-type-
 def func_stringified_nested(**kwargs: "Unpack[Unpack[TD1]]") -> None:  # error: [invalid-type-form]
     pass
 
-# TODO: These should emit `invalid-type-form`; `Unpack` is only valid as the top-level
-# `**kwargs` annotation form, not nested inside a larger type expression.
-def func_union_nested(**kwargs: Unpack[TD1] | None) -> None:
+def func_union_nested(**kwargs: Unpack[TD1] | None) -> None:  # error: [invalid-type-form]
     pass
 
-def func_list_nested(**kwargs: list[Unpack[TD1]]) -> None:
+def func_list_nested(**kwargs: list[Unpack[TD1]]) -> None:  # error: [invalid-type-form]
     pass
 
-def func_stringified_list_nested(**kwargs: "list[Unpack[TD1]]") -> None:
+def func_stringified_list_nested(**kwargs: "list[Unpack[TD1]]") -> None:  # error: [invalid-type-form]
     pass
 
 def func_keyword_only_overlap(*, v1: int, **kwargs: Unpack[TD1]) -> None:  # error: [invalid-type-form]
