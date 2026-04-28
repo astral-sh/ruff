@@ -3578,7 +3578,14 @@ impl<'a> Iterator for ArgumentsSourceOrder<'a> {
             None
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.args.len() - self.next_arg + self.keywords.len() - self.next_keyword;
+        (remaining, Some(remaining))
+    }
 }
+
+impl ExactSizeIterator for ArgumentsSourceOrder<'_> {}
 
 impl FusedIterator for ArgumentsSourceOrder<'_> {}
 
