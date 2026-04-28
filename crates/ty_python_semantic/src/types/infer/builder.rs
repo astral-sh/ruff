@@ -165,6 +165,12 @@ impl<'db> DeclaredAndInferredType<'db> {
     }
 }
 
+fn should_preserve_inferred_binding_type(ty: Type<'_>) -> bool {
+    // Dataclass field specifiers carry metadata in the inferred RHS type; replacing it with the
+    // declared field type would lose settings like `init=False`.
+    matches!(ty, Type::KnownInstance(KnownInstanceType::Field(_)))
+}
+
 /// We currently store one dataclass field-specifiers inline, because that covers standard
 /// dataclasses. attrs uses 2 specifiers, pydantic and strawberry use 3 specifiers. SQLAlchemy
 /// uses 7 field specifiers. We could probably store more inline if this turns out to be a
@@ -1345,19 +1351,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
                 }
-                if inferred_ty.is_assignable_to(self.db(), declared_ty.inner_type()) {
-                    (declared_ty, inferred_ty)
+                let declared_type = declared_ty.inner_type();
+                if inferred_ty.is_assignable_to(self.db(), declared_type) {
+                    if !should_preserve_inferred_binding_type(inferred_ty)
+                        // TODO We currently can't distinguish here between "no declared type" and
+                        // "declared types is `Unknown` (e.g. due to a bad annotation, missing
+                        // import, etc.)". Ideally we would still prefer `Unknown` declared type,
+                        // but use inferred type if there is no declared type.
+                        && !matches!(declared_type, Type::Dynamic(DynamicType::Unknown))
+                        && declared_type.is_assignable_to(self.db(), inferred_ty)
+                    {
+                        (declared_ty, declared_type)
+                    } else {
+                        (declared_ty, inferred_ty)
+                    }
                 } else {
                     report_invalid_assignment(
                         &self.context,
                         node,
                         definition,
-                        declared_ty.inner_type(),
+                        declared_type,
                         inferred_ty,
                     );
 
                     // if the assignment is invalid, fall back to assuming the annotation is correct
-                    (declared_ty, declared_ty.inner_type())
+                    (declared_ty, declared_type)
                 }
             }
         };
