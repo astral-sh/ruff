@@ -713,11 +713,6 @@ impl<'db> ConstraintSetBuilder<'db> {
                 return *remapped;
             }
 
-            // Absorb the uncertain branch into both true and false branches. This collapses
-            // the TDD back to a binary structure, which is correct but loses the TDD laziness for
-            // unions.
-            // TODO: A 4-arg `ite_uncertain` could preserve TDD structure if `load` becomes
-            // performance-sensitive.
             let old_interior = other.nodes[old_node];
             let if_true = rebuild_node(builder, other, constraints, cache, old_interior.if_true);
             let if_uncertain = rebuild_node(
@@ -728,14 +723,12 @@ impl<'db> ConstraintSetBuilder<'db> {
                 old_interior.if_uncertain,
             );
             let if_false = rebuild_node(builder, other, constraints, cache, old_interior.if_false);
-            let if_true_merged = if_true.or(builder, if_uncertain);
-            let if_false_merged = if_false.or(builder, if_uncertain);
             // `Constraint::new_node` creates standalone nodes whose source order starts at 1.
             // Shift the reloaded condition back to the source order recorded in the owned set;
             // solution extraction uses this order for deterministic unions and intersections.
             let condition = constraints[old_interior.constraint]
                 .with_adjusted_source_order(builder, old_interior.source_order.saturating_sub(1));
-            let remapped = condition.ite(builder, if_true_merged, if_false_merged);
+            let remapped = condition.ite_uncertain(builder, if_true, if_uncertain, if_false);
 
             cache.insert(old_node, remapped);
             remapped
@@ -2077,6 +2070,61 @@ impl NodeId {
     fn ite(self, builder: &ConstraintSetBuilder<'_>, then_node: Self, else_node: Self) -> Self {
         self.and(builder, then_node)
             .or(builder, self.negate(builder).and(builder, else_node))
+    }
+
+    /// Returns the TDD `if-then-else` of four BDDs: when `self` evaluates to `true`, it returns
+    /// what `then_node` evaluates to; when `self` evaluates to `false`, it returns what
+    /// `else_node` evaluates to; and `uncertain_node` is included regardless of `self`'s value.
+    fn ite_uncertain(
+        self,
+        builder: &ConstraintSetBuilder<'_>,
+        then_node: Self,
+        uncertain_node: Self,
+        else_node: Self,
+    ) -> Self {
+        if uncertain_node == ALWAYS_TRUE {
+            return ALWAYS_TRUE;
+        }
+
+        match self.node() {
+            Node::AlwaysTrue => then_node.or(builder, uncertain_node),
+            Node::AlwaysFalse => else_node.or(builder, uncertain_node),
+            Node::Interior(_) => {
+                let interior = builder.interior_node_data(self);
+                // Fast path for a bare positive constraint whose branches are still later in the
+                // BDD variable ordering. This is the common case when loading an owned TDD into a
+                // fresh builder, and lets us preserve an existing uncertain branch directly.
+                if interior.if_true == ALWAYS_TRUE
+                    && interior.if_uncertain == ALWAYS_FALSE
+                    && interior.if_false == ALWAYS_FALSE
+                    && then_node
+                        .root_constraint(builder)
+                        .is_none_or(|root| root.ordering() > interior.constraint.ordering())
+                    && uncertain_node
+                        .root_constraint(builder)
+                        .is_none_or(|root| root.ordering() > interior.constraint.ordering())
+                    && else_node
+                        .root_constraint(builder)
+                        .is_none_or(|root| root.ordering() > interior.constraint.ordering())
+                {
+                    return NodeId::with_uncertain(
+                        builder,
+                        interior.constraint,
+                        then_node,
+                        uncertain_node,
+                        else_node,
+                        interior.source_order,
+                    );
+                }
+
+                // For compound conditions, or when the new builder's variable ordering requires
+                // one of the branches to move above `self`, fall back to the semantic expansion:
+                // `(self ∧ then_node) ∨ uncertain_node ∨ (¬self ∧ else_node)`.
+                self.and(builder, then_node)
+                    .or(builder, uncertain_node)
+                    .or(builder, self.negate(builder).and(builder, else_node))
+            }
+        }
     }
 
     fn implies_subtype_of<'db>(
@@ -6237,7 +6285,7 @@ mod tests {
     }
 
     /// Round-trip through `OwnedConstraintSet`: build a TDD with uncertain branches, convert to
-    /// owned, load into a new builder, and verify semantic equivalence.
+    /// owned, load into a new builder, and verify that we preserve the uncertain branch.
     #[test]
     fn tdd_owned_round_trip() {
         let db = setup_db();
@@ -6276,15 +6324,12 @@ mod tests {
             loaded,
             indoc! {r#"
                 <0> (U = str) 2/2
-                ┡━₁ <1> (T = int) 1/1
-                │   ┡━₁ never
-                │   ├─? always
+                ┡━₁ always
+                ├─? <1> (T = int) 1/1
+                │   ┡━₁ always
+                │   ├─? never
                 │   └─₀ never
-                ├─? never
-                └─₀ <2> (T = int) 1/1
-                    ┡━₁ always
-                    ├─? never
-                    └─₀ never
+                └─₀ never
             "#},
         );
     }
