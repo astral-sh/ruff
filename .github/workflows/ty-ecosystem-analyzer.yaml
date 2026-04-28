@@ -111,7 +111,7 @@ jobs:
     needs: [build-ty]
     strategy:
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5]
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
@@ -152,7 +152,7 @@ jobs:
             --new "${GITHUB_SHA}" \
             --exclude-newer "${EXCLUDE_NEWER}" \
             --shard "${SHARD}" \
-            --num-shards 4 \
+            --num-shards 6 \
             --output-old "diagnostics-base-${SHARD}.json" \
             --output-new "diagnostics-PR-${SHARD}.json"
 
@@ -196,6 +196,16 @@ jobs:
         with:
           name: diagnostics-shard-3
 
+      - name: Download shard 4 diagnostics
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: diagnostics-shard-4
+
+      - name: Download shard 5 diagnostics
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: diagnostics-shard-5
+
       - name: Generate reports
         id: generate-reports
         shell: bash
@@ -203,8 +213,8 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
         run: |
           # Merge shard diagnostics
-          jq -s '{ outputs: [.[].outputs[]] }' diagnostics-base-0.json diagnostics-base-1.json diagnostics-base-2.json diagnostics-base-3.json > diagnostics-base.json
-          jq -s '{ outputs: [.[].outputs[]] }' diagnostics-PR-0.json   diagnostics-PR-1.json   diagnostics-PR-2.json   diagnostics-PR-3.json   > diagnostics-PR.json
+          jq -s '{ outputs: [.[].outputs[]] }' diagnostics-base-0.json diagnostics-base-1.json diagnostics-base-2.json diagnostics-base-3.json diagnostics-base-4.json diagnostics-base-5.json > diagnostics-base.json
+          jq -s '{ outputs: [.[].outputs[]] }' diagnostics-PR-0.json   diagnostics-PR-1.json   diagnostics-PR-2.json   diagnostics-PR-3.json   diagnostics-PR-4.json   diagnostics-PR-5.json   > diagnostics-PR.json
 
           uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@$ECOSYSTEM_ANALYZER_COMMIT"
 
