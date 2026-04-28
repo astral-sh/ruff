@@ -950,8 +950,16 @@ impl<'db> Signature<'db> {
             }
         }
 
-        let when = self_type.when_constraint_set_assignable_to_owned(db, expected_self_ty);
-        when.query(|_, when| when.is_always_satisfied(db))
+        let inferable_typevars = self.inferable_typevars(db);
+        if inferable_typevars == InferableTypeVars::None {
+            let when = self_type.when_constraint_set_assignable_to_owned(db, expected_self_ty);
+            when.query(|_, when| when.is_always_satisfied(db))
+        } else {
+            let constraints = ConstraintSetBuilder::new();
+            self_type
+                .when_assignable_to(db, expected_self_ty, &constraints, inferable_typevars)
+                .is_always_satisfied(db)
+        }
     }
 
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
