@@ -468,6 +468,19 @@ def with_paramspec[**P2](f: Foo[Concatenate[int, P2]]) -> None:
     reveal_type(f.attr)  # revealed: (int, /, *args: P2@with_paramspec.args, **kwargs: P2@with_paramspec.kwargs) -> None
 ```
 
+`Concatenate` with a gradual tail is not equivalent to a bare gradual `ParamSpec` value because the
+fixed prefix still needs to be checked.
+
+```py
+from typing import Callable, Concatenate
+
+class Box[**P]:
+    attr: Callable[P, None]
+
+def not_bare_ellipsis[**P](y: Box[Concatenate[int, ...]]) -> None:
+    concrete: Box[P] = y  # error: [invalid-assignment]
+```
+
 ## `Concatenate` in type aliases
 
 ### Using `type` statement (PEP 695)

@@ -3,6 +3,7 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
 use crate::place::{DefinedPlace, Place};
+use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
     OwnedConstraintSet,
@@ -11,6 +12,7 @@ use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
+use crate::types::signatures::ParametersKind;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -1064,6 +1066,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     })
             }
 
+            // A gradual `ParamSpec` value (`...`) is assignability-consistent with any concrete
+            // `ParamSpec` value. This only applies to fixed `ParamSpec` values in already-
+            // specialized generic aliases; inferable `ParamSpec`s are handled by the inference
+            // paths below.
+            (Type::TypeVar(bound_typevar), other) | (other, Type::TypeVar(bound_typevar))
+                if self.relation.is_assignability()
+                    && !bound_typevar.is_inferable(db, self.inferable)
+                    && bound_typevar.is_paramspec(db)
+                    && Self::is_gradual_paramspec_value(db, other) =>
+            {
+                self.always()
+            }
+
             // A fully static typevar is a subtype of its upper bound, and to something similar to
             // the union of its constraints. An unbound, unconstrained, fully static typevar has an
             // implicit upper bound of `object` (which is handled above).
@@ -1872,6 +1887,28 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             disjointness_visitor: self.disjointness_visitor,
             materialization_visitor: self.materialization_visitor,
         }
+    }
+
+    /// Return `true` if `ty` is the gradual `...` value for a `ParamSpec`.
+    ///
+    /// For example, in `Command[Any, ..., Any]`, the middle type argument is represented as a
+    /// callable-shaped `ParamSpec` value with gradual parameters. That value is assignability-
+    /// consistent with a concrete `ParamSpec` specialization such as the middle type argument in
+    /// `Command[int, [str], object]`.
+    ///
+    /// This intentionally does not match arbitrary gradual callables like `Callable[..., object]`
+    /// or prefixed gradual forms like `Callable[Concatenate[int, ...], object]`; it only matches
+    /// the internal value used to represent a bare `...` `ParamSpec` specialization.
+    fn is_gradual_paramspec_value(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        let Type::Callable(callable) = ty else {
+            return false;
+        };
+
+        callable.kind(db) == CallableTypeKind::ParamSpecValue
+            && callable
+                .signatures(db)
+                .iter()
+                .all(|signature| signature.parameters().kind() == ParametersKind::Gradual)
     }
 }
 
