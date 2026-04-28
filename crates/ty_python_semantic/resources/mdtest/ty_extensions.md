@@ -543,6 +543,60 @@ reveal_type(generic_context(foo))  # revealed: ty_extensions.GenericContext[T@fo
 reveal_type(generic_context(bar))  # revealed: ty_extensions.GenericContext[T@bar]
 ```
 
+## `TypeOf` in generic returned callable parameters
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from collections.abc import Callable
+from ty_extensions import TypeOf
+
+class Box[T]:
+    @staticmethod
+    def method(x: T) -> T:
+        return x
+
+def factory[T]() -> Callable[[TypeOf[Box[T].method]], T]:
+    raise NotImplementedError
+
+factory()(Box[int].method)
+```
+
+## Mutually recursive method `TypeOf` in returned callables
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Concatenate
+from ty_extensions import TypeOf, generic_context
+
+class Foo:
+    @staticmethod
+    def method[**P, T](
+        x: "Callable[Concatenate[TypeOf[Bar.method], ...], T]",
+    ) -> "Callable[Concatenate[TypeOf[Bar.method], P], T]":
+        return x
+
+class Bar:
+    @staticmethod
+    def method[**P, T](
+        x: "Callable[Concatenate[TypeOf[Foo.method], ...], T]",
+    ) -> "Callable[Concatenate[TypeOf[Foo.method], P], T]":
+        return x
+
+reveal_type(generic_context(Foo.method))  # revealed: ty_extensions.GenericContext[T@method]
+reveal_type(generic_context(Bar.method))  # revealed: ty_extensions.GenericContext[T@method]
+```
+
 ## Deeply nested `TypeOf` chains
 
 Multiple redefinitions of a function with `TypeOf[foo]` as the return type create a chain of

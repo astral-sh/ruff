@@ -970,6 +970,32 @@ impl<'db> FunctionType<'db> {
         )
     }
 
+    pub(crate) fn apply_type_mapping_to_updated_signatures_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let updated_signature = self
+            .updated_signature(db)
+            .map(|signature| signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+        let updated_last_definition_signature = self
+            .updated_last_definition_signature(db)
+            .map(|signature| signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+
+        if updated_signature.is_none() && updated_last_definition_signature.is_none() {
+            self
+        } else {
+            Self::new(
+                db,
+                self.literal(db),
+                updated_signature,
+                updated_last_definition_signature,
+            )
+        }
+    }
+
     pub(crate) fn with_dataclass_transformer_params(
         self,
         db: &'db dyn Db,

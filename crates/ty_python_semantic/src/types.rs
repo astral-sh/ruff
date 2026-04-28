@@ -5675,10 +5675,25 @@ impl<'db> Type<'db> {
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
             Type::FunctionLiteral(function) => visitor.visit(self, type_mapping, || {
+                if matches!(
+                    type_mapping,
+                    TypeMapping::ApplySpecialization(ApplySpecialization::ReturnCallables(_))
+                ) {
+                    // Avoid forcing lazy function signatures while rescoping returned callables.
+                    // Recursive `TypeOf[foo]` references can otherwise expand indefinitely, but
+                    // already-specialized function literals may still need this mapping if their
+                    // updated signatures mention moved typevars.
+                    return Type::FunctionLiteral(
+                        function.apply_type_mapping_to_updated_signatures_impl(
+                            db,
+                            type_mapping,
+                            tcx,
+                            visitor,
+                        ),
+                    );
+                }
+
                 match type_mapping {
-                    TypeMapping::ApplySpecialization(ApplySpecialization::ReturnCallables(_)) => {
-                        self
-                    }
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
                     TypeMapping::Promote(PromotionMode::On, _) => {
