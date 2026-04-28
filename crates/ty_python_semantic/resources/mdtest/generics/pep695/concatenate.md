@@ -477,8 +477,8 @@ from typing import Callable, Concatenate
 class Box[**P]:
     attr: Callable[P, None]
 
-def not_bare_ellipsis[**P](y: Box[Concatenate[int, ...]]) -> None:
-    concrete: Box[P] = y  # error: [invalid-assignment]
+def f[**P](x: Box[Concatenate[int, ...]]) -> None:
+    y: Box[P] = x  # error: [invalid-assignment]
 ```
 
 ## `Concatenate` in type aliases

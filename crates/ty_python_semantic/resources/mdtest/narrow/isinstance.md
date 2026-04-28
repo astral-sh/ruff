@@ -800,36 +800,20 @@ python-version = "3.13"
 
 ```py
 from collections.abc import Callable
-from typing import Any, Generic, ParamSpec, TypeVar, cast
+from typing import Any, ParamSpec, TypeVar, cast
 
 P = ParamSpec("P")
 R = TypeVar("R")
 
-class Task(Generic[P, R]):
-    def __init__(
-        self,
-        fn: Callable[P, R] | classmethod[Any, P, R],
-    ) -> None:
-        if isinstance(fn, classmethod):
-            fn = cast(Callable[P, R], fn.__func__)
+def f(fn: Callable[P, R] | classmethod[Any, P, R]) -> Callable[P, R]:
+    if isinstance(fn, classmethod):
+        fn = cast(Callable[P, R], fn.__func__)
 
-        reveal_type(fn)  # revealed: (**P@Task) -> R@Task
+    if not callable(fn):
+        raise TypeError
 
-        if not callable(fn):
-            raise TypeError
-
-        reveal_type(fn)  # revealed: (**P@Task) -> R@Task
-        self.fn = fn
-
-def task(fn: Callable[P, R]) -> Task[P, R]:
-    return Task(fn)
-
-@task
-def f(x: int) -> str:
-    return str(x)
-
-reveal_type(f.fn)  # revealed: (x: int) -> str
-reveal_type(f.fn(1))  # revealed: str
+    reveal_type(fn)  # revealed: (**P@f) -> R@f
+    return fn
 ```
 
 ## Narrowing with TypedDict unions

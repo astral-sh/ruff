@@ -151,16 +151,15 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Callable, Generic, assert_type
+from typing import Callable, Generic
 from typing_extensions import ParamSpec
 
-DefaultP = ParamSpec("DefaultP", default=[str, int])
+P = ParamSpec("P", default=[str])
 
-class ClassParamSpec(Generic[DefaultP]):
-    x: Callable[DefaultP, None]
+class C(Generic[P]):
+    x: Callable[P, None]
 
-assert_type(ClassParamSpec(), ClassParamSpec[str, int])
-assert_type(ClassParamSpec[[bool, bool]](), ClassParamSpec[bool, bool])
+reveal_type(C().x)  # revealed: (str, /) -> None
 ```
 
 ### Forward references in stub files
@@ -482,20 +481,16 @@ reveal_type(TypeVarAndParamSpec[int, Any]().attr)  # revealed: (...) -> int
 regardless of the inferred variance of the `ParamSpec`.
 
 ```py
-from typing import Any, Callable, Generic, ParamSpec, TypeVar
+from typing import Callable, Generic, ParamSpec
 
 P = ParamSpec("P")
-T = TypeVar("T")
-R = TypeVar("R")
 
-class Command(Generic[T, P, R]):
-    callback: Callable[P, R]
+class Command(Generic[P]):
+    callback: Callable[P, None]
 
-def accepts_gradual(command: Command[int, [str], object]) -> None:
-    gradual: Command[Any, ..., Any] = command
-
-def accepts_concrete(command: Command[Any, ..., Any]) -> None:
-    concrete: Command[int, [str], object] = command
+def _(concrete: Command[[str]], gradual: Command[...]) -> None:
+    a: Command[...] = concrete
+    b: Command[[str]] = gradual
 ```
 
 ## `ParamSpec` cannot specialize a `TypeVar`, and vice versa

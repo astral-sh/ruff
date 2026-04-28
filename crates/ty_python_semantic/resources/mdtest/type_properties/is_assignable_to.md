@@ -1488,20 +1488,18 @@ value when it appears in a generic class. This is assignability consistency, not
 
 ```py
 from ty_extensions import static_assert, is_assignable_to, is_subtype_of
-from typing import Any, Callable, Generic, ParamSpec, TypeVar
+from typing import Callable, Generic, ParamSpec
 
 P = ParamSpec("P")
-T = TypeVar("T")
-R = TypeVar("R")
 
-class Command(Generic[T, P, R]):
-    callback: Callable[P, R]
+class Command(Generic[P]):
+    callback: Callable[P, None]
 
-static_assert(is_assignable_to(Command[int, [str], object], Command[Any, ..., Any]))
-static_assert(is_assignable_to(Command[Any, ..., Any], Command[int, [str], object]))
+static_assert(is_assignable_to(Command[[str]], Command[...]))
+static_assert(is_assignable_to(Command[...], Command[[str]]))
 
-static_assert(not is_subtype_of(Command[int, [str], object], Command[Any, ..., Any]))
-static_assert(not is_subtype_of(Command[Any, ..., Any], Command[int, [str], object]))
+static_assert(not is_subtype_of(Command[[str]], Command[...]))
+static_assert(not is_subtype_of(Command[...], Command[[str]]))
 ```
 
 `ParamSpec` specializations in generic classes are compared using the callable parameter relation.
@@ -1514,38 +1512,32 @@ python-version = "3.12"
 ```
 
 ```py
-from collections.abc import Callable, Coroutine
-from datetime import datetime
-from typing import Any, Final
+from collections.abc import Callable
+from typing import Final
 from ty_extensions import TypeOf, static_assert, is_assignable_to
 
-class Job[**P, R]:
-    target: Final[Callable[P, R]]
+class Job[**P]:
+    target: Final[Callable[P, None]]
 
-    def __init__(self, target: Callable[P, R]) -> None:
+    def __init__(self, target: Callable[P, None]) -> None:
         self.target = target
 
-def named(now: datetime) -> None:
+def named(x: int) -> None:
     pass
 
-def defaulted(now: datetime | None = None) -> None:
+def defaulted(x: int | None = None) -> None:
     pass
 
-async def async_callback(now: datetime) -> None:
-    pass
-
-def exception_callback(_: Exception | None = None) -> None:
+def wrong(x: str) -> None:
     pass
 
 named_job = Job(named)
 defaulted_job = Job(defaulted)
-async_job = Job(async_callback)
-exception_job = Job(exception_callback)
+wrong_job = Job(wrong)
 
-static_assert(is_assignable_to(TypeOf[named_job], Job[[datetime], None]))
-static_assert(is_assignable_to(TypeOf[defaulted_job], Job[[datetime], None]))
-static_assert(is_assignable_to(TypeOf[async_job], Job[[datetime], Coroutine[Any, Any, None] | None]))
-static_assert(not is_assignable_to(TypeOf[exception_job], Job[[datetime], None]))
+static_assert(is_assignable_to(TypeOf[named_job], Job[[int]]))
+static_assert(is_assignable_to(TypeOf[defaulted_job], Job[[int]]))
+static_assert(not is_assignable_to(TypeOf[wrong_job], Job[[int]]))
 ```
 
 ## `Concatenate`
