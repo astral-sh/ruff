@@ -478,6 +478,26 @@ both mypy and Pyright allow this and there are usages of this in the wild e.g.,
 reveal_type(TypeVarAndParamSpec[int, Any]().attr)  # revealed: (...) -> int
 ```
 
+`...` has the same gradual behavior when used as a `ParamSpec` argument in a generic class,
+regardless of the inferred variance of the `ParamSpec`.
+
+```py
+from typing import Any, Callable, Generic, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+R = TypeVar("R")
+
+class Command(Generic[T, P, R]):
+    callback: Callable[P, R]
+
+def accepts_gradual(command: Command[int, [str], object]) -> None:
+    gradual: Command[Any, ..., Any] = command
+
+def accepts_concrete(command: Command[Any, ..., Any]) -> None:
+    concrete: Command[int, [str], object] = command
+```
+
 ## `ParamSpec` cannot specialize a `TypeVar`, and vice versa
 
 <!-- snapshot-diagnostics -->
