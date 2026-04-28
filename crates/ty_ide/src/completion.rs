@@ -792,14 +792,10 @@ impl<'m> ContextCursor<'m> {
 
     /// Returns the string literal expression that the cursor is positioned within, if any.
     fn enclosing_string_literal_expr(&self) -> Option<&'m ast::ExprStringLiteral> {
-        self.covering_node.ancestors().find_map(|node| match node {
-            ast::AnyNodeRef::ExprStringLiteral(string_expr)
-                if string_expr.range().contains(self.offset) =>
-            {
-                Some(string_expr)
-            }
+        match self.covering_node.parent() {
+            Some(ast::AnyNodeRef::ExprStringLiteral(string_expr)) => Some(string_expr),
             _ => None,
-        })
+        }
     }
 
     /// Returns the quote style of the string literal that the cursor is positioned within, if any.
@@ -7221,11 +7217,7 @@ x: Literal["a\\b"] = "<CURSOR>"
     }
 
     #[test]
-    fn no_string_literal_completions_in_incomplete_string_without_expr_node() {
-        // TODO: Support string literal completions for incomplete strings.
-        //       While this currently passes, we actually do want completions
-        //       on incomplete strings, since completions otherwise rely on
-        //       IDEs auto-closing new strings.
+    fn string_literal_completions_in_incomplete_string() {
         let builder = completion_test_builder(
             r#"
 from typing import Literal
@@ -7235,7 +7227,7 @@ x: Literal["a"] = "a<CURSOR>
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @"<No completions found>",
+            @"a",
         );
     }
 
