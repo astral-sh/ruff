@@ -127,6 +127,13 @@ impl Workspace {
 
         let system = WasmSystem::new(SystemPath::new(root));
 
+        // Pre-create the /packages directory for external dependencies.
+        // extra-paths validation requires the directory to exist before options are applied.
+        system
+            .fs
+            .create_directory_all(SystemPath::new("/packages"))
+            .map_err(into_error)?;
+
         let project = ProjectMetadata::from_options(
             options,
             SystemPathBuf::from(root),
@@ -733,6 +740,91 @@ impl Workspace {
             file,
             path: vendored_path.to_path_buf().into(),
         })
+    }
+
+    /// Writes a single file to the memory file system without opening it for checking.
+    ///
+    /// Unlike [`Self::open_file`], this does **not** register the file in the project's
+    /// open-file set, so it will not be type-checked directly.
+    /// Use this for external dependency files that should be available for module resolution
+    /// but should not be type-checked themselves (e.g. files under `/packages/`).
+    ///
+    /// If the file already exists, a `Changed` event is emitted.
+    /// Otherwise, a `Created` event is emitted.
+    ///
+    /// Returns an error if the path refers to a file that is currently open
+    /// (managed via [`Self::open_file`] / [`Self::update_file`]).
+    /// Use [`Self::update_file`] to modify open files instead.
+    #[wasm_bindgen(js_name = "writeFile")]
+    pub fn write_file(&mut self, path: &str, contents: &str) -> Result<(), Error> {
+        let path = SystemPath::absolute(path, self.db.project().root(&self.db));
+
+        if let Ok(file) = system_path_to_file(&self.db, &path) {
+            if self.db.project().open_files(&self.db).contains(&file) {
+                return Err(Error::new(&format!(
+                    "Cannot write to open file '{path}'. Use `updateFile` instead."
+                )));
+            }
+        }
+
+        let already_exists = self.system.fs.exists(&path);
+
+        self.system
+            .fs
+            .write_file_all(&path, contents)
+            .map_err(into_error)?;
+
+        let changes = if already_exists {
+            vec![
+                ChangeEvent::Changed {
+                    path: path.clone(),
+                    kind: ChangedKind::FileContent,
+                },
+                ChangeEvent::Changed {
+                    path,
+                    kind: ChangedKind::FileMetadata,
+                },
+            ]
+        } else {
+            vec![ChangeEvent::Created {
+                path,
+                kind: CreatedKind::File,
+            }]
+        };
+
+        self.db.apply_changes(changes, None);
+        Ok(())
+    }
+
+    /// Removes a single file from the memory file system.
+    ///
+    /// No-op if the file does not exist. Returns an error if the path refers to a
+    /// file that is currently open (managed via [`Self::open_file`]).
+    /// Use [`Self::close_file`] to remove open files.
+    #[wasm_bindgen(js_name = "removeFile")]
+    pub fn remove_file(&mut self, path: &str) -> Result<(), Error> {
+        let path = SystemPath::absolute(path, self.db.project().root(&self.db));
+
+        if let Ok(file) = system_path_to_file(&self.db, &path) {
+            if self.db.project().open_files(&self.db).contains(&file) {
+                return Err(Error::new(&format!(
+                    "Cannot remove open file '{path}'. Use `closeFile` instead."
+                )));
+            }
+        }
+
+        if self.system.fs.exists(&path) {
+            self.system.fs.remove_file(&path).map_err(into_error)?;
+            self.db.apply_changes(
+                vec![ChangeEvent::Deleted {
+                    path,
+                    kind: DeletedKind::File,
+                }],
+                None,
+            );
+        }
+
+        Ok(())
     }
 }
 
