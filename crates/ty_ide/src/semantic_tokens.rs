@@ -660,7 +660,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         };
 
         let Some((annotation, metadata)) = tuple.elts.split_first() else {
-            self.visit_value_expression(slice);
+            self.visit_annotation(slice);
             return;
         };
 
