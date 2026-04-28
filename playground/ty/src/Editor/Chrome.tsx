@@ -45,7 +45,6 @@ export interface Props {
   files: ReadonlyFiles;
   theme: Theme;
   selectedFileName: string;
-  documentRevision: number;
   onRun(): Promise<string>;
 
   onAddFile(workspace: Workspace, name: string): void;
@@ -66,7 +65,6 @@ export default function Chrome({
   selectedFileName,
   workspacePromise,
   theme,
-  documentRevision,
   onRun,
   onAddFile,
   onRenameFile,
@@ -160,7 +158,7 @@ export default function Chrome({
     workspace,
     secondaryTool,
     files.currentVendoredFile ?? null,
-    documentRevision,
+    files.revision,
   );
 
   return (
@@ -244,7 +242,6 @@ export default function Chrome({
                 <Panel id="secondary-panel" minSize={100}>
                   <SecondaryPanel
                     files={files}
-                    documentRevision={documentRevision}
                     onRun={onRun}
                     theme={theme}
                     tool={secondaryTool}
@@ -269,9 +266,9 @@ function useCheckResult(
   workspace: Workspace,
   secondaryTool: SecondaryTool | null,
   currentVendoredFileHandle: FileHandle | null,
-  documentRevision: number,
+  revision: number,
 ): CheckResult {
-  const deferredDocumentRevision = useDeferredValue(documentRevision);
+  const deferredRevision = useDeferredValue(revision);
 
   return useMemo(() => {
     // Determine which file handle to use
@@ -367,7 +364,7 @@ function useCheckResult(
     workspace,
     secondaryTool,
     currentVendoredFileHandle,
-    deferredDocumentRevision,
+    deferredRevision,
   ]);
 }
 

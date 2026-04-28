@@ -17,7 +17,6 @@ export type SecondaryPanelResult =
 
 export interface SecondaryPanelProps {
   files: ReadonlyFiles;
-  documentRevision: number;
   onRun(): Promise<string>;
   tool: SecondaryTool;
   result: SecondaryPanelResult;
@@ -28,7 +27,6 @@ export default function SecondaryPanel({
   tool,
   result,
   files,
-  documentRevision,
   onRun,
   theme,
 }: SecondaryPanelProps) {
@@ -39,7 +37,7 @@ export default function SecondaryPanel({
         result={result}
         theme={theme}
         onRun={onRun}
-        revision={files.revision + documentRevision}
+        revision={files.revision}
       />
     </div>
   );

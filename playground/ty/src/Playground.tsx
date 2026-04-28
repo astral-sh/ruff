@@ -41,10 +41,6 @@ export default function Playground() {
   const [error, setError] = useState<string | null>(null);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [files, dispatchFiles] = useReducer(filesReducer, INIT_FILES_STATE);
-  const [documentRevision, bumpDocumentRevision] = useReducer(
-    (revision) => revision + 1,
-    0,
-  );
   const documentStoreRef = useRef<MonacoDocumentStore | null>(null);
 
   const workspacePromiseRef = useRef<Promise<Workspace> | null>(null);
@@ -56,7 +52,7 @@ export default function Playground() {
         fetched.monaco,
         workspace,
         setError,
-        bumpDocumentRevision,
+        () => dispatchFiles({ type: "documentChanged" }),
       );
       documentStoreRef.current = documentStore;
       restoreWorkspace(
@@ -82,7 +78,7 @@ export default function Playground() {
       : files.metadata[files.selected].name;
   }, [files.metadata, files.selected]);
 
-  usePersistLocally(files, documentStoreRef, documentRevision);
+  usePersistLocally(files, documentStoreRef);
 
   const handleShare = useCallback(async () => {
     const serializedFiles = serializeFiles(files, documentStoreRef.current);
@@ -273,7 +269,7 @@ export default function Playground() {
         tool="ty"
         version={version}
         onChangeTheme={setTheme}
-        edit={files.revision + documentRevision}
+        edit={files.revision}
         onShare={handleShare}
         onCopyMarkdownLink={handleCopyMarkdownLink}
         onCopyMarkdown={handleCopyMarkdown}
@@ -291,7 +287,6 @@ export default function Playground() {
           onRenameFile={handleFileRenamed}
           onRemoveFile={handleFileRemoved}
           onSelectFile={handleFileSelected}
-          documentRevision={documentRevision}
           onRun={handleRun}
           onSelectVendoredFile={handleVendoredFileSelected}
           onClearVendoredFile={handleVendoredFileCleared}
@@ -362,17 +357,15 @@ const DEFAULT_WORKSPACE = {
 function usePersistLocally(
   files: FilesState,
   documentStoreRef: RefObject<MonacoDocumentStore | null>,
-  documentRevision: number,
 ): void {
   const deferredFiles = useDeferredValue(files);
-  const deferredDocumentRevision = useDeferredValue(documentRevision);
 
   useEffect(() => {
     const serialized = serializeFiles(deferredFiles, documentStoreRef.current);
     if (serialized != null) {
       persistLocal(serialized);
     }
-  }, [deferredFiles, deferredDocumentRevision, documentStoreRef]);
+  }, [deferredFiles, documentStoreRef]);
 }
 
 export type FileId = number;
@@ -405,7 +398,7 @@ interface FilesState {
   metadata: FileMetadata;
 
   /**
-   * The revision. Gets incremented every time files changes.
+   * Invalidation token for file metadata changes and document content changes.
    */
   revision: number;
 
@@ -444,6 +437,7 @@ export type FileAction =
     }
   | { type: "selectFile"; id: FileId }
   | { type: "selectFileByName"; name: string }
+  | { type: "documentChanged" }
   | { type: "reset" }
   | {
       type: "selectVendoredFile";
@@ -516,6 +510,7 @@ function filesReducer(
           ...state.metadata,
           [id]: { ...file, name: to, uri: newUri, handle: newHandle },
         },
+        revision: state.revision + 1,
       };
     }
 
@@ -547,6 +542,13 @@ function filesReducer(
       return {
         ...INIT_FILES_STATE,
         playgroundRevision: state.playgroundRevision + 1,
+        revision: state.revision + 1,
+      };
+    }
+
+    case "documentChanged": {
+      return {
+        ...state,
         revision: state.revision + 1,
       };
     }
@@ -686,7 +688,9 @@ class MonacoDocumentStore {
     content: string,
     handle: FileHandle | null,
   ): editor.ITextModel {
-    this.closeDocument(name);
+    if (this.model(name) != null) {
+      throw new Error(`Document ${name} is already open`);
+    }
 
     const model = this.monaco.editor.createModel(
       content,
@@ -705,9 +709,7 @@ class MonacoDocumentStore {
   ): editor.ITextModel {
     const content = this.text(oldName) ?? "";
     this.closeDocument(oldName);
-    const model = this.openDocument(newName, content, newHandle);
-    this.onChanged();
-    return model;
+    return this.openDocument(newName, content, newHandle);
   }
 
   closeDocument(name: string): void {
