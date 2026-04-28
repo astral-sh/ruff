@@ -398,7 +398,11 @@ impl<'db> Bindings<'db> {
         for element in &mut self.elements {
             for item in &mut element.items {
                 match item {
-                    CallableItem::Regular(_) => {}
+                    CallableItem::Regular(binding) => {
+                        for overload in &mut binding.overloads {
+                            overload.set_return_type(constructor_instance_type);
+                        }
+                    }
                     CallableItem::Constructor(binding) => {
                         binding.set_constructed_instance_type(constructor_instance_type);
                         let constructor_context = binding.context();
@@ -534,6 +538,14 @@ impl<'db> Bindings<'db> {
     ) -> Self {
         self.set_constructor_instance_type_in_place(db, constructor_instance_type);
         self
+    }
+
+    pub(crate) fn set_constructed_instance_type(
+        &mut self,
+        db: &'db dyn Db,
+        constructor_instance_type: Type<'db>,
+    ) {
+        self.set_constructor_instance_type_in_place(db, constructor_instance_type);
     }
 
     pub(crate) fn into_constructor_bindings(
