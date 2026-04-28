@@ -51,6 +51,56 @@ fn parameters_have_annotations(parameters: &ast::Parameters) -> bool {
             .is_some_and(|param| param.annotation.is_some())
 }
 
+/// Return type policy for checking explicit `return` statements in a function body.
+#[derive(Debug, Copy, Clone)]
+struct ExpectedReturnType<'db> {
+    /// The externally-visible return type.
+    public: Type<'db>,
+    /// The lexical return type, if it differs for a generic PEP 695 function.
+    lexical: Option<Type<'db>>,
+}
+
+impl<'db> ExpectedReturnType<'db> {
+    /// Creates the expected return type policy for `function_node`.
+    fn from_function(
+        db: &'db dyn Db,
+        function: FunctionType<'db>,
+        function_node: &ast::StmtFunctionDef,
+    ) -> Self {
+        /// Normalizes special return annotations to the type actually returned by expressions.
+        fn normalize<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+            match ty {
+                Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(db),
+                ty => ty,
+            }
+        }
+
+        let public = normalize(db, function.last_definition_raw_signature(db).return_ty);
+        let lexical = function_node.type_params.is_some().then(|| {
+            normalize(
+                db,
+                function.last_definition_lexical_raw_signature(db).return_ty,
+            )
+        });
+
+        Self { public, lexical }
+    }
+
+    /// Returns the externally-visible return type.
+    fn public(self) -> Type<'db> {
+        self.public
+    }
+
+    /// Returns `true` if `ty` is accepted by either the public return type or the lexical return
+    /// type.
+    fn accepts(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        ty.is_assignable_to(db, self.public)
+            || self
+                .lexical
+                .is_some_and(|lexical| ty.is_assignable_to(db, lexical))
+    }
+}
+
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
         fn can_implicitly_return_none<'db>(db: &'db dyn Db, use_def: &UseDefMap<'db>) -> bool {
@@ -110,10 +160,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let declared_ty = enclosing_function
                 .last_definition_raw_signature(db)
                 .return_ty;
-            let expected_ty = match declared_ty {
-                Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(db),
-                ty => ty,
-            };
+            let expected_return =
+                ExpectedReturnType::from_function(db, enclosing_function, function);
+            let expected_ty = expected_return.public();
 
             let scope_id = self.index.node_scope(NodeWithScopeRef::Function(function));
             if scope_id.is_generator_function(self.index) {
@@ -195,7 +244,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ty if ty.is_notimplemented(db) => None,
                     _ => Some(ty_range),
                 })
-                .filter(|ty_range| !ty_range.ty.is_assignable_to(db, expected_ty))
+                .filter(|ty_range| !expected_return.accepts(db, ty_range.ty))
             {
                 report_invalid_return_type(
                     &self.context,

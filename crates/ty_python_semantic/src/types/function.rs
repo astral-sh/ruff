@@ -79,7 +79,7 @@ use crate::types::known_instance::DeprecatedInstance;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::relation::TypeRelationChecker;
-use crate::types::signatures::{CallableSignature, Signature};
+use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
@@ -446,6 +446,25 @@ impl<'db> OverloadLiteral<'db> {
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
     pub(super) fn raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
+        self.raw_signature_impl(db, ReturnCallableTypeVarScope::Public)
+    }
+
+    /// Typed internally-visible "raw" signature using the function's lexical generic context.
+    ///
+    /// Unlike [`raw_signature`](Self::raw_signature), this does not rescope type variables that
+    /// only appear in a return-position `Callable` to the returned callable. Use this view for
+    /// function body inference, where PEP 695 type parameters remain lexically in scope.
+    pub(super) fn lexical_raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
+        self.raw_signature_impl(db, ReturnCallableTypeVarScope::Lexical)
+    }
+
+    /// Builds the internally-visible raw signature with the requested return-`Callable` type
+    /// variable binding policy.
+    fn raw_signature_impl(
+        self,
+        db: &'db dyn Db,
+        return_callable_typevar_scope: ReturnCallableTypeVarScope,
+    ) -> Signature<'db> {
         /// `self` or `cls` can be implicitly positional-only if:
         /// - It is a method AND
         /// - No parameters in the method use PEP-570 syntax AND
@@ -526,6 +545,7 @@ impl<'db> OverloadLiteral<'db> {
             definition,
             function_stmt_node,
             has_implicitly_positional_first_parameter,
+            return_callable_typevar_scope,
         );
 
         let generic_context = raw_signature.generic_context;
@@ -790,6 +810,12 @@ impl<'db> FunctionLiteral<'db> {
     /// over-invalidation.
     fn last_definition_raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
         self.last_definition.raw_signature(db)
+    }
+
+    /// Typed externally-visible "raw" lexical signature of the last overload or implementation of
+    /// this function.
+    fn last_definition_lexical_raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
+        self.last_definition.lexical_raw_signature(db)
     }
 
     /// Return `Some()` if this function is an abstract method.
@@ -1189,6 +1215,21 @@ impl<'db> FunctionType<'db> {
     )]
     pub(crate) fn last_definition_raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
         self.literal(db).last_definition_raw_signature(db)
+    }
+
+    /// Typed externally-visible "raw" lexical signature of the last overload or implementation of
+    /// this function.
+    ///
+    /// This preserves the function's lexical generic context for return-position `Callable` type
+    /// variables. Use it when checking code inside the function body; callers should use
+    /// [`last_definition_raw_signature`](Self::last_definition_raw_signature).
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial=last_definition_signature_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    pub(crate) fn last_definition_lexical_raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
+        self.literal(db).last_definition_lexical_raw_signature(db)
     }
 
     /// Convert the `FunctionType` into a [`CallableType`].
