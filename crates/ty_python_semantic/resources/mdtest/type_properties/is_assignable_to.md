@@ -1483,6 +1483,27 @@ def f(func: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
     static_assert(not is_assignable_to(dict[str, Unknown], TypeOf[kwargs]))
 ```
 
+The gradual `...` form of a `ParamSpec` argument is assignable to and from a concrete `ParamSpec`
+value when it appears in a generic class. This is assignability consistency, not subtyping.
+
+```py
+from ty_extensions import static_assert, is_assignable_to, is_subtype_of
+from typing import Any, Callable, Generic, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+R = TypeVar("R")
+
+class Command(Generic[T, P, R]):
+    callback: Callable[P, R]
+
+static_assert(is_assignable_to(Command[int, [str], object], Command[Any, ..., Any]))
+static_assert(is_assignable_to(Command[Any, ..., Any], Command[int, [str], object]))
+
+static_assert(not is_subtype_of(Command[int, [str], object], Command[Any, ..., Any]))
+static_assert(not is_subtype_of(Command[Any, ..., Any], Command[int, [str], object]))
+```
+
 ## `Concatenate`
 
 ### Self-assignability
