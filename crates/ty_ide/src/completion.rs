@@ -43,9 +43,20 @@ pub fn completion<'db>(
     let model = SemanticModel::new(db, file);
 
     if context.cursor.is_in_string() {
+        let Some(string_expr) = context.cursor.enclosing_string_literal_expr() else {
+            return vec![];
+        };
+
         let mut completions =
             Completions::new(db, CollectionContext::none(), UserQuery::fuzzy(None));
-        add_string_literal_completions(&model, &context.cursor, &mut completions);
+
+        add_string_literal_completions(
+            &model,
+            string_expr,
+            context.cursor.string_quote_style(),
+            &mut completions,
+        );
+
         return completions.into_completions();
     }
 
@@ -1674,7 +1685,8 @@ fn add_keyword_completions<'db>(db: &'db dyn Db, completions: &mut Completions<'
 
 fn add_string_literal_completions<'db>(
     model: &SemanticModel<'db>,
-    cursor: &ContextCursor<'_>,
+    string_expr: &ast::ExprStringLiteral,
+    quote_style: Option<Quote>,
     completions: &mut Completions<'db>,
 ) {
     fn force_escape_quote(body: &str, quote: Quote) -> String {
@@ -1709,15 +1721,12 @@ fn add_string_literal_completions<'db>(
         Some(force_escape_quote(&out, quote))
     }
 
-    let Some(string_expr) = cursor.enclosing_string_literal_expr() else {
-        return;
-    };
     let candidates = model.expected_string_literal_completions(string_expr);
     if candidates.is_empty() {
         return;
     }
 
-    let quote_style = cursor.string_quote_style().unwrap_or(Quote::Double);
+    let quote_style = quote_style.unwrap_or(Quote::Double);
     for candidate in candidates {
         let Some(insert) = escape_for_quote(&candidate.value, quote_style) else {
             continue;
