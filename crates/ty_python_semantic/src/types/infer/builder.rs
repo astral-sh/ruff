@@ -461,13 +461,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn extend_scope(&mut self, inference: &ScopeInference<'db>) {
         self.expressions.extend(inference.expressions.iter());
+        self.expected_types.extend(inference.expected_types.iter());
 
         if let Some(extra) = &inference.extra {
             self.context.extend(&extra.diagnostics);
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
-            self.expected_types.extend(extra.expected_types.iter());
             self.type_expression_flags
                 .extend(extra.type_expression_flags.iter());
         }
@@ -9348,15 +9348,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let extra = (!string_annotations.is_empty()
             || !type_expression_flags.is_empty()
-            || !expected_types.is_empty()
             || !diagnostics.is_empty()
             || cycle_recovery.is_some())
         .then(|| {
             type_expression_flags.shrink_to_fit();
-            expected_types.shrink_to_fit();
             Box::new(ScopeInferenceExtra {
                 string_annotations,
-                expected_types,
                 type_expression_flags,
                 cycle_recovery,
                 diagnostics,
@@ -9364,8 +9361,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         expressions.shrink_to_fit();
+        expected_types.shrink_to_fit();
 
-        ScopeInference { expressions, extra }
+        ScopeInference {
+            expressions,
+            expected_types,
+            extra,
+        }
     }
 
     const fn inference_flags(&self) -> InferenceFlags {
