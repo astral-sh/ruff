@@ -1079,6 +1079,16 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
+            // Any concrete specialization of a `ParamSpec` is a subtype of the top
+            // materialization of a `ParamSpec` value.
+            (Type::TypeVar(bound_typevar), other)
+                if !bound_typevar.is_inferable(db, self.inferable)
+                    && bound_typevar.is_paramspec(db)
+                    && Self::is_top_paramspec_value(db, other) =>
+            {
+                self.always()
+            }
+
             // A fully static typevar is a subtype of its upper bound, and to something similar to
             // the union of its constraints. An unbound, unconstrained, fully static typevar has an
             // implicit upper bound of `object` (which is handled above).
@@ -1909,6 +1919,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .signatures(db)
                 .iter()
                 .all(|signature| signature.parameters().kind() == ParametersKind::Gradual)
+    }
+
+    /// Returns `true` if `ty` is the top materialization of a `ParamSpec` value.
+    fn is_top_paramspec_value(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        let Type::Callable(callable) = ty else {
+            return false;
+        };
+
+        callable.kind(db) == CallableTypeKind::ParamSpecValue
+            && callable
+                .signatures(db)
+                .iter()
+                .all(|signature| signature.parameters().kind() == ParametersKind::Top)
     }
 }
 
