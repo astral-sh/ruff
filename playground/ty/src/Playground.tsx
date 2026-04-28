@@ -72,34 +72,34 @@ export default function Playground() {
   usePersistLocally(files, session);
 
   const handleShare = useCallback(async () => {
-    const serializedFiles = serializeFiles(files, session);
+    const serialized = serializeFiles(files, session);
 
-    if (serializedFiles != null) {
-      await persist(serializedFiles);
+    if (serialized != null) {
+      await persist(serialized);
     }
   }, [session, files]);
 
   const handleCopyMarkdown = useCallback(async () => {
-    const serializedFiles = serializeFiles(files, session);
+    const serialized = serializeFiles(files, session);
 
-    if (serializedFiles != null) {
-      await copyAsMarkdown(serializedFiles);
+    if (serialized != null) {
+      await copyAsMarkdown(serialized);
     }
   }, [session, files]);
 
   const handleCopyMarkdownLink = useCallback(async () => {
-    const serializedFiles = serializeFiles(files, session);
+    const serialized = serializeFiles(files, session);
 
-    if (serializedFiles != null) {
-      await copyAsMarkdownLink(serializedFiles);
+    if (serialized != null) {
+      await copyAsMarkdownLink(serialized);
     }
   }, [session, files]);
 
   const handleDownload = useCallback(async () => {
-    const serializedFiles = serializeFiles(files, session);
+    const serialized = serializeFiles(files, session);
 
-    if (serializedFiles != null) {
-      const downloadFiles = { ...serializedFiles.files };
+    if (serialized != null) {
+      const downloadFiles = { ...serialized.files };
 
       if (SETTINGS_FILE_NAME in downloadFiles) {
         try {
@@ -119,8 +119,8 @@ export default function Playground() {
   }, [session, files]);
 
   const handleRun = useCallback(async () => {
-    const serializedFiles = serializeFiles(files, session);
-    return serializedFiles == null ? "" : runPython(serializedFiles);
+    const serialized = serializeFiles(files, session);
+    return serialized == null ? "" : runPython(serialized);
   }, [session, files]);
 
   const handleFileAdded = useCallback(
@@ -681,7 +681,7 @@ export class PlaygroundSession {
       languageForFile(handle ?? name),
       this.uri(name),
     );
-    this.registerWorkspaceSync(name, handle, model);
+    this.registerModelChanged(name, handle, model);
 
     return model;
   }
@@ -710,7 +710,7 @@ export class PlaygroundSession {
     return this.model(name)?.getValue() ?? null;
   }
 
-  private registerWorkspaceSync(
+  private registerModelChanged(
     name: string,
     handle: FileHandle | null,
     model: editor.ITextModel,

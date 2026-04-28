@@ -33,7 +33,7 @@ import {
   LocationLink,
   TextEdit,
 } from "ty_wasm";
-import { FileId, ReadonlyFiles } from "../Playground";
+import { FileId, PlaygroundFile, ReadonlyFiles } from "../Playground";
 import { Diagnostic } from "./Diagnostics";
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 import CompletionItemKind = languages.CompletionItemKind;
@@ -482,11 +482,11 @@ class PlaygroundServer
     this.inVendoredFileCondition.set(isViewingVendoredFile);
   }
 
-  private getPlaygroundFileIdForUri(uri: Uri): FileId | null {
+  private getPlaygroundFileForUri(uri: Uri): PlaygroundFile | null {
     return (
       Object.values(this.props.files.metadata).find((file) => {
         return file.uri.toString() === uri.toString();
-      })?.id ?? null
+      }) ?? null
     );
   }
 
@@ -512,12 +512,12 @@ class PlaygroundServer
       return this.getOrCreateVendoredFileHandle(vendoredPath);
     }
 
-    const fileId = this.getPlaygroundFileIdForUri(model.uri);
-    if (fileId == null) {
+    const file = this.getPlaygroundFileForUri(model.uri);
+    if (file == null) {
       return null;
     }
 
-    return this.props.files.metadata[fileId].handle;
+    return file.handle;
   }
 
   private formatSignatureHelp(
@@ -798,15 +798,15 @@ class PlaygroundServer
       this.props.onVendoredFileChange(fileHandle);
     } else {
       // Handle regular files
-      const fileId = this.getPlaygroundFileIdForUri(resource);
+      const file = this.getPlaygroundFileForUri(resource);
 
-      if (fileId == null) {
+      if (file == null) {
         return false;
       }
 
       // Set the model and trigger UI updates
-      if (files.selected !== fileId) {
-        this.props.onOpenFile(fileId);
+      if (files.selected !== file.id) {
+        this.props.onOpenFile(file.id);
       }
     }
 
@@ -859,15 +859,14 @@ class PlaygroundServer
         this.monaco.editor.createModel(content, "python", uri);
       } else {
         // Regular file models are owned by Monaco and created by the playground.
-        const fileId = this.getPlaygroundFileIdForUri(uri);
-        if (fileId == null) {
+        const file = this.getPlaygroundFileForUri(uri);
+        if (file == null) {
           return {
             uri,
             range: tyRangeToMonacoRange(link.full_range),
           } as languages.LocationLink;
         }
 
-        const file = this.props.files.metadata[fileId];
         const model = this.monaco.editor.getModel(file.uri);
         if (model != null) {
           uri = model.uri;
