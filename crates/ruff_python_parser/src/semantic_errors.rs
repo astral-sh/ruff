@@ -1344,7 +1344,10 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::BreakOutsideLoop => f.write_str("`break` outside loop"),
             SemanticSyntaxErrorKind::ContinueOutsideLoop => f.write_str("`continue` outside loop"),
             SemanticSyntaxErrorKind::GlobalParameter(name) => {
-                write!(f, "name `{name}` is parameter and global")
+                write!(
+                    f,
+                    "name `{name}` cannot refer to a parameter and a global variable"
+                )
             }
             SemanticSyntaxErrorKind::DifferentMatchPatternBindings => {
                 write!(f, "alternative patterns bind different names")
