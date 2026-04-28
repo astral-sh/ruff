@@ -121,12 +121,9 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         arguments: &'a ast::Arguments,
         mut infer_argument_type: impl FnMut(&ast::ArgOrKeyword, &ast::Expr) -> Type<'db>,
     ) -> Self {
-        let mut call_arguments = Self {
-            items: Vec::with_capacity(arguments.len()),
-        };
-
-        for arg_or_keyword in arguments.iter_source_order() {
-            let (argument, ty) = match arg_or_keyword {
+        arguments
+            .iter_source_order()
+            .map(|arg_or_keyword| match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
                         let ty = infer_argument_type(&arg_or_keyword, value);
@@ -142,14 +139,8 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                         (Argument::Keywords, Some(ty))
                     }
                 }
-            };
-            call_arguments.items.push(CallArgument {
-                argument,
-                types: CallArgumentTypes::new(ty),
-            });
-        }
-
-        call_arguments
+            })
+            .collect()
     }
 
     /// Like [`Self::from_arguments`] but fills as much typing info in as possible.
@@ -443,16 +434,13 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
     where
         T: IntoIterator<Item = (Argument<'a>, Option<Type<'db>>)>,
     {
-        let iter = iter.into_iter();
-        let (lower, upper) = iter.size_hint();
-        let mut items = Vec::with_capacity(upper.unwrap_or(lower));
-
-        for (argument, ty) in iter {
-            items.push(CallArgument {
+        let items = iter
+            .into_iter()
+            .map(|(argument, ty)| CallArgument {
                 argument,
                 types: CallArgumentTypes::new(ty),
-            });
-        }
+            })
+            .collect();
 
         Self { items }
     }
