@@ -5473,13 +5473,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn store_expected_type(&mut self, expression: impl Into<ExpressionNodeKey>, ty: Type<'db>) {
-        if !self.has_string_literal_completion_candidates(ty) {
+        if !Self::has_string_literal_completion_candidates(ty) {
             return;
         }
         self.expected_types.insert(expression.into(), ty);
     }
 
-    fn has_string_literal_completion_candidates(&self, ty: Type<'db>) -> bool {
+    fn has_string_literal_completion_candidates(ty: Type<'db>) -> bool {
         matches!(
             ty,
             Type::Union(_) | Type::Intersection(_) | Type::TypeAlias(_)
