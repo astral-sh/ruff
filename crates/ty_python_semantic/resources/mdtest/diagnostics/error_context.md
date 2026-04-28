@@ -648,7 +648,8 @@ error[invalid-assignment]: Object of type `DoesNotHaveName` is not assignable to
    |             Declared type
    |
 info: type `DoesNotHaveName` is not assignable to protocol `SupportsName`
-info: └── protocol member `name` is not defined on type `DoesNotHaveName`
+info: └── protocol member `name` is incompatible
+info:     └── protocol member `name` is not defined on type `DoesNotHaveName`
 ```
 
 ## Type aliases

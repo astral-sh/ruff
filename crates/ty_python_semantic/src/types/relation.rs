@@ -2016,12 +2016,28 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             .interface(db)
             .members(db)
             .when_any(db, self.constraints, |member| {
-                other
-                    .member(db, member.name())
-                    .place
-                    .ignore_possibly_undefined()
-                    .when_none_or(db, self.constraints, |attribute_type| {
-                        self.protocol_member_has_disjoint_type_from_ty(db, &member, attribute_type)
+                let attribute = member.name();
+
+                member
+                    .instance_get_type(db)
+                    .when_some_and(db, self.constraints, |get_type| {
+                        other
+                            .member(db, attribute)
+                            .place
+                            .ignore_possibly_undefined()
+                            .when_none_or(db, self.constraints, |attribute_type| {
+                                self.check_type_pair(db, get_type, attribute_type)
+                            })
+                    })
+                    .or(db, self.constraints, || {
+                        ConstraintSet::from_bool(
+                            self.constraints,
+                            member.instance_set_type().is_ok_and(|set_type| {
+                                other
+                                    .validate_attribute_assignment(db, attribute, set_type)
+                                    .is_err()
+                            }),
+                        )
                     })
             })
     }
@@ -2364,16 +2380,19 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                         .interface(db)
                         .members(db)
                         .when_any(db, self.constraints, |member| {
-                            match other.member(db, member.name()).place {
-                                Place::Defined(DefinedPlace {
-                                    ty: attribute_type, ..
-                                }) => self.protocol_member_has_disjoint_type_from_ty(
-                                    db,
-                                    &member,
-                                    attribute_type,
-                                ),
-                                Place::Undefined => self.never(),
-                            }
+                            member.instance_get_type(db).when_some_and(
+                                db,
+                                self.constraints,
+                                |get_type| {
+                                    let Place::Defined(DefinedPlace {
+                                        ty: attribute_type, ..
+                                    }) = other.member(db, member.name()).place
+                                    else {
+                                        return self.never();
+                                    };
+                                    self.check_type_pair(db, get_type, attribute_type)
+                                },
+                            )
                         })
                 })
             }
