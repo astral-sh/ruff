@@ -2162,23 +2162,19 @@ class MyClass:
         );
 
         assert_snapshot!(test.goto_declaration(), @"
-      info[goto-declaration]: Go to declaration
-       --> main.py:8:4
-        |
-      6 |     g: str
-      7 |
-      8 | TD(f=1)
-        |    ^ Clicking here
-        |
-      info: Found 1 declaration
-       --> main.py:5:5
-        |
-      4 | class TD(TypedDict):
-      5 |     f: int
-        |     -
-      6 |     g: str
-        |
-      ");
+        info[goto-declaration]: Go to declaration
+         --> main.py:8:4
+          |
+        8 | TD(f=1)
+          |    ^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:5:5
+          |
+        5 |     f: int
+          |     -
+          |
+        ");
     }
 
     #[test]
@@ -2196,23 +2192,19 @@ class MyClass:
         );
 
         assert_snapshot!(test.goto_declaration(), @"
-      info[goto-declaration]: Go to declaration
-       --> main.py:8:4
-        |
-      6 |     g: str
-      7 |
-      8 | NT(f=1)
-        |    ^ Clicking here
-        |
-      info: Found 1 declaration
-       --> main.py:5:5
-        |
-      4 | class NT(NamedTuple):
-      5 |     f: int
-        |     -
-      6 |     g: str
-        |
-      ");
+        info[goto-declaration]: Go to declaration
+         --> main.py:8:4
+          |
+        8 | NT(f=1)
+          |    ^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:5:5
+          |
+        5 |     f: int
+          |     -
+          |
+        ");
     }
 
     #[test]
@@ -2231,24 +2223,19 @@ class MyClass:
         );
 
         assert_snapshot!(test.goto_declaration(), @"
-      info[goto-declaration]: Go to declaration
-       --> main.py:9:4
-        |
-      7 |     g: str
-      8 |
-      9 | DC(f=1)
-        |    ^ Clicking here
-        |
-      info: Found 1 declaration
-       --> main.py:6:5
-        |
-      4 | @dataclass
-      5 | class DC:
-      6 |     f: int
-        |     -
-      7 |     g: str
-        |
-      ");
+        info[goto-declaration]: Go to declaration
+         --> main.py:9:4
+          |
+        9 | DC(f=1)
+          |    ^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:6:5
+          |
+        6 |     f: int
+          |     -
+          |
+        ");
     }
 
     #[test]
@@ -2269,25 +2256,19 @@ class MyClass:
         );
 
         assert_snapshot!(test.goto_declaration(), @"
-      info[goto-declaration]: Go to declaration
-        --> main.py:11:4
-         |
-       9 |     def __init__(self, f: int) -> None: ...
-      10 |
-      11 | DC(f=1)
-         |    ^ Clicking here
-         |
-      info: Found 1 declaration
-        --> main.py:9:24
-         |
-       7 |     g: str
-       8 |
-       9 |     def __init__(self, f: int) -> None: ...
-         |                        -
-      10 |
-      11 | DC(f=1)
-         |
-      ");
+        info[goto-declaration]: Go to declaration
+          --> main.py:11:4
+           |
+        11 | DC(f=1)
+           |    ^ Clicking here
+           |
+        info: Found 1 declaration
+         --> main.py:9:24
+          |
+        9 |     def __init__(self, f: int) -> None: ...
+          |                        -
+          |
+        ");
     }
 
     #[test]
@@ -2309,24 +2290,19 @@ class MyClass:
         );
 
         assert_snapshot!(test.goto_declaration(), @"
-      info[goto-declaration]: Go to declaration
-        --> main.py:12:4
-         |
-      10 |     f: int = Field(alias='g')
-      11 |
-      12 | DC(g=1)
-         |    ^ Clicking here
-         |
-      info: Found 1 declaration
-        --> main.py:10:5
-         |
-       9 | class DC(MyDataclass):
-      10 |     f: int = Field(alias='g')
-         |     -
-      11 |
-      12 | DC(g=1)
-         |
-      ");
+        info[goto-declaration]: Go to declaration
+          --> main.py:12:4
+           |
+        12 | DC(g=1)
+           |    ^ Clicking here
+           |
+        info: Found 1 declaration
+          --> main.py:10:5
+           |
+        10 |     f: int = Field(alias='g')
+           |     -
+           |
+        ");
     }
 
     #[test]

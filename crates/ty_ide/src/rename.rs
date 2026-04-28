@@ -1208,7 +1208,6 @@ TD(f=1)
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:5:5
           |
-        4 | class TD(TypedDict):
         5 |     f: int
           |     ^
         6 |     g: str
@@ -1237,7 +1236,6 @@ TD(f<CURSOR>=1)
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:5:5
           |
-        4 | class TD(TypedDict):
         5 |     f: int
           |     ^
         6 |     g: str
@@ -1266,7 +1264,6 @@ NT(f=1)
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:5:5
           |
-        4 | class NT(NamedTuple):
         5 |     f: int
           |     ^
         6 |     g: str
@@ -1296,8 +1293,6 @@ DC(f=1)
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:6:5
           |
-        4 | @dataclass
-        5 | class DC:
         6 |     f: int
           |     ^
         7 |     g: str

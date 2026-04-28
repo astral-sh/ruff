@@ -2111,18 +2111,14 @@ TD(f<CURSOR>=1)
         info[goto-definition]: Go to definition
          --> main.py:8:4
           |
-        6 |     g: str
-        7 |
         8 | TD(f=1)
           |    ^ Clicking here
           |
         info: Found 1 definition
          --> main.py:5:5
           |
-        4 | class TD(TypedDict):
         5 |     f: int
           |     -
-        6 |     g: str
           |
         ");
     }
@@ -2149,17 +2145,14 @@ td.update(f<CURSOR>=2)
         info[goto-definition]: Go to definition
          --> main.py:9:11
           |
-        8 | td = TD(f=1, g=\"\")
         9 | td.update(f=2)
           |           ^ Clicking here
           |
         info: Found 1 definition
          --> main.py:5:5
           |
-        4 | class TD(TypedDict):
         5 |     f: int
           |     -
-        6 |     g: str
           |
         ");
     }
@@ -2187,18 +2180,14 @@ func(f<CURSOR>=1)
         info[goto-definition]: Go to definition
           --> main.py:10:6
            |
-         8 | def func(**kwargs: Unpack[TD]): ...
-         9 |
         10 | func(f=1)
            |      ^ Clicking here
            |
         info: Found 1 definition
          --> main.py:5:5
           |
-        4 | class TD(TypedDict):
         5 |     f: int
           |     -
-        6 |     g: str
           |
         ");
     }
@@ -2224,18 +2213,14 @@ NT(f<CURSOR>=1)
         info[goto-definition]: Go to definition
          --> main.py:8:4
           |
-        6 |     g: str
-        7 |
         8 | NT(f=1)
           |    ^ Clicking here
           |
         info: Found 1 definition
          --> main.py:5:5
           |
-        4 | class NT(NamedTuple):
         5 |     f: int
           |     -
-        6 |     g: str
           |
         ");
     }
@@ -2262,19 +2247,14 @@ DC(f<CURSOR>=1)
         info[goto-definition]: Go to definition
          --> main.py:9:4
           |
-        7 |     g: str
-        8 |
         9 | DC(f=1)
           |    ^ Clicking here
           |
         info: Found 1 definition
          --> main.py:6:5
           |
-        4 | @dataclass
-        5 | class DC:
         6 |     f: int
           |     -
-        7 |     g: str
           |
         ");
     }
@@ -2303,21 +2283,15 @@ DC(f<CURSOR>=1)
         info[goto-definition]: Go to definition
           --> main.py:11:4
            |
-         9 |     def __init__(self, f: int) -> None: ...
-        10 |
         11 | DC(f=1)
            |    ^ Clicking here
            |
         info: Found 1 definition
-          --> main.py:9:24
-           |
-         7 |     g: str
-         8 |
-         9 |     def __init__(self, f: int) -> None: ...
-           |                        -
-        10 |
-        11 | DC(f=1)
-           |
+         --> main.py:9:24
+          |
+        9 |     def __init__(self, f: int) -> None: ...
+          |                        -
+          |
         ");
     }
 
@@ -2346,19 +2320,14 @@ DC(g<CURSOR>=1)
         info[goto-definition]: Go to definition
           --> main.py:12:4
            |
-        10 |     f: int = Field(alias='g')
-        11 |
         12 | DC(g=1)
            |    ^ Clicking here
            |
         info: Found 1 definition
           --> main.py:10:5
            |
-         9 | class DC(MyDataclass):
         10 |     f: int = Field(alias='g')
            |     -
-        11 |
-        12 | DC(g=1)
            |
         ");
     }
