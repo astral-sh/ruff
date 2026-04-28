@@ -685,20 +685,20 @@ impl<'db> ConstraintSetBuilder<'db> {
     }
 
     /// Loads an [`OwnedConstraintSet`] into this builder.
+    ///
+    /// The BDD structure inside a builder depends on the ordering of constraints and typevars in
+    /// the builder's arenas. (The constraint ordering defines the BDD variable ordering, while the
+    /// typevar ordering defines which typevars can be lower/upper bounds of other typevars.) There
+    /// is no guarantee that the `OwnedConstraintSet` and this builder have consistent orderings,
+    /// so we have to just reload everything, standardizing on _this_ builder's orderings. That's
+    /// not the quickest thing in the world, but that is usually an acceptable tradeoff. Prefer
+    /// `OwnedConstraintSet::query` when you only need to query a single owned set, since that
+    /// avoids remapping and preserves the original TDD structure.
     pub(crate) fn load<'c>(
         &'c self,
         db: &'db dyn Db,
         other: &OwnedConstraintSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        // The BDD structure inside a builder depends on the ordering of constraints and typevars
-        // in the builder's arenas. (The constraint ordering defines the BDD variable ordering,
-        // while the typevar ordering defines which typevars can be lower/upper bounds of other
-        // typevars.) There is no guarantee that the `OwnedConstraintSet` and this builder have
-        // consistent orderings, so we have to just reload everything, standardizing on _this_
-        // builder's orderings. That's not the quickest thing in the world, but that's fine, since
-        // Prefer `OwnedConstraintSet::query` when you only need to query a single owned set; that
-        // avoids remapping and preserves the original TDD structure.
-
         fn rebuild_node<'db>(
             builder: &ConstraintSetBuilder<'db>,
             other: &OwnedConstraintSet<'db>,
