@@ -507,6 +507,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let structurally_satisfied = if let Type::ProtocolInstance(source_protocol) = ty {
             self.check_protocol_interface_pair(
                 db,
+                ty,
                 source_protocol.interface(db),
                 protocol.interface(db),
             )
