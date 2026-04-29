@@ -252,17 +252,9 @@ impl WorkspaceOptions {
         if let Some(extension) = self.python_extension
             && let Some(active_environment) = extension.active_environment
         {
-            overrides.fallback_python = if let Some(environment) = &active_environment.environment {
-                environment.folder_uri.to_file_path().ok().and_then(|path| {
-                    Some(RelativePathBuf::python_extension(
-                        SystemPathBuf::from_path_buf(path).ok()?,
-                    ))
-                })
-            } else {
-                Some(RelativePathBuf::python_extension(
-                    active_environment.executable.sys_prefix,
-                ))
-            };
+            overrides.fallback_python = Some(RelativePathBuf::python_extension(
+                active_environment.executable.sys_prefix,
+            ));
 
             overrides.fallback_python_version = active_environment
                 .version
@@ -485,27 +477,36 @@ pub(crate) struct ActiveEnvironment {
 pub(crate) struct EnvironmentVersion {
     pub(crate) major: i64,
     pub(crate) minor: i64,
-    #[allow(dead_code)]
-    pub(crate) patch: i64,
-    #[allow(dead_code)]
-    pub(crate) sys_version: String,
+    #[deprecated(
+        note = "Unused by the server. Use `major` and `minor` instead. This can be omitted when the Python Environments extension reports a major/minor-only version; Zed omits the entire `version` object."
+    )]
+    pub(crate) patch: Option<i64>,
+    #[deprecated(
+        note = "Unused by the server. Use `major` and `minor` instead. This is not provided by the Python Environments extension; Zed omits the entire `version` object."
+    )]
+    pub(crate) sys_version: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonEnvironment {
-    pub(crate) folder_uri: Url,
-    #[allow(dead_code)]
+    #[deprecated(
+        note = "Unused by the server. Use `executable.sysPrefix` instead. This can point to a Python executable instead of an environment root; Zed omits the entire `environment` object."
+    )]
+    pub(crate) folder_uri: Option<Url>,
+    #[deprecated(
+        note = "Unused by the server. This is not provided by the Python Environments extension; Zed omits the entire `environment` object."
+    )]
     #[serde(rename = "type")]
-    pub(crate) kind: String,
-    #[allow(dead_code)]
+    pub(crate) kind: Option<String>,
+    #[deprecated(note = "Unused by the server. Zed omits the entire `environment` object.")]
     pub(crate) name: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonExecutable {
-    #[allow(dead_code)]
-    pub(crate) uri: Url,
+    #[deprecated(note = "Unused by the server. Use `sys_prefix` instead.")]
+    pub(crate) uri: Option<Url>,
     pub(crate) sys_prefix: SystemPathBuf,
 }
