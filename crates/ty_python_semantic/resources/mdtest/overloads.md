@@ -143,7 +143,7 @@ reveal_type(foo3.takes_self_or_int(1))  # revealed: int
 ## Constructor
 
 ```py
-from typing import overload
+from typing import Any, Generic, TypeVar, overload
 
 class Foo:
     @overload
@@ -160,6 +160,18 @@ reveal_type(foo.x)  # revealed: int | None
 foo1 = Foo(1)
 reveal_type(foo1)  # revealed: Foo
 reveal_type(foo1.x)  # revealed: int | None
+
+T = TypeVar("T")
+
+class GenericConstructor(Generic[T]):
+    @overload
+    def __init__(self: "GenericConstructor[list[int]]", value: int) -> None: ...
+    @overload
+    def __init__(self: "GenericConstructor[set[str]]", value: str) -> None: ...
+    @overload
+    def __init__(self, value: T) -> None: ...
+    def __init__(self, value: Any) -> None:
+        pass
 ```
 
 ## Version specific
@@ -568,12 +580,34 @@ def foo(x):
 
 ### Implementation consistency
 
-The implementation must accept every argument accepted by each overload, and each overload return
-type must be assignable to the implementation return type. This check initially only covers
-overloads where all signatures are non-generic.
+The overload implementation must accept all arguments accepted by the overloads, and all overload
+return types must be assignable to the implementation return type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
-from typing import overload
+from typing import (
+    Any,
+    Callable,
+    Concatenate,
+    Coroutine,
+    Final,
+    Generic,
+    Literal,
+    ParamSpec,
+    Protocol,
+    Sequence,
+    TypedDict,
+    TypeVar,
+    Unpack,
+    overload,
+)
+
+T = TypeVar("T")
+TIntStr = TypeVar("TIntStr", int, str)
 
 @overload
 def return_type(x: int) -> int: ...
@@ -590,21 +624,810 @@ def parameter_type(x: int) -> int: ...
 def parameter_type(x: str) -> str: ...
 def parameter_type(x: int) -> int | str:
     return 1
+
+@overload
+# error: [invalid-overload]
+def mixed_generic(x: T) -> T: ...
+@overload
+# error: [invalid-overload]
+def mixed_generic(x: int) -> int: ...
+def mixed_generic(x: str) -> object:
+    return x
+
+@overload
+# error: [invalid-overload]
+def generic_parameter_concrete_return(x: list[T]) -> int: ...
+@overload
+def generic_parameter_concrete_return(x: str) -> str: ...
+def generic_parameter_concrete_return(x: object) -> str:
+    return ""
+
+@overload
+# error: [invalid-overload]
+def generic_parameter_domain(x: list[T]) -> None: ...
+@overload
+def generic_parameter_domain(x: int) -> None: ...
+def generic_parameter_domain(x: list[int] | int) -> None:
+    pass
+
+@overload
+# error: [invalid-overload]
+def generic_parameter_domain_both_generic(x: list[T]) -> None: ...
+@overload
+def generic_parameter_domain_both_generic(x: int) -> None: ...
+def generic_parameter_domain_both_generic(x: tuple[T] | int) -> None:
+    pass
+
+@overload
+# error: [invalid-overload]
+def generic_parameter_domain_upper_bound(x: list[T]) -> None: ...
+@overload
+def generic_parameter_domain_upper_bound(x: int) -> None: ...
+def generic_parameter_domain_upper_bound(x: list[object] | int) -> None:
+    pass
+
+@overload
+# error: [invalid-overload]
+def generic_return(x: list[T]) -> T: ...
+@overload
+def generic_return(x: int) -> int: ...
+def generic_return(x: object) -> int:
+    return 1
+
+@overload
+# error: [invalid-overload]
+def generic_implementation_parameter(x: str) -> None: ...
+@overload
+# error: [invalid-overload]
+def generic_implementation_parameter(x: int) -> None: ...
+def generic_implementation_parameter(x: list[T]) -> None:
+    pass
+
+@overload
+# error: [invalid-overload]
+def generic_implementation_return(x: int) -> str: ...
+@overload
+def generic_implementation_return(x: str) -> str: ...
+def generic_implementation_return(x: T) -> T:
+    return x
+
+@overload
+def keyword_only_generic_return(*, x: int) -> int: ...
+@overload
+def keyword_only_generic_return(*, x: str) -> str: ...
+def keyword_only_generic_return(*, x: T) -> T:
+    return x
+
+class Future[T]:
+    result: T
+
+@overload
+def implementation_return_typevar_identity[R, *Ts](
+    target: Callable[[*Ts], Coroutine[Any, Any, R]],
+    *args: *Ts,
+) -> Future[R] | None: ...
+@overload
+def implementation_return_typevar_identity[R, *Ts](
+    target: Callable[[*Ts], Coroutine[Any, Any, R] | R],
+    *args: *Ts,
+) -> Future[R] | None: ...
+def implementation_return_typevar_identity[R, *Ts](
+    target: Callable[[*Ts], Coroutine[Any, Any, R] | R] | Coroutine[Any, Any, R],
+    *args: *Ts,
+) -> Future[R] | None:
+    raise NotImplementedError
+
+class HassJob[**P, R]:
+    def __init__(self, target: Callable[P, R]) -> None:
+        self.target: Final = target
+
+@overload
+def implementation_return_typevar_identity_in_generic_wrapper[R](
+    hassjob: HassJob[..., Coroutine[Any, Any, R]],
+    *args: Any,
+) -> Future[R] | None: ...
+@overload
+def implementation_return_typevar_identity_in_generic_wrapper[R](
+    hassjob: HassJob[..., Coroutine[Any, Any, R] | R],
+    *args: Any,
+) -> Future[R] | None: ...
+def implementation_return_typevar_identity_in_generic_wrapper[R](
+    hassjob: HassJob[..., Coroutine[Any, Any, R] | R],
+    *args: Any,
+) -> Future[R] | None:
+    raise NotImplementedError
+
+class Request: ...
+class Response: ...
+class StreamResponse: ...
+class HomeAssistantView: ...
+
+type DecoratorResponse = Response | StreamResponse
+type DecoratorFunc[T, **P, R] = Callable[
+    Concatenate[T, Request, P],
+    Coroutine[Any, Any, R],
+]
+
+@overload
+def decorator_alias_union_return[
+    ViewT: HomeAssistantView,
+    **P,
+    ResponseT: DecoratorResponse,
+](
+    func: None = None,
+) -> Callable[
+    [DecoratorFunc[ViewT, P, ResponseT]],
+    DecoratorFunc[ViewT, P, ResponseT],
+]: ...
+@overload
+def decorator_alias_union_return[
+    ViewT: HomeAssistantView,
+    **P,
+    ResponseT: DecoratorResponse,
+](
+    func: DecoratorFunc[ViewT, P, ResponseT],
+) -> DecoratorFunc[ViewT, P, ResponseT]: ...
+def decorator_alias_union_return[
+    ViewT: HomeAssistantView,
+    **P,
+    ResponseT: DecoratorResponse,
+](
+    func: DecoratorFunc[ViewT, P, ResponseT] | None = None,
+) -> (
+    Callable[
+        [DecoratorFunc[ViewT, P, ResponseT]],
+        DecoratorFunc[ViewT, P, ResponseT],
+    ]
+    | DecoratorFunc[ViewT, P, ResponseT]
+):
+    raise NotImplementedError
+
+@overload
+# error: [invalid-overload]
+def dynamic_implementation_keyword_name(y: int) -> int: ...
+@overload
+def dynamic_implementation_keyword_name(x: str) -> str: ...
+def dynamic_implementation_keyword_name(x) -> int | str:
+    return x
+
+@overload
+# error: [invalid-overload]
+def dynamic_implementation_self_name_is_not_receiver(y: int) -> int: ...
+@overload
+# error: [invalid-overload]
+def dynamic_implementation_self_name_is_not_receiver(x: str) -> str: ...
+def dynamic_implementation_self_name_is_not_receiver(self) -> int | str:
+    return self
+
+@overload
+# error: [invalid-overload]
+def dynamic_implementation_mixed_keyword_call(x: int, y: int) -> int: ...
+@overload
+# error: [invalid-overload]
+def dynamic_implementation_mixed_keyword_call(x: str, y: str) -> str: ...
+def dynamic_implementation_mixed_keyword_call(y, x) -> int | str:
+    return x
+
+@overload
+# error: [invalid-overload]
+def dynamic_implementation_omitted_default(x: int = 0) -> int: ...
+@overload
+def dynamic_implementation_omitted_default(x: str) -> str: ...
+def dynamic_implementation_omitted_default(x) -> int | str:
+    return x
+
+@overload
+# error: [invalid-overload]
+def dynamic_implementation_variadic_arguments(*args: int) -> int: ...
+@overload
+def dynamic_implementation_variadic_arguments(x: str) -> str: ...
+def dynamic_implementation_variadic_arguments(x) -> int | str:
+    return x
+
+@overload
+def generic_container_implementation(x: list[int]) -> int: ...
+@overload
+def generic_container_implementation(x: list[str]) -> str: ...
+def generic_container_implementation(x: list[T]) -> T:
+    return x[0]
+
+@overload
+def constrained_implementation_parameter(x: int) -> object: ...
+@overload
+# error: [invalid-overload]
+def constrained_implementation_parameter(x: bytes) -> object: ...
+def constrained_implementation_parameter(x: TIntStr) -> object:
+    return x
+
+@overload
+def constrained_nested_implementation_parameter(x: list[int]) -> object: ...
+@overload
+# error: [invalid-overload]
+def constrained_nested_implementation_parameter(x: list[bytes]) -> object: ...
+def constrained_nested_implementation_parameter(x: list[TIntStr]) -> object:
+    return x
+
+@overload
+def constrained_nested_overload_parameter(x: list[TIntStr]) -> object: ...
+@overload
+def constrained_nested_overload_parameter(x: list[bytes]) -> object: ...
+def constrained_nested_overload_parameter(x: list[int] | list[str] | list[bytes]) -> object:
+    return x
+
+class Box(Generic[T]):
+    @overload
+    def method(self, x: int) -> int: ...
+    @overload
+    # error: [invalid-overload]
+    def method(self, x: str) -> str: ...
+    def method(self, x: int) -> int | str:
+        return x
+
+class StaticmethodSelfIsExplicit:
+    @overload
+    @staticmethod
+    # error: [invalid-overload]
+    def method(y: int) -> int: ...
+    @overload
+    @staticmethod
+    # error: [invalid-overload]
+    def method(x: str) -> str: ...
+    @staticmethod
+    def method(self) -> int | str:
+        return self
+
+@overload
+def generic_union_implementation(x: list[T]) -> T: ...
+@overload
+def generic_union_implementation(x: None) -> None: ...
+def generic_union_implementation(x: list[T] | None) -> T | None:
+    return None if x is None else x[0]
+
+Row_co = TypeVar("Row_co", covariant=True)
+
+class Connection(Generic[Row_co]): ...
+
+class RowFactory(Protocol[Row_co]):
+    def __call__(self) -> Row_co: ...
+
+class PsycopgCursor(Generic[Row_co]):
+    @overload
+    def __init__(self, connection: Connection[Row_co]) -> None: ...
+    @overload
+    def __init__(self, connection: Connection[Any], *, row_factory: RowFactory[Row_co]) -> None: ...
+    def __init__(self, connection: Connection[Any], *, row_factory: RowFactory[Row_co] | None = None) -> None: ...
+
+@overload
+def literal_keyword_implementation(x: int, *, flag: Literal[True]) -> int: ...
+@overload
+def literal_keyword_implementation(x: str, *, flag: bool = False) -> str: ...
+def literal_keyword_implementation(x: int | str, *, flag: bool = False) -> int | str:
+    return x
+
+class Dataset: ...
+class DataArray: ...
+
+DatasetOrDataArrayT = TypeVar("DatasetOrDataArrayT", bound=Dataset | DataArray)
+DatasetOrDataArrayU = TypeVar("DatasetOrDataArrayU", bound=Dataset | DataArray)
+DatasetOrDataArrayV = TypeVar("DatasetOrDataArrayV", bound=Dataset | DataArray)
+
+@overload
+def bounded_typevar_variadic_implementation(obj: DatasetOrDataArrayT, /) -> tuple[DatasetOrDataArrayT]: ...
+@overload
+def bounded_typevar_variadic_implementation(
+    obj1: DatasetOrDataArrayT,
+    obj2: DatasetOrDataArrayU,
+    /,
+) -> tuple[DatasetOrDataArrayT, DatasetOrDataArrayU]: ...
+@overload
+def bounded_typevar_variadic_implementation(
+    obj1: DatasetOrDataArrayT,
+    obj2: DatasetOrDataArrayU,
+    obj3: DatasetOrDataArrayV,
+    /,
+) -> tuple[DatasetOrDataArrayT, DatasetOrDataArrayU, DatasetOrDataArrayV]: ...
+@overload
+def bounded_typevar_variadic_implementation(*objects: Dataset | DataArray) -> tuple[Dataset | DataArray, ...]: ...
+def bounded_typevar_variadic_implementation(*objects: Dataset | DataArray) -> tuple[Dataset | DataArray, ...]:
+    raise NotImplementedError
+
+class Command(Generic[T]): ...
+
+AnyCommandT = TypeVar("AnyCommandT", bound=Command[Any])
+IntCommandT = TypeVar("IntCommandT", bound=Command[int])
+StrCommandT = TypeVar("StrCommandT", bound=Command[str])
+
+class Hooks(Generic[T]):
+    @overload
+    def add(self: "Hooks[int]", command: IntCommandT) -> IntCommandT: ...
+    @overload
+    def add(self: "Hooks[str]", command: StrCommandT) -> StrCommandT: ...
+    def add(self, command: AnyCommandT) -> AnyCommandT:
+        return command
+
+class Builds(Protocol[T]): ...
+
+R = TypeVar("R")
+P = ParamSpec("P")
+
+class BuildsWithSig(Builds[T], Protocol[T, P]): ...
+
+Importable = TypeVar("Importable", bound=Callable[..., Any])
+
+class BuildFactory:
+    @overload
+    def __call__(
+        self,
+        target: type[BuildsWithSig[type[R], P]],
+        *,
+        populate_full_signature: Literal[True],
+        partial: Literal[False, None] = ...,
+    ) -> type[BuildsWithSig[type[R], P]]: ...
+    @overload
+    def __call__(
+        self,
+        target: Callable[P, R],
+        *,
+        populate_full_signature: Literal[True],
+        partial: Literal[False, None] = ...,
+    ) -> type[BuildsWithSig[type[R], P]]: ...
+    @overload
+    def __call__(
+        self,
+        target: Importable,
+        *args: T,
+        populate_full_signature: bool = ...,
+        partial: Literal[False, None] = ...,
+        **kwargs: T,
+    ) -> type[Builds[Importable]]: ...
+    def __call__(
+        self,
+        target: Callable[P, R] | type[Builds[Importable]] | type[BuildsWithSig[type[R], P]],
+        *args: T,
+        populate_full_signature: bool = False,
+        partial: bool | None = None,
+        **kwargs: T,
+    ) -> Any:
+        return Builds
+
+class ClassTypeVarBox[T]:
+    @overload
+    # error: [invalid-overload]
+    def method(self, x: int) -> None: ...
+    @overload
+    # error: [invalid-overload]
+    def method(self, x: str) -> None: ...
+    def method(self, x: T) -> None:
+        pass
+
+class SpecializedSelfBox[T]:
+    # Like mypy and pyright, we do not re-specialize the implementation separately
+    # for each overload based on the overload's explicit `self` annotation.
+    @overload
+    # error: [invalid-overload]
+    def method(self: "SpecializedSelfBox[int]", x: int) -> int: ...
+    @overload
+    # error: [invalid-overload]
+    def method(self: "SpecializedSelfBox[str]", x: str) -> str: ...
+    def method(self, x: T) -> T:
+        return x
+
+class ReadSharedKwds(TypedDict, total=False):
+    sep: str
+    header: int
+
+@overload
+# error: [invalid-overload]
+def typed_dict_kwargs_explicit_implementation(path: str, **kwds: Unpack[ReadSharedKwds]) -> int: ...
+@overload
+# error: [invalid-overload]
+def typed_dict_kwargs_explicit_implementation(path: bytes, **kwds: Unpack[ReadSharedKwds]) -> str: ...
+def typed_dict_kwargs_explicit_implementation(
+    path: str | bytes,
+    *,
+    sep: str = ",",
+    header: int = 0,
+) -> int | str:
+    return 1
+
+@overload
+def paramspec_overload_gradual_variadic_implementation(func: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T: ...
+@overload
+def paramspec_overload_gradual_variadic_implementation(func: Callable[..., T]) -> T: ...
+def paramspec_overload_gradual_variadic_implementation(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
+    return func(*args, **kwargs)
+
+@overload
+def paramspec_overload_with_static_prefix_gradual_variadic_implementation(
+    obj: T,
+    func: Callable[P, T],
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> T: ...
+@overload
+def paramspec_overload_with_static_prefix_gradual_variadic_implementation(
+    obj: Any,
+    func: tuple[Callable[..., T], str],
+    *args: Any,
+    **kwargs: Any,
+) -> T: ...
+def paramspec_overload_with_static_prefix_gradual_variadic_implementation(
+    obj: T,
+    func: Callable[P, T] | tuple[Callable[..., T], str],
+    *args: Any,
+    **kwargs: Any,
+) -> T:
+    return obj
+
+@overload
+def paramspec_kwargs_only_implementation(
+    func: Callable[P, T],
+    **kwargs: P.kwargs,  # error: [invalid-paramspec]
+) -> T: ...
+@overload
+def paramspec_kwargs_only_implementation(
+    func: Callable[P, Sequence[T]],
+    **kwargs: P.kwargs,  # error: [invalid-paramspec]
+) -> tuple[T, ...]: ...
+def paramspec_kwargs_only_implementation(
+    func: Callable[P, T | Sequence[T]],
+    **kwargs: P.kwargs,  # error: [invalid-paramspec]
+) -> T | tuple[T, ...]:
+    return ()
+
+@overload
+def structured_gradual_callable_variadic_implementation(fn: Callable[[int], str], /) -> Any: ...
+@overload
+def structured_gradual_callable_variadic_implementation(
+    fn: Callable[[int], str],
+    other: Callable[[str], bytes],
+    /,
+) -> Any: ...
+def structured_gradual_callable_variadic_implementation(*fns: Callable[[Any], Any]) -> Any:
+    return fns[0]
+
+@overload
+def prefixed_structured_gradual_callable_variadic_implementation(value: int, /) -> int: ...
+@overload
+def prefixed_structured_gradual_callable_variadic_implementation(value: int, fn: Callable[[int], str], /) -> str: ...
+@overload
+def prefixed_structured_gradual_callable_variadic_implementation(
+    value: int,
+    fn: Callable[[int], str],
+    other: Callable[[str], bytes],
+    /,
+) -> bytes: ...
+def prefixed_structured_gradual_callable_variadic_implementation(
+    value: Any,
+    *fns: Callable[[Any], Any],
+) -> Any:
+    return value
+
+@overload
+def ellipsis_callable_variadic_implementation(fn: Callable[[int], str], /) -> Any: ...
+@overload
+def ellipsis_callable_variadic_implementation(
+    fn: Callable[[int], str],
+    other: Callable[[str], bytes],
+    /,
+) -> Any: ...
+def ellipsis_callable_variadic_implementation(*fns: Callable[..., Any]) -> Any:
+    return fns[0]
 ```
 
-Generic overloads are left to the full implementation-consistency check.
+### Inserted positional implementation parameter before variadic arguments
+
+An overload with `*args: Any` accepts arbitrary extra positional arguments. If the implementation
+inserts an annotated optional positional parameter before its own `*args`, those same overload
+arguments bind to the inserted parameter in the implementation, not to the variadic parameter. The
+implementation must therefore accept the inserted parameter's type for every extra positional
+argument that the overload accepts.
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
+from typing import Any, TypeVar, overload
+
+T = TypeVar("T")
+
+@overload
+# error: [invalid-overload]
+def command(name: str = ..., *args: Any) -> int: ...
+@overload
+def command(name: str = ..., cls: type[T] = ..., *args: Any) -> T: ...
+def command(
+    name: str = "",
+    cls: type[Any] | None = None,
+    *args: Any,
+) -> Any:
+    return None
+```
+
+### Positional-only implementation parameters before overload keyword parameter
+
+An overload parameter after `/` is still positional-or-keyword. If the implementation inserts
+additional positional-only parameters before that parameter, a positional call accepted by the
+overload binds to a different implementation parameter.
+
+```py
+from typing import overload
+
+@overload
+# error: [invalid-overload]
+def timestamp(value: object, /, timezone: str | None = None) -> str: ...
+@overload
+def timestamp(year: int, month: int, day: int, /) -> str: ...
+def timestamp(
+    value_or_year: object,
+    month: int | None = None,
+    day: int | None = None,
+    /,
+    timezone: str | None = None,
+) -> str:
+    return ""
+```
+
+### Invariant generic wrapper implementation parameter
+
+An implementation parameter using an invariant generic wrapper around a union does not accept an
+overload parameter using the same wrapper around one member of that union.
+
+```py
+from collections.abc import Coroutine
+from typing import Any, Generic, ParamSpec, TypeVar, overload
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+class Task(Generic[P, R]): ...
+class Future(Generic[R]): ...
+
+class TaskRunner:
+    @overload
+    # error: [invalid-overload]
+    def submit(
+        self,
+        task: Task[P, Coroutine[Any, Any, R]],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> Future[R]: ...
+    @overload
+    def submit(
+        self,
+        task: Task[P, R],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> Future[R]: ...
+    def submit(
+        self,
+        task: Task[P, R | Coroutine[Any, Any, R]],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> Future[R]:
+        raise NotImplementedError
+```
+
+### Callable return type variance
+
+An overload return type must be assignable to the implementation return type. Callable parameter
+types are contravariant, so an implementation returning a callable that may require either `int` or
+`str` is not compatible with an overload that promises a callable accepting only `int`.
+
+```py
+from collections.abc import Callable
+from typing import Generic, Literal, TypeVar, overload
+
+D = TypeVar("D", Literal[0], Literal[1])
+
+class Wrapper(Generic[D]): ...
+
+@overload
+# error: [invalid-overload]
+def decorator(
+    dimensionality: Literal[0] = 0,
+) -> Callable[[Callable[[int], int]], Wrapper[Literal[0]]]: ...
+@overload
+# error: [invalid-overload]
+def decorator(
+    dimensionality: Literal[1],
+) -> Callable[[Callable[[str], str]], Wrapper[Literal[1]]]: ...
+def decorator(
+    dimensionality: D | Literal[0] = 0,
+) -> Callable[
+    [Callable[[int], int] | Callable[[str], str]],
+    Wrapper[D | Literal[0]],
+]:
+    raise NotImplementedError
+```
+
+### Optional positional implementation parameter
+
+An implementation with an optional positional parameter accepts calls that omit that parameter,
+including an overload that only exposes keyword-only parameters.
+
+```py
+from typing import overload
+
+class CallableWithOptionalParameter:
+    @overload
+    def __call__(self, *, flag: bool = ...) -> int: ...
+    @overload
+    def __call__(self, __value: int, *, flag: bool = ...) -> int: ...
+    def __call__(self, __value: int | None = None, *, flag: bool = False) -> int:
+        return 1
+```
+
+### Specialized receiver annotations
+
+Explicit `self` annotations on overloads narrow the overload call surface, but ty follows mypy and
+pyright in not re-specializing the implementation separately for each overload.
+
+```py
+from typing import Generic, Literal, TypeVar, overload
+
+Choice = TypeVar("Choice", Literal[0], Literal[1])
+
+class Zero: ...
+class One: ...
+
+class SpecializedReceiver(Generic[Choice]):
+    @overload
+    # error: [invalid-overload]
+    def method(self: "SpecializedReceiver[Literal[0]]") -> Zero: ...
+    @overload
+    # error: [invalid-overload]
+    def method(self: "SpecializedReceiver[Literal[1]]") -> One: ...
+    def method(self: "SpecializedReceiver[Choice]") -> Zero | One:
+        raise NotImplementedError
+```
+
+### Special method parameter names
+
+Special methods can still be called directly. A mismatched overload parameter name is therefore
+observable because `obj.__getitem__(index=...)` is accepted by the overload but not by the
+implementation.
+
+```py
+from typing import overload
+
+class Diff:
+    @overload
+    # error: [invalid-overload]
+    def __getitem__(self, index: int) -> int: ...
+    @overload
+    def __getitem__(self, item: str) -> str: ...
+    def __getitem__(self, item: int | str) -> int | str:
+        return 1
+```
+
+### `Unpack[TypedDict]` implementation expansion
+
+We intentionally do not treat an implementation's explicit keyword-only parameters as equivalent to
+an overload `**kwargs: Unpack[TypedDict]` parameter during overload implementation consistency.
+
+```py
+from typing import overload
+from typing_extensions import TypedDict, Unpack
+
+class Kwargs(TypedDict, total=False):
+    key: int
+
+@overload
+# error: [invalid-overload]
+def unpacked_kwargs(**kwargs: Unpack[Kwargs]) -> None: ...
+@overload
+def unpacked_kwargs() -> None: ...
+def unpacked_kwargs(*, key: int = 0) -> None:
+    pass
+```
+
+### Async implementation return
+
+For `async def` overloads, implementation consistency compares the coroutine result type, not the
+outer coroutine object type.
+
+```py
+from collections.abc import Awaitable
 from typing import TypeVar, overload
 
 T = TypeVar("T")
 
 @overload
-def generic_parameter_type(x: T) -> T: ...
+async def async_identity(value: Awaitable[T]) -> T: ...
 @overload
-def generic_parameter_type(x: str) -> str: ...
-def generic_parameter_type(x: int) -> int | str:
-    return x
+async def async_identity(value: T) -> T: ...
+async def async_identity(value: T | Awaitable[T]) -> T:
+    raise NotImplementedError
+```
+
+### Awaitable callback return
+
+When a callback can return either `T` or `Awaitable[T]`, the overload return type must preserve the
+same `T` through an invariant generic wrapper.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from asyncio import Future
+from collections.abc import Awaitable, Callable
+from typing import TypeVar, overload
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+class Thenable(Future[T]):
+    @overload
+    def then(self, callback: Callable[[T], Awaitable[S]]) -> "Thenable[S]": ...
+    @overload
+    def then(self, callback: Callable[[T], S]) -> "Thenable[S]": ...
+    def then(self, callback: Callable[[T], S | Awaitable[S]]) -> "Thenable[S]":
+        raise NotImplementedError
+```
+
+### Positional-only implementation parameter
+
+A defaulted positional-only implementation parameter still accepts calls that omit it, including an
+overload that only accepts keyword arguments.
+
+```py
+from typing import overload
+
+class PositionalOnlyImplementation:
+    @overload
+    def update(self, value: int, /) -> None: ...
+    @overload
+    def update(self, **kwargs: int) -> None: ...
+    def update(self, value: object = (), /, **kwargs: object) -> None:
+        pass
+```
+
+### `TypeIs` return
+
+`TypeIs` uses a top-materialized type for narrowing, but overload implementation consistency still
+relates the declared `TypeIs` argument so a gradual implementation return remains compatible.
+
+```py
+from collections.abc import Iterable, Sequence
+from typing import Any, TypeVar, overload
+from typing_extensions import TypeIs
+
+T = TypeVar("T")
+
+@overload
+def is_sequence(value: Iterable[T]) -> TypeIs[Sequence[T]]: ...
+@overload
+def is_sequence(value: object) -> TypeIs[Sequence[Any]]: ...
+def is_sequence(value: object) -> TypeIs[Sequence[Any]]:
+    return isinstance(value, Sequence)
+```
+
+### `TypeGuard` return with specialized receivers
+
+`TypeGuard` is covariant in its guarded type, so an implementation return can stay generic over the
+class type parameter while overloads use specialized receiver types.
+
+```py
+from typing import Generic, TypeGuard, TypeVar, overload
+
+T_co = TypeVar("T_co", bound=BaseException, covariant=True)
+E = TypeVar("E", bound=Exception)
+B = TypeVar("B", bound=BaseException)
+
+class Guarded(Generic[T_co]): ...
+
+class Receiver(Generic[T_co]):
+    @overload
+    def accepts(self: "Receiver[E]", value: Exception) -> TypeGuard[Guarded[E]]: ...
+    @overload
+    def accepts(self: "Receiver[B]", value: BaseException) -> TypeGuard[Guarded[B]]: ...
+    def accepts(self, value: BaseException) -> TypeGuard[Guarded[T_co]]:
+        raise NotImplementedError
 ```
 
 ### Implementation consistency parameter mismatch diagnostics

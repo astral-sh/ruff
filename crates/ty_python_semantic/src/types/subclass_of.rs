@@ -2,7 +2,7 @@ use crate::place::PlaceAndQualifiers;
 use crate::types::class::DynamicClassLiteral;
 use crate::types::constraints::ConstraintSet;
 use crate::types::protocol_class::ProtocolClass;
-use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
+use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, ClassType, DynamicType,
@@ -309,12 +309,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(target_class)) => {
                 ConstraintSet::from_bool(
                     self.constraints,
-                    target_class.is_object(db) || self.relation.is_assignability(),
+                    target_class.is_object(db)
+                        || matches!(
+                            self.relation,
+                            TypeRelation::Assignability | TypeRelation::ImplementationCompatibility
+                        ),
                 )
             }
-            (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
-            }
+            (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => ConstraintSet::from_bool(
+                self.constraints,
+                matches!(
+                    self.relation,
+                    TypeRelation::Assignability | TypeRelation::ImplementationCompatibility
+                ),
+            ),
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
             // and `type[int]` describes all possible runtime subclasses of the class `int`.

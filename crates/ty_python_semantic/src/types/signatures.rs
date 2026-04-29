@@ -37,13 +37,15 @@ use crate::types::typed_dict::{
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
-    ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind,
-    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping, UnionBuilder,
-    VarianceInferable, infer_complete_scope_types, todo_type,
+    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind,
+    ParameterDescription, SelfBinding, TypeContext, TypeMapping, UnionBuilder, VarianceInferable,
+    infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 use ty_python_core::definition::Definition;
+
+mod overload_consistency;
 
 /// Infer the type of a parameter or return annotation in a function signature.
 ///
@@ -483,22 +485,6 @@ pub struct Signature<'db> {
 
     /// Return type. If no annotation was provided, this is `Unknown`.
     pub(crate) return_ty: Type<'db>,
-}
-
-/// Whether one callable signature's parameters are compatible with another's.
-pub(crate) enum ParameterConsistency<'db> {
-    /// The parameters are compatible.
-    Consistent,
-    /// The parameters are incompatible, with context explaining the incompatibility.
-    Inconsistent(ErrorContextTree<'db>),
-}
-
-/// Whether one callable signature's return type is compatible with another's.
-pub(crate) enum ReturnTypeConsistency<'db> {
-    /// The return types are compatible.
-    Consistent,
-    /// The return types are incompatible, with context explaining the incompatibility.
-    Inconsistent(ErrorContextTree<'db>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -1089,90 +1075,6 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn is_non_generic(&self, db: &'db dyn Db) -> bool {
-        self.generic_context.is_none()
-            && self.parameters().iter().all(|parameter| {
-                !parameter
-                    .annotated_type()
-                    .has_typevar_or_typevar_instance(db)
-            })
-            && !self.return_ty.has_typevar_or_typevar_instance(db)
-    }
-
-    /// Return whether this non-generic implementation accepts the arguments of a non-generic
-    /// overload, and the relation error context if it does not.
-    ///
-    /// This is a deliberately narrow first pass for overload implementation consistency. Generic
-    /// signatures need additional type-variable-domain handling and should be left to the full
-    /// implementation.
-    pub(crate) fn non_generic_implementation_parameters_consistency_with(
-        &self,
-        db: &'db dyn Db,
-        overload: &Self,
-    ) -> ParameterConsistency<'db> {
-        debug_assert!(self.is_non_generic(db));
-        debug_assert!(overload.is_non_generic(db));
-
-        let implementation = self.clone().with_return_type(Type::unknown());
-        let overload = overload.clone().with_return_type(Type::unknown());
-        let constraints = ConstraintSetBuilder::new();
-        let relation_visitor = HasRelationToVisitor::default(&constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::default();
-        let checker = TypeRelationChecker::constraint_set_assignability_with_context(
-            &constraints,
-            &relation_visitor,
-            &disjointness_visitor,
-            &signature_relation_visitor,
-            &materialization_visitor,
-        );
-
-        let is_consistent = checker
-            .check_signature_pair(db, &implementation, &overload)
-            .is_always_satisfied(db);
-
-        if is_consistent {
-            ParameterConsistency::Consistent
-        } else {
-            ParameterConsistency::Inconsistent(checker.into_error_context())
-        }
-    }
-
-    /// Return whether a non-generic overload return type is assignable to a non-generic
-    /// implementation return type, and the relation error context if it is not.
-    pub(crate) fn non_generic_implementation_return_type_consistency_with(
-        &self,
-        db: &'db dyn Db,
-        overload: &Self,
-    ) -> ReturnTypeConsistency<'db> {
-        debug_assert!(self.is_non_generic(db));
-        debug_assert!(overload.is_non_generic(db));
-
-        let constraints = ConstraintSetBuilder::new();
-        let relation_visitor = HasRelationToVisitor::default(&constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::default();
-        let checker = TypeRelationChecker::assignability_with_context(
-            &constraints,
-            &relation_visitor,
-            &disjointness_visitor,
-            &signature_relation_visitor,
-            &materialization_visitor,
-        );
-
-        let is_consistent = checker
-            .check_type_pair(db, overload.return_ty, self.return_ty)
-            .is_always_satisfied(db);
-
-        if is_consistent {
-            ReturnTypeConsistency::Consistent
-        } else {
-            ReturnTypeConsistency::Inconsistent(checker.into_error_context())
-        }
-    }
-
     pub(crate) fn when_constraint_set_assignable_to_signatures<'c>(
         &self,
         db: &'db dyn Db,
@@ -1407,7 +1309,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_overloads: &[Signature<'db>],
         target_overloads: &[Signature<'db>],
     ) -> ConstraintSet<'db, 'c> {
-        if self.relation.is_constraint_set_assignability() {
+        if matches!(
+            self.relation,
+            TypeRelation::ConstraintSetAssignability | TypeRelation::ImplementationCompatibility
+        ) {
             // TODO: Oof, maybe ParamSpec needs to live at CallableSignature, not Signature?
             let source_is_single_paramspec =
                 CallableSignature::signatures_is_single_paramspec(source_overloads);
@@ -1501,15 +1406,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         match (source_overloads, target_overloads) {
             ([source_signature], [target_signature]) => {
                 // Base case: both callable types contain a single signature.
-                if self.relation.is_constraint_set_assignability()
-                    && (source_signature
+                if matches!(
+                    self.relation,
+                    TypeRelation::ConstraintSetAssignability
+                        | TypeRelation::ImplementationCompatibility
+                ) && (source_signature
+                    .parameters
+                    .as_paramspec_with_prefix()
+                    .is_some()
+                    || target_signature
                         .parameters
                         .as_paramspec_with_prefix()
-                        .is_some()
-                        || target_signature
-                            .parameters
-                            .as_paramspec_with_prefix()
-                            .is_some())
+                        .is_some())
                 {
                     self.check_signature_pair_inner(db, source_signature, target_signature)
                 } else {
@@ -1575,6 +1483,38 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        self.check_signature_pair_with_typevars(
+            db,
+            source,
+            target,
+            source.inferable_typevars(db),
+            target.inferable_typevars(db),
+        )
+    }
+
+    /// Check two signatures using caller-supplied inferable type variables.
+    ///
+    /// Most callers infer type variables from the signatures themselves. Overload implementation
+    /// consistency needs a narrower set so that implementation-local type variables can be
+    /// inferred while unrelated class type variables remain universally quantified.
+    ///
+    /// ```python
+    /// from typing import overload
+    ///
+    /// class Box[T]:
+    ///     @overload
+    ///     def get(self, default: T) -> T: ...
+    ///     def get(self, default: object) -> object:
+    ///         return default
+    /// ```
+    fn check_signature_pair_with_typevars(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+        source_inferable: InferableTypeVars<'db>,
+        target_inferable: InferableTypeVars<'db>,
+    ) -> ConstraintSet<'db, 'c> {
         // If either signature is generic, their typevars should also be considered inferable when
         // checking whether one signature is a subtype/etc of the other, since we only need to find
         // one specialization that causes the check to succeed.
@@ -1587,8 +1527,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         //         # Here, TypeOf[identity2] is a generic callable that should consider T to be
         //         # inferable, even though other uses of T in the function body are non-inferable.
         //         return t
-        let source_inferable = source.inferable_typevars(db);
-        let target_inferable = target.inferable_typevars(db);
         let inferable = source_inferable.merge(db, target_inferable);
         let inferable = self.inferable.merge(db, inferable);
 
@@ -1747,6 +1685,49 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                target_name: Option<&Name>,
                                target_index: usize| {
             match (target_ty, source_ty) {
+                // Keep dynamic implementation parameters gradual when checking implementation
+                // compatibility. Otherwise, checking an overload like:
+                //
+                // ```python
+                // class C[T]:
+                //     @overload
+                //     def __init__(self, value: T) -> None: ...
+                //     def __init__(self, value: Any) -> None: ...
+                // ```
+                //
+                // would turn `T` against `Any` into a constraint on the non-inferable class
+                // typevar instead of accepting the implementation's dynamic parameter.
+                (Type::TypeVar(bound_typevar), Type::Dynamic(_))
+                | (Type::Dynamic(_), Type::TypeVar(bound_typevar))
+                    if self.relation.is_implementation_compatibility()
+                        && !bound_typevar.is_inferable(db, self.inferable) =>
+                {
+                    return true;
+                }
+                // If a gradual implementation parameter already accepts the overload parameter,
+                // do not record constraints that only come from nested dynamic types:
+                //
+                // ```python
+                // @overload
+                // def compose[B](
+                //     f1: Callable[[B], object],
+                //     f2: Callable[[object], B],
+                //     /,
+                // ) -> object: ...
+                // def compose(*functions: Callable[[Any], Any]) -> object: ...
+                // ```
+                //
+                // The implementation parameter is gradual enough to accept both overload
+                // arguments. If we record separate constraints for the two nested `Any`s, the
+                // repeated non-inferable overload typevar `B` can make the gradual implementation
+                // look artificially narrow.
+                _ if self.relation.is_implementation_compatibility()
+                    && source_ty.has_dynamic(db)
+                    && target_ty.has_typevar_or_typevar_instance(db)
+                    && target_ty.is_assignable_to(db, source_ty) =>
+                {
+                    return true;
+                }
                 // This is a special case where the _same_ components of two different `ParamSpec`
                 // type variables are assignable to each other when they're both in an inferable
                 // position.
@@ -1782,7 +1763,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .is_never_satisfied(db)
         };
 
-        if self.relation.is_constraint_set_assignability() {
+        if matches!(
+            self.relation,
+            TypeRelation::ConstraintSetAssignability | TypeRelation::ImplementationCompatibility
+        ) {
             let source_paramspec = source.parameters.as_paramspec_with_prefix();
             let target_paramspec = target.parameters.as_paramspec_with_prefix();
 
@@ -2538,7 +2522,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         source.parameters.is_gradual() && target.parameters.is_gradual(),
                     ),
                 ),
-                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => result,
+                TypeRelation::Assignability
+                | TypeRelation::ConstraintSetAssignability
+                | TypeRelation::ImplementationCompatibility => result,
             };
         }
 

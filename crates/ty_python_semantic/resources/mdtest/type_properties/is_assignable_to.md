@@ -1441,6 +1441,7 @@ static_assert(not is_assignable_to(TypeOf[GenericFinalClass[str]], type[GenericF
 `TypeGuard[...]` and `TypeIs[...]` are always assignable to `bool`.
 
 ```py
+from collections.abc import Sequence
 from ty_extensions import Unknown, is_assignable_to, static_assert
 from typing_extensions import Any, TypeGuard, TypeIs
 
@@ -1449,6 +1450,10 @@ static_assert(is_assignable_to(TypeIs[Any], bool))
 
 static_assert(not is_assignable_to(TypeGuard[Unknown], str))
 static_assert(not is_assignable_to(TypeIs[Any], str))
+
+static_assert(is_assignable_to(TypeIs[Sequence[int]], TypeIs[Sequence[Any]]))
+static_assert(is_assignable_to(TypeIs[Sequence[Any]], TypeIs[Sequence[int]]))
+static_assert(not is_assignable_to(TypeIs[Sequence[int]], TypeIs[Sequence[object]]))
 ```
 
 ## `TypeIs` with gradual types
