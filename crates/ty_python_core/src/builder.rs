@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
 use itertools::Itertools;
-use ruff_python_ast::helpers::is_dotted_name;
+use ruff_python_ast::helpers::{any_over_expr, is_dotted_name};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
@@ -105,6 +105,34 @@ struct ScopeInfo<'ast> {
     narrowing_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
 }
 
+#[derive(Clone)]
+struct BoolOpSnapshots {
+    truthy: FlowSnapshot,
+    falsy: FlowSnapshot,
+}
+
+struct BoolOpSnapshot {
+    before: FlowSnapshot,
+    after: Option<BoolOpSnapshots>,
+}
+
+impl BoolOpSnapshot {
+    fn truthy(&self) -> FlowSnapshot {
+        let Self { before, after } = self;
+        after
+            .as_ref()
+            .map_or_else(|| before, |snapshots| &snapshots.truthy)
+            .clone()
+    }
+    fn falsy(&self) -> FlowSnapshot {
+        let Self { before, after } = self;
+        after
+            .as_ref()
+            .map_or_else(|| before, |snapshots| &snapshots.falsy)
+            .clone()
+    }
+}
+
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Builder state
     db: &'db dyn Db,
@@ -147,6 +175,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     scopes_by_expression: ExpressionsScopeMapBuilder,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
+    bool_op_snapshots_by_node: FxHashMap<ExpressionNodeKey, BoolOpSnapshots>,
     statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
     enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
     imported_modules: FxHashSet<ModuleName>,
@@ -195,6 +224,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
+            bool_op_snapshots_by_node: FxHashMap::default(),
             statements_by_node: FxHashMap::default(),
             enclosing_lambda_statements: FxHashMap::default(),
 
@@ -1468,6 +1498,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_use_def_map_mut().mark_unreachable();
     }
 
+    /// Records that the current state can enter any active `finally` suites before the current
+    /// terminal control-flow transfer reaches its destination.
+    fn record_terminal_finally_entry(&mut self) {
+        let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
+        try_node_stack_manager.record_terminal_finally_entry(self);
+        self.try_node_context_stack_manager = try_node_stack_manager;
+    }
+
     /// Records a reachability constraint that always evaluates to "ambiguous".
     fn record_ambiguous_reachability(&mut self) {
         self.current_use_def_map_mut()
@@ -2667,8 +2705,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
             ast::Stmt::If(node) => {
+                let flow_snapshot = |builder: &Self, test: &'ast ast::Expr| {
+                    let no_branch_taken = builder.flow_snapshot();
+                    let bool_op_snapshots = builder
+                        .bool_op_snapshots_by_node
+                        .get(&ExpressionNodeKey::from(test));
+                    BoolOpSnapshot {
+                        before: no_branch_taken,
+                        after: bool_op_snapshots.cloned(),
+                    }
+                };
+
                 self.visit_expr(&node.test);
-                let mut no_branch_taken = self.flow_snapshot();
+                let mut bool_op_snapshot = flow_snapshot(self, &node.test);
+                self.flow_restore(bool_op_snapshot.truthy());
                 let (mut last_predicate, mut last_narrowing_id) =
                     self.record_expression_narrowing_constraint(&node.test);
                 let mut last_reachability_constraint =
@@ -2709,7 +2759,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     post_clauses.push(self.flow_snapshot());
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken
-                    self.flow_restore(no_branch_taken.clone());
+                    self.flow_restore(bool_op_snapshot.falsy());
 
                     self.record_negated_narrowing_constraint(last_predicate, last_narrowing_id);
                     self.record_negated_reachability_constraint(last_reachability_constraint);
@@ -2717,7 +2767,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     if let Some(elif_test) = clause_test {
                         self.visit_expr(elif_test);
                         // A test expression is evaluated whether the branch is taken or not
-                        no_branch_taken = self.flow_snapshot();
+                        bool_op_snapshot = flow_snapshot(self, elif_test);
+                        self.flow_restore(bool_op_snapshot.truthy());
 
                         (last_predicate, last_narrowing_id) =
                             self.record_expression_narrowing_constraint(elif_test);
@@ -3065,8 +3116,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let mut post_except_states = vec![];
 
                 // Take a record also of all the intermediate states we encountered
-                // while visiting the `try` block
-                let try_block_snapshots = self.try_node_context_stack_manager.pop_context();
+                // while visiting the `try` block. Keep the context itself on the stack so that
+                // terminal statements in `except` and `else` suites can still be recorded as
+                // entries to the associated `finally` suite.
+                let try_block_snapshots = self
+                    .try_node_context_stack_manager
+                    .take_try_suite_snapshots();
 
                 if !handlers.is_empty() {
                     // Save the state immediately *after* visiting the `try` block
@@ -3145,6 +3200,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.flow_merge(post_except_state);
                 }
 
+                let normal_pre_finally_state = self.flow_snapshot();
+                let terminal_finally_entry_snapshots = self
+                    .try_node_context_stack_manager
+                    .pop_context()
+                    .into_terminal_finally_entry_snapshots();
+
                 // TODO: there's lots of complexity here that isn't yet handled by our model.
                 // In order to accurately model the semantics of `finally` suites, we in fact need to visit
                 // the suite twice: once under the (current) assumption that either the `try + else` suite
@@ -3155,12 +3216,31 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // For more details, see:
                 // - https://astral-sh.notion.site/Exception-handler-control-flow-11348797e1ca80bb8ce1e9aedbbe439d
                 // - https://github.com/astral-sh/ruff/pull/13633#discussion_r1788626702
-                self.visit_body(finalbody);
+                if normal_pre_finally_state.is_always_unreachable()
+                    && !terminal_finally_entry_snapshots.is_empty()
+                {
+                    let mut snapshots = terminal_finally_entry_snapshots.into_iter();
+                    let first_snapshot = snapshots.next().expect("checked non-empty snapshots");
+                    self.flow_restore(first_snapshot);
+                    for snapshot in snapshots {
+                        self.flow_merge(snapshot);
+                    }
+                    self.visit_body(finalbody);
+                    if !self.flow_snapshot().is_always_unreachable() {
+                        self.record_terminal_finally_entry();
+                    }
+                    self.mark_unreachable();
+                } else {
+                    // Mixed normal and terminal entry states are still handled by the normal path
+                    // only. See the corresponding TODO tests in `terminal_statements.md`.
+                    self.visit_body(finalbody);
+                }
                 self.in_try = was_in_try;
             }
 
             ast::Stmt::Raise(_) | ast::Stmt::Return(_) => {
                 walk_stmt(self, stmt);
+                self.record_terminal_finally_entry();
                 // Everything in the current block after a terminal statement is unreachable.
                 self.mark_unreachable();
             }
@@ -3170,6 +3250,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 if let Some(current_loop) = self.current_loop_mut() {
                     current_loop.push_continue(snapshot);
                 }
+                self.record_terminal_finally_entry();
                 // Everything in the current block after a terminal statement is unreachable.
                 self.mark_unreachable();
             }
@@ -3179,6 +3260,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 if let Some(current_loop) = self.current_loop_mut() {
                     current_loop.push_break(snapshot);
                 }
+                self.record_terminal_finally_entry();
                 // Everything in the current block after a terminal statement is unreachable.
                 self.mark_unreachable();
             }
@@ -3686,8 +3768,22 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     }
                 }
 
+                let no_short_circuit =
+                    any_over_expr(expr, &ast::Expr::is_named_expr).then(|| self.flow_snapshot());
+
                 for snapshot in snapshots {
                     self.flow_merge(snapshot);
+                }
+
+                if let Some(no_short_circuit) = no_short_circuit {
+                    let bool_op_key = ExpressionNodeKey::from(expr);
+                    let maybe_short_circuit = self.flow_snapshot();
+                    let (truthy, falsy) = match op {
+                        ast::BoolOp::And => (no_short_circuit, maybe_short_circuit),
+                        ast::BoolOp::Or => (maybe_short_circuit, no_short_circuit),
+                    };
+                    self.bool_op_snapshots_by_node
+                        .insert(bool_op_key, BoolOpSnapshots { truthy, falsy });
                 }
             }
             ast::Expr::StringLiteral(_) => {

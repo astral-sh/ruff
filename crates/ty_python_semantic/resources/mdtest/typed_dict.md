@@ -60,7 +60,7 @@ If a dict literal is inferred against a union containing both a `TypedDict` and 
 extra keys accepted by the non-`TypedDict` arm should not trigger eager `TypedDict` diagnostics:
 
 ```py
-from typing import Any
+from typing import Any, TypedDict
 
 class FormatterConfig(TypedDict, total=False):
     format: str
@@ -1306,7 +1306,7 @@ test all the permutations:
 
 ```py
 from typing import Any
-from typing_extensions import ReadOnly
+from typing_extensions import ReadOnly, TypedDict, Unpack
 
 class RequiredMutableInt(TypedDict):
     x: int
@@ -3004,6 +3004,338 @@ TD2 = TypedDict("TD2", {"required": "Required[str]", "optional": int}, total=Fal
 td3: TD2 = {"required": "hello"}  # Valid
 # error: [missing-typed-dict-key] "Missing required key 'required' in TypedDict `TD2` constructor"
 bad_td2: TD2 = {"optional": 42}
+```
+
+## `Unpack[TypedDict]` in `**kwargs`
+
+Using `Unpack[TypedDict]` on a `**kwargs` parameter should expose named keyword parameters to
+callers while preserving the original `TypedDict` shape inside the function body.
+
+### Parameter binding
+
+Inside the function, `kwargs` should still behave like the original `TypedDict`, including
+flow-sensitive access to optional keys.
+
+```py
+from typing_extensions import NotRequired, Required, TypedDict, Unpack
+
+class TD1(TypedDict):
+    v1: Required[int]
+    v2: NotRequired[str]
+
+class TD2(TD1):
+    v3: Required[str]
+
+def func(**kwargs: Unpack[TD2]) -> None:
+    reveal_type(kwargs)  # revealed: TD2
+    reveal_type(kwargs["v1"])  # revealed: int
+    if "v2" in kwargs:
+        reveal_type(kwargs["v2"])  # revealed: str
+    reveal_type(kwargs["v3"])  # revealed: str
+```
+
+### Call-site validation
+
+At the call site, required keys must be provided, known keys must be type-checked, and extra
+keywords are accepted as `object` because ordinary `TypedDict`s are open.
+
+```py
+from typing_extensions import NotRequired, Required, TypedDict, Unpack
+
+class TD1(TypedDict):
+    v1: Required[int]
+    v2: NotRequired[str]
+
+class TD2(TD1):
+    v3: Required[str]
+
+def func(**kwargs: Unpack[TD2]) -> None:
+    pass
+
+# error: [missing-argument]
+func()
+func(v1=1, v3="ok")
+func(v1=1, v2="optional", v3="ok")
+func(v1=1, v3="ok", v4=1)
+
+# error: [invalid-argument-type]
+func(v1=1, v3=1)
+```
+
+### Extra keyword arguments
+
+Extra keyword arguments are modeled according to the unpacked `TypedDict`'s openness and extra-item
+policy.
+
+```py
+from typing_extensions import TypedDict, Unpack
+
+class Movie(TypedDict, extra_items=bool):
+    name: str
+
+def movie(**kwargs: Unpack[Movie]) -> None:
+    pass
+
+movie(name="Blade Runner", novel_adaptation=True)
+
+# TODO: Once `extra_items` is supported, this should be an invalid-argument-type error because
+# `year` should be checked against `bool`, not `object`.
+movie(name="Blade Runner", year=1982)
+
+class ClosedMovie(TypedDict, closed=True):
+    name: str
+
+def closed_movie(**kwargs: Unpack[ClosedMovie]) -> None:
+    pass
+
+closed_movie(name="Blade Runner")
+
+# TODO: Once `closed` is supported, this should be an unknown-argument error because closed
+# TypedDicts should not add a trailing `**kwargs` parameter.
+closed_movie(name="Blade Runner", year=1982)
+```
+
+### Assignability with explicit keyword-only signatures
+
+A callable using `**kwargs: Unpack[TD2]` should line up with equivalent explicit keyword-only
+signatures when assigning to the explicit form. The reverse assignment is rejected because an open
+unpacked `TypedDict` also accepts extra keyword arguments.
+
+```py
+from typing import Protocol
+from typing_extensions import NotRequired, Required, TypedDict, Unpack
+
+class TD1(TypedDict):
+    v1: Required[int]
+    v2: NotRequired[str]
+
+class TD2(TD1):
+    v3: Required[str]
+
+def func(**kwargs: Unpack[TD2]) -> None:
+    pass
+
+class ExplicitKwargs(Protocol):
+    def __call__(self, *, v1: int, v3: str, v2: str = "") -> None: ...
+
+class TypedDictKwargs(Protocol):
+    def __call__(self, **kwargs: Unpack[TD2]) -> None: ...
+
+explicit_ok: ExplicitKwargs = func
+typed_dict_ok: TypedDictKwargs = func
+
+def _(explicit: ExplicitKwargs, typed_dict: TypedDictKwargs) -> None:
+    # error: [invalid-assignment]
+    typed_dict_2: TypedDictKwargs = explicit
+    explicit_2: ExplicitKwargs = typed_dict
+
+def func7(*, v1: int, v3: str, v2: str = "") -> None:
+    pass
+
+# error: [invalid-assignment]
+typed_dict_from_explicit: TypedDictKwargs = func7
+```
+
+### Missing required keys remain incompatible
+
+A callable that does not accept all required unpacked keys should not be assignable to the unpacked
+form.
+
+```py
+from typing import Protocol
+from typing_extensions import NotRequired, Required, TypedDict, Unpack
+
+class TD(TypedDict):
+    v1: Required[int]
+    v2: NotRequired[str]
+    v3: Required[str]
+
+def func(**kwargs: Unpack[TD]) -> None:
+    pass
+
+class MissingRequiredKwarg(Protocol):
+    def __call__(self, *, v1: int) -> None: ...
+
+# error: [invalid-assignment]
+missing_required: MissingRequiredKwarg = func
+```
+
+### Optional-only unpacked kwargs still expose named keys
+
+An unpacked all-optional open `TypedDict` exposes its declared keys as optional named keyword
+arguments while still accepting extra keyword arguments as `object`.
+
+```py
+from typing import Protocol
+from typing_extensions import TypedDict, Unpack
+
+class OptionalOnlyKwargs(TypedDict, total=False):
+    a: int
+
+def accepts_optional_kwargs(**kwargs: Unpack[OptionalOnlyKwargs]) -> None:
+    pass
+
+class WantsA(Protocol):
+    def __call__(self, *, a: int = 1) -> None: ...
+
+wants_a: WantsA = accepts_optional_kwargs
+accepts_optional_kwargs(b="whatever")
+
+# error: [invalid-argument-type]
+accepts_optional_kwargs(a="bad")
+```
+
+### Invalid `Unpack` signatures
+
+These signatures should be rejected. Some of them use a well-formed `Unpack[...]` expression, but
+the overall `**kwargs` signature is still invalid: mixing explicit parameters with conflicting
+unpacked names, using a type variable, or using a union instead of a concrete `TypedDict`.
+
+```py
+from typing import TypeVar, Union
+from typing_extensions import NotRequired, TypedDict, Unpack
+
+class TD1(TypedDict):
+    v1: int
+    v2: NotRequired[str]
+
+class TD2(TypedDict):
+    v3: str
+
+class DunderTD(TypedDict):
+    __x: int
+
+def func5(v1: int, **kwargs: Unpack[TD1]) -> None:  # error: [invalid-type-form]
+    pass
+
+T = TypeVar("T", bound=TD1)
+
+def func6(**kwargs: Unpack[T]) -> None:  # error: [invalid-type-form]
+    pass
+
+TDUnion = Union[TD1, TD2]
+
+def func_union(**kwargs: Unpack[TDUnion]) -> None:  # error: [invalid-type-form]
+    pass
+
+def func_nested(**kwargs: Unpack[Unpack[TD1]]) -> None:  # error: [invalid-type-form]
+    pass
+
+def func_stringified_nested(**kwargs: "Unpack[Unpack[TD1]]") -> None:  # error: [invalid-type-form]
+    pass
+
+def func_union_nested(**kwargs: Unpack[TD1] | None) -> None:  # error: [invalid-type-form]
+    pass
+
+def func_list_nested(**kwargs: list[Unpack[TD1]]) -> None:  # error: [invalid-type-form]
+    pass
+
+def func_stringified_list_nested(**kwargs: "list[Unpack[TD1]]") -> None:  # error: [invalid-type-form]
+    pass
+
+def func_keyword_only_overlap(*, v1: int, **kwargs: Unpack[TD1]) -> None:  # error: [invalid-type-form]
+    pass
+
+# error: [invalid-legacy-positional-parameter]
+# error: [invalid-type-form]
+def func_keyword_only_dunder_overlap(*, __x: int, **kwargs: Unpack[DunderTD]) -> None:
+    pass
+```
+
+### Aliases are followed
+
+Type aliases to a `TypedDict` should still be accepted in `Unpack`.
+
+```py
+from typing_extensions import NotRequired, Required, TypedDict, Unpack
+
+class TD1(TypedDict):
+    v1: Required[int]
+    v2: NotRequired[str]
+
+class TD2(TD1):
+    v3: Required[str]
+
+TD2Alias = TD2
+
+def func_alias(**kwargs: Unpack[TD2Alias]) -> None:
+    reveal_type(kwargs)  # revealed: TD2
+```
+
+### PEP 695 aliases are followed
+
+PEP 695 type aliases to a `TypedDict` should still be accepted in `Unpack`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import NotRequired, Required, TypedDict, Unpack
+
+class TD1(TypedDict):
+    v1: Required[int]
+    v2: NotRequired[str]
+
+class TD2(TD1):
+    v3: Required[str]
+
+type TD2Alias = TD2
+
+def func_alias(**kwargs: Unpack[TD2Alias]) -> None:
+    reveal_type(kwargs)  # revealed: TD2
+```
+
+### Stringified annotations are followed
+
+Quoted annotations should behave the same way as unquoted `Unpack[TypedDict]` annotations.
+
+```py
+from typing_extensions import TypedDict, Unpack
+
+class StringifiedTD(TypedDict):
+    a: int
+
+def stringified(**kwargs: "Unpack[StringifiedTD]") -> None:
+    reveal_type(kwargs)  # revealed: StringifiedTD
+
+stringified(a=1)
+```
+
+## Bare `TypedDict` annotations in `**kwargs`
+
+A bare `TypedDict` annotation on `**kwargs` still means “arbitrary keyword names whose values have
+this `TypedDict` type”. Only `Unpack[TypedDict]` should expose named keyword parameters.
+
+```py
+from typing import Protocol
+from typing_extensions import TypedDict
+
+class BareKwargs(TypedDict):
+    a: int
+
+def plain(**kwargs: BareKwargs) -> None:
+    reveal_type(kwargs)  # revealed: dict[str, BareKwargs]
+
+plain(a=BareKwargs(a=1))
+
+# error: [invalid-argument-type]
+plain(a=1)
+
+class BareKwargsProtocol(Protocol):
+    def __call__(self, **kwargs: BareKwargs) -> None: ...
+
+class ExplicitAProtocol(Protocol):
+    def __call__(self, *, a: int) -> None: ...
+
+bare_kwargs_ok: BareKwargsProtocol = plain
+
+# error: [invalid-assignment]
+explicit_a_bad: ExplicitAProtocol = plain
+
+def unrelated_named_parameter(x: int, **kwargs: BareKwargs) -> None:
+    reveal_type(kwargs)  # revealed: dict[str, BareKwargs]
 ```
 
 ## Recursive functional `TypedDict` (unstringified forward reference)

@@ -1,12 +1,12 @@
 import { Icons, Theme } from "shared";
 import classNames from "classnames";
 import { useState } from "react";
-import { FileId } from "../Playground";
+import { FileId, FileMetadata } from "../Playground";
 import { type FileHandle } from "ty_wasm";
 
 export interface Props {
-  // The file names
-  files: ReadonlyArray<{ id: FileId; name: string }>;
+  order: ReadonlyArray<FileId>;
+  metadata: FileMetadata;
   theme: Theme;
   selected: FileId;
 
@@ -20,7 +20,8 @@ export interface Props {
 }
 
 export function Files({
-  files,
+  order,
+  metadata,
   selected,
   theme,
   onAdd,
@@ -28,11 +29,14 @@ export function Files({
   onRename,
   onSelect,
 }: Props) {
+  const hasFileNamed = (fileName: string) =>
+    Object.values(metadata).some((file) => file.name === fileName);
+
   const handleAdd = () => {
     let index: number | null = null;
     let fileName = "module.py";
 
-    while (files.some(({ name }) => name === fileName)) {
+    while (hasFileNamed(fileName)) {
       index = (index ?? 0) + 1;
       fileName = `module${index}.py`;
     }
@@ -40,7 +44,7 @@ export function Files({
     onAdd(fileName);
   };
 
-  const lastFile = files.length === 1;
+  const lastFile = order.length === 1;
 
   return (
     <ul
@@ -49,30 +53,34 @@ export function Files({
         theme === "dark" ? "text-white border-rock" : null,
       )}
     >
-      {files.map(({ id, name }) => (
-        <ListItem key={id} selected={selected === id} theme={theme}>
-          <FileEntry
-            selected={selected === id}
-            name={name}
-            onClicked={() => onSelect(id)}
-            onRenamed={(newName) => {
-              if (!files.some(({ name }) => name === newName)) {
-                onRename(id, newName);
-              }
-            }}
-          />
+      {order.map((id) => {
+        const file = metadata[id];
 
-          <button
-            disabled={lastFile}
-            onClick={lastFile ? undefined : () => onRemove(id)}
-            className={"inline-block disabled:opacity-50 cursor-pointer"}
-            title="Close file"
-          >
-            <span className="sr-only">Close</span>
-            <Icons.Close />
-          </button>
-        </ListItem>
-      ))}
+        return (
+          <ListItem key={id} selected={selected === id} theme={theme}>
+            <FileEntry
+              selected={selected === id}
+              name={file.name}
+              onClicked={() => onSelect(id)}
+              onRenamed={(newName) => {
+                if (!hasFileNamed(newName)) {
+                  onRename(id, newName);
+                }
+              }}
+            />
+
+            <button
+              disabled={lastFile}
+              onClick={lastFile ? undefined : () => onRemove(id)}
+              className={"inline-block disabled:opacity-50 cursor-pointer"}
+              title="Close file"
+            >
+              <span className="sr-only">Close</span>
+              <Icons.Close />
+            </button>
+          </ListItem>
+        );
+      })}
       <ListItem selected={false} theme={theme}>
         <button
           onClick={handleAdd}

@@ -541,19 +541,14 @@ class MyClass:
         info[folding-range]: Folding Range
          --> main.py:3:5
           |
-        2 |   class MyClass:
         3 | /     def __init__(self):
         4 | |         self.value = 1
           | |______________________^
-        5 |
-        6 |       def method(self):
           |
 
         info[folding-range]: Folding Range
          --> main.py:6:5
           |
-        4 |           self.value = 1
-        5 |
         6 | /     def method(self):
         7 | |         return self.value
           | |_________________________^
@@ -596,7 +591,6 @@ class MyClass:
         info[folding-range]: Folding Range
          --> main.py:3:5
           |
-        2 |   class MyClass:
         3 | /     def __init__(self):
         4 | |         self.value = 1
         5 | |         """
@@ -609,8 +603,6 @@ class MyClass:
         info[folding-range]: Folding Range
          --> main.py:5:9
           |
-        3 |       def __init__(self):
-        4 |           self.value = 1
         5 | /         """
         6 | |         This is an
         7 | |         attribute comment.
@@ -644,15 +636,11 @@ def main():
         3 | | import sys
         4 | | from typing import List, Dict
           | |_____________________________^
-        5 |
-        6 |   def main():
           |
 
         info[folding-range]: Folding Range
          --> main.py:6:1
           |
-        4 |   from typing import List, Dict
-        5 |
         6 | / def main():
         7 | |     pass
           | |________^
@@ -685,15 +673,11 @@ import requests
         2 | / import os
         3 | | import sys
           | |__________^
-        4 |
-        5 |   import numpy
           |
 
         info[folding-range]: Folding Range (imports)
          --> main.py:5:1
           |
-        3 |   import sys
-        4 |
         5 | / import numpy
         6 | | import pandas
         7 | | import requests
@@ -733,15 +717,11 @@ from fastapi import FastAPI
         2 | / import os
         3 | | from math import prod
           | |_____________________^
-        4 |
-        5 |   try:
           |
 
         info[folding-range]: Folding Range (imports)
           --> main.py:12:1
            |
-        10 |       bar = None
-        11 |
         12 | / import requests
         13 | | from fastapi import FastAPI
            | |___________________________^
@@ -750,38 +730,27 @@ from fastapi import FastAPI
         info[folding-range]: Folding Range
          --> main.py:5:1
           |
-        3 |   from math import prod
-        4 |
         5 | / try:
         6 | |     import foo
         7 | |     import bar
           | |______________^
-        8 |   except ImportError:
-        9 |       first = None
           |
 
         info[folding-range]: Folding Range (imports)
          --> main.py:6:5
           |
-        5 |   try:
         6 | /     import foo
         7 | |     import bar
           | |______________^
-        8 |   except ImportError:
-        9 |       first = None
           |
 
         info[folding-range]: Folding Range
           --> main.py:8:1
            |
-         6 |       import foo
-         7 |       import bar
          8 | / except ImportError:
          9 | |     first = None
         10 | |     bar = None
            | |______________^
-        11 |
-        12 |   import requests
            |
         ");
     }
@@ -828,24 +797,17 @@ class MyClass:
         info[folding-range]: Folding Range (imports)
          --> main.py:3:5
           |
-        2 |   def my_function():
         3 | /     import os
         4 | |     import sys
           | |______________^
-        5 |
-        6 |       import numpy
           |
 
         info[folding-range]: Folding Range (imports)
          --> main.py:6:5
           |
-        4 |       import sys
-        5 |
         6 | /     import numpy
         7 | |     import pandas
           | |_________________^
-        8 |
-        9 |       do_something()
           |
 
         info[folding-range]: Folding Range
@@ -860,7 +822,6 @@ class MyClass:
         info[folding-range]: Folding Range (imports)
           --> main.py:13:5
            |
-        12 |   class MyClass:
         13 | /     import typing
         14 | |     import collections
            | |______________________^
@@ -903,56 +864,38 @@ else:
         2 | / if condition:
         3 | |     do_something()
           | |__________________^
-        4 |   elif other:
-        5 |       do_other()
           |
 
         info[folding-range]: Folding Range
          --> main.py:4:1
           |
-        2 |   if condition:
-        3 |       do_something()
         4 | / elif other:
         5 | |     do_other()
           | |______________^
-        6 |   else:
-        7 |       default()
           |
 
         info[folding-range]: Folding Range
          --> main.py:6:1
           |
-        4 |   elif other:
-        5 |       do_other()
         6 | / else:
         7 | |     default()
           | |_____________^
-        8 |
-        9 |   for item in items:
           |
 
         info[folding-range]: Folding Range
           --> main.py:9:1
            |
-         7 |       default()
-         8 |
          9 | / for item in items:
         10 | |     process(item)
            | |_________________^
-        11 |   else:
-        12 |       okay()
            |
 
         info[folding-range]: Folding Range
           --> main.py:14:1
            |
-        12 |       okay()
-        13 |
         14 | / while running:
         15 | |     continue_work()
            | |___________________^
-        16 |   else:
-        17 |       doit()
            |
         ");
     }
@@ -997,7 +940,6 @@ if condition:
         info[folding-range]: Folding Range
           --> main.py:3:5
            |
-         2 |   if condition:
          3 | /     while running:
          4 | |         do_this()
          5 | |         and_that()
@@ -1012,8 +954,6 @@ if condition:
         info[folding-range]: Folding Range
           --> main.py:6:9
            |
-         4 |           do_this()
-         5 |           and_that()
          6 | /         if maybe:
          7 | |             and_maybe_this()
          8 | |             and_maybe_this()
@@ -1056,40 +996,28 @@ else:
         3 | |     process(item)
         4 | |     validate(item)
           | |__________________^
-        5 |   else:
-        6 |       log_success()
           |
 
         info[folding-range]: Folding Range
          --> main.py:6:5
           |
-        4 |       validate(item)
-        5 |   else:
         6 | /     log_success()
         7 | |     notify_complete()
           | |_____________________^
-        8 |
-        9 |   while condition:
           |
 
         info[folding-range]: Folding Range
           --> main.py:9:1
            |
-         7 |       notify_complete()
-         8 |
          9 | / while condition:
         10 | |     do_work()
         11 | |     check_status()
            | |__________________^
-        12 |   else:
-        13 |       handle_done()
            |
 
         info[folding-range]: Folding Range
           --> main.py:13:5
            |
-        11 |       check_status()
-        12 |   else:
         13 | /     handle_done()
         14 | |     cleanup_resources()
            | |_______________________^
@@ -1125,26 +1053,18 @@ finally:
         2 | / try:
         3 | |     risky_operation()
           | |_____________________^
-        4 |   except ValueError:
-        5 |       handle_value_error()
           |
 
         info[folding-range]: Folding Range
-          --> main.py:9:5
-           |
-         7 |     handle_type_error()
-         8 | else:
-         9 |     success_action()
-           |     ^^^^^^^^^^^^^^^^
-        10 | finally:
-        11 |     cleanup()
-           |
+         --> main.py:9:5
+          |
+        9 |     success_action()
+          |     ^^^^^^^^^^^^^^^^
+          |
 
         info[folding-range]: Folding Range
           --> main.py:11:5
            |
-         9 |     success_action()
-        10 | finally:
         11 |     cleanup()
            |     ^^^^^^^^^
            |
@@ -1152,25 +1072,17 @@ finally:
         info[folding-range]: Folding Range
          --> main.py:4:1
           |
-        2 |   try:
-        3 |       risky_operation()
         4 | / except ValueError:
         5 | |     handle_value_error()
           | |________________________^
-        6 |   except TypeError:
-        7 |       handle_type_error()
           |
 
         info[folding-range]: Folding Range
          --> main.py:6:1
           |
-        4 |   except ValueError:
-        5 |       handle_value_error()
         6 | / except TypeError:
         7 | |     handle_type_error()
           | |_______________________^
-        8 |   else:
-        9 |       success_action()
           |
         ");
     }
@@ -1207,15 +1119,11 @@ my_dict = {
         5 | |     3,
         6 | | ]
           | |_^
-        7 |
-        8 |   my_dict = {
           |
 
         info[folding-range]: Folding Range
           --> main.py:8:11
            |
-         6 |   ]
-         7 |
          8 |   my_dict = {
            |  ___________^
          9 | |     "a": 1,
@@ -1266,45 +1174,33 @@ multiline t-string
         4 | | multiline string
         5 | | """
           | |___^
-        6 |
-        7 |   multiline_bytes = b"""
           |
 
         info[folding-range]: Folding Range
           --> main.py:7:19
            |
-         5 |   """
-         6 |
          7 |   multiline_bytes = b"""
            |  ___________________^
          8 | | This is
          9 | | multiline bytes
         10 | | """
            | |___^
-        11 |
-        12 |   multiline_fstring = f"""
            |
 
         info[folding-range]: Folding Range
           --> main.py:12:21
            |
-        10 |   """
-        11 |
         12 |   multiline_fstring = f"""
            |  _____________________^
         13 | | This is a
         14 | | multiline f-string
         15 | | """
            | |___^
-        16 |
-        17 |   multiline_tstring = t"""
            |
 
         info[folding-range]: Folding Range
           --> main.py:17:21
            |
-        15 |   """
-        16 |
         17 |   multiline_tstring = t"""
            |  _____________________^
         18 | | This is a
@@ -1350,31 +1246,22 @@ match value:
         info[folding-range]: Folding Range
          --> main.py:3:5
           |
-        2 |   match value:
         3 | /     case 1:
         4 | |         one()
           | |_____________^
-        5 |       case 2:
-        6 |           two()
           |
 
         info[folding-range]: Folding Range
          --> main.py:5:5
           |
-        3 |       case 1:
-        4 |           one()
         5 | /     case 2:
         6 | |         two()
           | |_____________^
-        7 |       case _:
-        8 |           default()
           |
 
         info[folding-range]: Folding Range
          --> main.py:7:5
           |
-        5 |       case 2:
-        6 |           two()
         7 | /     case _:
         8 | |         default()
           | |_________________^
@@ -1406,22 +1293,18 @@ def main():
         info[folding-range]: Folding Range (imports)
          --> main.py:3:1
           |
-        2 |   # region Imports
         3 | / import os
         4 | | import sys
           | |__________^
-        5 |   # endregion
           |
 
         info[folding-range]: Folding Range
-          --> main.py:8:1
-           |
-         7 |   # region Main
-         8 | / def main():
-         9 | |     pass
-           | |________^
-        10 |   # endregion
-           |
+         --> main.py:8:1
+          |
+        8 | / def main():
+        9 | |     pass
+          | |________^
+          |
 
         info[folding-range]: Folding Range (region)
          --> main.py:2:1
@@ -1431,15 +1314,11 @@ def main():
         4 | | import sys
         5 | | # endregion
           | |___________^
-        6 |
-        7 |   # region Main
           |
 
         info[folding-range]: Folding Range (region)
           --> main.py:7:1
            |
-         5 |   # endregion
-         6 |
          7 | / # region Main
          8 | | def main():
          9 | |     pass
@@ -1513,25 +1392,21 @@ def my_function():
         info[folding-range]: Folding Range (comment)
          --> main.py:3:5
           |
-        2 |   def my_function():
         3 | /     """
         4 | |     This is a multiline
         5 | |     docstring.
         6 | |     """
           | |_______^
-        7 |       pass
           |
 
         info[folding-range]: Folding Range
          --> main.py:3:5
           |
-        2 |   def my_function():
         3 | /     """
         4 | |     This is a multiline
         5 | |     docstring.
         6 | |     """
           | |_______^
-        7 |       pass
           |
         "#);
     }
@@ -1586,25 +1461,21 @@ def with_rawstring_doc():
         info[folding-range]: Folding Range (comment)
          --> main.py:3:5
           |
-        2 |   def with_fstring_doc():
         3 | /     f"""
         4 | |     This is an f-string
         5 | |     used as a docstring.
         6 | |     """
           | |_______^
-        7 |       pass
           |
 
         info[folding-range]: Folding Range
          --> main.py:3:5
           |
-        2 |   def with_fstring_doc():
         3 | /     f"""
         4 | |     This is an f-string
         5 | |     used as a docstring.
         6 | |     """
           | |_______^
-        7 |       pass
           |
 
         info[folding-range]: Folding Range
@@ -1622,25 +1493,21 @@ def with_rawstring_doc():
         info[folding-range]: Folding Range (comment)
           --> main.py:11:5
            |
-        10 |   def with_tstring_doc():
         11 | /     t"""
         12 | |     This is a t-string
         13 | |     used as a docstring.
         14 | |     """
            | |_______^
-        15 |       pass
            |
 
         info[folding-range]: Folding Range
           --> main.py:11:5
            |
-        10 |   def with_tstring_doc():
         11 | /     t"""
         12 | |     This is a t-string
         13 | |     used as a docstring.
         14 | |     """
            | |_______^
-        15 |       pass
            |
 
         info[folding-range]: Folding Range
@@ -1658,25 +1525,21 @@ def with_rawstring_doc():
         info[folding-range]: Folding Range (comment)
           --> main.py:19:5
            |
-        18 |   def with_rawstring_doc():
         19 | /     r"""
         20 | |     This is a raw string
         21 | |     used as a docstring.
         22 | |     """
            | |_______^
-        23 |       pass
            |
 
         info[folding-range]: Folding Range
           --> main.py:19:5
            |
-        18 |   def with_rawstring_doc():
         19 | /     r"""
         20 | |     This is a raw string
         21 | |     used as a docstring.
         22 | |     """
            | |_______^
-        23 |       pass
            |
         "#);
     }
@@ -1707,13 +1570,9 @@ def foo():
         info[folding-range]: Folding Range
          --> main.py:6:1
           |
-        4 |   # explaining something important
-        5 |
         6 | / def foo():
         7 | |     pass
           | |________^
-        8 |
-        9 |   # Another comment block
           |
 
         info[folding-range]: Folding Range (comment)
@@ -1723,15 +1582,11 @@ def foo():
         3 | | # that spans multiple lines
         4 | | # explaining something important
           | |________________________________^
-        5 |
-        6 |   def foo():
           |
 
         info[folding-range]: Folding Range (comment)
           --> main.py:9:1
            |
-         7 |       pass
-         8 |
          9 | / # Another comment block
         10 | | # with more details
            | |___________________^
@@ -1820,36 +1675,28 @@ with open("file.txt") as f:
         info[folding-range]: Folding Range (comment)
          --> main.py:3:21
           |
-        2 |                   def chunk_date_range():
         3 | /                     """Split a date range into chunks respecting the maximum days limit.
         4 | |
         5 | |                     The API has a 1-month limit, so this function splits larger ranges
         6 | |                     into smaller chunks that can be requested individually.
         7 | |                     """
           | |_______________________^
-        8 |                       # Handle both date-only and datetime strings
-        9 |                       a = 10
           |
 
         info[folding-range]: Folding Range
          --> main.py:3:21
           |
-        2 |                   def chunk_date_range():
         3 | /                     """Split a date range into chunks respecting the maximum days limit.
         4 | |
         5 | |                     The API has a 1-month limit, so this function splits larger ranges
         6 | |                     into smaller chunks that can be requested individually.
         7 | |                     """
           | |_______________________^
-        8 |                       # Handle both date-only and datetime strings
-        9 |                       a = 10
           |
 
         info[folding-range]: Folding Range
           --> main.py:11:21
            |
-         9 |                       a = 10
-        10 |
         11 | /                     while current <= end:
         12 | |                         # Calculate the end of the current chunk
         13 | |                         # Go to the last day of the current month
@@ -1863,11 +1710,9 @@ with open("file.txt") as f:
         info[folding-range]: Folding Range (comment)
           --> main.py:12:1
            |
-        11 |                       while current <= end:
         12 | /                         # Calculate the end of the current chunk
         13 | |                         # Go to the last day of the current month
            | |_________________________________________________________________^
-        14 |                           b = 20
            |
         "#);
     }
@@ -1959,7 +1804,6 @@ def my_function():
         info[folding-range]: Folding Range
          --> main.py:3:1
           |
-        2 |   @decorator
         3 | / def my_function():
         4 | |     pass
           | |________^
@@ -1987,8 +1831,6 @@ def my_function():
         info[folding-range]: Folding Range
          --> main.py:5:1
           |
-        3 |   @second
-        4 |   @third
         5 | / def my_function():
         6 | |     pass
           | |________^
@@ -2016,7 +1858,6 @@ class MyClass:
         info[folding-range]: Folding Range
          --> main.py:3:1
           |
-        2 |   @dataclass
         3 | / class MyClass:
         4 | |     value: int
         5 | |     name: str
@@ -2044,8 +1885,6 @@ class MyClass:
         info[folding-range]: Folding Range
          --> main.py:4:1
           |
-        2 |   @decorator_a
-        3 |   @decorator_b
         4 | / class MyClass:
         5 | |     value: int
           | |______________^
@@ -2071,7 +1910,6 @@ async def my_async_function():
         info[folding-range]: Folding Range
          --> main.py:3:1
           |
-        2 |   @decorator
         3 | / async def my_async_function():
         4 | |     pass
           | |________^
@@ -2108,8 +1946,6 @@ def outer_function():
         info[folding-range]: Folding Range
          --> main.py:4:5
           |
-        2 |   def outer_function():
-        3 |       @decorator
         4 | /     def inner_function():
         5 | |         pass
           | |____________^
@@ -2146,8 +1982,6 @@ class MyClass:
         info[folding-range]: Folding Range
          --> main.py:4:5
           |
-        2 |   class MyClass:
-        3 |       @decorator
         4 | /     async def my_async_method(self):
         5 | |         pass
           | |____________^

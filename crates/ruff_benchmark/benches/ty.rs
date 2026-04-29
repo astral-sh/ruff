@@ -848,6 +848,78 @@ accepts_objects(
     });
 }
 
+/// Regression benchmark for many precise arguments constraining the same type variable.
+///
+/// The parameters are distinct to avoid exercising the `*args` parameter-type accumulator. The
+/// important part is that specialization inference should not repeatedly rebuild a growing union
+/// for `T` as each argument adds another solution.
+fn benchmark_typevar_mapping_large_accumulation(criterion: &mut Criterion) {
+    const NUM_ARGUMENTS: usize = 256;
+
+    setup_rayon();
+
+    let mut code = "def combine[T](\n".to_string();
+    for i in 0..NUM_ARGUMENTS {
+        writeln!(&mut code, "    p{i}: T,").ok();
+    }
+    code.push_str(") -> T:\n    return p0\n\ncombine(\n");
+
+    for i in 0..NUM_ARGUMENTS {
+        writeln!(&mut code, r#"    ("field_{i}", {i}),"#).ok();
+    }
+
+    code.push_str(")\n");
+
+    criterion.bench_function("ty_micro[typevar_mapping_accumulation]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Benchmark for many small type-variable accumulations.
+///
+/// This guards the common case where each type variable only receives a few constraints. Optimizing
+/// the large-accumulation case should not make these small generic calls slower.
+fn benchmark_typevar_mapping_small_accumulations(criterion: &mut Criterion) {
+    const NUM_CALLS: usize = 256;
+
+    setup_rayon();
+
+    let mut code = "\
+def combine[T](first: T, second: T, third: T) -> T:
+    return first
+
+"
+    .to_string();
+
+    for i in 0..NUM_CALLS {
+        writeln!(
+            &mut code,
+            r#"combine(("field_{i}", {i}), ("other_{i}", "{i}"), ("flag_{i}", True))"#
+        )
+        .ok();
+    }
+
+    criterion.bench_function("ty_micro[typevar_mapping_small_accumulations]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Benchmark for narrowing a large union type through multiple match statements.
 ///
 /// This is extracted from egglog-python's `pretty.py`, where a ~30-class union type
@@ -1186,6 +1258,8 @@ criterion_group!(
     benchmark_many_protocol_members_mismatch,
     benchmark_gradual_vararg_call,
     benchmark_vararg_parameter_type_accumulation,
+    benchmark_typevar_mapping_large_accumulation,
+    benchmark_typevar_mapping_small_accumulations,
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,
     benchmark_large_isinstance_narrowing,

@@ -11,7 +11,8 @@ use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBounds, Solutions,
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
+    Solutions,
 };
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
@@ -30,7 +31,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
     MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, UnionType, binding_type, declaration_type,
+    TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, binding_type, declaration_type,
     infer_definition_types,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
@@ -1734,7 +1735,7 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     db: &'db dyn Db,
     constraints: &'c ConstraintSetBuilder<'db>,
     inferable: InferableTypeVars<'db>,
-    types: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+    types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
 }
 
 /// An assignment from a bound type variable to a given type, along with the variance of the outermost
@@ -1758,29 +1759,38 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// Build a specialization, using a caller-provided hook to select the solution for each
     /// typevar.
     ///
-    /// The `choose` hook is called for each *inferred* typevar (those with entries in the type
-    /// mappings) with the typevar's materialized lower and upper bounds. Currently, both bounds
-    /// are set to the inferred type (representing an equality constraint). Unmapped typevars
-    /// are left to `specialize_recursive` to fill in with defaults.
+    /// The `choose` hook is called for each typevar on the generic context with the typevar's
+    /// materialized lower and upper bounds. Currently, both bounds are set to the inferred type
+    /// (representing an equality constraint). Unmapped typevars have bounds of `None,` and fallback
+    /// to their default specialization if an alternative default type is not chosen.
     ///
     /// The hook should return `Some(ty)` to use `ty` as the specialization for this typevar, or
     /// `None` to use the inferred type unchanged.
     pub(crate) fn build_with(
         &mut self,
         generic_context: GenericContext<'db>,
-        mut choose: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
+        mut choose: impl FnMut(
+            BoundTypeVarInstance<'db>,
+            Option<(Type<'db>, Type<'db>)>,
+        ) -> Option<Type<'db>>,
     ) -> Specialization<'db> {
+        let db = self.db;
         let types = generic_context
-            .variables_inner(self.db)
+            .variables_inner(db)
             .iter()
             .map(|(identity, variable)| {
-                let mapped_ty = self.types.get(identity).copied()?;
-                // The typevar was inferred — present both bounds as the inferred type.
-                let chosen = choose(*variable, mapped_ty, mapped_ty);
-                Some(chosen.unwrap_or(mapped_ty))
+                match self.types.get_mut(identity) {
+                    Some(mapped_ty) => {
+                        let mapped_ty = mapped_ty.get_or_build(db);
+                        // The typevar was inferred — present both bounds as the inferred type.
+                        let chosen = choose(*variable, Some((mapped_ty, mapped_ty)));
+                        Some(chosen.unwrap_or(mapped_ty))
+                    }
+                    None => choose(*variable, None),
+                }
             });
 
-        generic_context.specialize_recursive(self.db, types)
+        generic_context.specialize_recursive(db, types)
     }
 
     /// Insert a type mapping for a bound typevar.
@@ -1805,10 +1815,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     return;
                 }
 
-                *entry.get_mut() = UnionType::from_two_elements(self.db, *entry.get(), ty);
+                entry.get_mut().add(self.db, ty);
             }
             Entry::Vacant(entry) => {
-                entry.insert(ty);
+                entry.insert(UnionAccumulator::new(ty));
             }
         }
     }
@@ -1846,24 +1856,28 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) -> Result<(), ()> {
         let set = set.remove_noninferable(self.db, self.constraints, self.inferable);
-        let solutions = match set.solutions_with(
-            self.db,
-            self.constraints,
-            |typevar, _variance, lower, upper| {
-                PathBounds::default_solve(self.db, self.constraints, typevar, lower, upper)
-            },
-        ) {
+        let solutions = match set.solutions(self.db, self.constraints) {
             Solutions::Unsatisfiable => return Err(()),
             Solutions::Unconstrained => return Ok(()),
             Solutions::Constrained(solutions) => solutions,
         };
-        for solution in &solutions {
+        for solution in solutions {
             for binding in solution {
                 let variance = formal.variance_of(self.db, binding.bound_typevar);
                 self.add_type_mapping(binding.bound_typevar, binding.solution, variance, &mut f);
             }
         }
         Ok(())
+    }
+
+    fn add_type_mappings_from_owned_constraint_set(
+        &mut self,
+        formal: Type<'db>,
+        set: &'db OwnedConstraintSet<'db>,
+        f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
+    ) -> Result<(), ()> {
+        let set = self.constraints.load(self.db, set);
+        self.add_type_mappings_from_constraint_set(formal, set, f)
     }
 
     /// Infer type mappings by comparing formal callable signatures against actual callables.
@@ -2353,18 +2367,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // will handle implicitly implemented protocols and generic protocols. We
                         // eventually want this logic to be used for _all_ nominal instances
                         // (replacing the logic below).
-                        let when = actual.when_constraint_set_assignable_to(
-                            self.db,
-                            formal,
-                            self.constraints,
-                        );
+                        let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
                         // For protocol inference via constraint sets, we currently treat
                         // unsatisfiable results as "no inference" instead of an immediate
                         // specialization error. This matches the previous behavior (where
                         // unsatisfied comparisons simply produced no type mappings), and avoids
                         // false positives for callable-wrapper patterns while this path is still
                         // a hybrid of old and new solver logic.
-                        let _ = self.add_type_mappings_from_constraint_set(formal, when, &mut f);
+                        let _ =
+                            self.add_type_mappings_from_owned_constraint_set(formal, when, &mut f);
                         return Ok(());
                     }
 
@@ -2404,12 +2415,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // union, but the old solver isn't well-equipped to handle that (due to side effects
             // from even failed matches), so for now we handle this particular case.
             (formal @ Type::ProtocolInstance(_), actual @ Type::Union(_)) => {
-                let when =
-                    actual.when_constraint_set_assignable_to(self.db, formal, self.constraints);
+                let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
                 // For protocol inference via constraint sets, keep unsatisfiable results non-fatal
                 // for now, matching the protocol constraint-set path in the nominal-instance
                 // arm above.
-                let _ = self.add_type_mappings_from_constraint_set(formal, when, &mut f);
+                let _ = self.add_type_mappings_from_owned_constraint_set(formal, when, &mut f);
                 return Ok(());
             }
 

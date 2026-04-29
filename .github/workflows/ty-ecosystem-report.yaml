@@ -18,6 +18,8 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
+  # Line-tables-only debug info: faster builds, backtraces still work.
+  CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
 
 jobs:
   ty-ecosystem-report:
@@ -27,8 +29,6 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          path: ruff
-          fetch-depth: 0
           persist-credentials: false
 
       - name: Install the latest version of uv
@@ -39,32 +39,33 @@ jobs:
 
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          workspaces: "ruff"
           lookup-only: false
 
       - name: Install Rust toolchain
         run: rustup show
 
+      - name: "Install mold"
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
+
       - name: Create report
         shell: bash
         run: |
-          cd ruff
+          # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
+          git fetch --no-tags --filter=blob:none --unshallow origin
 
           echo "Enabling configuration overloads (see .github/ty-ecosystem.toml)"
           mkdir -p ~/.config/ty
           cp .github/ty-ecosystem.toml ~/.config/ty/ty.toml
 
-          cd ..
-
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@e7576e66e8f992b057ea92c820c04313dceda755"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@702b757c63622c7ea3cc3a271050eeab15d83aa7"
 
           ecosystem-analyzer \
             --verbose \
-            --repository ruff \
+            --repository . \
             --flaky-runs 20 \
             analyze \
             --profile=profiling \
-            --projects ruff/crates/ty_python_semantic/resources/primer/good.txt \
+            --projects crates/ty_python_semantic/resources/primer/good.txt \
             --output ecosystem-diagnostics.json
 
           mkdir dist

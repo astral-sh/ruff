@@ -35,8 +35,7 @@ def _(l: list[int] | None = None):
     reveal_type(l1)  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
 
     l2: list[int] = l or list()
-    # it would be better if this were `list[int]`? (https://github.com/astral-sh/ty/issues/136)
-    reveal_type(l2)  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
+    reveal_type(l2)  # revealed: list[int]
 
 def f[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
@@ -98,10 +97,14 @@ x: list[int | str] = list1(42) * 3
 `typed_dict.py`:
 
 ```py
-from typing import Callable, Hashable, Mapping, TypedDict
+from typing import Any, Callable, Hashable, Mapping, TypedDict
+from typing_extensions import Never
 
 class TD(TypedDict):
     x: int
+
+class BadTD(TypedDict):
+    x: str
 
 d1_literal = {"x": 1}
 d1_dict = dict(x=1)
@@ -111,9 +114,11 @@ reveal_type(d1_dict)  # revealed: dict[str, int]
 
 d2_literal: TD = {"x": 1}
 d2_dict: TD = dict(x=1)
+d2_unpack: TD = dict(**d2_literal)
 
 reveal_type(d2_literal)  # revealed: TD
 reveal_type(d2_dict)  # revealed: TD
+reveal_type(d2_unpack)  # revealed: TD
 
 d3_literal: dict[str, int] = {"x": 1}
 d3_dict: dict[str, int] = dict(x=1)
@@ -126,6 +131,30 @@ d4_invalid_dict: TD = dict(x="1")  # error: [invalid-argument-type]
 
 reveal_type(d4_invalid_literal)  # revealed: TD
 reveal_type(d4_invalid_dict)  # revealed: TD
+
+def unpack_invalid_typed_dict(src: BadTD) -> TD:
+    # The fast path should validate TypedDict-shaped unpacks even when they are not assignable to
+    # the target. That preserves the key-level TypedDict diagnostic instead of falling back to a
+    # broad `dict[str, str]` assignment error.
+    # error: [invalid-argument-type] "Invalid argument to key "x" with declared type `int` on TypedDict `TD`: value of type `str`"
+    return dict(**src)
+
+def return_any_unpack(src: Any) -> TD:
+    return dict(**src)
+
+def pass_never_unpack(src: Never) -> None:
+    takes_td(dict(**src))
+
+def takes_mapping(value: Mapping[str, object]) -> None:
+    pass
+
+def keep_keyword_diagnostics(kwargs: Mapping[str, object]) -> None:
+    # The TypedDict-aware `dict(...)` fast path should not lose diagnostics from named keywords
+    # when unsupported `**kwargs` forces it to fall back to ordinary dict inference.
+    # error: [unresolved-reference] "Name `missing` used when not defined"
+    # error: [invalid-assignment]
+    maybe_td: TD = dict(x=missing, **kwargs)
+    takes_mapping(maybe_td)
 
 # Note: the second variant (`d5_dict`) is not technically allowed by the `dict.__init__` overloads
 # in typeshed, which require the key type to be `str` when using keyword arguments. However, we
@@ -140,6 +169,15 @@ def return_literal() -> TD:
 
 def return_dict() -> TD:
     return dict(x=1)
+
+def return_unpack(src: TD) -> TD:
+    return dict(**src)
+
+def takes_td(value: TD) -> None:
+    pass
+
+def pass_unpack(src: TD) -> None:
+    takes_td(dict(**src))
 
 def return_invalid_literal() -> TD:
     # TODO: ideally, this would only emit the first error, but not `invalid-return-type` (like the `return_invalid_dict` case below).

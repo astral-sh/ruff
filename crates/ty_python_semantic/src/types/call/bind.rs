@@ -55,7 +55,8 @@ use crate::types::{
     DataclassFlags, DataclassParams, GenericAlias, InternedConstraintSet, IntersectionType,
     KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, NominalInstanceType,
     PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints,
-    TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
+    list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -879,7 +880,9 @@ impl<'db> Bindings<'db> {
         call_arguments: &'a CallArguments<'a, 'db>,
         argument_index: usize,
     ) -> Type<'db> {
-        let argument_types = &call_arguments.types()[argument_index];
+        let argument_types = call_arguments
+            .argument_types(argument_index)
+            .expect("argument index should be valid");
 
         // If there is a single matching parameter, return the argument type inferred against
         // its declared type.
@@ -3033,7 +3036,7 @@ impl<'db> CallableBinding<'db> {
                 let slots = overload
                     .argument_matches
                     .iter()
-                    .zip(arguments.types())
+                    .zip(arguments.iter_types())
                     .flat_map(move |(matched_argument, argument_types)| {
                         matched_argument.iter().map(
                             move |(parameter_index, variadic_argument_type)| {
@@ -4324,29 +4327,30 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 let return_ty =
                     return_ty.filter_disjoint_elements(self.db, tcx, self.inferable_typevars);
                 let tcx = tcx.filter_disjoint_elements(self.db, return_ty, self.inferable_typevars);
-                let set = return_ty
-                    .when_constraint_set_assignable_to(self.db, tcx, constraints)
-                    .remove_noninferable(self.db, constraints, self.inferable_typevars);
+                let path_bounds = return_ty.assignable_solutions_with_inferable(
+                    self.db,
+                    tcx,
+                    self.inferable_typevars,
+                );
 
                 // Use `solutions_with` to determine per-typevar variance from the raw
                 // lower/upper bounds on each BDD path.
                 let mut variance_map: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
                     FxHashMap::default();
-                let solutions =
-                    set.solutions_with(self.db, constraints, |typevar, variance, lower, upper| {
-                        let identity = typevar.identity(self.db);
-                        variance_map
-                            .entry(identity)
-                            .and_modify(|current| *current = current.join(variance))
-                            .or_insert(variance);
-                        PathBounds::default_solve(self.db, constraints, typevar, lower, upper)
-                    });
+                let solutions = path_bounds.solve_with(|typevar, variance, lower, upper| {
+                    let identity = typevar.identity(self.db);
+                    variance_map
+                        .entry(identity)
+                        .and_modify(|current| *current = current.join(variance))
+                        .or_insert(variance);
+                    PathBounds::default_solve(self.db, constraints, typevar, lower, upper)
+                });
 
                 let Solutions::Constrained(solutions) = solutions else {
                     return None;
                 };
 
-                let mut preferred: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
+                let mut preferred: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>> =
                     FxHashMap::default();
 
                 for solution in &solutions {
@@ -4390,13 +4394,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
                         preferred
                             .entry(identity)
-                            .and_modify(|existing| {
-                                *existing =
-                                    UnionType::from_two_elements(self.db, *existing, inferred_ty);
-                            })
-                            .or_insert(inferred_ty);
+                            .and_modify(|existing| existing.add(self.db, inferred_ty))
+                            .or_insert_with(|| UnionAccumulator::new(inferred_ty));
                     }
                 }
+
+                let preferred: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> = preferred
+                    .into_iter()
+                    .map(|(identity, accumulator)| (identity, accumulator.into_type(self.db)))
+                    .collect();
 
                 // Add preferred types to the builder so they serve as the base mapping
                 // when argument inference adds more types.
@@ -4443,50 +4449,51 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Attempt to promote any promotable types assigned to the specialization.
         // The hook receives (typevar, lower_bound, upper_bound) and returns Some(ty) to
         // override the default solution, or None to keep it.
-        let maybe_promote =
-            |typevar: BoundTypeVarInstance<'db>, lower: Type<'db>, _upper: Type<'db>| {
-                let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
+        let maybe_promote = |typevar: BoundTypeVarInstance<'db>,
+                             bounds: Option<(Type<'db>, Type<'db>)>| {
+            let (lower, _upper) = bounds?;
+            let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
 
-                // For constrained TypeVars, the inferred type is already one of the
-                // constraints. Promoting literals would produce a type that doesn't
-                // match any constraint.
-                if matches!(
-                    bound_or_constraints,
-                    Some(TypeVarBoundOrConstraints::Constraints(_))
-                ) {
-                    return None;
-                }
+            // For constrained TypeVars, the inferred type is already one of the
+            // constraints. Promoting literals would produce a type that doesn't
+            // match any constraint.
+            if matches!(
+                bound_or_constraints,
+                Some(TypeVarBoundOrConstraints::Constraints(_))
+            ) {
+                return None;
+            }
 
-                let mut variance_in_return = TypeVarVariance::Bivariant;
+            let mut variance_in_return = TypeVarVariance::Bivariant;
 
-                // Find all occurrences of the type variable in the return type.
-                self.return_ty
-                    .visit_specialization(self.db, |ty, variance| {
-                        if ty != Type::TypeVar(typevar) {
-                            return;
-                        }
-
-                        variance_in_return = variance_in_return.join(variance);
-                    });
-
-                // Promotion is only useful if the type variable is in non-covariant position
-                // in the return type.
-                if variance_in_return.is_covariant() {
-                    return None;
-                }
-
-                let promoted = lower.promote(self.db);
-
-                // If the TypeVar has an upper bound, only use the promoted type if it
-                // still satisfies the bound.
-                if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
-                    if !promoted.is_assignable_to(self.db, bound) {
-                        return None;
+            // Find all occurrences of the type variable in the return type.
+            self.return_ty
+                .visit_specialization(self.db, |ty, variance| {
+                    if ty != Type::TypeVar(typevar) {
+                        return;
                     }
-                }
 
-                Some(promoted)
-            };
+                    variance_in_return = variance_in_return.join(variance);
+                });
+
+            // Promotion is only useful if the type variable is in non-covariant position
+            // in the return type.
+            if variance_in_return.is_covariant() {
+                return None;
+            }
+
+            let promoted = lower.promote(self.db);
+
+            // If the TypeVar has an upper bound, only use the promoted type if it
+            // still satisfies the bound.
+            if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
+                if !promoted.is_assignable_to(self.db, bound) {
+                    return None;
+                }
+            }
+
+            Some(promoted)
+        };
 
         let specialization = builder.build_with(generic_context, maybe_promote);
 
