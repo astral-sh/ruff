@@ -690,9 +690,6 @@ pub(crate) struct ScopeInference<'db> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
-    /// Expected types for expression nodes tracked for IDE completion.
-    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
-
     /// The extra data that is only present for few inference regions.
     extra: Option<Box<ScopeInferenceExtra<'db>>>,
 }
@@ -701,6 +698,8 @@ pub(crate) struct ScopeInference<'db> {
 struct ScopeInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
+    /// Expected types for expression nodes tracked for IDE completion.
+    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
     /// Metadata for type expressions in this region.
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
@@ -720,7 +719,6 @@ impl<'db> ScopeInference<'db> {
                 ..ScopeInferenceExtra::default()
             })),
             expressions: FxHashMap::default(),
-            expected_types: FxHashMap::default(),
         }
     }
 
@@ -761,7 +759,9 @@ impl<'db> ScopeInference<'db> {
         &self,
         expression: impl Into<ExpressionNodeKey>,
     ) -> Option<Type<'db>> {
-        self.expected_types.get(&expression.into()).copied()
+        self.extra
+            .as_deref()
+            .and_then(|extra| extra.expected_types.get(&expression.into()).copied())
     }
 
     fn fallback_type(&self) -> Option<Type<'db>> {
