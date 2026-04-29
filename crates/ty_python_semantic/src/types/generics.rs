@@ -1363,6 +1363,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             db,
             self.constraints,
             |(bound_typevar, source_type, target_type)| {
+                // Overload implementation consistency checks whether the implementation can
+                // accept calls described by an overload. For example, a covariant
+                // `Connection[Row]` overload parameter is accepted by an implementation parameter
+                // typed as `Connection[Any]`. In that mode, the gradual target argument should not
+                // create a universal constraint requiring every possible `Row` specialization to
+                // satisfy `Row <: Any`; it makes the generic argument slot compatible regardless
+                // of the class variance.
+                if self.relation.is_implementation_compatibility()
+                    && (source_type.is_dynamic() || target_type.is_dynamic())
+                {
+                    return self.always();
+                }
+
                 // Subtyping/assignability of each type in the specialization depends on the variance
                 // of the corresponding typevar:
                 //   - covariant: verify that source_type <: target_type
@@ -1463,7 +1476,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (
                 None,
                 Some(target_mat),
-                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
+                TypeRelation::Assignability
+                | TypeRelation::ConstraintSetAssignability
+                | TypeRelation::ImplementationCompatibility,
             ) => self.check_subtyping_in_invariant_position(
                 db,
                 source_type,
@@ -1474,7 +1489,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (
                 Some(source_mat),
                 None,
-                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
+                TypeRelation::Assignability
+                | TypeRelation::ConstraintSetAssignability
+                | TypeRelation::ImplementationCompatibility,
             ) => self.check_subtyping_in_invariant_position(
                 db,
                 source_type,

@@ -90,7 +90,7 @@ pub(crate) fn check_overloaded_function<'db>(
     if let Some(implementation) = implementation
         && decorators_are_consistent(db, overloads, implementation)
     {
-        check_non_generic_overload_implementation_consistency(context, overloads, implementation);
+        check_overload_implementation_consistency(context, overloads, implementation);
     }
 
     // Check that the overloaded function has at least two overloads
@@ -282,42 +282,53 @@ pub(crate) fn check_overloaded_function<'db>(
     }
 }
 
-/// Check non-generic overload signatures against their implementation.
+/// Check that each overload is compatible with the concrete implementation.
 ///
-/// This is the first, deliberately narrow pass at overload implementation consistency. It reports
-/// only when the overloads and implementation are all non-generic; generic signatures require
-/// careful treatment of type-variable domains.
-fn check_non_generic_overload_implementation_consistency<'db>(
+/// The implementation must accept every argument shape accepted by the overload and must return a
+/// type broad enough for every overload return.
+///
+/// ```py
+/// from typing import overload
+///
+/// @overload
+/// def f(x: int) -> int: ...
+/// @overload
+/// def f(x: str) -> str: ...
+/// def f(x: int) -> int | str:
+///     return x
+/// ```
+///
+/// The `str` overload is inconsistent because the implementation cannot accept `str`.
+fn check_overload_implementation_consistency<'db>(
     context: &InferContext<'db, '_>,
     overloads: &'db [OverloadLiteral<'db>],
     implementation: OverloadLiteral<'db>,
 ) {
     let db = context.db();
     let implementation_signature = implementation.signature(db);
+    let has_implicit_receiver = implementation.has_implicit_receiver(db);
 
-    if !implementation_signature.is_non_generic(db) {
-        return;
-    }
-
-    let overload_signatures = overloads
-        .iter()
-        .map(|overload| (overload, overload.signature(db)))
-        .collect::<Vec<_>>();
-
-    if overload_signatures
-        .iter()
-        .any(|(_, signature)| !signature.is_non_generic(db))
-    {
-        return;
-    }
-
-    for (overload, overload_signature) in overload_signatures {
+    for overload in overloads {
+        let overload_signature = overload.signature(db);
         let function_node = overload.node(db, context.file(), context.module());
+        // `__new__` overloads drive constructor-call selection and commonly have broad
+        // implementations like `*args: object -> object`; checking them with regular callable
+        // implementation rules produces false positives.
+        if function_node.name.as_str() == "__new__" {
+            continue;
+        }
         let parameters_are_consistent = implementation_signature
-            .are_non_generic_implementation_parameters_consistent_with(db, &overload_signature);
-        let return_type_is_consistent = overload_signature
-            .return_ty
-            .is_assignable_to(db, implementation_signature.return_ty);
+            .is_overload_implementation_parameters_consistent_with(
+                db,
+                &overload_signature,
+                has_implicit_receiver,
+            );
+        let return_type_is_consistent = implementation_signature
+            .is_overload_implementation_return_consistent_with(
+                db,
+                &overload_signature,
+                has_implicit_receiver,
+            );
 
         if parameters_are_consistent && return_type_is_consistent {
             continue;
