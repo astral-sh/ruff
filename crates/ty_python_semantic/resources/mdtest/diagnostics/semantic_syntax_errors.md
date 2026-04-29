@@ -459,7 +459,7 @@ error[invalid-syntax]: `continue` outside loop
    |
 ```
 
-## name is parameter and global
+## name cannot refer to a parameter and a global variable
 
 ```py
 a = None
@@ -496,7 +496,7 @@ def f(a):
 ```
 
 ```snapshot
-error[invalid-syntax]: name `a` is parameter and global
+error[invalid-syntax]: name `a` cannot refer to a parameter and a global variable
  --> src/mdtest_snippet.py:4:12
   |
 4 |     global a  # snapshot: invalid-syntax
@@ -504,7 +504,7 @@ error[invalid-syntax]: name `a` is parameter and global
   |
 
 
-error[invalid-syntax]: name `a` is parameter and global
+error[invalid-syntax]: name `a` cannot refer to a parameter and a global variable
  --> src/mdtest_snippet.py:8:16
   |
 8 |         global a  # snapshot: invalid-syntax
@@ -512,7 +512,7 @@ error[invalid-syntax]: name `a` is parameter and global
   |
 
 
-error[invalid-syntax]: name `a` is parameter and global
+error[invalid-syntax]: name `a` cannot refer to a parameter and a global variable
   --> src/mdtest_snippet.py:16:16
    |
 16 |         global a  # snapshot: invalid-syntax
@@ -520,7 +520,7 @@ error[invalid-syntax]: name `a` is parameter and global
    |
 
 
-error[invalid-syntax]: name `a` is parameter and global
+error[invalid-syntax]: name `a` cannot refer to a parameter and a global variable
   --> src/mdtest_snippet.py:22:12
    |
 22 |     global a  # snapshot: invalid-syntax
@@ -528,7 +528,7 @@ error[invalid-syntax]: name `a` is parameter and global
    |
 
 
-error[invalid-syntax]: name `a` is parameter and global
+error[invalid-syntax]: name `a` cannot refer to a parameter and a global variable
   --> src/mdtest_snippet.py:27:12
    |
 27 |     global a  # snapshot: invalid-syntax
