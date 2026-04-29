@@ -663,9 +663,9 @@ pub(crate) fn check_static_class_definitions<'db>(
                         metaclass: metaclass2,
                         explicit_metaclass_of: class2,
                     },
-                candidate1_is_base_class,
+                had_explicit_metaclass,
             } => {
-                if *candidate1_is_base_class {
+                if !had_explicit_metaclass {
                     report_conflicting_metaclass_from_bases(
                         context,
                         class_node.into(),

@@ -12,7 +12,8 @@ use crate::place::{DefinedPlace, Place, place_from_bindings};
 use crate::suppression::FileSuppressionId;
 use crate::types::call::CallError;
 use crate::types::class::{
-    CodeGeneratorKind, DisjointBase, DisjointBaseKind, ExpandedClassBaseEntry, MethodDecorator,
+    CodeGeneratorKind, DisjointBase, DisjointBaseKind, DynamicMetaclassConflict,
+    DynamicMetaclassError, ExpandedClassBaseEntry, MethodDecorator,
 };
 use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral};
 use crate::types::infer::UnsupportedComparisonError;
@@ -4456,6 +4457,96 @@ pub(super) fn report_conflicting_metaclass_from_bases(
         metaclass1 = metaclass1.name(db),
         metaclass2 = metaclass2.name(db),
     ));
+}
+
+/// Emit a diagnostic for a metaclass conflict on a dynamic class constructor call.
+pub(super) fn report_dynamic_metaclass_conflict(
+    context: &InferContext,
+    node: AnyNodeRef,
+    class_name: &str,
+    conflict: &DynamicMetaclassConflict,
+) {
+    let db = context.db();
+    let DynamicMetaclassConflict {
+        metaclass1,
+        base1,
+        metaclass2,
+        base2,
+        had_explicit_metaclass,
+    } = *conflict;
+
+    if !had_explicit_metaclass {
+        report_conflicting_metaclass_from_bases(
+            context,
+            node,
+            class_name,
+            metaclass1,
+            base1
+                .expect("base-origin candidate should have a base")
+                .display(db),
+            metaclass2,
+            base2.display(db),
+        );
+        return;
+    }
+
+    let Some(builder) = context.report_lint(&CONFLICTING_METACLASS, node) else {
+        return;
+    };
+
+    builder.into_diagnostic(format_args!(
+        "The metaclass of a derived class (`{class_name}`) \
+            must be a subclass of the metaclasses of all its bases, \
+            but `{metaclass_of_class}` (metaclass of `{class_name}`) \
+            and `{metaclass_of_base}` (metaclass of base class `{base}`) \
+            have no subclass relationship",
+        metaclass_of_class = metaclass1.name(db),
+        metaclass_of_base = metaclass2.name(db),
+        base = base2.name(db),
+    ));
+}
+
+/// Emit a diagnostic for a metaclass error on a dynamic class constructor call.
+pub(super) fn report_dynamic_metaclass_error(
+    context: &InferContext,
+    node: AnyNodeRef,
+    class_name: &str,
+    error: &DynamicMetaclassError,
+) {
+    let db = context.db();
+
+    match error {
+        DynamicMetaclassError::Conflict(conflict) => {
+            report_dynamic_metaclass_conflict(context, node, class_name, conflict);
+        }
+        DynamicMetaclassError::GenericMetaclass => {
+            let Some(builder) = context.report_lint(&INVALID_METACLASS, node) else {
+                return;
+            };
+
+            builder.into_diagnostic("Generic metaclasses are not supported");
+        }
+        DynamicMetaclassError::NotCallable(ty) => {
+            let Some(builder) = context.report_lint(&INVALID_METACLASS, node) else {
+                return;
+            };
+
+            builder.into_diagnostic(format_args!(
+                "Metaclass type `{}` is not callable",
+                ty.display(db)
+            ));
+        }
+        DynamicMetaclassError::PartlyNotCallable(ty) => {
+            let Some(builder) = context.report_lint(&INVALID_METACLASS, node) else {
+                return;
+            };
+
+            builder.into_diagnostic(format_args!(
+                "Metaclass type `{}` is partly not callable",
+                ty.display(db)
+            ));
+        }
+    }
 }
 
 /// Information regarding the conflicting disjoint bases a class is inferred to have in its MRO.

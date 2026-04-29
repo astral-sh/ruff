@@ -549,6 +549,8 @@ Assigned calls still preserve list-literal base information after reporting the 
 argument:
 
 ```py
+from ty_extensions import reveal_mro
+
 class Base:
     attr: int = 1
 
@@ -561,6 +563,7 @@ bases = (Base,)
 # error: [invalid-argument-type]
 FromStarredList = type("FromStarredList", [*bases], {})
 reveal_type(FromStarredList().attr)  # revealed: int
+reveal_mro(FromStarredList)  # revealed: (<class 'FromStarredList'>, <class 'Base'>, <class 'object'>)
 ```
 
 ## `type[...]` as base class

@@ -1,7 +1,8 @@
 use std::fmt::Write;
 
 pub(crate) use self::dynamic_literal::{
-    DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict, dynamic_class_bases_argument,
+    DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict, DynamicMetaclassError,
+    dynamic_class_bases_argument,
 };
 pub(super) use self::enum_literal::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec};
 pub use self::known::KnownClass;
@@ -2624,9 +2625,13 @@ pub(super) enum MetaclassErrorKind<'db> {
         /// `candidate2` will always be the inferred metaclass of a base class
         candidate2: MetaclassCandidate<'db>,
 
-        /// Flag to indicate whether `candidate1` is the explicit `metaclass=` keyword or the
-        /// inferred metaclass of a base class. This helps us give better error messages in diagnostics.
-        candidate1_is_base_class: bool,
+        /// Whether the class definition supplied an explicit `metaclass=` keyword.
+        ///
+        /// This intentionally does not track where the current winning candidate came from.
+        /// During reconciliation, an explicit metaclass can be replaced by a more-derived base
+        /// metaclass, but we still want the conflict diagnostic to mention that the class itself
+        /// had an explicit metaclass override.
+        had_explicit_metaclass: bool,
     },
     /// The metaclass is a parameterized generic class, which is not supported.
     GenericMetaclass,
