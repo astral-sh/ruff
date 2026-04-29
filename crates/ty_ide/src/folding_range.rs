@@ -114,19 +114,6 @@ impl FoldingRangeVisitor<'_> {
         if !self.is_multiline(folding_range.range) {
             return;
         }
-        self.force_add_range(folding_range);
-    }
-
-    /// Always adds the given range.
-    ///
-    /// This is useful when you always want a folding range even if
-    /// the range may not span multiple lines. For example, `else`
-    /// or `finally` blocks.
-    fn force_add_range(&mut self, folding_range: impl Into<FoldingRange>) {
-        let folding_range = folding_range.into();
-        if !self.contains_range_filter(folding_range.range) {
-            return;
-        }
         self.ranges.push(folding_range);
     }
 
@@ -340,6 +327,27 @@ impl FoldingRangeVisitor<'_> {
         self.add_range(TextRange::new(block_fold_start, last_block_statement.end()));
     }
 
+    /// Searches for a given keyword and, if present, adds a fold for the body of the block while
+    /// leaving the block header visible.
+    fn add_block_body_range_after_keyword<T: Ranged>(
+        &mut self,
+        keyword: TokenKind,
+        previous_block_end: TextSize,
+        block: &[T],
+    ) {
+        let Some(first_body_statement) = block.first() else {
+            return;
+        };
+        let Some(keyword_start) = self.find_token_start(
+            keyword,
+            TextRange::new(previous_block_end, first_body_statement.start()),
+        ) else {
+            return;
+        };
+
+        self.add_block_body_range(keyword_start, block);
+    }
+
     /// Add a folding range for function definitions, excluding decorators.
     fn add_function_def_range(&mut self, func: &StmtFunctionDef) {
         if let Some(decorator) = func.decorator_list.last() {
@@ -406,18 +414,23 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
             AnyNodeRef::StmtFor(for_stmt) => {
                 // Fold the for body separately from the else block.
                 self.add_block_body_range(for_stmt.start(), &for_stmt.body);
-                if let (Some(first), Some(last)) = (for_stmt.orelse.first(), for_stmt.orelse.last())
-                {
-                    self.add_range(TextRange::new(first.start(), last.end()));
+                if let Some(body_last) = for_stmt.body.last() {
+                    self.add_block_body_range_after_keyword(
+                        TokenKind::Else,
+                        body_last.end(),
+                        &for_stmt.orelse,
+                    );
                 }
             }
             AnyNodeRef::StmtWhile(while_stmt) => {
                 // Fold the while body separately from the else block.
                 self.add_block_body_range(while_stmt.start(), &while_stmt.body);
-                if let (Some(first), Some(last)) =
-                    (while_stmt.orelse.first(), while_stmt.orelse.last())
-                {
-                    self.add_range(TextRange::new(first.start(), last.end()));
+                if let Some(body_last) = while_stmt.body.last() {
+                    self.add_block_body_range_after_keyword(
+                        TokenKind::Else,
+                        body_last.end(),
+                        &while_stmt.orelse,
+                    );
                 }
             }
             AnyNodeRef::StmtWith(with_stmt) => {
@@ -428,15 +441,31 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
                 self.add_block_body_range(try_stmt.start(), &try_stmt.body);
                 // Exception handlers are folded via ExceptHandlerExceptHandler.
                 // Fold the else block if present.
-                if let (Some(first), Some(last)) = (try_stmt.orelse.first(), try_stmt.orelse.last())
+                if let Some(previous_block_end) = try_stmt
+                    .handlers
+                    .last()
+                    .map(Ranged::end)
+                    .or_else(|| try_stmt.body.last().map(Ranged::end))
                 {
-                    self.force_add_range(TextRange::new(first.start(), last.end()));
+                    self.add_block_body_range_after_keyword(
+                        TokenKind::Else,
+                        previous_block_end,
+                        &try_stmt.orelse,
+                    );
                 }
                 // Fold the finally block if present.
-                if let (Some(first), Some(last)) =
-                    (try_stmt.finalbody.first(), try_stmt.finalbody.last())
+                if let Some(previous_block_end) = try_stmt
+                    .orelse
+                    .last()
+                    .map(Ranged::end)
+                    .or_else(|| try_stmt.handlers.last().map(Ranged::end))
+                    .or_else(|| try_stmt.body.last().map(Ranged::end))
                 {
-                    self.force_add_range(TextRange::new(first.start(), last.end()));
+                    self.add_block_body_range_after_keyword(
+                        TokenKind::Finally,
+                        previous_block_end,
+                        &try_stmt.finalbody,
+                    );
                 }
             }
             AnyNodeRef::StmtMatch(match_stmt) => {
