@@ -2258,32 +2258,25 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         rhs_type: Type<'db>,
         constrain_with_equality: bool,
     ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
-        let resolved_attribute_value_type = attribute_value_type.resolve_type_alias(self.db);
-        if !is_or_contains_nominal_instance(self.db, resolved_attribute_value_type) {
+        let Type::Union(union) = attribute_value_type.resolve_type_alias(self.db) else {
             return None;
-        }
+        };
         if !is_supported_tag_literal(rhs_type) {
             return None;
         }
-        if constrain_with_equality
-            && !all_matching_nominal_attributes_have_literal_types(
-                self.db,
-                resolved_attribute_value_type,
-                attribute_name,
-            )
-        {
-            return None;
-        }
 
-        let narrowed = narrow_nominal_attribute_type(
-            self.db,
-            resolved_attribute_value_type,
-            attribute_name,
-            rhs_type,
-            constrain_with_equality,
-        );
+        let narrowed = union.filter(self.db, |element| {
+            nominal_attribute_type(self.db, *element, attribute_name).is_none_or(|attribute_type| {
+                if constrain_with_equality {
+                    !is_supported_tag_literal(attribute_type)
+                        || !attribute_type.is_disjoint_from(self.db, rhs_type)
+                } else {
+                    !attribute_type.is_subtype_of(self.db, rhs_type)
+                }
+            })
+        });
 
-        if narrowed == resolved_attribute_value_type {
+        if narrowed == Type::Union(union) {
             return None;
         }
 
@@ -2340,53 +2333,6 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     }
 }
 
-fn is_or_contains_nominal_instance<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    match ty {
-        Type::NominalInstance(_) => true,
-        Type::Intersection(intersection) => {
-            intersection
-                .positive(db)
-                .iter()
-                .any(|intersection_element_ty| {
-                    is_or_contains_nominal_instance(db, *intersection_element_ty)
-                })
-        }
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .any(|union_member_ty| is_or_contains_nominal_instance(db, *union_member_ty)),
-        Type::TypeAlias(alias) => is_or_contains_nominal_instance(db, alias.value_type(db)),
-
-        Type::Dynamic(_)
-        | Type::Divergent(_)
-        | Type::Never
-        | Type::FunctionLiteral(_)
-        | Type::BoundMethod(_)
-        | Type::KnownBoundMethod(_)
-        | Type::WrapperDescriptor(_)
-        | Type::DataclassDecorator(_)
-        | Type::DataclassTransformer(_)
-        | Type::Callable(_)
-        | Type::ModuleLiteral(_)
-        | Type::ClassLiteral(_)
-        | Type::GenericAlias(_)
-        | Type::SubclassOf(_)
-        | Type::TypedDict(_)
-        | Type::ProtocolInstance(_)
-        | Type::SpecialForm(_)
-        | Type::KnownInstance(_)
-        | Type::PropertyInstance(_)
-        | Type::AlwaysTruthy
-        | Type::AlwaysFalsy
-        | Type::LiteralValue(_)
-        | Type::TypeVar(_)
-        | Type::BoundSuper(_)
-        | Type::TypeIs(_)
-        | Type::TypeGuard(_)
-        | Type::NewTypeInstance(_) => false,
-    }
-}
-
 fn is_supported_tag_literal(ty: Type) -> bool {
     matches!(
         ty.as_literal_value_kind(),
@@ -2413,61 +2359,6 @@ fn nominal_attribute_type<'db>(
             .ignore_possibly_undefined()
     } else {
         None
-    }
-}
-
-fn narrow_nominal_attribute_type<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    attribute_name: &str,
-    rhs_type: Type<'db>,
-    constrain_with_equality: bool,
-) -> Type<'db> {
-    match ty {
-        Type::NominalInstance(_) => {
-            let Some(attribute_type) = nominal_attribute_type(db, ty, attribute_name) else {
-                return ty;
-            };
-            let keep = if constrain_with_equality {
-                !attribute_type.is_disjoint_from(db, rhs_type)
-            } else {
-                !attribute_type.is_subtype_of(db, rhs_type)
-            };
-            if keep { ty } else { Type::Never }
-        }
-        Type::Intersection(intersection) => {
-            let mut builder = IntersectionBuilder::new(db);
-            for positive in intersection.positive(db) {
-                builder = builder.add_positive(narrow_nominal_attribute_type(
-                    db,
-                    *positive,
-                    attribute_name,
-                    rhs_type,
-                    constrain_with_equality,
-                ));
-            }
-            for negative in intersection.negative(db) {
-                builder = builder.add_negative(*negative);
-            }
-            builder.build()
-        }
-        Type::Union(union) => union.map(db, |element| {
-            narrow_nominal_attribute_type(
-                db,
-                *element,
-                attribute_name,
-                rhs_type,
-                constrain_with_equality,
-            )
-        }),
-        Type::TypeAlias(alias) => narrow_nominal_attribute_type(
-            db,
-            alias.value_type(db),
-            attribute_name,
-            rhs_type,
-            constrain_with_equality,
-        ),
-        _ => ty,
     }
 }
 
@@ -2548,77 +2439,6 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         | Type::NewTypeInstance(_) => {
             unreachable!(
                 "invalid type {} in all_matching_typeddict_fields_have_literal_types",
-                ty.display(db)
-            )
-        }
-    }
-}
-
-fn all_matching_nominal_attributes_have_literal_types<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    attribute_name: &str,
-) -> bool {
-    match ty {
-        Type::NominalInstance(_) => {
-            nominal_attribute_type(db, ty, attribute_name).is_some_and(is_supported_tag_literal)
-        }
-        Type::Union(union) => union.elements(db).iter().all(|union_member_ty| {
-            !is_or_contains_nominal_instance(db, *union_member_ty)
-                || all_matching_nominal_attributes_have_literal_types(
-                    db,
-                    *union_member_ty,
-                    attribute_name,
-                )
-        }),
-        Type::TypeAlias(alias) => all_matching_nominal_attributes_have_literal_types(
-            db,
-            alias.value_type(db),
-            attribute_name,
-        ),
-        Type::Intersection(intersection) => {
-            intersection
-                .positive(db)
-                .iter()
-                .all(|intersection_member_ty| {
-                    !is_or_contains_nominal_instance(db, *intersection_member_ty)
-                        || all_matching_nominal_attributes_have_literal_types(
-                            db,
-                            *intersection_member_ty,
-                            attribute_name,
-                        )
-                })
-        }
-
-        Type::Dynamic(_)
-        | Type::Divergent(_)
-        | Type::Never
-        | Type::FunctionLiteral(_)
-        | Type::BoundMethod(_)
-        | Type::KnownBoundMethod(_)
-        | Type::WrapperDescriptor(_)
-        | Type::DataclassDecorator(_)
-        | Type::DataclassTransformer(_)
-        | Type::Callable(_)
-        | Type::ModuleLiteral(_)
-        | Type::ClassLiteral(_)
-        | Type::GenericAlias(_)
-        | Type::SubclassOf(_)
-        | Type::TypedDict(_)
-        | Type::ProtocolInstance(_)
-        | Type::SpecialForm(_)
-        | Type::KnownInstance(_)
-        | Type::PropertyInstance(_)
-        | Type::AlwaysTruthy
-        | Type::AlwaysFalsy
-        | Type::LiteralValue(_)
-        | Type::TypeVar(_)
-        | Type::BoundSuper(_)
-        | Type::TypeIs(_)
-        | Type::TypeGuard(_)
-        | Type::NewTypeInstance(_) => {
-            unreachable!(
-                "invalid type {} in all_matching_nominal_attributes_have_literal_types",
                 ty.display(db)
             )
         }
