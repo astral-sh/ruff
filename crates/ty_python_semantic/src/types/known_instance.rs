@@ -7,7 +7,7 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassType, GenericContext,
         InferenceFlags, InvalidTypeExpressionError, KnownClass, StringLiteralType, Type,
-        TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder,
+        TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, any_over_type,
         class::NamedTupleSpec,
         constraints::OwnedConstraintSet,
         generics::{Specialization, walk_generic_context},
@@ -734,11 +734,14 @@ impl<'db> EagerUnionTypeInstance<'db> {
             variables
         };
 
+        // Promote to lazy only when the alias is recursive. For non-recursive aliases (the majority in real codebases),
+        // keeping the eager form avoids creating an `ImplicitTypeAliasType` whose
+        // `value_type` would be re-evaluated through the salsa cache on every downstream query.
         if let Some(name) = target.as_name_expr()
-            && self
-                .union_type
-                .as_ref()
-                .is_ok_and(|ty| legacy_typevars(*ty).is_empty())
+            && self.union_type.as_ref().is_ok_and(|ty| {
+                legacy_typevars(*ty).is_empty()
+                    && any_over_type(db, *ty, false, |inner| inner.is_divergent())
+            })
         {
             Some(Type::KnownInstance(KnownInstanceType::UnionType(
                 UnionTypeInstance::from_definition(
