@@ -346,3 +346,43 @@ re.match('', '', fla<CURSOR>
 
     Ok(())
 }
+
+/// Tests the LSP-facing shape for string-literal completions with an already-typed prefix.
+///
+/// The server intentionally returns the full completion in `insertText`. Without an explicit
+/// `textEdit`, LSP clients are allowed to interpret that insert text relative to the current
+/// word; for example, VS Code applies `insertText: "apple"` at `app|` as the suffix `le`.
+#[test]
+fn string_literal_completion_uses_full_lsp_insert_text() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+from typing import Literal
+x: Literal[\"apple\"] = \"app\"
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(ClientOptions::default().with_auto_import(false))
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(1, 26));
+
+    insta::assert_json_snapshot!(completions, @r#"
+    [
+      {
+        "label": "apple",
+        "kind": 12,
+        "detail": "Literal[\"apple\"]",
+        "sortText": "0",
+        "insertText": "apple"
+      }
+    ]
+    "#);
+
+    Ok(())
+}
