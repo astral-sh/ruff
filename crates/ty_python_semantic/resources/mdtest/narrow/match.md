@@ -527,3 +527,47 @@ def _(u: tuple[Literal["foo"], int] | tuple[Literal["bar"], str]):
             # still narrow to `tuple[Literal["bar"], str]` when `u[0]` equals "bar".
             reveal_type(u)  # revealed: tuple[Literal["bar"], str]
 ```
+
+## Narrowing tagged unions of nominal classes by attribute
+
+```py
+from typing import Literal
+
+class A:
+    tag: Literal["a"]
+    field_a: int
+
+class B:
+    tag: Literal["b"]
+    field_b: str
+
+def _(x: A | B):
+    match x.tag:
+        case "a":
+            reveal_type(x)  # revealed: A
+            reveal_type(x.field_a)  # revealed: int
+        case "b":
+            reveal_type(x)  # revealed: B
+            reveal_type(x.field_b)  # revealed: str
+        case _:
+            reveal_type(x)  # revealed: Never
+```
+
+Non-literal tag arms block positive narrowing:
+
+```py
+from typing import Literal
+
+class A:
+    tag: Literal["a"]
+
+class B:
+    tag: str
+
+def _(x: A | B):
+    match x.tag:
+        case "a":
+            reveal_type(x)  # revealed: A | B
+        case _:
+            reveal_type(x)  # revealed: B
+```
