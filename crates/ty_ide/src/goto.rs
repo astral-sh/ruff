@@ -153,14 +153,6 @@ pub(crate) enum GotoTarget<'a> {
     ///                 ^
     PatternMatchAsName(&'a ast::PatternMatchAs),
 
-    /// Go to on the name of a PEP 695 type alias statement.
-    ///
-    /// ```py
-    /// type Box = int | None
-    ///      ^^^
-    /// ```
-    TypeAliasName(&'a ast::StmtTypeAlias),
-
     /// Go to on the name of a type variable
     ///
     /// ```py
@@ -355,7 +347,6 @@ impl GotoTarget<'_> {
             GotoTarget::Expression(expression) => expression.inferred_type(model),
             GotoTarget::FunctionDef(function) => function.inferred_type(model),
             GotoTarget::ClassDef(class) => class.inferred_type(model),
-            GotoTarget::TypeAliasName(type_alias) => type_alias.inferred_type(model),
             GotoTarget::Parameter(parameter) => parameter.inferred_type(model),
             GotoTarget::ImportSymbolAlias { alias, .. }
             | GotoTarget::ImportModuleAlias { alias, .. }
@@ -488,10 +479,6 @@ impl GotoTarget<'_> {
 
             GotoTarget::ClassDef(class) => Some(vec![ResolvedDefinition::Definition(
                 class.definition(model),
-            )]),
-
-            GotoTarget::TypeAliasName(type_alias) => Some(vec![ResolvedDefinition::Definition(
-                type_alias.definition(model),
             )]),
 
             GotoTarget::Parameter(parameter) => Some(vec![ResolvedDefinition::Definition(
@@ -738,10 +725,6 @@ impl GotoTarget<'_> {
             GotoTarget::StringAnnotationSubexpr { name, .. } => name.as_deref().map(Cow::Borrowed),
             GotoTarget::FunctionDef(function) => Some(Cow::Borrowed(function.name.as_str())),
             GotoTarget::ClassDef(class) => Some(Cow::Borrowed(class.name.as_str())),
-            GotoTarget::TypeAliasName(type_alias) => type_alias
-                .name
-                .as_name_expr()
-                .map(|name| Cow::Borrowed(name.id.as_str())),
             GotoTarget::Parameter(parameter) => Some(Cow::Borrowed(parameter.name.as_str())),
             GotoTarget::ImportSymbolAlias { asname, .. } => Some(Cow::Borrowed(asname.as_str())),
             GotoTarget::ImportExportedName { alias, .. } => {
@@ -1126,17 +1109,6 @@ impl GotoTarget<'_> {
             }
 
             node => {
-                // Check if this is the LHS name of a PEP 695 type alias (the `x` in `type x = ...`).
-                //
-                // The LHS is an `ExprName` in a write position, which on its own
-                // resolves to `Never`, so we retarget to the alias statement.
-                if let AnyNodeRef::ExprName(name) = node
-                    && let Some(AnyNodeRef::StmtTypeAlias(type_alias)) = covering_node.parent()
-                    && type_alias.name.range() == name.range
-                {
-                    return Some(GotoTarget::TypeAliasName(type_alias));
-                }
-
                 // Check if this is seemingly a callable being invoked (the `x` in `x(...)`).
                 //
                 // Note that `node` might be the `foo()` call itself or
@@ -1176,7 +1148,6 @@ impl Ranged for GotoTarget<'_> {
             },
             GotoTarget::FunctionDef(function) => function.name.range,
             GotoTarget::ClassDef(class) => class.name.range,
-            GotoTarget::TypeAliasName(type_alias) => type_alias.name.range(),
             GotoTarget::Parameter(parameter) => parameter.name.range,
             GotoTarget::ImportSymbolAlias { asname, .. } => asname.range,
             Self::ImportExportedName { alias, .. } => alias.name.range,

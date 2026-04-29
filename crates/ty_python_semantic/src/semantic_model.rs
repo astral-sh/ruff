@@ -646,7 +646,6 @@ macro_rules! impl_binding_has_ty_def {
 
 impl_binding_has_ty_def!(ast::StmtFunctionDef);
 impl_binding_has_ty_def!(ast::StmtClassDef);
-impl_binding_has_ty_def!(ast::StmtTypeAlias);
 impl_binding_has_ty_def!(ast::Parameter);
 impl_binding_has_ty_def!(ast::ParameterWithDefault);
 impl_binding_has_ty_def!(ast::TypeParamTypeVar);
