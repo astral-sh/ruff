@@ -566,6 +566,78 @@ def foo(x):
     return x
 ```
 
+### Implementation consistency
+
+The implementation must accept every argument accepted by each overload, and each overload return
+type must be assignable to the implementation return type. This check initially only covers
+overloads where all signatures are non-generic.
+
+```py
+from typing import overload
+
+@overload
+def return_type(x: int) -> int: ...
+@overload
+# error: [invalid-overload] "Overload return type is not assignable to implementation return type"
+def return_type(x: str) -> str: ...
+def return_type(x: int | str) -> int:
+    return 1
+
+@overload
+def parameter_type(x: int) -> int: ...
+@overload
+# error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+def parameter_type(x: str) -> str: ...
+def parameter_type(x: int) -> int | str:
+    return 1
+```
+
+Non-generic implementation checks require parameter names and positional-only forms to line up with
+each overload signature.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Iterable
+from typing import overload
+
+class ColumnSelector:
+    @overload
+    def _extract(self, row_key: int) -> object: ...
+    @overload
+    # error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+    def _extract(self, column_key: int) -> object: ...
+    def _extract(self, row_key: int | None = None, column_key: int | None = None) -> object:
+        return object()
+
+class PositionalOnlyWithKwargs:
+    @overload
+    def update(self, params: Iterable[tuple[str, str | Iterable[str]]], /, **kwds: str) -> None: ...
+    @overload
+    # error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+    def update(self, **kwds: str | Iterable[str]) -> None: ...
+    def update(self, params=(), /, **kwds) -> None:
+        pass
+```
+
+Generic overloads are left to the full implementation-consistency check.
+
+```py
+from typing import TypeVar, overload
+
+T = TypeVar("T")
+
+@overload
+def generic_parameter_type(x: T) -> T: ...
+@overload
+def generic_parameter_type(x: str) -> str: ...
+def generic_parameter_type(x: int) -> int | str:
+    return x
+```
+
 ### Inconsistent decorators
 
 #### `@staticmethod`
