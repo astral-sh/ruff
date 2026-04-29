@@ -7,9 +7,11 @@ use crate::session::Session;
 use crate::session::client::Client;
 use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
-use std::fmt::Write;
+use std::fmt::{self, Write};
 use std::str::FromStr;
+use ty_module_resolver::ModuleResolveMode;
 use ty_project::Db as _;
+use ty_python_core::program::Program;
 
 pub(crate) struct ExecuteCommand;
 
@@ -64,6 +66,27 @@ fn debug_information(session: &Session) -> crate::Result<String> {
 
     for db in session.project_dbs() {
         writeln!(buffer, "Project at {}", db.project().root(db))?;
+        let program = Program::get(db);
+        writeln!(buffer, "Program:")?;
+        writeln!(
+            buffer,
+            "  python-version: {}",
+            program.python_version_with_source(db).version
+        )?;
+        writeln!(buffer, "  python-platform: {}", program.python_platform(db))?;
+        let mut writer = IndentingWriter {
+            inner: &mut buffer,
+            indent: "  ",
+            at_line_start: false,
+        };
+        writeln!(
+            writer,
+            "  search-paths: {:#}",
+            program
+                .search_paths(db)
+                .display(db, ModuleResolveMode::StubsAllowed)
+        )?;
+
         writeln!(buffer, "Settings: {:#?}", db.project().settings(db))?;
         writeln!(buffer)?;
         writeln!(
@@ -73,4 +96,24 @@ fn debug_information(session: &Session) -> crate::Result<String> {
         )?;
     }
     Ok(buffer)
+}
+
+struct IndentingWriter<'a> {
+    inner: &'a mut String,
+    indent: &'static str,
+    at_line_start: bool,
+}
+
+impl Write for IndentingWriter<'_> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for part in s.split_inclusive('\n') {
+            if self.at_line_start {
+                self.inner.write_str(self.indent)?;
+            }
+            self.inner.write_str(part)?;
+            self.at_line_start = part.ends_with('\n');
+        }
+
+        Ok(())
+    }
 }
