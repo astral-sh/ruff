@@ -651,6 +651,53 @@ info: type `DoesNotHaveName` is not assignable to protocol `SupportsName`
 info: └── protocol member `name` is not defined on type `DoesNotHaveName`
 ```
 
+Missing protocol members (protocol to protocol):
+
+```py
+class SupportsSomethingElse(Protocol):
+    def something_else(self) -> None: ...
+
+def _(source: SupportsSomethingElse):
+    target: SupportsCheck = source  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `SupportsSomethingElse` is not assignable to `SupportsCheck`
+  --> src/mdtest_snippet.py:28:13
+   |
+28 |     target: SupportsCheck = source  # snapshot
+   |             -------------   ^^^^^^ Incompatible value of type `SupportsSomethingElse`
+   |             |
+   |             Declared type
+   |
+info: protocol `SupportsSomethingElse` is not assignable to protocol `SupportsCheck`
+info: └── protocol member `check` is not defined on type `SupportsSomethingElse`
+```
+
+Incompatible types for protocol members (protocol to protocol):
+
+```py
+class SupportsCheckWithOtherSignature(Protocol):
+    def check(self, x: int, y: bytes) -> bool: ...
+
+def _(source: SupportsCheckWithOtherSignature):
+    target: SupportsCheck = source  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `SupportsCheckWithOtherSignature` is not assignable to `SupportsCheck`
+  --> src/mdtest_snippet.py:33:13
+   |
+33 |     target: SupportsCheck = source  # snapshot
+   |             -------------   ^^^^^^ Incompatible value of type `SupportsCheckWithOtherSignature`
+   |             |
+   |             Declared type
+   |
+info: protocol `SupportsCheckWithOtherSignature` is not assignable to protocol `SupportsCheck`
+info: └── protocol member `check` is incompatible
+info:     └── parameter `y` has an incompatible type: `str` is not assignable to `bytes`
+```
+
 ## Type aliases
 
 Type aliases should be expanded in diagnostics to understand the underlying incompatibilities:
@@ -885,7 +932,8 @@ info: type `list[str]` is not assignable to protocol `Iterable[bytes]`
 info: └── protocol member `__iter__` is incompatible
 info:     └── incompatible return types: `Iterator[str]` is not assignable to `Iterator[bytes]`
 info:         └── protocol `Iterator[str]` is not assignable to protocol `Iterator[bytes]`
-info:             └── incompatible return types: `str` is not assignable to `bytes`
+info:             └── protocol member `__next__` is incompatible
+info:                 └── incompatible return types: `str` is not assignable to `bytes`
 ```
 
 ## Invariant generic classes
