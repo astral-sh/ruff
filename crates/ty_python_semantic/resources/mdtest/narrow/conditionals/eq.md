@@ -353,7 +353,7 @@ def _(x: A | B):
         reveal_type(x)  # revealed: A
 ```
 
-Non-literal tag arms block positive narrowing:
+Non-literal tag arms are preserved during positive narrowing:
 
 ```py
 from typing import Literal
@@ -364,9 +364,12 @@ class A:
 class B:
     tag: str
 
-def _(x: A | B):
+class C:
+    tag: Literal["c"]
+
+def _(x: A | B | C):
     if x.tag == "a":
         reveal_type(x)  # revealed: A | B
     else:
-        reveal_type(x)  # revealed: B
+        reveal_type(x)  # revealed: B | C
 ```

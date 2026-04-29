@@ -2099,15 +2099,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         if !is_supported_tag_literal(rhs_type) {
             return None;
         }
-        if constrain_with_equality
-            && !all_matching_nominal_attributes_have_literal_types(
-                self.db,
-                resolved_attribute_value_type,
-                attribute_name,
-            )
-        {
-            return None;
-        }
 
         let narrowed = narrow_nominal_attribute_type(
             self.db,
@@ -2261,7 +2252,8 @@ fn narrow_nominal_attribute_type<'db>(
                 return ty;
             };
             let keep = if constrain_with_equality {
-                !attribute_type.is_disjoint_from(db, rhs_type)
+                !is_supported_tag_literal(attribute_type)
+                    || !attribute_type.is_disjoint_from(db, rhs_type)
             } else {
                 !attribute_type.is_subtype_of(db, rhs_type)
             };
@@ -2378,77 +2370,6 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         | Type::NewTypeInstance(_) => {
             unreachable!(
                 "invalid type {} in all_matching_typeddict_fields_have_literal_types",
-                ty.display(db)
-            )
-        }
-    }
-}
-
-fn all_matching_nominal_attributes_have_literal_types<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    attribute_name: &str,
-) -> bool {
-    match ty {
-        Type::NominalInstance(_) => {
-            nominal_attribute_type(db, ty, attribute_name).is_some_and(is_supported_tag_literal)
-        }
-        Type::Union(union) => union.elements(db).iter().all(|union_member_ty| {
-            !is_or_contains_nominal_instance(db, *union_member_ty)
-                || all_matching_nominal_attributes_have_literal_types(
-                    db,
-                    *union_member_ty,
-                    attribute_name,
-                )
-        }),
-        Type::TypeAlias(alias) => all_matching_nominal_attributes_have_literal_types(
-            db,
-            alias.value_type(db),
-            attribute_name,
-        ),
-        Type::Intersection(intersection) => {
-            intersection
-                .positive(db)
-                .iter()
-                .all(|intersection_member_ty| {
-                    !is_or_contains_nominal_instance(db, *intersection_member_ty)
-                        || all_matching_nominal_attributes_have_literal_types(
-                            db,
-                            *intersection_member_ty,
-                            attribute_name,
-                        )
-                })
-        }
-
-        Type::Dynamic(_)
-        | Type::Divergent(_)
-        | Type::Never
-        | Type::FunctionLiteral(_)
-        | Type::BoundMethod(_)
-        | Type::KnownBoundMethod(_)
-        | Type::WrapperDescriptor(_)
-        | Type::DataclassDecorator(_)
-        | Type::DataclassTransformer(_)
-        | Type::Callable(_)
-        | Type::ModuleLiteral(_)
-        | Type::ClassLiteral(_)
-        | Type::GenericAlias(_)
-        | Type::SubclassOf(_)
-        | Type::TypedDict(_)
-        | Type::ProtocolInstance(_)
-        | Type::SpecialForm(_)
-        | Type::KnownInstance(_)
-        | Type::PropertyInstance(_)
-        | Type::AlwaysTruthy
-        | Type::AlwaysFalsy
-        | Type::LiteralValue(_)
-        | Type::TypeVar(_)
-        | Type::BoundSuper(_)
-        | Type::TypeIs(_)
-        | Type::TypeGuard(_)
-        | Type::NewTypeInstance(_) => {
-            unreachable!(
-                "invalid type {} in all_matching_nominal_attributes_have_literal_types",
                 ty.display(db)
             )
         }
