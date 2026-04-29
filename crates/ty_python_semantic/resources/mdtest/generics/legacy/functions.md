@@ -403,16 +403,14 @@ A = TypeVar("A")
 B = TypeVar("B")
 
 def recursive_identity(t: T) -> T:
-    # TODO: revealed: T@recursive_identity
-    reveal_type(recursive_identity(t))  # revealed: Unknown
+    reveal_type(recursive_identity(t))  # revealed: T@recursive_identity
     return t
 
 def pair(a: A, b: B) -> tuple[A, B]:
     return (a, b)
 
 def recursive_pair(t: T) -> T:
-    # TODO: revealed: tuple[T@recursive_pair, Literal[1]]
-    reveal_type(pair(recursive_pair(t), recursive_pair(1)))  # revealed: tuple[Unknown, Literal[1]]
+    reveal_type(pair(recursive_pair(t), recursive_pair(1)))  # revealed: tuple[T@recursive_pair, Literal[1]]
     return t
 ```
 

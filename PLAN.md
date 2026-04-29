@@ -205,12 +205,24 @@ Phase 2 implementation notes:
 
 Goal: fix recursive direct calls such as `identity(t)` inside `identity`.
 
-- [ ] Locate where call binding receives a generic callable signature before inferring specialization.
-- [ ] Freshen the callable signature's generic context at the call occurrence boundary.
-- [ ] Add an analogous per-call nonce source if direct call binding cannot reuse a `TypeRelationChecker` nonce generator.
-- [ ] Run existing specialization inference against the fresh signature.
-- [ ] Ensure solved fresh typevars are substituted into the return type and do not leak.
-- [ ] Verify recursive function mdtests in both PEP 695 and legacy files.
+- [x] Locate where call binding receives a generic callable signature before inferring specialization.
+- [x] Freshen the callable signature's generic context at the call occurrence boundary.
+    - Implemented for regular callable bindings whose generic contexts do not contain ParamSpecs.
+    - Constructor bindings and ParamSpec-containing generic contexts are intentionally deferred; enabling them exposed broader constructor/ParamSpec inference regressions unrelated to the recursive TypeVar target.
+- [x] Add an analogous per-call nonce source if direct call binding cannot reuse a `TypeRelationChecker` nonce generator.
+- [x] Run existing specialization inference against the fresh signature.
+- [x] Ensure solved fresh typevars are substituted into the return type and do not leak for the recursive TypeVar cases.
+- [x] Verify recursive function mdtests in both PEP 695 and legacy files.
+
+Phase 3 implementation notes:
+
+- `Bindings::match_parameters` now creates a per-call `TypeVarNonceGenerator` and freshens regular callable bindings before argument type-context inference and specialization.
+- `CallableBinding` allocates one nonce for the callable occurrence and applies it to all overload generic contexts in that binding, so overloads in one callable occurrence share the same occurrence nonce while still remaining distinct by source identity/binding context.
+- Generic contexts containing ParamSpecs are skipped for now. A trial implementation that freshened ParamSpecs caused existing `Callable[P, R]` inference cases such as `accepts_callable(returns_int)` to lose the inferred `P` specialization.
+- Constructor bindings are skipped for now. A trial implementation that freshened constructors caused existing generic class constructor inference cases such as `list(items)` to leak unsolved class typevars.
+- Validation run after Phase 3:
+    - `cargo check -p ty_python_semantic`
+    - targeted mdtests for `generics/pep695/functions.md`, `generics/legacy/functions.md`, `generics/pep695/callables.md`, `generics/legacy/callables.md`, and `type_properties/implies_subtype_of.md`
 
 ## Phase 4: Freshen generic callable-vs-callable relation
 
@@ -234,14 +246,15 @@ Goal: fix the TODO in `TypeRelationChecker::check_signature_pair`.
 
 ## Phase 6: Flip mdtest expectations and add final regression coverage
 
-- [ ] Flip TODO expectations added in the previous revision:
+- [x] Flip direct recursive function reveal-type expectations in the PEP 695 and legacy function mdtests.
 
-    - recursive function reveal types
+- [ ] Flip remaining TODO expectations added in the previous revision:
+
     - `partial(partial, drop)` reveal types
     - invariant `listify` implication assertions
     - recursive `listify` implication assertion
 
-- [ ] Remove the deliberately undesired current expectations and `static-assert-error` comments.
+- [ ] Remove the remaining deliberately undesired current expectations and `static-assert-error` comments.
 
 - [ ] Consider additional coverage after the core cases pass:
 

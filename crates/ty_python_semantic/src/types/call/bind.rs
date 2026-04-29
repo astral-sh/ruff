@@ -49,7 +49,7 @@ use crate::types::signatures::{
     CallableSignature, Parameter, ParameterForm, ParameterKind, Parameters, ParametersKind,
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
-use crate::types::typevar::BoundTypeVarIdentity;
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonce, TypeVarNonceGenerator};
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassLiteral, DATACLASS_FLAGS,
     DataclassFlags, DataclassParams, GenericAlias, InternedConstraintSet, IntersectionType,
@@ -77,6 +77,15 @@ enum CallErrorPriority {
     TopCallable = 1,
     /// Specific binding error (invalid argument type, missing argument, etc.).
     BindingError = 2,
+}
+
+fn generic_context_has_paramspec<'db>(
+    db: &'db dyn Db,
+    generic_context: GenericContext<'db>,
+) -> bool {
+    generic_context
+        .variables(db)
+        .any(|typevar| typevar.is_paramspec(db))
 }
 
 /// A single callable item within the union/intersection structure.
@@ -159,6 +168,21 @@ impl<'db> CallableItem<'db> {
     fn set_downstream_constructor(&mut self, bindings: &Bindings<'db>) {
         if let Some(binding) = self.as_constructor_mut() {
             binding.set_downstream_constructor(bindings.clone());
+        }
+    }
+
+    fn freshen_generic_contexts_in_place(
+        &mut self,
+        db: &'db dyn Db,
+        nonce_generator: &TypeVarNonceGenerator,
+    ) {
+        match self {
+            CallableItem::Regular(binding) => {
+                binding.freshen_generic_contexts_in_place(db, nonce_generator);
+            }
+            // TODO: Constructor freshening also has to keep constructor instance context in sync
+            // with `__new__`/`__init__` signatures.
+            CallableItem::Constructor(_) => {}
         }
     }
 
@@ -730,6 +754,16 @@ impl<'db> Bindings<'db> {
         self.map_with(&f)
     }
 
+    fn freshen_generic_contexts_in_place(
+        &mut self,
+        db: &'db dyn Db,
+        nonce_generator: &TypeVarNonceGenerator,
+    ) {
+        for item in self.iter_callable_items_mut() {
+            item.freshen_generic_contexts_in_place(db, nonce_generator);
+        }
+    }
+
     /// Match the arguments of a call site against the parameters of a collection of possibly
     /// unioned, possibly overloaded signatures.
     ///
@@ -744,6 +778,8 @@ impl<'db> Bindings<'db> {
         db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
+        let nonce_generator = TypeVarNonceGenerator::default();
+        self.freshen_generic_contexts_in_place(db, &nonce_generator);
         self.match_parameters_in_place(db, arguments);
         self
     }
@@ -2586,6 +2622,36 @@ impl<'db> CallableBinding<'db> {
         };
         for overload in &mut self.overloads {
             overload.signature = overload.signature.bind_self(db, Some(bound_self));
+        }
+    }
+
+    fn freshen_generic_contexts_in_place(
+        &mut self,
+        db: &'db dyn Db,
+        nonce_generator: &TypeVarNonceGenerator,
+    ) {
+        if self
+            .overloads
+            .iter()
+            .all(|overload| overload.signature.generic_context.is_none())
+        {
+            return;
+        }
+
+        // ParamSpec freshening needs relation-side support so `Callable[P, R]` inference doesn't
+        // quantify away `P` before call specialization can use it.
+        if self.overloads.iter().any(|overload| {
+            overload
+                .signature
+                .generic_context
+                .is_some_and(|generic_context| generic_context_has_paramspec(db, generic_context))
+        }) {
+            return;
+        }
+
+        let nonce = nonce_generator.next();
+        for overload in &mut self.overloads {
+            overload.freshen_generic_context(db, nonce);
         }
     }
 
@@ -5113,6 +5179,19 @@ impl<'db> Binding<'db> {
         if self.callable_type == before {
             self.callable_type = after;
         }
+    }
+
+    fn freshen_generic_context(&mut self, db: &'db dyn Db, nonce: TypeVarNonce) {
+        if self.signature.generic_context.is_none() {
+            return;
+        }
+
+        // TODO: This eagerly clones/updates the signature for every generic callable invocation.
+        // We can skip freshening when there is no containing scope that binds the same generic
+        // context, because there is no outer occurrence for this callable occurrence to collide
+        // with.
+        self.signature = self.signature.freshen_generic_context(db, nonce);
+        self.return_ty = self.initial_return_type(db);
     }
 
     fn match_parameters(

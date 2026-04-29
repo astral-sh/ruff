@@ -34,8 +34,8 @@ use crate::types::typed_dict::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind,
-    ParameterDescription, SelfBinding, TypeContext, TypeMapping, UnionBuilder, VarianceInferable,
-    infer_complete_scope_types, todo_type,
+    ParameterDescription, SelfBinding, TypeContext, TypeMapping, TypeVarNonce, UnionBuilder,
+    VarianceInferable, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -633,6 +633,22 @@ impl<'db> Signature<'db> {
                 .return_ty
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
         }
+    }
+
+    pub(crate) fn freshen_generic_context(&self, db: &'db dyn Db, nonce: TypeVarNonce) -> Self {
+        let Some(generic_context) = self.generic_context else {
+            return self.clone();
+        };
+
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::FreshenBoundTypeVars {
+                generic_context,
+                nonce,
+            },
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
     }
 
     pub(crate) fn find_legacy_typevars_impl(
