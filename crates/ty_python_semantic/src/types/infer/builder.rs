@@ -9027,7 +9027,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             mut expressions,
             qualifiers: _,
             mut type_expression_flags,
-            string_annotations,
+            mut string_annotations,
             mut expected_types,
             scope,
             bindings,
@@ -9078,6 +9078,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 type_expression_flags.shrink_to_fit();
                 expected_types.shrink_to_fit();
+                string_annotations.shrink_to_fit();
                 Box::new(ExpressionInferenceExtra {
                     string_annotations,
                     expected_types,
@@ -9106,7 +9107,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             mut expressions,
             mut qualifiers,
             mut type_expression_flags,
-            string_annotations,
+            mut string_annotations,
             expected_types: _,
             scope,
             bindings,
@@ -9141,6 +9142,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         .then(|| {
             qualifiers.shrink_to_fit();
             type_expression_flags.shrink_to_fit();
+            string_annotations.shrink_to_fit();
             Box::new(StatementInferenceInnerExtra {
                 string_annotations,
                 called_functions: called_functions
@@ -9249,8 +9251,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             mut expressions,
             mut qualifiers,
             mut type_expression_flags,
-            string_annotations,
-            expected_types,
+            mut string_annotations,
+            mut expected_types,
             scope,
             bindings,
             declarations,
@@ -9284,6 +9286,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         .then(|| {
             qualifiers.shrink_to_fit();
             type_expression_flags.shrink_to_fit();
+            expected_types.shrink_to_fit();
+            string_annotations.shrink_to_fit();
             Box::new(DefinitionInferenceExtra {
                 string_annotations,
                 expected_types,
@@ -9333,7 +9337,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Self {
             context,
-            string_annotations,
+            mut string_annotations,
             mut expected_types,
             mut type_expression_flags,
             mut expressions,
@@ -9371,6 +9375,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         .then(|| {
             type_expression_flags.shrink_to_fit();
             expected_types.shrink_to_fit();
+            string_annotations.shrink_to_fit();
             Box::new(ScopeInferenceExtra {
                 string_annotations,
                 expected_types,
