@@ -4,6 +4,7 @@
 )]
 mod all_symbols;
 mod code_action;
+mod code_lens;
 mod completion;
 mod doc_highlights;
 mod docstring;
@@ -31,6 +32,7 @@ mod workspace_symbols;
 
 pub use all_symbols::{AllSymbolInfo, all_symbols};
 pub use code_action::{QuickFix, code_actions};
+pub use code_lens::{CodeLensCommand, CodeLensItem, code_lens};
 pub use completion::{Completion, CompletionKind, CompletionSettings, completion};
 pub use doc_highlights::document_highlights;
 pub use document_symbols::document_symbols;
@@ -630,6 +632,7 @@ mod tests {
                     python_version: PythonVersionWithSource::default(),
                     python_platform: PythonPlatform::default(),
                     search_paths,
+                    python_executable: None,
                 },
             );
 

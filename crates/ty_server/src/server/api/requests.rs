@@ -13,6 +13,7 @@ module. For example, see `super::type_hierarchy`.
 */
 
 mod code_action;
+mod code_lens;
 mod completion;
 mod diagnostic;
 mod doc_highlights;
@@ -39,6 +40,7 @@ mod workspace_diagnostic;
 mod workspace_symbols;
 
 pub(super) use code_action::CodeActionRequestHandler;
+pub(super) use code_lens::CodeLensRequestHandler;
 pub(super) use completion::CompletionRequestHandler;
 pub(super) use diagnostic::DocumentDiagnosticRequestHandler;
 pub(super) use doc_highlights::DocumentHighlightRequestHandler;

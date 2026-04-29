@@ -53,19 +53,21 @@ impl std::fmt::Display for ResolvedClientCapabilities {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum SupportedCommand {
     Debug,
+    RunTest,
 }
 
 impl SupportedCommand {
     /// Returns the identifier of the command.
-    const fn identifier(self) -> &'static str {
+    pub(crate) const fn identifier(self) -> &'static str {
         match self {
             SupportedCommand::Debug => "ty.printDebugInformation",
+            SupportedCommand::RunTest => "ty.runTest",
         }
     }
 
     /// Returns all the commands that the server currently supports.
-    const fn all() -> [SupportedCommand; 1] {
-        [SupportedCommand::Debug]
+    const fn all() -> [SupportedCommand; 2] {
+        [SupportedCommand::Debug, SupportedCommand::RunTest]
     }
 }
 
@@ -75,6 +77,7 @@ impl FromStr for SupportedCommand {
     fn from_str(name: &str) -> anyhow::Result<Self, Self::Err> {
         Ok(match name {
             "ty.printDebugInformation" => Self::Debug,
+            "ty.runTest" => Self::RunTest,
             _ => return Err(anyhow::anyhow!("Invalid command `{name}`")),
         })
     }
@@ -448,6 +451,9 @@ pub(crate) fn server_capabilities(
         }),
         selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
         folding_range_provider: Some(types::FoldingRangeProviderCapability::Simple(true)),
+        code_lens_provider: Some(types::CodeLensOptions {
+            resolve_provider: Some(false),
+        }),
         document_symbol_provider: Some(OneOf::Left(true)),
         workspace_symbol_provider: Some(OneOf::Left(true)),
         notebook_document_sync: Some(OneOf::Left(lsp_types::NotebookDocumentSyncOptions {
