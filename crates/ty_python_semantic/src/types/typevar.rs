@@ -727,18 +727,6 @@ impl<'db> BoundTypeVarInstance<'db> {
         }
     }
 
-    /// Returns a new bound typevar instance with a fresh occurrence identity.
-    #[expect(dead_code)]
-    pub(crate) fn freshen(self, db: &'db dyn Db, nonce: TypeVarNonce) -> Self {
-        Self::new(
-            db,
-            self.typevar(db),
-            self.binding_context(db),
-            self.paramspec_attr(db),
-            Some(nonce),
-        )
-    }
-
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db Name {
         self.typevar(db).name(db)
     }
@@ -976,6 +964,16 @@ impl<'db> BoundTypeVarInstance<'db> {
                     Type::TypeVar(self)
                 }
             }
+            TypeMapping::FreshenBoundTypeVars {
+                generic_context,
+                nonce,
+            } => {
+                if generic_context.contains(db, self) {
+                    Type::TypeVar(self.freshen(db, *nonce, type_mapping, visitor))
+                } else {
+                    Type::TypeVar(self)
+                }
+            }
             TypeMapping::Promote(..)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
@@ -1036,6 +1034,51 @@ impl<'db> BoundTypeVarInstance<'db> {
             self.binding_context(db),
             self.paramspec_attr(db),
             self.freshness(db),
+        )
+    }
+
+    fn freshen(
+        self,
+        db: &'db dyn Db,
+        nonce: TypeVarNonce,
+        type_mapping: &TypeMapping<'_, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let typevar = self.typevar(db);
+        let bound_or_constraints = typevar.bound_or_constraints(db);
+        let default = self.default_type(db);
+
+        if bound_or_constraints.is_none() && default.is_none() {
+            return Self::new(
+                db,
+                typevar,
+                self.binding_context(db),
+                self.paramspec_attr(db),
+                Some(nonce),
+            );
+        }
+
+        let typevar = TypeVarInstance::new(
+            db,
+            typevar.identity(db),
+            bound_or_constraints.map(|bound_or_constraints| {
+                bound_or_constraints
+                    .apply_type_mapping_impl(db, type_mapping, visitor)
+                    .into()
+            }),
+            typevar.explicit_variance(db),
+            default.map(|ty| {
+                ty.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
+                    .into()
+            }),
+        );
+
+        Self::new(
+            db,
+            typevar,
+            self.binding_context(db),
+            self.paramspec_attr(db),
+            Some(nonce),
         )
     }
 
@@ -1392,6 +1435,20 @@ impl<'db> TypeVarConstraints<'db> {
         TypeVarConstraints::new(db, materialized)
     }
 
+    fn apply_type_mapping_impl(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let mapped = self
+            .elements(db)
+            .iter()
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor))
+            .collect::<Box<_>>();
+        TypeVarConstraints::new(db, mapped)
+    }
+
     /// Normalize for cycle recovery by combining with the previous value and
     /// removing divergent types introduced by the cycle.
     ///
@@ -1451,6 +1508,26 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
                 TypeVarBoundOrConstraints::Constraints(constraints.materialize_impl(
                     db,
                     materialization_kind,
+                    visitor,
+                ))
+            }
+        }
+    }
+
+    fn apply_type_mapping_impl(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        match self {
+            TypeVarBoundOrConstraints::UpperBound(bound) => TypeVarBoundOrConstraints::UpperBound(
+                bound.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor),
+            ),
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                TypeVarBoundOrConstraints::Constraints(constraints.apply_type_mapping_impl(
+                    db,
+                    type_mapping,
                     visitor,
                 ))
             }

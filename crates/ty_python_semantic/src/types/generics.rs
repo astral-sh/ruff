@@ -475,6 +475,20 @@ impl<'db> GenericContext<'db> {
         self.variables_inner(db).values().copied()
     }
 
+    pub(crate) fn contains(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> bool {
+        let bound_typevar = if bound_typevar.is_paramspec(db) {
+            bound_typevar.without_paramspec_attr(db)
+        } else {
+            bound_typevar
+        };
+        self.variables_inner(db)
+            .contains_key(&bound_typevar.identity(db))
+    }
+
     /// Returns `true` if this generic context contains exactly one `ParamSpec` and no other type
     /// variables.
     ///

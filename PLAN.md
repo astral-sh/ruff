@@ -176,18 +176,30 @@ Phase 1 implementation notes:
 
 Goal: freshen all typevars bound by a generic callable occurrence as a group, using one shared nonce for the whole occurrence.
 
-- [ ] Add a helper that takes a `GenericContext<'db>` and one `TypeVarNonce`, returning:
-    - fresh `GenericContext<'db>`;
-    - mapping from original `BoundTypeVarInstance`/identity to fresh `BoundTypeVarInstance`;
-    - list/set of fresh identities that should be inferable/existential.
-- [ ] Apply that mapping to a `Signature<'db>` / `CallableSignature<'db>`.
-    - This can reuse or generalize the existing `ApplySpecialization::ReturnCallables` path.
-    - Consider renaming/generalizing that variant if it becomes a general bound-typevar replacement mapping.
-    - The generalized mapping should match by `BoundTypeVarIdentity` / `is_same_typevar_as`, not exact `BoundTypeVarInstance`, so it handles materialized variables and two-pass freshening shells correctly.
-- [ ] Ensure freshening rewrites only typevars bound by the callable occurrence's generic context.
+- [x] Add a `TypeMapping` variant that takes a `GenericContext<'db>` and one `TypeVarNonce`, deriving on demand:
+    - fresh `GenericContext<'db>` via `TypeMapping::update_signature_generic_context`;
+    - on-the-fly mapping from original `BoundTypeVarInstance`/identity to fresh `BoundTypeVarInstance`;
+    - fresh identities for inferable/existential handling by applying the mapping to the original context.
+- [x] Apply that mapping to a `Signature<'db>` / `CallableSignature<'db>`.
+    - The freshening path is a `TypeMapping` variant, not an `ApplySpecialization` variant, because freshening a matching typevar must recursively apply the same type mapping to that typevar's bounds/constraints/defaults.
+    - The mapping matches by `BoundTypeVarIdentity` / `is_same_typevar_as`, not exact `BoundTypeVarInstance`, so it handles materialized variables correctly.
+- [x] Ensure freshening rewrites only typevars bound by the callable occurrence's generic context.
     - Free outer typevars must remain unchanged.
-- [ ] Audit nested callable signatures.
+- [x] Audit nested callable signatures.
     - A nested generic callable occurrence should get its own fresh group when it is itself checked/invoked, not merely because it appears inside a freshened outer signature.
+
+Phase 2 implementation notes:
+
+- Added `TypeMapping::FreshenBoundTypeVars { generic_context, nonce }`, which replaces matching typevars by `BoundTypeVarIdentity` rather than exact `BoundTypeVarInstance` equality.
+- `TypeMapping::update_signature_generic_context` now preserves generic contexts under `FreshenBoundTypeVars` by applying the same mapping to the context variables.
+- There is no separate `GenericContextFreshening` wrapper; callers should construct/use the `TypeMapping` variant directly.
+- `GenericContext::contains(db, bound_typevar)` performs efficient membership checks via `variables_inner(db).contains_key(...)`, normalizing ParamSpec attrs before lookup.
+- `BoundTypeVarInstance::apply_type_mapping_impl` owns the freshening behavior: when the typevar belongs to the generic context, it freshens the bound typevar and recursively applies the same type mapping to the underlying typevar's bounds/constraints/defaults so sibling references point at the same fresh occurrence identity. Repeated on-demand construction relies on salsa interning to canonicalize equivalent fresh variables.
+- The old shallow `BoundTypeVarInstance::freshen` helper was inlined into the recursive `freshen` helper.
+- The helper only maps identities from the generic context being freshened. Nested callable signatures are traversed like normal type structure for those identities, but nested generic callable occurrences are not independently freshened until Phase 3/4 call or relation boundaries.
+- Validation run after Phase 2:
+    - `cargo check -p ty_python_semantic`
+    - targeted mdtests for `generics/pep695/functions.md`, `generics/legacy/functions.md`, `generics/pep695/callables.md`, `generics/legacy/callables.md`, and `type_properties/implies_subtype_of.md`
 
 ## Phase 3: Freshen direct generic callable invocation
 

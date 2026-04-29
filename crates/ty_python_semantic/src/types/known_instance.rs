@@ -289,6 +289,7 @@ impl<'db> KnownInstanceType<'db> {
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::Promote(..)
+                | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf(..)
                 | TypeMapping::ReplaceSelf { .. }
                 | TypeMapping::Materialize(_)
