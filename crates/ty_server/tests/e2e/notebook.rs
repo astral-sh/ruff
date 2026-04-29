@@ -228,7 +228,7 @@ type Style = Literal["italic", "bold", "underline"]"#,
 }
 
 #[test]
-fn semantic_tokens_for_cell_do_not_leak_quoted_annotations() -> anyhow::Result<()> {
+fn semantic_tokens_for_cell_do_not_leak_stringified_annotations() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
         .build()
         .wait_until_workspaces_are_initialized();
