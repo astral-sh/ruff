@@ -5,7 +5,7 @@ use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, TraversalSignal, walk_body, walk_node,
 };
-use ruff_python_ast::{AnyNodeRef, Stmt, StmtClassDef, StmtFunctionDef};
+use ruff_python_ast::{AnyNodeRef, Stmt};
 use ruff_python_trivia::{CommentLinePosition, is_python_whitespace};
 use ruff_source_file::{LineRanges, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -286,21 +286,6 @@ impl FoldingRangeVisitor<'_> {
         self.add_range(FoldingRange::from(first_stmt.range()).with_kind(FoldingRangeKind::Comment));
     }
 
-    /// Add a folding range for the function or class definition.
-    ///
-    /// `target` is checked for in `search_range`, and is used as the start if found.
-    fn add_def_range(&mut self, target: TokenKind, search_range: TextRange, end: TextSize) {
-        let target_token = self
-            .tokens
-            .in_range(search_range)
-            .iter()
-            .find(|tok| tok.kind() == target);
-        if let Some(tok) = target_token {
-            let range = TextRange::new(tok.start(), end);
-            self.add_range(range);
-        }
-    }
-
     /// Attempts to find the start of the given token in the given range.
     fn find_token_start(&self, target: TokenKind, search_range: TextRange) -> Option<TextSize> {
         self.tokens
@@ -347,31 +332,6 @@ impl FoldingRangeVisitor<'_> {
 
         self.add_block_body_range(keyword_start, block);
     }
-
-    /// Add a folding range for function definitions, excluding decorators.
-    fn add_function_def_range(&mut self, func: &StmtFunctionDef) {
-        if let Some(decorator) = func.decorator_list.last() {
-            let target = if func.is_async {
-                TokenKind::Async
-            } else {
-                TokenKind::Def
-            };
-            let search_range = TextRange::new(decorator.end(), func.name.start());
-            self.add_def_range(target, search_range, func.end());
-        } else {
-            self.add_range(func.range());
-        }
-    }
-
-    /// Add a folding range for class definitions, excluding decorators.
-    fn add_class_def_range(&mut self, class: &StmtClassDef) {
-        if let Some(decorator) = class.decorator_list.last() {
-            let search_range = TextRange::new(decorator.end(), class.name.start());
-            self.add_def_range(TokenKind::Class, search_range, class.end());
-        } else {
-            self.add_range(class.range());
-        }
-    }
 }
 
 impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
@@ -386,7 +346,7 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
             }
             // Compound statements that create folding regions
             AnyNodeRef::StmtFunctionDef(func) => {
-                self.add_function_def_range(func);
+                self.add_block_body_range(func.name.start(), &func.body);
                 // Note that this may be duplicative with folding
                 // ranges added for string literals. But I don't think
                 // the LSP protocol specifies that this is a problem.
@@ -397,7 +357,7 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
                 self.add_docstring_range(&func.body);
             }
             AnyNodeRef::StmtClassDef(class) => {
-                self.add_class_def_range(class);
+                self.add_block_body_range(class.name.start(), &class.body);
                 // See comment above for class docstrings about this
                 // being duplicative with adding folding ranges for
                 // string literals.
