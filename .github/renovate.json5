@@ -4,7 +4,7 @@
   suppressNotifications: ["prEditedNotification"],
   extends: ["github>astral-sh/renovate-config"],
   labels: ["internal"],
-  schedule: ["before 0am on Wednesday"],
+  schedule: ["before 4am on Wednesday"],
   semanticCommits: "disabled",
   separateMajorMinor: false,
   enabledManagers: ["github-actions", "pre-commit", "cargo", "pep621", "pip_requirements", "npm"],
