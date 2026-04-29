@@ -5721,12 +5721,16 @@ impl<'db> Type<'db> {
 
             // TODO(jelle): Materialize should be handled differently, since TypeIs is invariant
             Type::TypeIs(type_is) => visitor.visit(self, type_mapping, || {
-                type_is.with_type(
+                Type::TypeIs(TypeIsType::new(
                     db,
                     type_is
                         .return_type(db)
                         .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                )
+                    type_is
+                        .declared_type(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    type_is.place_info(db),
+                ))
             }),
 
             Type::TypeGuard(type_guard) => visitor.visit(self, type_mapping, || {
@@ -5976,6 +5980,12 @@ impl<'db> Type<'db> {
 
             Type::TypeIs(type_is) => {
                 type_is.return_type(db).find_legacy_typevars_impl(
+                    db,
+                    binding_context,
+                    typevars,
+                    visitor,
+                );
+                type_is.declared_type(db).find_legacy_typevars_impl(
                     db,
                     binding_context,
                     typevars,
@@ -7645,6 +7655,7 @@ pub(super) struct MetaclassTransformInfo<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct TypeIsType<'db> {
     return_type: Type<'db>,
+    declared_type: Type<'db>,
     /// The ID of the scope to which the place belongs
     /// and the ID of the place itself within that scope.
     place_info: Option<(ScopeId<'db>, ScopedPlaceId)>,
@@ -7669,17 +7680,24 @@ impl<'db> TypeIsType<'db> {
         Some(format!("{}", table.place(place)))
     }
 
-    pub(crate) fn unbound(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        Type::TypeIs(Self::new(db, ty, None))
-    }
-
-    pub(crate) fn bound(
-        db: &'db dyn Db,
-        return_type: Type<'db>,
-        scope: ScopeId<'db>,
-        place: ScopedPlaceId,
-    ) -> Type<'db> {
-        Type::TypeIs(Self::new(db, return_type, Some((scope, place))))
+    /// Construct an unbound `TypeIs` return type from the user-written type expression.
+    ///
+    /// The stored return type uses the top materialization for narrowing while the declared type is
+    /// preserved for `TypeIs` invariance checks.
+    ///
+    /// ```python
+    /// from typing import TypeIs
+    ///
+    /// def is_tuple(value: object) -> TypeIs[tuple[int, ...]]:
+    ///     return isinstance(value, tuple)
+    /// ```
+    pub(crate) fn from_type_expression(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        // N.B. Using the top materialization here is a pragmatic decision that
+        // makes us produce more intuitive results given how `TypeIs` is used in
+        // the real world (in particular, in typeshed). However, there's some
+        // debate about whether this is really fully correct. See
+        // <https://github.com/astral-sh/ruff/pull/20591> for more discussion.
+        Type::TypeIs(Self::new(db, ty.top_materialization(db), ty, None))
     }
 
     #[must_use]
@@ -7689,12 +7707,17 @@ impl<'db> TypeIsType<'db> {
         scope: ScopeId<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
-        Self::bound(db, self.return_type(db), scope, place)
+        Type::TypeIs(Self::new(
+            db,
+            self.return_type(db),
+            self.declared_type(db),
+            Some((scope, place)),
+        ))
     }
 
     #[must_use]
     pub(crate) fn with_type(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        Type::TypeIs(Self::new(db, ty, self.place_info(db)))
+        Type::TypeIs(Self::new(db, ty, ty, self.place_info(db)))
     }
 
     pub(crate) fn is_bound(self, db: &'db dyn Db) -> bool {
