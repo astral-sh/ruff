@@ -68,6 +68,17 @@ impl From<TextRange> for FoldingRange {
 struct BlockHeader {
     /// The full range of the header, from the block's keyword to the colon.
     range: TextRange,
+    /// The optional header subrange to fold, and the grouped range that surrounds it.
+    ///
+    /// For example, when a function definition has a multi-line parameter list, this range
+    /// covers the ellipsis in `def f(...):`.
+    sub_range: Option<BlockHeaderSubRange>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct BlockHeaderSubRange {
+    wrapper_range: TextRange,
+    sub_range: TextRange,
 }
 
 /// Returns a list of folding ranges for the given file.
@@ -82,10 +93,15 @@ pub fn folding_ranges(
     let mut visitor = FoldingRangeVisitor {
         source: source.as_str(),
         ranges: vec![],
+        active_block_header_sub_ranges: vec![],
         tokens: parsed.tokens(),
         range_filter,
     };
     walk_node(&mut visitor, AnyNodeRef::from(parsed.syntax()));
+    debug_assert!(
+        visitor.active_block_header_sub_ranges.is_empty(),
+        "all active block header subranges should be cleared after traversal"
+    );
 
     // Add remaining ranges not covered by the AST visitor.
     let own_line_comment_ranges: Vec<_> = parsed
@@ -113,8 +129,15 @@ pub fn folding_ranges(
 struct FoldingRangeVisitor<'a> {
     source: &'a str,
     ranges: Vec<FoldingRange>,
+    active_block_header_sub_ranges: Vec<ActiveBlockHeaderSubRange>,
     tokens: &'a Tokens,
     range_filter: Option<TextRange>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ActiveBlockHeaderSubRange {
+    owner: TextRange,
+    wrapper_range: TextRange,
 }
 
 impl FoldingRangeVisitor<'_> {
@@ -155,6 +178,19 @@ impl FoldingRangeVisitor<'_> {
 
     fn is_multiline(&self, range: TextRange) -> bool {
         self.source[range].contains('\n') || self.source[range].contains('\r')
+    }
+
+    fn is_redundant_block_header_ast_range(&self, range: TextRange) -> bool {
+        self.active_block_header_sub_ranges
+            .iter()
+            .any(|block_header_sub_range| range == block_header_sub_range.wrapper_range)
+    }
+
+    /// Adds a generic multiline AST-node range, skipping redundant ranges for block headers.
+    fn add_multiline_node_range(&mut self, range: TextRange) {
+        if !self.is_redundant_block_header_ast_range(range) {
+            self.add_range(range);
+        }
     }
 
     /// Compute folding ranges for consecutive import statements.
@@ -334,15 +370,27 @@ impl FoldingRangeVisitor<'_> {
     /// Attempts to find a [`BlockHeader`] within the given range.
     fn block_header(&self, start: TextSize, body_start: TextSize) -> Option<BlockHeader> {
         let mut open_groups = Vec::new();
+        let mut sub_range = None;
         let mut colon_end = None;
 
         for token in self.tokens.in_range(TextRange::new(start, body_start)) {
             match token.kind() {
                 TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => {
-                    open_groups.push(token.start());
+                    open_groups.push((token.start(), token.end()));
                 }
                 TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace => {
-                    open_groups.pop();
+                    if let Some((wrapper_start, sub_range_start)) = open_groups.pop()
+                        && open_groups.is_empty()
+                        && sub_range.is_none()
+                    {
+                        let range = TextRange::new(sub_range_start, token.start());
+                        if self.is_multiline(range) {
+                            sub_range = Some(BlockHeaderSubRange {
+                                wrapper_range: TextRange::new(wrapper_start, token.end()),
+                                sub_range: range,
+                            });
+                        }
+                    }
                 }
                 TokenKind::Colon if open_groups.is_empty() => {
                     colon_end = Some(token.end());
@@ -353,18 +401,40 @@ impl FoldingRangeVisitor<'_> {
 
         Some(BlockHeader {
             range: TextRange::new(start, colon_end?),
+            sub_range,
         })
     }
 
-    /// Adds a folding range for the body of the given block, keeping the full header line visible.
-    fn add_block_ranges<T: Ranged>(&mut self, header_start: TextSize, body: &[T]) {
+    /// Adds folding ranges for the given block of code:
+    ///
+    /// 1. A folding range for the body of the block (always present).
+    /// 2. An optional folding range for a multi-line block header.
+    fn add_block_ranges<T: Ranged>(
+        &mut self,
+        owner: TextRange,
+        header_start: TextSize,
+        body: &[T],
+    ) {
         let (Some(first), Some(last)) = (body.first(), body.last()) else {
             return;
         };
         let Some(header) = self.block_header(header_start, first.start()) else {
             return;
         };
+        if let Some(sub_range) = header.sub_range {
+            self.active_block_header_sub_ranges
+                .push(ActiveBlockHeaderSubRange {
+                    owner,
+                    wrapper_range: sub_range.wrapper_range,
+                });
+        }
 
+        // Optionally add a folding range for the text between grouping tokens in a multi-line block header.
+        if let Some(sub_range) = header.sub_range {
+            self.add_range(sub_range.sub_range);
+        }
+
+        // Add a folding range for the body of the block, keeping the full header line visible.
         let body_fold_start = self.source.line_end(header.range.end());
         if body_fold_start <= last.end() {
             self.add_range(TextRange::new(body_fold_start, last.end()));
@@ -374,18 +444,20 @@ impl FoldingRangeVisitor<'_> {
     /// Searches for a given keyword (e.g. `else`) and, if present, adds folding ranges for the block it defines.
     fn add_block_ranges_from_keyword(
         &mut self,
+        owner: TextRange,
         keyword: TokenKind,
         search_range: TextRange,
         body: &[impl Ranged],
     ) {
         if let Some(header_start) = self.find_token_start(keyword, search_range) {
-            self.add_block_ranges(header_start, body);
+            self.add_block_ranges(owner, header_start, body);
         }
     }
 
     /// Adds folding ranges for a given block while leaving decorators unfolded.
     fn add_block_ranges_omitting_decorators(
         &mut self,
+        owner: TextRange,
         statement_start: TextSize,
         last_decorator_end: Option<TextSize>,
         keyword: TokenKind,
@@ -394,12 +466,13 @@ impl FoldingRangeVisitor<'_> {
     ) {
         if let Some(decorator_end) = last_decorator_end {
             self.add_block_ranges_from_keyword(
+                owner,
                 keyword,
                 TextRange::new(decorator_end, keyword_search_end),
                 body,
             );
         } else {
-            self.add_block_ranges(statement_start, body);
+            self.add_block_ranges(owner, statement_start, body);
         }
     }
 
@@ -411,6 +484,7 @@ impl FoldingRangeVisitor<'_> {
             TokenKind::Def
         };
         self.add_block_ranges_omitting_decorators(
+            func.range(),
             func.start(),
             func.decorator_list.last().map(Ranged::end),
             keyword,
@@ -422,6 +496,7 @@ impl FoldingRangeVisitor<'_> {
     /// Add a folding range for class definitions, excluding decorators.
     fn add_class_def_range(&mut self, class: &StmtClassDef) {
         self.add_block_ranges_omitting_decorators(
+            class.range(),
             class.start(),
             class.decorator_list.last().map(Ranged::end),
             TokenKind::Class,
@@ -462,19 +537,20 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
             }
             AnyNodeRef::StmtIf(if_stmt) => {
                 // Fold each branch individually rather than the entire if block.
-                self.add_block_ranges(if_stmt.start(), &if_stmt.body);
+                self.add_block_ranges(if_stmt.range(), if_stmt.start(), &if_stmt.body);
             }
             AnyNodeRef::ElifElseClause(clause) => {
                 // Each elif/else clause has its own range.
-                self.add_block_ranges(clause.start(), &clause.body);
+                self.add_block_ranges(clause.range(), clause.start(), &clause.body);
             }
             AnyNodeRef::StmtFor(for_stmt) => {
                 // Fold the for body separately from the else block.
-                self.add_block_ranges(for_stmt.start(), &for_stmt.body);
+                self.add_block_ranges(for_stmt.range(), for_stmt.start(), &for_stmt.body);
                 if let (Some(body_last), Some(orelse_first)) =
                     (for_stmt.body.last(), for_stmt.orelse.first())
                 {
                     self.add_block_ranges_from_keyword(
+                        for_stmt.range(),
                         TokenKind::Else,
                         TextRange::new(body_last.end(), orelse_first.start()),
                         &for_stmt.orelse,
@@ -483,11 +559,12 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
             }
             AnyNodeRef::StmtWhile(while_stmt) => {
                 // Fold the while body separately from the else block.
-                self.add_block_ranges(while_stmt.start(), &while_stmt.body);
+                self.add_block_ranges(while_stmt.range(), while_stmt.start(), &while_stmt.body);
                 if let (Some(body_last), Some(orelse_first)) =
                     (while_stmt.body.last(), while_stmt.orelse.first())
                 {
                     self.add_block_ranges_from_keyword(
+                        while_stmt.range(),
                         TokenKind::Else,
                         TextRange::new(body_last.end(), orelse_first.start()),
                         &while_stmt.orelse,
@@ -495,11 +572,11 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
                 }
             }
             AnyNodeRef::StmtWith(with_stmt) => {
-                self.add_block_ranges(with_stmt.start(), &with_stmt.body);
+                self.add_block_ranges(with_stmt.range(), with_stmt.start(), &with_stmt.body);
             }
             AnyNodeRef::StmtTry(try_stmt) => {
                 // Fold the try body separately from handlers, else, and finally.
-                self.add_block_ranges(try_stmt.start(), &try_stmt.body);
+                self.add_block_ranges(try_stmt.range(), try_stmt.start(), &try_stmt.body);
                 // Exception handlers are folded via ExceptHandlerExceptHandler.
                 // Fold the else block if present.
                 if let Some(orelse_first) = try_stmt.orelse.first() {
@@ -510,6 +587,7 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
                         .or_else(|| try_stmt.body.last().map(Ranged::end));
                     if let Some(previous_end) = previous_end {
                         self.add_block_ranges_from_keyword(
+                            try_stmt.range(),
                             TokenKind::Else,
                             TextRange::new(previous_end, orelse_first.start()),
                             &try_stmt.orelse,
@@ -526,6 +604,7 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
                         .or_else(|| try_stmt.body.last().map(Ranged::end));
                     if let Some(previous_end) = previous_end {
                         self.add_block_ranges_from_keyword(
+                            try_stmt.range(),
                             TokenKind::Finally,
                             TextRange::new(previous_end, finally_first.start()),
                             &try_stmt.finalbody,
@@ -534,75 +613,86 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
                 }
             }
             AnyNodeRef::StmtMatch(match_stmt) => {
-                self.add_block_ranges(match_stmt.start(), &match_stmt.cases);
+                self.add_block_ranges(match_stmt.range(), match_stmt.start(), &match_stmt.cases);
             }
 
             // Match cases within match statements
             AnyNodeRef::MatchCase(case) => {
-                self.add_block_ranges(case.start(), &case.body);
+                self.add_block_ranges(case.range(), case.start(), &case.body);
             }
 
             // Exception handlers
             AnyNodeRef::ExceptHandlerExceptHandler(handler) => {
-                self.add_block_ranges(handler.start(), &handler.body);
+                self.add_block_ranges(handler.range(), handler.start(), &handler.body);
             }
 
             // Multiline expressions
             AnyNodeRef::ExprList(list) => {
-                self.add_range(list.range());
+                self.add_multiline_node_range(list.range());
             }
             AnyNodeRef::ExprTuple(tuple)
                 // Only fold parenthesized tuples.
                 if tuple.parenthesized => {
-                    self.add_range(tuple.range());
+                    self.add_multiline_node_range(tuple.range());
                 }
             AnyNodeRef::ExprDict(dict) => {
-                self.add_range(dict.range());
+                self.add_multiline_node_range(dict.range());
             }
             AnyNodeRef::ExprSet(set) => {
-                self.add_range(set.range());
+                self.add_multiline_node_range(set.range());
             }
             AnyNodeRef::ExprListComp(listcomp) => {
-                self.add_range(listcomp.range());
+                self.add_multiline_node_range(listcomp.range());
             }
             AnyNodeRef::ExprSetComp(setcomp) => {
-                self.add_range(setcomp.range());
+                self.add_multiline_node_range(setcomp.range());
             }
             AnyNodeRef::ExprDictComp(dictcomp) => {
-                self.add_range(dictcomp.range());
+                self.add_multiline_node_range(dictcomp.range());
             }
             AnyNodeRef::ExprGenerator(generator) => {
-                self.add_range(generator.range());
+                self.add_multiline_node_range(generator.range());
             }
 
             // Function calls with arguments spanning multiple lines
             AnyNodeRef::ExprCall(call) => {
-                self.add_range(call.range());
+                self.add_multiline_node_range(call.range());
             }
 
             // String and bytes literals
             AnyNodeRef::ExprStringLiteral(string) => {
-                self.add_range(string.range());
+                self.add_multiline_node_range(string.range());
             }
             AnyNodeRef::ExprBytesLiteral(bytes) => {
-                self.add_range(bytes.range());
+                self.add_multiline_node_range(bytes.range());
             }
             AnyNodeRef::ExprFString(fstring) => {
-                self.add_range(fstring.range());
+                self.add_multiline_node_range(fstring.range());
             }
             AnyNodeRef::ExprTString(tstring) => {
-                self.add_range(tstring.range());
+                self.add_multiline_node_range(tstring.range());
             }
 
             // Type parameter lists
             AnyNodeRef::TypeParams(params) => {
-                self.add_range(params.range());
+                self.add_multiline_node_range(params.range());
             }
 
             _ => {}
         }
 
         TraversalSignal::Traverse
+    }
+
+    fn leave_node(&mut self, node: AnyNodeRef<'_>) {
+        let node_range = node.range();
+        while self
+            .active_block_header_sub_ranges
+            .last()
+            .is_some_and(|sub_range| sub_range.owner == node_range)
+        {
+            self.active_block_header_sub_ranges.pop();
+        }
     }
 
     fn visit_body(&mut self, body: &'_ [Stmt]) {
@@ -1598,6 +1688,194 @@ def my_function():
         5 | |     docstring.
         6 | |     """
           | |_______^
+          |
+        "#);
+    }
+
+    #[test]
+    fn test_folding_range_multiline_function_header() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def combine(
+    first,
+    second,
+):
+    return first + second
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:13
+          |
+        2 |   def combine(
+          |  _____________^
+        3 | |     first,
+        4 | |     second,
+          | |____________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:5:3
+          |
+        5 |   ):
+          |  ___^
+        6 | |     return first + second
+          | |_________________________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_multiline_class_header() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+class Derived(
+    Base,
+    metaclass=Meta,
+):
+    value = 1
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:15
+          |
+        2 |   class Derived(
+          |  _______________^
+        3 | |     Base,
+        4 | |     metaclass=Meta,
+          | |____________________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:5:3
+          |
+        5 |   ):
+          |  ___^
+        6 | |     value = 1
+          | |_____________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_multiline_parenthesized_if_header() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+if (
+    first
+    and second
+):
+    handle()
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:5
+          |
+        2 |   if (
+          |  _____^
+        3 | |     first
+        4 | |     and second
+          | |_______________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:5:3
+          |
+        5 |   ):
+          |  ___^
+        6 | |     handle()
+          | |____________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_multiline_square_bracket_header() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+class Repository[
+    Model,
+    Id,
+]:
+    value = 1
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:18
+          |
+        2 |   class Repository[
+          |  __________________^
+        3 | |     Model,
+        4 | |     Id,
+          | |________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:5:3
+          |
+        5 |   ]:
+          |  ___^
+        6 | |     value = 1
+          | |_____________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_multiline_brace_header() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+if {
+    "enabled": feature_flag,
+}["enabled"]:
+    handle()
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @r#"
+        info[folding-range]: Folding Range
+         --> main.py:2:5
+          |
+        2 |   if {
+          |  _____^
+        3 | |     "enabled": feature_flag,
+          | |_____________________________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:4:14
+          |
+        4 |   }["enabled"]:
+          |  ______________^
+        5 | |     handle()
+          | |____________^
           |
         "#);
     }

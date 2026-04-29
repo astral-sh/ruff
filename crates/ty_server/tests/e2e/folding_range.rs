@@ -14,6 +14,24 @@ fn folding_range_basic_functionality() -> Result<()> {
 
     def method(self):
         return self.value
+
+    def combine(
+        first,
+        second,
+    ):
+        return first + second
+
+    class Derived(
+        Base,
+        metaclass=Meta,
+    ):
+        value = 1
+
+    if (
+        first
+        and second
+    ):
+        handle()
 "#;
 
     let mut server = TestServerBuilder::new()?
