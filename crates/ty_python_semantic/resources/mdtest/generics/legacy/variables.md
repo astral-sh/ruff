@@ -437,11 +437,9 @@ T = TypeVar("T", covariant=True, contravariant=True)
 
 ### Infer variance
 
-> A generic class that uses the traditional syntax may include combinations of type variables with
-> explicit and inferred variance.
-
 For a `TypeVar` with `infer_variance=True`, we infer covariance when the type variable only appears
-in return positions, and contravariance when it only appears in parameter positions.
+in return positions, contravariance when it only appears in parameter positions, and invariance when
+it appears in both positions.
 
 ```toml
 [environment]
@@ -470,6 +468,42 @@ sink_obj: Sink[object] = Sink[int]()  # error: [invalid-assignment]
 sink_int: Sink[int] = Sink[object]()
 ```
 
+Both assignments are errors when the type variable is inferred to be invariant:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", infer_variance=True)
+
+class Box(Generic[T]):
+    value: T
+
+box_int: Box[int] = Box[object]()  # error: [invalid-assignment]
+box_obj: Box[object] = Box[int]()  # error: [invalid-assignment]
+```
+
+> A generic class that uses the traditional syntax may include combinations of type variables with
+> explicit and inferred variance.
+
+```py
+from typing import Generic, TypeVar
+
+ExplicitOutT = TypeVar("ExplicitOutT", covariant=True)
+InferredInT = TypeVar("InferredInT", infer_variance=True)
+
+class Mixed(Generic[ExplicitOutT, InferredInT]):
+    def get(self) -> ExplicitOutT:
+        raise NotImplementedError
+
+    def send(self, value: InferredInT) -> None:
+        raise NotImplementedError
+
+mixed_covariant: Mixed[object, int] = Mixed[int, int]()
+mixed_not_covariant: Mixed[int, int] = Mixed[object, int]()  # error: [invalid-assignment]
+mixed_contravariant: Mixed[int, int] = Mixed[int, object]()
+mixed_not_contravariant: Mixed[int, object] = Mixed[int, int]()  # error: [invalid-assignment]
+```
+
 Variance cannot be specified explicitly when variance inference is requested:
 
 ```py
@@ -481,9 +515,9 @@ CovariantAndInferred = TypeVar("CovariantAndInferred", covariant=True, infer_var
 
 ```snapshot
 error[invalid-legacy-type-variable]: A `TypeVar` cannot specify variance when `infer_variance=True`
-  --> src/mdtest_snippet.py:23:24
+  --> src/mdtest_snippet.py:48:24
    |
-23 | CovariantAndInferred = TypeVar("CovariantAndInferred", covariant=True, infer_variance=True)
+48 | CovariantAndInferred = TypeVar("CovariantAndInferred", covariant=True, infer_variance=True)
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 ```
