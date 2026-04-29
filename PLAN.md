@@ -140,9 +140,9 @@ def identity[T](t: T) -> T:
 
 ## Phase 1: Add nonce scaffolding without behavior changes
 
-- [ ] Add a freshness field to `BoundTypeVarInstance` with a default/non-fresh value.
-- [ ] Add the freshness field to `BoundTypeVarIdentity`.
-- [ ] Update all constructors to provide the default freshness.
+- [x] Add a freshness field to `BoundTypeVarInstance` with a default/non-fresh value.
+- [x] Add the freshness field to `BoundTypeVarIdentity`.
+- [x] Update all constructors to provide the default freshness.
     - `with_binding_context`
     - `synthetic`
     - `synthetic_self`
@@ -150,18 +150,27 @@ def identity[T](t: T) -> T:
     - `without_paramspec_attr`
     - `map_bound_or_constraints`
     - materialization / `to_instance` helpers
-- [ ] Add helpers:
+- [x] Add helpers:
     - `freshen(db, nonce) -> BoundTypeVarInstance`
-    - `freshness(db)` / `identity_ignoring_freshness` if needed
-    - display/debug helpers if useful
-- [ ] Preserve current mdtests before any call/signature behavior changes.
-- [ ] Add clone-safe nonce state to `TypeRelationChecker` and propagate it through checker constructors/conversions.
+    - generated `freshness(db)` accessors from the salsa field
+    - no `identity_ignoring_freshness` or display changes were needed for this phase
+- [x] Preserve current mdtests before any call/signature behavior changes.
+- [x] Add clone-safe nonce state to `TypeRelationChecker` and propagate it through checker constructors/conversions.
     - direct `TypeRelationChecker` construction in `relation.rs`
     - `with_inferable_typevars`
     - `as_disjointness_checker`
     - `as_equivalence_checker`
-    - conversions from `DisjointnessChecker` / `EquivalenceChecker` back into `TypeRelationChecker`
-        `DisjointnessChecker` and `EquivalenceChecker` will likely need to carry the same generator handle when they can convert back into a `TypeRelationChecker`.
+    - conversions from `DisjointnessChecker` / `EquivalenceChecker` back into `TypeRelationChecker` carry the same generator handle
+
+Phase 1 implementation notes:
+
+- `TypeVarNonce` is a public wrapper around `NonZeroU32`; `None` remains the non-fresh/default value in `Option<TypeVarNonce>`.
+- `TypeVarNonceGenerator` uses `Rc<Cell<TypeVarNonce>>`, so cloned relation/disjointness/equivalence checkers share one monotonically increasing sequence. Exhaustion panics; supporting more than 2 billion distinct fresh occurrences in one relation context is intentionally out of scope.
+- Constructors that copy an existing `BoundTypeVarInstance` preserve its freshness; constructors that synthesize or initially bind a source typevar use `None`.
+- User-facing `BoundTypeVarIdentity` display still ignores freshness.
+- Validation run after Phase 1:
+    - `cargo check -p ty_python_semantic`
+    - targeted mdtests for `generics/pep695/functions.md`, `generics/legacy/functions.md`, `generics/pep695/callables.md`, `generics/legacy/callables.md`, and `type_properties/implies_subtype_of.md`
 
 ## Phase 2: Add a reusable generic-context freshening helper
 

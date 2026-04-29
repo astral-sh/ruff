@@ -1,4 +1,6 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::num::NonZeroU32;
+use std::rc::Rc;
 
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
@@ -165,7 +167,13 @@ impl<'db> TypeVarInstance<'db> {
         db: &'db dyn Db,
         binding_context: Definition<'db>,
     ) -> BoundTypeVarInstance<'db> {
-        BoundTypeVarInstance::new(db, self, BindingContext::Definition(binding_context), None)
+        BoundTypeVarInstance::new(
+            db,
+            self,
+            BindingContext::Definition(binding_context),
+            None,
+            None,
+        )
     }
 
     fn with_name_suffix(self, db: &'db dyn Db, suffix: &str) -> Self {
@@ -638,6 +646,47 @@ impl<'db> TypeVarInstance<'db> {
     }
 }
 
+/// A nonce that gives a bound typevar occurrence a fresh identity.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update)]
+pub struct TypeVarNonce(NonZeroU32);
+
+// This type does not have any heap storage.
+impl get_size2::GetSize for TypeVarNonce {}
+
+impl TypeVarNonce {
+    const FIRST: Self = Self(NonZeroU32::MIN);
+
+    fn increment(self) -> Self {
+        Self(
+            self.0
+                .checked_add(1)
+                .expect("exhausted bound typevar freshness nonces"),
+        )
+    }
+}
+
+/// A clone-safe generator of fresh bound-typevar occurrence nonces.
+#[derive(Clone, Debug)]
+pub(crate) struct TypeVarNonceGenerator {
+    next: Rc<Cell<TypeVarNonce>>,
+}
+
+impl Default for TypeVarNonceGenerator {
+    fn default() -> Self {
+        Self {
+            next: Rc::new(Cell::new(TypeVarNonce::FIRST)),
+        }
+    }
+}
+
+impl TypeVarNonceGenerator {
+    pub(crate) fn next(&self) -> TypeVarNonce {
+        let nonce = self.next.get();
+        self.next.set(nonce.increment());
+        nonce
+    }
+}
+
 /// A type variable that has been bound to a generic context, and which can be specialized to a
 /// concrete type.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -647,6 +696,8 @@ pub struct BoundTypeVarInstance<'db> {
     /// If [`Some`], this indicates that this type variable is the `args` or `kwargs` component
     /// of a `ParamSpec` i.e., `P.args` or `P.kwargs`.
     pub(super) paramspec_attr: Option<ParamSpecAttrKind>,
+    /// If [`Some`], this bound typevar is a fresh occurrence of the source-level typevar.
+    pub(super) freshness: Option<TypeVarNonce>,
 }
 
 // The Salsa heap is tracked separately.
@@ -659,19 +710,33 @@ impl<'db> BoundTypeVarInstance<'db> {
             self.typevar(db).with_name_suffix(db, suffix),
             self.binding_context(db),
             self.paramspec_attr(db),
+            self.freshness(db),
         )
     }
 
-    /// Get the identity of this bound typevar.
+    /// Get the identity of this bound typevar occurrence.
     ///
-    /// This is used for comparing whether two bound typevars represent the same logical typevar,
+    /// This is used for comparing whether two bound typevars represent the same occurrence,
     /// regardless of e.g. differences in their bounds or constraints due to materialization.
     pub(crate) fn identity(self, db: &'db dyn Db) -> BoundTypeVarIdentity<'db> {
         BoundTypeVarIdentity {
             identity: self.typevar(db).identity(db),
             binding_context: self.binding_context(db),
             paramspec_attr: self.paramspec_attr(db),
+            freshness: self.freshness(db),
         }
+    }
+
+    /// Returns a new bound typevar instance with a fresh occurrence identity.
+    #[expect(dead_code)]
+    pub(crate) fn freshen(self, db: &'db dyn Db, nonce: TypeVarNonce) -> Self {
+        Self::new(
+            db,
+            self.typevar(db),
+            self.binding_context(db),
+            self.paramspec_attr(db),
+            Some(nonce),
+        )
     }
 
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db Name {
@@ -716,7 +781,13 @@ impl<'db> BoundTypeVarInstance<'db> {
             None, // `P.args` and `P.kwargs` cannot have defaults even though `P` can
         );
 
-        Self::new(db, typevar, self.binding_context(db), Some(kind))
+        Self::new(
+            db,
+            typevar,
+            self.binding_context(db),
+            Some(kind),
+            self.freshness(db),
+        )
     }
 
     /// Returns a new bound typevar instance without any `ParamSpec` attribute set.
@@ -744,10 +815,11 @@ impl<'db> BoundTypeVarInstance<'db> {
             ),
             self.binding_context(db),
             None,
+            self.freshness(db),
         )
     }
 
-    /// Returns whether two bound typevars represent the same logical typevar, regardless of e.g.
+    /// Returns whether two bound typevars represent the same occurrence, regardless of e.g.
     /// differences in their bounds or constraints due to materialization.
     pub(crate) fn is_same_typevar_as(self, db: &'db dyn Db, other: Self) -> bool {
         self.identity(db) == other.identity(db)
@@ -769,7 +841,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             Some(variance),
             None, // _default
         );
-        Self::new(db, typevar, BindingContext::Synthetic, None)
+        Self::new(db, typevar, BindingContext::Synthetic, None, None)
     }
 
     /// Create a new synthetic `Self` type variable with the given upper bound.
@@ -791,7 +863,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             Some(TypeVarVariance::Invariant),
             None, // _default
         );
-        Self::new(db, typevar, binding_context, None)
+        Self::new(db, typevar, binding_context, None, None)
     }
 
     /// Returns an identical type variable with its `TypeVarBoundOrConstraints` mapped by the
@@ -815,6 +887,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             typevar,
             self.binding_context(db),
             self.paramspec_attr(db),
+            self.freshness(db),
         )
     }
 
@@ -962,6 +1035,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 .materialize_impl(db, materialization_kind, visitor),
             self.binding_context(db),
             self.paramspec_attr(db),
+            self.freshness(db),
         )
     }
 
@@ -971,6 +1045,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             self.typevar(db).to_instance(db)?,
             self.binding_context(db),
             self.paramspec_attr(db),
+            self.freshness(db),
         ))
     }
 }
@@ -1119,12 +1194,12 @@ impl std::fmt::Display for ParamSpecAttrKind {
     }
 }
 
-/// The identity of a bound type variable.
+/// The identity of a bound type variable occurrence.
 ///
 /// This identifies a specific binding of a typevar to a context (e.g., `T@ClassC` vs `T@FunctionF`),
-/// independent of the typevar's bounds or constraints. Two bound typevars have the same identity
-/// if they represent the same logical typevar bound in the same context, even if their bounds
-/// have been materialized differently.
+/// plus an optional freshness nonce for fresh callable occurrences, independent of the typevar's
+/// bounds or constraints. Two bound typevars have the same identity if they represent the same
+/// occurrence, even if their bounds have been materialized differently.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub struct BoundTypeVarIdentity<'db> {
     pub(crate) identity: TypeVarIdentity<'db>,
@@ -1132,6 +1207,8 @@ pub struct BoundTypeVarIdentity<'db> {
     /// If [`Some`], this indicates that this type variable is the `args` or `kwargs` component
     /// of a `ParamSpec` i.e., `P.args` or `P.kwargs`.
     pub(super) paramspec_attr: Option<ParamSpecAttrKind>,
+    /// If [`Some`], this bound typevar is a fresh occurrence of the source-level typevar.
+    pub(super) freshness: Option<TypeVarNonce>,
 }
 
 #[salsa::tracked(
