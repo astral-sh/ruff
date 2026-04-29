@@ -663,6 +663,12 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
             {
                 places.insert(place);
             }
+            if let ast::Expr::Attribute(attribute) = expr
+                && let Some(place_expr) = PlaceExpr::try_from_expr(&attribute.value)
+                && let Some(place) = self.places.place_id((&place_expr).into())
+            {
+                places.insert(place);
+            }
         }
 
         places
@@ -766,6 +772,12 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                     places.insert(place);
                 }
             }
+        }
+        if let ast::Expr::Attribute(attribute) = subject_node
+            && let Some(place_expr) = PlaceExpr::try_from_expr(&attribute.value)
+            && let Some(place) = self.places.place_id((&place_expr).into())
+        {
+            places.insert(place);
         }
 
         // Handle Or patterns by recursing into each alternative
