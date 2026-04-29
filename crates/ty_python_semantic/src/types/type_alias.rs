@@ -246,6 +246,11 @@ pub(super) fn walk_implicit_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Size
 }
 
 impl<'db> ImplicitTypeAliasType<'db> {
+    /// The RHS of the alias evaluated as a type expression.
+    ///
+    /// Note that this is not the form used in value-expression contexts (e.g. when an
+    /// implicit-alias `UnionType` instance is used as the operand of `|` or as `isinstance`'s
+    /// second argument); for that, see [`super::known_instance::LazyUnionTypeInstance`].
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         infer_implicit_assignment_value_type(
             db,
@@ -303,6 +308,18 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
+    /// The RHS of the alias evaluated as a type expression.
+    ///
+    /// For PEP 695 aliases this returns the body of the type statement (with any
+    /// applicable specialization applied). For implicit (PEP 613-style) aliases this re-evaluates
+    /// the assignment RHS in `ExpressionKind::TypeExpression` mode (the same form used to
+    /// resolve `x: Alias` references).
+    ///
+    /// This is not the path used to render the alias in a value-expression context. When an
+    /// implicit-alias `UnionType` instance is used as a value (e.g. as `isinstance`'s second
+    /// argument or an operand of `|`), the alias is preserved as `Type::TypeAlias(Implicit(...))`
+    /// via [`super::known_instance::UnionTypeInstance::union_type`] without going through this
+    /// method.
     pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),

@@ -459,11 +459,13 @@ impl<'db> UnionTypeInstance<'db> {
         db: &'db dyn Db,
         name: Name,
         definition: Definition<'db>,
+        value_expr_types: Option<[Type<'db>; 2]>,
     ) -> Self {
         Self::new(
             db,
             UnionTypeInstanceInner::Lazy(LazyUnionTypeInstance {
                 type_alias: ImplicitTypeAliasType::new(db, name, definition),
+                _value_expr_types: value_expr_types,
             }),
         )
     }
@@ -484,6 +486,12 @@ impl<'db> UnionTypeInstance<'db> {
         )
     }
 
+    /// Returns the type-expression view of the union.
+    ///
+    /// For the lazy variant this preserves the alias by wrapping it in
+    /// `Type::TypeAlias(Implicit(...))`, so the constraint solver and diagnostics can see the
+    /// alias name rather than its expansion. For the eager variant this returns the
+    /// already-built union (or the validation error if any element is not a valid type).
     pub(crate) fn union_type(
         self,
         db: &'db dyn Db,
@@ -556,6 +564,10 @@ impl<'db> UnionTypeInstance<'db> {
 #[derive(Clone, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub struct LazyUnionTypeInstance<'db> {
     type_alias: ImplicitTypeAliasType<'db>,
+    /// Cached value-expression types captured at eager-to-lazy promotion time. Reused by
+    /// `value_expression_types` so we do not re-run inference for the common path.
+    #[allow(clippy::used_underscore_binding)]
+    _value_expr_types: Option<[Type<'db>; 2]>,
 }
 
 impl<'db> LazyUnionTypeInstance<'db> {
@@ -563,38 +575,33 @@ impl<'db> LazyUnionTypeInstance<'db> {
         self.type_alias
     }
 
+    /// Returns the alias' RHS evaluated as `kind`. The alias-name view used in type-expression
+    /// contexts is produced separately by [`UnionTypeInstance::union_type`].
     fn value_type(&self, db: &'db dyn Db, kind: ExpressionKind) -> Type<'db> {
         infer_implicit_assignment_value_type(db, self.type_alias.definition(db), kind)
     }
 
     fn value_expression_types(
-        &self,
+        &'db self,
         db: &'db dyn Db,
     ) -> Result<impl Iterator<Item = Type<'db>> + 'db, InvalidTypeExpressionError<'db>> {
+        if let Some(value_expr_types) = &self._value_expr_types {
+            return Ok(Either::Left(value_expr_types.iter().copied()));
+        }
         match self.value_type(db, ExpressionKind::Normal) {
-            ty @ Type::KnownInstance(KnownInstanceType::UnionType(union)) => {
-                match union.inner(db) {
-                    UnionTypeInstanceInner::Eager(eager) => eager.value_expression_types(db),
-                    UnionTypeInstanceInner::Lazy(_) => Err(InvalidTypeExpressionError {
-                        fallback_type: Type::unknown(),
-                        invalid_expressions: smallvec::smallvec_inline![
-                            super::InvalidTypeExpression::InvalidType(
-                                ty,
-                                self.type_alias.definition(db).scope(db)
-                            )
-                        ],
-                    }),
+            Type::KnownInstance(KnownInstanceType::UnionType(union)) => match union.inner(db) {
+                UnionTypeInstanceInner::Eager(eager) => {
+                    eager.value_expression_types(db).map(Either::Right)
                 }
-            }
-            other => Err(InvalidTypeExpressionError {
-                fallback_type: Type::unknown(),
-                invalid_expressions: smallvec::smallvec_inline![
-                    super::InvalidTypeExpression::InvalidType(
-                        other,
-                        self.type_alias.definition(db).scope(db)
-                    )
-                ],
-            }),
+                UnionTypeInstanceInner::Lazy(_) => unreachable!(
+                    "Promotion only converts a fully evaluated eager union to lazy, so the salsa-cached \
+                     `value_type` cannot return another lazy `UnionType`"
+                ),
+            },
+            _ => unreachable!(
+                "When `LazyUnionTypeInstance::value_type` is called with `ExpressionKind::Normal`, \
+                cycles (return `Divergent`) should not occur."
+            ),
         }
     }
 }
@@ -734,7 +741,12 @@ impl<'db> EagerUnionTypeInstance<'db> {
                 .is_ok_and(|ty| legacy_typevars(*ty).is_empty())
         {
             Some(Type::KnownInstance(KnownInstanceType::UnionType(
-                UnionTypeInstance::from_definition(db, name.id().clone(), definition),
+                UnionTypeInstance::from_definition(
+                    db,
+                    name.id().clone(),
+                    definition,
+                    self._value_expr_types,
+                ),
             )))
         } else {
             None
