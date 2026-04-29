@@ -1128,8 +1128,8 @@ impl GotoTarget<'_> {
             node => {
                 // Check if this is the LHS name of a PEP 695 type alias (the `x` in `type x = ...`).
                 //
-                // Note that the LHS is parsed as an `ExprName` write target, so without
-                // retargeting hover would show `Never` rather than the alias type.
+                // The LHS is an `ExprName` in a write position, which on its own
+                // resolves to `Never`, so we retarget to the alias statement.
                 if let AnyNodeRef::ExprName(name) = node
                     && let Some(AnyNodeRef::StmtTypeAlias(type_alias)) = covering_node.parent()
                     && type_alias.name.range() == name.range
