@@ -228,6 +228,44 @@ type Style = Literal["italic", "bold", "underline"]"#,
 }
 
 #[test]
+fn semantic_tokens_for_cell_do_not_leak_quoted_annotations() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.initialization_result().unwrap();
+
+    let mut builder = NotebookBuilder::virtual_file("src/test.ipynb");
+
+    // Create a first cell that contains semantic tokens.
+    builder.add_python_cell(
+        r#"from typing import cast
+
+x = cast("list[str]", [])"#,
+    );
+
+    // Create a second, empty cell that does not contain any semantic tokens.
+    let second_cell = builder.add_python_cell("");
+
+    builder.open(&mut server);
+
+    // Assert that we didn't receive any semantic tokens for the empty cell.
+    // This proves that none were leaked from the first cell.
+    let response = semantic_tokens_full_for_cell(&mut server, &second_cell);
+    assert!(matches!(
+        response,
+        Some(lsp_types::SemanticTokensResult::Tokens(_))
+    ));
+    if let Some(lsp_types::SemanticTokensResult::Tokens(tokens)) = response {
+        assert!(tokens.data.is_empty());
+    }
+
+    server.collect_publish_diagnostic_notifications(2);
+
+    Ok(())
+}
+
+#[test]
 fn swap_cells() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
         .build()
