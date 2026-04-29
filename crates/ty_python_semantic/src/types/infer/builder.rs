@@ -428,6 +428,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred.extend(extra.deferred.iter().copied());
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
+            self.expected_types.extend(extra.expected_types.iter());
             self.qualifiers.extend(extra.qualifiers.iter());
             self.type_expression_flags
                 .extend(extra.type_expression_flags.iter());
@@ -9108,7 +9109,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             mut qualifiers,
             mut type_expression_flags,
             mut string_annotations,
-            expected_types: _,
+            mut expected_types,
             scope,
             bindings,
             declarations,
@@ -9135,16 +9136,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let extra = (!diagnostics.is_empty()
             || !string_annotations.is_empty()
             || cycle_recovery.is_some()
+            || !expected_types.is_empty()
             || !deferred.is_empty()
             || !called_functions.is_empty()
             || !qualifiers.is_empty()
             || !type_expression_flags.is_empty())
         .then(|| {
             qualifiers.shrink_to_fit();
+            expected_types.shrink_to_fit();
             type_expression_flags.shrink_to_fit();
             string_annotations.shrink_to_fit();
             Box::new(StatementInferenceInnerExtra {
                 string_annotations,
+                expected_types,
                 called_functions: called_functions
                     .into_iter()
                     .collect::<Vec<_>>()

@@ -1145,6 +1145,9 @@ struct StatementInferenceInnerExtra<'db> {
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
 
+    /// Expected types for expression nodes tracked for IDE completion.
+    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+
     /// Functions called while inferring this statement.
     called_functions: Box<[FunctionType<'db>]>,
 

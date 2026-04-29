@@ -7232,6 +7232,28 @@ x: Literal["a"] = "a<CURSOR>
     }
 
     #[test]
+    fn string_literal_completions_in_standalone_statement() {
+        let builder = completion_test_builder(
+            r#"
+from collections.abc import Callable
+from typing import Literal
+
+def func(callback: Callable[[], Literal["yes", "no"]]) -> None: ...
+
+x = y = func(lambda: "<CURSOR>")
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        no :: Literal["no"]
+        yes :: Literal["yes"]
+        "#,
+        );
+    }
+
+    #[test]
     fn typevar_with_upper_bound() {
         let builder = completion_test_builder(
             "\
