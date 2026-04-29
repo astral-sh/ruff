@@ -5702,67 +5702,20 @@ impl<'db> Type<'db> {
                 element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }),
             Type::Intersection(intersection) => {
-                // Identity preservation: lazily instantiate the builder only when
-                // a change is observed (or when negatives must be dropped).
-                let process_negatives =
-                    !matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, _));
-                let positives = intersection.positive(db);
-                let negatives = intersection.negative(db);
-
-                let mut builder: Option<IntersectionBuilder<'db>> = None;
-
-                for (i, positive) in positives.iter().enumerate() {
-                    let new_positive =
-                        positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-                    if let Some(b) = builder.take() {
-                        builder = Some(b.add_positive(new_positive));
-                    } else if &new_positive != positive {
-                        let mut b = IntersectionBuilder::new(db);
-                        for prev in positives.iter().take(i) {
-                            b = b.add_positive(*prev);
-                        }
-                        builder = Some(b.add_positive(new_positive));
-                    }
+                let mut builder = IntersectionBuilder::new(db);
+                for positive in intersection.positive(db) {
+                    builder =
+                        builder.add_positive(positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
                 }
-
-                if process_negatives {
-                    for (i, negative) in negatives.iter().enumerate() {
-                        let new_negative = negative.apply_type_mapping_impl(
-                            db,
-                            &type_mapping.flip(),
-                            tcx,
-                            visitor,
+                // Promotion should remove negative contributions from intersections,
+                // so we don't preserve them here when promotion is enabled.
+                if !matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, _)) {
+                    for negative in intersection.negative(db) {
+                        builder = builder.add_negative(
+                            negative.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
                         );
-                        if let Some(b) = builder.take() {
-                            builder = Some(b.add_negative(new_negative));
-                        } else if &new_negative != negative {
-                            // First change is in negatives — replay all positives and
-                            // the unchanged negative prefix before adding the new one.
-                            let mut b = IntersectionBuilder::new(db);
-                            for p in positives {
-                                b = b.add_positive(*p);
-                            }
-                            for n in negatives.iter().take(i) {
-                                b = b.add_negative(*n);
-                            }
-                            builder = Some(b.add_negative(new_negative));
-                        }
-                    }
-                } else if !negatives.is_empty() {
-                    // Promotion drops negatives. If any existed, identity is broken;
-                    // build with positives only.
-                    if builder.is_none() {
-                        let mut b = IntersectionBuilder::new(db);
-                        for p in positives {
-                            b = b.add_positive(*p);
-                        }
-                        builder = Some(b);
                     }
                 }
-
-                let Some(builder) = builder else {
-                    return self;
-                };
                 builder.build()
             }
 
