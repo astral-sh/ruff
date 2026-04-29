@@ -7307,6 +7307,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 &call_arguments,
                                 call_expression,
                                 self.file(),
+                                call_expression_tcx,
                             );
                         }
                     }

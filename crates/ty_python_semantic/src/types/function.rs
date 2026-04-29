@@ -1890,6 +1890,7 @@ impl KnownFunction {
         call_arguments: &CallArguments<'_, 'db>,
         call_expression: &ast::ExprCall,
         file: File,
+        call_expression_tcx: TypeContext<'db>,
     ) {
         let db = context.db();
         let parameter_types = overload.parameter_types();
@@ -2076,6 +2077,19 @@ impl KnownFunction {
                                 "`{casted_display}` is equivalent to `{source_display}`",
                             ));
                         }
+                    }
+                } else if let Some(annotation) = call_expression_tcx.annotation
+                    && annotation.is_equivalent_to(db, *casted_type)
+                    && source_type.is_assignable_to(db, annotation)
+                    && annotation.is_assignable_to(db, *source_type)
+                    && !any_over_type(db, *source_type, true, contains_unknown_or_todo)
+                    && !any_over_type(db, *casted_type, true, contains_unknown_or_todo)
+                {
+                    if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
+                        builder.into_diagnostic(format_args!(
+                            "Cast is redundant; the assignment target is annotated as `{}`",
+                            casted_type.display(db),
+                        ));
                     }
                 }
             }
