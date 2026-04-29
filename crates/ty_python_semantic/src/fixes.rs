@@ -992,7 +992,7 @@ mod tests {
                 "#
         ),
          @r#"
-        Added 5 suppressions
+        Added 6 suppressions
 
         ## Fixed source
 
@@ -1010,7 +1010,7 @@ mod tests {
             diag = get_data()
             diag["home_assistant"]["entities"] = sorted(  # ty:ignore[invalid-assignment]
                 diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty:ignore[invalid-argument-type, not-subscriptable]
-            )
+            )  # ty:ignore[no-matching-overload]
         ```
         "#);
     }
