@@ -550,6 +550,9 @@ pub(crate) struct TypeContext<'db> {
     /// Whether this context comes from an annotated variable assignment (`x: T = ...`).
     /// Used to restrict certain checks (e.g. redundant cast) to that specific syntactic form.
     pub(crate) from_annotated_assignment: bool,
+    /// Whether this context comes from a plain (unannotated) name assignment (`x = ...`).
+    /// Used to detect casts that could be expressed as a type annotation instead.
+    pub(crate) from_plain_name_assignment: bool,
 }
 
 impl<'db> TypeContext<'db> {
@@ -557,6 +560,7 @@ impl<'db> TypeContext<'db> {
         Self {
             annotation,
             from_annotated_assignment: false,
+            from_plain_name_assignment: false,
         }
     }
 
@@ -564,6 +568,17 @@ impl<'db> TypeContext<'db> {
         Self {
             annotation: Some(annotation),
             from_annotated_assignment: true,
+            from_plain_name_assignment: false,
+        }
+    }
+
+    /// Context for a plain (unannotated) name assignment: `x = <expr>`.
+    /// Used to detect casts that could be expressed as a type annotation instead.
+    pub(crate) fn for_plain_name_assignment() -> Self {
+        Self {
+            annotation: None,
+            from_annotated_assignment: false,
+            from_plain_name_assignment: true,
         }
     }
 
@@ -582,6 +597,7 @@ impl<'db> TypeContext<'db> {
         Self {
             annotation: self.annotation.map(f),
             from_annotated_assignment: self.from_annotated_assignment,
+            from_plain_name_assignment: self.from_plain_name_assignment,
         }
     }
 

@@ -2092,6 +2092,18 @@ impl KnownFunction {
                             target = target_type.display(db)
                         ));
                     }
+                } else if call_expression_tcx.from_plain_name_assignment
+                    && source_type.is_assignable_to(db, *target_type)
+                    && target_type.is_assignable_to(db, *source_type)
+                    && !any_over_type(db, *source_type, true, contains_unknown_or_todo)
+                    && !any_over_type(db, *target_type, true, contains_unknown_or_todo)
+                {
+                    if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
+                        builder.into_diagnostic(format_args!(
+                            "Cast to `{target}` can be replaced with a type annotation",
+                            target = target_type.display(db),
+                        ));
+                    }
                 }
             }
 

@@ -66,6 +66,7 @@ the gradual guarantee and leads to cascading errors when an object is inferred a
 from ty_extensions import Unknown
 
 def f(x: Any, y: Unknown, z: Any | str | int):
+    # error: [redundant-cast] "Cast to `dict[str, Any]` can be replaced with a type annotation"
     a = cast(dict[str, Any], x)
     reveal_type(a)  # revealed: dict[str, Any]
 
@@ -174,6 +175,36 @@ We only report these types of `redundant-cast` diagnostics for annotated assignm
 ```py
 def returns_int(x_any: Any) -> int:
     return cast(int, x_any)  # technically redundant, but no diagnostic
+```
+
+## Redundant casts in plain assignments
+
+A cast like `x = cast(int, expr)` where `expr: Any` can be written more idiomatically as
+`x: int = expr`. We report a `[redundant-cast]` diagnostic for this case too:
+
+```py
+from typing import Any, Sequence, cast
+
+def _(x_any: Any, x_int: int, x_sequence_any: Sequence[Any]):
+    # error: [redundant-cast] "Cast to `int` can be replaced with a type annotation"
+    a = cast(int, x_any)
+
+    # error: [redundant-cast] "Cast to `Any` can be replaced with a type annotation"
+    b = cast(Any, x_int)
+
+    # error: [redundant-cast]
+    c = cast(Sequence[Any], x_sequence_any)
+```
+
+As with annotated assignments, the diagnostic is not emitted when the cast has observable effects on
+the inferred type. The cast below converts `bool` to `int`, which is a narrowing that cannot be
+expressed just by annotating the variable as `int`:
+
+```py
+from typing import cast
+
+def _(x_bool: bool):
+    a = cast(int, x_bool)  # not redundant: annotating `a: int = x_bool` would infer `bool`
 ```
 
 ## Diagnostic snapshots
