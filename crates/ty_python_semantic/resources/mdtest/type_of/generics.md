@@ -635,9 +635,9 @@ def f[
         reveal_type(type_t_unbound_upcast)  # revealed: (...) -> T@f
         reveal_type(type_t_object_bound_upcast)  # revealed: (...) -> T1@f
 
-        # revealed: Overload[(x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> int, (x: str | bytes | bytearray, /, base: SupportsIndex) -> int]
+        # revealed: Overload[(x: ConvertibleToInt = 0, /) -> int, (x: str | bytes | bytearray, /, base: SupportsIndex) -> int]
         reveal_type(type_int_upcast)
-        # revealed: Overload[(x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> T2@f, (x: str | bytes | bytearray, /, base: SupportsIndex) -> T2@f]
+        # revealed: Overload[(x: ConvertibleToInt = 0, /) -> T2@f, (x: str | bytes | bytearray, /, base: SupportsIndex) -> T2@f]
         reveal_type(type_t_int_bound_upcast)
         # revealed: ((x: int, y: str | None = None) -> T3@f) | ((x: int, y: int | None = None) -> T3@f)
         reveal_type(type_t_union_bound_upcast)

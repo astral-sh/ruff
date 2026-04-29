@@ -3,12 +3,15 @@ use std::fmt::Write;
 use crate::{
     Db,
     types::{
-        GenericContext, Type, definition_expression_type,
-        display::qualified_name_components_from_scope, generics::Specialization, visitor,
+        GenericContext, Type, TypeContext, definition_expression_type,
+        display::qualified_name_components_from_scope, generics::Specialization,
+        infer_expression_type, visitor,
     },
 };
 use ty_python_core::{
+    ast_node_ref::AstNodeRef,
     definition::{Definition, DefinitionKind},
+    expression::{Expression, ExpressionKind},
     scope::ScopeId,
     semantic_index,
 };
@@ -16,6 +19,48 @@ use ty_python_core::{
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+
+#[salsa::tracked(
+    cycle_fn=implicit_assignment_value_type_cycle_recover,
+    cycle_initial=|_, id, _, _| Type::divergent(id),
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(super) fn infer_implicit_assignment_value_type<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    expression_kind: ExpressionKind,
+) -> Type<'db> {
+    let file = definition.file(db);
+    let module = parsed_module(db, file).load(db);
+    let value_node = match definition.kind(db) {
+        DefinitionKind::Assignment(assignment) => assignment.value(&module),
+        // SAFETY: Only implicit type aliases that meet this condition are promoted to
+        // `ImplicitTypeAliasType`; others are eagerly expanded and do not reach here.
+        DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(&module).unwrap(),
+        _ => unreachable!(),
+    };
+    let value_expression = Expression::new(
+        db,
+        file,
+        definition.file_scope(db),
+        AstNodeRef::new(&module, value_node),
+        None,
+        expression_kind,
+    );
+
+    infer_expression_type(db, value_expression, TypeContext::default())
+}
+
+fn implicit_assignment_value_type_cycle_recover<'db>(
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous_ty: &Type<'db>,
+    current_ty: Type<'db>,
+    _definition: Definition<'db>,
+    _expression_kind: ExpressionKind,
+) -> Type<'db> {
+    current_ty.cycle_normalized(db, *previous_ty, cycle)
+}
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PEP695TypeAliasType<'db> {
@@ -182,12 +227,47 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     }
 }
 
+/// An implicit type alias defined by assigning a type expression to a name.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct ImplicitTypeAliasType<'db> {
+    #[returns(ref)]
+    pub name: Name,
+    pub definition: Definition<'db>,
+}
+
+impl get_size2::GetSize for ImplicitTypeAliasType<'_> {}
+
+pub(super) fn walk_implicit_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    type_alias: ImplicitTypeAliasType<'db>,
+    visitor: &V,
+) {
+    visitor.visit_type(db, type_alias.value_type(db));
+}
+
+impl<'db> ImplicitTypeAliasType<'db> {
+    /// The RHS of the alias evaluated as a type expression.
+    ///
+    /// Note that this is not the form used in value-expression contexts (e.g. when an
+    /// implicit-alias `UnionType` instance is used as the operand of `|` or as `isinstance`'s
+    /// second argument); for that, see [`super::known_instance::LazyUnionTypeInstance`].
+    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+        infer_implicit_assignment_value_type(
+            db,
+            self.definition(db),
+            ExpressionKind::TypeExpression,
+        )
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub enum TypeAliasType<'db> {
     /// A type alias defined using the PEP 695 `type` statement.
     PEP695(PEP695TypeAliasType<'db>),
     /// A type alias defined by manually instantiating the PEP 695 `types.TypeAliasType`.
     ManualPEP695(ManualPEP695TypeAliasType<'db>),
+    /// A type alias defined implicitly by assignment.
+    Implicit(ImplicitTypeAliasType<'db>),
 }
 
 pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -205,6 +285,9 @@ pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         TypeAliasType::ManualPEP695(type_alias) => {
             walk_manual_pep_695_type_alias(db, type_alias, visitor);
         }
+        TypeAliasType::Implicit(type_alias) => {
+            walk_implicit_type_alias(db, type_alias, visitor);
+        }
     }
 }
 
@@ -213,6 +296,7 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.name(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.name(db),
+            TypeAliasType::Implicit(type_alias) => type_alias.name(db),
         }
     }
 
@@ -220,13 +304,27 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.definition(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.definition(db),
+            TypeAliasType::Implicit(type_alias) => type_alias.definition(db),
         }
     }
 
+    /// The RHS of the alias evaluated as a type expression.
+    ///
+    /// For PEP 695 aliases this returns the body of the type statement (with any
+    /// applicable specialization applied). For implicit (PEP 613-style) aliases this re-evaluates
+    /// the assignment RHS in `ExpressionKind::TypeExpression` mode (the same form used to
+    /// resolve `x: Alias` references).
+    ///
+    /// This is not the path used to render the alias in a value-expression context. When an
+    /// implicit-alias `UnionType` instance is used as a value (e.g. as `isinstance`'s second
+    /// argument or an operand of `|`), the alias is preserved as `Type::TypeAlias(Implicit(...))`
+    /// via [`super::known_instance::UnionTypeInstance::union_type`] without going through this
+    /// method.
     pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
+            TypeAliasType::Implicit(type_alias) => type_alias.value_type(db),
         }
     }
 
@@ -234,13 +332,14 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.raw_value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
+            TypeAliasType::Implicit(type_alias) => type_alias.value_type(db),
         }
     }
 
     pub(crate) fn as_pep_695_type_alias(self) -> Option<PEP695TypeAliasType<'db>> {
         match self {
             TypeAliasType::PEP695(type_alias) => Some(type_alias),
-            TypeAliasType::ManualPEP695(_) => None,
+            TypeAliasType::ManualPEP695(_) | TypeAliasType::Implicit(_) => None,
         }
     }
 
@@ -248,21 +347,21 @@ impl<'db> TypeAliasType<'db> {
         // TODO: Add support for generic non-PEP695 type aliases.
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.generic_context(db),
-            TypeAliasType::ManualPEP695(_) => None,
+            TypeAliasType::ManualPEP695(_) | TypeAliasType::Implicit(_) => None,
         }
     }
 
     pub(crate) fn specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.specialization(db),
-            TypeAliasType::ManualPEP695(_) => None,
+            TypeAliasType::ManualPEP695(_) | TypeAliasType::Implicit(_) => None,
         }
     }
 
     pub(super) fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.apply_function_specialization(db, ty),
-            TypeAliasType::ManualPEP695(_) => ty,
+            TypeAliasType::ManualPEP695(_) | TypeAliasType::Implicit(_) => ty,
         }
     }
 
@@ -275,7 +374,7 @@ impl<'db> TypeAliasType<'db> {
             TypeAliasType::PEP695(type_alias) => {
                 TypeAliasType::PEP695(type_alias.apply_specialization(db, f))
             }
-            TypeAliasType::ManualPEP695(_) => self,
+            TypeAliasType::ManualPEP695(_) | TypeAliasType::Implicit(_) => self,
         }
     }
 

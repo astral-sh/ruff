@@ -171,9 +171,20 @@ python-version = "3.10"
 ```
 
 ```py
+from typing import Literal
+
 def _(x: type[int | list | bytes]):
     # snapshot: invalid-argument-type
     if issubclass(x, int | list[int]):
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+    # error: [invalid-argument-type]
+    elif isinstance(x, (list[int] | bytes, int)):
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+    # error: [invalid-argument-type]
+    elif isinstance(x, (int, str | Literal[42])):
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+    # error: [invalid-argument-type]
+    elif isinstance(x, (int, (str, (bytes, memoryview | Literal[42])))):
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
     else:
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
@@ -181,9 +192,9 @@ def _(x: type[int | list | bytes]):
 
 ```snapshot
 error[invalid-argument-type]: Invalid second argument to `issubclass`
- --> src/mdtest_snippet.py:3:8
+ --> src/mdtest_snippet.py:5:8
   |
-3 |     if issubclass(x, int | list[int]):
+5 |     if issubclass(x, int | list[int]):
   |        ^^^^^^^^^^^^^^---------------^
   |                      |
   |                      This `UnionType` instance contains non-class elements
@@ -205,13 +216,13 @@ def _(x: type[int | list | bytes]):
 
 ```snapshot
 error[invalid-argument-type]: Invalid second argument to `issubclass`
- --> src/mdtest_snippet.py:9:8
-  |
-9 |     if issubclass(x, (int, list[int] | bytes)):
-  |        ^^^^^^^^^^^^^^^^^^^^-----------------^^
-  |                            |
-  |                            This `UnionType` instance contains non-class elements
-  |
+  --> src/mdtest_snippet.py:20:8
+   |
+20 |     if issubclass(x, (int, list[int] | bytes)):
+   |        ^^^^^^^^^^^^^^^^^^^^-----------------^^
+   |                            |
+   |                            This `UnionType` instance contains non-class elements
+   |
 info: A `UnionType` instance can only be used as the second argument to `issubclass` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union is not a class object
 ```
@@ -229,9 +240,9 @@ def _(x: type[int | list | bytes]):
 
 ```snapshot
 error[invalid-argument-type]: Invalid second argument to `issubclass`
-  --> src/mdtest_snippet.py:15:8
+  --> src/mdtest_snippet.py:26:8
    |
-15 |     if issubclass(x, (int, (str, list[int] | bytes))):
+26 |     if issubclass(x, (int, (str, list[int] | bytes))):
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^-----------------^^^
    |                                  |
    |                                  This `UnionType` instance contains non-class elements
@@ -255,9 +266,9 @@ def _(x: type[int | list | bytes]):
 
 ```snapshot
 error[invalid-argument-type]: Invalid second argument to `issubclass`
-  --> src/mdtest_snippet.py:23:8
+  --> src/mdtest_snippet.py:34:8
    |
-23 |     if issubclass(x, classes):
+34 |     if issubclass(x, classes):
    |        ^^^^^^^^^^^^^^^^^^^^^^
    |
 info: A `UnionType` instance can only be used as the second argument to `issubclass` if all elements are class objects
@@ -293,7 +304,7 @@ from typing import Union
 
 IntOrStr = Union[int, str]
 
-reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'int | str'>
+reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'IntOrStr'>
 
 def f(x: type[int | str | bytes | range]):
     if issubclass(x, IntOrStr):
@@ -429,12 +440,11 @@ def flag() -> bool:
 
 t = int if flag() else str
 
-# error: [invalid-argument-type] "Argument to function `issubclass` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["str"]"
+# error: [invalid-argument-type] "Argument to function `issubclass` is incorrect: Expected `_ClassInfo`, found `Literal["str"]"
 if issubclass(t, "str"):
     reveal_type(t)  # revealed: <class 'int'> | <class 'str'>
 
-# TODO: this should cause us to emit a diagnostic during
-# type checking
+# error: [invalid-argument-type] "Argument to function `issubclass` is incorrect: Expected `_ClassInfo`, found `tuple[<class 'bytes'>, Literal["str"]]`"
 if issubclass(t, (bytes, "str")):
     reveal_type(t)  # revealed: <class 'int'> | <class 'str'>
 

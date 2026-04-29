@@ -19,7 +19,9 @@ use crate::types::relation::{
 };
 use crate::types::signatures::{CallableSignature, Parameters};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
-use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
+use crate::types::type_alias::{
+    walk_implicit_type_alias, walk_manual_pep_695_type_alias, walk_pep_695_type_alias,
+};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
 };
@@ -736,6 +738,9 @@ impl<'db> GenericContext<'db> {
                     }
                     TypeAliasType::ManualPEP695(type_alias) => {
                         walk_manual_pep_695_type_alias(db, type_alias, self);
+                    }
+                    TypeAliasType::Implicit(type_alias) => {
+                        walk_implicit_type_alias(db, type_alias, self);
                     }
                 }
             }
@@ -1634,7 +1639,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 ///
 /// You will usually use [`Specialization`] instead of this type. This type is used when we need to
 /// substitute types for type variables before we have fully constructed a [`Specialization`].
-#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub enum ApplySpecialization<'a, 'db> {
     Specialization(Specialization<'db>),
     Partial {
@@ -1685,6 +1690,38 @@ impl<'db> ApplySpecialization<'_, 'db> {
                     None
                 }
             }
+        }
+    }
+
+    /// Convert this specialization mapping to a concrete specialization over its own generic
+    /// context, preserving skipped type variables in partial specializations as identity mappings.
+    pub(crate) fn as_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+        match self {
+            ApplySpecialization::Specialization(specialization) => Some(specialization),
+            ApplySpecialization::Partial {
+                generic_context,
+                types,
+                skip,
+            } => Some(
+                generic_context.specialize(
+                    db,
+                    generic_context
+                        .variables(db)
+                        .enumerate()
+                        .map(|(index, bound_typevar)| {
+                            if skip.is_some_and(|skip| skip == index) {
+                                Type::TypeVar(bound_typevar)
+                            } else {
+                                types
+                                    .get(index)
+                                    .copied()
+                                    .unwrap_or(Type::TypeVar(bound_typevar))
+                            }
+                        })
+                        .collect::<Vec<_>>(),
+                ),
+            ),
+            ApplySpecialization::ReturnCallables(_) | ApplySpecialization::Single(_, _) => None,
         }
     }
 }

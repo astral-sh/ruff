@@ -992,7 +992,7 @@ mod tests {
                 "#
         ),
          @r#"
-        Added 4 suppressions
+        Added 6 suppressions
 
         ## Fixed source
 
@@ -1003,14 +1003,14 @@ mod tests {
 
 
         def get_data() -> dict[str, JsonValue]:
-            return {"home_assistant": {"entities": [{"entity_id": "sensor.test"}]}}
+            return {"home_assistant": {"entities": [{"entity_id": "sensor.test"}]}}  # ty:ignore[invalid-return-type]
 
 
         def f() -> None:
             diag = get_data()
             diag["home_assistant"]["entities"] = sorted(  # ty:ignore[invalid-assignment]
                 diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty:ignore[invalid-argument-type, not-subscriptable]
-            )
+            )  # ty:ignore[no-matching-overload]
         ```
         "#);
     }

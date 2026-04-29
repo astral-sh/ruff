@@ -915,15 +915,18 @@ enum NestedSubstitutionSide {
 /// Identifies one nested-typevar substitution that has been applied while saturating a single
 /// BDD path.
 ///
-/// We intentionally key this by the constraint that we substitute _into_ and the typevar that we
-/// substitute _for_, but not by the replacement type. For the pathological cases that matter for
-/// performance, the same nested substitution shape can keep producing ever-deeper replacement
-/// types (for instance, repeated `Iterable[...]` wrapping). Recording only the substitution site
-/// lets [`PathAssignments`] apply that substitution at most once per path, which preserves the
-/// initial cross-typevar relationship without repeatedly unfolding the same pattern.
+/// We key this by the typevar of the constrained constraint (which stays the same across an
+/// entire chain of derivations against a single root constraint), the typevar that we substitute
+/// _for_, and the side. We deliberately do _not_ key by the constraint id we substitute into,
+/// because each nested substitution produces a new derived constraint, and if we keyed by that
+/// id the next derivation step would have a different id and the repeat-guard would never fire.
+/// The pathological cases that matter for performance involve repeated wrapping (e.g.
+/// `Iterable[...]` layers) that keeps producing ever-deeper replacement types while targeting
+/// the same constrained typevar; keying by the constrained typevar plus the substituted typevar
+/// lets [`PathAssignments`] apply each substitution shape at most once per path.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 struct NestedSubstitution {
-    substituted_into: ConstraintId,
+    constrained_typevar: TypeVarId,
     substituted_typevar: TypeVarId,
     side: NestedSubstitutionSide,
 }
@@ -939,12 +942,12 @@ struct DerivedConstraint {
 fn nested_substitution<'db>(
     db: &'db dyn Db,
     builder: &ConstraintSetBuilder<'db>,
-    substituted_into: ConstraintId,
+    constrained_typevar: BoundTypeVarInstance<'db>,
     substituted_typevar: BoundTypeVarInstance<'db>,
     side: NestedSubstitutionSide,
 ) -> NestedSubstitution {
     NestedSubstitution {
-        substituted_into,
+        constrained_typevar: builder.typevar_id(db, constrained_typevar),
         substituted_typevar: builder.typevar_id(db, substituted_typevar),
         side,
     }
@@ -4931,7 +4934,7 @@ impl SequentMap {
                             Some(nested_substitution(
                                 db,
                                 builder,
-                                constrained_constraint,
+                                constrained_typevar,
                                 bound_typevar,
                                 NestedSubstitutionSide::Upper,
                             )),
@@ -4995,7 +4998,7 @@ impl SequentMap {
                             Some(nested_substitution(
                                 db,
                                 builder,
-                                constrained_constraint,
+                                constrained_typevar,
                                 bound_typevar,
                                 NestedSubstitutionSide::Lower,
                             )),
@@ -5091,7 +5094,7 @@ impl SequentMap {
                                 Some(nested_substitution(
                                     db,
                                     builder,
-                                    constrained_constraint,
+                                    constrained_typevar,
                                     nested_typevar,
                                     NestedSubstitutionSide::Upper,
                                 )),
@@ -5135,7 +5138,7 @@ impl SequentMap {
                                 Some(nested_substitution(
                                     db,
                                     builder,
-                                    constrained_constraint,
+                                    constrained_typevar,
                                     nested_typevar,
                                     NestedSubstitutionSide::Lower,
                                 )),

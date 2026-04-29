@@ -3400,6 +3400,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
 
                 self.typevar_binding_context = previous_typevar_binding_context;
+                let value_ty = self.try_promote_union_type_alias(target, definition, value_ty);
 
                 // `TYPE_CHECKING` is a special variable that should only be assigned `False`
                 // at runtime, but is always considered `True` in type checking.
@@ -4182,6 +4183,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 inferred_ty
             };
+            let inferred_ty = self.try_promote_union_type_alias(target, definition, inferred_ty);
 
             if is_pep_613_type_alias {
                 let inferred_ty =
@@ -8968,6 +8970,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 (ty, range)
             },
         )
+    }
+
+    fn try_promote_union_type_alias(
+        &self,
+        target: &ast::Expr,
+        definition: Definition<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
+        if let Some(instance) = ty.as_union_type_instance()
+            && let Some(eager) = instance.as_eager(self.db())
+            && let Some(lazy) =
+                eager.try_into_lazy(self.db(), target, definition, self.typevar_binding_context)
+        {
+            lazy
+        } else {
+            ty
+        }
     }
 
     fn infer_type_parameters(&mut self, type_parameters: &ast::TypeParams) {

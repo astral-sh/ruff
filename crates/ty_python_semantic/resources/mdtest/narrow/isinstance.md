@@ -154,6 +154,17 @@ info: Elements `<special-form 'Literal[42]'>` and `<class 'list[int]'>` in the u
     # snapshot: invalid-argument-type
     elif isinstance(x, Any | NamedTuple | list[int]):
         reveal_type(x)  # revealed: int | list[int] | bytes
+    # error: [invalid-argument-type]
+    elif isinstance(x, (list[int] | bytes, int)):
+        reveal_type(x)  # revealed: int | list[int] | bytes
+    # error: [invalid-argument-type]
+    elif isinstance(x, (int, str | Literal[42])):
+        reveal_type(x)  # revealed: int | list[int] | bytes
+    # error: [invalid-argument-type]
+    elif isinstance(x, (int, (str, (bytes, memoryview | Literal[42])))):
+        reveal_type(x)  # revealed: int | list[int] | bytes
+    else:
+        reveal_type(x)  # revealed: int | list[int] | bytes
 ```
 
 ```snapshot
@@ -169,11 +180,6 @@ info: A `UnionType` instance can only be used as the second argument to `isinsta
 info: Element `<special-form 'typing.Any'>` in the union, and 2 more elements, are not class objects
 ```
 
-```py
-    else:
-        reveal_type(x)  # revealed: int | list[int] | bytes
-```
-
 The same validation also applies when an invalid `UnionType` is nested inside a tuple:
 
 ```py
@@ -187,9 +193,9 @@ def _(x: int | list[int] | bytes):
 
 ```snapshot
 error[invalid-argument-type]: Invalid second argument to `isinstance`
-  --> src/mdtest_snippet.py:17:8
+  --> src/mdtest_snippet.py:26:8
    |
-17 |     if isinstance(x, (int, list[int] | bytes)):
+26 |     if isinstance(x, (int, list[int] | bytes)):
    |        ^^^^^^^^^^^^^^^^^^^^-----------------^^
    |                            |
    |                            This `UnionType` instance contains non-class elements
@@ -211,9 +217,9 @@ def _(x: int | list[int] | bytes):
 
 ```snapshot
 error[invalid-argument-type]: Invalid second argument to `isinstance`
-  --> src/mdtest_snippet.py:23:8
+  --> src/mdtest_snippet.py:32:8
    |
-23 |     if isinstance(x, (int, (str, list[int] | bytes))):
+32 |     if isinstance(x, (int, (str, list[int] | bytes))):
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^-----------------^^^
    |                                  |
    |                                  This `UnionType` instance contains non-class elements
@@ -237,9 +243,9 @@ def _(x: int | list[int] | bytes):
 
 ```snapshot
 error[invalid-argument-type]: Invalid second argument to `isinstance`
-  --> src/mdtest_snippet.py:31:8
+  --> src/mdtest_snippet.py:40:8
    |
-31 |     if isinstance(x, classes):
+40 |     if isinstance(x, classes):
    |        ^^^^^^^^^^^^^^^^^^^^^^
    |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
@@ -276,7 +282,7 @@ from typing import Union
 
 IntOrStr = Union[int, str]
 
-reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'int | str'>
+reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'IntOrStr'>
 
 def _(x: int | str | bytes | memoryview | range):
     if isinstance(x, IntOrStr):
@@ -412,11 +418,11 @@ def _(flag: bool):
 def _(flag: bool):
     x = 1 if flag else "a"
 
-    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["a"]"
+    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `_ClassInfo`, found `Literal["a"]"
     if isinstance(x, "a"):
         reveal_type(x)  # revealed: Literal[1, "a"]
 
-    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["int"]"
+    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `_ClassInfo`, found `Literal["int"]"
     if isinstance(x, "int"):
         reveal_type(x)  # revealed: Literal[1, "a"]
 ```

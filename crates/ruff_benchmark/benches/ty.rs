@@ -693,6 +693,44 @@ class E(Enum):
     });
 }
 
+fn benchmark_recursive_union_type_alias_and_protocol(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_micro[recursive_union_type_alias_and_protocol]", |b| {
+        b.iter_batched_ref(
+            || {
+                setup_micro_case(
+                    r#"
+                    from __future__ import annotations
+
+                    from typing import Protocol, Union
+
+                    class Traceable(Protocol):
+                        def trace_repr(self) -> TraceableValue:
+                            ...
+
+                    TraceableValue = Union[
+                        Traceable,
+                        bool,
+                        tuple["TraceableValue", ...],
+                    ]
+
+                    class FilledOutfit:
+                        def trace_repr(self) -> TraceableValue:
+                            return False
+                    "#,
+                )
+            },
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Regression benchmark for protocol-to-protocol non-assignability when the target protocol
 /// has one more member than the source protocol.
 ///
@@ -1216,6 +1254,7 @@ criterion_group!(
     benchmark_complex_constrained_attributes_3,
     benchmark_many_enum_members,
     benchmark_many_enum_members_2,
+    benchmark_recursive_union_type_alias_and_protocol,
     benchmark_many_protocol_members_mismatch,
     benchmark_gradual_vararg_call,
     benchmark_vararg_parameter_type_accumulation,
