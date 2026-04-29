@@ -833,7 +833,7 @@ fn fmt_type_guard_like<'db, T: TypeGuardLike<'db>>(
         .write_str(T::FORM_NAME)?;
     f.write_char('[')?;
     guard
-        .return_type(db)
+        .type_argument(db)
         .display_with(db, settings.singleline())
         .fmt_detailed(f)?;
     if let Some(name) = guard.place_name(db) {

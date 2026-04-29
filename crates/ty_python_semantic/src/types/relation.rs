@@ -1683,13 +1683,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             // `TypeIs` is invariant.
             (Type::TypeIs(source), Type::TypeIs(target)) => {
-                let source_return = source.return_type(db);
-                let target_return = target.return_type(db);
-                self.check_type_pair(db, source_return, target_return).and(
-                    db,
-                    self.constraints,
-                    || self.check_type_pair(db, target_return, source_return),
-                )
+                let source_type = source.type_argument(db);
+                let target_type = target.type_argument(db);
+                self.check_type_pair(db, source_type, target_type)
+                    .and(db, self.constraints, || {
+                        self.check_type_pair(db, target_type, source_type)
+                    })
             }
 
             // `TypeGuard` is covariant.
