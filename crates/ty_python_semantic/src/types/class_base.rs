@@ -4,8 +4,8 @@ use crate::types::mro::MroIterator;
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DivergentType, DynamicType, KnownClass,
-    KnownInstanceType, MaterializationKind, SpecialFormType, StaticMroError, Type, TypeContext,
-    TypeMapping, todo_type,
+    KnownInstanceType, MaterializationKind, RecursiveTypeNormalizationVisitor, SpecialFormType,
+    StaticMroError, Type, TypeContext, TypeMapping, todo_type,
 };
 use crate::{Db, DisplaySettings};
 
@@ -42,12 +42,13 @@ impl<'db> ClassBase<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
         match self {
             Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
             Self::Divergent(_) => Some(self),
             Self::Class(class) => Some(Self::Class(
-                class.recursive_type_normalized_impl(db, div, nested)?,
+                class.recursive_type_normalized_impl(db, div, nested, visitor)?,
             )),
             Self::Protocol | Self::Generic | Self::TypedDict => Some(self),
         }

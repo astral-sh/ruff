@@ -82,10 +82,11 @@ use crate::types::relation::TypeRelationChecker;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
-    ClassLiteral, ClassType, DynamicType, FindLegacyTypeVarsVisitor, IntersectionBuilder,
-    KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
-    Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
+    ApplySpecialization, ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance,
+    CallableType, ClassBase, ClassLiteral, ClassType, DynamicType, FindLegacyTypeVarsVisitor,
+    IntersectionBuilder, KnownClass, KnownInstanceType, RecursiveTypeNormalizationKey,
+    RecursiveTypeNormalizationVisitor, SpecialFormType, SubclassOfInner, SubclassOfType,
+    Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
     binding_type, definition_expression_type, infer_definition_types, walk_signature,
 };
 use crate::{Db, FxOrderSet};
@@ -970,6 +971,27 @@ impl<'db> FunctionType<'db> {
         )
     }
 
+    /// Applies a type mapping to signatures that have already been updated on this function.
+    ///
+    /// This deliberately rewrites only [`FunctionType::updated_signature`] and
+    /// [`FunctionType::updated_last_definition_signature`]. If neither field is set, the
+    /// function is returned unchanged instead of rebuilding signatures from the underlying
+    /// [`FunctionLiteral`].
+    ///
+    /// This is used when rescoping type variables that appear only inside a returned
+    /// [`CallableType`]. For example:
+    ///
+    /// ```py
+    /// def outer[T]() -> Callable[[], Callable[[], T]]:
+    ///     def inner() -> T: ...
+    ///     return inner
+    /// ```
+    ///
+    /// During returned-callable rescoping, the outer `Callable[[], T]` is rewritten to use a
+    /// fresh `T@return`. If `inner` already has an updated signature, this method applies the same
+    /// mapping there so the updated signature stays consistent. If `inner` is still represented
+    /// solely by its function literal, there is nothing to rewrite here; rebuilding its signature
+    /// just for this mapping can re-enter recursive `TypeOf[inner]` evaluation.
     pub(crate) fn apply_type_mapping_to_updated_signatures_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -996,15 +1018,20 @@ impl<'db> FunctionType<'db> {
         }
     }
 
-    /// Applies a type mapping, without forcing lazy signatures for returned-callable rescoping.
-    pub(crate) fn apply_type_mapping_preserving_return_callable_laziness_impl<'a>(
+    /// Applies a type mapping, using the reduced function rewrite needed for returned-callable
+    /// rescoping.
+    pub(crate) fn apply_type_mapping_for_return_callable_rescope_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        if type_mapping.is_return_callable_specialization() {
+        if matches!(
+            type_mapping,
+            TypeMapping::ApplySpecialization(specialization)
+                if matches!(specialization, ApplySpecialization::ReturnCallables(_))
+        ) {
             self.apply_type_mapping_to_updated_signatures_impl(db, type_mapping, tcx, visitor)
         } else {
             self.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
@@ -1194,7 +1221,7 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|_, _, _| CallableSignature::single(Signature::bottom()),
+        cycle_initial=|db, id, _| CallableSignature::cycle_initial(db, id),
         cycle_fn=|db, cycle, previous, value: CallableSignature<'db>, _| value.cycle_normalized(db, previous, cycle),
         heap_size=ruff_memory_usage::heap_size,
     )]
@@ -1271,22 +1298,34 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
-        let literal = self.literal(db);
-        let updated_signature = match self.updated_signature(db) {
-            Some(signature) => Some(signature.recursive_type_normalized_impl(db, div, nested)?),
-            None => None,
-        };
-        let updated_last_definition_signature = match self.updated_last_definition_signature(db) {
-            Some(signature) => Some(signature.recursive_type_normalized_impl(db, div, nested)?),
-            None => None,
-        };
-        Some(Self::new(
-            db,
-            literal,
-            updated_signature,
-            updated_last_definition_signature,
-        ))
+        visitor.visit(
+            RecursiveTypeNormalizationKey::Function(self.literal(db), nested),
+            || None,
+            || {
+                let literal = self.literal(db);
+                let updated_signature = match self.updated_signature(db) {
+                    Some(signature) => {
+                        Some(signature.recursive_type_normalized_impl(db, div, nested, visitor)?)
+                    }
+                    None => None,
+                };
+                let updated_last_definition_signature =
+                    match self.updated_last_definition_signature(db) {
+                        Some(signature) => Some(
+                            signature.recursive_type_normalized_impl(db, div, nested, visitor)?,
+                        ),
+                        None => None,
+                    };
+                Some(Self::new(
+                    db,
+                    literal,
+                    updated_signature,
+                    updated_last_definition_signature,
+                ))
+            },
+        )
     }
 
     pub(super) fn as_abstract_method(

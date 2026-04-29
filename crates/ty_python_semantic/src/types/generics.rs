@@ -28,9 +28,9 @@ use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
-    MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, binding_type, declaration_type,
-    infer_definition_types,
+    MaterializationKind, RecursiveTypeNormalizationVisitor, Type, TypeAliasType, TypeContext,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator,
+    UnionType, binding_type, declaration_type, infer_definition_types,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -1208,23 +1208,24 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
         let types = if nested {
             self.types(db)
                 .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, div, true))
+                .map(|ty| ty.recursive_type_normalized_impl(db, div, true, visitor))
                 .collect::<Option<Box<[_]>>>()?
         } else {
             self.types(db)
                 .iter()
                 .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, div, true)
+                    ty.recursive_type_normalized_impl(db, div, true, visitor)
                         .unwrap_or(div)
                 })
                 .collect::<Box<[_]>>()
         };
         let tuple_inner = match self.tuple_inner(db) {
-            Some(tuple) => Some(tuple.recursive_type_normalized_impl(db, div, nested)?),
+            Some(tuple) => Some(tuple.recursive_type_normalized_impl(db, div, nested, visitor)?),
             None => None,
         };
         let context = self.generic_context(db);
