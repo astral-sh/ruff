@@ -5472,18 +5472,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assert_eq!(previous, None);
     }
 
-    fn store_expected_type(&mut self, expression: impl Into<ExpressionNodeKey>, ty: Type<'db>) {
-        if !Self::has_string_literal_completion_candidates(ty) {
+    fn store_maybe_expected_type(
+        &mut self,
+        expression: impl Into<ExpressionNodeKey>,
+        ty: Type<'db>,
+    ) {
+        if !self.has_string_literal_completion_candidates(ty) {
             return;
         }
+
+        self.store_expected_type(expression, ty);
+    }
+
+    fn store_expected_type(&mut self, expression: impl Into<ExpressionNodeKey>, ty: Type<'db>) {
         self.expected_types.insert(expression.into(), ty);
     }
 
-    fn has_string_literal_completion_candidates(ty: Type<'db>) -> bool {
-        matches!(
-            ty,
-            Type::Union(_) | Type::Intersection(_) | Type::TypeAlias(_)
-        ) || matches!(ty, Type::LiteralValue(literal) if literal.as_string().is_some())
+    fn has_string_literal_completion_candidates(&self, ty: Type<'db>) -> bool {
+        match ty {
+            Type::LiteralValue(literal) => literal.as_string().is_some(),
+            Type::Union(union) => union
+                .elements(self.db())
+                .iter()
+                .any(|ty| self.has_string_literal_completion_candidates(*ty)),
+            Type::Intersection(intersection) => intersection
+                .iter_positive(self.db())
+                .any(|ty| self.has_string_literal_completion_candidates(ty)),
+            Type::TypeAlias(_) => true,
+            _ => false,
+        }
     }
 
     fn union_expected_types(&mut self, expected_types: &FxHashMap<ExpressionNodeKey, Type<'db>>) {
@@ -5531,7 +5548,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         if let Some(expected) = tcx.annotation {
-            self.store_expected_type(ast::ExprRef::from(literal), expected);
+            self.store_maybe_expected_type(ast::ExprRef::from(literal), expected);
         }
 
         if tcx.is_typealias() {
