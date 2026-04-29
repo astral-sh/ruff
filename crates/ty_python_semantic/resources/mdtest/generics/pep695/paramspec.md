@@ -394,6 +394,61 @@ both mypy and Pyright allow this and there are usages of this in the wild e.g.,
 reveal_type(TypeVarAndParamSpec[int, Any]().attr)  # revealed: (...) -> int
 ```
 
+`...` has the same gradual behavior when used as a `ParamSpec` argument in a generic class,
+regardless of the variance of the `ParamSpec`.
+
+```py
+from typing import Callable
+
+class Command[**P]:
+    callback: Callable[P, None]
+
+# confirm that Command is invariant in P
+def _(of_int: Command[int], of_bool: Command[bool]) -> None:
+    a: Command[int] = of_bool  # error: [invalid-assignment]
+    b: Command[bool] = of_int  # error: [invalid-assignment]
+
+# but gradual signature is still assignable in both directions
+def _(concrete: Command[[str]], gradual: Command[...]) -> None:
+    a: Command[...] = concrete
+    b: Command[[str]] = gradual
+```
+
+`ParamSpec` specializations in generic classes are compared using the callable parameter relation.
+This avoids rejecting wrappers around callbacks that are safe to use with a positional-only callback
+protocol.
+
+```py
+from collections.abc import Callable
+from typing import Final
+
+class Job[**P]:
+    target: Final[Callable[P, None]]
+
+    def __init__(self, target: Callable[P, None]) -> None:
+        self.target = target
+
+def named(x: int) -> None:
+    pass
+
+def defaulted(x: int | None = None) -> None:
+    pass
+
+def wrong(x: str) -> None:
+    pass
+
+named_job = Job(named)
+defaulted_job = Job(defaulted)
+wrong_job = Job(wrong)
+
+def takes_int_job(job: Job[[int]]) -> None:
+    pass
+
+takes_int_job(named_job)
+takes_int_job(defaulted_job)
+takes_int_job(wrong_job)  # error: [invalid-argument-type]
+```
+
 ## `ParamSpec` cannot specialize a `TypeVar`, and vice versa
 
 <!-- snapshot-diagnostics -->

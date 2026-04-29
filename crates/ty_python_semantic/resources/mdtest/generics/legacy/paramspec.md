@@ -154,12 +154,22 @@ python-version = "3.12"
 from typing import Callable, Generic
 from typing_extensions import ParamSpec
 
-P = ParamSpec("P", default=[str])
+PList = ParamSpec("PList", default=[str])
+PEllipsis = ParamSpec("PEllipsis", default=...)
+PAnother = ParamSpec("PAnother", default=PList)
 
-class C(Generic[P]):
-    x: Callable[P, None]
+class C1(Generic[PList]):
+    x: Callable[PList, None]
 
-reveal_type(C().x)  # revealed: (str, /) -> None
+class C2(Generic[PEllipsis]):
+    x: Callable[PEllipsis, None]
+
+class C3(Generic[PList, PAnother]):
+    x: Callable[PAnother, None]
+
+reveal_type(C1().x)  # revealed: (str, /) -> None
+reveal_type(C2().x)  # revealed: (...) -> None
+reveal_type(C3().x)  # revealed: (str, /) -> None
 ```
 
 ### Forward references in stub files
@@ -478,19 +488,66 @@ reveal_type(TypeVarAndParamSpec[int, Any]().attr)  # revealed: (...) -> int
 ```
 
 `...` has the same gradual behavior when used as a `ParamSpec` argument in a generic class,
-regardless of the inferred variance of the `ParamSpec`.
+regardless of the variance of the `ParamSpec`.
 
 ```py
 from typing import Callable, Generic, ParamSpec
 
+# legacy ParamSpec with no variance specified is invariant
 P = ParamSpec("P")
 
 class Command(Generic[P]):
     callback: Callable[P, None]
 
+# confirm that Command is invariant in P
+def _(of_int: Command[int], of_bool: Command[bool]) -> None:
+    a: Command[int] = of_bool  # error: [invalid-assignment]
+    b: Command[bool] = of_int  # error: [invalid-assignment]
+
+# but gradual signature is still assignable in both directions
 def _(concrete: Command[[str]], gradual: Command[...]) -> None:
     a: Command[...] = concrete
     b: Command[[str]] = gradual
+```
+
+`ParamSpec` specializations in generic classes are compared using the callable parameter relation.
+This avoids rejecting wrappers around callbacks that are safe to use with a positional-only callback
+protocol.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+from typing import Final
+
+class Job[**P]:
+    target: Final[Callable[P, None]]
+
+    def __init__(self, target: Callable[P, None]) -> None:
+        self.target = target
+
+def named(x: int) -> None:
+    pass
+
+def defaulted(x: int | None = None) -> None:
+    pass
+
+def wrong(x: str) -> None:
+    pass
+
+named_job = Job(named)
+defaulted_job = Job(defaulted)
+wrong_job = Job(wrong)
+
+def takes_int_job(job: Job[[int]]) -> None:
+    pass
+
+takes_int_job(named_job)
+takes_int_job(defaulted_job)
+takes_int_job(wrong_job)  # error: [invalid-argument-type]
 ```
 
 ## `ParamSpec` cannot specialize a `TypeVar`, and vice versa
