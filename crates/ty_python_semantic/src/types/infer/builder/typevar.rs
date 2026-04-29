@@ -950,6 +950,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut default = None;
         let mut covariant = false;
         let mut contravariant = false;
+        let mut infer_variance = false;
         let mut name_param_ty = None;
         let mut name_param_node = None;
 
@@ -1042,18 +1043,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             kwarg,
                         );
                     }
-                    // TODO support `infer_variance` in legacy TypeVars
-                    if self
+                    match self
                         .infer_expression(&kwarg.value, TypeContext::default())
                         .bool(db)
-                        .is_ambiguous()
                     {
-                        return error(
-                            &self.context,
-                            "The `infer_variance` parameter of `TypeVar` \
-                            cannot have an ambiguous truthiness",
-                            &kwarg.value,
-                        );
+                        Truthiness::AlwaysTrue => infer_variance = true,
+                        Truthiness::AlwaysFalse => {}
+                        Truthiness::Ambiguous => {
+                            return error(
+                                &self.context,
+                                "The `infer_variance` parameter of `TypeVar` \
+                                cannot have an ambiguous truthiness",
+                                &kwarg.value,
+                            );
+                        }
                     }
                 }
                 name => {
@@ -1071,17 +1074,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let variance = match (covariant, contravariant) {
-            (true, true) => {
+        let variance = match (covariant, contravariant, infer_variance) {
+            (true, true, _) => {
                 return error(
                     &self.context,
                     "A `TypeVar` cannot be both covariant and contravariant",
                     call_expr,
                 );
             }
-            (true, false) => TypeVarVariance::Covariant,
-            (false, true) => TypeVarVariance::Contravariant,
-            (false, false) => TypeVarVariance::Invariant,
+            (true, false, true) | (false, true, true) => {
+                return error(
+                    &self.context,
+                    "A `TypeVar` cannot specify variance when `infer_variance=True`",
+                    call_expr,
+                );
+            }
+            (true, false, false) => Some(TypeVarVariance::Covariant),
+            (false, true, false) => Some(TypeVarVariance::Contravariant),
+            (false, false, false) => Some(TypeVarVariance::Invariant),
+            (false, false, true) => None,
         };
 
         let Some(name_param_ty) = name_param_ty.or_else(|| {
@@ -1168,7 +1179,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db,
             identity,
             bound_or_constraints,
-            Some(variance),
+            variance,
             default,
         )))
     }

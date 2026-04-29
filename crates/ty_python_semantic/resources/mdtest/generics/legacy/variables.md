@@ -435,6 +435,93 @@ from typing import TypeVar
 T = TypeVar("T", covariant=True, contravariant=True)
 ```
 
+### Infer variance
+
+For a `TypeVar` with `infer_variance=True`, we infer covariance when the type variable only appears
+in return positions, contravariance when it only appears in parameter positions, and invariance when
+it appears in both positions.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar
+
+OutT = TypeVar("OutT", infer_variance=True)
+
+class Source(Generic[OutT]):
+    def get(self) -> OutT:
+        raise NotImplementedError
+
+source_int: Source[int] = Source[object]()  # error: [invalid-assignment]
+source_obj: Source[object] = Source[int]()
+
+InT = TypeVar("InT", infer_variance=True)
+
+class Sink(Generic[InT]):
+    def send(self, value: InT) -> None:
+        raise NotImplementedError
+
+sink_obj: Sink[object] = Sink[int]()  # error: [invalid-assignment]
+sink_int: Sink[int] = Sink[object]()
+```
+
+Both assignments are errors when the type variable is inferred to be invariant:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", infer_variance=True)
+
+class Box(Generic[T]):
+    value: T
+
+box_int: Box[int] = Box[object]()  # error: [invalid-assignment]
+box_obj: Box[object] = Box[int]()  # error: [invalid-assignment]
+```
+
+> A generic class that uses the traditional syntax may include combinations of type variables with
+> explicit and inferred variance.
+
+```py
+from typing import Generic, TypeVar
+
+ExplicitOutT = TypeVar("ExplicitOutT", covariant=True)
+InferredInT = TypeVar("InferredInT", infer_variance=True)
+
+class Mixed(Generic[ExplicitOutT, InferredInT]):
+    def get(self) -> ExplicitOutT:
+        raise NotImplementedError
+
+    def send(self, value: InferredInT) -> None:
+        raise NotImplementedError
+
+mixed_covariant: Mixed[object, int] = Mixed[int, int]()
+mixed_not_covariant: Mixed[int, int] = Mixed[object, int]()  # error: [invalid-assignment]
+mixed_contravariant: Mixed[int, int] = Mixed[int, object]()
+mixed_not_contravariant: Mixed[int, object] = Mixed[int, int]()  # error: [invalid-assignment]
+```
+
+Variance cannot be specified explicitly when variance inference is requested:
+
+```py
+from typing import TypeVar
+
+# snapshot: invalid-legacy-type-variable
+CovariantAndInferred = TypeVar("CovariantAndInferred", covariant=True, infer_variance=True)
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: A `TypeVar` cannot specify variance when `infer_variance=True`
+  --> src/mdtest_snippet.py:48:24
+   |
+48 | CovariantAndInferred = TypeVar("CovariantAndInferred", covariant=True, infer_variance=True)
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+```
+
 ### Boolean parameters must be unambiguous
 
 ```py
