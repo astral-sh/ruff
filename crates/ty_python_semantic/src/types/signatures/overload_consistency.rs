@@ -378,24 +378,19 @@ impl<'db> Signature<'db> {
             .return_type_for_argument_types_of(db, overload, has_implicit_receiver)
             .unwrap_or(self.return_ty);
 
-        self.is_overload_return_type_assignable_to(db, overload.return_ty, implementation_return_ty)
-            // The synthetic call can still leave equivalent overload and implementation typevars
-            // with different identities. Use the parameter constraints to relate generic return
-            // types, but keep concrete overload returns on the synthetic-call result above.
-            || (overload.return_ty.has_typevar_or_typevar_instance(db)
-                && implementation_return_ty.has_typevar_or_typevar_instance(db)
-                && self.is_overload_return_type_assignable_under_parameter_constraints(
-                    db,
-                    overload,
-                    self.return_ty,
-                    has_implicit_receiver,
-                ))
+        self.is_overload_return_type_assignable_for_implementation_parameters(
+            db,
+            overload,
+            implementation_return_ty,
+            has_implicit_receiver,
+        )
     }
 
-    /// Return whether a generic overload return is assignable under parameter-derived constraints.
+    /// Return whether an overload return is assignable to the implementation return.
     ///
-    /// This handles cases where equivalent overload and implementation type variables have
-    /// different identities but are related by the successful parameter compatibility check.
+    /// The synthetic call can still leave equivalent overload and implementation type variables
+    /// with different identities. When the parameter relation is satisfiable, use those constraints
+    /// to relate generic return types while checking the synthetic-call return type.
     ///
     /// ```python
     /// from typing import overload
@@ -405,7 +400,7 @@ impl<'db> Signature<'db> {
     /// def f[T](x: T) -> T:
     ///     return x
     /// ```
-    fn is_overload_return_type_assignable_under_parameter_constraints(
+    fn is_overload_return_type_assignable_for_implementation_parameters(
         &self,
         db: &'db dyn Db,
         overload: &Self,
@@ -414,10 +409,6 @@ impl<'db> Signature<'db> {
     ) -> bool {
         let constraints = ConstraintSetBuilder::new();
         let inferable = self.implementation_consistency_inferable_typevars(db);
-        let return_inferable = inferable.merge(
-            db,
-            overload.implementation_consistency_inferable_typevars(db),
-        );
 
         let parameter_constraints = self
             .clone()
@@ -430,9 +421,25 @@ impl<'db> Signature<'db> {
             );
 
         if !parameter_constraints.satisfied_by_all_typevars(db, &constraints, inferable) {
-            return false;
+            // Keep return diagnostics independent when parameter compatibility has already failed.
+            return overload
+                .return_ty
+                .when_assignable_to(db, implementation_return_ty, &constraints, inferable)
+                .satisfied_by_all_typevars(db, &constraints, inferable);
         }
 
+        // Only infer overload return type variables when both returns are generic. If the
+        // implementation return is concrete, overload type variables must stay universal.
+        let return_inferable = if overload.return_ty.has_typevar_or_typevar_instance(db)
+            && implementation_return_ty.has_typevar_or_typevar_instance(db)
+        {
+            inferable.merge(
+                db,
+                overload.implementation_consistency_inferable_typevars(db),
+            )
+        } else {
+            inferable
+        };
         let return_constraints = overload.return_ty.when_assignable_to(
             db,
             implementation_return_ty,
@@ -442,36 +449,6 @@ impl<'db> Signature<'db> {
 
         parameter_constraints
             .and(db, &constraints, || return_constraints)
-            .satisfied_by_all_typevars(db, &constraints, inferable)
-    }
-
-    /// Return whether an overload return type is assignable to an implementation return type.
-    ///
-    /// The direct assignability check is retried as a constraint-set query so generic
-    /// implementation returns can be validated against all inferred specializations.
-    ///
-    /// ```python
-    /// from typing import overload
-    ///
-    /// @overload
-    /// def f[T](x: T) -> T: ...
-    /// def f(x: object) -> object:
-    ///     return x
-    /// ```
-    fn is_overload_return_type_assignable_to(
-        &self,
-        db: &'db dyn Db,
-        overload_return_ty: Type<'db>,
-        implementation_return_ty: Type<'db>,
-    ) -> bool {
-        if overload_return_ty.is_assignable_to(db, implementation_return_ty) {
-            return true;
-        }
-
-        let constraints = ConstraintSetBuilder::new();
-        let inferable = self.implementation_consistency_inferable_typevars(db);
-        overload_return_ty
-            .when_assignable_to(db, implementation_return_ty, &constraints, inferable)
             .satisfied_by_all_typevars(db, &constraints, inferable)
     }
 
