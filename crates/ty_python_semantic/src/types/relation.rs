@@ -206,15 +206,49 @@ pub(crate) enum TypeRelation {
     /// relationships with a typevar. This will eventually replace `Assignability`, but allows us
     /// to start using the new relation in a controlled manner in some places.
     ConstraintSetAssignability,
+
+    /// The relation used to check whether an overload implementation accepts all arguments
+    /// accepted by a single overload signature.
+    ///
+    /// This is constraint-set based like [`Self::ConstraintSetAssignability`], but treats gradual
+    /// type arguments in implementation parameters as accepting the corresponding overload type
+    /// argument without adding a universal typevar constraint.
+    ImplementationCompatibility,
 }
 
 impl TypeRelation {
+    /// Return `true` for relations that use ordinary gradual assignability behavior.
     pub(crate) const fn is_assignability(self) -> bool {
-        matches!(self, TypeRelation::Assignability)
+        matches!(
+            self,
+            TypeRelation::Assignability | TypeRelation::ImplementationCompatibility
+        )
     }
 
+    /// Return `true` for assignability relations backed by constraint sets.
     pub(crate) const fn is_constraint_set_assignability(self) -> bool {
-        matches!(self, TypeRelation::ConstraintSetAssignability)
+        matches!(
+            self,
+            TypeRelation::ConstraintSetAssignability | TypeRelation::ImplementationCompatibility
+        )
+    }
+
+    /// Return `true` for the assignability-like relation used by overload implementation checks.
+    ///
+    /// This identifies comparisons such as an overload parameter `int` being accepted by an
+    /// implementation parameter `object` without enabling the same special cases for ordinary
+    /// assignability.
+    ///
+    /// ```python
+    /// from typing import overload
+    ///
+    /// @overload
+    /// def f(x: int) -> int: ...
+    /// def f(x: object) -> object:
+    ///     return x
+    /// ```
+    pub(crate) const fn is_implementation_compatibility(self) -> bool {
+        matches!(self, TypeRelation::ImplementationCompatibility)
     }
 
     pub(crate) const fn is_subtyping(self) -> bool {
@@ -225,6 +259,7 @@ impl TypeRelation {
         match self {
             TypeRelation::Assignability
             | TypeRelation::ConstraintSetAssignability
+            | TypeRelation::ImplementationCompatibility
             | TypeRelation::Redundancy { .. } => true,
             TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => {
                 ty.subtyping_is_always_reflexive()
@@ -710,7 +745,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
-    pub(super) fn constraint_set_assignability_with_context(
+    /// Create a relation checker for overload implementation parameter compatibility.
+    ///
+    /// The checker answers whether the implementation accepts every call accepted by an overload,
+    /// with gradual implementation parameters treated as accepting the overload argument domain.
+    ///
+    /// ```python
+    /// from typing import Any, overload
+    ///
+    /// @overload
+    /// def f(x: int) -> int: ...
+    /// def f(x: Any) -> object:
+    ///     return x
+    /// ```
+    pub(super) fn implementation_compatibility(
         constraints: &'c ConstraintSetBuilder<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
@@ -720,28 +768,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Self {
             constraints,
             inferable: InferableTypeVars::None,
-            relation: TypeRelation::ConstraintSetAssignability,
-            context_tree: ErrorContextTree::enabled(),
-            given: ConstraintSet::from_bool(constraints, false),
-            relation_visitor,
-            disjointness_visitor,
-            signature_relation_visitor,
-            materialization_visitor,
-        }
-    }
-
-    pub(super) fn assignability_with_context(
-        constraints: &'c ConstraintSetBuilder<'db>,
-        relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
-        disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
-        signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
-        materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
-    ) -> Self {
-        Self {
-            constraints,
-            inferable: InferableTypeVars::None,
-            relation: TypeRelation::Assignability,
-            context_tree: ErrorContextTree::enabled(),
+            relation: TypeRelation::ImplementationCompatibility,
+            context_tree: ErrorContextTree::disabled(),
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -753,6 +781,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     pub(super) fn with_inferable_typevars(&self, inferable: InferableTypeVars<'db>) -> Self {
         Self {
             inferable,
+            ..self.clone()
+        }
+    }
+
+    pub(super) fn with_error_context(&self) -> Self {
+        Self {
+            context_tree: ErrorContextTree::enabled(),
             ..self.clone()
         }
     }
@@ -916,6 +951,50 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .implies_subtype_of(db, self.constraints, source, target);
         }
 
+        // Implementation compatibility existentially quantifies implementation typevars after
+        // checking a signature pair. Enforce declared bounds and constraints before translating
+        // the relation to a raw typevar constraint, otherwise any specialization would appear to
+        // satisfy a constrained implementation parameter.
+        if self.relation.is_implementation_compatibility()
+            && let Type::TypeVar(bound_typevar) = target
+            && bound_typevar.is_inferable(db, self.inferable)
+            && let Some(bound_or_constraints) = bound_typevar.typevar(db).bound_or_constraints(db)
+        {
+            return match bound_or_constraints {
+                TypeVarBoundOrConstraints::UpperBound(bound) => self
+                    .check_type_pair(db, source, bound)
+                    .and(db, self.constraints, || {
+                        ConstraintSet::constrain_typevar(
+                            db,
+                            self.constraints,
+                            bound_typevar,
+                            source,
+                            bound,
+                        )
+                    }),
+                TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                    .elements(db)
+                    .iter()
+                    .when_any(db, self.constraints, |constraint| {
+                        // A constrained TypeVar specializes to exactly one of its constraints.
+                        // Recording the chosen constraint preserves repeated-use correlations.
+                        self.check_type_pair(db, source, *constraint).and(
+                            db,
+                            self.constraints,
+                            || {
+                                ConstraintSet::constrain_typevar(
+                                    db,
+                                    self.constraints,
+                                    bound_typevar,
+                                    *constraint,
+                                    *constraint,
+                                )
+                            },
+                        )
+                    }),
+            };
+        }
+
         // Handle the constraint-set-based assignability relation next. Comparisons with a
         // typevar are translated directly into a constraint set.
         if self.relation.is_constraint_set_assignability() {
@@ -1076,7 +1155,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.constraints,
                 match self.relation {
                     TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
-                    TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
+                    TypeRelation::Assignability
+                    | TypeRelation::ConstraintSetAssignability
+                    | TypeRelation::ImplementationCompatibility => true,
                     TypeRelation::Redundancy { .. } => match target {
                         Type::Dynamic(_) => true,
                         Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
@@ -1088,7 +1169,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.constraints,
                 match self.relation {
                     TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
-                    TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
+                    TypeRelation::Assignability
+                    | TypeRelation::ConstraintSetAssignability
+                    | TypeRelation::ImplementationCompatibility => true,
                     TypeRelation::Redundancy { .. } => match source {
                         Type::Dynamic(_) => true,
                         Type::Intersection(intersection) => {
@@ -1403,7 +1486,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         TypeRelation::Subtyping
                         | TypeRelation::Redundancy { .. }
                         | TypeRelation::SubtypingAssuming => source,
-                        TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
+                        TypeRelation::Assignability
+                        | TypeRelation::ConstraintSetAssignability
+                        | TypeRelation::ImplementationCompatibility => {
                             source.bottom_materialization(db)
                         }
                     };
@@ -1416,7 +1501,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                                 | TypeRelation::Redundancy { .. }
                                 | TypeRelation::SubtypingAssuming => neg_ty,
                                 TypeRelation::Assignability
-                                | TypeRelation::ConstraintSetAssignability => {
+                                | TypeRelation::ConstraintSetAssignability
+                                | TypeRelation::ImplementationCompatibility => {
                                     neg_ty.bottom_materialization(db)
                                 }
                             };
