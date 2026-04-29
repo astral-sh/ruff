@@ -391,6 +391,31 @@ reveal_type(two_params("a", "b"))  # revealed: Literal["a", "b"]
 reveal_type(two_params("a", 1))  # revealed: Literal["a", 1]
 ```
 
+Recursive occurrences of a generic function should be treated as fresh generic callable occurrences.
+The recursive call's typevars are inferable at the call site, even though the function body's own
+typevars are non-inferable.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+A = TypeVar("A")
+B = TypeVar("B")
+
+def recursive_identity(t: T) -> T:
+    # TODO: revealed: T@recursive_identity
+    reveal_type(recursive_identity(t))  # revealed: Unknown
+    return t
+
+def pair(a: A, b: B) -> tuple[A, B]:
+    return (a, b)
+
+def recursive_pair(t: T) -> T:
+    # TODO: revealed: tuple[T@recursive_pair, Literal[1]]
+    reveal_type(pair(recursive_pair(t), recursive_pair(1)))  # revealed: tuple[Unknown, Literal[1]]
+    return t
+```
+
 When one of the parameters is a union, we attempt to find the smallest specialization that satisfies
 all of the constraints.
 

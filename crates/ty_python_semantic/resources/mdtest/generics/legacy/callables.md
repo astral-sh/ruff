@@ -321,6 +321,35 @@ def singleton(flag: bool = False) -> Callable[[Callable[[int], S]], Callable[[in
     return wrapper
 ```
 
+## Multiple occurrences of a higher-order generic callable
+
+If a generic callable is used more than once in a higher-order call, each occurrence should get its
+own fresh typevars. In this example, the outer `partial` call receives a second, independent
+occurrence of `partial` as its first argument, and `drop` as its second argument.
+
+```py
+from typing import Callable, TypeVar
+
+A = TypeVar("A")
+B = TypeVar("B")
+C = TypeVar("C")
+X = TypeVar("X")
+Y = TypeVar("Y")
+
+def partial(c: Callable[[A, B], C], a: A) -> Callable[[B], C]:
+    def inner(b: B) -> C:
+        return c(a, b)
+    return inner
+
+def drop(x: X, y: Y) -> Y:
+    return y
+
+# TODO: revealed: Literal["x"]
+reveal_type(partial(partial, drop)(1)("x"))  # revealed: Unknown
+# TODO: revealed: Literal[1]
+reveal_type(partial(partial, drop)("x")(1))  # revealed: Unknown
+```
+
 ## SymPy one-import MRE scaffold (multi-file)
 
 Reduced regression lock for a SymPy overload/protocol shape that can panic in the

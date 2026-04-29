@@ -537,6 +537,38 @@ def identity2[T](t: T) -> T:
     return t
 ```
 
+Invariant generic classes in a generic callable's return type should preserve cross-typevar
+constraints that remain after the callable's own typevars are quantified away. Here, `listify` can
+be used as a `Callable[[U], list[V]]` when the surrounding constraints imply `U ≤ V`.
+
+```py
+from typing import Callable
+from ty_extensions import ConstraintSet, TypeOf, static_assert
+
+def listify[T](t: T) -> list[T]:
+    return [t]
+
+def constrained_by_other_typevars[U, V]() -> None:
+    ok = ConstraintSet.range(bool, U, int) & ConstraintSet.range(int, V, int)
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(ok.implies_subtype_of(TypeOf[listify], Callable[[U], list[V]]))
+
+    bad = ConstraintSet.range(str, U, str) & ConstraintSet.range(int, V, int)
+    static_assert(not bad.implies_subtype_of(TypeOf[listify], Callable[[U], list[V]]))
+
+def recursive_listify[T](t: T) -> list[T]:
+    constraints = ConstraintSet.range(bool, T, int)
+
+    static_assert(constraints.implies_subtype_of(TypeOf[recursive_listify], Callable[[int], list[int]]))
+    static_assert(constraints.implies_subtype_of(TypeOf[recursive_listify], Callable[[str], list[str]]))
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(not constraints.implies_subtype_of(TypeOf[recursive_listify], Callable[[str], list[int]]))
+
+    return [t]
+```
+
 ## Transitivity
 
 ### Transitivity can propagate across typevars
