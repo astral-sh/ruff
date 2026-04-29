@@ -5766,7 +5766,7 @@ def f(c: C[int]) -> None:
     # The key thing is that we don't stack overflow while checking this.
     # The cycle detection assumes compatibility when it detects potential
     # infinite recursion between protocol specializations.
-    takes_c(c)
+    takes_c(c)  # error: [invalid-argument-type]
 
 class Left[T](Protocol):
     @property

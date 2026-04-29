@@ -4271,7 +4271,7 @@ def function():
         );
 
         // TODO: Should this be constravariant instead?
-        assert_snapshot!(test.hover(), @r###"
+        assert_snapshot!(test.hover(), @"
         P@Alias (covariant)
         ---------------------------------------------
         ```python
@@ -4286,7 +4286,7 @@ def function():
           |                                         |
           |                                         source
           |
-        "###);
+        ");
     }
 
     #[test]
