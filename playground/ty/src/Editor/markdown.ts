@@ -37,19 +37,25 @@ export function generatePlaygroundMarkdown(
   files: { [name: string]: string },
   shareUrl: string,
 ): string {
-  let markdown = `## [Playground](${shareUrl})
-
-`;
+  let markdown = "";
+  const showFilenames = Object.keys(files).length > 1;
 
   for (const [filename, content] of Object.entries(files)) {
-    markdown += `### \`${filename}\`
+    if (showFilenames) {
+      markdown += `\`${filename}\`:
 
-\`\`\`${getLanguageTag(filename)}
+`;
+    }
+
+    markdown += `\`\`\`${getLanguageTag(filename)}
 ${content}
 \`\`\`
 
 `;
   }
+
+  markdown += `[Playground](${shareUrl})
+`;
 
   return markdown;
 }
