@@ -371,16 +371,14 @@ r2: RecursiveList[int] = [1, [1, 2, 3]]
 r3: RecursiveList[int] = "a"
 # error: [invalid-assignment]
 r4: RecursiveList[int] = ["a"]
-# TODO: this should be an error
+# error: [invalid-assignment] "Object of type `list[int | list[RecursiveList[int]] | list[int | list[RecursiveList[int]] | str]]` is not assignable to `RecursiveList[int]`"
 r5: RecursiveList[int] = [1, ["a"]]
 
 def _(x: RecursiveList[int]):
     if isinstance(x, list):
-        # TODO: should be `list[RecursiveList[int]]
-        reveal_type(x[0])  # revealed: int | list[Any]
+        reveal_type(x[0])  # revealed: int | list[RecursiveList[int]]
     if isinstance(x, list) and isinstance(x[0], list):
-        # TODO: should be `list[RecursiveList[int]]`
-        reveal_type(x[0])  # revealed: list[Any]
+        reveal_type(x[0])  # revealed: list[RecursiveList[int]]
 ```
 
 Assignment checks respect structural subtyping, i.e. type aliases with the same structure are
@@ -413,7 +411,7 @@ d1: DivergentList[int] = []
 d2: DivergentList[int] = [1]
 # error: [invalid-assignment]
 d3: DivergentList[int] = ["a"]
-# TODO: this should be an error
+# error: [invalid-assignment] "Object of type `list[list[DivergentList[int]] | list[list[DivergentList[int]] | int]]` is not assignable to `DivergentList[int]`"
 d4: DivergentList[int] = [[1]]
 
 def _(x: DivergentList[int]):
