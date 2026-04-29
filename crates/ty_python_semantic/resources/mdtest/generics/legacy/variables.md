@@ -435,6 +435,59 @@ from typing import TypeVar
 T = TypeVar("T", covariant=True, contravariant=True)
 ```
 
+### Infer variance
+
+> A generic class that uses the traditional syntax may include combinations of type variables with
+> explicit and inferred variance.
+
+For a `TypeVar` with `infer_variance=True`, we infer covariance when the type variable only appears
+in return positions, and contravariance when it only appears in parameter positions.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar
+
+OutT = TypeVar("OutT", infer_variance=True)
+
+class Source(Generic[OutT]):
+    def get(self) -> OutT:
+        raise NotImplementedError
+
+source_int: Source[int] = Source[object]()  # error: [invalid-assignment]
+source_obj: Source[object] = Source[int]()
+
+InT = TypeVar("InT", infer_variance=True)
+
+class Sink(Generic[InT]):
+    def send(self, value: InT) -> None:
+        raise NotImplementedError
+
+sink_obj: Sink[object] = Sink[int]()  # error: [invalid-assignment]
+sink_int: Sink[int] = Sink[object]()
+```
+
+Variance cannot be specified explicitly when variance inference is requested:
+
+```py
+from typing import TypeVar
+
+# snapshot: invalid-legacy-type-variable
+CovariantAndInferred = TypeVar("CovariantAndInferred", covariant=True, infer_variance=True)
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: A `TypeVar` cannot specify variance when `infer_variance=True`
+  --> src/mdtest_snippet.py:23:24
+   |
+23 | CovariantAndInferred = TypeVar("CovariantAndInferred", covariant=True, infer_variance=True)
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+```
+
 ### Boolean parameters must be unambiguous
 
 ```py
