@@ -4,7 +4,7 @@
   suppressNotifications: ["prEditedNotification"],
   extends: ["github>astral-sh/renovate-config"],
   labels: ["internal"],
-  schedule: ["before 4am on Monday"],
+  schedule: ["before 0am on Wednesday"],
   semanticCommits: "disabled",
   separateMajorMinor: false,
   enabledManagers: ["github-actions", "pre-commit", "cargo", "pep621", "pip_requirements", "npm"],
@@ -85,6 +85,12 @@
       matchManagers: ["npm"],
       matchDepTypes: ["devDependencies"],
       description: "Weekly update of NPM development dependencies",
+    },
+    {
+      groupName: "ESLint dependencies",
+      matchManagers: ["npm"],
+      matchPackageNames: ["@eslint/js", "eslint"],
+      description: "Weekly update of ESLint dependencies",
     },
     {
       groupName: "Monaco",
