@@ -992,7 +992,7 @@ mod tests {
                 "#
         ),
          @r#"
-        Added 4 suppressions
+        Added 5 suppressions
 
         ## Fixed source
 
@@ -1003,7 +1003,7 @@ mod tests {
 
 
         def get_data() -> dict[str, JsonValue]:
-            return {"home_assistant": {"entities": [{"entity_id": "sensor.test"}]}}
+            return {"home_assistant": {"entities": [{"entity_id": "sensor.test"}]}}  # ty:ignore[invalid-return-type]
 
 
         def f() -> None:

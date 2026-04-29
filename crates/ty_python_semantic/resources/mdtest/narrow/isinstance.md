@@ -193,9 +193,9 @@ def _(x: int | list[int] | bytes):
 
 ```snapshot
 error[invalid-argument-type]: Invalid second argument to `isinstance`
-  --> src/mdtest_snippet.py:17:8
+  --> src/mdtest_snippet.py:26:8
    |
-17 |     if isinstance(x, (int, list[int] | bytes)):
+26 |     if isinstance(x, (int, list[int] | bytes)):
    |        ^^^^^^^^^^^^^^^^^^^^-----------------^^
    |                            |
    |                            This `UnionType` instance contains non-class elements
@@ -217,9 +217,9 @@ def _(x: int | list[int] | bytes):
 
 ```snapshot
 error[invalid-argument-type]: Invalid second argument to `isinstance`
-  --> src/mdtest_snippet.py:23:8
+  --> src/mdtest_snippet.py:32:8
    |
-23 |     if isinstance(x, (int, (str, list[int] | bytes))):
+32 |     if isinstance(x, (int, (str, list[int] | bytes))):
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^-----------------^^^
    |                                  |
    |                                  This `UnionType` instance contains non-class elements
@@ -243,9 +243,9 @@ def _(x: int | list[int] | bytes):
 
 ```snapshot
 error[invalid-argument-type]: Invalid second argument to `isinstance`
-  --> src/mdtest_snippet.py:31:8
+  --> src/mdtest_snippet.py:40:8
    |
-31 |     if isinstance(x, classes):
+40 |     if isinstance(x, classes):
    |        ^^^^^^^^^^^^^^^^^^^^^^
    |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects

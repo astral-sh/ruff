@@ -261,14 +261,14 @@ j1: JsonValue = 42
 reveal_type(j1)  # revealed: Literal[42]
 # TODO: better type using bidirectional inference
 j2: JsonValue = {"key": 123}
-reveal_type(
-    j2
-)  # revealed: dict[str, int | float | str | None | dict[str, int | float | str | None | dict[str, Any] | list[Any]] | list[int | float | str | None | dict[str, Any] | list[Any]]]
+# fmt: off
+reveal_type(j2)  # revealed: dict[str, str | int | float | None | dict[str, int | float | str | None | dict[str, Any] | list[Any]] | list[int | float | str | None | dict[str, Any] | list[Any]]]
+# fmt: on
 # TODO: better type using bidirectional inference
 j3: JsonValue = [1, [2, [3]]]
-reveal_type(
-    j3
-)  # revealed: list[int | float | str | None | dict[str, int | float | str | None | dict[str, Any] | list[Any]] | list[int | float | str | None | dict[str, Any] | list[Any]]]
+# fmt: off
+reveal_type(j3)  # revealed: list[int | float | str | None | dict[str, int | float | str | None | dict[str, Any] | list[Any]] | list[int | float | str | None | dict[str, Any] | list[Any]]]
+# fmt: on
 # error: [invalid-assignment]
 j4: JsonValue = {1: "value"}
 # error: [invalid-assignment]
@@ -294,12 +294,12 @@ class Node:
         self.value = value
 
 n1 = Node(42)
-reveal_type(n1.value)  # revealed: Unknown | int | list[Child]
+reveal_type(n1.value)  # revealed: int | list[int | list[Any]]
 n2 = Node([1, [2, [3]]])
-reveal_type(n2.value)  # revealed: Unknown | int | list[Child]
+reveal_type(n2.value)  # revealed: int | list[int | list[Any]]
 # error: [invalid-argument-type]
 n3 = Node(["a"])
-reveal_type(n3.value)  # revealed: Unknown | int | list[Child]
+reveal_type(n3.value)  # revealed: int | list[int | list[Any]]
 ```
 
 The type of the second parameter of `isinstance/issubclass` is defined using an implicit (PEP-613)
