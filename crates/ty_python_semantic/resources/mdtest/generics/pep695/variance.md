@@ -6,12 +6,11 @@ python-version = "3.12"
 ```
 
 Type variables have a property called _variance_ that affects the subtyping and assignability
-relations. Much more detail can be found in the [spec]. To summarize, each typevar is either
-**covariant**, **contravariant**, or **invariant**. Our inference lattice also has an internal
-**bivariant** state; if a PEP 695 type parameter would otherwise infer to bivariance, we fall back
-to covariance instead. (Bivariance is technically correct when a typevar is unused, but it is
-confusing since it makes all specializations equivalent, it's not practically useful, and it's not
-in the spec, so we avoid it.)
+relations. Much more detail can be found in the [spec]. PEP 695 defines inferred variance as
+**covariant**, **contravariant**, or **invariant**. We also represent **bivariance** internally, for
+cases where varying a type parameter does not change the type. For PEP 695 parameters, we report
+these cases as covariant, matching the spec's inference algorithm when assignment is valid in both
+directions.
 
 For all of the examples below, we will consider typevars `T` and `U`, two generic classes using
 those typevars `C[T]` and `D[U]`, and two types `A` and `B`.
@@ -372,11 +371,11 @@ of that instance affect its variance.
 ```py
 from ty_extensions import is_subtype_of, static_assert
 
-class Bivariant[T]:
-    def takes_int_self(self, value: Bivariant[int]): ...
+class WouldBeBivariant[T]:
+    def takes_int_self(self, value: WouldBeBivariant[int]): ...
 
-static_assert(is_subtype_of(Bivariant[int], Bivariant[object]))
-static_assert(is_subtype_of(Bivariant[object], Bivariant[int]))
+static_assert(is_subtype_of(WouldBeBivariant[int], WouldBeBivariant[object]))
+static_assert(not is_subtype_of(WouldBeBivariant[object], WouldBeBivariant[int]))
 
 class Covariant[T]:
     def get(self) -> T:
