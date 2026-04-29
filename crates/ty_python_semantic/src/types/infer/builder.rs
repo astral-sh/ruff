@@ -1622,8 +1622,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         type_alias: &ast::StmtTypeAlias,
         definition: Definition<'db>,
     ) {
-        self.infer_expression(&type_alias.name, TypeContext::default());
-
         // Check that no type parameter with a default follows a TypeVarTuple
         // in the type alias's PEP 695 type parameter list.
         if let Some(type_params) = type_alias.type_params.as_deref() {
@@ -1646,6 +1644,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 None,
             )),
         ));
+
+        self.store_expression_type(&type_alias.name, type_alias_ty);
 
         self.add_declaration_with_binding(
             type_alias.into(),

@@ -83,6 +83,9 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
                         qualifiers,
                     )
                 }),
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => {
+                HoverContent::Type(Type::TypeAlias(alias), None, qualifiers)
+            }
             Type::TypeVar(typevar) => {
                 HoverContent::Type(ty, Some(typevar.variance(db)), qualifiers)
             }
@@ -5147,6 +5150,58 @@ def function():
           |                       ^- Cursor offset
           |                       |
           |                       source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_type_alias_name() {
+        let test = hover_test(
+            r#"
+        type Box<CURSOR> = int | None
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        Box
+        ---------------------------------------------
+        ```python
+        Box
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:6
+          |
+        2 | type Box = int | None
+          |      ^^^- Cursor offset
+          |      |
+          |      source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_generic_type_alias_name() {
+        let test = hover_test(
+            r#"
+        type Wrapper<CURSOR>[T] = list[T]
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        Wrapper
+        ---------------------------------------------
+        ```python
+        Wrapper
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:6
+          |
+        2 | type Wrapper[T] = list[T]
+          |      ^^^^^^^- Cursor offset
+          |      |
+          |      source
           |
         ");
     }
