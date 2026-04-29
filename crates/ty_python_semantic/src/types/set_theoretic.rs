@@ -157,10 +157,9 @@ impl<'db> UnionType<'db> {
                 b.add_in_place(new_ty);
             } else if &new_ty != ty {
                 // First change at index `i`. Initialize the builder and
-                // replay the unchanged prefix (we know `elements[..i]`
-                // mapped to themselves, so we pass the originals directly).
+                // replay the unchanged prefix.
                 let mut b = UnionBuilder::new(db).unpack_aliases(false);
-                for prev in &elements[..i] {
+                for prev in elements.iter().take(i) {
                     b.add_in_place(*prev);
                 }
                 b.add_in_place(new_ty);
@@ -749,10 +748,26 @@ impl<'db> IntersectionType<'db> {
         db: &'db dyn Db,
         mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        let mut builder = IntersectionBuilder::new(db);
-        for ty in self.positive(db) {
-            builder = builder.add_positive(transform_fn(ty));
+        // Identity preservation: lazily instantiate the builder only once the
+        // first changed positive is observed. If nothing changed, return
+        // `Type::Intersection(self)` directly without ever allocating.
+        let positives = self.positive(db);
+        let mut builder: Option<IntersectionBuilder<'db>> = None;
+        for (i, ty) in positives.iter().enumerate() {
+            let new_ty = transform_fn(ty);
+            if let Some(b) = builder.take() {
+                builder = Some(b.add_positive(new_ty));
+            } else if &new_ty != ty {
+                let mut b = IntersectionBuilder::new(db);
+                for prev in positives.iter().take(i) {
+                    b = b.add_positive(*prev);
+                }
+                builder = Some(b.add_positive(new_ty));
+            }
         }
+        let Some(mut builder) = builder else {
+            return Type::Intersection(self);
+        };
         for ty in self.negative(db) {
             builder = builder.add_negative(*ty);
         }
