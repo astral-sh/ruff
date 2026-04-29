@@ -171,6 +171,30 @@ class_with_callable_dunder = ClassWithNonMethodDunder()
 reveal_type(class_with_callable_dunder[0])  # revealed: str
 ```
 
+Recursive aliases in the dunder annotation should still terminate when we look up and call the
+dunder via `type(obj)`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import reveal_type
+
+class G:
+    def __call__(self, key: int) -> "RecursiveGetItem":
+        return self
+
+type RecursiveGetItem = G | RecursiveGetItem
+
+class C:
+    __getitem__: RecursiveGetItem = G()
+
+def f(x: C):
+    reveal_type(x[0])  # revealed: G | Unknown
+```
+
 ## Dunders are looked up using the descriptor protocol
 
 Here, we demonstrate that the descriptor protocol is invoked when looking up a dunder method. Note
