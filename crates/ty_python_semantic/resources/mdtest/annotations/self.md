@@ -1077,7 +1077,7 @@ class ExplicitGeneric[T]:
 
 ExplicitGeneric[int]().special()
 
-# error: [invalid-argument-type] "Argument to bound method `special` is incorrect: Expected `ExplicitGeneric[int]`, found `ExplicitGeneric[str]`"
+# error: [invalid-argument-type] "Argument to bound method `ExplicitGeneric.special` is incorrect: Expected `ExplicitGeneric[int]`, found `ExplicitGeneric[str]`"
 ExplicitGeneric[str]().special()
 ```
 
