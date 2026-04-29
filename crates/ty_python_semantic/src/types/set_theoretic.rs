@@ -144,27 +144,33 @@ impl<'db> UnionType<'db> {
         db: &'db dyn Db,
         mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        // Identity preservation: walk elements first; if every transformed element
-        // equals its original, return `Type::Union(self)` without rebuilding the
-        // UnionType through `UnionBuilder`.
-        let mut mapped = Vec::with_capacity(self.elements(db).len());
-        let mut changed = false;
-        for ty in self.elements(db) {
+        // Identity preservation: walk elements without any intermediate buffer.
+        // The `UnionBuilder` itself is instantiated lazily — only once the
+        // first changed element is observed. Until then we just compare
+        // `transform_fn`'s output against the original. If nothing changed,
+        // we return `Type::Union(self)` directly without ever allocating.
+        let elements = self.elements(db);
+        let mut builder: Option<UnionBuilder<'db>> = None;
+        for (i, ty) in elements.iter().enumerate() {
             let new_ty = transform_fn(ty);
-            if &new_ty != ty {
-                changed = true;
+            if let Some(b) = builder.as_mut() {
+                b.add_in_place(new_ty);
+            } else if &new_ty != ty {
+                // First change at index `i`. Initialize the builder and
+                // replay the unchanged prefix (we know `elements[..i]`
+                // mapped to themselves, so we pass the originals directly).
+                let mut b = UnionBuilder::new(db).unpack_aliases(false);
+                for prev in &elements[..i] {
+                    b.add_in_place(*prev);
+                }
+                b.add_in_place(new_ty);
+                builder = Some(b);
             }
-            mapped.push(new_ty);
         }
-        if !changed {
+        let Some(builder) = builder else {
             return Type::Union(self);
-        }
-        mapped
-            .into_iter()
-            .fold(
-                UnionBuilder::new(db).unpack_aliases(false),
-                UnionBuilder::add,
-            )
+        };
+        builder
             .recursively_defined(self.recursively_defined(db))
             .build()
     }
