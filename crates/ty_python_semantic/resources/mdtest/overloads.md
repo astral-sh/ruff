@@ -697,6 +697,23 @@ def keyword_only_generic_return(*, x: int) -> int: ...
 def keyword_only_generic_return(*, x: str) -> str: ...
 def keyword_only_generic_return(*, x: T) -> T:
     return x
+```
+
+### Generic implementation return inference
+
+For generic implementations, ty checks the implementation return type selected for each overload's
+argument types. This preserves type-variable identities through wrappers, decorator aliases, and
+coroutine-returning callbacks.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Callable, Concatenate, Coroutine, Final, TypeVar, overload
+
+R = TypeVar("R")
 
 class Future[T]:
     result: T
@@ -781,6 +798,15 @@ def decorator_alias_union_return[
     | DecoratorFunc[ViewT, P, ResponseT]
 ):
     raise NotImplementedError
+```
+
+### Gradual implementation signatures
+
+A gradual implementation can still be too narrow if parameter names, defaults, or variadic forms do
+not accept every call shape accepted by the overloads.
+
+```py
+from typing import overload
 
 @overload
 # error: [invalid-overload]
@@ -823,6 +849,19 @@ def dynamic_implementation_variadic_arguments(*args: int) -> int: ...
 def dynamic_implementation_variadic_arguments(x: str) -> str: ...
 def dynamic_implementation_variadic_arguments(x) -> int | str:
     return x
+```
+
+### Type-variable parameter domains
+
+Overload parameter domains must be covered for all relevant type-variable specializations. This
+includes constrained type variables, bounded type variables, and nested occurrences where variance
+determines whether an upper bound is sufficient.
+
+```py
+from typing import Any, Callable, Generic, Literal, Protocol, TypeVar, overload
+
+T = TypeVar("T")
+TIntStr = TypeVar("TIntStr", int, str)
 
 @overload
 def generic_container_implementation(x: list[int]) -> int: ...
@@ -931,6 +970,34 @@ def bounded_typevar_variadic_implementation(*objects: Dataset | DataArray) -> tu
 def bounded_typevar_variadic_implementation(*objects: Dataset | DataArray) -> tuple[Dataset | DataArray, ...]:
     raise NotImplementedError
 
+CallbackT = TypeVar("CallbackT", bound=int)
+
+@overload
+# error: [invalid-overload]
+def bounded_typevar_covariant_parameter_domain(callback: Callable[[CallbackT], None]) -> None: ...
+@overload
+def bounded_typevar_covariant_parameter_domain(callback: Callable[[str], None]) -> None: ...
+def bounded_typevar_covariant_parameter_domain(
+    callback: Callable[[int], None] | Callable[[str], None],
+) -> None:
+    pass
+```
+
+### Method and callable-object implementations
+
+Implicit receivers can be normalized for ordinary methods, but static methods and explicit
+specialized receiver annotations still participate in implementation consistency.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Callable, Generic, Literal, ParamSpec, Protocol, TypeVar, overload
+
+T = TypeVar("T")
+
 class Command(Generic[T]): ...
 
 AnyCommandT = TypeVar("AnyCommandT", bound=Command[Any])
@@ -1011,6 +1078,16 @@ class SpecializedSelfBox[T]:
     def method(self: "SpecializedSelfBox[str]", x: str) -> str: ...
     def method(self, x: T) -> T:
         return x
+```
+
+### `Unpack[TypedDict]` implementation parameters
+
+An implementation with explicit keyword-only parameters is not equivalent to an overload accepting
+arbitrary `**kwargs` from an unpacked `TypedDict`.
+
+```py
+from typing import TypedDict, overload
+from typing_extensions import Unpack
 
 class ReadSharedKwds(TypedDict, total=False):
     sep: str
@@ -1029,6 +1106,18 @@ def typed_dict_kwargs_explicit_implementation(
     header: int = 0,
 ) -> int | str:
     return 1
+```
+
+### ParamSpec and structured variadic implementations
+
+`ParamSpec` overloads keep their callable argument structure unless the implementation is gradual.
+Structured callable parameter domains are also expanded across the variadic implementation surface.
+
+```py
+from typing import Any, Callable, ParamSpec, Sequence, TypeVar, overload
+
+T = TypeVar("T")
+P = ParamSpec("P")
 
 @overload
 def paramspec_overload_gradual_variadic_implementation(func: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T: ...
@@ -1245,14 +1334,15 @@ def decorator(
 
 ### Optional positional implementation parameter
 
-An implementation with an optional positional parameter accepts calls that omit that parameter,
-including an overload that only exposes keyword-only parameters.
+An implementation using the PEP 484 double-underscore convention also makes the receiver
+positional-only, so it is not assignable to an overload with a positional-or-keyword receiver.
 
 ```py
 from typing import overload
 
 class CallableWithOptionalParameter:
     @overload
+    # error: [invalid-overload]
     def __call__(self, *, flag: bool = ...) -> int: ...
     @overload
     def __call__(self, __value: int, *, flag: bool = ...) -> int: ...
@@ -1301,6 +1391,32 @@ class Diff:
     def __getitem__(self, item: str) -> str: ...
     def __getitem__(self, item: int | str) -> int | str:
         return 1
+```
+
+### `__new__` implementation consistency
+
+Overloaded `__new__` methods use the same implementation consistency checks as other overloads.
+Broad implementations still accept the narrower overload call shapes.
+
+```py
+from typing import overload
+
+class NewParameterDiff:
+    @overload
+    def __new__(cls, value: int) -> "NewParameterDiff": ...
+    @overload
+    # error: [invalid-overload]
+    def __new__(cls, value: str) -> "NewParameterDiff": ...
+    def __new__(cls, value: int) -> "NewParameterDiff":
+        raise NotImplementedError
+
+class NewBroadImplementation:
+    @overload
+    def __new__(cls, value: int) -> "NewBroadImplementation": ...
+    @overload
+    def __new__(cls, value: str) -> "NewBroadImplementation": ...
+    def __new__(cls, *args: object, **kwargs: object) -> object:
+        raise NotImplementedError
 ```
 
 ### `Unpack[TypedDict]` implementation expansion
@@ -1372,8 +1488,8 @@ class Thenable(Future[T]):
 
 ### Positional-only implementation parameter
 
-A defaulted positional-only implementation parameter still accepts calls that omit it, including an
-overload that only accepts keyword arguments.
+A defaulted positional-only implementation parameter can be omitted, but the slash also makes the
+receiver positional-only, so an overload with a positional-or-keyword receiver is inconsistent.
 
 ```py
 from typing import overload
@@ -1382,6 +1498,7 @@ class PositionalOnlyImplementation:
     @overload
     def update(self, value: int, /) -> None: ...
     @overload
+    # error: [invalid-overload]
     def update(self, **kwargs: int) -> None: ...
     def update(self, value: object = (), /, **kwargs: object) -> None:
         pass
