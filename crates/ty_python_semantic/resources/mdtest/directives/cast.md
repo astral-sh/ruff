@@ -111,7 +111,7 @@ regardless:
 
 ```py
 def _(x_any: Any, x_int: int, x_bool: bool, x_sequence_any: Sequence[Any]):
-    # error: [redundant-cast] "Cast is redundant; the assignment target is annotated as `int`"
+    # error: [redundant-cast] "Unnecessary cast to type `int` in annotated assignment"
     a_cast: int = cast(int, x_any)
     a_no_cast: int = x_any
 
@@ -165,6 +165,15 @@ The same is true in the following example:
     d_no_cast: int | None = x_int
     reveal_type(d_cast)  # revealed: int | None
     reveal_type(d_no_cast)  # revealed: int
+```
+
+We only report these types of `redundant-cast` diagnostics for annotated assignments. The following
+`cast` is technically also redundant, but there might be a good reason to keep it (e.g. to be
+"notified" once the return type of that function changes):
+
+```py
+def returns_int(x_any: Any) -> int:
+    return cast(int, x_any)  # technically redundant, but no diagnostic
 ```
 
 ## Diagnostic snapshots

@@ -3869,7 +3869,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let value_ty = value.as_ref().map(|value| {
                 self.infer_maybe_standalone_expression(
                     value,
-                    TypeContext::new(Some(annotated.inner_type())),
+                    TypeContext::for_annotated_assignment(annotated.inner_type()),
                 )
             });
 
@@ -4162,7 +4162,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let inferred_ty = self.infer_maybe_standalone_expression(
                 value,
-                TypeContext::new(Some(declared.inner_type())),
+                TypeContext::for_annotated_assignment(declared.inner_type()),
             );
 
             self.typevar_binding_context = previous_typevar_binding_context;
