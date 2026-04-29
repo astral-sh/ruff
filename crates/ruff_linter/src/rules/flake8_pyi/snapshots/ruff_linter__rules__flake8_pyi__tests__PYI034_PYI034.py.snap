@@ -511,6 +511,7 @@ help: Use `Self` as return type
 392 +     def __enter__(self) -> typing.Self: ...    # PYI034
 393 |     async def __aenter__(self) -> "UsesStringizedForwardReferences": ...  # PYI034
 394 |     def __iadd__(self, other) -> "UsesStringizedForwardReferences": ...  # PYI034
+395 |
 note: This is an unsafe fix and may change runtime behavior
 
 PYI034 [*] `__aenter__` methods in classes like `UsesStringizedForwardReferences` usually return `self` at runtime
@@ -529,6 +530,8 @@ help: Use `Self` as return type
     -     async def __aenter__(self) -> "UsesStringizedForwardReferences": ...  # PYI034
 393 +     async def __aenter__(self) -> typing.Self: ...  # PYI034
 394 |     def __iadd__(self, other) -> "UsesStringizedForwardReferences": ...  # PYI034
+395 |
+396 |
 note: This is an unsafe fix and may change runtime behavior
 
 PYI034 [*] `__iadd__` methods in classes like `UsesStringizedForwardReferences` usually return `self` at runtime
@@ -545,4 +548,7 @@ help: Use `Self` as return type
 393 |     async def __aenter__(self) -> "UsesStringizedForwardReferences": ...  # PYI034
     -     def __iadd__(self, other) -> "UsesStringizedForwardReferences": ...  # PYI034
 394 +     def __iadd__(self, other) -> typing.Self: ...  # PYI034
+395 |
+396 |
+397 | class InPlaceOperationReturningOtherTypeAtRuntime:
 note: This is an unsafe fix and may change runtime behavior
