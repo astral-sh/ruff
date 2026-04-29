@@ -566,6 +566,47 @@ def foo(x):
     return x
 ```
 
+### Implementation consistency
+
+The implementation must accept every argument accepted by each overload, and each overload return
+type must be assignable to the implementation return type. This check initially only covers
+overloads where all signatures are non-generic.
+
+```py
+from typing import overload
+
+@overload
+def return_type(x: int) -> int: ...
+@overload
+# error: [invalid-overload] "Overload return type is not assignable to implementation return type"
+def return_type(x: str) -> str: ...
+def return_type(x: int | str) -> int:
+    return 1
+
+@overload
+def parameter_type(x: int) -> int: ...
+@overload
+# error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+def parameter_type(x: str) -> str: ...
+def parameter_type(x: int) -> int | str:
+    return 1
+```
+
+Generic overloads are left to the full implementation-consistency check.
+
+```py
+from typing import TypeVar, overload
+
+T = TypeVar("T")
+
+@overload
+def generic_parameter_type(x: T) -> T: ...
+@overload
+def generic_parameter_type(x: str) -> str: ...
+def generic_parameter_type(x: int) -> int | str:
+    return x
+```
+
 ### Inconsistent decorators
 
 #### `@staticmethod`

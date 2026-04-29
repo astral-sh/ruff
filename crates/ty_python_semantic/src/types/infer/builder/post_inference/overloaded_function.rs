@@ -6,12 +6,13 @@ use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
 
 use crate::{
+    Db,
     place::{DefinedPlace, Definedness, Place, place_from_bindings},
     types::{
         KnownClass, Type, binding_type,
         context::InferContext,
         diagnostic::INVALID_OVERLOAD,
-        function::{FunctionDecorators, FunctionType, KnownFunction},
+        function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
     },
 };
 use ty_python_core::{
@@ -84,6 +85,12 @@ pub(crate) fn check_overloaded_function<'db>(
     let (overloads, implementation) = function.overloads_and_implementation(db);
     if overloads.is_empty() {
         return;
+    }
+
+    if let Some(implementation) = implementation
+        && decorators_are_consistent(db, overloads, implementation)
+    {
+        check_non_generic_overload_implementation_consistency(context, overloads, implementation);
     }
 
     // Check that the overloaded function has at least two overloads
@@ -273,4 +280,97 @@ pub(crate) fn check_overloaded_function<'db>(
             }
         }
     }
+}
+
+/// Check non-generic overload signatures against their implementation.
+///
+/// This is the first, deliberately narrow pass at overload implementation consistency. It reports
+/// only when the overloads and implementation are all non-generic; generic signatures require
+/// careful treatment of type-variable domains.
+fn check_non_generic_overload_implementation_consistency<'db>(
+    context: &InferContext<'db, '_>,
+    overloads: &'db [OverloadLiteral<'db>],
+    implementation: OverloadLiteral<'db>,
+) {
+    let db = context.db();
+    let implementation_signature = implementation.signature(db);
+
+    if !implementation_signature.is_non_generic(db) {
+        return;
+    }
+
+    let overload_signatures = overloads
+        .iter()
+        .map(|overload| (overload, overload.signature(db)))
+        .collect::<Vec<_>>();
+
+    if overload_signatures
+        .iter()
+        .any(|(_, signature)| !signature.is_non_generic(db))
+    {
+        return;
+    }
+
+    for (overload, overload_signature) in overload_signatures {
+        let function_node = overload.node(db, context.file(), context.module());
+        let parameters_are_consistent = implementation_signature
+            .are_non_generic_implementation_parameters_consistent_with(db, &overload_signature);
+        let return_type_is_consistent = overload_signature
+            .return_ty
+            .is_assignable_to(db, implementation_signature.return_ty);
+
+        if parameters_are_consistent && return_type_is_consistent {
+            continue;
+        }
+
+        let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name) else {
+            continue;
+        };
+        let message = match (parameters_are_consistent, return_type_is_consistent) {
+            (false, true) => "Implementation does not accept all arguments of this overload",
+            (true, false) => "Overload return type is not assignable to implementation return type",
+            (false, false) => "Overload signature is not consistent with implementation",
+            (true, true) => continue,
+        };
+        let mut diagnostic = builder.into_diagnostic(format_args!("{message}"));
+        if !parameters_are_consistent {
+            diagnostic.info("Implementation does not accept all arguments of this overload");
+        }
+        if !return_type_is_consistent {
+            diagnostic.info(format_args!(
+                "Overload returns `{}`, which is not assignable to implementation return type `{}`",
+                overload_signature.return_ty.display(db),
+                implementation_signature.return_ty.display(db),
+            ));
+        }
+        diagnostic.annotate(
+            context
+                .secondary(implementation.focus_range(db, context.module()))
+                .message(format_args!("Implementation defined here")),
+        );
+    }
+}
+
+/// Return whether overloads and implementation agree on decorators that affect binding.
+///
+/// The implementation-consistency check assumes matching callable shapes. For example, mixing
+/// `@staticmethod` on only the implementation is reported by the decorator check instead.
+fn decorators_are_consistent<'db>(
+    db: &'db dyn Db,
+    overloads: &'db [OverloadLiteral<'db>],
+    implementation: OverloadLiteral<'db>,
+) -> bool {
+    [
+        FunctionDecorators::CLASSMETHOD,
+        FunctionDecorators::STATICMETHOD,
+    ]
+    .into_iter()
+    .all(|decorator| {
+        let mut functions = overloads.iter().chain(std::iter::once(&implementation));
+        let Some(first) = functions.next() else {
+            return true;
+        };
+        let expected = first.has_known_decorator(db, decorator);
+        functions.all(|function| function.has_known_decorator(db, decorator) == expected)
+    })
 }
