@@ -142,11 +142,25 @@ impl<'db> UnionType<'db> {
     pub(crate) fn map_leave_aliases(
         self,
         db: &'db dyn Db,
-        transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+        mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        self.elements(db)
-            .iter()
-            .map(transform_fn)
+        // Identity preservation: walk elements first; if every transformed element
+        // equals its original, return `Type::Union(self)` without rebuilding the
+        // UnionType through `UnionBuilder`.
+        let mut mapped = Vec::with_capacity(self.elements(db).len());
+        let mut changed = false;
+        for ty in self.elements(db) {
+            let new_ty = transform_fn(ty);
+            if &new_ty != ty {
+                changed = true;
+            }
+            mapped.push(new_ty);
+        }
+        if !changed {
+            return Type::Union(self);
+        }
+        mapped
+            .into_iter()
             .fold(
                 UnionBuilder::new(db).unpack_aliases(false),
                 UnionBuilder::add,
