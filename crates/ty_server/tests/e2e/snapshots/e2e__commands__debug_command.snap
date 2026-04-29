@@ -34,7 +34,6 @@ Program:
     <temp_dir>/src,
     <temp_dir>/,
     vendored://stdlib,
-    <site-packages>,
   ]
 Settings: Settings {
     rules: <RULES>,
@@ -178,7 +177,7 @@ Memory report:
 =======SALSA STRUCTS=======
 `Program`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `Project`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
-`FileRoot`                                         metadata=[X.XXMB]   fields=[X.XXMB]   count=2
+`FileRoot`                                         metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `ModuleResolveModeIngredient`                      metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 =======SALSA QUERIES=======
 `dynamic_resolution_paths -> alloc::vec::Vec<ty_module_resolver::path::SearchPath>`
