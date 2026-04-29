@@ -1247,7 +1247,7 @@ impl<'db> Specialization<'db> {
             .variables(db)
             .zip(self.types(db))
             .map(|(bound_typevar, vartype)| {
-                match bound_typevar.variance(db) {
+                match specialization_variance(db, bound_typevar) {
                     TypeVarVariance::Bivariant => {
                         // With bivariance, all specializations are subtypes of each other,
                         // so any materialization is acceptable.
@@ -1369,7 +1369,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 //   - contravariant: verify that target_type <: source_type
                 //   - invariant: verify that source_type <: target_type AND target_type <: source_type
                 //   - bivariant: skip, can't make subtyping/assignability false
-                match bound_typevar.variance(db) {
+                match specialization_variance(db, bound_typevar) {
                     TypeVarVariance::Invariant => self.check_relation_in_invariant_position(
                         db,
                         *source_type,
@@ -1564,6 +1564,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
             }
         }
+    }
+}
+
+fn specialization_variance<'db>(
+    db: &'db dyn Db,
+    bound_typevar: BoundTypeVarInstance<'db>,
+) -> TypeVarVariance {
+    let variance = bound_typevar.variance(db);
+    if bound_typevar.is_paramspec(db) {
+        // `ParamSpec` specializations are represented as callable-shaped values. Their relation
+        // and materialization already use callable parameter contravariance, so flip the generic
+        // variance here to avoid applying that direction twice.
+        variance.flip()
+    } else {
+        variance
     }
 }
 

@@ -787,6 +787,35 @@ def _(x: object):
         reveal_type(x.y)  # revealed: tuple[A, object]
 ```
 
+## Narrowing generic `classmethod`
+
+After an `isinstance(..., classmethod)` branch unwraps and replaces a generic `classmethod`, the
+false-branch residual should be impossible. This avoids retaining a `classmethod[...] & Top[...]`
+arm that later causes `call-top-callable` false positives.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from collections.abc import Callable
+from typing import Any, ParamSpec, TypeVar, cast
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def f(fn: Callable[P, R] | classmethod[Any, P, R]) -> Callable[P, R]:
+    if isinstance(fn, classmethod):
+        fn = cast(Callable[P, R], fn.__func__)
+
+    if not callable(fn):
+        raise TypeError
+
+    reveal_type(fn)  # revealed: (**P@f) -> R@f
+    return fn
+```
+
 ## Narrowing with TypedDict unions
 
 Narrowing unions of `int` and multiple TypedDicts using `isinstance(x, dict)` should not panic
