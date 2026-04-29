@@ -741,6 +741,47 @@ foo1(f1, 1, "a", "b")
 foo1(f1, x=1, z="a")
 ```
 
+Inline literals passed through `ParamSpec` components should be inferred using the specialized
+parameter types of the callable argument. This mirrors wrappers like `asyncio.to_thread` around
+clients that expose large `Unpack[TypedDict]` keyword signatures.
+
+```py
+from typing import Callable, TypedDict, Unpack
+
+class Tag(TypedDict):
+    Key: str
+    Value: str
+
+class PutObjectRequest(TypedDict):
+    TagSet: list[Tag]
+
+def put_tags(tags: list[Tag], /) -> None: ...
+def put_object(**kwargs: Unpack[PutObjectRequest]) -> None: ...
+def to_thread_like[**P, R](func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return func(*args, **kwargs)
+
+def to_thread_like_keyword[**P, R](func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+    return func(*args, **kwargs)
+
+to_thread_like(put_tags, reveal_type([{"Key": "k", "Value": "v"}]))  # revealed: list[Tag]
+to_thread_like(put_object, TagSet=reveal_type([{"Key": "k", "Value": "v"}]))  # revealed: list[Tag]
+to_thread_like_keyword(func=put_object, TagSet=reveal_type([{"Key": "k", "Value": "v"}]))  # revealed: list[Tag]
+to_thread_like_keyword(TagSet=reveal_type([{"Key": "k", "Value": "v"}]), func=put_object)  # revealed: list[Tag]
+```
+
+ParamSpec forwarding should not use raw unspecialized type variables from a wrapped generic callable
+as argument context, since that can hide errors between forwarded arguments.
+
+```py
+from typing import Callable
+
+def generic_pair[T](x: list[T], y: list[T], /) -> None: ...
+def to_thread_like[**P, R](func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return func(*args, **kwargs)
+
+to_thread_like(generic_pair, [1], [""])  # error: [invalid-argument-type]
+```
+
 ### Specializing `ParamSpec` with another `ParamSpec`
 
 ```py

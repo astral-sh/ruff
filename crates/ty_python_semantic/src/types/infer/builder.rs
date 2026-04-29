@@ -88,14 +88,14 @@ use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
 use crate::types::{
-    CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType, DynamicType,
-    InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder, IntersectionType,
-    KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind, MemberLookupPolicy,
-    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
-    SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType, UnionAccumulator,
-    UnionBuilder, UnionType, binding_type, infer_complete_scope_types, infer_scope_types,
-    todo_type,
+    BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType,
+    DynamicType, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind,
+    MemberLookupPolicy, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature,
+    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType,
+    UnionAccumulator, UnionBuilder, UnionType, binding_type, infer_complete_scope_types,
+    infer_scope_types, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -5136,16 +5136,167 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        fn insert_inferred_argument_type<'db>(
+            arguments_types: &mut CallArguments<'_, 'db>,
+            argument_index: usize,
+            declared_type: Type<'db>,
+            original_declared_type: Type<'db>,
+            inferred_ty: Type<'db>,
+        ) {
+            arguments_types.insert_type(argument_index, declared_type, inferred_ty);
+            if declared_type != original_declared_type {
+                arguments_types.insert_type(argument_index, original_declared_type, inferred_ty);
+            }
+        }
+
+        fn inferred_paramspec_callable<'db>(
+            db: &'db dyn Db,
+            constraints: &ConstraintSetBuilder<'db>,
+            overload: &Binding<'db>,
+            binding: &CallableBinding<'db>,
+            paramspec: BoundTypeVarInstance<'db>,
+            arguments_types: &CallArguments<'_, 'db>,
+            call_expression_tcx: TypeContext<'db>,
+        ) -> Option<CallableType<'db>> {
+            let mut specialized_binding = CallableBinding::from_overloads(
+                overload.signature_type,
+                [overload.signature.clone()],
+            );
+            if let Some(bound_type) = binding.bound_type {
+                specialized_binding = specialized_binding.with_bound_type(bound_type);
+            }
+
+            // Reuse the normal binding checker to infer `P` from the arguments that have already
+            // been inferred. This avoids duplicating specialization logic here; the current
+            // `P.args`/`P.kwargs` argument is still uninferred, so it only contributes `Unknown`.
+            let mut specialized_bindings =
+                Bindings::from(specialized_binding).match_parameters(db, arguments_types);
+            let _ = specialized_bindings.check_types_impl(
+                db,
+                constraints,
+                arguments_types,
+                call_expression_tcx,
+                &[],
+            );
+
+            let Type::Callable(callable) = specialized_bindings
+                .single_element()
+                .and_then(|binding| binding.matching_overloads().exactly_one().ok())
+                .and_then(|(_, overload)| overload.specialization())
+                .and_then(|specialization| specialization.get(db, paramspec))?
+            else {
+                return None;
+            };
+
+            (callable.kind(db) == CallableTypeKind::ParamSpecValue).then_some(callable)
+        }
+
+        #[expect(clippy::too_many_arguments)]
+        fn paramspec_argument_context<'db>(
+            db: &'db dyn Db,
+            constraints: &ConstraintSetBuilder<'db>,
+            overload: &Binding<'db>,
+            binding: &CallableBinding<'db>,
+            callable: CallableType<'db>,
+            arguments_types: &CallArguments<'_, 'db>,
+            argument_index: usize,
+            call_expression_tcx: TypeContext<'db>,
+        ) -> Option<Type<'db>> {
+            let (prefix, _) = overload.signature.parameters().as_paramspec_with_prefix()?;
+            // The callable stored for `P` represents the tail call accepted by the
+            // `P.args`/`P.kwargs` parameters, so rematch the argument suffix against that callable.
+            let paramspec_start_argument_index = overload
+                .argument_matches()
+                .iter()
+                .position(|argument_matches| {
+                    argument_matches
+                        .parameters
+                        .iter()
+                        .any(|parameter_index| *parameter_index >= prefix.len())
+                })?
+                .checked_sub(usize::from(binding.bound_type.is_some()))?;
+            let sub_argument_index = argument_index.checked_sub(paramspec_start_argument_index)?;
+
+            let specialized_binding = CallableBinding::from_overloads(
+                overload.signature_type,
+                callable.signatures(db).iter().cloned(),
+            );
+            let sub_arguments = arguments_types.start_from(paramspec_start_argument_index);
+            let mut specialized_bindings =
+                Bindings::from(specialized_binding).match_parameters(db, &sub_arguments);
+            let _ = specialized_bindings.check_types_impl(
+                db,
+                constraints,
+                &sub_arguments,
+                call_expression_tcx,
+                &[],
+            );
+
+            let specialized_binding = specialized_bindings.single_element()?;
+            let (_, specialized_overload) = specialized_binding
+                .matching_overloads()
+                .exactly_one()
+                .ok()?;
+            let [specialized_parameter_index] = specialized_overload
+                .argument_matches()
+                .get(sub_argument_index)?
+                .parameters
+                .as_slice()
+            else {
+                return None;
+            };
+
+            let parameter_type = specialized_overload.signature.parameters()
+                [*specialized_parameter_index]
+                .annotated_type();
+            let parameter_type = specialized_overload
+                .specialization()
+                .map_or(parameter_type, |specialization| {
+                    parameter_type.apply_specialization(db, specialization)
+                });
+
+            // A context like `list[Unknown]` or `list[T@g]` is worse than no context here:
+            // it can erase the concrete literal type that should later specialize the wrapped
+            // callable.
+            (!parameter_type.has_dynamic(db) && !parameter_type.has_typevar_or_typevar_instance(db))
+                .then_some(parameter_type)
+        }
+
+        fn paramspec_binder_parameter_type<'db>(
+            db: &'db dyn Db,
+            overload: &Binding<'db>,
+            binding: &CallableBinding<'db>,
+            argument_index: usize,
+        ) -> Option<Type<'db>> {
+            let (prefix, paramspec) = overload.signature.parameters().as_paramspec_with_prefix()?;
+            let adjusted_argument_index = if binding.bound_type.is_some() {
+                argument_index + 1
+            } else {
+                argument_index
+            };
+            let [parameter_index] = overload
+                .argument_matches()
+                .get(adjusted_argument_index)?
+                .parameters
+                .as_slice()
+            else {
+                return None;
+            };
+
+            if *parameter_index >= prefix.len() {
+                return None;
+            }
+
+            let parameter_type = overload.signature.parameters()[*parameter_index].annotated_type();
+            parameter_type
+                .references_typevar(db, paramspec.typevar(db).identity(db))
+                .then_some(parameter_type)
+        }
+
         debug_assert_eq!(arguments_types.len(), bindings.argument_forms().len());
 
         let db = self.db();
         let constraints = ConstraintSetBuilder::new();
-        let iter = itertools::izip!(
-            0..,
-            arguments_types.iter_mut(),
-            bindings.argument_forms().iter().copied(),
-            ast_arguments
-        );
 
         let mut overloads_with_binding: Vec<(&Binding<'db>, &CallableBinding<'db>)> = Vec::new();
 
@@ -5153,7 +5304,59 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             add_overloads_from_binding(&mut overloads_with_binding, binding);
         });
 
-        for (argument_index, (_, argument_types), argument_form, ast_argument) in iter {
+        // A keyword argument matched to `**P.kwargs` can appear before the keyword argument that
+        // binds `P`, e.g. `wrapper(TagSet=[...], func=put_object)`. Seed those binder argument
+        // types first so the normal ParamSpec context path below is not source-order dependent.
+        for (argument_index, (argument_form, ast_argument)) in bindings
+            .argument_forms()
+            .iter()
+            .copied()
+            .zip(ast_arguments.clone())
+            .enumerate()
+        {
+            let ast_argument = match ast_argument {
+                ast::ArgOrKeyword::Arg(ast::Expr::Starred(_))
+                | ast::ArgOrKeyword::Keyword(ast::Keyword { arg: None, .. }) => continue,
+
+                ast::ArgOrKeyword::Arg(arg) => arg,
+                ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. }) => value,
+            };
+
+            if matches!(argument_form, Some(ParameterForm::Type)) {
+                continue;
+            }
+
+            let mut inferred_declared_types = FxHashSet::default();
+            for declared_type in overloads_with_binding
+                .iter()
+                .filter_map(|(overload, binding)| {
+                    paramspec_binder_parameter_type(db, overload, binding, argument_index)
+                })
+            {
+                if !inferred_declared_types.insert(declared_type) {
+                    continue;
+                }
+
+                let mut speculative_builder = self.speculate();
+                let inferred_ty = infer_argument_ty(
+                    &mut speculative_builder,
+                    (
+                        argument_index,
+                        ast_argument,
+                        TypeContext::new(Some(declared_type)),
+                    ),
+                );
+                arguments_types.insert_type(argument_index, declared_type, inferred_ty);
+            }
+        }
+
+        for (argument_index, (argument_form, ast_argument)) in bindings
+            .argument_forms()
+            .iter()
+            .copied()
+            .zip(ast_arguments)
+            .enumerate()
+        {
             let ast_argument = match ast_argument {
                 // Splatted arguments are inferred before parameter matching to
                 // determine their length.
@@ -5168,7 +5371,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Type-form arguments are inferred without type context, so we can infer the argument type directly.
             if let Some(ParameterForm::Type) = argument_form {
-                argument_types.insert(
+                arguments_types.insert_type(
+                    argument_index,
                     TypeContext::default(),
                     self.infer_type_expression(ast_argument),
                 );
@@ -5179,27 +5383,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Retrieve the parameter type context for the current argument in a given overload and its binding.
             let parameter_tcx = |overload: &'bindings Binding<'db>,
                                  binding: &CallableBinding<'db>| {
-                let argument_index = if binding.bound_type.is_some() {
+                let adjusted_argument_index = if binding.bound_type.is_some() {
                     argument_index + 1
                 } else {
                     argument_index
                 };
 
-                let argument_matches = &overload.argument_matches()[argument_index];
+                let argument_matches = &overload.argument_matches()[adjusted_argument_index];
                 let [parameter_index] = argument_matches.parameters.as_slice() else {
                     return None;
                 };
 
                 let parameter = &overload.signature.parameters()[*parameter_index];
                 let mut parameter_type = parameter.annotated_type();
+                let original_parameter_type = parameter_type;
 
-                // If the parameter is a single type variable with an upper bound, e.g., `typing.Self`,
-                // use the upper bound as type context.
+                // If the parameter is a single non-ParamSpec type variable with an upper bound,
+                // e.g., `typing.Self`, use the upper bound as type context. ParamSpec components
+                // need to reach generic call specialization below, where earlier arguments can
+                // specialize the full `ParamSpec`.
                 if let Type::TypeVar(typevar) = parameter_type
+                    && !typevar.is_paramspec(db)
                     && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
                         typevar.typevar(db).bound_or_constraints(db)
                 {
-                    return Some((parameter, TypeContext::new(Some(bound))));
+                    return Some((
+                        original_parameter_type,
+                        original_parameter_type,
+                        TypeContext::new(Some(bound)),
+                    ));
                 }
 
                 // If this is a generic call, attempt to specialize the parameter type using the
@@ -5219,6 +5431,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let _ = builder.infer(declared_return_ty, return_ty);
                     }
 
+                    let paramspec = if let Type::TypeVar(typevar) = original_parameter_type
+                        && typevar.is_paramspec(db)
+                        && typevar.paramspec_attr(db).is_some()
+                    {
+                        Some(typevar.without_paramspec_attr(db))
+                    } else {
+                        None
+                    };
+
                     // Default specialize any type variables to a marker type, which will be ignored
                     // during argument inference, allowing the concrete subset of the parameter
                     // type to still affect argument inference.
@@ -5236,43 +5457,88 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     });
 
+                    // A `P.args`/`P.kwargs` parameter has a useful context only after another
+                    // argument, usually a `Callable[P, R]`, specializes `P`.
+                    if let Some(paramspec) = paramspec
+                        && let Some(callable) = inferred_paramspec_callable(
+                            db,
+                            &constraints,
+                            overload,
+                            binding,
+                            paramspec,
+                            arguments_types,
+                            call_expression_tcx,
+                        )
+                        && let Some(specialized_parameter_type) = paramspec_argument_context(
+                            db,
+                            &constraints,
+                            overload,
+                            binding,
+                            callable,
+                            arguments_types,
+                            argument_index,
+                            call_expression_tcx,
+                        )
+                    {
+                        return Some((
+                            specialized_parameter_type,
+                            original_parameter_type,
+                            TypeContext::new(Some(specialized_parameter_type)),
+                        ));
+                    }
+
                     parameter_type = parameter_type.apply_specialization(db, specialization);
                 }
 
-                Some((parameter, TypeContext::new(Some(parameter_type))))
+                Some((
+                    original_parameter_type,
+                    original_parameter_type,
+                    TypeContext::new(Some(parameter_type)),
+                ))
             };
 
             // If there is only a single binding and overload, we can infer the argument directly with
             // the unique parameter type annotation.
             if let Ok((overload, binding)) = overloads_with_binding.iter().exactly_one() {
-                if let Some((parameter, parameter_tcx)) = parameter_tcx(overload, binding) {
-                    argument_types.insert(
-                        parameter.annotated_type(),
-                        infer_argument_ty(self, (argument_index, ast_argument, parameter_tcx)),
+                let parameter_context = parameter_tcx(overload, binding);
+
+                if let Some((declared_type, original_declared_type, parameter_tcx)) =
+                    parameter_context
+                {
+                    let inferred_ty =
+                        infer_argument_ty(self, (argument_index, ast_argument, parameter_tcx));
+                    insert_inferred_argument_type(
+                        arguments_types,
+                        argument_index,
+                        declared_type,
+                        original_declared_type,
+                        inferred_ty,
                     );
                 } else {
-                    argument_types.insert(
+                    let inferred_ty = infer_argument_ty(
+                        self,
+                        (argument_index, ast_argument, TypeContext::default()),
+                    );
+                    arguments_types.insert_type(
+                        argument_index,
                         TypeContext::default(),
-                        infer_argument_ty(
-                            self,
-                            (argument_index, ast_argument, TypeContext::default()),
-                        ),
+                        inferred_ty,
                     );
                 }
             } else {
+                // Infer the type of each argument once with each distinct parameter type as type context.
+                let parameter_types: Vec<_> = overloads_with_binding
+                    .iter()
+                    .filter_map(|(overload, binding)| parameter_tcx(overload, binding))
+                    .collect();
+
                 // We perform inference once without any type context, emitting any diagnostics that are unrelated
                 // to bidirectional type inference.
-                argument_types.insert(
-                    TypeContext::default(),
-                    infer_argument_ty(self, (argument_index, ast_argument, TypeContext::default())),
-                );
+                let default_ty =
+                    infer_argument_ty(self, (argument_index, ast_argument, TypeContext::default()));
+                arguments_types.insert_type(argument_index, TypeContext::default(), default_ty);
 
-                // Infer the type of each argument once with each distinct parameter type as type context.
-                let parameter_types = overloads_with_binding
-                    .iter()
-                    .filter_map(|(overload, binding)| parameter_tcx(overload, binding));
-
-                let mut seen = FxHashSet::default();
+                let mut inferred_by_declared_type = FxHashMap::default();
 
                 // Cache expressions inferred across speculative inference attempts.
                 //
@@ -5280,8 +5546,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // as inner expressions are repeatedly inferred with the same type context.
                 let teardown = self.setup_expression_cache();
 
-                for (parameter, parameter_tcx) in parameter_types {
-                    if !seen.insert(parameter.annotated_type()) {
+                for (declared_type, original_declared_type, parameter_tcx) in parameter_types {
+                    if let Some(inferred_ty) =
+                        inferred_by_declared_type.get(&declared_type).copied()
+                    {
+                        if declared_type != original_declared_type {
+                            arguments_types.insert_type(
+                                argument_index,
+                                original_declared_type,
+                                inferred_ty,
+                            );
+                        }
                         continue;
                     }
 
@@ -5293,8 +5568,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         &mut speculative_builder,
                         (argument_index, ast_argument, parameter_tcx),
                     );
+                    inferred_by_declared_type.insert(declared_type, inferred_ty);
                     self.union_expected_types(&speculative_builder.expected_types);
-                    argument_types.insert(parameter.annotated_type(), inferred_ty);
+                    insert_inferred_argument_type(
+                        arguments_types,
+                        argument_index,
+                        declared_type,
+                        original_declared_type,
+                        inferred_ty,
+                    );
                 }
 
                 if teardown {

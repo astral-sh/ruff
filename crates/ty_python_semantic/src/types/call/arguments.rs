@@ -206,6 +206,19 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         self.items.get(index).map(|item| &item.types)
     }
 
+    pub(crate) fn insert_type(
+        &mut self,
+        index: usize,
+        tcx: impl Into<TypeContext<'db>>,
+        ty: Type<'db>,
+    ) {
+        self.items
+            .get_mut(index)
+            .expect("argument index should be valid")
+            .types
+            .insert(tcx, ty);
+    }
+
     pub(crate) fn iter_types(&self) -> impl Iterator<Item = &CallArgumentTypes<'db>> + '_ {
         self.items.iter().map(|item| &item.types)
     }
