@@ -6,14 +6,15 @@ use crate::{AsMode, Mode};
 ///
 /// Real-world Python rarely nests more than a handful of levels deep; this cap
 /// exists to keep the parser from overflowing the stack on adversarial or
-/// machine-generated input. The value is intentionally modest because each
-/// "depth unit" corresponds to several real stack frames on the parser's
-/// descent (for a parenthesised expression: ~8 frames, each a few KB in a
-/// debug build), so one depth unit is roughly 15–30 KB of actual stack. The
-/// default has to fit comfortably within the tightest stacks we care about:
-/// Rust's default 2 MB worker-thread stack (used by `std::thread`, tokio,
-/// `cargo test`, …) and Windows' 1 MB main-thread stack.
-const DEFAULT_MAX_RECURSION_DEPTH: u16 = 200;
+/// machine-generated input.
+///
+/// The default value mirrors CPython's `MAXSTACK` of 200 nested parentheses
+/// (`Parser/parser.c`): a one-statement module of the form `((((1))))` at
+/// depth 200 must parse, and one at depth 201 must fail. Each nesting level
+/// costs one `enter_recursion` call, plus two framing calls (one for the
+/// surrounding statement and one for the innermost atom), so the cap is set
+/// to `200 + 2`.
+const DEFAULT_MAX_RECURSION_DEPTH: u16 = 202;
 
 /// Options for controlling how a source file is parsed.
 ///
