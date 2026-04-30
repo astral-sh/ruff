@@ -141,3 +141,26 @@ InvalidEmptyAnnotated = Annotated[]
 def _(a: InvalidEmptyAnnotated):
     reveal_type(a)  # revealed: Unknown
 ```
+
+## Invalid unpacking target
+
+Regression test: ensure that ty does not panic when a stub file contains an assignment with an
+invalid unpacking target combined with a malformed RHS, and another module star-imports from it.
+
+`type_stubs.pyi`:
+
+```pyi
+# error: [invalid-syntax]
+# error: [invalid-syntax]
+# error: [invalid-syntax]
+# error: [invalid-syntax]
+'',~=
+```
+
+`main.py`:
+
+```py
+from type_stubs import *
+
+x = 1
+```

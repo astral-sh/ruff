@@ -269,16 +269,10 @@ impl<'db> UnpackResult<'db> {
     /// Returns the inferred type for a given sub-expression of the left-hand side target
     /// of an unpacking assignment.
     ///
-    /// # Panics
-    ///
-    /// May panic if a scoped expression ID is passed in that does not correspond to a sub-
-    /// expression of the target.
-    #[track_caller]
+    /// Falls back to `Type::unknown()` when no type was recorded.
     pub(crate) fn expression_type(&self, expr_id: impl Into<ExpressionNodeKey>) -> Type<'db> {
-        self.try_expression_type(expr_id).expect(
-            "expression should belong to this `UnpackResult` and \
-            `Unpacker` should have inferred a type for it",
-        )
+        self.try_expression_type(expr_id)
+            .unwrap_or_else(Type::unknown)
     }
 
     pub(crate) fn try_expression_type(
