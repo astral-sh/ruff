@@ -308,6 +308,18 @@ impl<'db> ProtocolInterface<'db> {
         })
     }
 
+    pub(super) fn own_instance_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> Option<PlaceAndQualifiers<'db>> {
+        self.member_by_name(db, name)
+            .map(|member| PlaceAndQualifiers {
+                place: Place::bound(member.ty()),
+                qualifiers: member.qualifiers(),
+            })
+    }
+
     pub(super) fn includes_member(self, db: &'db dyn Db, name: &str) -> bool {
         self.inner(db).contains_key(name)
     }
@@ -322,11 +334,7 @@ impl<'db> ProtocolInterface<'db> {
     }
 
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
-        self.member_by_name(db, name)
-            .map(|member| PlaceAndQualifiers {
-                place: Place::bound(member.ty()),
-                qualifiers: member.qualifiers(),
-            })
+        self.own_instance_member(db, name)
             .unwrap_or_else(|| Type::object().member(db, name))
     }
 
