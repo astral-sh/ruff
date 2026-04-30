@@ -175,10 +175,15 @@ impl<'db> CallableItem<'db> {
         &mut self,
         db: &'db dyn Db,
         nonce_generator: &TypeVarNonceGenerator,
+        enclosing_generic_contexts: Option<&[GenericContext<'db>]>,
     ) {
         match self {
             CallableItem::Regular(binding) => {
-                binding.freshen_generic_contexts_in_place(db, nonce_generator);
+                binding.freshen_generic_contexts_in_place(
+                    db,
+                    nonce_generator,
+                    enclosing_generic_contexts,
+                );
             }
             // TODO: Constructor freshening also has to keep constructor instance context in sync
             // with `__new__`/`__init__` signatures.
@@ -375,6 +380,14 @@ pub(crate) struct Bindings<'db> {
 
     /// Whether each argument will be used as a value and/or a type form in this call.
     argument_forms: ArgumentForms,
+
+    /// Generic contexts that enclose this call site, if known.
+    ///
+    /// This is an optimization hint for deciding when direct-call generic freshening is needed.
+    /// `None` means the caller did not provide the information, so we conservatively freshen every
+    /// eligible generic callable. `Some([])` means the caller knows there are no enclosing generic
+    /// contexts, so freshening can be skipped.
+    enclosing_generic_contexts: Option<Box<[GenericContext<'db>]>>,
 }
 
 impl<'db> Bindings<'db> {
@@ -507,6 +520,7 @@ impl<'db> Bindings<'db> {
             argument_forms: ArgumentForms::new(0),
             implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound,
+            enclosing_generic_contexts: None,
         }
     }
 
@@ -540,6 +554,7 @@ impl<'db> Bindings<'db> {
             implicit_dunder_init_is_possibly_unbound,
             elements,
             argument_forms: ArgumentForms::new(0),
+            enclosing_generic_contexts: None,
         }
     }
 
@@ -584,6 +599,14 @@ impl<'db> Bindings<'db> {
             return self;
         };
         self.apply_generic_context_in_place(db, generic_context);
+        self
+    }
+
+    pub(crate) fn with_enclosing_generic_contexts(
+        mut self,
+        enclosing_generic_contexts: impl IntoIterator<Item = GenericContext<'db>>,
+    ) -> Self {
+        self.enclosing_generic_contexts = Some(enclosing_generic_contexts.into_iter().collect());
         self
     }
 
@@ -740,6 +763,7 @@ impl<'db> Bindings<'db> {
             argument_forms: self.argument_forms,
             implicit_dunder_new_is_possibly_unbound: self.implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound: self.implicit_dunder_init_is_possibly_unbound,
+            enclosing_generic_contexts: self.enclosing_generic_contexts,
             elements: self
                 .elements
                 .into_iter()
@@ -759,9 +783,15 @@ impl<'db> Bindings<'db> {
         db: &'db dyn Db,
         nonce_generator: &TypeVarNonceGenerator,
     ) {
+        let enclosing_generic_contexts = self.enclosing_generic_contexts.take();
         for item in self.iter_callable_items_mut() {
-            item.freshen_generic_contexts_in_place(db, nonce_generator);
+            item.freshen_generic_contexts_in_place(
+                db,
+                nonce_generator,
+                enclosing_generic_contexts.as_deref(),
+            );
         }
+        self.enclosing_generic_contexts = enclosing_generic_contexts;
     }
 
     /// Match the arguments of a call site against the parameters of a collection of possibly
@@ -2494,6 +2524,7 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
             argument_forms: ArgumentForms::new(0),
             implicit_dunder_new_is_possibly_unbound: false,
             implicit_dunder_init_is_possibly_unbound: false,
+            enclosing_generic_contexts: None,
         }
     }
 }
@@ -2519,6 +2550,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             argument_forms: ArgumentForms::new(0),
             implicit_dunder_new_is_possibly_unbound: false,
             implicit_dunder_init_is_possibly_unbound: false,
+            enclosing_generic_contexts: None,
         }
     }
 }
@@ -2629,6 +2661,7 @@ impl<'db> CallableBinding<'db> {
         &mut self,
         db: &'db dyn Db,
         nonce_generator: &TypeVarNonceGenerator,
+        enclosing_generic_contexts: Option<&[GenericContext<'db>]>,
     ) {
         if self
             .overloads
@@ -2649,9 +2682,20 @@ impl<'db> CallableBinding<'db> {
             return;
         }
 
+        let should_freshen = |overload: &Binding<'db>| {
+            overload.signature.generic_context.is_some_and(|context| {
+                enclosing_generic_contexts.is_none_or(|contexts| contexts.contains(&context))
+            })
+        };
+        if !self.overloads.iter().any(should_freshen) {
+            return;
+        }
+
         let nonce = nonce_generator.next();
         for overload in &mut self.overloads {
-            overload.freshen_generic_context(db, nonce);
+            if should_freshen(overload) {
+                overload.freshen_generic_context(db, nonce);
+            }
         }
     }
 
@@ -5186,10 +5230,6 @@ impl<'db> Binding<'db> {
             return;
         }
 
-        // TODO: This eagerly clones/updates the signature for every generic callable invocation.
-        // We can skip freshening when there is no containing scope that binds the same generic
-        // context, because there is no outer occurrence for this callable occurrence to collide
-        // with.
         self.signature = self.signature.freshen_generic_context(db, nonce);
         self.return_ty = self.initial_return_type(db);
     }

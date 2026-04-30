@@ -217,12 +217,14 @@ Goal: fix recursive direct calls such as `identity(t)` inside `identity`.
 Phase 3 implementation notes:
 
 - `Bindings::match_parameters` now creates a per-call `TypeVarNonceGenerator` and freshens regular callable bindings before argument type-context inference and specialization.
-- `CallableBinding` allocates one nonce for the callable occurrence and applies it to all overload generic contexts in that binding, so overloads in one callable occurrence share the same occurrence nonce while still remaining distinct by source identity/binding context.
+- `CallableBinding` allocates one nonce for the callable occurrence and applies it to each overload's own generic context independently, so overloads in one callable occurrence share the same occurrence nonce while still remaining distinct by source identity/binding context.
+- `Bindings` can carry optional enclosing generic-context information. `TypeInferenceBuilder` provides this for expression call sites using `enclosing_generic_contexts`, allowing direct-call freshening to be skipped unless the callable generic context is also bound by a containing scope. Call sites that do not provide the information still conservatively over-freshen.
 - Generic contexts containing ParamSpecs are skipped for now. A trial implementation that freshened ParamSpecs caused existing `Callable[P, R]` inference cases such as `accepts_callable(returns_int)` to lose the inferred `P` specialization.
 - Constructor bindings are skipped for now. A trial implementation that freshened constructors caused existing generic class constructor inference cases such as `list(items)` to leak unsolved class typevars.
 - Validation run after Phase 3:
     - `cargo check -p ty_python_semantic`
     - targeted mdtests for `generics/pep695/functions.md`, `generics/legacy/functions.md`, `generics/pep695/callables.md`, `generics/legacy/callables.md`, and `type_properties/implies_subtype_of.md`
+    - full `mdtest::` run
 
 ## Phase 4: Freshen generic callable-vs-callable relation
 
