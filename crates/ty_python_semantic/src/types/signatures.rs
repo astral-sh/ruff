@@ -686,7 +686,6 @@ impl<'db> Signature<'db> {
         )
     }
 
-    #[expect(dead_code, reason = "used by follow-up deterministic freshening work")]
     pub(crate) fn max_typevar_freshness_matching_generic_context(
         &self,
         db: &'db dyn Db,
@@ -1276,21 +1275,27 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // If either signature is generic, freshen that signature's typevars before considering
         // them inferable for this relation. The relation only needs to find one specialization of
         // each generic callable that causes the check to succeed, but those callable-local
-        // specializations must not collide with any same-source typevars in the surrounding
-        // context.
-        let next_freshening_nonce = |_signature: &Signature<'db>| None;
-
+        // specializations must not collide with any same-source typevars in the other signature.
         let freshened_source;
-        let source = if let Some(nonce) = next_freshening_nonce(source) {
-            freshened_source = source.freshen_generic_context(db, nonce);
+        let source = if source.generic_context != target.generic_context
+            && let Some(generic_context) = source.generic_context
+            && let Some(delta) = target
+                .max_typevar_freshness_matching_generic_context(db, generic_context)
+                .map(|freshness| freshness.increment().value())
+        {
+            freshened_source = source.freshen_generic_context_by_delta(db, delta);
             &freshened_source
         } else {
             source
         };
 
         let freshened_target;
-        let target = if let Some(nonce) = next_freshening_nonce(target) {
-            freshened_target = target.freshen_generic_context(db, nonce);
+        let target = if let Some(generic_context) = target.generic_context
+            && let Some(delta) = source
+                .max_typevar_freshness_matching_generic_context(db, generic_context)
+                .map(|freshness| freshness.increment().value())
+        {
+            freshened_target = target.freshen_generic_context_by_delta(db, delta);
             &freshened_target
         } else {
             target

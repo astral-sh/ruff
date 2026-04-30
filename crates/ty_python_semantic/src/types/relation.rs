@@ -11,10 +11,9 @@ use crate::types::constraints::{
 use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
-use crate::types::generics::GenericContext;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
-use crate::types::typevar::{TypeVarNonce, TypeVarNonceGenerator};
+use crate::types::typevar::TypeVarNonceGenerator;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -724,17 +723,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable,
             ..self.clone()
         }
-    }
-
-    #[expect(
-        dead_code,
-        reason = "temporarily unused while relation freshening is disabled"
-    )]
-    pub(super) fn next_typevar_nonce(
-        &self,
-        generic_context: GenericContext<'db>,
-    ) -> Option<TypeVarNonce> {
-        self.next_nonce.next(generic_context)
     }
 
     pub(super) fn always(&self) -> ConstraintSet<'db, 'c> {

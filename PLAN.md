@@ -170,22 +170,24 @@ The relation `TypeOf[identity2] <: Callable[[str], str]` does not see the ambien
   - Recast existing `TypeMapping::FreshenBoundTypeVars` to store a `delta`; added `Signature::freshen_generic_context_by_delta`.
 - [x] Ensure it updates the signature's `generic_context` consistently with parameter and return types.
 - [x] Keep ParamSpecs unchanged initially, unless explicitly supported.
-  - The delta mapping has the same ParamSpec behavior as the existing freshening mapping; relation-side code will continue to decide whether to skip ParamSpec contexts.
+  - The delta mapping skips freshening ParamSpec typevars themselves, but still freshens non-ParamSpec typevars in the same generic context.
 - [x] Run `cargo fmt` and `cargo check -p ty_python_semantic` after Phase 3 changes.
 
 ### Phase 4: Replace relation-side occurrence-count freshening
 
-- [ ] Remove relation-side dependency on `TypeVarNonceGenerator::seen`.
-- [ ] In `check_signature_pair`, deterministically freshen each side's generic context by scanning the full opposite signature for colliding base identities.
-- [ ] If both sides have exactly the same `GenericContext`, freshen rhs only as a cheap optimization.
-- [ ] Preserve free/free typevar sharing.
-- [ ] Re-enable relation freshening; remove the temporary `None` closure.
-- [ ] Run focused mdtests:
+- [x] Remove relation-side dependency on `TypeVarNonceGenerator::seen`.
+- [x] In `check_signature_pair`, deterministically freshen each side's generic context by scanning the full opposite signature for colliding base identities.
+- [x] If both sides have exactly the same `GenericContext`, freshen rhs only as a cheap optimization.
+- [x] Preserve free/free typevar sharing.
+- [x] Re-enable relation freshening; remove the temporary `None` closure.
+- [x] Run focused mdtests:
   - `mdtest::type_properties/implies_subtype_of.md`
   - `mdtest::generics/pep695/functions.md`
   - `mdtest::generics/legacy/functions.md`
   - `mdtest::generics/pep695/callables.md`
   - `mdtest::generics/legacy/callables.md`
+  - Result: generics mdtests passed; `type_properties/implies_subtype_of.md` still has expected generic-callable failures at lines 525 and 568. These are the implication-layer cases deferred to Phase 5.
+- [x] Run `cargo fmt` and `cargo check -p ty_python_semantic` after Phase 4 changes.
 
 ### Phase 5: Update mdtests for explicit implication-layer freshening
 

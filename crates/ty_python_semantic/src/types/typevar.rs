@@ -719,18 +719,6 @@ impl<'db> TypeVarNonceGenerator<'db> {
         inner.seen.extend(generic_contexts);
     }
 
-    pub(crate) fn next(&self, generic_context: GenericContext<'db>) -> Option<TypeVarNonce> {
-        let mut inner = self.inner.borrow_mut();
-        let first_occurrence = inner.seen.insert(generic_context);
-        if first_occurrence {
-            None
-        } else {
-            let nonce = inner.next;
-            inner.next = nonce.increment();
-            Some(nonce)
-        }
-    }
-
     pub(crate) fn next_if_seeded(
         &self,
         generic_context: GenericContext<'db>,
@@ -1116,7 +1104,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 generic_context,
                 delta,
             } => {
-                if generic_context.contains(db, self) {
+                if generic_context.contains(db, self) && !self.is_paramspec(db) {
                     Type::TypeVar(self.freshen_with_mapping(
                         db,
                         self.freshness(db).add(*delta),
