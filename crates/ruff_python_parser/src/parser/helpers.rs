@@ -17,7 +17,11 @@ pub(super) fn set_expr_ctx(expr: &mut Expr, new_ctx: ExprContext) {
             set_expr_ctx(value, new_ctx);
         }
         Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => {
-            set_expr_ctx(operand, new_ctx);
+            // `UnaryOp` is never a valid assignment or deletion target. When the parser
+            // recovers from bad input like `a, not = ...`, the operand isn't genuinely
+            // in target position, so mark it `Invalid` rather than propagating `new_ctx`
+            // and misleading consumers into treating it as a real target sub-expression.
+            set_expr_ctx(operand, ExprContext::Invalid);
         }
         Expr::List(ast::ExprList { elts, ctx, .. })
         | Expr::Tuple(ast::ExprTuple { elts, ctx, .. }) => {
