@@ -112,9 +112,9 @@ impl<'src> Parser<'src> {
     /// - <https://docs.python.org/3/reference/simple_stmts.html>
     pub(super) fn parse_statement(&mut self) -> Stmt {
         let range = self.current_token_range();
-        if self.enter_recursion(range) {
+        if let Some(scope) = self.enter_recursion(range) {
             let stmt = self.parse_statement_inner();
-            self.leave_recursion();
+            scope.exit(self);
             stmt
         } else {
             // `enter_recursion` already recorded a `RecursionLimitExceeded`
