@@ -9,7 +9,7 @@ use crate::{
         KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
         Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
         UnionType,
-        constraints::{ConstraintSet, IteratorConstraintsExtension},
+        constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         relation::{TypeRelation, TypeRelationChecker},
         signatures::CallableSignature,
         visitor, walk_signature,
@@ -205,6 +205,13 @@ impl<'db> Type<'db> {
                 )))
             }
 
+            // TODO if >1 element in the intersection is callable,
+            // we should intersect them rather than just picking the first one that we find
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .find_map(|element| element.try_upcast_to_callable_with_policy(db, policy)),
+
             Type::Never
             | Type::DataclassTransformer(_)
             | Type::AlwaysTruthy
@@ -219,7 +226,6 @@ impl<'db> Type<'db> {
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
             | Type::PropertyInstance(_)
-            | Type::Intersection(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_) => None,
         }
@@ -530,5 +536,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source.iter().when_all(db, self.constraints, |element| {
             self.check_callable_pair(db, *element, target)
         })
+    }
+
+    pub(super) fn check_type_satisfies_callable(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: CallableType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        source
+            .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(self.relation))
+            .when_some_and(db, self.constraints, |callables| {
+                self.check_callables_vs_callable(db, &callables, target)
+            })
     }
 }

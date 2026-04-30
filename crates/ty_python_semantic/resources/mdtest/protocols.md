@@ -1319,7 +1319,7 @@ from both `X` and `Y`:
 
 ```py
 from typing import Protocol
-from ty_extensions import Intersection, static_assert, is_equivalent_to
+from ty_extensions import Intersection, static_assert, is_equivalent_to, is_subtype_of
 
 class HasX(Protocol):
     x: int
@@ -1329,8 +1329,9 @@ class HasY(Protocol):
 
 class HasXAndYProto(HasX, HasY, Protocol): ...
 
-# TODO: this should pass
-static_assert(is_equivalent_to(HasXAndYProto, Intersection[HasX, HasY]))  # error: [static-assert-error]
+static_assert(is_equivalent_to(HasXAndYProto, Intersection[HasX, HasY]))
+static_assert(is_subtype_of(HasXAndYProto, Intersection[HasX, HasY]))
+static_assert(is_subtype_of(Intersection[HasX, HasY], HasXAndYProto))
 ```
 
 But this is only true if the subclass has `Protocol` in its explicit bases (otherwise, it is a
@@ -1340,6 +1341,37 @@ nominal type rather than a structural type):
 class HasXAndYNominal(HasX, HasY): ...
 
 static_assert(not is_equivalent_to(HasXAndYNominal, Intersection[HasX, HasY]))
+static_assert(not is_equivalent_to(HasXAndYNominal, HasXAndYProto))
+static_assert(is_subtype_of(HasXAndYNominal, Intersection[HasX, HasY]))
+static_assert(is_subtype_of(HasXAndYNominal, HasXAndYProto))
+
+class FullyNominal:
+    x: int
+    y: str
+
+static_assert(is_subtype_of(FullyNominal, HasXAndYProto))
+static_assert(is_subtype_of(FullyNominal, Intersection[HasX, HasY]))
+
+class NominalX:
+    x: int
+
+class NominalY:
+    y: str
+
+static_assert(is_subtype_of(Intersection[NominalX, NominalY], HasXAndYProto))
+static_assert(is_subtype_of(Intersection[NominalX, NominalY], Intersection[HasX, HasY]))
+```
+
+Intersections of nominal types also satisfy method-based protocols like `Sized`:
+
+```py
+from typing import Mapping
+from ty_extensions import Unknown, Intersection, Top
+
+def f(x: Intersection[list[Unknown], Top[Mapping[Unknown, object]]]):
+    # revealed: (bound method list[Unknown].__len__() -> int) & (bound method Top[Mapping[Unknown, object]].__len__() -> int)
+    reveal_type(x.__len__)
+    len(x)  # fine
 ```
 
 A protocol type `X` and a nominal type `Y` can be inferred as disjoint types if `Y` is a `@final`
