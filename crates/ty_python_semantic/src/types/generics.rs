@@ -2080,19 +2080,20 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     }
                 }
 
-                let mut bound_typevars = union_formal
+                let mut bare_typevars = union_formal
                     .elements(self.db)
                     .iter()
                     .filter_map(|ty| ty.as_typevar());
 
                 // TODO:
                 // Handling more than one bare typevar is something that we can't handle yet.
-                if bound_typevars.nth(1).is_some() {
+                let has_bare_typevar = bare_typevars.next().is_some();
+                if bare_typevars.next().is_some() {
                     return Ok(());
                 }
 
-                // Finally, if there are no bare typevars, we try to infer type mappings by
-                // checking against each union element. This handles cases like
+                // Finally, infer type mappings by checking against each union element. This handles
+                // cases like
                 // ```py
                 // def f[T](t: P[T] | Q[T]) -> T: ...
                 //
@@ -2101,7 +2102,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // ```
                 let mut first_error = None;
                 let mut found_matching_element = false;
-                for formal_element in union_formal.elements(self.db) {
+                let mut found_non_bare_matching_element = false;
+                for formal_element in union_formal
+                    .elements(self.db)
+                    .iter()
+                    .filter(|ty| !has_bare_typevar || ty.as_typevar().is_none())
+                {
                     let result =
                         self.infer_map_impl(*formal_element, actual, polarity, &mut f, seen);
                     if let Err(err) = result {
@@ -2110,6 +2116,31 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // The recursive call to `infer_map_impl` may succeed even if the actual type is
                         // not assignable to the formal element.
                         if !actual
+                            .when_assignable_to(
+                                self.db,
+                                *formal_element,
+                                self.constraints,
+                                self.inferable,
+                            )
+                            .is_never_satisfied(self.db)
+                        {
+                            found_matching_element = true;
+                            found_non_bare_matching_element = true;
+                        }
+                    }
+                }
+
+                if has_bare_typevar && !found_non_bare_matching_element {
+                    for formal_element in union_formal
+                        .elements(self.db)
+                        .iter()
+                        .filter(|ty| ty.as_typevar().is_some())
+                    {
+                        let result =
+                            self.infer_map_impl(*formal_element, actual, polarity, &mut f, seen);
+                        if let Err(err) = result {
+                            first_error.get_or_insert(err);
+                        } else if !actual
                             .when_assignable_to(
                                 self.db,
                                 *formal_element,

@@ -984,14 +984,36 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             && let Some(bound_or_constraints) = bound_typevar.typevar(db).bound_or_constraints(db)
         {
             return match bound_or_constraints {
-                TypeVarBoundOrConstraints::UpperBound(bound) => {
-                    self.check_type_pair(db, source, bound)
-                }
+                TypeVarBoundOrConstraints::UpperBound(bound) => self
+                    .check_type_pair(db, source, bound)
+                    .and(db, self.constraints, || {
+                        ConstraintSet::constrain_typevar(
+                            db,
+                            self.constraints,
+                            bound_typevar,
+                            source,
+                            bound,
+                        )
+                    }),
                 TypeVarBoundOrConstraints::Constraints(constraints) => constraints
                     .elements(db)
                     .iter()
                     .when_any(db, self.constraints, |constraint| {
-                        self.check_type_pair(db, source, *constraint)
+                        // A constrained TypeVar specializes to exactly one of its constraints.
+                        // Recording the chosen constraint preserves repeated-use correlations.
+                        self.check_type_pair(db, source, *constraint).and(
+                            db,
+                            self.constraints,
+                            || {
+                                ConstraintSet::constrain_typevar(
+                                    db,
+                                    self.constraints,
+                                    bound_typevar,
+                                    *constraint,
+                                    *constraint,
+                                )
+                            },
+                        )
                     }),
             };
         }
@@ -1401,6 +1423,25 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 let context_collection_enabled = self.is_context_collection_enabled();
 
                 let elements = union.elements(db);
+                if matches!(self.relation, TypeRelation::ConstraintSetAssignability)
+                    && !context_collection_enabled
+                    && elements.iter().any(|element| element.is_type_var())
+                {
+                    let non_bare_typevar_result = elements
+                        .iter()
+                        .filter(|element| !element.is_type_var())
+                        .when_any(db, self.constraints, |&elem_ty| {
+                            self.check_type_pair(db, source, elem_ty)
+                        });
+                    if !non_bare_typevar_result.is_never_satisfied(db) {
+                        return non_bare_typevar_result.or(
+                            db,
+                            self.constraints,
+                            is_new_type_of_union,
+                        );
+                    }
+                }
+
                 let result = elements
                     .iter()
                     .when_any(db, self.constraints, |&elem_ty| {

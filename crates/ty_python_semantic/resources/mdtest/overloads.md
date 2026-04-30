@@ -697,6 +697,14 @@ def keyword_only_generic_return(*, x: int) -> int: ...
 def keyword_only_generic_return(*, x: str) -> str: ...
 def keyword_only_generic_return(*, x: T) -> T:
     return x
+
+@overload
+# error: [invalid-overload]
+def generic_overload_return_variables_are_universal[T](x: T) -> T: ...
+@overload
+def generic_overload_return_variables_are_universal(x: object, y: object) -> list[object]: ...
+def generic_overload_return_variables_are_universal[U](x: U, y: object = object()) -> list[U]:
+    return [x]
 ```
 
 ### Generic implementation return inference
@@ -714,6 +722,15 @@ python-version = "3.12"
 from typing import Any, Callable, Concatenate, Coroutine, Final, TypeVar, overload
 
 R = TypeVar("R")
+
+@overload
+# error: [invalid-overload]
+def implementation_return_typevar_not_contextualized(x: int) -> int: ...
+@overload
+# error: [invalid-overload]
+def implementation_return_typevar_not_contextualized(x: str) -> str: ...
+def implementation_return_typevar_not_contextualized[T: str](x: int | str) -> T:
+    raise NotImplementedError
 
 class Future[T]:
     result: T
@@ -862,6 +879,7 @@ from typing import Any, Callable, Generic, Literal, Protocol, TypeVar, overload
 
 T = TypeVar("T")
 TIntStr = TypeVar("TIntStr", int, str)
+TStrBytes = TypeVar("TStrBytes", str, bytes)
 
 @overload
 def generic_container_implementation(x: list[int]) -> int: ...
@@ -876,6 +894,14 @@ def constrained_implementation_parameter(x: int) -> object: ...
 # error: [invalid-overload]
 def constrained_implementation_parameter(x: bytes) -> object: ...
 def constrained_implementation_parameter(x: TIntStr) -> object:
+    return x
+
+@overload
+# error: [invalid-overload]
+def constrained_repeated_implementation_parameter(x: str, y: bytes) -> object: ...
+@overload
+def constrained_repeated_implementation_parameter(x: bytes, y: bytes) -> object: ...
+def constrained_repeated_implementation_parameter(x: TStrBytes, y: TStrBytes) -> object:
     return x
 
 @overload
@@ -945,7 +971,11 @@ def literal_keyword_implementation(x: int | str, *, flag: bool = False) -> int |
 
 class Dataset: ...
 class DataArray: ...
+class Base: ...
+class A(Base): ...
+class B(Base): ...
 
+TBase = TypeVar("TBase", bound=Base)
 DatasetOrDataArrayT = TypeVar("DatasetOrDataArrayT", bound=Dataset | DataArray)
 DatasetOrDataArrayU = TypeVar("DatasetOrDataArrayU", bound=Dataset | DataArray)
 DatasetOrDataArrayV = TypeVar("DatasetOrDataArrayV", bound=Dataset | DataArray)
@@ -981,6 +1011,14 @@ def bounded_typevar_covariant_parameter_domain(
     callback: Callable[[int], None] | Callable[[str], None],
 ) -> None:
     pass
+
+@overload
+# error: [invalid-overload]
+def bounded_repeated_invariant_implementation(x: list[A], y: list[B]) -> Base: ...
+@overload
+def bounded_repeated_invariant_implementation(x: list[A], y: list[A]) -> A: ...
+def bounded_repeated_invariant_implementation(x: list[TBase], y: list[TBase]) -> TBase:
+    return x[0]
 ```
 
 ### Method and callable-object implementations
@@ -994,7 +1032,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Any, Callable, Generic, Literal, ParamSpec, Protocol, TypeVar, overload
+from typing import Any, Callable, Generic, Literal, ParamSpec, Protocol, Self, TypeVar, overload
 
 T = TypeVar("T")
 
@@ -1011,6 +1049,16 @@ class Hooks(Generic[T]):
     def add(self: "Hooks[str]", command: StrCommandT) -> StrCommandT: ...
     def add(self, command: AnyCommandT) -> AnyCommandT:
         return command
+
+class ClassScopedParamSpec[**Ps]:
+    @overload
+    # error: [invalid-overload]
+    def call(self, callback: Callable[[int], int]) -> int: ...
+    @overload
+    # error: [invalid-overload]
+    def call(self, callback: Callable[[str], int]) -> int: ...
+    def call(self, callback: Callable[Ps, int]) -> int:
+        return 1
 
 class Builds(Protocol[T]): ...
 
@@ -1067,6 +1115,15 @@ class ClassTypeVarBox[T]:
     def method(self, x: T) -> None:
         pass
 
+class ClassTypeVarReturnBox[T]:
+    @overload
+    # error: [invalid-overload]
+    def method(self, x: int) -> int: ...
+    @overload
+    def method(self, x: str) -> T: ...
+    def method(self, x: object) -> T:
+        raise NotImplementedError
+
 class SpecializedSelfBox[T]:
     # Like mypy and pyright, we do not re-specialize the implementation separately
     # for each overload based on the overload's explicit `self` annotation.
@@ -1078,6 +1135,15 @@ class SpecializedSelfBox[T]:
     def method(self: "SpecializedSelfBox[str]", x: str) -> str: ...
     def method(self, x: T) -> T:
         return x
+
+class SelfReturn:
+    @overload
+    # error: [invalid-overload]
+    def clone(self) -> int: ...
+    @overload
+    def clone(self, value: int) -> Self: ...
+    def clone(self, value: int | None = None) -> Self:
+        return self
 ```
 
 ### `Unpack[TypedDict]` implementation parameters
@@ -1127,6 +1193,41 @@ def paramspec_overload_gradual_variadic_implementation(func: Callable[..., T], *
     return func(*args, **kwargs)
 
 @overload
+# error: [invalid-overload]
+def paramspec_overload_nongradual_callable_implementation(func: Callable[P, int]) -> None: ...
+@overload
+def paramspec_overload_nongradual_callable_implementation(func: int) -> None: ...
+def paramspec_overload_nongradual_callable_implementation(
+    func: Callable[[int], int] | int,
+) -> None:
+    pass
+
+@overload
+# error: [invalid-overload]
+def paramspec_overload_gradual_variadic_implementation_required_prefix(
+    func: Callable[P, T],
+    /,
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> T: ...
+@overload
+def paramspec_overload_gradual_variadic_implementation_required_prefix(
+    func: None,
+    required: object,
+    /,
+    *args: Any,
+    **kwargs: Any,
+) -> None: ...
+def paramspec_overload_gradual_variadic_implementation_required_prefix(
+    func,
+    required,
+    /,
+    *args: Any,
+    **kwargs: Any,
+) -> Any:
+    return func(*args, **kwargs) if func is not None else None
+
+@overload
 def paramspec_overload_with_static_prefix_gradual_variadic_implementation(
     obj: T,
     func: Callable[P, T],
@@ -1149,11 +1250,13 @@ def paramspec_overload_with_static_prefix_gradual_variadic_implementation(
     return obj
 
 @overload
+# error: [invalid-overload]
 def paramspec_kwargs_only_implementation(
     func: Callable[P, T],
     **kwargs: P.kwargs,  # error: [invalid-paramspec]
 ) -> T: ...
 @overload
+# error: [invalid-overload]
 def paramspec_kwargs_only_implementation(
     func: Callable[P, Sequence[T]],
     **kwargs: P.kwargs,  # error: [invalid-paramspec]
