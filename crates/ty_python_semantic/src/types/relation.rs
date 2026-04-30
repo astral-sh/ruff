@@ -11,6 +11,7 @@ use crate::types::constraints::{
 use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
+use crate::types::generics::GenericContext;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::typevar::{TypeVarNonce, TypeVarNonceGenerator};
@@ -659,8 +660,8 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) inferable: InferableTypeVars<'db>,
     pub(super) relation: TypeRelation,
     context_tree: ErrorContextTree<'db>,
-    given: ConstraintSet<'db, 'c>,
-    next_nonce: TypeVarNonceGenerator,
+    pub(super) given: ConstraintSet<'db, 'c>,
+    next_nonce: TypeVarNonceGenerator<'db>,
 
     // N.B. these fields are private to reduce the risk of
     // "double-visiting" a given pair of types. You should
@@ -725,8 +726,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
-    pub(super) fn next_typevar_nonce(&self) -> TypeVarNonce {
-        self.next_nonce.next()
+    pub(super) fn next_typevar_nonce(
+        &self,
+        generic_context: GenericContext<'db>,
+    ) -> Option<TypeVarNonce> {
+        self.next_nonce.next(generic_context)
     }
 
     pub(super) fn always(&self) -> ConstraintSet<'db, 'c> {
@@ -1961,7 +1965,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     given: ConstraintSet<'db, 'c>,
-    next_nonce: TypeVarNonceGenerator,
+    next_nonce: TypeVarNonceGenerator<'db>,
 
     // N.B. these fields are private to reduce the risk of
     // "double-visiting" a given pair of types. You should
@@ -2028,7 +2032,7 @@ pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'db>,
     given: ConstraintSet<'db, 'c>,
-    next_nonce: TypeVarNonceGenerator,
+    next_nonce: TypeVarNonceGenerator<'db>,
 
     // N.B. these fields are private to reduce the risk of
     // "double-visiting" a given pair of types. You should

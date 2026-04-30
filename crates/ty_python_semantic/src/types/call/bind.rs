@@ -174,16 +174,11 @@ impl<'db> CallableItem<'db> {
     fn freshen_generic_contexts_in_place(
         &mut self,
         db: &'db dyn Db,
-        nonce_generator: &TypeVarNonceGenerator,
-        enclosing_generic_contexts: Option<&[GenericContext<'db>]>,
+        nonce_generator: &TypeVarNonceGenerator<'db>,
     ) {
         match self {
             CallableItem::Regular(binding) => {
-                binding.freshen_generic_contexts_in_place(
-                    db,
-                    nonce_generator,
-                    enclosing_generic_contexts,
-                );
+                binding.freshen_generic_contexts_in_place(db, nonce_generator);
             }
             // TODO: Constructor freshening also has to keep constructor instance context in sync
             // with `__new__`/`__init__` signatures.
@@ -781,15 +776,14 @@ impl<'db> Bindings<'db> {
     fn freshen_generic_contexts_in_place(
         &mut self,
         db: &'db dyn Db,
-        nonce_generator: &TypeVarNonceGenerator,
+        nonce_generator: &TypeVarNonceGenerator<'db>,
     ) {
         let enclosing_generic_contexts = self.enclosing_generic_contexts.take();
+        if let Some(enclosing_generic_contexts) = enclosing_generic_contexts.as_deref() {
+            nonce_generator.seed_all(enclosing_generic_contexts.iter().copied());
+        }
         for item in self.iter_callable_items_mut() {
-            item.freshen_generic_contexts_in_place(
-                db,
-                nonce_generator,
-                enclosing_generic_contexts.as_deref(),
-            );
+            item.freshen_generic_contexts_in_place(db, nonce_generator);
         }
         self.enclosing_generic_contexts = enclosing_generic_contexts;
     }
@@ -2660,8 +2654,7 @@ impl<'db> CallableBinding<'db> {
     fn freshen_generic_contexts_in_place(
         &mut self,
         db: &'db dyn Db,
-        nonce_generator: &TypeVarNonceGenerator,
-        enclosing_generic_contexts: Option<&[GenericContext<'db>]>,
+        nonce_generator: &TypeVarNonceGenerator<'db>,
     ) {
         if self
             .overloads
@@ -2682,18 +2675,21 @@ impl<'db> CallableBinding<'db> {
             return;
         }
 
-        let should_freshen = |overload: &Binding<'db>| {
-            overload.signature.generic_context.is_some_and(|context| {
-                enclosing_generic_contexts.is_none_or(|contexts| contexts.contains(&context))
-            })
-        };
-        if !self.overloads.iter().any(should_freshen) {
+        let mut freshening_nonces = Vec::with_capacity(self.overloads.len());
+        for overload in &self.overloads {
+            freshening_nonces.push(
+                overload
+                    .signature
+                    .generic_context
+                    .and_then(|context| nonce_generator.next_if_seeded(context)),
+            );
+        }
+        if freshening_nonces.iter().all(Option::is_none) {
             return;
         }
 
-        let nonce = nonce_generator.next();
-        for overload in &mut self.overloads {
-            if should_freshen(overload) {
+        for (overload, nonce) in self.overloads.iter_mut().zip(freshening_nonces) {
+            if let Some(nonce) = nonce {
                 overload.freshen_generic_context(db, nonce);
             }
         }

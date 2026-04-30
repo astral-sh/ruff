@@ -1,4 +1,4 @@
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::num::NonZeroU32;
 use std::rc::Rc;
 
@@ -665,25 +665,63 @@ impl TypeVarNonce {
     }
 }
 
-/// A clone-safe generator of fresh bound-typevar occurrence nonces.
-#[derive(Clone, Debug)]
-pub(crate) struct TypeVarNonceGenerator {
-    next: Rc<Cell<TypeVarNonce>>,
+#[derive(Debug)]
+struct TypeVarNonceGeneratorInner<'db> {
+    next: TypeVarNonce,
+    seen: FxHashSet<GenericContext<'db>>,
 }
 
-impl Default for TypeVarNonceGenerator {
+/// A clone-safe generator of fresh bound-typevar occurrence nonces.
+///
+/// The generator only allocates a nonce for the second and later occurrence of a generic context.
+/// The first occurrence can use its source-level identity directly because there is no previous
+/// occurrence for it to collide with.
+#[derive(Clone, Debug)]
+pub(crate) struct TypeVarNonceGenerator<'db> {
+    inner: Rc<RefCell<TypeVarNonceGeneratorInner<'db>>>,
+}
+
+impl<'db> Default for TypeVarNonceGenerator<'db> {
     fn default() -> Self {
         Self {
-            next: Rc::new(Cell::new(TypeVarNonce::FIRST)),
+            inner: Rc::new(RefCell::new(TypeVarNonceGeneratorInner {
+                next: TypeVarNonce::FIRST,
+                seen: FxHashSet::default(),
+            })),
         }
     }
 }
 
-impl TypeVarNonceGenerator {
-    pub(crate) fn next(&self) -> TypeVarNonce {
-        let nonce = self.next.get();
-        self.next.set(nonce.increment());
-        nonce
+impl<'db> TypeVarNonceGenerator<'db> {
+    pub(crate) fn seed_all(&self, generic_contexts: impl IntoIterator<Item = GenericContext<'db>>) {
+        let mut inner = self.inner.borrow_mut();
+        inner.seen.extend(generic_contexts);
+    }
+
+    pub(crate) fn next(&self, generic_context: GenericContext<'db>) -> Option<TypeVarNonce> {
+        let mut inner = self.inner.borrow_mut();
+        let first_occurrence = inner.seen.insert(generic_context);
+        if first_occurrence {
+            None
+        } else {
+            let nonce = inner.next;
+            inner.next = nonce.increment();
+            Some(nonce)
+        }
+    }
+
+    pub(crate) fn next_if_seeded(
+        &self,
+        generic_context: GenericContext<'db>,
+    ) -> Option<TypeVarNonce> {
+        let mut inner = self.inner.borrow_mut();
+        if inner.seen.contains(&generic_context) {
+            let nonce = inner.next;
+            inner.next = nonce.increment();
+            Some(nonce)
+        } else {
+            None
+        }
     }
 }
 

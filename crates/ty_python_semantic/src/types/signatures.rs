@@ -1229,27 +1229,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // each generic callable that causes the check to succeed, but those callable-local
         // specializations must not collide with any same-source typevars in the surrounding
         // context.
-        let should_freshen = |signature: &Signature<'db>| {
-            // ParamSpec freshening needs more support in specialization inference; for now,
-            // preserve the previous raw-identity behavior for those signatures.
-            signature.generic_context.is_some_and(|generic_context| {
-                !generic_context
-                    .variables(db)
-                    .any(|typevar| typevar.is_paramspec(db))
-            })
-        };
+        let next_freshening_nonce = |_signature: &Signature<'db>| None;
 
         let freshened_source;
-        let source = if should_freshen(source) {
-            freshened_source = source.freshen_generic_context(db, self.next_typevar_nonce());
+        let source = if let Some(nonce) = next_freshening_nonce(source) {
+            freshened_source = source.freshen_generic_context(db, nonce);
             &freshened_source
         } else {
             source
         };
 
         let freshened_target;
-        let target = if should_freshen(target) {
-            freshened_target = target.freshen_generic_context(db, self.next_typevar_nonce());
+        let target = if let Some(nonce) = next_freshening_nonce(target) {
+            freshened_target = target.freshen_generic_context(db, nonce);
             &freshened_target
         } else {
             target
