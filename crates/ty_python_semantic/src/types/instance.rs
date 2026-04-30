@@ -24,6 +24,7 @@ use crate::types::protocol_class::{
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelationChecker,
 };
+use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
@@ -733,12 +734,14 @@ impl<'db> ProtocolInstanceType<'db> {
             let constraints = ConstraintSetBuilder::new();
             let relation_visitor = HasRelationToVisitor::default(&constraints);
             let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+            let signature_relation_visitor = SignatureRelationVisitor::default();
             let materialization_visitor = ApplyTypeMappingVisitor::default();
             let checker = TypeRelationChecker::subtyping(
                 &constraints,
                 InferableTypeVars::None,
                 &relation_visitor,
                 &disjointness_visitor,
+                &signature_relation_visitor,
                 &materialization_visitor,
             );
             checker
