@@ -329,9 +329,9 @@ impl<'src> Parser<'src> {
         context: ExpressionContext,
     ) -> ParsedExpr {
         let range = self.current_token_range();
-        if self.enter_recursion(range) {
+        if let Some(scope) = self.enter_recursion(range) {
             let result = self.parse_lhs_expression_inner(left_precedence, context);
-            self.leave_recursion();
+            scope.exit(self);
             result
         } else {
             // The recursion limit has been exceeded; return the standard
@@ -1824,13 +1824,13 @@ impl<'src> Parser<'src> {
 
         let format_spec = if self.eat(TokenKind::Colon) {
             let spec_start = self.node_start();
-            let elements = if self.enter_recursion(self.current_token_range()) {
+            let elements = if let Some(scope) = self.enter_recursion(self.current_token_range()) {
                 let elements = self.parse_interpolated_string_elements(
                     flags,
                     InterpolatedStringElementsKind::FormatSpec(string_kind),
                     string_kind,
                 );
-                self.leave_recursion();
+                scope.exit(self);
                 elements
             } else {
                 ast::InterpolatedStringElements::from(vec![])
