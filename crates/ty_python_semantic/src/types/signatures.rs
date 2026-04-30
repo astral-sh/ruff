@@ -2521,7 +2521,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 default_type: source_default,
                                 ..
                             } => {
-                                if source_default.is_none() && target_default.is_some() {
+                                if source_default.is_none()
+                                    && (target_also_accepts_positional || target_default.is_some())
+                                {
                                     return self.never();
                                 }
                                 if !check_types(

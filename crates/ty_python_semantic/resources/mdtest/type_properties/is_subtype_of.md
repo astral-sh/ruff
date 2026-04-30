@@ -1364,14 +1364,16 @@ static_assert(is_subtype_of(RegularCallableTypeOf[variadic_keyword], RegularCall
 static_assert(not is_subtype_of(RegularCallableTypeOf[variadic_keyword], RegularCallableTypeOf[standard_variadic_float]))
 ```
 
-The keyword part of the standard parameter can be matched against keyword-only parameter with the
-same name if the keyword-variadic parameter is absent.
+The keyword part of the standard parameter can be matched against an optional keyword-only parameter
+with the same name if the keyword-variadic parameter is absent.
 
 ```py
 def variadic_a(*args: int, a: int) -> None: ...
+def variadic_optional_a(*args: int, a: int = 1) -> None: ...
 def variadic_b(*args: int, b: int) -> None: ...
 
-static_assert(is_subtype_of(RegularCallableTypeOf[variadic_a], RegularCallableTypeOf[standard_int]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[variadic_a], RegularCallableTypeOf[standard_int]))
+static_assert(is_subtype_of(RegularCallableTypeOf[variadic_optional_a], RegularCallableTypeOf[standard_int]))
 # The parameter name is different
 static_assert(not is_subtype_of(RegularCallableTypeOf[variadic_b], RegularCallableTypeOf[standard_int]))
 ```
