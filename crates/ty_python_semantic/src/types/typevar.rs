@@ -716,9 +716,10 @@ impl<'db> BoundTypeVarInstance<'db> {
 
     /// Get the identity of this bound typevar occurrence.
     ///
-    /// This includes the source-level typevar, binding context, ParamSpec attribute, and freshness
-    /// nonce. It is used for comparing whether two bound typevars represent the same occurrence,
-    /// regardless of e.g. differences in their bounds or constraints due to materialization.
+    /// This includes the source-level typevar, binding context, `ParamSpec` attribute, and
+    /// freshness nonce. It is used for comparing whether two bound typevars represent the same
+    /// occurrence, regardless of e.g. differences in their bounds or constraints due to
+    /// materialization.
     pub(crate) fn identity(self, db: &'db dyn Db) -> BoundTypeVarIdentity<'db> {
         BoundTypeVarIdentity {
             identity: self.typevar(db).identity(db),
