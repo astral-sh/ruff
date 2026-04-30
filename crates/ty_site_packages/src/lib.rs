@@ -10,6 +10,7 @@
 
 mod version;
 
+use std::hash::{Hash, Hasher};
 use std::io;
 use std::num::NonZeroUsize;
 use std::ops::Deref;
@@ -49,15 +50,56 @@ type StdlibDiscoveryResult<T> = Result<T, StdlibDiscoveryError>;
 /// *might* be added to the `SitePackagesPaths` twice, but we wouldn't
 /// want duplicates to appear in this set.
 #[derive(Debug, PartialEq, Eq, Default)]
-pub struct SitePackagesPaths(IndexSet<SystemPathBuf>);
+pub struct SitePackagesPaths(IndexSet<SitePackagesPath>);
+
+#[derive(Debug, Clone)]
+struct SitePackagesPath {
+    /// The resolved `site-packages` or `dist-packages` directory.
+    path: SystemPathBuf,
+    /// A file to use when anchoring diagnostics for settings inferred from this path.
+    settings_diagnostic_path: Option<SystemPathBuf>,
+}
+
+impl SitePackagesPath {
+    fn new(path: SystemPathBuf, settings_diagnostic_path: Option<SystemPathBuf>) -> Self {
+        Self {
+            path,
+            settings_diagnostic_path,
+        }
+    }
+
+    fn into_path(self) -> SystemPathBuf {
+        self.path
+    }
+}
+
+impl PartialEq for SitePackagesPath {
+    fn eq(&self, other: &Self) -> bool {
+        // The diagnostic anchor is metadata for this path, not part of the path's set identity.
+        self.path == other.path
+    }
+}
+
+impl Eq for SitePackagesPath {}
+
+impl Hash for SitePackagesPath {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.path.hash(state);
+    }
+}
 
 impl SitePackagesPaths {
     fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
-    fn insert(&mut self, path: SystemPathBuf) {
-        self.0.insert(path);
+    fn insert_with_settings_diagnostic_path(
+        &mut self,
+        path: SystemPathBuf,
+        settings_diagnostic_path: Option<SystemPathBuf>,
+    ) {
+        self.0
+            .insert(SitePackagesPath::new(path, settings_diagnostic_path));
     }
 
     fn extend(&mut self, other: Self) {
@@ -67,17 +109,14 @@ impl SitePackagesPaths {
     /// Concatenate two instances of [`SitePackagesPaths`].
     #[must_use]
     pub fn concatenate(mut self, other: Self) -> Self {
-        for path in other {
+        for path in other.0 {
             self.0.insert(path);
         }
         self
     }
 
     /// Tries to detect the version from the layout of the `site-packages` directory.
-    pub fn python_version_from_layout(
-        &self,
-        system: &dyn System,
-    ) -> Option<PythonVersionWithSource> {
+    pub fn python_version_from_layout(&self) -> Option<PythonVersionWithSource> {
         if cfg!(windows) {
             // The path to `site-packages` on Unix is
             // `<sys.prefix>/lib/pythonX.Y/site-packages`,
@@ -87,8 +126,12 @@ impl SitePackagesPaths {
 
         let primary_site_packages = self.0.first()?;
 
-        let mut site_packages_ancestor_components =
-            primary_site_packages.components().rev().skip(1).map(|c| {
+        let mut site_packages_ancestor_components = primary_site_packages
+            .path
+            .components()
+            .rev()
+            .skip(1)
+            .map(|c| {
                 // This should have all been validated in `site_packages.rs`
                 // when we resolved the search paths for the project.
                 debug_assert!(
@@ -115,7 +158,9 @@ impl SitePackagesPaths {
         let version = PythonVersion::from_str(version).ok()?;
         let source = PythonVersionSource::InstallationDirectoryLayout {
             site_packages_parent_dir: Box::from(parent_component),
-            source: settings_diagnostic_path_from_site_packages_path(primary_site_packages, system)
+            source: primary_site_packages
+                .settings_diagnostic_path
+                .clone()
                 .map(|path| PythonVersionFileSource::new(Arc::new(path), None)),
         };
 
@@ -123,24 +168,16 @@ impl SitePackagesPaths {
     }
 
     pub fn into_vec(self) -> Vec<SystemPathBuf> {
-        self.0.into_iter().collect()
+        self.into_iter().collect()
     }
 }
 
 impl fmt::Display for SitePackagesPaths {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_list().entries(self.0.iter()).finish()
+        f.debug_list()
+            .entries(self.0.iter().map(|path| &path.path))
+            .finish()
     }
-}
-
-/// Return a [`SystemPathBuf`] to use for anchoring settings diagnostics surfaced while analyzing
-/// the interpreter at the given `site-packages` directly.
-fn settings_diagnostic_path_from_site_packages_path(
-    site_packages_path: &SystemPath,
-    system: &dyn System,
-) -> Option<SystemPathBuf> {
-    let sys_prefix = site_packages_path.ancestors().nth(3)?;
-    settings_diagnostic_path_from_sys_prefix(sys_prefix, system)
 }
 
 /// Return a [`SystemPathBuf`] to use for anchoring settings diagnostics surfaced while analyzing
@@ -203,22 +240,31 @@ fn is_versioned_interpreter_path(file_name: &str) -> bool {
 
 impl<const N: usize> From<[SystemPathBuf; N]> for SitePackagesPaths {
     fn from(paths: [SystemPathBuf; N]) -> Self {
-        Self(IndexSet::from(paths))
+        Self(
+            paths
+                .into_iter()
+                .map(|path| SitePackagesPath::new(path, None))
+                .collect(),
+        )
     }
 }
 
 impl IntoIterator for SitePackagesPaths {
     type Item = SystemPathBuf;
-    type IntoIter = indexmap::set::IntoIter<SystemPathBuf>;
+    type IntoIter = std::vec::IntoIter<SystemPathBuf>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+        self.0
+            .into_iter()
+            .map(SitePackagesPath::into_path)
+            .collect::<Vec<_>>()
+            .into_iter()
     }
 }
 
 impl PartialEq<&[SystemPathBuf]> for SitePackagesPaths {
     fn eq(&self, other: &&[SystemPathBuf]) -> bool {
-        self.0.as_slice() == *other
+        self.0.iter().map(|path| &path.path).eq(other.iter())
     }
 }
 
@@ -1275,21 +1321,24 @@ fn probe_package_dirs(
     python_version: PythonVersion,
     implementation: PythonImplementation,
     system: &dyn System,
+    settings_diagnostic_path: Option<&SystemPath>,
     directories: &mut SitePackagesPaths,
 ) {
+    let settings_diagnostic_path = || settings_diagnostic_path.map(SystemPath::to_path_buf);
+
     // Try to insert the CPython-style package path into `directories`.
     // Returns `true` if a matching directory was found, so the caller can
     // decide whether to fall back to probing other implementations.
     let probe_cpython_path = |directories: &mut SitePackagesPaths| {
         let path = prefix_dir.join(format!("python{python_version}/{suffix}"));
         if system.is_directory(&path) {
-            directories.insert(path);
+            directories.insert_with_settings_diagnostic_path(path, settings_diagnostic_path());
             true
         } else if python_version.free_threaded_build_available() {
             // CPython free-threaded (3.13+) variant: pythonX.Yt
             let alt = prefix_dir.join(format!("python{python_version}t/{suffix}"));
             if system.is_directory(&alt) {
-                directories.insert(alt);
+                directories.insert_with_settings_diagnostic_path(alt, settings_diagnostic_path());
                 true
             } else {
                 false
@@ -1304,7 +1353,7 @@ fn probe_package_dirs(
     let probe_pypy_path = |directories: &mut SitePackagesPaths| {
         let path = prefix_dir.join(format!("pypy{python_version}/{suffix}"));
         if system.is_directory(&path) {
-            directories.insert(path);
+            directories.insert_with_settings_diagnostic_path(path, settings_diagnostic_path());
             true
         } else {
             false
@@ -1335,6 +1384,7 @@ fn discover_package_dirs(
     suffixes: &(impl IntoIterator<Item = InstallationDir> + Clone),
     implementation: PythonImplementation,
     system: &dyn System,
+    settings_diagnostic_path: Option<&SystemPath>,
     directories: &mut SitePackagesPaths,
 ) {
     let Ok(dir_iter) = system.read_directory(prefix_dir) else {
@@ -1365,7 +1415,10 @@ fn discover_package_dirs(
             for suffix in suffixes.clone() {
                 let candidate = path.join(suffix.as_str());
                 if system.is_directory(&candidate) {
-                    directories.insert(candidate);
+                    directories.insert_with_settings_diagnostic_path(
+                        candidate,
+                        settings_diagnostic_path.map(SystemPath::to_path_buf),
+                    );
                 }
             }
         }
@@ -1430,6 +1483,8 @@ fn site_packages_directories_from_sys_prefix(
 
     let mut directories = SitePackagesPaths::default();
     let is_debian_system_prefix = sys_prefix_path.as_str() == "/usr";
+    let settings_diagnostic_path =
+        settings_diagnostic_path_from_sys_prefix(sys_prefix_path, system);
 
     // On Debian/Ubuntu with sys.prefix=/usr, pip-installed packages go to
     // /usr/local/lib/pythonX.Y/dist-packages and take priority over system
@@ -1445,6 +1500,7 @@ fn site_packages_directories_from_sys_prefix(
                 python_version,
                 implementation,
                 system,
+                settings_diagnostic_path.as_deref(),
                 &mut directories,
             );
         }
@@ -1458,6 +1514,7 @@ fn site_packages_directories_from_sys_prefix(
                     python_version,
                     implementation,
                     system,
+                    settings_diagnostic_path.as_deref(),
                     &mut directories,
                 );
             }
@@ -1469,6 +1526,7 @@ fn site_packages_directories_from_sys_prefix(
                 &[InstallationDir::DistPackages],
                 implementation,
                 system,
+                settings_diagnostic_path.as_deref(),
                 &mut directories,
             );
         }
@@ -1480,6 +1538,7 @@ fn site_packages_directories_from_sys_prefix(
                 &InstallationDir::iter(),
                 implementation,
                 system,
+                settings_diagnostic_path.as_deref(),
                 &mut directories,
             );
         }
@@ -1494,7 +1553,10 @@ fn site_packages_directories_from_sys_prefix(
     ) {
         let debian_dist_packages = sys_prefix_path.join("lib/python3/dist-packages");
         if system.is_directory(&debian_dist_packages) {
-            directories.insert(debian_dist_packages);
+            directories.insert_with_settings_diagnostic_path(
+                debian_dist_packages,
+                settings_diagnostic_path,
+            );
         }
     }
 
@@ -2729,7 +2791,10 @@ mod tests {
         assert_eq!(paths.to_string(), "[]");
 
         let mut paths = SitePackagesPaths::default();
-        paths.insert(SystemPathBuf::from("/path/to/site/packages"));
+        paths.insert_with_settings_diagnostic_path(
+            SystemPathBuf::from("/path/to/site/packages"),
+            None,
+        );
 
         assert_eq!(paths.to_string(), r#"["/path/to/site/packages"]"#);
     }
@@ -2757,9 +2822,14 @@ mod tests {
             .write_file_all(&project_pyvenv_cfg, "home = /python/bin")
             .unwrap();
 
-        let paths = SitePackagesPaths::from([self_site_packages, project_site_packages]);
+        let mut paths = SitePackagesPaths::default();
+        paths.insert_with_settings_diagnostic_path(
+            self_site_packages,
+            Some(self_pyvenv_cfg.clone()),
+        );
+        paths.insert_with_settings_diagnostic_path(project_site_packages, Some(project_pyvenv_cfg));
         let PythonVersionWithSource { version, source } =
-            paths.python_version_from_layout(&system).unwrap();
+            paths.python_version_from_layout().unwrap();
 
         assert_eq!(version, PythonVersion::from((3, 16)));
         assert_eq!(

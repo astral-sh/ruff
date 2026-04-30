@@ -253,7 +253,7 @@ impl Options {
                         python_environment.python_version_from_metadata()
                     })
                     .cloned()
-                    .or_else(|| site_packages_paths.python_version_from_layout(system));
+                    .or_else(|| site_packages_paths.python_version_from_layout());
 
                 inferred_python_version.map(PythonVersionResolution::Inferred)
             })
