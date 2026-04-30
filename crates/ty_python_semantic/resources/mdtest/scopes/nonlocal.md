@@ -147,7 +147,7 @@ def a():
                 nonlocal x
                 reveal_type(x)  # revealed: Literal[3, 2, 4]
                 x = 4
-                reveal_type(x)  # revealed: Literal[4, 3]
+                reveal_type(x)  # revealed: Literal[4]
 
                 def e():
                     reveal_type(x)  # revealed: Literal[4, 3, 2]
@@ -178,72 +178,66 @@ def a():
     X = 1
     X = 2
 
+# With `X` not yet bound in this scope, we consider all its nested bindings to
+# be potentially visible, everything except `X = 3` and `X = 4` below.
+# Unfortunately this example is a false negative; `X` is unbound at runtime.
+#
+# It's tempting to omit `X = 1`, because it looks like it can't reach the end of
+# `a`, though it could become visible if an exception was raised and caught
+# somewhere in between. It wouldn't be crazy to assume normal control flow and
+# only consider end-of-scope bindings here, but uses from within nested functions
+# have to consider all bindings in any case, and doing the same everywhere is
+# simpler. Multithreading and async can also make these bindings visible, though
+# we generally ignore those.
+#
+# TODO: We also include bindings from functions defined below, which can't have
+# been called yet. We could potentially omit those. Similarly, uses on a branch
+# where some function is never defined arguably shouldn't see nested bindings
+# from that function. But note that this reasoning only works for uses within
+# the *defining scope* of a variable, i.e. here at the module level for `X` and
+# in the body of `b` for `y`. The bodies of nested functions might run at any
+# time, possibly after later functions have been defined and called.
+reveal_type(X)  # revealed: Literal[1, 2, 6, 5]
 X = 3
-# In this simple case we could reason that `X = 3` is now the only visible
-# binding, both because `a()` is never called, and more specifically because
-# there's no call to it between the previous line and the next. However, that
-# sort of analysis isn't possible in the general case, and we don't try to do
-# it, so we conservatively include both `X = 1` and `X = 2`. It's tempting to
-# omit `X = 1`, because it looks like it can't reach end-of-scope, but it could
-# become visible if an exception is raised and caught.
-#
-# NOTE: It could be reasonable to ignore exceptions and assume normal control
-# flow, but uses in nested functions have to consider all bindings and not just
-# end-of-scope bindings either way, so it's simpler to do that everywhere.
-# Multithreading is another reason `X = 1` could be visible here, though we
-# assume single-threaded execution in many places.
-#
-# TODO: We currently include bindings from functions defined below, which can't
-# have been called yet, and we could consider filtering those out. Similarly,
-# uses on a branch where some function is never defined arguably shouldn't see
-# bindings from that function. But we need to be careful if/when we try this:
-# This sort of "function doesn't exist yet" reasoning is only valid for uses
-# within the *defining scope* of a variable, i.e. here at the module level for
-# `X` and in the body of `b` for `y`. In uses from nested functions, we don't
-# know when the function body runs, or whether it runs more than once.
-#
-# So currently, the only binding we rule out here is `X = 4`.
-reveal_type(X)  # revealed: Literal[3, 1, 2, 7, 8, 5, 6]
+# Now that `X` has a binding in the current flow, we ignore nested bindings.
+# This behavior isn't generally sound, but users expect it in "obvious" cases
+# like this, and it matches the way we treat narrowing constraints.
+reveal_type(X)  # revealed: Literal[3]
+a()
+# An unfortunate side effect of the behavior above is that we ignore the call to
+# `a()`. We can't generally track when functions are called, so we don't know
+# that the local binding has been overwritten.
+reveal_type(X)  # revealed: Literal[3]
 X = 4
 
 def b():
     global X
-    # We consider every binding of `X` potentially visible here, including the
-    # bindings later on in this function, because it can run more than once.
-    # TODO: We could potentially rule out `X = 3` above, because it can't reach
-    # the definition of this function.
-    reveal_type(X)  # revealed: Literal[3, 4, 1, 2, 7, 8, 5, 6]
+    # As above, `X` is not yet bound in this flow, so we consider all its nested
+    # bindings. That includes `X = 5` below, which could come from a previous
+    # call to `b()`. Since this isn't the defining scope of `X`, we also include
+    # all bindings from the defining scope.
+    # TODO: We could potentially filter out `X = 3` here, since it's always
+    # rebound before `b` is defined.
+    reveal_type(X)  # revealed: Literal[3, 4, 1, 2, 6, 5]
     X = 5
     y = 5
-    # Assuming single-threaded execution, `X = 5` dominates any top-level
-    # bindings. In general, a local binding of a variable dominates bindings
-    # from the variable's *defining scope*. But all nested bindings are still
-    # potentially visible, again including the other one in this function.
-    reveal_type(X)  # revealed: Literal[5, 1, 2, 7, 8, 6]
-    # This is the defining scope of `y`, so its local bindings respect control
-    # flow analysis as usual, and `y = 6` is not visible.
-    # TODO: As above, we could filter out nonlocal bindings of `y` from
-    # functions that haven't been defined yet in this scope.
-    reveal_type(y)  # revealed: Literal[5, 7, 8]
-    X = 6
-    y = 6
+    # `X` and `y` have bindings in the current flow, so again we ignore bindings
+    # from other flows and scopes.
+    reveal_type(X)  # revealed: Literal[5]
+    reveal_type(y)  # revealed: Literal[5]
 
     def c():
         global X
         nonlocal y
-        # As above, every binding of `X` and `y` is potentially visible here.
-        # TODO: Again we could potentially rule out `X = 3` and also in this
-        # case `y = 5`, because they can't reach this function definition.
-        reveal_type(X)  # revealed: Literal[3, 4, 1, 2, 7, 8, 5, 6]
-        reveal_type(y)  # revealed: Literal[5, 6, 7, 8]
-        X = 7
-        y = 7
-        # As above, local assignments dominate bindings from the *defining
-        # scope* of the bound variable, but not nested bindings.
-        reveal_type(X)  # revealed: Literal[7, 1, 2, 8, 5, 6]
-        reveal_type(y)  # revealed: Literal[7, 8]
-        X = 8
-        y = 8
+        # TODO: Again we could potentially filter out `X = 3` here.
+        reveal_type(X)  # revealed: Literal[3, 4, 1, 2, 6, 5]
+        # We conservatively treat the assignment `y = 6` below as a nested
+        # binding that could come from a previous call to `c()`.
+        reveal_type(y)  # revealed: Literal[5, 6]
+        X = 6
+        y = 6
+        reveal_type(X)  # revealed: Literal[6]
+        reveal_type(y)  # revealed: Literal[6]
 ```
 
 ## Local variable bindings "look ahead" to any assignment in the current scope
@@ -460,7 +454,7 @@ def f1():
                     y = "string"  # allowed, because `f3`'s `y` is untyped
 ```
 
-## `nonlocal` affects the inferred type in the outer scope
+## `nonlocal` does not affect ordinary local flow in the outer scope
 
 Without `nonlocal`, `g` can't write to `x`, and the inferred type of `x` in `f`'s scope isn't
 affected by `g`:
@@ -473,18 +467,18 @@ def f():
     reveal_type(x)  # revealed: Literal[1]
 ```
 
-But with `nonlocal`, `g` could write to `x`, and that affects its inferred type in `f`. That's true
-regardless of whether `g` actually writes to `x`. With a write:
+With `nonlocal`, `g` can write to `x`, but ordinary local flow in `f` still trusts the local
+binding. We don't try to model whether `g` has been called:
 
 ```py
 def f():
     x = 1
     def g():
         nonlocal x
-        reveal_type(x)  # revealed: int
+        reveal_type(x)  # revealed: Literal[1]
         x += 1
-        reveal_type(x)  # revealed: int
-    reveal_type(x)  # revealed: int
+        reveal_type(x)  # revealed: Literal[2]
+    reveal_type(x)  # revealed: Literal[1]
 ```
 
 Without a write:
@@ -495,7 +489,6 @@ def f():
     def g():
         nonlocal x
         reveal_type(x)  # revealed: Literal[1]
-    # TODO: should be `Unknown | Literal[1]`
     reveal_type(x)  # revealed: Literal[1]
 ```
 

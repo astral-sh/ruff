@@ -245,36 +245,39 @@ def f():
     reveal_type(x)  # revealed: Literal["56"]
 ```
 
-When a `global` augmented assignment has no module-scope binding to use as its base value, we
-include an imprecise contribution rather than recursing through the same global symbol indefinitely:
-
-```py
-def f():
-    global z  # error: [unresolved-global] "Invalid global declaration of `z`: `z` has no declarations or bindings in the global scope"
-    z += 1
-
-# error: [possibly-unresolved-reference] "Name `z` used when possibly not defined"
-reveal_type(z)  # revealed: Unknown
-```
-
 ## Imported globals include nested `global` bindings
 
 `module.py`:
 
 ```py
-x = 1
+def a():
+    global X
+    X = 1
+    X = 2
 
-def f():
-    global x
-    x = "two"
+# `X = 3` is *not* visible to importers, because it doesn't reach end of scope. However, all nested
+# bindings are visible, including `X = 1`. In theory, nested bindings that don't appear to reach
+# end-of-scope could still be visible to callers via exception handling. In practice, we need to
+# track all nested bindings for uses within other nested functions, and it's simpler to only track
+# them one way.
+X = 3
+X = 4
+
+def b():
+    global X
+    X = 5
+
+    def c():
+        global X
+        X = 6
 ```
 
 `main.py`:
 
 ```py
-from module import x
+import module
 
-reveal_type(x)  # revealed: Literal[1, "two"]
+reveal_type(module.X)  # revealed: Literal[4, 1, 2, 6, 5]
 ```
 
 ## Local assignment prevents falling back to the outer scope

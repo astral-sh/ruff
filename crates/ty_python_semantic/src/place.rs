@@ -91,13 +91,6 @@ impl PublicTypePolicy {
             Self::Promote => ty.promote(db).promote_singletons(db),
         }
     }
-
-    const fn merge_for_union(self, other: Self) -> Self {
-        match (self, other) {
-            (Self::Promote, Self::Promote) => Self::Promote,
-            _ => Self::Raw,
-        }
-    }
 }
 
 /// A defined place with its raw type, origin, definedness, and public-type policy.
@@ -880,49 +873,17 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
     }
 }
 
-pub(crate) fn union_place_and_qualifiers<'db>(
-    db: &'db dyn Db,
-    left: PlaceAndQualifiers<'db>,
-    right: PlaceAndQualifiers<'db>,
-) -> PlaceAndQualifiers<'db> {
-    PlaceAndQualifiers {
-        place: union_places(db, left.place, right.place),
-        qualifiers: left.qualifiers.union(right.qualifiers),
-    }
-}
-
-fn union_places<'db>(db: &'db dyn Db, left: Place<'db>, right: Place<'db>) -> Place<'db> {
-    match (left, right) {
-        (Place::Undefined, right) => right,
-        (left, Place::Undefined) => left,
-        (Place::Defined(left), Place::Defined(right)) => Place::Defined(DefinedPlace {
-            ty: UnionType::from_two_elements(db, left.ty, right.ty),
-            origin: left.origin.merge(right.origin),
-            definedness: left.definedness.max(right.definedness),
-            public_type_policy: left
-                .public_type_policy
-                .merge_for_union(right.public_type_policy),
-        }),
-    }
-}
-
-#[salsa::tracked(
-    cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
-    cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, _, _, _| {
-        place.cycle_normalized(db, *previous, cycle)
-    },
-    heap_size=ruff_memory_usage::heap_size
-)]
-pub(crate) fn nested_bindings_by_symbol<'db>(
+#[salsa::tracked(cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn nested_binding_ty_by_symbol<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     symbol_id: ScopedSymbolId,
     requires_explicit_reexport: RequiresExplicitReExport,
-) -> PlaceAndQualifiers<'db> {
+) -> Option<Type<'db>> {
     let table = place_table(db, scope);
     let nested_scopes = table.nested_scopes_with_bindings(symbol_id);
     if nested_scopes.is_empty() {
-        return Place::Undefined.into();
+        return None;
     }
 
     // If the defining scope gives this symbol a definite declared type, trust that declaration.
@@ -938,14 +899,12 @@ pub(crate) fn nested_bindings_by_symbol<'db>(
             ..
         })
     ) {
-        return Place::Undefined.into();
+        return None;
     }
 
-    let has_defining_scope_binding = use_def_map(db, scope)
-        .reachable_symbol_bindings(symbol_id)
-        .any(|binding| matches!(binding.binding, DefinitionState::Defined(_)));
     let symbol_name = table.symbol(symbol_id).name().as_str();
-    let mut nested = Place::Undefined;
+    let mut union = UnionBuilder::new(db);
+    let mut has_nested_binding = false;
     for &nested_scope_id in nested_scopes {
         let nested_scope = nested_scope_id.to_scope_id(db, scope.file(db));
         let nested_place_table = place_table(db, nested_scope);
@@ -954,30 +913,55 @@ pub(crate) fn nested_bindings_by_symbol<'db>(
         };
 
         let bindings = use_def_map(db, nested_scope).reachable_symbol_bindings(nested_symbol_id);
-        let has_ungrounded_augmented_assignment = !has_defining_scope_binding
-            && bindings.clone().any(|binding| {
-                matches!(
-                    binding.binding,
-                    DefinitionState::Defined(definition)
-                        if matches!(definition.kind(db), DefinitionKind::AugmentedAssignment(_))
-                )
-            });
-        let nested_place = if has_ungrounded_augmented_assignment {
-            Place::Defined(
-                DefinedPlace::new(Type::unknown()).with_definedness(Definedness::PossiblyUndefined),
+        // Augmented assignments read the previous value of the same place and can make this
+        // summary recursive. The current-scope flow still infers the augmented assignment itself.
+        if bindings.clone().any(|binding| {
+            matches!(
+                binding.binding,
+                DefinitionState::Defined(definition)
+                    if matches!(definition.kind(db), DefinitionKind::AugmentedAssignment(_))
             )
-        } else {
-            match place_from_bindings_impl(db, bindings, requires_explicit_reexport).place {
-                Place::Defined(defined) => {
-                    Place::Defined(defined.with_definedness(Definedness::PossiblyUndefined))
-                }
-                Place::Undefined => Place::Undefined,
-            }
-        };
-        nested = union_places(db, nested, nested_place);
+        }) {
+            continue;
+        }
+
+        if let Some(ty) = place_from_bindings_impl(db, bindings, requires_explicit_reexport)
+            .place
+            .raw_type()
+        {
+            union = union.add(ty);
+            has_nested_binding = true;
+        }
     }
 
-    nested.into()
+    if has_nested_binding {
+        Some(union.build())
+    } else {
+        None
+    }
+}
+
+fn union_place_with_inferred_type<'db>(
+    db: &'db dyn Db,
+    place: Place<'db>,
+    inferred_ty: Type<'db>,
+) -> Place<'db> {
+    match place {
+        Place::Undefined => Place::bound(inferred_ty),
+        Place::Defined(defined) => Place::Defined(DefinedPlace {
+            ty: UnionType::from_two_elements(db, defined.ty, inferred_ty),
+            origin: defined.origin.merge(TypeOrigin::Inferred),
+            ..defined
+        }),
+    }
+}
+
+fn union_place_with_optional_inferred_type<'db>(
+    db: &'db dyn Db,
+    place: Place<'db>,
+    inferred_ty: Option<Type<'db>>,
+) -> Place<'db> {
+    inferred_ty.map_or(place, |ty| union_place_with_inferred_type(db, place, ty))
 }
 
 #[salsa::tracked(
@@ -1012,13 +996,10 @@ pub(crate) fn place_by_id<'db>(
         ConsideredDefinitions::AllReachable => use_def.reachable_bindings(place_id),
     };
 
-    let nested_bindings = || {
-        place_id
-            .as_symbol()
-            .map(|symbol_id| {
-                nested_bindings_by_symbol(db, scope, symbol_id, requires_explicit_reexport)
-            })
-            .unwrap_or_default()
+    let nested_binding_ty = || {
+        place_id.as_symbol().and_then(|symbol_id| {
+            nested_binding_ty_by_symbol(db, scope, symbol_id, requires_explicit_reexport)
+        })
     };
 
     // If a symbol is undeclared, but qualified with `typing.Final`, we use the right-hand side
@@ -1044,10 +1025,10 @@ pub(crate) fn place_by_id<'db>(
             qualifiers,
         } if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
             let bindings = all_considered_bindings();
-            let inferred = union_places(
+            let inferred = union_place_with_optional_inferred_type(
                 db,
                 place_from_bindings_impl(db, bindings, requires_explicit_reexport).place,
-                nested_bindings().place,
+                nested_binding_ty(),
             );
             match inferred {
                 Place::Defined(DefinedPlace {
@@ -1126,11 +1107,10 @@ pub(crate) fn place_by_id<'db>(
                 }),
             };
 
-            union_place_and_qualifiers(
-                db,
-                PlaceAndQualifiers { place, qualifiers },
-                nested_bindings(),
-            )
+            PlaceAndQualifiers {
+                place: union_place_with_optional_inferred_type(db, place, nested_binding_ty()),
+                qualifiers,
+            }
         }
         // Place is undeclared, infer the type from bindings
         PlaceAndQualifiers {
@@ -1141,7 +1121,7 @@ pub(crate) fn place_by_id<'db>(
             let boundness_analysis = bindings.boundness_analysis();
             let mut inferred =
                 place_from_bindings_impl(db, bindings, requires_explicit_reexport).place;
-            inferred = union_places(db, inferred, nested_bindings().place);
+            inferred = union_place_with_optional_inferred_type(db, inferred, nested_binding_ty());
 
             if boundness_analysis == BoundnessAnalysis::AssumeBound {
                 if let Place::Defined(defined) = inferred {
