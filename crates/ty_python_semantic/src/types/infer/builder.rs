@@ -30,10 +30,11 @@ use super::{
 use crate::diagnostic::format_enumeration;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
-    TypeOrigin, builtins_module_scope, builtins_symbol, class_body_implicit_symbol,
-    explicit_global_symbol, global_symbol, loop_header_reachability,
-    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
-    place_from_bindings, place_from_declarations, typing_extensions_symbol,
+    RequiresExplicitReExport, TypeOrigin, builtins_module_scope, builtins_symbol,
+    class_body_implicit_symbol, explicit_global_symbol, global_symbol, loop_header_reachability,
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol,
+    nested_bindings_by_symbol, place, place_from_bindings, place_from_declarations,
+    typing_extensions_symbol, union_place_and_qualifiers,
 };
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
@@ -7792,6 +7793,91 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn global_symbol_for_nested_bindings(
+        &self,
+        name: &str,
+    ) -> Option<(ScopeId<'db>, ScopedSymbolId)> {
+        let symbol_id = self
+            .index
+            .place_table(FileScopeId::global())
+            .symbol_id(name)?;
+        self.symbol_with_nested_bindings(FileScopeId::global(), symbol_id)
+    }
+
+    fn symbol_with_nested_bindings(
+        &self,
+        file_scope_id: FileScopeId,
+        symbol_id: ScopedSymbolId,
+    ) -> Option<(ScopeId<'db>, ScopedSymbolId)> {
+        let place_table = self.index.place_table(file_scope_id);
+        if place_table
+            .nested_scopes_with_bindings(symbol_id)
+            .is_empty()
+        {
+            return None;
+        }
+
+        Some((file_scope_id.to_scope_id(self.db(), self.file()), symbol_id))
+    }
+
+    fn defining_symbol_for_nested_bindings(
+        &self,
+        place_expr: PlaceExprRef,
+    ) -> Option<(ScopeId<'db>, ScopedSymbolId)> {
+        let db = self.db();
+        let scope = self.scope();
+        let file_scope_id = scope.file_scope_id(db);
+        let symbol = place_expr.as_symbol()?;
+        let symbol_name = symbol.name().as_str();
+        let place_table = self.index.place_table(file_scope_id);
+
+        if let Some(symbol_id) = place_table.symbol_id(symbol_name) {
+            let symbol = place_table.symbol(symbol_id);
+            if symbol.is_local() {
+                return self.symbol_with_nested_bindings(file_scope_id, symbol_id);
+            }
+            if symbol.is_global() {
+                return self.global_symbol_for_nested_bindings(symbol_name);
+            }
+        }
+
+        for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
+            if enclosing_scope_file_id.is_global() {
+                break;
+            }
+
+            let enclosing_scope = self.index.scope(enclosing_scope_file_id);
+            let is_immediately_enclosing_scope = scope.is_annotation(db)
+                && scope
+                    .scope(db)
+                    .parent()
+                    .is_some_and(|parent| parent == enclosing_scope_file_id);
+
+            if !enclosing_scope.kind().is_function_like() && !is_immediately_enclosing_scope {
+                continue;
+            }
+
+            let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
+            let Some(enclosing_symbol_id) = enclosing_place_table.symbol_id(symbol_name) else {
+                continue;
+            };
+            let enclosing_symbol = enclosing_place_table.symbol(enclosing_symbol_id);
+
+            if enclosing_symbol.is_global() {
+                return self.global_symbol_for_nested_bindings(symbol_name);
+            }
+
+            if (enclosing_symbol.is_bound() || enclosing_symbol.is_declared())
+                && !enclosing_symbol.is_nonlocal()
+            {
+                return self
+                    .symbol_with_nested_bindings(enclosing_scope_file_id, enclosing_symbol_id);
+            }
+        }
+
+        self.global_symbol_for_nested_bindings(symbol_name)
+    }
+
     /// Infer the type of a place expression from definitions, assuming a load context.
     /// This method also returns the [`ConstraintKey`]s for each scope associated with `expr`,
     /// which is used to narrow by condition rather than by assignment.
@@ -8104,6 +8190,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     })
                 })
         });
+
+        let place = if let Some((defining_scope, defining_symbol_id)) =
+            self.defining_symbol_for_nested_bindings(place_expr)
+        {
+            union_place_and_qualifiers(
+                db,
+                place,
+                nested_bindings_by_symbol(
+                    db,
+                    defining_scope,
+                    defining_symbol_id,
+                    RequiresExplicitReExport::No,
+                ),
+            )
+        } else {
+            place
+        };
 
         if let Some(ty) = place.place.ignore_possibly_undefined() {
             self.check_deprecated(expr_ref, ty);

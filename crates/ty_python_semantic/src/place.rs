@@ -20,6 +20,7 @@ use ty_python_core::place::{PlaceExprRef, ScopedPlaceId};
 use ty_python_core::predicate::{Predicate, ScopedPredicateId};
 use ty_python_core::reachability_constraints::ReachabilityConstraints;
 use ty_python_core::scope::ScopeId;
+use ty_python_core::symbol::ScopedSymbolId;
 use ty_python_core::{
     BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
     DeclarationWithConstraint, DeclarationsIterator, Truthiness, get_loop_header, global_scope,
@@ -88,6 +89,13 @@ impl PublicTypePolicy {
         match self {
             Self::Raw => ty,
             Self::Promote => ty.promote(db).promote_singletons(db),
+        }
+    }
+
+    const fn merge_for_union(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Promote, Self::Promote) => Self::Promote,
+            _ => Self::Raw,
         }
     }
 }
@@ -872,6 +880,106 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
     }
 }
 
+pub(crate) fn union_place_and_qualifiers<'db>(
+    db: &'db dyn Db,
+    left: PlaceAndQualifiers<'db>,
+    right: PlaceAndQualifiers<'db>,
+) -> PlaceAndQualifiers<'db> {
+    PlaceAndQualifiers {
+        place: union_places(db, left.place, right.place),
+        qualifiers: left.qualifiers.union(right.qualifiers),
+    }
+}
+
+fn union_places<'db>(db: &'db dyn Db, left: Place<'db>, right: Place<'db>) -> Place<'db> {
+    match (left, right) {
+        (Place::Undefined, right) => right,
+        (left, Place::Undefined) => left,
+        (Place::Defined(left), Place::Defined(right)) => Place::Defined(DefinedPlace {
+            ty: UnionType::from_two_elements(db, left.ty, right.ty),
+            origin: left.origin.merge(right.origin),
+            definedness: left.definedness.max(right.definedness),
+            public_type_policy: left
+                .public_type_policy
+                .merge_for_union(right.public_type_policy),
+        }),
+    }
+}
+
+#[salsa::tracked(
+    cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
+    cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, _, _, _| {
+        place.cycle_normalized(db, *previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(crate) fn nested_bindings_by_symbol<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    symbol_id: ScopedSymbolId,
+    requires_explicit_reexport: RequiresExplicitReExport,
+) -> PlaceAndQualifiers<'db> {
+    let table = place_table(db, scope);
+    let nested_scopes = table.nested_scopes_with_bindings(symbol_id);
+    if nested_scopes.is_empty() {
+        return Place::Undefined.into();
+    }
+
+    // If the defining scope gives this symbol a definite declared type, trust that declaration.
+    // Nested `global`/`nonlocal` assignments should be checked against it instead of changing the
+    // symbol's visible type.
+    let declarations = use_def_map(db, scope).end_of_scope_symbol_declarations(symbol_id);
+    let declared = place_from_declarations_impl(db, declarations, requires_explicit_reexport)
+        .ignore_conflicting_declarations();
+    if matches!(
+        declared.place,
+        Place::Defined(DefinedPlace {
+            definedness: Definedness::AlwaysDefined,
+            ..
+        })
+    ) {
+        return Place::Undefined.into();
+    }
+
+    let has_defining_scope_binding = use_def_map(db, scope)
+        .reachable_symbol_bindings(symbol_id)
+        .any(|binding| matches!(binding.binding, DefinitionState::Defined(_)));
+    let symbol_name = table.symbol(symbol_id).name().as_str();
+    let mut nested = Place::Undefined;
+    for &nested_scope_id in nested_scopes {
+        let nested_scope = nested_scope_id.to_scope_id(db, scope.file(db));
+        let nested_place_table = place_table(db, nested_scope);
+        let Some(nested_symbol_id) = nested_place_table.symbol_id(symbol_name) else {
+            continue;
+        };
+
+        let bindings = use_def_map(db, nested_scope).reachable_symbol_bindings(nested_symbol_id);
+        let has_ungrounded_augmented_assignment = !has_defining_scope_binding
+            && bindings.clone().any(|binding| {
+                matches!(
+                    binding.binding,
+                    DefinitionState::Defined(definition)
+                        if matches!(definition.kind(db), DefinitionKind::AugmentedAssignment(_))
+                )
+            });
+        let nested_place = if has_ungrounded_augmented_assignment {
+            Place::Defined(
+                DefinedPlace::new(Type::unknown()).with_definedness(Definedness::PossiblyUndefined),
+            )
+        } else {
+            match place_from_bindings_impl(db, bindings, requires_explicit_reexport).place {
+                Place::Defined(defined) => {
+                    Place::Defined(defined.with_definedness(Definedness::PossiblyUndefined))
+                }
+                Place::Undefined => Place::Undefined,
+            }
+        };
+        nested = union_places(db, nested, nested_place);
+    }
+
+    nested.into()
+}
+
 #[salsa::tracked(
     cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
     cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, _, _, _, _| {
@@ -904,6 +1012,15 @@ pub(crate) fn place_by_id<'db>(
         ConsideredDefinitions::AllReachable => use_def.reachable_bindings(place_id),
     };
 
+    let nested_bindings = || {
+        place_id
+            .as_symbol()
+            .map(|symbol_id| {
+                nested_bindings_by_symbol(db, scope, symbol_id, requires_explicit_reexport)
+            })
+            .unwrap_or_default()
+    };
+
     // If a symbol is undeclared, but qualified with `typing.Final`, we use the right-hand side
     // inferred type, without unioning with `Unknown`, because it cannot be modified.
     if let Some(qualifiers) = declared.is_bare_final() {
@@ -927,7 +1044,12 @@ pub(crate) fn place_by_id<'db>(
             qualifiers,
         } if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
             let bindings = all_considered_bindings();
-            match place_from_bindings_impl(db, bindings, requires_explicit_reexport).place {
+            let inferred = union_places(
+                db,
+                place_from_bindings_impl(db, bindings, requires_explicit_reexport).place,
+                nested_bindings().place,
+            );
+            match inferred {
                 Place::Defined(DefinedPlace {
                     ty: inferred,
                     origin,
@@ -1004,7 +1126,11 @@ pub(crate) fn place_by_id<'db>(
                 }),
             };
 
-            PlaceAndQualifiers { place, qualifiers }
+            union_place_and_qualifiers(
+                db,
+                PlaceAndQualifiers { place, qualifiers },
+                nested_bindings(),
+            )
         }
         // Place is undeclared, infer the type from bindings
         PlaceAndQualifiers {
@@ -1015,6 +1141,7 @@ pub(crate) fn place_by_id<'db>(
             let boundness_analysis = bindings.boundness_analysis();
             let mut inferred =
                 place_from_bindings_impl(db, bindings, requires_explicit_reexport).place;
+            inferred = union_places(db, inferred, nested_bindings().place);
 
             if boundness_analysis == BoundnessAnalysis::AssumeBound {
                 if let Place::Defined(defined) = inferred {

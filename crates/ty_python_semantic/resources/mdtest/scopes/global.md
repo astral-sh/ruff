@@ -87,8 +87,8 @@ def f():
 ## Nested function after conditional rebinding
 
 A nested function should resolve a `global` name through the enclosing scope, even if that scope
-conditionally rebinds it. Here, the early return means `inner` only sees the original module
-binding:
+conditionally rebinds it. We conservatively include the binding before the early return, because we
+do not try to prove that `inner` cannot run on that path:
 
 ```py
 x = 1
@@ -101,7 +101,7 @@ def outer(flag: bool) -> None:
         return
 
     def inner() -> None:
-        reveal_type(x)  # revealed: Literal[1]
+        reveal_type(x)  # revealed: Literal[1, 2]
 ```
 
 Without the early return, the nested function should see both possible bindings. This is a known
@@ -233,16 +233,48 @@ x = None
 global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
 ```
 
-## Local bindings override preceding `global` bindings
+## Local `global` bindings dominate module-scope bindings
 
 ```py
 x = 42
 
 def f():
     global x
-    reveal_type(x)  # revealed: Literal[42]
+    reveal_type(x)  # revealed: Literal[42, "56"]
     x = "56"
     reveal_type(x)  # revealed: Literal["56"]
+```
+
+When a `global` augmented assignment has no module-scope binding to use as its base value, we
+include an imprecise contribution rather than recursing through the same global symbol indefinitely:
+
+```py
+def f():
+    global z  # error: [unresolved-global] "Invalid global declaration of `z`: `z` has no declarations or bindings in the global scope"
+    z += 1
+
+# error: [possibly-unresolved-reference] "Name `z` used when possibly not defined"
+reveal_type(z)  # revealed: Unknown
+```
+
+## Imported globals include nested `global` bindings
+
+`module.py`:
+
+```py
+x = 1
+
+def f():
+    global x
+    x = "two"
+```
+
+`main.py`:
+
+```py
+from module import x
+
+reveal_type(x)  # revealed: Literal[1, "two"]
 ```
 
 ## Local assignment prevents falling back to the outer scope
