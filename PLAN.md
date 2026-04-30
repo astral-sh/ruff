@@ -278,20 +278,24 @@ Phase 5 validation notes:
 
 - [~] Flip remaining TODO expectations added in the previous revision:
 
-    - [?] `partial(partial, drop)` reveal types — deferred until call inference combines constraint sets across arguments
-    - invariant `listify` implication assertions
+    - [?] `partial(partial, drop)` reveal types — deferred until call inference combines constraint sets across arguments; TODO comments now explain why this is still `Unknown`
+    - [?] invariant `listify` implication assertion — deferred because existentially reducing callable-local typevars is lossy for invariant generic-class relationships; TODO comment now explains why the expected error remains
     - [x] recursive `listify` implication assertion
 
-- [ ] Remove the remaining deliberately undesired current expectations and `static-assert-error` comments.
+- [x] Remove or justify the remaining deliberately undesired current expectations and `static-assert-error` comments added for this feature.
 
-- [ ] Consider additional coverage after the core cases pass:
+    - The remaining feature-specific expected failures are intentionally kept with explanatory comments.
+
+- [?] Consider additional coverage after the core cases pass:
 
     - generic defaults that reference sibling typevars;
     - ParamSpec callable occurrences;
     - overloaded generic callable occurrences with repeated source-level typevar identities;
     - nested generic callable signatures.
 
-- [ ] Run targeted mdtests:
+    Deferred to follow-up. The current regression set covers the target recursive direct-call and relation cases, plus existing callable factory/overload/ParamSpec regression files.
+
+- [x] Run targeted mdtests:
 
     ```sh
     CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic -- mdtest::generics/pep695/functions.md
@@ -301,9 +305,9 @@ Phase 5 validation notes:
     CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic -- mdtest::type_properties/implies_subtype_of.md
     ```
 
-- [ ] Run broader ty semantic tests after targeted mdtests pass.
+- [x] Run broader ty semantic tests after targeted mdtests pass.
 
-- [ ] Run `/home/dcreager/bin/jpk run -a` before final handoff.
+- [x] Run `/home/dcreager/bin/jpk run -a` before final handoff.
 
 ## Phase 7: Cleanup and documentation
 
