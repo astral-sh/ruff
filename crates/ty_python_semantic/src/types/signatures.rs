@@ -3377,6 +3377,13 @@ impl<'db> Parameter<'db> {
         let index = semantic_index(db, function_definition.file(db));
         let definition = Some(index.expect_single_definition(parameter));
 
+        let default_ty_from_kind = match &kind {
+            ParameterKind::PositionalOnly { default_type, .. }
+            | ParameterKind::PositionalOrKeyword { default_type, .. }
+            | ParameterKind::KeywordOnly { default_type, .. } => *default_type,
+            ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => None,
+        };
+
         let (annotated_type, inferred_annotation, has_starred_annotation) =
             if let Some(annotation) = parameter.annotation() {
                 (
@@ -3384,6 +3391,8 @@ impl<'db> Parameter<'db> {
                     false,
                     annotation.is_starred_expr(),
                 )
+            } else if let Some(default_ty) = default_ty_from_kind {
+                (default_ty.promote(db).promote_singletons(db), true, false)
             } else {
                 (Type::unknown(), true, false)
             };
@@ -3780,25 +3789,39 @@ mod tests {
 
         assert_eq!(sig.return_ty.display(&db).to_string(), "bytes");
         assert_params_have_definitions(&sig);
+        // Unannotated parameters with defaults get a promoted annotated type inferred from
+        // the default value, while keeping `inferred_annotation = true` (not user-written).
+        let mut c = Parameter::positional_only(Some(Name::new_static("c")))
+            .with_annotated_type(KnownClass::Int.to_instance(&db))
+            .with_default_type(Type::int_literal(1));
+        c.inferred_annotation = true;
+
+        let mut e = Parameter::positional_or_keyword(Name::new_static("e"))
+            .with_annotated_type(KnownClass::Int.to_instance(&db))
+            .with_default_type(Type::int_literal(3));
+        e.inferred_annotation = true;
+
+        let mut g = Parameter::keyword_only(Name::new_static("g"))
+            .with_annotated_type(KnownClass::Int.to_instance(&db))
+            .with_default_type(Type::int_literal(5));
+        g.inferred_annotation = true;
+
         assert_params(
             &sig,
             &[
                 Parameter::positional_only(Some(Name::new_static("a"))),
                 Parameter::positional_only(Some(Name::new_static("b")))
                     .with_annotated_type(KnownClass::Int.to_instance(&db)),
-                Parameter::positional_only(Some(Name::new_static("c")))
-                    .with_default_type(Type::int_literal(1)),
+                c,
                 Parameter::positional_only(Some(Name::new_static("d")))
                     .with_annotated_type(KnownClass::Int.to_instance(&db))
                     .with_default_type(Type::int_literal(2)),
-                Parameter::positional_or_keyword(Name::new_static("e"))
-                    .with_default_type(Type::int_literal(3)),
+                e,
                 Parameter::positional_or_keyword(Name::new_static("f"))
                     .with_annotated_type(LiteralValueType::unpromotable(4).into())
                     .with_default_type(LiteralValueType::unpromotable(4).into()),
                 Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
-                Parameter::keyword_only(Name::new_static("g"))
-                    .with_default_type(Type::int_literal(5)),
+                g,
                 Parameter::keyword_only(Name::new_static("h"))
                     .with_annotated_type(LiteralValueType::unpromotable(6).into())
                     .with_default_type(LiteralValueType::unpromotable(6).into()),

@@ -798,7 +798,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             let ty = if let Some(default_expr) = default_expr {
                 let default_ty = self.file_expression_type(default_expr);
-                UnionType::from_two_elements(db, Type::unknown(), default_ty)
+                default_ty.promote(db).promote_singletons(db)
             } else if let Some(ty) = self.special_first_method_parameter_type(parameter) {
                 ty
             } else {
