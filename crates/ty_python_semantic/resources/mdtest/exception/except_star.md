@@ -63,10 +63,10 @@ except* int:  # error: [invalid-exception-caught]
 try:
     help()
 except* 3 as e:  # error: [invalid-exception-caught]
-    reveal_type(e)  # revealed: BaseExceptionGroup[Unknown]
+    reveal_type(e)  # revealed: BaseExceptionGroup[BaseException & Unknown]
 
 try:
     help()
 except* (AttributeError, 42) as e:  # error: [invalid-exception-caught]
-    reveal_type(e)  # revealed: BaseExceptionGroup[AttributeError | Unknown]
+    reveal_type(e)  # revealed: BaseExceptionGroup[AttributeError | (BaseException & Unknown)]
 ```

@@ -180,10 +180,10 @@ reveal_type(Bounded[int])  # revealed: <type alias 'Bounded[int]'>
 reveal_type(Bounded[IntSubclass])  # revealed: <type alias 'Bounded[IntSubclass]'>
 
 # error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `T@Bounded`"
-reveal_type(Bounded[str])  # revealed: <type alias 'Bounded[Unknown]'>
+reveal_type(Bounded[str])  # revealed: <type alias 'Bounded[int & Unknown]'>
 
 # error: [invalid-type-arguments] "Type `int | str` is not assignable to upper bound `int` of type variable `T@Bounded`"
-reveal_type(Bounded[int | str])  # revealed: <type alias 'Bounded[Unknown]'>
+reveal_type(Bounded[int | str])  # revealed: <type alias 'Bounded[int & Unknown]'>
 
 reveal_type(BoundedByUnion[int])  # revealed: <type alias 'BoundedByUnion[int]'>
 reveal_type(BoundedByUnion[IntSubclass])  # revealed: <type alias 'BoundedByUnion[IntSubclass]'>
@@ -197,7 +197,7 @@ def _(x: TupleOfIntAndStr[int, str]):
 
 # error: [invalid-type-arguments] "Type `int` is not assignable to upper bound `str` of type variable `U@TupleOfIntAndStr`"
 def _(x: TupleOfIntAndStr[int, int]):
-    reveal_type(x)  # revealed: tuple[int, Unknown]
+    reveal_type(x)  # revealed: tuple[int, str & Unknown]
 ```
 
 If the type variable is constrained, the specialized type must satisfy those constraints:
@@ -218,7 +218,7 @@ reveal_type(Constrained[str])  # revealed: <type alias 'Constrained[str]'>
 reveal_type(Constrained[int | str])  # revealed: <type alias 'Constrained[int | str]'>
 
 # error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `T@Constrained`"
-reveal_type(Constrained[object])  # revealed: <type alias 'Constrained[Unknown]'>
+reveal_type(Constrained[object])  # revealed: <type alias 'Constrained[(int & Unknown) | (str & Unknown)]'>
 
 type TupleOfIntOrStr[T: (int, str), U: (int, str)] = tuple[T, U]
 
@@ -227,7 +227,7 @@ def _(x: TupleOfIntOrStr[int, str]):
 
 # error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `U@TupleOfIntOrStr`"
 def _(x: TupleOfIntOrStr[int, object]):
-    reveal_type(x)  # revealed: tuple[int, Unknown]
+    reveal_type(x)  # revealed: tuple[int, (int & Unknown) | (str & Unknown)]
 ```
 
 If the type variable has a default, it can be omitted:

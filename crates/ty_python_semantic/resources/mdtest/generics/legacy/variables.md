@@ -588,14 +588,11 @@ reveal_type(f(B()))  # revealed: B
 reveal_type(g(C()))  # revealed: C
 reveal_type(g(D()))  # revealed: D
 
-# TODO: one diagnostic would probably be sufficient here...?
-#
 # error: [invalid-argument-type] "Argument type `C` does not satisfy upper bound `A` of type variable `T`"
-# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `B`, found `C`"
 reveal_type(f(C()))  # revealed: B
 
-# error: [invalid-argument-type]
-reveal_type(g(A()))  # revealed: Unknown
+# error: [invalid-argument-type] "Argument to function `g` is incorrect: Argument type `A` does not satisfy constraints (`C`, `D`) of type variable `U`"
+reveal_type(g(A()))  # revealed: (C & Unknown) | (D & Unknown)
 ```
 
 ### Constructor signature versioning
@@ -737,7 +734,7 @@ T = TypeVar("T", bound=list["G"])
 class G(Generic[T]):
     x: T
 
-reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
+reveal_type(G[list[G]]().x)  # revealed: list[G[Top[list[Divergent]] & Unknown]]
 ```
 
 An invalid specialization in a recursive bound doesn't cause a panic:
@@ -753,7 +750,7 @@ class Node(Generic[T]):
 
 # error: [invalid-type-arguments]
 def _(n: Node[str]):
-    reveal_type(n)  # revealed: Node[Unknown]
+    reveal_type(n)  # revealed: Node[Top[Node[Divergent]] & Unknown]
 ```
 
 ### Defaults
