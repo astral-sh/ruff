@@ -1176,7 +1176,7 @@ print(sys.last_exc, os.getegid())
 
 #[cfg_attr(windows, ignore = "site-packages layout inference is Unix-only")]
 #[test]
-fn touching_pyproject_updates_inferred_python_version_diagnostics_when_metadata_is_unchanged()
+fn reloading_options_updates_inferred_python_version_diagnostics_when_metadata_is_unchanged()
 -> anyhow::Result<()> {
     let latest_supported_minor = PythonVersion::iter().last().unwrap().minor;
     let unsupported_minor = latest_supported_minor + 1;
@@ -1218,6 +1218,8 @@ fn touching_pyproject_updates_inferred_python_version_diagnostics_when_metadata_
         case.project_path(&supported_python_directory).as_std_path(),
     )?;
 
+    // TODO: Invalidate program settings when a `site-packages` directory is renamed. This
+    // manually reloads the options instead of exercising the file-watching path for that rename.
     case.update_options(Options::default())?;
 
     let diagnostics = case.db.check();
