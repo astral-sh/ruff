@@ -481,6 +481,34 @@ impl<'db> UnionBuilder<'db> {
         self.add_in_place_impl(ty, &mut vec![]);
     }
 
+    /// This adds an element directly without redundancy checks.
+    /// Use this only if you are certain that this can be done safely under certain assumptions
+    /// (e.g., rebuilding an already reduced union).
+    pub(crate) fn add_unchecked_in_place(&mut self, ty: Type<'db>) {
+        match ty {
+            Type::Never => {}
+            ty if ty.is_object() => self.collapse_to_object(),
+            Type::LiteralValue(literal)
+                if matches!(
+                    literal.kind(),
+                    LiteralValueTypeKind::String(_)
+                        | LiteralValueTypeKind::Bytes(_)
+                        | LiteralValueTypeKind::Int(_)
+                        | LiteralValueTypeKind::Enum(_)
+                ) =>
+            {
+                self.add_in_place(ty);
+            }
+            _ => {
+                if let Type::LiteralValue(literal) = ty {
+                    self.recursively_defined =
+                        self.recursively_defined.or(literal.recursively_defined());
+                }
+                self.elements.push(UnionElement::Type(ty));
+            }
+        }
+    }
+
     pub(crate) fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         let cycle_recovery = self.cycle_recovery;
         let should_widen = |literals, recursively_defined: RecursivelyDefined| {

@@ -144,7 +144,7 @@ impl<'db> UnionType<'db> {
                 // mapped to themselves, so we pass the originals directly).
                 let mut b = UnionBuilder::new(db);
                 for prev in &elements[..i] {
-                    b.add_in_place(*prev);
+                    b.add_unchecked_in_place(*prev);
                 }
                 b.add_in_place(new_ty);
                 builder = Some(b);
@@ -174,7 +174,7 @@ impl<'db> UnionType<'db> {
             } else if &new_ty != ty {
                 let mut b = UnionBuilder::new(db).unpack_aliases(false);
                 for prev in &elements[..i] {
-                    b.add_in_place(*prev);
+                    b.add_unchecked_in_place(*prev);
                 }
                 b.add_in_place(new_ty);
                 builder = Some(b);
@@ -210,7 +210,7 @@ impl<'db> UnionType<'db> {
             } else if &new_ty != ty {
                 let mut b = UnionBuilder::new(db);
                 for prev in &elements[..i] {
-                    b.add_in_place(*prev);
+                    b.add_unchecked_in_place(*prev);
                 }
                 b.add_in_place(new_ty);
                 builder = Some(b);
