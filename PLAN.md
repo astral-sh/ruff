@@ -142,24 +142,27 @@ The relation `TypeOf[identity2] <: Callable[[str], str]` does not see the ambien
 ### Phase 0: Restore a known exploratory baseline
 
 - [x] Current code is in an exploratory state with relation freshening disabled and no library guard.
-- [ ] Before implementation, inspect `jj diff --git` and this file. Decide whether to build on the current exploratory diff or split/rewrite it.
-- [ ] Ensure no debug `eprintln!` statements remain before running tests.
+- [x] Before implementation, inspect `jj diff --git` and this file. Decided to build on the current exploratory diff in a follow-up jj revision.
+- [x] Ensure no debug `eprintln!` statements remain before running tests.
 
 ### Phase 1: Convert freshness representation to `u32`
 
-- [ ] Change `TypeVarNonce` / bound-typevar freshness storage from `Option<NonZeroU32>` to a `u32`-backed representation.
-- [ ] Preserve `0 == not freshened` semantics.
-- [ ] Add helpers for:
+- [x] Change `TypeVarNonce` / bound-typevar freshness storage from `Option<NonZeroU32>` to a `u32`-backed representation.
+- [x] Preserve `0 == not freshened` semantics.
+- [x] Add helpers for:
   - current freshness value,
   - base identity with freshness zeroed,
   - adding a deterministic delta.
-- [ ] Run `cargo check -p ty_python_semantic`.
+- [x] Run `cargo check -p ty_python_semantic`.
+  - Passed in revision `[π] Convert typevar freshness nonce representation`.
 
 ### Phase 2: Add typevar freshness collection utilities
 
-- [ ] Add helpers to compare typevars against the identities bound by a `GenericContext` while ignoring freshness.
-- [ ] Add traversal helpers to scan a `Type` / `Signature` for occurrences that match a caller-provided generic context ignoring freshness, returning the maximum freshness nonce seen.
-- [ ] Add analogous traversal support for `ConstraintSet` / `OwnedConstraintSet` if needed for implication-layer work.
+- [x] Add helpers to compare typevars against the identities bound by a `GenericContext` while ignoring freshness.
+- [x] Add traversal helpers to scan a `Type` / `Signature` for occurrences that match a caller-provided generic context ignoring freshness, returning the maximum freshness nonce seen.
+- [x] Add analogous traversal support for `ConstraintSet` / `OwnedConstraintSet` if needed for implication-layer work.
+  - Not needed for now; `implies_subtype_of` freshening remains punted.
+- [x] Run `cargo fmt` and `cargo check -p ty_python_semantic` after Phase 2 changes.
 
 ### Phase 3: Add generic-context bumping
 

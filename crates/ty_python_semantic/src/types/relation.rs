@@ -726,6 +726,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
+    #[expect(
+        dead_code,
+        reason = "temporarily unused while relation freshening is disabled"
+    )]
     pub(super) fn next_typevar_nonce(
         &self,
         generic_context: GenericContext<'db>,

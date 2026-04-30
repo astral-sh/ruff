@@ -32,6 +32,7 @@ use crate::types::typed_dict::{
     UnpackedTypedDictKey, extract_unpacked_typed_dict_keys_from_kwargs_annotation,
     extract_unpacked_typed_dict_keys_from_value_type,
 };
+use crate::types::typevar::max_typevar_freshness_matching_generic_context;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind,
@@ -679,6 +680,50 @@ impl<'db> Signature<'db> {
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
         )
+    }
+
+    #[expect(dead_code, reason = "used by follow-up deterministic freshening work")]
+    pub(crate) fn max_typevar_freshness_matching_generic_context(
+        &self,
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+    ) -> Option<TypeVarNonce> {
+        let mut max_freshness = None;
+        let mut update = |freshness| {
+            max_freshness = max_freshness.max(freshness);
+        };
+
+        if let Some(signature_generic_context) = self.generic_context {
+            for typevar in signature_generic_context.variables(db) {
+                update(max_typevar_freshness_matching_generic_context(
+                    db,
+                    Type::TypeVar(typevar),
+                    generic_context,
+                ));
+            }
+        }
+
+        for param in &self.parameters {
+            update(max_typevar_freshness_matching_generic_context(
+                db,
+                param.annotated_type(),
+                generic_context,
+            ));
+            if let Some(default_ty) = param.default_type() {
+                update(max_typevar_freshness_matching_generic_context(
+                    db,
+                    default_ty,
+                    generic_context,
+                ));
+            }
+        }
+        update(max_typevar_freshness_matching_generic_context(
+            db,
+            self.return_ty,
+            generic_context,
+        ));
+
+        max_freshness
     }
 
     pub(crate) fn find_legacy_typevars_impl(

@@ -1,5 +1,4 @@
-use std::cell::RefCell;
-use std::num::NonZeroU32;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use ruff_db::parsed::parsed_module;
@@ -13,8 +12,10 @@ use crate::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
         KnownClass, KnownInstanceType, MaterializationKind, Parameter, Parameters, Type,
         TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
-        any_over_type, binding_type, definition_expression_type, tuple::Tuple,
-        variance::VarianceInferable, visitor,
+        any_over_type, binding_type, definition_expression_type,
+        tuple::Tuple,
+        variance::VarianceInferable,
+        visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },
 };
 use ty_python_core::{
@@ -172,7 +173,7 @@ impl<'db> TypeVarInstance<'db> {
             self,
             BindingContext::Definition(binding_context),
             None,
-            None,
+            TypeVarNonce::NONE,
         )
     }
 
@@ -647,19 +648,40 @@ impl<'db> TypeVarInstance<'db> {
 }
 
 /// A nonce that gives a bound typevar occurrence a fresh identity.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update)]
-pub struct TypeVarNonce(NonZeroU32);
+///
+/// `0` is reserved for source-level, non-freshened typevars. Positive values identify fresh
+/// occurrences.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd, salsa::Update)]
+pub struct TypeVarNonce(u32);
 
 // This type does not have any heap storage.
 impl get_size2::GetSize for TypeVarNonce {}
 
 impl TypeVarNonce {
-    const FIRST: Self = Self(NonZeroU32::MIN);
+    pub(crate) const NONE: Self = Self(0);
+    const FIRST: Self = Self(1);
 
-    fn increment(self) -> Self {
+    #[expect(dead_code, reason = "used by follow-up deterministic freshening work")]
+    pub(crate) const fn value(self) -> u32 {
+        self.0
+    }
+
+    pub(crate) const fn is_fresh(self) -> bool {
+        self.0 != 0
+    }
+
+    pub(crate) fn increment(self) -> Self {
         Self(
             self.0
                 .checked_add(1)
+                .expect("exhausted bound typevar freshness nonces"),
+        )
+    }
+
+    pub(crate) fn add(self, delta: u32) -> Self {
+        Self(
+            self.0
+                .checked_add(delta)
                 .expect("exhausted bound typevar freshness nonces"),
         )
     }
@@ -725,6 +747,66 @@ impl<'db> TypeVarNonceGenerator<'db> {
     }
 }
 
+pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    generic_context: GenericContext<'db>,
+) -> Option<TypeVarNonce> {
+    struct MatchingFreshnessCollector<'db> {
+        base_identities: FxHashSet<BoundTypeVarIdentity<'db>>,
+        recursion_guard: TypeCollector<'db>,
+        max_freshness: Cell<Option<TypeVarNonce>>,
+    }
+
+    impl<'db> MatchingFreshnessCollector<'db> {
+        fn new(db: &'db dyn Db, generic_context: GenericContext<'db>) -> Self {
+            let base_identities = generic_context
+                .variables(db)
+                .map(|typevar| {
+                    let mut identity = typevar.identity(db);
+                    identity.freshness = TypeVarNonce::NONE;
+                    identity
+                })
+                .collect();
+            Self {
+                base_identities,
+                recursion_guard: TypeCollector::default(),
+                max_freshness: Cell::default(),
+            }
+        }
+    }
+
+    impl<'db> TypeVisitor<'db> for MatchingFreshnessCollector<'db> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            false
+        }
+
+        fn visit_bound_type_var_type(
+            &self,
+            db: &'db dyn Db,
+            bound_typevar: BoundTypeVarInstance<'db>,
+        ) {
+            let mut identity = bound_typevar.identity(db);
+            identity.freshness = TypeVarNonce::NONE;
+            if self.base_identities.contains(&identity) {
+                self.max_freshness.set(
+                    self.max_freshness
+                        .get()
+                        .max(Some(bound_typevar.freshness(db))),
+                );
+            }
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+    }
+
+    let collector = MatchingFreshnessCollector::new(db, generic_context);
+    collector.visit_type(db, ty);
+    collector.max_freshness.get()
+}
+
 /// A type variable that has been bound to a generic context, and which can be specialized to a
 /// concrete type.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -734,8 +816,8 @@ pub struct BoundTypeVarInstance<'db> {
     /// If [`Some`], this indicates that this type variable is the `args` or `kwargs` component
     /// of a `ParamSpec` i.e., `P.args` or `P.kwargs`.
     pub(super) paramspec_attr: Option<ParamSpecAttrKind>,
-    /// If [`Some`], this bound typevar is a fresh occurrence of the source-level typevar.
-    pub(super) freshness: Option<TypeVarNonce>,
+    /// The freshness nonce for this bound typevar occurrence; `0` is the source-level occurrence.
+    pub(super) freshness: TypeVarNonce,
 }
 
 // The Salsa heap is tracked separately.
@@ -765,6 +847,27 @@ impl<'db> BoundTypeVarInstance<'db> {
             paramspec_attr: self.paramspec_attr(db),
             freshness: self.freshness(db),
         }
+    }
+
+    #[expect(dead_code, reason = "used by follow-up deterministic freshening work")]
+    pub(crate) fn is_fresh(self, db: &'db dyn Db) -> bool {
+        self.freshness(db).is_fresh()
+    }
+
+    #[expect(dead_code, reason = "used by follow-up deterministic freshening work")]
+    pub(crate) fn has_same_base_identity(self, db: &'db dyn Db, other: Self) -> bool {
+        self.identity(db).has_same_base_identity(other.identity(db))
+    }
+
+    #[expect(dead_code, reason = "used by follow-up deterministic freshening work")]
+    pub(crate) fn freshen(self, db: &'db dyn Db, delta: u32) -> Self {
+        Self::new(
+            db,
+            self.typevar(db),
+            self.binding_context(db),
+            self.paramspec_attr(db),
+            self.freshness(db).add(delta),
+        )
     }
 
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db Name {
@@ -869,7 +972,13 @@ impl<'db> BoundTypeVarInstance<'db> {
             Some(variance),
             None, // _default
         );
-        Self::new(db, typevar, BindingContext::Synthetic, None, None)
+        Self::new(
+            db,
+            typevar,
+            BindingContext::Synthetic,
+            None,
+            TypeVarNonce::NONE,
+        )
     }
 
     /// Create a new synthetic `Self` type variable with the given upper bound.
@@ -891,7 +1000,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             Some(TypeVarVariance::Invariant),
             None, // _default
         );
-        Self::new(db, typevar, binding_context, None, None)
+        Self::new(db, typevar, binding_context, None, TypeVarNonce::NONE)
     }
 
     /// Returns an identical type variable with its `TypeVarBoundOrConstraints` mapped by the
@@ -1009,7 +1118,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 nonce,
             } => {
                 if generic_context.contains(db, self) {
-                    Type::TypeVar(self.freshen(db, *nonce, type_mapping, visitor))
+                    Type::TypeVar(self.freshen_with_mapping(db, *nonce, type_mapping, visitor))
                 } else {
                     Type::TypeVar(self)
                 }
@@ -1077,7 +1186,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         )
     }
 
-    fn freshen(
+    fn freshen_with_mapping(
         self,
         db: &'db dyn Db,
         nonce: TypeVarNonce,
@@ -1094,7 +1203,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 typevar,
                 self.binding_context(db),
                 self.paramspec_attr(db),
-                Some(nonce),
+                nonce,
             );
         }
 
@@ -1118,7 +1227,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             typevar,
             self.binding_context(db),
             self.paramspec_attr(db),
-            Some(nonce),
+            nonce,
         )
     }
 
@@ -1280,7 +1389,7 @@ impl std::fmt::Display for ParamSpecAttrKind {
 /// The identity of a bound type variable occurrence.
 ///
 /// This identifies a specific binding of a typevar to a context (e.g., `T@ClassC` vs `T@FunctionF`),
-/// plus an optional freshness nonce for fresh callable occurrences, independent of the typevar's
+/// plus a freshness nonce for fresh callable occurrences, independent of the typevar's
 /// bounds or constraints. Two bound typevars have the same identity if they represent the same
 /// occurrence, even if their bounds have been materialized differently. Two fresh occurrences of
 /// the same source-level typevar have different bound identities.
@@ -1291,8 +1400,24 @@ pub struct BoundTypeVarIdentity<'db> {
     /// If [`Some`], this indicates that this type variable is the `args` or `kwargs` component
     /// of a `ParamSpec` i.e., `P.args` or `P.kwargs`.
     pub(super) paramspec_attr: Option<ParamSpecAttrKind>,
-    /// If [`Some`], this bound typevar is a fresh occurrence of the source-level typevar.
-    pub(super) freshness: Option<TypeVarNonce>,
+    /// The freshness nonce for this bound typevar occurrence; `0` is the source-level occurrence.
+    pub(super) freshness: TypeVarNonce,
+}
+
+impl<'db> BoundTypeVarIdentity<'db> {
+    pub(crate) fn has_same_base_identity(mut self, mut other: Self) -> bool {
+        self.freshness = TypeVarNonce::NONE;
+        other.freshness = TypeVarNonce::NONE;
+        self == other
+    }
+
+    #[expect(dead_code, reason = "used by follow-up deterministic freshening work")]
+    pub(crate) fn freshen(self, delta: u32) -> Self {
+        Self {
+            freshness: self.freshness.add(delta),
+            ..self
+        }
+    }
 }
 
 #[salsa::tracked(
