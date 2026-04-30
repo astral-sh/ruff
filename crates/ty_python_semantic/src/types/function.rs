@@ -55,7 +55,7 @@ use bitflags::bitflags;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
-use ruff_python_ast::{self as ast, ParameterWithDefault};
+use ruff_python_ast::{self as ast, AnyNodeRef, ParameterWithDefault};
 use ruff_text_size::Ranged;
 use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module};
 
@@ -2065,11 +2065,21 @@ impl KnownFunction {
                     && !any_over_type(db, *source_type, true, contains_unknown_or_todo)
                     && !any_over_type(db, *casted_type, true, contains_unknown_or_todo)
                 {
-                    if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
+                    let value_arg = call_expression.arguments.find_argument_value("val", 1);
+                    let node = value_arg
+                        .map(AnyNodeRef::from)
+                        .unwrap_or(AnyNodeRef::from(call_expression));
+                    if let Some(builder) = context.report_lint(&REDUNDANT_CAST, node) {
                         let source_display = source_type.display(db).to_string();
                         let casted_display = casted_type.display(db).to_string();
                         let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Value is already of type `{casted_display}`",
+                            "Redundant cast to type `{casted_display}`",
+                        ));
+                        diagnostic.set_primary_message(format_args!(
+                            "Value is already of type `{casted_display}`"
+                        ));
+                        diagnostic.set_concise_message(format_args!(
+                            "Redundant cast: value is already of type `{casted_display}`",
                         ));
                         if source_display != casted_display {
                             diagnostic.info(format_args!(
