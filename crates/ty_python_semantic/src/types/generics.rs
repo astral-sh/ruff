@@ -209,6 +209,11 @@ pub(crate) fn typing_self<'db>(
     )
 }
 
+/// The set of bound typevar occurrences that can be solved by the current inference context.
+///
+/// Membership is keyed by [`BoundTypeVarIdentity`], including any freshness nonce. This lets a
+/// fresh generic-callable occurrence be inferable without making the surrounding source-level
+/// typevar inferable.
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) enum InferableTypeVars<'db> {
     None,
@@ -288,7 +293,11 @@ impl<'db> InferableTypeVars<'db> {
     }
 }
 
-/// A list of formal type variables for a generic function, class, or type alias.
+/// A list of formal type variables for a generic function, class, type alias, or fresh callable
+/// occurrence.
+///
+/// Variables are keyed by bound occurrence identity, so freshened copies of the same source-level
+/// generic context can coexist without collapsing into each other.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct GenericContext<'db> {
     #[returns(ref)]

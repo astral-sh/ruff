@@ -312,8 +312,8 @@ Phase 5 validation notes:
 ## Phase 7: Cleanup and documentation
 
 - [x] Remove obsolete TODO in `signatures.rs` or replace it with narrower follow-up TODOs.
-- [ ] Audit comments in `constraints.rs` and `generics.rs` that describe typevar identity/order.
-- [ ] Document the distinction between source-level typevar identity and fresh bound-typevar occurrence identity.
+- [x] Audit comments in `constraints.rs` and `generics.rs` that describe typevar identity/order.
+- [x] Document the distinction between source-level typevar identity and fresh bound-typevar occurrence identity.
 - [?] Add or update debug/display output for fresh typevars.
     - Follow-on work: user-facing display currently hides freshness, but we will eventually need a way to distinguish multiple fresh copies of the same generic callable/typevars when they can appear together in output.
 

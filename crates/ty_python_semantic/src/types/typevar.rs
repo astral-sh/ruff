@@ -716,7 +716,8 @@ impl<'db> BoundTypeVarInstance<'db> {
 
     /// Get the identity of this bound typevar occurrence.
     ///
-    /// This is used for comparing whether two bound typevars represent the same occurrence,
+    /// This includes the source-level typevar, binding context, ParamSpec attribute, and freshness
+    /// nonce. It is used for comparing whether two bound typevars represent the same occurrence,
     /// regardless of e.g. differences in their bounds or constraints due to materialization.
     pub(crate) fn identity(self, db: &'db dyn Db) -> BoundTypeVarIdentity<'db> {
         BoundTypeVarIdentity {
@@ -1242,7 +1243,8 @@ impl std::fmt::Display for ParamSpecAttrKind {
 /// This identifies a specific binding of a typevar to a context (e.g., `T@ClassC` vs `T@FunctionF`),
 /// plus an optional freshness nonce for fresh callable occurrences, independent of the typevar's
 /// bounds or constraints. Two bound typevars have the same identity if they represent the same
-/// occurrence, even if their bounds have been materialized differently.
+/// occurrence, even if their bounds have been materialized differently. Two fresh occurrences of
+/// the same source-level typevar have different bound identities.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub struct BoundTypeVarIdentity<'db> {
     pub(crate) identity: TypeVarIdentity<'db>,
