@@ -213,7 +213,29 @@ reveal_type(sys.version_info[:2])
 
     // The unsupported version inferred from the selected environment surfaces as a
     // settings diagnostic on the environment's `pyvenv.cfg`.
-    server.collect_publish_diagnostic_notifications(1);
+    let diagnostics = server.collect_publish_diagnostic_notifications(1);
+    assert_json_snapshot!(diagnostics, @r#"
+    {
+      "file://<temp_dir>/venv/pyvenv.cfg": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 15
+            },
+            "end": {
+              "line": 0,
+              "character": 21
+            }
+          },
+          "severity": 2,
+          "code": "unsupported-python-version",
+          "source": "ty",
+          "message": "Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.14 instead.\n\ninfo: Expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`.\ninfo: Set `environment.python-version` explicitly to override the inferred version.\ninfo: The version was inferred from the `pyvenv.cfg` file."
+        }
+      ]
+    }
+    "#);
 
     server.open_text_document(main, foo_content, 1);
     let diagnostics = server.document_diagnostic_request(main, None);
