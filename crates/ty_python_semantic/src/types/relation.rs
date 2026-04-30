@@ -711,7 +711,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
-    #[expect(dead_code)]
     pub(super) fn next_typevar_nonce(&self) -> TypeVarNonce {
         self.next_nonce.next()
     }

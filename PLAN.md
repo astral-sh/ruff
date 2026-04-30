@@ -230,17 +230,31 @@ Phase 3 implementation notes:
 
 Goal: fix the TODO in `TypeRelationChecker::check_signature_pair`.
 
-- [ ] In `check_signature_pair`, allocate a single nonce from `self` for the source signature and freshen the source signature's generic context when present.
-- [ ] Freshen the target signature's generic context independently with a separate single nonce when present.
-- [ ] Merge ambient inferables with the fresh source/target inferables.
-- [ ] Call `check_signature_pair_inner` on the freshened signatures.
-- [ ] Existentially reduce exactly the fresh source/target identities after the inner check.
+- [x] In `check_signature_pair`, allocate a single nonce from `self` for the source signature and freshen the source signature's generic context when present.
+- [x] Freshen the target signature's generic context independently with a separate single nonce when present.
+- [x] Merge ambient inferables with the fresh source/target inferables.
+- [x] Call `check_signature_pair_inner` on the freshened signatures.
+- [x] Existentially reduce exactly the fresh source/target identities after the inner check.
     - Do not reduce an outer/non-fresh identity with the same source-level typevar.
-- [ ] Verify `type_properties/implies_subtype_of.md` recursive and invariant `listify` cases.
+- [~] Verify `type_properties/implies_subtype_of.md` recursive and invariant `listify` cases.
+    - The recursive same-source-typevar cases now pass without expected `static-assert-error` comments.
+    - The non-recursive invariant `listify` implication still needs the old expected error; this appears to require improving existential reduction / transitive constraint preservation rather than only callable-occurrence freshening.
+
+Phase 4 implementation notes:
+
+- `TypeRelationChecker::check_signature_pair` now freshens source and target generic signatures independently before adding their callable-local typevars to the inferable set.
+- The reduction step uses inferables from the freshened signatures, so outer/non-fresh identities with the same source-level typevar are not quantified away.
+- Generic contexts containing ParamSpecs are temporarily not freshened on the relation path. Freshening them produced false-positive return-type errors for existing `Callable[P, R]` decorator cases; this remains a follow-up alongside the direct-call ParamSpec deferral from Phase 3.
+- Validation run after Phase 4:
+    - `cargo check -p ty_python_semantic`
+    - targeted mdtests for `generics/pep695/functions.md`, `generics/legacy/functions.md`, `generics/pep695/callables.md`, `generics/legacy/callables.md`, and `type_properties/implies_subtype_of.md`
+    - `mdtest::annotations/unsupported_special_forms.md` regression check for ParamSpec relation behavior
+    - full `mdtest::` run
 
 ## Phase 5: Validate higher-order and overload cases
 
-- [ ] Verify `partial(partial, drop)` in both PEP 695 and legacy syntax.
+- [?] Verify `partial(partial, drop)` in both PEP 695 and legacy syntax.
+    - Still `Unknown` after freshening. This case requires combining constraint sets across both arguments of the outer call (`partial` as `c`, `drop` as `a`), which is separate follow-on work.
 - [ ] Verify overloaded callable inference still treats overload sets as intended.
 - [ ] Verify generic callable factory tests still pass.
 - [ ] Audit `SpecializationBuilder::add_type_mappings_from_constraint_set` for any accidental fresh-typevar leaks.
@@ -250,11 +264,11 @@ Goal: fix the TODO in `TypeRelationChecker::check_signature_pair`.
 
 - [x] Flip direct recursive function reveal-type expectations in the PEP 695 and legacy function mdtests.
 
-- [ ] Flip remaining TODO expectations added in the previous revision:
+- [~] Flip remaining TODO expectations added in the previous revision:
 
-    - `partial(partial, drop)` reveal types
+    - [?] `partial(partial, drop)` reveal types — deferred until call inference combines constraint sets across arguments
     - invariant `listify` implication assertions
-    - recursive `listify` implication assertion
+    - [x] recursive `listify` implication assertion
 
 - [ ] Remove the remaining deliberately undesired current expectations and `static-assert-error` comments.
 
@@ -281,7 +295,7 @@ Goal: fix the TODO in `TypeRelationChecker::check_signature_pair`.
 
 ## Phase 7: Cleanup and documentation
 
-- [ ] Remove obsolete TODO in `signatures.rs` or replace it with narrower follow-up TODOs.
+- [x] Remove obsolete TODO in `signatures.rs` or replace it with narrower follow-up TODOs.
 - [ ] Audit comments in `constraints.rs` and `generics.rs` that describe typevar identity/order.
 - [ ] Document the distinction between source-level typevar identity and fresh bound-typevar occurrence identity.
 - [ ] Add or update debug display for fresh typevars if needed.

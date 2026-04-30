@@ -522,8 +522,6 @@ def identity2[T](t: T) -> T:
 
     static_assert(constraints.implies_subtype_of(TypeOf[identity2], Callable[[int], int]))
     static_assert(constraints.implies_subtype_of(TypeOf[identity2], Callable[[str], str]))
-    # TODO: no error
-    # error: [static-assert-error]
     static_assert(not constraints.implies_subtype_of(TypeOf[identity2], Callable[[str], int]))
     static_assert(constraints.implies_subtype_of(TypeOf[identity2], GenericIdentity[int]))
     static_assert(constraints.implies_subtype_of(TypeOf[identity2], GenericIdentity[str]))
@@ -562,8 +560,6 @@ def recursive_listify[T](t: T) -> list[T]:
 
     static_assert(constraints.implies_subtype_of(TypeOf[recursive_listify], Callable[[int], list[int]]))
     static_assert(constraints.implies_subtype_of(TypeOf[recursive_listify], Callable[[str], list[str]]))
-    # TODO: no error
-    # error: [static-assert-error]
     static_assert(not constraints.implies_subtype_of(TypeOf[recursive_listify], Callable[[str], list[int]]))
 
     return [t]

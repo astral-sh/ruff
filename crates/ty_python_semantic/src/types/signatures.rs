@@ -1192,18 +1192,37 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        // If either signature is generic, their typevars should also be considered inferable when
-        // checking whether one signature is a subtype/etc of the other, since we only need to find
-        // one specialization that causes the check to succeed.
-        //
-        // TODO: We should alpha-rename these typevars, too, to correctly handle when a generic
-        // callable refers to typevars from within the context that defines them. This primarily
-        // comes up when referring to a generic function recursively from within its body:
-        //
-        //     def identity[T](t: T) -> T:
-        //         # Here, TypeOf[identity2] is a generic callable that should consider T to be
-        //         # inferable, even though other uses of T in the function body are non-inferable.
-        //         return t
+        // If either signature is generic, freshen that signature's typevars before considering
+        // them inferable for this relation. The relation only needs to find one specialization of
+        // each generic callable that causes the check to succeed, but those callable-local
+        // specializations must not collide with any same-source typevars in the surrounding
+        // context.
+        let should_freshen = |signature: &Signature<'db>| {
+            // ParamSpec freshening needs more support in specialization inference; for now,
+            // preserve the previous raw-identity behavior for those signatures.
+            signature.generic_context.is_some_and(|generic_context| {
+                !generic_context
+                    .variables(db)
+                    .any(|typevar| typevar.is_paramspec(db))
+            })
+        };
+
+        let freshened_source;
+        let source = if should_freshen(source) {
+            freshened_source = source.freshen_generic_context(db, self.next_typevar_nonce());
+            &freshened_source
+        } else {
+            source
+        };
+
+        let freshened_target;
+        let target = if should_freshen(target) {
+            freshened_target = target.freshen_generic_context(db, self.next_typevar_nonce());
+            &freshened_target
+        } else {
+            target
+        };
+
         let source_inferable = source.inferable_typevars(db);
         let target_inferable = target.inferable_typevars(db);
         let inferable = source_inferable.merge(db, target_inferable);
