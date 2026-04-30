@@ -4566,6 +4566,26 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         })
     }
 
+    fn paramspec_argument_indices(&self, prefix_len: usize) -> Vec<usize> {
+        self.argument_matches
+            .iter()
+            .enumerate()
+            .filter_map(|(argument_index, argument_matches)| {
+                argument_matches
+                    .parameters
+                    .iter()
+                    .any(|parameter_index| *parameter_index >= prefix_len)
+                    .then_some(argument_index)
+            })
+            .collect()
+    }
+
+    fn adjusted_argument_indices(&self) -> Vec<Option<usize>> {
+        self.enumerate_argument_types()
+            .map(|(_, adjusted_argument_index, _, _)| adjusted_argument_index)
+            .collect()
+    }
+
     fn infer_specialization(&mut self, constraints: &ConstraintSetBuilder<'db>) {
         let Some(generic_context) = self.signature.generic_context else {
             return;
@@ -4927,17 +4947,35 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
     fn check_argument_types(&mut self, constraints: &ConstraintSetBuilder<'db>) {
         let paramspec = self.signature.parameters().as_paramspec_with_prefix();
+        let mut paramspec_evaluated = false;
 
         for (argument_index, adjusted_argument_index, argument, argument_types) in
             self.enumerate_argument_types()
         {
-            if let Some((_, paramspec)) = paramspec {
-                if self.try_paramspec_evaluation_at(constraints, argument_index, paramspec) {
-                    // Once we find an argument that matches the `ParamSpec`, we can stop checking
-                    // the remaining arguments since `ParamSpec` should always be the last
-                    // parameter.
-                    return;
+            let paramspec_component_start = if let Some((prefix, paramspec)) = paramspec {
+                if !paramspec_evaluated
+                    && self.try_paramspec_evaluation_at(constraints, argument_index, paramspec)
+                {
+                    paramspec_evaluated = true;
                 }
+
+                paramspec_evaluated.then_some(prefix.len())
+            } else {
+                None
+            };
+
+            let is_paramspec_component_parameter = |parameter_index: usize| {
+                paramspec_component_start.is_some_and(|start| parameter_index >= start)
+            };
+
+            let matched_parameters = &self.argument_matches[argument_index].parameters;
+            if paramspec_component_start.is_some()
+                && !matched_parameters.is_empty()
+                && matched_parameters
+                    .iter()
+                    .all(|parameter_index| is_paramspec_component_parameter(*parameter_index))
+            {
+                continue;
             }
 
             match argument {
@@ -4946,6 +4984,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     argument_index,
                     adjusted_argument_index,
                     argument,
+                    paramspec_component_start,
                 ),
                 Argument::Keywords => self.check_keyword_variadic_argument_type(
                     constraints,
@@ -4954,10 +4993,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     argument,
                     // Splatted arguments are inferred without type context.
                     argument_types.get_default().unwrap_or(Type::unknown()),
+                    paramspec_component_start,
                 ),
                 _ => {
                     // If the argument isn't splatted, just check its type directly.
                     for parameter_index in &self.argument_matches[argument_index].parameters {
+                        if is_paramspec_component_parameter(*parameter_index) {
+                            continue;
+                        }
+
                         let declared_type =
                             self.signature.parameters()[*parameter_index].annotated_type();
                         let argument_type = argument_types.get_for_declared_type(declared_type);
@@ -4975,7 +5019,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        if let Some((_, paramspec)) = paramspec {
+        if let Some((_, paramspec)) = paramspec
+            && !paramspec_evaluated
+        {
             // If we reach here, none of the arguments matched the `ParamSpec` parameter, but the
             // `ParamSpec` could specialize to a parameter list containing some parameters. For
             // example,
@@ -5047,10 +5093,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.evaluate_paramspec_sub_call(constraints, Some(argument_index), paramspec)
     }
 
-    /// Invoke a sub-call for the given `ParamSpec` type variable, using the remaining arguments.
+    /// Invoke a sub-call for the given `ParamSpec` type variable, using the forwarded arguments.
     ///
-    /// The remaining arguments start from `argument_index` if provided, otherwise no arguments
-    /// are passed.
+    /// The forwarded arguments are those matched to the `ParamSpec` components if
+    /// `argument_index` is provided, otherwise no arguments are passed.
     ///
     /// This method returns `false` if the specialization does not contain a mapping for the given
     /// `paramspec` or contains an invalid mapping (i.e., not a `Callable` of kind `ParamSpecValue`).
@@ -5078,20 +5124,29 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return false;
         }
 
-        let (sub_arguments, error_offset) = if let Some(argument_index) = argument_index {
-            let num_synthetic_args = self
-                .arguments
+        let (sub_arguments, error_argument_indices) = if let Some(argument_index) = argument_index {
+            let Some((prefix, _)) = self.signature.parameters().as_paramspec_with_prefix() else {
+                return false;
+            };
+            let paramspec_argument_indices = self.paramspec_argument_indices(prefix.len());
+            if !paramspec_argument_indices.contains(&argument_index) {
+                return false;
+            }
+
+            let adjusted_argument_indices = self.adjusted_argument_indices();
+            let error_argument_indices: Vec<Option<usize>> = paramspec_argument_indices
                 .iter()
-                .filter(|(arg, _)| matches!(arg, Argument::Synthetic))
-                .count();
+                .map(|argument_index| adjusted_argument_indices[*argument_index])
+                .collect();
 
             (
-                self.arguments.start_from(argument_index),
-                Some(argument_index - num_synthetic_args),
+                self.arguments.select(&paramspec_argument_indices),
+                Some(error_argument_indices),
             )
         } else {
             (CallArguments::none(), None)
         };
+        let error_argument_indices = error_argument_indices.as_deref();
 
         // Create Bindings with all overloads and perform full overload resolution
         let callable_binding =
@@ -5124,7 +5179,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             .errors
                             .iter()
                             .cloned()
-                            .map(|err| err.maybe_apply_argument_index_offset(error_offset)),
+                            .map(|err| err.maybe_remap_argument_indices(error_argument_indices)),
                     );
                 } else {
                     let index = callable_binding
@@ -5139,7 +5194,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             .errors
                             .iter()
                             .cloned()
-                            .map(|err| err.maybe_apply_argument_index_offset(error_offset)),
+                            .map(|err| err.maybe_remap_argument_indices(error_argument_indices)),
                     );
                 }
             }
@@ -5151,7 +5206,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         .errors
                         .iter()
                         .cloned()
-                        .map(|err| err.maybe_apply_argument_index_offset(error_offset)),
+                        .map(|err| err.maybe_remap_argument_indices(error_argument_indices)),
                 );
             }
             MatchingOverloadIndex::Multiple(_) => {
@@ -5167,7 +5222,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             .errors
                             .iter()
                             .cloned()
-                            .map(|err| err.maybe_apply_argument_index_offset(error_offset)),
+                            .map(|err| err.maybe_remap_argument_indices(error_argument_indices)),
                     );
                 }
             }
@@ -5182,10 +5237,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         argument_index: usize,
         adjusted_argument_index: Option<usize>,
         argument: Argument<'a>,
+        paramspec_component_start: Option<usize>,
     ) {
         for (parameter_index, variadic_argument_type) in
             self.argument_matches[argument_index].iter()
         {
+            if paramspec_component_start.is_some_and(|start| parameter_index >= start) {
+                continue;
+            }
+
             self.check_argument_type(
                 constraints,
                 argument_index,
@@ -5204,6 +5264,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         adjusted_argument_index: Option<usize>,
         argument: Argument<'a>,
         argument_type: Type<'db>,
+        paramspec_component_start: Option<usize>,
     ) {
         if let Type::TypedDict(typed_dict) = argument_type {
             for (argument_type, parameter_index) in typed_dict
@@ -5212,6 +5273,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 .map(|field| field.declared_ty)
                 .zip(&self.argument_matches[argument_index].parameters)
             {
+                if paramspec_component_start.is_some_and(|start| *parameter_index >= start) {
+                    continue;
+                }
+
                 self.check_argument_type(
                     constraints,
                     argument_index,
@@ -5249,6 +5314,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             };
 
         for parameter_index in &self.argument_matches[argument_index].parameters {
+            if paramspec_component_start.is_some_and(|start| *parameter_index >= start) {
+                continue;
+            }
+
             let value_type = if let Some(value_type) = value_type_paramspec {
                 value_type
             } else {
@@ -6151,6 +6220,47 @@ impl BindingError<'_> {
             self.apply_argument_index_offset(offset);
         }
         self
+    }
+
+    fn maybe_remap_argument_indices(mut self, argument_indices: Option<&[Option<usize>]>) -> Self {
+        if let Some(argument_indices) = argument_indices {
+            self.remap_argument_indices(argument_indices);
+        }
+        self
+    }
+
+    fn remap_argument_indices(&mut self, argument_indices: &[Option<usize>]) {
+        let remap = |argument_index: &mut Option<usize>| {
+            *argument_index = argument_index
+                .and_then(|index| argument_indices.get(index).copied())
+                .flatten();
+        };
+
+        match self {
+            BindingError::InvalidArgumentType { argument_index, .. }
+            | BindingError::InvalidKeyType { argument_index, .. }
+            | BindingError::UnknownArgument { argument_index, .. }
+            | BindingError::PositionalOnlyParameterAsKwarg { argument_index, .. }
+            | BindingError::ParameterAlreadyAssigned { argument_index, .. }
+            | BindingError::SpecializationError { argument_index, .. } => {
+                remap(argument_index);
+            }
+
+            BindingError::TooManyPositionalArguments {
+                first_excess_argument_index,
+                ..
+            } => {
+                remap(first_excess_argument_index);
+            }
+
+            BindingError::CalledTopCallable(..)
+            | BindingError::InternalCallError(..)
+            | BindingError::InvalidDataclassApplication(..)
+            | BindingError::MissingArguments { .. }
+            | BindingError::UnmatchedOverload
+            | BindingError::PropertyHasNoSetter(..)
+            | BindingError::PropertyHasNoDeleter(..) => {}
+        }
     }
 
     /// Applies the given offset to the argument indices in this error, if any.

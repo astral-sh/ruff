@@ -5191,6 +5191,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (callable.kind(db) == CallableTypeKind::ParamSpecValue).then_some(callable)
         }
 
+        fn paramspec_argument_indices<'db>(
+            overload: &Binding<'db>,
+            binding: &CallableBinding<'db>,
+            prefix_len: usize,
+        ) -> Vec<usize> {
+            let bound_argument_offset = usize::from(binding.bound_type.is_some());
+
+            overload
+                .argument_matches()
+                .iter()
+                .enumerate()
+                .filter_map(|(matched_argument_index, argument_matches)| {
+                    if matched_argument_index < bound_argument_offset {
+                        return None;
+                    }
+
+                    argument_matches
+                        .parameters
+                        .iter()
+                        .any(|parameter_index| *parameter_index >= prefix_len)
+                        .then_some(matched_argument_index - bound_argument_offset)
+                })
+                .collect()
+        }
+
         #[expect(clippy::too_many_arguments)]
         fn paramspec_argument_context<'db>(
             db: &'db dyn Db,
@@ -5203,25 +5228,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             call_expression_tcx: TypeContext<'db>,
         ) -> Option<Type<'db>> {
             let (prefix, _) = overload.signature.parameters().as_paramspec_with_prefix()?;
-            // The callable stored for `P` represents the tail call accepted by the
-            // `P.args`/`P.kwargs` parameters, so rematch the argument suffix against that callable.
-            let paramspec_start_argument_index = overload
-                .argument_matches()
+            let paramspec_argument_indices =
+                paramspec_argument_indices(overload, binding, prefix.len());
+            let sub_argument_index = paramspec_argument_indices
                 .iter()
-                .position(|argument_matches| {
-                    argument_matches
-                        .parameters
-                        .iter()
-                        .any(|parameter_index| *parameter_index >= prefix.len())
-                })?
-                .checked_sub(usize::from(binding.bound_type.is_some()))?;
-            let sub_argument_index = argument_index.checked_sub(paramspec_start_argument_index)?;
+                .position(|paramspec_argument_index| *paramspec_argument_index == argument_index)?;
 
             let specialized_binding = CallableBinding::from_overloads(
                 overload.signature_type,
                 callable.signatures(db).iter().cloned(),
             );
-            let sub_arguments = arguments_types.start_from(paramspec_start_argument_index);
+            let sub_arguments = arguments_types.select(&paramspec_argument_indices);
             let mut specialized_bindings =
                 Bindings::from(specialized_binding).match_parameters(db, &sub_arguments);
             let _ = specialized_bindings.check_types_impl(
@@ -5249,15 +5266,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let parameter_type = specialized_overload.signature.parameters()
                 [*specialized_parameter_index]
                 .annotated_type();
+            // A context like `list[Unknown]` or `list[T@g]` is worse than no context here:
+            // it can erase the concrete literal type that should later specialize the wrapped
+            // callable. Check the parameter before applying the sub-call specialization so an
+            // earlier forwarded argument cannot turn `list[T@g]` into apparently-safe `list[int]`.
+            if parameter_type.has_dynamic(db) || parameter_type.has_typevar_or_typevar_instance(db)
+            {
+                return None;
+            }
+
             let parameter_type = specialized_overload
                 .specialization()
                 .map_or(parameter_type, |specialization| {
                     parameter_type.apply_specialization(db, specialization)
                 });
 
-            // A context like `list[Unknown]` or `list[T@g]` is worse than no context here:
-            // it can erase the concrete literal type that should later specialize the wrapped
-            // callable.
             (!parameter_type.has_dynamic(db) && !parameter_type.has_typevar_or_typevar_instance(db))
                 .then_some(parameter_type)
         }

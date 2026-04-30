@@ -746,7 +746,7 @@ parameter types of the callable argument. This mirrors wrappers like `asyncio.to
 clients that expose large `Unpack[TypedDict]` keyword signatures.
 
 ```py
-from typing import Callable, TypedDict, Unpack
+from typing import Callable, TypedDict, Unpack, overload
 
 class Tag(TypedDict):
     Key: str
@@ -767,6 +767,23 @@ to_thread_like(put_tags, reveal_type([{"Key": "k", "Value": "v"}]))  # revealed:
 to_thread_like(put_object, TagSet=reveal_type([{"Key": "k", "Value": "v"}]))  # revealed: list[Tag]
 to_thread_like_keyword(func=put_object, TagSet=reveal_type([{"Key": "k", "Value": "v"}]))  # revealed: list[Tag]
 to_thread_like_keyword(TagSet=reveal_type([{"Key": "k", "Value": "v"}]), func=put_object)  # revealed: list[Tag]
+
+def requires_x(*, x: int) -> str:
+    return ""
+
+def with_flag[**P, R](func: Callable[P, R], flag: int, *args: P.args, **kwargs: P.kwargs) -> R:
+    return func(*args, **kwargs)
+
+with_flag(x=1, func=requires_x, flag=1)
+with_flag(x=1, func=requires_x, flag="bad")  # error: [invalid-argument-type]
+
+@overload
+def overloaded_put_object(*, TagSet: list[Tag]) -> None: ...
+@overload
+def overloaded_put_object(*, func: object, TagSet: list[int]) -> None: ...
+def overloaded_put_object(*, TagSet: object, func: object = None) -> None: ...
+
+to_thread_like_keyword(TagSet=reveal_type([{"Key": "k", "Value": "v"}]), func=overloaded_put_object)  # revealed: list[Tag]
 ```
 
 ParamSpec forwarding should not use raw unspecialized type variables from a wrapped generic callable
@@ -776,10 +793,16 @@ as argument context, since that can hide errors between forwarded arguments.
 from typing import Callable
 
 def generic_pair[T](x: list[T], y: list[T], /) -> None: ...
+def generic_pair_with_container[T](x: T, y: list[T], /) -> None: ...
 def to_thread_like[**P, R](func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
     return func(*args, **kwargs)
 
-to_thread_like(generic_pair, [1], [""])  # error: [invalid-argument-type]
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+to_thread_like(generic_pair, [1], reveal_type([""]))  # revealed: list[str]
+
+# error: [invalid-argument-type]
+to_thread_like(generic_pair_with_container, 1, reveal_type([""]))  # revealed: list[str]
 ```
 
 ### Specializing `ParamSpec` with another `ParamSpec`
