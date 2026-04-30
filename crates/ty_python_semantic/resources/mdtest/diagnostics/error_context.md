@@ -1242,3 +1242,37 @@ error[invalid-yield]: Yield expression type does not match annotation
   |
 info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
 ```
+
+### In `not-iterable` diagnostics
+
+```py
+from typing import Iterable, Iterator, Self
+
+class WrongIterator:
+    def __next__(self, wrong: str) -> int:
+        return 0
+
+class WrongIterable:
+    def __iter__(self) -> WrongIterator:
+        return WrongIterator()
+
+# snapshot: not-iterable
+for _ in WrongIterable():
+    pass
+```
+
+```snapshot
+error[not-iterable]: Object of type `WrongIterable` is not iterable
+  --> src/mdtest_snippet.py:12:10
+   |
+12 | for _ in WrongIterable():
+   |          ^^^^^^^^^^^^^^^
+   |
+info: Its `__iter__` method returns an object of type `WrongIterator`, which has an invalid `__next__` method
+info: type `WrongIterable` is not assignable to protocol `Iterable[Unknown]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── incompatible return types: `WrongIterator` is not assignable to `Iterator[Unknown]`
+info:         └── type `WrongIterator` is not assignable to protocol `Iterator[Unknown]`
+info:             └── protocol member `__next__` is incompatible
+info: Expected signature for `__next__` is `def __next__(self): ...`
+```

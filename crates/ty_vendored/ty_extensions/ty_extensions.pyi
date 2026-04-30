@@ -1,7 +1,7 @@
 # ruff: noqa: PYI021
+import collections.abc
 import sys
 import types
-from collections.abc import Iterable
 from enum import Enum
 from typing import Any, ClassVar, Protocol, _SpecialForm
 
@@ -272,7 +272,7 @@ class NamedTupleLike(Protocol):
     _fields: ClassVar[tuple[Any, ...]]
     _field_defaults: ClassVar[dict[str, Any]]
     @classmethod
-    def _make(cls: type[Self], iterable: Iterable[Any]) -> Self: ...
+    def _make(cls: type[Self], iterable: collections.abc.Iterable[Any]) -> Self: ...
     def _asdict(self, /) -> dict[str, Any]: ...
 
     # Positional arguments aren't actually accepted by these methods at runtime,
@@ -287,3 +287,9 @@ class NamedTupleLike(Protocol):
     def _replace(self, *args, **kwargs) -> Self: ...
     if sys.version_info >= (3, 13):
         def __replace__(self, *args, **kwargs) -> Self: ...
+
+class Iterator[T](Protocol):
+    def __next__(self) -> T: ...
+
+class Iterable[T](Protocol):
+    def __iter__(self) -> Iterator[T]: ...
