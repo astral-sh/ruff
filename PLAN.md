@@ -255,10 +255,22 @@ Phase 4 implementation notes:
 
 - [?] Verify `partial(partial, drop)` in both PEP 695 and legacy syntax.
     - Still `Unknown` after freshening. This case requires combining constraint sets across both arguments of the outer call (`partial` as `c`, `drop` as `a`), which is separate follow-on work.
-- [ ] Verify overloaded callable inference still treats overload sets as intended.
-- [ ] Verify generic callable factory tests still pass.
-- [ ] Audit `SpecializationBuilder::add_type_mappings_from_constraint_set` for any accidental fresh-typevar leaks.
-- [ ] Add debug assertions if fresh typevars should never appear in final public result types after a call/relation path.
+- [x] Verify overloaded callable inference still treats overload sets as intended.
+- [x] Verify generic callable factory tests still pass.
+- [x] Audit `SpecializationBuilder::add_type_mappings_from_constraint_set` for any accidental fresh-typevar leaks.
+    - The method first calls `remove_noninferable`, then builds solutions only for the current inferable set. During call specialization, fresh callable-local typevars are inferable only inside the call/relation path and should either appear only as intermediate solution types or be substituted/reduced before public results. No additional leak was found in this audit.
+- [?] Add debug assertions if fresh typevars should never appear in final public result types after a call/relation path.
+    - Deferred. User-facing display intentionally hides freshness, and there are known deferred cases around ParamSpecs and invariant generic relationships where a blanket assertion would need a precise definition of allowed internal result shapes.
+
+Phase 5 validation notes:
+
+- Ran mdtests covering overloaded callables, callable factories, and ParamSpec regressions:
+    - `mdtest::generics/pep695/callables.md`
+    - `mdtest::generics/legacy/callables.md`
+    - `mdtest::call/overloads.md`
+    - `mdtest::overloads.md`
+    - `mdtest::generics/pep695/paramspec.md`
+    - `mdtest::generics/legacy/paramspec.md`
 
 ## Phase 6: Flip mdtest expectations and add final regression coverage
 
@@ -298,7 +310,8 @@ Phase 4 implementation notes:
 - [x] Remove obsolete TODO in `signatures.rs` or replace it with narrower follow-up TODOs.
 - [ ] Audit comments in `constraints.rs` and `generics.rs` that describe typevar identity/order.
 - [ ] Document the distinction between source-level typevar identity and fresh bound-typevar occurrence identity.
-- [ ] Add or update debug display for fresh typevars if needed.
+- [?] Add or update debug/display output for fresh typevars.
+    - Follow-on work: user-facing display currently hides freshness, but we will eventually need a way to distinguish multiple fresh copies of the same generic callable/typevars when they can appear together in output.
 
 ## Notes for future implementers
 
