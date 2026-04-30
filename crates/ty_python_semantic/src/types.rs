@@ -6737,10 +6737,10 @@ pub enum TypeMapping<'a, 'db> {
     /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
     /// being used in.
     BindLegacyTypevars(BindingContext<'db>),
-    /// Freshens typevars bound by a generic context occurrence.
+    /// Freshens typevars bound by a generic context occurrence by adding a shared delta.
     FreshenBoundTypeVars {
         generic_context: GenericContext<'db>,
-        nonce: TypeVarNonce,
+        delta: u32,
     },
     /// Binds any `typing.Self` typevar with a particular `self` class.
     BindSelf(SelfBinding<'db>),

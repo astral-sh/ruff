@@ -166,9 +166,12 @@ The relation `TypeOf[identity2] <: Callable[[str], str]` does not see the ambien
 
 ### Phase 3: Add generic-context bumping
 
-- [ ] Add an `ApplyTypeMapping` variant or dedicated visitor that bumps all typevars bound by a specific `GenericContext` by one shared `delta`.
-- [ ] Ensure it updates the signature's `generic_context` consistently with parameter and return types.
-- [ ] Keep ParamSpecs unchanged initially, unless explicitly supported.
+- [x] Add an `ApplyTypeMapping` variant or dedicated visitor that bumps all typevars bound by a specific `GenericContext` by one shared `delta`.
+  - Recast existing `TypeMapping::FreshenBoundTypeVars` to store a `delta`; added `Signature::freshen_generic_context_by_delta`.
+- [x] Ensure it updates the signature's `generic_context` consistently with parameter and return types.
+- [x] Keep ParamSpecs unchanged initially, unless explicitly supported.
+  - The delta mapping has the same ParamSpec behavior as the existing freshening mapping; relation-side code will continue to decide whether to skip ParamSpec contexts.
+- [x] Run `cargo fmt` and `cargo check -p ty_python_semantic` after Phase 3 changes.
 
 ### Phase 4: Replace relation-side occurrence-count freshening
 

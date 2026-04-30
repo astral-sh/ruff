@@ -667,6 +667,10 @@ impl<'db> Signature<'db> {
     }
 
     pub(crate) fn freshen_generic_context(&self, db: &'db dyn Db, nonce: TypeVarNonce) -> Self {
+        self.freshen_generic_context_by_delta(db, nonce.value())
+    }
+
+    pub(crate) fn freshen_generic_context_by_delta(&self, db: &'db dyn Db, delta: u32) -> Self {
         let Some(generic_context) = self.generic_context else {
             return self.clone();
         };
@@ -675,7 +679,7 @@ impl<'db> Signature<'db> {
             db,
             &TypeMapping::FreshenBoundTypeVars {
                 generic_context,
-                nonce,
+                delta,
             },
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),

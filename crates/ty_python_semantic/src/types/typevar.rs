@@ -661,7 +661,6 @@ impl TypeVarNonce {
     pub(crate) const NONE: Self = Self(0);
     const FIRST: Self = Self(1);
 
-    #[expect(dead_code, reason = "used by follow-up deterministic freshening work")]
     pub(crate) const fn value(self) -> u32 {
         self.0
     }
@@ -1115,10 +1114,15 @@ impl<'db> BoundTypeVarInstance<'db> {
             }
             TypeMapping::FreshenBoundTypeVars {
                 generic_context,
-                nonce,
+                delta,
             } => {
                 if generic_context.contains(db, self) {
-                    Type::TypeVar(self.freshen_with_mapping(db, *nonce, type_mapping, visitor))
+                    Type::TypeVar(self.freshen_with_mapping(
+                        db,
+                        self.freshness(db).add(*delta),
+                        type_mapping,
+                        visitor,
+                    ))
                 } else {
                     Type::TypeVar(self)
                 }
