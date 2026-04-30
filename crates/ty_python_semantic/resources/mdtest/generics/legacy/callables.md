@@ -189,6 +189,49 @@ reveal_type(generic_context(outside_callable(1)))
 outside_callable(1)("string")
 ```
 
+## Callable assignability with skipped optional parameters
+
+A callable can safely accept a required positional-or-keyword parameter by keyword even if that
+parameter appears later in the implementation signature, as long as the skipped parameters are
+optional.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Iterable
+
+from ty_extensions import CallableTypeOf, TypeOf, is_assignable_to, static_assert
+
+def accepts_column_key(row_key: int | None = None, column_key: int | None = None) -> None:
+    pass
+
+def requires_column_key(column_key: int) -> None:
+    pass
+
+type AcceptsColumnKey = TypeOf[accepts_column_key]
+type RequiresColumnKey = CallableTypeOf[requires_column_key]
+
+static_assert(is_assignable_to(AcceptsColumnKey, RequiresColumnKey))
+
+def accepts_keywords_with_positional_only_prefix(
+    params: object = (),
+    /,
+    **kwds: str | Iterable[str],
+) -> None:
+    pass
+
+def requires_keyword_or_positional(column_key: str | Iterable[str]) -> None:
+    pass
+
+type AcceptsKeywordsWithPositionalOnlyPrefix = TypeOf[accepts_keywords_with_positional_only_prefix]
+type RequiresKeywordOrPositional = CallableTypeOf[requires_keyword_or_positional]
+
+static_assert(is_assignable_to(AcceptsKeywordsWithPositionalOnlyPrefix, RequiresKeywordOrPositional))
+```
+
 ## Naming a generic `Callable` with paramspecs: function return values
 
 The same pattern holds if the callable involves a paramspec.

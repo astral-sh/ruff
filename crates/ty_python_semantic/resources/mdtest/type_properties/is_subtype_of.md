@@ -1376,6 +1376,17 @@ static_assert(is_subtype_of(RegularCallableTypeOf[variadic_a], RegularCallableTy
 static_assert(not is_subtype_of(RegularCallableTypeOf[variadic_b], RegularCallableTypeOf[standard_int]))
 ```
 
+A standard parameter already consumed by positional matching still takes precedence over `**kwargs`
+when the same name is passed by keyword:
+
+```py
+def consumed_explicit_keyword(a: object = None, b: str = "", **kwargs: object) -> None: ...
+def later_keyword(b: int, c: str = "") -> None: ...
+
+static_assert(not is_subtype_of(RegularCallableTypeOf[consumed_explicit_keyword], RegularCallableTypeOf[later_keyword]))
+static_assert(not is_assignable_to(RegularCallableTypeOf[consumed_explicit_keyword], RegularCallableTypeOf[later_keyword]))
+```
+
 A variadic positional parameter alone cannot match a positional-or-keyword parameter because
 variadic positional parameters can only be called positionally.
 

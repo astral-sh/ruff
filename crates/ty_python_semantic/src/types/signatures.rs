@@ -2202,7 +2202,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
             match next_parameter {
                 EitherOrBoth::Left(source_parameter) => match source_parameter.kind() {
-                    ParameterKind::KeywordOnly { .. } | ParameterKind::KeywordVariadic { .. }
+                    ParameterKind::PositionalOrKeyword { .. }
+                    | ParameterKind::KeywordOnly { .. }
+                    | ParameterKind::KeywordVariadic { .. }
                         if !target_keywords.is_empty() =>
                     {
                         // If there are any unmatched keyword parameters in `other`, they need to
@@ -2272,11 +2274,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             },
                         ) => {
                             if source_name != target_name {
-                                self.provide_context(|| ErrorContext::ParameterNameMismatch {
-                                    source_name: source_name.clone(),
-                                    target_name: target_name.clone(),
-                                });
-                                return self.never();
+                                // A positional-or-keyword target parameter represents both a
+                                // positional call shape and a keyword call shape. The current
+                                // source parameter can accept the positional call shape, but the
+                                // keyword call shape has to be checked by name after positional
+                                // matching. The skipped source parameter must be optional so the
+                                // source still accepts the keyword call shape.
+                                if source_default.is_none() {
+                                    self.provide_context(|| ErrorContext::ParameterNameMismatch {
+                                        source_name: source_name.clone(),
+                                        target_name: target_name.clone(),
+                                    });
+                                    return self.never();
+                                }
+                                target_keywords.push(target_param);
                             }
                             // The following checks are the same as positional-only parameters.
                             if source_default.is_none() && target_default.is_some() {
@@ -2361,18 +2372,32 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         }
 
                         (
-                            ParameterKind::PositionalOnly { name, .. },
+                            ParameterKind::PositionalOnly {
+                                name,
+                                default_type: source_default,
+                            },
                             ParameterKind::PositionalOrKeyword {
                                 name: target_name, ..
                             },
                         ) => {
-                            self.provide_context(|| {
-                                ErrorContext::ParameterMustAcceptKeywordArguments {
-                                    source_name: name.clone(),
-                                    target_name: target_name.clone(),
-                                }
-                            });
-                            return self.never();
+                            if source_default.is_none() {
+                                self.provide_context(|| {
+                                    ErrorContext::ParameterMustAcceptKeywordArguments {
+                                        source_name: name.clone(),
+                                        target_name: target_name.clone(),
+                                    }
+                                });
+                                return self.never();
+                            }
+                            if !check_types(
+                                target_param.annotated_type(),
+                                source_param.annotated_type(),
+                                target_param.name(),
+                                target_index,
+                            ) {
+                                return result;
+                            }
+                            target_keywords.push(target_param);
                         }
 
                         (
@@ -2410,6 +2435,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // But, `source` could contain any unmatched positional parameters.
         let (source_params, target_params) = parameters.into_remaining();
 
+        // Collect all explicitly declared source parameters that can be bound by keyword.
+        // Even parameters already consumed by positional matching take precedence over
+        // `**kwargs` for calls that pass the same name by keyword.
+        let mut source_explicit_keywords = FxHashMap::default();
+        for source_param in &source.parameters {
+            match source_param.kind() {
+                ParameterKind::KeywordOnly { name, .. }
+                | ParameterKind::PositionalOrKeyword { name, .. } => {
+                    source_explicit_keywords.insert(name.as_str(), source_param);
+                }
+                _ => {}
+            }
+        }
+
         // Collect all the keyword-only parameters and the unmatched standard parameters.
         let mut source_keywords = FxHashMap::default();
 
@@ -2441,7 +2480,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
-        for target_param in target_keywords.into_iter().chain(target_params) {
+        for (target_param, target_also_accepts_positional) in target_keywords
+            .into_iter()
+            .map(|param| (param, true))
+            .chain(target_params.map(|param| (param, false)))
+        {
             match target_param.kind() {
                 ParameterKind::KeywordOnly {
                     name: target_name,
@@ -2451,13 +2494,30 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     name: target_name,
                     default_type: target_default,
                 } => {
-                    if let Some(source_param) = source_keywords.remove(&**target_name) {
+                    if let Some(source_param) = source_keywords
+                        .remove(&**target_name)
+                        .or_else(|| source_explicit_keywords.get(&**target_name).copied())
+                    {
                         match source_param.kind() {
                             ParameterKind::PositionalOrKeyword {
                                 default_type: source_default,
                                 ..
+                            } => {
+                                if source_default.is_none()
+                                    && (target_also_accepts_positional || target_default.is_some())
+                                {
+                                    return self.never();
+                                }
+                                if !check_types(
+                                    target_param.annotated_type(),
+                                    source_param.annotated_type(),
+                                    target_param.name(),
+                                    target_index,
+                                ) {
+                                    return result;
+                                }
                             }
-                            | ParameterKind::KeywordOnly {
+                            ParameterKind::KeywordOnly {
                                 default_type: source_default,
                                 ..
                             } => {
