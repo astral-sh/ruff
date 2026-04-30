@@ -709,11 +709,55 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
+    pub(super) fn constraint_set_assignability_with_context(
+        constraints: &'c ConstraintSetBuilder<'db>,
+        relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+        signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
+        materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        Self {
+            constraints,
+            inferable: InferableTypeVars::None,
+            relation: TypeRelation::ConstraintSetAssignability,
+            context_tree: ErrorContextTree::enabled(),
+            given: ConstraintSet::from_bool(constraints, false),
+            relation_visitor,
+            disjointness_visitor,
+            signature_relation_visitor,
+            materialization_visitor,
+        }
+    }
+
+    pub(super) fn assignability_with_context(
+        constraints: &'c ConstraintSetBuilder<'db>,
+        relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+        signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
+        materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        Self {
+            constraints,
+            inferable: InferableTypeVars::None,
+            relation: TypeRelation::Assignability,
+            context_tree: ErrorContextTree::enabled(),
+            given: ConstraintSet::from_bool(constraints, false),
+            relation_visitor,
+            disjointness_visitor,
+            signature_relation_visitor,
+            materialization_visitor,
+        }
+    }
+
     pub(super) fn with_inferable_typevars(&self, inferable: InferableTypeVars<'db>) -> Self {
         Self {
             inferable,
             ..self.clone()
         }
+    }
+
+    pub(super) fn into_error_context(self) -> ErrorContextTree<'db> {
+        self.context_tree
     }
 
     pub(super) fn always(&self) -> ConstraintSet<'db, 'c> {

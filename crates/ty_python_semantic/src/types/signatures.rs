@@ -37,9 +37,9 @@ use crate::types::typed_dict::{
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
-    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind,
-    ParameterDescription, SelfBinding, TypeContext, TypeMapping, UnionBuilder, VarianceInferable,
-    infer_complete_scope_types, todo_type,
+    ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind,
+    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping, UnionBuilder,
+    VarianceInferable, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -483,6 +483,22 @@ pub struct Signature<'db> {
 
     /// Return type. If no annotation was provided, this is `Unknown`.
     pub(crate) return_ty: Type<'db>,
+}
+
+/// Whether one callable signature's parameters are compatible with another's.
+pub(crate) enum ParameterConsistency<'db> {
+    /// The parameters are compatible.
+    Consistent,
+    /// The parameters are incompatible, with context explaining the incompatibility.
+    Inconsistent(ErrorContextTree<'db>),
+}
+
+/// Whether one callable signature's return type is compatible with another's.
+pub(crate) enum ReturnTypeConsistency<'db> {
+    /// The return types are compatible.
+    Consistent,
+    /// The return types are incompatible, with context explaining the incompatibility.
+    Inconsistent(ErrorContextTree<'db>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -1078,26 +1094,77 @@ impl<'db> Signature<'db> {
     }
 
     /// Return whether this non-generic implementation accepts the arguments of a non-generic
-    /// overload.
+    /// overload, and the relation error context if it does not.
     ///
     /// This is a deliberately narrow first pass for overload implementation consistency. Generic
     /// signatures need additional type-variable-domain handling and should be left to the full
     /// implementation.
-    pub(crate) fn are_non_generic_implementation_parameters_consistent_with(
+    pub(crate) fn non_generic_implementation_parameters_consistency_with(
         &self,
         db: &'db dyn Db,
         overload: &Self,
-    ) -> bool {
+    ) -> ParameterConsistency<'db> {
         debug_assert!(self.is_non_generic());
         debug_assert!(overload.is_non_generic());
 
         let implementation = self.clone().with_return_type(Type::unknown());
         let overload = overload.clone().with_return_type(Type::unknown());
         let constraints = ConstraintSetBuilder::new();
+        let relation_visitor = HasRelationToVisitor::default(&constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        let checker = TypeRelationChecker::constraint_set_assignability_with_context(
+            &constraints,
+            &relation_visitor,
+            &disjointness_visitor,
+            &signature_relation_visitor,
+            &materialization_visitor,
+        );
 
-        implementation
-            .when_constraint_set_assignable_to(db, &overload, &constraints)
-            .is_always_satisfied(db)
+        let is_consistent = checker
+            .check_signature_pair(db, &implementation, &overload)
+            .is_always_satisfied(db);
+
+        if is_consistent {
+            ParameterConsistency::Consistent
+        } else {
+            ParameterConsistency::Inconsistent(checker.into_error_context())
+        }
+    }
+
+    /// Return whether a non-generic overload return type is assignable to a non-generic
+    /// implementation return type, and the relation error context if it is not.
+    pub(crate) fn non_generic_implementation_return_type_consistency_with(
+        &self,
+        db: &'db dyn Db,
+        overload: &Self,
+    ) -> ReturnTypeConsistency<'db> {
+        debug_assert!(self.is_non_generic());
+        debug_assert!(overload.is_non_generic());
+
+        let constraints = ConstraintSetBuilder::new();
+        let relation_visitor = HasRelationToVisitor::default(&constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        let checker = TypeRelationChecker::assignability_with_context(
+            &constraints,
+            &relation_visitor,
+            &disjointness_visitor,
+            &signature_relation_visitor,
+            &materialization_visitor,
+        );
+
+        let is_consistent = checker
+            .check_type_pair(db, overload.return_ty, self.return_ty)
+            .is_always_satisfied(db);
+
+        if is_consistent {
+            ReturnTypeConsistency::Consistent
+        } else {
+            ReturnTypeConsistency::Inconsistent(checker.into_error_context())
+        }
     }
 
     pub(crate) fn when_constraint_set_assignable_to_signatures<'c>(

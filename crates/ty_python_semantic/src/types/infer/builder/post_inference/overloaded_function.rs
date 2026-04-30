@@ -13,6 +13,7 @@ use crate::{
         context::InferContext,
         diagnostic::INVALID_OVERLOAD,
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
+        signatures::{ParameterConsistency, ReturnTypeConsistency},
     },
 };
 use ty_python_core::{
@@ -298,35 +299,59 @@ fn check_non_generic_overload_implementation_consistency<'db>(
 
     for (overload, overload_signature) in overload_signatures {
         let function_node = overload.node(db, context.file(), context.module());
-        let parameters_are_consistent = implementation_signature
-            .are_non_generic_implementation_parameters_consistent_with(db, &overload_signature);
-        let return_type_is_consistent = overload_signature
-            .return_ty
-            .is_assignable_to(db, implementation_signature.return_ty);
+        let parameter_consistency = implementation_signature
+            .non_generic_implementation_parameters_consistency_with(db, &overload_signature);
+        let return_type_consistency = implementation_signature
+            .non_generic_implementation_return_type_consistency_with(db, &overload_signature);
 
-        if parameters_are_consistent && return_type_is_consistent {
-            continue;
-        }
+        let (parameter_error_context, return_type_error_context, message) =
+            match (parameter_consistency, return_type_consistency) {
+                (ParameterConsistency::Consistent, ReturnTypeConsistency::Consistent) => continue,
+                (
+                    ParameterConsistency::Inconsistent(error_context),
+                    ReturnTypeConsistency::Consistent,
+                ) => (
+                    Some(error_context),
+                    None,
+                    "Implementation does not accept all arguments of this overload",
+                ),
+                (
+                    ParameterConsistency::Consistent,
+                    ReturnTypeConsistency::Inconsistent(error_context),
+                ) => (
+                    None,
+                    Some(error_context),
+                    "Overload return type is not assignable to implementation return type",
+                ),
+                (
+                    ParameterConsistency::Inconsistent(parameter_error_context),
+                    ReturnTypeConsistency::Inconsistent(return_type_error_context),
+                ) => (
+                    Some(parameter_error_context),
+                    Some(return_type_error_context),
+                    "Overload signature is not consistent with implementation",
+                ),
+            };
 
         let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name) else {
             continue;
         };
-        let message = match (parameters_are_consistent, return_type_is_consistent) {
-            (false, true) => "Implementation does not accept all arguments of this overload",
-            (true, false) => "Overload return type is not assignable to implementation return type",
-            (false, false) => "Overload signature is not consistent with implementation",
-            (true, true) => continue,
-        };
-        let mut diagnostic = builder.into_diagnostic(message);
-        if !parameters_are_consistent {
-            diagnostic.info("Implementation does not accept all arguments of this overload");
+        let mut diagnostic = builder.into_diagnostic(format_args!("{message}"));
+        if let Some(error_context) = parameter_error_context {
+            diagnostic.info(format_args!(
+                "Implementation signature `{}` is not assignable to overload signature `{}`",
+                implementation_signature.display(db),
+                overload_signature.display(db),
+            ));
+            error_context.attach_to(db, &mut diagnostic);
         }
-        if !return_type_is_consistent {
+        if let Some(error_context) = return_type_error_context {
             diagnostic.info(format_args!(
                 "Overload returns `{}`, which is not assignable to implementation return type `{}`",
                 overload_signature.return_ty.display(db),
                 implementation_signature.return_ty.display(db),
             ));
+            error_context.attach_to(db, &mut diagnostic);
         }
         diagnostic.annotate(
             context
