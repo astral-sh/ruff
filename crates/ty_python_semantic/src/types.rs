@@ -855,11 +855,11 @@ fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
 ) -> Option<Type<'db>> {
     let ty = if nested {
         guard
-            .return_type(db)
+            .type_argument(db)
             .recursive_type_normalized_impl(db, div, true)?
     } else {
         guard
-            .return_type(db)
+            .type_argument(db)
             .recursive_type_normalized_impl(db, div, true)
             .unwrap_or(div)
     };
@@ -5720,12 +5720,11 @@ impl<'db> Type<'db> {
                 builder.build()
             }
 
-            // TODO(jelle): Materialize should be handled differently, since TypeIs is invariant
             Type::TypeIs(type_is) => visitor.visit(self, type_mapping, || {
                 type_is.with_type(
                     db,
                     type_is
-                        .return_type(db)
+                        .type_argument(db)
                         .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 )
             }),
@@ -5978,7 +5977,7 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeIs(type_is) => {
-                type_is.return_type(db).find_legacy_typevars_impl(
+                type_is.type_argument(db).find_legacy_typevars_impl(
                     db,
                     binding_context,
                     typevars,
@@ -7662,7 +7661,7 @@ pub(super) struct MetaclassTransformInfo<'db> {
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct TypeIsType<'db> {
-    return_type: Type<'db>,
+    type_argument: Type<'db>,
     /// The ID of the scope to which the place belongs
     /// and the ID of the place itself within that scope.
     place_info: Option<(ScopeId<'db>, ScopedPlaceId)>,
@@ -7673,7 +7672,7 @@ fn walk_typeis_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     typeis_type: TypeIsType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, typeis_type.return_type(db));
+    visitor.visit_type(db, typeis_type.type_argument(db));
 }
 
 // The Salsa heap is tracked separately.
@@ -7687,17 +7686,28 @@ impl<'db> TypeIsType<'db> {
         Some(format!("{}", table.place(place)))
     }
 
-    pub(crate) fn unbound(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    /// Construct an unbound `TypeIs` return type from the user-written type expression.
+    ///
+    /// The user-written type is preserved for `TypeIs` invariance checks, while the return type
+    /// used for narrowing applies the top materialization on demand.
+    ///
+    /// ```python
+    /// from typing import TypeIs
+    ///
+    /// def is_tuple(value: object) -> TypeIs[tuple[int, ...]]:
+    ///     return isinstance(value, tuple)
+    /// ```
+    pub(crate) fn from_type_expression(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         Type::TypeIs(Self::new(db, ty, None))
     }
 
-    pub(crate) fn bound(
-        db: &'db dyn Db,
-        return_type: Type<'db>,
-        scope: ScopeId<'db>,
-        place: ScopedPlaceId,
-    ) -> Type<'db> {
-        Type::TypeIs(Self::new(db, return_type, Some((scope, place))))
+    pub(crate) fn return_type(self, db: &'db dyn Db) -> Type<'db> {
+        // N.B. Using the top materialization here is a pragmatic decision that
+        // makes us produce more intuitive results given how `TypeIs` is used in
+        // the real world (in particular, in typeshed). However, there's some
+        // debate about whether this is really fully correct. See
+        // <https://github.com/astral-sh/ruff/pull/20591> for more discussion.
+        self.type_argument(db).top_materialization(db)
     }
 
     #[must_use]
@@ -7707,7 +7717,7 @@ impl<'db> TypeIsType<'db> {
         scope: ScopeId<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
-        Self::bound(db, self.return_type(db), scope, place)
+        Type::TypeIs(Self::new(db, self.type_argument(db), Some((scope, place))))
     }
 
     #[must_use]
@@ -7724,7 +7734,7 @@ impl<'db> VarianceInferable<'db> for TypeIsType<'db> {
     // See the [typing spec] on why `TypeIs` is invariant in its type.
     // [typing spec]: https://typing.python.org/en/latest/spec/narrowing.html#typeis
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
-        self.return_type(db)
+        self.type_argument(db)
             .with_polarity(TypeVarVariance::Invariant)
             .variance_of(db, typevar)
     }
@@ -7804,13 +7814,13 @@ pub(crate) trait TypeGuardLike<'db>: Copy {
     /// The name of this type guard form (for error messages and display)
     const FORM_NAME: &'static str;
 
-    /// Get the return type that the type guard narrows to
-    fn return_type(self, db: &'db dyn Db) -> Type<'db>;
+    /// Get the annotation argument stored in the type guard form.
+    fn type_argument(self, db: &'db dyn Db) -> Type<'db>;
 
     /// Get the human-readable place name if bound
     fn place_name(self, db: &'db dyn Db) -> Option<String>;
 
-    /// Create a new instance with a different return type, wrapped in Type
+    /// Create a new instance with a different type argument, wrapped in Type.
     fn with_type(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db>;
 
     /// The `SpecialFormType` for display purposes
@@ -7820,8 +7830,8 @@ pub(crate) trait TypeGuardLike<'db>: Copy {
 impl<'db> TypeGuardLike<'db> for TypeIsType<'db> {
     const FORM_NAME: &'static str = "TypeIs";
 
-    fn return_type(self, db: &'db dyn Db) -> Type<'db> {
-        TypeIsType::return_type(self, db)
+    fn type_argument(self, db: &'db dyn Db) -> Type<'db> {
+        TypeIsType::type_argument(self, db)
     }
 
     fn place_name(self, db: &'db dyn Db) -> Option<String> {
@@ -7840,7 +7850,7 @@ impl<'db> TypeGuardLike<'db> for TypeIsType<'db> {
 impl<'db> TypeGuardLike<'db> for TypeGuardType<'db> {
     const FORM_NAME: &'static str = "TypeGuard";
 
-    fn return_type(self, db: &'db dyn Db) -> Type<'db> {
+    fn type_argument(self, db: &'db dyn Db) -> Type<'db> {
         TypeGuardType::return_type(self, db)
     }
 

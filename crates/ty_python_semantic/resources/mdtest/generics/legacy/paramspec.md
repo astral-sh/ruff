@@ -64,11 +64,9 @@ def decorator(f: Callable[P2, int]) -> Callable[P2, int]:
     return f
 ```
 
-### Accepts only a single `name` argument
+### Bounds and constraints
 
-> The runtime should accept bounds and covariant and contravariant arguments in the declaration just
-> as typing.TypeVar does, but for now we will defer the standardization of the semantics of those
-> options to a later PEP.
+`ParamSpec` does not allow defining bounds or constraints.
 
 ```py
 from typing import ParamSpec
@@ -77,10 +75,82 @@ from typing import ParamSpec
 P1 = ParamSpec("P1", bound=int)
 # error: [invalid-paramspec]
 P2 = ParamSpec("P2", int, str)
+```
+
+### Variance
+
+Legacy `ParamSpec` accepts `covariant` and `contravariant` arguments. A `ParamSpec` with no variance
+specified is invariant, and a `ParamSpec` with `infer_variance=True` uses variance inference.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Generic, ParamSpec
+
+P = ParamSpec("P")
+
+class InvariantParamSpec(Generic[P]):
+    callback: Callable[P, None]
+
+in_out_obj: InvariantParamSpec[object] = InvariantParamSpec[int]()  # error: [invalid-assignment]
+in_out_int: InvariantParamSpec[int] = InvariantParamSpec[object]()  # error: [invalid-assignment]
+
+InP = ParamSpec("InP", contravariant=True)
+
+class ContravariantParamSpec(Generic[InP]):
+    def parameters(self) -> Callable[InP, None]:
+        raise NotImplementedError
+
+in_obj: ContravariantParamSpec[object] = ContravariantParamSpec[int]()  # error: [invalid-assignment]
+in_int: ContravariantParamSpec[int] = ContravariantParamSpec[object]()
+
+OutP = ParamSpec("OutP", covariant=True)
+
+class CovariantParamSpec(Generic[OutP]):
+    def accepts_callback(self, callback: Callable[OutP, None]) -> None:
+        raise NotImplementedError
+
+out_int: CovariantParamSpec[int] = CovariantParamSpec[object]()  # error: [invalid-assignment]
+out_obj: CovariantParamSpec[object] = CovariantParamSpec[int]()
+
+InferredInP = ParamSpec("InferredInP", infer_variance=True)
+
+class InferredContravariantParamSpec(Generic[InferredInP]):
+    def parameters(self) -> Callable[InferredInP, None]:
+        raise NotImplementedError
+
+inferred_in_obj: InferredContravariantParamSpec[object] = InferredContravariantParamSpec[int]()  # error: [invalid-assignment]
+inferred_in_int: InferredContravariantParamSpec[int] = InferredContravariantParamSpec[object]()
+
+InferredOutP = ParamSpec("InferredOutP", infer_variance=True)
+
+class InferredCovariantParamSpec(Generic[InferredOutP]):
+    def accepts_callback(self, callback: Callable[InferredOutP, None]) -> None:
+        raise NotImplementedError
+
+inferred_out_int: InferredCovariantParamSpec[int] = InferredCovariantParamSpec[object]()  # error: [invalid-assignment]
+inferred_out_obj: InferredCovariantParamSpec[object] = InferredCovariantParamSpec[int]()
+```
+
+```py
+from typing import ParamSpec
+
+def cond() -> bool:
+    return True
+
 # error: [invalid-paramspec]
-P3 = ParamSpec("P3", covariant=True)
+Both = ParamSpec("Both", covariant=True, contravariant=True)
 # error: [invalid-paramspec]
-P4 = ParamSpec("P4", contravariant=True)
+AmbiguousCovariant = ParamSpec("AmbiguousCovariant", covariant=cond())
+# error: [invalid-paramspec]
+AmbiguousContravariant = ParamSpec("AmbiguousContravariant", contravariant=cond())
+# error: [invalid-paramspec]
+AmbiguousInferVariance = ParamSpec("AmbiguousInferVariance", infer_variance=cond())
+# error: [invalid-paramspec]
+CovariantAndInferred = ParamSpec("CovariantAndInferred", covariant=True, infer_variance=True)
 ```
 
 ### Defaults

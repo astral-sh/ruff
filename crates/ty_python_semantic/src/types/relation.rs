@@ -12,7 +12,7 @@ use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
-use crate::types::signatures::ParametersKind;
+use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::typevar::{TypeVarNonce, TypeVarNonceGenerator};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
@@ -332,6 +332,7 @@ impl<'db> Type<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker {
             constraints,
@@ -342,6 +343,7 @@ impl<'db> Type<'db> {
             next_nonce: TypeVarNonceGenerator::default(),
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
+            signature_relation_visitor: &signature_relation_visitor,
             materialization_visitor: &materialization_visitor,
         };
         checker.check_type_pair(db, self, target)
@@ -378,6 +380,7 @@ impl<'db> Type<'db> {
             next_nonce: TypeVarNonceGenerator::default(),
             relation_visitor: &HasRelationToVisitor::default(&builder),
             disjointness_visitor: &IsDisjointVisitor::default(&builder),
+            signature_relation_visitor: &SignatureRelationVisitor::default(),
             materialization_visitor: &ApplyTypeMappingVisitor::default(),
         };
         checker.check_type_pair(db, self, target);
@@ -496,6 +499,7 @@ impl<'db> Type<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker {
             constraints,
@@ -506,6 +510,7 @@ impl<'db> Type<'db> {
             next_nonce: TypeVarNonceGenerator::default(),
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
+            signature_relation_visitor: &signature_relation_visitor,
             materialization_visitor: &materialization_visitor,
         };
         checker.check_type_pair(db, self, target)
@@ -567,12 +572,14 @@ impl<'db> Type<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
         let checker = EquivalenceChecker {
             constraints,
             given: ConstraintSet::from_bool(constraints, false),
             next_nonce: TypeVarNonceGenerator::default(),
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
+            signature_relation_visitor: &signature_relation_visitor,
             materialization_visitor,
         };
         checker.check_type_pair(db, self, other)
@@ -608,6 +615,7 @@ impl<'db> Type<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = DisjointnessChecker {
             constraints,
@@ -616,6 +624,7 @@ impl<'db> Type<'db> {
             next_nonce: TypeVarNonceGenerator::default(),
             disjointness_visitor: &disjointness_visitor,
             relation_visitor: &relation_visitor,
+            signature_relation_visitor: &signature_relation_visitor,
             materialization_visitor: &materialization_visitor,
         };
         checker.check_type_pair(db, self, other)
@@ -661,6 +670,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     // any other more "low-level" method.
     relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+    pub(super) signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
     pub(super) materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
 }
 
@@ -670,6 +680,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         inferable: InferableTypeVars<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+        signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
         materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
@@ -681,6 +692,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             next_nonce: TypeVarNonceGenerator::default(),
             relation_visitor,
             disjointness_visitor,
+            signature_relation_visitor,
             materialization_visitor,
         }
     }
@@ -689,6 +701,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+        signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
         materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
@@ -700,6 +713,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             next_nonce: TypeVarNonceGenerator::default(),
             relation_visitor,
             disjointness_visitor,
+            signature_relation_visitor,
             materialization_visitor,
         }
     }
@@ -1696,13 +1710,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             // `TypeIs` is invariant.
             (Type::TypeIs(source), Type::TypeIs(target)) => {
-                let source_return = source.return_type(db);
-                let target_return = target.return_type(db);
-                self.check_type_pair(db, source_return, target_return).and(
-                    db,
-                    self.constraints,
-                    || self.check_type_pair(db, target_return, source_return),
-                )
+                let source_type = source.type_argument(db);
+                let target_type = target.type_argument(db);
+                self.check_type_pair(db, source_type, target_type)
+                    .and(db, self.constraints, || {
+                        self.check_type_pair(db, target_type, source_type)
+                    })
             }
 
             // `TypeGuard` is covariant.
@@ -1899,6 +1912,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             next_nonce: self.next_nonce.clone(),
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
+            signature_relation_visitor: self.signature_relation_visitor,
             materialization_visitor: self.materialization_visitor,
         }
     }
@@ -1911,6 +1925,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             next_nonce: self.next_nonce.clone(),
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
+            signature_relation_visitor: self.signature_relation_visitor,
             materialization_visitor: self.materialization_visitor,
         }
     }
@@ -1956,6 +1971,7 @@ pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
     // any other more "low-level" method.
     relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+    signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
     materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
 }
 
@@ -1973,6 +1989,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             next_nonce: self.next_nonce.clone(),
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
+            signature_relation_visitor: self.signature_relation_visitor,
             materialization_visitor,
         }
     }
@@ -2021,6 +2038,7 @@ pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     // any other more "low-level" method.
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
     relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
+    signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
     materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
 }
 
@@ -2030,6 +2048,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         inferable: InferableTypeVars<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+        signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
         materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
@@ -2039,6 +2058,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             next_nonce: TypeVarNonceGenerator::default(),
             disjointness_visitor,
             relation_visitor,
+            signature_relation_visitor,
             materialization_visitor,
         }
     }
@@ -2056,6 +2076,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             next_nonce: self.next_nonce.clone(),
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
+            signature_relation_visitor: self.signature_relation_visitor,
             materialization_visitor: self.materialization_visitor,
         }
     }
@@ -2067,6 +2088,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             next_nonce: self.next_nonce.clone(),
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
+            signature_relation_visitor: self.signature_relation_visitor,
             materialization_visitor: self.materialization_visitor,
         }
     }

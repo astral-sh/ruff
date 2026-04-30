@@ -766,7 +766,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             db,
             self.typevar(db).identity(db),
             Some(TypeVarBoundOrConstraintsEvaluation::Eager(upper_bound)),
-            None, // ParamSpecs cannot have explicit variance
+            self.typevar(db).explicit_variance(db),
             None, // `P.args` and `P.kwargs` cannot have defaults even though `P` can
         );
 
@@ -799,7 +799,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 db,
                 self.typevar(db).identity(db),
                 None, // Remove the upper bound set by `with_paramspec_attr`
-                None, // ParamSpecs cannot have explicit variance
+                self.typevar(db).explicit_variance(db),
                 None, // `P.args` and `P.kwargs` cannot have defaults even though `P` can
             ),
             self.binding_context(db),

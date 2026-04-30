@@ -250,6 +250,8 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
     /// Expressions that are string annotations
     string_annotations: FxHashSet<ExpressionNodeKey>,
+    /// Expected types for expression nodes tracked for IDE completion.
+    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
     /// The scope this region is part of.
     scope: ScopeId<'db>,
@@ -355,6 +357,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             qualifiers: FxHashMap::default(),
             type_expression_flags: FxHashMap::default(),
             string_annotations: FxHashSet::default(),
+            expected_types: FxHashMap::default(),
             bindings: VecMap::default(),
             declarations: VecMap::default(),
             typevar_binding_context: None,
@@ -402,6 +405,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred.extend(extra.deferred.iter().copied());
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
+            self.expected_types.extend(extra.expected_types.iter());
             self.qualifiers.extend(extra.qualifiers.iter());
             self.type_expression_flags
                 .extend(extra.type_expression_flags.iter());
@@ -433,6 +437,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred.extend(extra.deferred.iter().copied());
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
+            self.expected_types.extend(extra.expected_types.iter());
             self.qualifiers.extend(extra.qualifiers.iter());
             self.type_expression_flags
                 .extend(extra.type_expression_flags.iter());
@@ -454,6 +459,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
+            self.expected_types.extend(extra.expected_types.iter());
             self.type_expression_flags
                 .extend(extra.type_expression_flags.iter());
 
@@ -471,6 +477,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
+            self.expected_types.extend(extra.expected_types.iter());
             self.type_expression_flags
                 .extend(extra.type_expression_flags.iter());
         }
@@ -1632,8 +1639,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         type_alias: &ast::StmtTypeAlias,
         definition: Definition<'db>,
     ) {
-        self.infer_expression(&type_alias.name, TypeContext::default());
-
         // Check that no type parameter with a default follows a TypeVarTuple
         // in the type alias's PEP 695 type parameter list.
         if let Some(type_params) = type_alias.type_params.as_deref() {
@@ -1656,6 +1661,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 None,
             )),
         ));
+
+        self.store_expression_type(&type_alias.name, type_alias_ty);
 
         self.add_declaration_with_binding(
             type_alias.into(),
@@ -5298,10 +5305,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // We use a speculative builder to silence any diagnostics emitted during multi-inference, as the
                     // type context is only used as a hint to infer a more assignable argument type, and should not lead
                     // to diagnostics for non-matching overloads.
+                    let mut speculative_builder = self.speculate();
                     let inferred_ty = infer_argument_ty(
-                        &mut self.speculate(),
+                        &mut speculative_builder,
                         (argument_index, ast_argument, parameter_tcx),
                     );
+                    self.union_expected_types(&speculative_builder.expected_types);
                     argument_types.insert(parameter.annotated_type(), inferred_ty);
                 }
 
@@ -5500,6 +5509,47 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assert_eq!(previous, None);
     }
 
+    fn store_maybe_expected_type(
+        &mut self,
+        expression: impl Into<ExpressionNodeKey>,
+        ty: Type<'db>,
+    ) {
+        if !self.has_string_literal_completion_candidates(ty) {
+            return;
+        }
+
+        self.store_expected_type(expression, ty);
+    }
+
+    fn store_expected_type(&mut self, expression: impl Into<ExpressionNodeKey>, ty: Type<'db>) {
+        self.expected_types.insert(expression.into(), ty);
+    }
+
+    fn has_string_literal_completion_candidates(&self, ty: Type<'db>) -> bool {
+        match ty {
+            Type::LiteralValue(literal) => literal.as_string().is_some(),
+            Type::Union(union) => union
+                .elements(self.db())
+                .iter()
+                .any(|ty| self.has_string_literal_completion_candidates(*ty)),
+            Type::Intersection(intersection) => intersection
+                .iter_positive(self.db())
+                .any(|ty| self.has_string_literal_completion_candidates(ty)),
+            Type::TypeAlias(_) => true,
+            _ => false,
+        }
+    }
+
+    fn union_expected_types(&mut self, expected_types: &FxHashMap<ExpressionNodeKey, Type<'db>>) {
+        let db = self.db();
+        for (expression, ty) in expected_types {
+            self.expected_types
+                .entry(*expression)
+                .and_modify(|existing| *existing = UnionType::from_two_elements(db, *existing, *ty))
+                .or_insert(*ty);
+        }
+    }
+
     fn infer_number_literal_expression(&self, literal: &ast::ExprNumberLiteral) -> Type<'db> {
         let ast::ExprNumberLiteral {
             range: _,
@@ -5534,6 +5584,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         literal: &ast::ExprStringLiteral,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
+        if let Some(expected) = tcx.annotation {
+            self.store_maybe_expected_type(ast::ExprRef::from(literal), expected);
+        }
+
         if tcx.is_typealias() {
             let aliased_type = self.infer_string_type_expression(literal);
             return Type::KnownInstance(KnownInstanceType::LiteralStringAlias(InternedType::new(
@@ -9010,7 +9064,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             mut expressions,
             qualifiers: _,
             mut type_expression_flags,
-            string_annotations,
+            mut string_annotations,
+            mut expected_types,
             scope,
             bindings,
             declarations,
@@ -9046,6 +9101,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let extra =
             (!string_annotations.is_empty()
                 || !type_expression_flags.is_empty()
+                || !expected_types.is_empty()
                 || cycle_recovery.is_some()
                 || !bindings.is_empty()
                 || !diagnostics.is_empty()).then(|| {
@@ -9058,8 +9114,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 type_expression_flags.shrink_to_fit();
+                expected_types.shrink_to_fit();
+                string_annotations.shrink_to_fit();
                 Box::new(ExpressionInferenceExtra {
                     string_annotations,
+                    expected_types,
                     type_expression_flags,
                     bindings: bindings.into_boxed_slice(),
                     diagnostics,
@@ -9085,7 +9144,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             mut expressions,
             mut qualifiers,
             mut type_expression_flags,
-            string_annotations,
+            mut string_annotations,
+            mut expected_types,
             scope,
             bindings,
             declarations,
@@ -9112,15 +9172,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let extra = (!diagnostics.is_empty()
             || !string_annotations.is_empty()
             || cycle_recovery.is_some()
+            || !expected_types.is_empty()
             || !deferred.is_empty()
             || !called_functions.is_empty()
             || !qualifiers.is_empty()
             || !type_expression_flags.is_empty())
         .then(|| {
             qualifiers.shrink_to_fit();
+            expected_types.shrink_to_fit();
             type_expression_flags.shrink_to_fit();
+            string_annotations.shrink_to_fit();
             Box::new(StatementInferenceInnerExtra {
                 string_annotations,
+                expected_types,
                 called_functions: called_functions
                     .into_iter()
                     .collect::<Vec<_>>()
@@ -9193,6 +9257,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: _,
             scope: _,
             string_annotations: _,
+            expected_types: _,
             return_types_and_ranges: _,
             dataclass_field_specifiers: _,
             undecorated_type: _,
@@ -9226,7 +9291,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             mut expressions,
             mut qualifiers,
             mut type_expression_flags,
-            string_annotations,
+            mut string_annotations,
+            mut expected_types,
             scope,
             bindings,
             declarations,
@@ -9250,6 +9316,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let extra = (!diagnostics.is_empty()
             || !string_annotations.is_empty()
+            || !expected_types.is_empty()
             || cycle_recovery.is_some()
             || undecorated_type.is_some()
             || !deferred.is_empty()
@@ -9259,8 +9326,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         .then(|| {
             qualifiers.shrink_to_fit();
             type_expression_flags.shrink_to_fit();
+            expected_types.shrink_to_fit();
+            string_annotations.shrink_to_fit();
             Box::new(DefinitionInferenceExtra {
                 string_annotations,
+                expected_types,
                 called_functions: called_functions
                     .into_iter()
                     .collect::<Vec<_>>()
@@ -9307,7 +9377,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Self {
             context,
-            string_annotations,
+            mut string_annotations,
+            mut expected_types,
             mut type_expression_flags,
             mut expressions,
             scope,
@@ -9338,12 +9409,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let extra = (!string_annotations.is_empty()
             || !type_expression_flags.is_empty()
+            || !expected_types.is_empty()
             || !diagnostics.is_empty()
             || cycle_recovery.is_some())
         .then(|| {
             type_expression_flags.shrink_to_fit();
+            expected_types.shrink_to_fit();
+            string_annotations.shrink_to_fit();
             Box::new(ScopeInferenceExtra {
                 string_annotations,
+                expected_types,
                 type_expression_flags,
                 cycle_recovery,
                 diagnostics,
@@ -9380,6 +9455,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context: _,
             expressions: _,
             string_annotations: _,
+            expected_types: _,
             scope: _,
             bindings: _,
             declarations: _,
@@ -9418,6 +9494,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions,
             type_expression_flags,
             string_annotations,
+            expected_types,
             scope,
             bindings,
             declarations,
@@ -9456,6 +9533,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.extend_cycle_recovery(cycle_recovery);
         self.string_annotations
             .extend(string_annotations.iter().copied());
+        self.expected_types.extend(expected_types.iter());
         self.type_expression_flags
             .extend(type_expression_flags.iter());
 
