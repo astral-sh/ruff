@@ -143,7 +143,6 @@ class C:
         self.bound_in_body_declared_in_init: str | None
 
         if flag:
-            # error: [invalid-assignment] "Object of type `Literal["a"]` is not assignable to attribute `bound_in_body_and_init` of type `int`"
             self.bound_in_body_and_init = "a"
 
 c_instance = C(True)
@@ -151,12 +150,16 @@ c_instance = C(True)
 reveal_type(c_instance.only_declared_in_body)  # revealed: str | None
 reveal_type(c_instance.only_declared_in_init)  # revealed: str | None
 reveal_type(c_instance.declared_in_body_and_init)  # revealed: str | None
-
 reveal_type(c_instance.declared_in_body_defined_in_init)  # revealed: str | None
-
 reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: str | None
-
 reveal_type(c_instance.bound_in_body_and_init)  # revealed: int | str
+
+c_instance.only_declared_in_body = b"invalid"  # error: [invalid-assignment]
+c_instance.only_declared_in_init = b"invalid"  # error: [invalid-assignment]
+c_instance.declared_in_body_and_init = b"invalid"  # error: [invalid-assignment]
+c_instance.declared_in_body_defined_in_init = b"invalid"  # error: [invalid-assignment]
+c_instance.bound_in_body_declared_in_init = b"invalid"  # error: [invalid-assignment]
+c_instance.bound_in_body_and_init = b"invalid"  # error: [invalid-assignment]
 ```
 
 #### Variable defined in non-`__init__` method
@@ -827,7 +830,7 @@ reveal_type(C.pure_class_variable)  # revealed: Literal["overwritten on class"]
 c_instance = C()
 reveal_type(c_instance.pure_class_variable)  # revealed: str
 
-# TODO: should raise an error.
+# error: [possibly-missing-attribute]
 c_instance.pure_class_variable = "value set on instance"
 ```
 
@@ -1355,6 +1358,7 @@ def _(flag1: bool, flag2: bool):
     reveal_type(C().x)  # revealed: int | str
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `C1 | C2 | C3`"
+    # error: [possibly-missing-attribute]
     C().x = 100
 ```
 
@@ -1390,7 +1394,8 @@ def _(flag: bool, flag1: bool, flag2: bool):
     reveal_type(C().x)  # revealed: int | str | bytes
 
     # error: [possibly-missing-attribute]
-    # error: [invalid-assignment]
+    # error: [possibly-missing-attribute]
+    # error: [possibly-missing-attribute]
     C().x = 100
 ```
 
@@ -1439,6 +1444,7 @@ def _(flag: bool):
     Bar.x = 3
 
     reveal_type(Bar().x)  # revealed: int
+    # error: [possibly-missing-attribute]
     Bar().x = 3
 ```
 

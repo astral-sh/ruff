@@ -2508,7 +2508,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     PlaceAndQualifiers {
                         place:
                             Place::Defined(DefinedPlace {
-                                ty: meta_attr_ty, ..
+                                ty: meta_attr_ty,
+                                origin,
+                                ..
                             }),
                         qualifiers,
                     } => {
@@ -2566,10 +2568,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             dunder_set_result.is_ok()
                         } else {
                             let write_ty = effective_write_type(meta_attr_ty);
-                            let value_ty =
-                                infer_value_ty.infer_silent(self, TypeContext::new(Some(write_ty)));
+                            if origin.is_declared() {
+                                let value_ty = infer_value_ty
+                                    .infer_silent(self, TypeContext::new(Some(write_ty)));
 
-                            ensure_assignable_to(self, value_ty, write_ty)
+                                ensure_assignable_to(self, value_ty, write_ty)
+                            } else {
+                                true
+                            }
                         };
 
                         let assignable_to_instance_attribute =
@@ -3147,10 +3153,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let meta_attr = object_ty.class_member(db, attribute.into());
         let needs_fallback = matches!(
             meta_attr.place,
-            Place::Defined(DefinedPlace {
-                definedness: Definedness::PossiblyUndefined,
-                ..
-            }) | Place::Undefined
+            Place::Defined(
+                DefinedPlace {
+                    definedness: Definedness::PossiblyUndefined,
+                    ..
+                } | DefinedPlace {
+                    origin: TypeOrigin::Inferred,
+                    ..
+                }
+            ) | Place::Undefined
         );
         let fallback_attr = if needs_fallback {
             Some(match object_ty {
