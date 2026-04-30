@@ -387,13 +387,71 @@ impl ConversionFlag {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+/// The debug text of a self-documenting f-string expression (e.g., `f"{x=}"`).
+///
+/// Stores the concatenation of leading text, expression source, and trailing text as a single
+/// [`CompactString`], with byte offsets to split them. The offsets are needed because the leading
+/// and trailing portions can contain non-whitespace characters (grouping parentheses, comments in
+/// triple-quoted f-strings) that cannot be distinguished from expression content by scanning.
+///
+/// [`CompactString`]: compact_str::CompactString
+#[derive(Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct DebugText {
+    /// The full text between the `{` and the conversion / `format_spec` / `}`.
+    text: compact_str::CompactString,
+    /// Byte offset where the expression source begins.
+    expression_start: u32,
+    /// Byte offset where the expression source ends.
+    expression_end: u32,
+}
+
+impl std::fmt::Debug for DebugText {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DebugText")
+            .field("leading", &self.leading())
+            .field("expression", &self.expression())
+            .field("trailing", &self.trailing())
+            .finish()
+    }
+}
+
+impl DebugText {
+    pub fn new(leading: &str, expression: &str, trailing: &str) -> Self {
+        let expression_start = leading.text_len().to_u32();
+        let expression_end = expression_start + expression.text_len().to_u32();
+        let mut buf = compact_str::CompactString::with_capacity(
+            leading.len() + expression.len() + trailing.len(),
+        );
+        buf.push_str(leading);
+        buf.push_str(expression);
+        buf.push_str(trailing);
+        Self {
+            text: buf,
+            expression_start,
+            expression_end,
+        }
+    }
+
+    /// The full debug text between the `{` and the conversion / `format_spec` / `}`.
+    pub fn as_str(&self) -> &str {
+        &self.text
+    }
+
     /// The text between the `{` and the expression node.
-    pub leading: String,
-    /// The text between the expression and the conversion, the `format_spec`, or the `}`, depending on what's present in the source
-    pub trailing: String,
+    pub fn leading(&self) -> &str {
+        &self.text[..self.expression_start as usize]
+    }
+
+    /// The source text of the expression (e.g., `0x0` in `f"{0x0=}"`).
+    pub fn expression(&self) -> &str {
+        &self.text[self.expression_start as usize..self.expression_end as usize]
+    }
+
+    /// The text between the expression and the conversion, the `format_spec`, or the `}`.
+    pub fn trailing(&self) -> &str {
+        &self.text[self.expression_end as usize..]
+    }
 }
 
 impl ExprFString {
