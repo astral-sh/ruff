@@ -201,8 +201,8 @@ class Sub(Base): ...
 reveal_type(Sub.all_instances)  # revealed: list[Sub]
 ```
 
-Assignments through exact class objects should bind `Self` when writing a `ClassVar`, while symbolic
-subclass objects remain conservative.
+Assignments through exact class objects should bind `Self` when writing a `ClassVar`. Symbolic
+subclass objects remain conservative because a `type[Base]` value can be any subclass of `Base`.
 
 ```py
 from typing import ClassVar, Self, TypeVar
@@ -220,6 +220,8 @@ reveal_type(Saved.latest)  # revealed: Saved
 class SavedSub(Saved): ...
 
 reveal_type(SavedSub.latest)  # revealed: SavedSub
+
+SavedSub.latest = SavedSub()
 
 def store_bad(cls: type[Saved]) -> None:
     cls.latest = Saved()  # error: [invalid-assignment]
