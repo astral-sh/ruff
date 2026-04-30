@@ -1515,6 +1515,7 @@ impl<'a> SemanticModel<'a> {
             "airflow" => self.seen.insert(Modules::AIRFLOW),
             "hashlib" => self.seen.insert(Modules::HASHLIB),
             "crypt" => self.seen.insert(Modules::CRYPT),
+            "unittest" => self.seen.insert(Modules::UNITTEST),
             _ => {}
         }
     }
@@ -2293,6 +2294,7 @@ bitflags! {
         const AIRFLOW = 1 << 27;
         const HASHLIB = 1 << 28;
         const CRYPT = 1 << 29;
+        const UNITTEST = 1 << 30;
     }
 }
 
