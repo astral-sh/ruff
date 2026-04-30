@@ -146,6 +146,10 @@ def _(flag: bool):
     # snapshot: not-iterable
     for x in NotIterable():
         pass
+
+    # revealed: Unknown
+    # error: [possibly-unresolved-reference]
+    reveal_type(x)
 ```
 
 ```snapshot
@@ -156,21 +160,6 @@ error[not-iterable]: Object of type `NotIterable` is not iterable
   |              ^^^^^^^^^^^^^
   |
 info: Its `__iter__` attribute has type `int | None`, which is not callable
-```
-
-```py
-    # revealed: Unknown
-    # snapshot: possibly-unresolved-reference
-    reveal_type(x)
-```
-
-```snapshot
-info[possibly-unresolved-reference]: Name `x` used when possibly not defined
-  --> src/mdtest_snippet.py:13:17
-   |
-13 |     reveal_type(x)
-   |                 ^
-   |
 ```
 
 ## Invalid iterable
@@ -433,6 +422,12 @@ error[not-iterable]: Object of type `Test | Test2` may not be iterable
    |              ^^^^^^^^
    |
 info: Its `__iter__` method returns an object of type `TestIter | int`, which may not have a `__next__` method
+info: element `Test2` of union `Test | Test2` is not assignable to `Iterable[Unknown]`
+info: └── type `Test2` is not assignable to protocol `Iterable[Unknown]`
+info:     └── protocol member `__iter__` is incompatible
+info:         └── incompatible return types: `int` is not assignable to `Iterator[Unknown]`
+info:             └── type `int` is not assignable to protocol `Iterator[Unknown]`
+info:                 └── protocol member `__next__` is not defined on type `int`
 ```
 
 ## Union type as iterable where one union element has a non-callable `__iter__`
@@ -711,6 +706,9 @@ error[not-iterable]: Object of type `Iterable` is not iterable
    |          ^^^^^^^^^^
    |
 info: Its `__iter__` method has an invalid signature
+info: type `Iterable` is not assignable to protocol `Iterable[Unknown]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── unexpected extra parameter `extra_arg`
 info: Expected signature `def __iter__(self): ...`
 ```
 
@@ -785,6 +783,12 @@ error[not-iterable]: Object of type `Iterable1` is not iterable
    |          ^^^^^^^^^^^
    |
 info: Its `__iter__` method returns an object of type `Iterator1`, which has an invalid `__next__` method
+info: type `Iterable1` is not assignable to protocol `Iterable[Unknown]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── incompatible return types: `Iterator1` is not assignable to `Iterator[Unknown]`
+info:         └── type `Iterator1` is not assignable to protocol `Iterator[Unknown]`
+info:             └── protocol member `__next__` is incompatible
+info:                 └── unexpected extra parameter `extra_arg`
 info: Expected signature for `__next__` is `def __next__(self): ...`
 ```
 
@@ -1053,6 +1057,9 @@ error[not-iterable]: Object of type `Iterable1` may not be iterable
    |              ^^^^^^^^^^^
    |
 info: Its `__iter__` method may have an invalid signature
+info: type `Iterable1` is not assignable to protocol `Iterable[Unknown]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── unexpected extra parameter `invalid_extra_arg`
 info: Type of `__iter__` is `(bound method Iterable1.__iter__() -> Iterator) | (bound method Iterable1.__iter__(invalid_extra_arg) -> Iterator)`
 info: Expected signature for `__iter__` is `def __iter__(self): ...`
 ```
@@ -1124,6 +1131,12 @@ error[not-iterable]: Object of type `Iterable1` may not be iterable
    |              ^^^^^^^^^^^
    |
 info: Its `__iter__` method returns an object of type `Iterator1`, which may have an invalid `__next__` method
+info: type `Iterable1` is not assignable to protocol `Iterable[Unknown]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── incompatible return types: `Iterator1` is not assignable to `Iterator[Unknown]`
+info:         └── type `Iterator1` is not assignable to protocol `Iterator[Unknown]`
+info:             └── protocol member `__next__` is incompatible
+info:                 └── unexpected extra parameter `invalid_extra_arg`
 info: Expected signature for `__next__` is `def __next__(self): ...`
 ```
 
@@ -1142,6 +1155,11 @@ error[not-iterable]: Object of type `Iterable2` may not be iterable
    |              ^^^^^^^^^^^
    |
 info: Its `__iter__` method returns an object of type `Iterator2`, which has a `__next__` attribute that may not be callable
+info: type `Iterable2` is not assignable to protocol `Iterable[Unknown]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── incompatible return types: `Iterator2` is not assignable to `Iterator[Unknown]`
+info:         └── type `Iterator2` is not assignable to protocol `Iterator[Unknown]`
+info:             └── protocol member `__next__` is incompatible
 ```
 
 ## Possibly invalid `__getitem__` methods

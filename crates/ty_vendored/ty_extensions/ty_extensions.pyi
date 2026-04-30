@@ -1,7 +1,7 @@
 # ruff: noqa: PYI021
+import collections.abc
 import sys
 import types
-from collections.abc import Iterable
 from enum import Enum
 from typing import Any, ClassVar, Protocol, _SpecialForm
 
@@ -303,7 +303,7 @@ class NamedTupleLike(Protocol):
     _fields: ClassVar[tuple[Any, ...]]
     _field_defaults: ClassVar[dict[str, Any]]
     @classmethod
-    def _make(cls: type[Self], iterable: Iterable[Any]) -> Self: ...
+    def _make(cls: type[Self], iterable: collections.abc.Iterable[Any]) -> Self: ...
     def _asdict(self, /) -> dict[str, Any]: ...
 
     # Positional arguments aren't actually accepted by these methods at runtime,
@@ -323,3 +323,9 @@ class ExactlySized[Length: int](Protocol):
     """A protocol for objects whose length is statically known."""
 
     def __len__(self) -> Length: ...
+
+class Iterator[T](Protocol):
+    def __next__(self) -> T: ...
+
+class Iterable[T](Protocol):
+    def __iter__(self) -> Iterator[T]: ...
