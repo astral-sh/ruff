@@ -1252,6 +1252,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return work();
         };
 
+        // Signature recursion through recursive protocols is coinductive in the same way as
+        // recursive type-relation checks: if checking this signature pair asks for the same
+        // declaration pair again, the inner obligation is the assumption currently being proved.
+        // Use `always` as the cycle value so valid fixed points can close; any real mismatch in
+        // the finite layer still bubbles out of `work`, because only exact active revisits take
+        // this branch and the result is not memoized.
         self.signature_relation_visitor
             .visit(&key, || self.always(), work)
     }
