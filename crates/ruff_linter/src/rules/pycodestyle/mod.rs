@@ -46,6 +46,14 @@ mod tests {
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_3.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_4.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_5.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_docstring.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_comments.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_future.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_shebang.py"))]
+    #[test_case(
+        Rule::ModuleImportNotAtTopOfFile,
+        Path::new("E402_shebang_docstring_and_future.py")
+    )]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402.ipynb"))]
     #[test_case(Rule::MultipleImportsOnOneLine, Path::new("E40.py"))]
     #[test_case(Rule::MultipleStatementsOnOneLineColon, Path::new("E70.py"))]
@@ -76,6 +84,22 @@ mod tests {
     }
 
     #[test_case(Rule::LineTooLong, Path::new("E501_5.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E40.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_0.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_1.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_2.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_3.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_4.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_5.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_docstring.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_comments.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_future.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_shebang.py"))]
+    #[test_case(
+        Rule::ModuleImportNotAtTopOfFile,
+        Path::new("E402_shebang_docstring_and_future.py")
+    )]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402.ipynb"))]
     #[test_case(Rule::RedundantBackslash, Path::new("E502.py"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_0.py"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_1.py"))]

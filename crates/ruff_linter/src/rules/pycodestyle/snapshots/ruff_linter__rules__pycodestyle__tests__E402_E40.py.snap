@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+assertion_line: 82
 ---
 E402 Module level import not at top of file
   --> E40.py:56:1
@@ -11,6 +12,7 @@ E402 Module level import not at top of file
 57 | #: E402
 58 | import foo
    |
+help: Move module level imports to top of file
 
 E402 Module level import not at top of file
   --> E40.py:58:1
@@ -22,6 +24,7 @@ E402 Module level import not at top of file
 59 |
 60 | a = 1
    |
+help: Move module level imports to top of file
 
 E402 Module level import not at top of file
   --> E40.py:62:1
@@ -33,6 +36,7 @@ E402 Module level import not at top of file
 63 |
 64 | #: E401
    |
+help: Move module level imports to top of file
 
 E402 Module level import not at top of file
   --> E40.py:65:1
@@ -42,6 +46,7 @@ E402 Module level import not at top of file
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
 66 | import re as regex, string; x = 1
    |
+help: Move module level imports to top of file
 
 E402 Module level import not at top of file
   --> E40.py:66:1
@@ -53,6 +58,7 @@ E402 Module level import not at top of file
 67 |
 68 | x = 1; import re as regex, string
    |
+help: Move module level imports to top of file
 
 E402 Module level import not at top of file
   --> E40.py:68:8
@@ -62,3 +68,4 @@ E402 Module level import not at top of file
 68 | x = 1; import re as regex, string
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
+help: Move module level imports to top of file

@@ -1,0 +1,176 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E402 [*] Module level import not at top of file
+ --> E402_comments.py:5:1
+  |
+3 | print("something")
+4 |
+5 | import last
+  | ^^^^^^^^^^^
+6 |
+7 | import late  # comment-late
+  |
+help: Move module level imports to top of file
+1 + import last
+2 | import os
+3 |
+4 | print("something")
+5 |
+  - import last
+6 |
+7 | import late  # comment-late
+8 |
+note: This is an unsafe fix and may change runtime behavior
+
+E402 [*] Module level import not at top of file
+ --> E402_comments.py:7:1
+  |
+5 | import last
+6 |
+7 | import late  # comment-late
+  | ^^^^^^^^^^^
+8 |
+9 | from late_paren1 import (  # comment-late_paren1
+  |
+help: Move module level imports to top of file
+1  + import late  # comment-late
+2  | import os
+3  |
+4  | print("something")
+5  |
+6  | import last
+7  |
+   - import late  # comment-late
+8  |
+9  | from late_paren1 import (  # comment-late_paren1
+10 |     value
+note: This is an unsafe fix and may change runtime behavior
+
+E402 [*] Module level import not at top of file
+  --> E402_comments.py:9:1
+   |
+ 7 |   import late  # comment-late
+ 8 |
+ 9 | / from late_paren1 import (  # comment-late_paren1
+10 | |     value
+11 | | )
+   | |_^
+12 |
+13 |   from late_paren2 import (
+   |
+help: Move module level imports to top of file
+1  + from late_paren1 import (  # comment-late_paren1
+2  +     value
+3  + )
+4  | import os
+5  |
+6  | print("something")
+--------------------------------------------------------------------------------
+9  |
+10 | import late  # comment-late
+11 |
+   - from late_paren1 import (  # comment-late_paren1
+   -     value
+   - )
+12 |
+13 | from late_paren2 import (
+14 |     value  # comment-late_paren2
+note: This is an unsafe fix and may change runtime behavior
+
+E402 [*] Module level import not at top of file
+  --> E402_comments.py:13:1
+   |
+11 |   )
+12 |
+13 | / from late_paren2 import (
+14 | |     value  # comment-late_paren2
+15 | | )
+   | |_^
+16 |
+17 |   from late_paren3 import (
+   |
+help: Move module level imports to top of file
+1  + from late_paren2 import (
+2  +     value  # comment-late_paren2
+3  + )
+4  | import os
+5  |
+6  | print("something")
+--------------------------------------------------------------------------------
+13 |     value
+14 | )
+15 |
+   - from late_paren2 import (
+   -     value  # comment-late_paren2
+   - )
+16 |
+17 | from late_paren3 import (
+18 |     value
+note: This is an unsafe fix and may change runtime behavior
+
+E402 [*] Module level import not at top of file
+  --> E402_comments.py:17:1
+   |
+15 |   )
+16 |
+17 | / from late_paren3 import (
+18 | |     value
+19 | | )  # comment-late_paren3
+   | |_^
+20 |
+21 |   from late_paren4 import (
+   |
+help: Move module level imports to top of file
+1  + from late_paren3 import (
+2  +     value
+3  + )  # comment-late_paren3
+4  | import os
+5  |
+6  | print("something")
+--------------------------------------------------------------------------------
+17 |     value  # comment-late_paren2
+18 | )
+19 |
+   - from late_paren3 import (
+   -     value
+   - )  # comment-late_paren3
+20 |
+21 | from late_paren4 import (
+22 |     value1,
+note: This is an unsafe fix and may change runtime behavior
+
+E402 [*] Module level import not at top of file
+  --> E402_comments.py:21:1
+   |
+19 |   )  # comment-late_paren3
+20 |
+21 | / from late_paren4 import (
+22 | |     value1,
+23 | |     value2,  # comment-late_paren4
+24 | |     value3,
+25 | | )
+   | |_^
+   |
+help: Move module level imports to top of file
+1  + from late_paren4 import (
+2  +     value1,
+3  +     value2,  # comment-late_paren4
+4  +     value3,
+5  + )
+6  | import os
+7  |
+8  | print("something")
+--------------------------------------------------------------------------------
+23 |     value
+24 | )  # comment-late_paren3
+25 |
+   - from late_paren4 import (
+   -     value1,
+   -     value2,  # comment-late_paren4
+   -     value3,
+   - )
+26 |
+27 |
+28 | # Prevent F403
+note: This is an unsafe fix and may change runtime behavior
