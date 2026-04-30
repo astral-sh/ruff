@@ -334,11 +334,14 @@ impl<'src> Parser<'src> {
             self.leave_recursion();
             result
         } else {
-            // Returns a trivial placeholder expression to stand in for a real
-            // expression when the recursion limit has been exceeded.
+            // The recursion limit has been exceeded; return the standard
+            // expression-recovery node (an empty `Name` with the `Invalid`
+            // context).
             ParsedExpr {
-                expr: Expr::EllipsisLiteral(ast::ExprEllipsisLiteral {
-                    range,
+                expr: Expr::Name(ast::ExprName {
+                    range: self.missing_node_range(),
+                    id: Name::empty(),
+                    ctx: ExprContext::Invalid,
                     node_index: AtomicNodeIndex::NONE,
                 }),
                 is_parenthesized: false,
