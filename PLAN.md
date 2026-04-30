@@ -238,7 +238,7 @@ Goal: fix the TODO in `TypeRelationChecker::check_signature_pair`.
     - Do not reduce an outer/non-fresh identity with the same source-level typevar.
 - [~] Verify `type_properties/implies_subtype_of.md` recursive and invariant `listify` cases.
     - The recursive same-source-typevar cases now pass without expected `static-assert-error` comments.
-    - The non-recursive invariant `listify` implication still needs the old expected error; this appears to require improving existential reduction / transitive constraint preservation rather than only callable-occurrence freshening.
+    - The non-recursive invariant `listify` implication still needs the old expected error. It is not an argument-conjunction case. It exposes that existentially reducing callable-local typevars is lossy for invariant generic-class relationships; in general, there may not be a derived constraint over only the remaining typevars that fully captures the invariant specialization relationship.
 
 Phase 4 implementation notes:
 

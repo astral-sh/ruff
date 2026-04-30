@@ -549,6 +549,11 @@ def listify[T](t: T) -> list[T]:
 def constrained_by_other_typevars[U, V]() -> None:
     ok = ConstraintSet.range(bool, U, int) & ConstraintSet.range(int, V, int)
     # TODO: no error
+    # This does not depend on combining constraints from multiple call arguments. The callable
+    # relation introduces constraints involving listify's fresh typevar and then existentially
+    # reduces that typevar away. That reduction is lossy for invariant generic classes: in general,
+    # there may not be a derived constraint over only the remaining typevars that fully captures the
+    # invariant specialization relationship.
     # error: [static-assert-error]
     static_assert(ok.implies_subtype_of(TypeOf[listify], Callable[[U], list[V]]))
 
