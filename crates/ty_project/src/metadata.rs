@@ -9,7 +9,7 @@ use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, Progra
 
 use crate::Db;
 use crate::metadata::options::ProjectOptionsOverrides;
-use crate::metadata::options::{OptionDiagnostic, ToSettingsError};
+use crate::metadata::options::{OptionDiagnostic, ProgramSettingsDiagnostic, ToSettingsError};
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::settings::Settings;
 use crate::metadata::value::ValueSource;
@@ -284,13 +284,13 @@ impl ProjectMetadata {
 
     pub fn to_program_settings<Strategy: MisconfigurationStrategy>(
         &self,
-        db: &dyn Db,
         system: &dyn System,
         vendored: &VendoredFileSystem,
         strategy: &Strategy,
-    ) -> Result<(ProgramSettings, Vec<OptionDiagnostic>), Strategy::Error<anyhow::Error>> {
+    ) -> Result<(ProgramSettings, Vec<ProgramSettingsDiagnostic>), Strategy::Error<anyhow::Error>>
+    {
         self.options
-            .to_program_settings(db, self.root(), self.name(), system, vendored, strategy)
+            .to_program_settings(self.root(), self.name(), system, vendored, strategy)
     }
 
     pub fn to_settings<Strategy: MisconfigurationStrategy>(

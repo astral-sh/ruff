@@ -158,13 +158,13 @@ impl Options {
 
     pub(crate) fn to_program_settings<Strategy: MisconfigurationStrategy>(
         &self,
-        db: &dyn Db,
         project_root: &SystemPath,
         project_name: &str,
         system: &dyn System,
         vendored: &VendoredFileSystem,
         strategy: &Strategy,
-    ) -> Result<(ProgramSettings, Vec<OptionDiagnostic>), Strategy::Error<anyhow::Error>> {
+    ) -> Result<(ProgramSettings, Vec<ProgramSettingsDiagnostic>), Strategy::Error<anyhow::Error>>
+    {
         let mut diagnostics = Vec::new();
         let environment = self.environment.or_default();
 
@@ -257,7 +257,7 @@ impl Options {
 
                 inferred_python_version.map(PythonVersionResolution::Inferred)
             })
-            .and_then(|resolution| resolution.into_program_version(db, &mut diagnostics))
+            .and_then(|resolution| resolution.into_program_version(&mut diagnostics))
             .unwrap_or_default();
 
         // Safe mode is handled inside this function, so we just assume this can't fail
@@ -573,8 +573,7 @@ enum PythonVersionResolution {
 impl PythonVersionResolution {
     fn into_program_version(
         self,
-        db: &dyn Db,
-        diagnostics: &mut Vec<OptionDiagnostic>,
+        diagnostics: &mut Vec<ProgramSettingsDiagnostic>,
     ) -> Option<PythonVersionWithSource> {
         match self {
             Self::Configured(python_version) => Some(python_version),
@@ -582,12 +581,32 @@ impl PythonVersionResolution {
                 if SupportedPythonVersion::try_from(python_version.version).is_ok() {
                     Some(python_version)
                 } else {
-                    diagnostics.push(unsupported_inferred_python_version_diagnostic(
-                        db,
-                        &python_version,
+                    diagnostics.push(ProgramSettingsDiagnostic::UnsupportedInferredPythonVersion(
+                        python_version,
                     ));
                     None
                 }
+            }
+        }
+    }
+}
+
+/// A diagnostic produced while resolving [`ProgramSettings`].
+///
+/// These diagnostics are kept separate from [`OptionDiagnostic`] while program settings are
+/// resolved so that this step does not need access to the database.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum ProgramSettingsDiagnostic {
+    /// The Python version inferred from the environment is newer than ty supports.
+    UnsupportedInferredPythonVersion(PythonVersionWithSource),
+}
+
+impl ProgramSettingsDiagnostic {
+    /// Convert this program-settings diagnostic into a diagnostic that can be stored on a project.
+    pub(crate) fn into_diagnostic(self, db: &dyn Db) -> OptionDiagnostic {
+        match self {
+            Self::UnsupportedInferredPythonVersion(python_version) => {
+                unsupported_inferred_python_version_diagnostic(db, &python_version)
             }
         }
     }

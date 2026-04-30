@@ -266,7 +266,6 @@ impl ProjectDatabase {
                     }
 
                     let program_settings_diagnostics = match metadata.to_program_settings(
-                        self,
                         self.system(),
                         self.vendored(),
                         &FallibleStrategy,
@@ -284,7 +283,7 @@ impl ProjectDatabase {
                         }
                     };
 
-                    let (settings, mut settings_diagnostics) = match metadata.options().to_settings(
+                    let (settings, settings_diagnostics) = match metadata.options().to_settings(
                         self,
                         metadata.root(),
                         &FallibleStrategy,
@@ -297,10 +296,15 @@ impl ProjectDatabase {
                             (None, vec![error.into_diagnostic()])
                         }
                     };
-                    settings_diagnostics.extend(program_settings_diagnostics);
 
                     tracing::debug!("Reloading project after structural change");
-                    project.reload(self, metadata, settings, settings_diagnostics);
+                    project.reload(
+                        self,
+                        metadata,
+                        settings,
+                        settings_diagnostics,
+                        program_settings_diagnostics,
+                    );
                 }
                 Err(error) => {
                     tracing::error!(
@@ -312,13 +316,25 @@ impl ProjectDatabase {
             return result;
         } else if result.custom_stdlib_changed {
             match project.metadata(self).to_program_settings(
-                self,
                 self.system(),
                 self.vendored(),
                 &FallibleStrategy,
             ) {
-                Ok((program_settings, _diagnostics)) => {
+                Ok((program_settings, program_settings_diagnostics)) => {
                     program.update_from_settings(self, program_settings);
+                    let settings_diagnostics = match project.metadata(self).options().to_settings(
+                        self,
+                        project.metadata(self).root(),
+                        &FallibleStrategy,
+                    ) {
+                        Ok((_, diagnostics)) => diagnostics,
+                        Err(error) => vec![error.into_diagnostic()],
+                    };
+                    project.update_settings_diagnostics(
+                        self,
+                        settings_diagnostics,
+                        program_settings_diagnostics,
+                    );
                 }
                 Err(error) => {
                     tracing::error!("Failed to resolve program settings: {error}");

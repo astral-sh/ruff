@@ -3,7 +3,7 @@
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
-use crate::metadata::options::OptionDiagnostic;
+use crate::metadata::options::{OptionDiagnostic, ProgramSettingsDiagnostic};
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 #[cfg(feature = "testing")]
 pub use db::tests::TestDb;
@@ -166,12 +166,22 @@ impl ProgressReporter for CollectReporter {
 
 #[salsa::tracked]
 impl Project {
-    pub fn from_metadata(
+    /// Create a project from resolved metadata and settings.
+    ///
+    /// Program-settings diagnostics are accepted separately so callers do not need to know how to
+    /// convert and merge them into the stored project settings diagnostics.
+    pub(crate) fn from_metadata(
         db: &dyn Db,
         metadata: ProjectMetadata,
         settings: Settings,
-        diagnostics: Vec<OptionDiagnostic>,
+        settings_diagnostics: Vec<OptionDiagnostic>,
+        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
     ) -> Self {
+        let diagnostics = Self::settings_diagnostics_with_program_diagnostics(
+            db,
+            settings_diagnostics,
+            program_settings_diagnostics,
+        );
         let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
             .durability(Durability::MEDIUM)
             .open_fileset_durability(Durability::LOW)
@@ -232,15 +242,25 @@ impl Project {
         )
     }
 
+    /// Reload the project after its metadata or settings have changed.
+    ///
+    /// Program-settings diagnostics are converted and merged here to keep reload behavior
+    /// consistent with initial project creation.
     pub fn reload(
         self,
         db: &mut dyn Db,
         metadata: ProjectMetadata,
         settings: Option<Settings>,
         settings_diagnostics: Vec<OptionDiagnostic>,
+        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
     ) {
         tracing::debug!("Reloading project");
         let metadata_changed = &metadata != self.metadata(db);
+        let settings_diagnostics = Self::settings_diagnostics_with_program_diagnostics(
+            db,
+            settings_diagnostics,
+            program_settings_diagnostics,
+        );
 
         self.reload_files(db);
 
@@ -260,6 +280,40 @@ impl Project {
 
         self.set_metadata(db).to(Box::new(metadata));
         self.try_add_file_root(db);
+    }
+
+    /// Replace stored settings diagnostics after recomputing program settings.
+    ///
+    /// This is used when a change affects [`ty_python_core::program::ProgramSettings`] without
+    /// reloading the full project.
+    pub(crate) fn update_settings_diagnostics(
+        self,
+        db: &mut dyn Db,
+        settings_diagnostics: Vec<OptionDiagnostic>,
+        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
+    ) {
+        let settings_diagnostics = Self::settings_diagnostics_with_program_diagnostics(
+            db,
+            settings_diagnostics,
+            program_settings_diagnostics,
+        );
+
+        if self.settings_diagnostics(db) != settings_diagnostics {
+            self.set_settings_diagnostics(db).to(settings_diagnostics);
+        }
+    }
+
+    fn settings_diagnostics_with_program_diagnostics(
+        db: &dyn Db,
+        mut settings_diagnostics: Vec<OptionDiagnostic>,
+        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
+    ) -> Vec<OptionDiagnostic> {
+        settings_diagnostics.extend(
+            program_settings_diagnostics
+                .into_iter()
+                .map(|diagnostic| diagnostic.into_diagnostic(db)),
+        );
+        settings_diagnostics
     }
 
     /// Checks the project and its dependencies according to the project's check mode.

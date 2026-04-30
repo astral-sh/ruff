@@ -231,7 +231,7 @@ reveal_type(sys.version_info[:2])
           "severity": 2,
           "code": "unsupported-python-version",
           "source": "ty",
-          "message": "Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.14 instead.\n\ninfo: Expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`.\ninfo: Set `environment.python-version` explicitly to override the inferred version.\ninfo: The version was inferred from the `pyvenv.cfg` file."
+          "message": "Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.14 instead.\n\ninfo: Expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`.\ninfo: Set `environment.python-version` explicitly to override the inferred version.\ninfo: The version was inferred from your virtual environment metadata."
         }
       ]
     }
