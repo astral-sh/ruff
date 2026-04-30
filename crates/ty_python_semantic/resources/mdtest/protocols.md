@@ -2821,6 +2821,30 @@ static_assert(not is_assignable_to(TypeOf[doesnt_satisfy_foo], Foo))
 static_assert(not is_subtype_of(TypeOf[doesnt_satisfy_foo], Foo))
 ```
 
+A source positional-or-keyword parameter that has already been consumed positionally cannot also
+accept a target keyword argument with the same name through `**kwargs`, because such a call would
+pass multiple values for that parameter at runtime:
+
+```py
+from typing import Protocol
+from ty_extensions import TypeOf, is_assignable_to, is_subtype_of, static_assert
+
+class TargetWithKeywordA(Protocol):
+    def __call__(self, x: int, /, *, a: int) -> object: ...
+
+def consumed_a(a: object, *, z: object | None = None, **kwargs: object) -> object:
+    return object()
+
+def positional_only_a(a: object, /, *, z: object | None = None, **kwargs: object) -> object:
+    return object()
+
+static_assert(not is_assignable_to(TypeOf[consumed_a], TargetWithKeywordA))
+static_assert(not is_subtype_of(TypeOf[consumed_a], TargetWithKeywordA))
+
+static_assert(is_assignable_to(TypeOf[positional_only_a], TargetWithKeywordA))
+static_assert(is_subtype_of(TypeOf[positional_only_a], TargetWithKeywordA))
+```
+
 Class-literals and generic aliases can also be subtypes of callback protocols:
 
 ```py

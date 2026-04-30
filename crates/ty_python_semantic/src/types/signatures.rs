@@ -2436,8 +2436,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let (source_params, target_params) = parameters.into_remaining();
 
         // Collect all explicitly declared source parameters that can be bound by keyword.
-        // Even parameters already consumed by positional matching take precedence over
-        // `**kwargs` for calls that pass the same name by keyword.
+        // Even parameters already consumed by positional matching block `**kwargs` for calls that
+        // pass the same name by keyword.
         let mut source_explicit_keywords = FxHashMap::default();
         for source_param in &source.parameters {
             match source_param.kind() {
@@ -2494,10 +2494,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     name: target_name,
                     default_type: target_default,
                 } => {
-                    if let Some(source_param) = source_keywords
-                        .remove(&**target_name)
-                        .or_else(|| source_explicit_keywords.get(&**target_name).copied())
-                    {
+                    if let Some(source_param) = source_keywords.remove(&**target_name) {
                         match source_param.kind() {
                             ParameterKind::PositionalOrKeyword {
                                 default_type: source_default,
@@ -2539,6 +2536,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 "`source_keywords` should only contain keyword-only or standard parameters"
                             ),
                         }
+                    } else if source_explicit_keywords.contains_key(&**target_name) {
+                        return self.never();
                     } else if let Some(source_keyword_variadic) = source_keyword_variadic {
                         if !check_types(
                             target_param.annotated_type(),
