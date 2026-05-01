@@ -43,7 +43,7 @@ from types import TracebackType
 from typing import IO, Any, BinaryIO, Final, Generic, Literal, Protocol, TextIO, TypeVar, overload, type_check_only
 from typing_extensions import Self, disjoint_base
 
-_T = TypeVar("_T")
+_S = TypeVar("_S", bound=str)
 
 if sys.version_info >= (3, 14):
     DEFAULT_BUFFER_SIZE: Final = 131072
@@ -886,4 +886,4 @@ if sys.version_info >= (3, 10):
         """
 
     @overload
-    def text_encoding(encoding: _T, stacklevel: int = 2, /) -> _T: ...
+    def text_encoding(encoding: _S, stacklevel: int = 2, /) -> _S: ...
