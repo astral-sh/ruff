@@ -65,6 +65,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::ops::{Deref, DerefMut};
 use ty_project::Db;
+use ty_python_core::definition::DefinitionCategory;
 use ty_python_semantic::types::{Type, TypeDefinition};
 
 /// Information associated with a text range.
@@ -156,6 +157,94 @@ impl From<FileRange> for NavigationTarget {
             focus_range: value.range(),
             full_range: value.range(),
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) struct DefinitionTarget {
+    navigation: NavigationTarget,
+    category: DefinitionCategory,
+    is_origin: bool,
+}
+
+impl DefinitionTarget {
+    pub(crate) fn new(
+        navigation: NavigationTarget,
+        category: DefinitionCategory,
+        is_origin: bool,
+    ) -> Self {
+        Self {
+            navigation,
+            category,
+            is_origin,
+        }
+    }
+
+    pub(crate) fn navigation(&self) -> &NavigationTarget {
+        &self.navigation
+    }
+
+    pub(crate) fn category(&self) -> DefinitionCategory {
+        self.category
+    }
+
+    pub(crate) fn is_origin(&self) -> bool {
+        self.is_origin
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct DefinitionTargets(smallvec::SmallVec<[DefinitionTarget; 1]>);
+
+impl DefinitionTargets {
+    pub(crate) fn unique(targets: impl IntoIterator<Item = DefinitionTarget>) -> Self {
+        let unique: FxHashSet<_> = targets.into_iter().collect();
+        let mut targets = unique.into_iter().collect::<Vec<_>>();
+        targets.sort_by_key(|target| {
+            (
+                target.navigation.file,
+                target.navigation.focus_range.start(),
+                target.category,
+            )
+        });
+        Self(targets.into())
+    }
+
+    pub(crate) fn navigation_targets(&self) -> NavigationTargets {
+        NavigationTargets::unique(self.0.iter().map(|target| target.navigation.clone()))
+    }
+
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, DefinitionTarget> {
+        self.0.iter()
+    }
+
+    pub(crate) fn declarations(&self) -> impl Iterator<Item = &DefinitionTarget> {
+        let has_semantic_declaration = self
+            .0
+            .iter()
+            .any(|target| target.category().is_declaration());
+        let first_binding = self
+            .0
+            .iter()
+            .filter(|target| target.category().is_binding())
+            .min_by_key(|target| {
+                (
+                    target.navigation.file,
+                    target.navigation.focus_range.start(),
+                )
+            });
+
+        self.0.iter().filter(move |target| {
+            if has_semantic_declaration {
+                target.category().is_declaration()
+            } else {
+                first_binding.is_some_and(|first_binding| first_binding == *target)
+            }
+        })
+    }
+
+    pub(crate) fn origin_targets(&self) -> impl Iterator<Item = &DefinitionTarget> {
+        self.0.iter().filter(|target| target.is_origin())
     }
 }
 
