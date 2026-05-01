@@ -9,6 +9,7 @@ platform, and is an alias to another module (e.g. ntpath).
 Some of this can actually be useful on non-Posix systems too, e.g.
 for manipulation of the pathname component of URLs.
 """
+
 import sys
 
 if sys.platform == "win32":
