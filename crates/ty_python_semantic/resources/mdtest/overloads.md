@@ -736,11 +736,18 @@ class Future[T]:
     result: T
 
 @overload
+# TODO: This is a false positive. We currently lose the correlation between
+# `R` and the `Coroutine[Any, Any, R] | R` callback result when checking the
+# overload against the implementation, so the invariant `Future` return looks
+# too wide.
+# error: [invalid-overload]
 def implementation_return_typevar_identity[R, *Ts](
     target: Callable[[*Ts], Coroutine[Any, Any, R]],
     *args: *Ts,
 ) -> Future[R] | None: ...
 @overload
+# TODO: Same false positive as above.
+# error: [invalid-overload]
 def implementation_return_typevar_identity[R, *Ts](
     target: Callable[[*Ts], Coroutine[Any, Any, R] | R],
     *args: *Ts,
@@ -814,6 +821,100 @@ def decorator_alias_union_return[
     ]
     | DecoratorFunc[ViewT, P, ResponseT]
 ):
+    raise NotImplementedError
+```
+
+### Legacy TypeVar aliases in implementation returns
+
+Legacy module-level `TypeVar`s captured by generic aliases should remain correlated when ty checks
+an overload's selected implementation return type.
+
+```py
+from typing import Generic, Sequence, overload
+from typing_extensions import TypeAliasType, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Source(Generic[T]): ...
+class Reader(Generic[T, U]): ...
+
+Read = TypeAliasType("Read", Source[T], type_params=(T,))
+Scan = TypeAliasType("Scan", Source[U], type_params=(U,))
+
+@overload
+# TODO: no error; ty should correlate `T` across the overload and implementation contexts.
+# error: [invalid-overload]
+def read(reads: Sequence[Read[T]]) -> Reader[T, object]: ...
+@overload
+# TODO: no error; ty should correlate `T` and `U` across the overload and implementation contexts.
+# error: [invalid-overload]
+def read(reads: Sequence[Read[T]], scans: Sequence[Scan[U]]) -> Reader[T, U]: ...
+def read(
+    reads: Sequence[Read[T]],
+    scans: Sequence[Scan[U]] = (),
+) -> Reader[T, U] | Reader[T, object]:
+    raise NotImplementedError
+```
+
+### Callable aliases in implementation returns
+
+Legacy module-level `TypeVar`s captured by callable aliases should remain correlated when an
+overload's selected implementation return type depends on the callable's return type.
+
+```py
+from typing import Callable, Iterable, TypeVar, overload
+
+DistributionT = TypeVar("DistributionT", bound="Distribution")
+InstallerT = Callable[["Requirement"], "DistributionT"]
+Installer = Callable[["Requirement"], "Distribution | None"]
+
+class Requirement: ...
+class Distribution: ...
+
+class WorkingSet:
+    @overload
+    # TODO: no error; ty should correlate `DistributionT` across the overload and implementation contexts.
+    # error: [invalid-overload]
+    def resolve(
+        self,
+        requirements: Iterable[Requirement],
+        installer: InstallerT[DistributionT],
+    ) -> list[DistributionT]: ...
+    @overload
+    def resolve(
+        self,
+        requirements: Iterable[Requirement],
+        installer: Installer | None = None,
+    ) -> list[Distribution]: ...
+    def resolve(
+        self,
+        requirements: Iterable[Requirement],
+        installer: Installer | InstallerT[DistributionT] | None = None,
+    ) -> list[Distribution] | list[DistributionT]:
+        raise NotImplementedError
+```
+
+### Recursive legacy TypeVar aliases in implementation returns
+
+Recursive aliases can expose the same legacy `TypeVar` correlation limitation when an overload
+return combines the alias variable with an independent default type.
+
+```py
+from typing import TypeAlias, TypeVar, Union, overload
+
+K = TypeVar("K")
+V = TypeVar("V")
+D = TypeVar("D")
+Tree: TypeAlias = dict[K, Union[V, "Tree[K, V]"]]
+
+@overload
+def get_value(tree: Tree[str, V], default: None = None) -> V | None: ...
+@overload
+# TODO: no error; ty should correlate `V` across the overload and implementation contexts.
+# error: [invalid-overload]
+def get_value(tree: Tree[str, V], default: D) -> V | D: ...
+def get_value(tree: Tree[str, V], default: D | None = None) -> V | D | None:
     raise NotImplementedError
 ```
 
@@ -1178,6 +1279,8 @@ def typed_dict_kwargs_explicit_implementation(
 
 `ParamSpec` overloads keep their callable argument structure unless the implementation is gradual.
 Structured callable parameter domains are also expanded across the variadic implementation surface.
+A `P.kwargs` parameter without the corresponding `*args: P.args` is intentionally still rejected:
+the `invalid-overload` diagnostics there are cascades from those invalid parameter definitions.
 
 ```py
 from typing import Any, Callable, ParamSpec, Sequence, TypeVar, overload
@@ -1305,6 +1408,86 @@ def ellipsis_callable_variadic_implementation(
 ) -> Any: ...
 def ellipsis_callable_variadic_implementation(*fns: Callable[..., Any]) -> Any:
     return fns[0]
+```
+
+### Gradual callable implementations with ParamSpec
+
+A gradual callable implementation parameter accepts overloads whose callable parameters are
+expressed with `ParamSpec` or `Concatenate`.
+
+```py
+from typing import Any, Callable, Concatenate, Coroutine, ParamSpec, TypeVar, overload
+
+P = ParamSpec("P")
+T = TypeVar("T")
+R = TypeVar("R")
+
+@overload
+def command(func: Callable[Concatenate[int, P], Coroutine[Any, Any, T]], /) -> object: ...
+@overload
+def command(func: Callable[P, Coroutine[Any, Any, T]], /) -> object: ...
+def command(func: Callable[..., Coroutine[Any, Any, T]], /) -> object:
+    raise NotImplementedError
+
+@overload
+def bind(func: Callable[P, R], /) -> Callable[P, R]: ...
+@overload
+def bind(func: Callable[Concatenate[int, P], R], arg: int, /) -> Callable[P, R]: ...
+def bind(func: Callable[..., R], /, *args: object) -> Callable[..., R]:
+    raise NotImplementedError
+```
+
+### ParamSpec return correlation in overload implementations
+
+Legacy `ParamSpec` and `TypeVar` variables in overload return types should remain correlated with
+the implementation's selected return type.
+
+```py
+from typing import Any, Callable, Coroutine, Generic, ParamSpec, TypeVar, overload
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+class AsyncWrapper(Generic[P, T]): ...
+class SyncWrapper(Generic[T]): ...
+
+@overload
+# TODO: no error; ty should correlate `P` and `T` across the overload and implementation contexts.
+# error: [invalid-overload]
+def cache(func: Callable[P, Coroutine[Any, Any, T]], /) -> AsyncWrapper[P, T]: ...
+@overload
+def cache(func: Callable[..., T], /) -> SyncWrapper[T]: ...
+def cache(
+    func: Callable[P, Coroutine[Any, Any, T]] | Callable[..., T],
+    /,
+) -> AsyncWrapper[P, T] | SyncWrapper[T]:
+    raise NotImplementedError
+```
+
+### Callable union implementation return correlation
+
+When an implementation parameter includes both a callable returning `T` and a callable returning a
+wrapper around `T`, the overload's selected implementation return type should preserve the selected
+`T`.
+
+```py
+from collections.abc import Callable, Generator
+from typing import Any, Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class Future(Generic[T]): ...
+
+@overload
+# TODO: no error; ty should correlate `T` across the overload and implementation contexts.
+# error: [invalid-overload]
+def coroutine(func: Callable[..., Generator[Any, Any, T]]) -> Callable[..., Future[T]]: ...
+@overload
+def coroutine(func: Callable[..., T]) -> Callable[..., Future[T]]: ...
+def coroutine(
+    func: Callable[..., Generator[Any, Any, T]] | Callable[..., T],
+) -> Callable[..., Future[T]]:
+    raise NotImplementedError
 ```
 
 ### Inserted positional implementation parameter before variadic arguments
@@ -1582,6 +1765,10 @@ S = TypeVar("S")
 
 class Thenable(Future[T]):
     @overload
+    # TODO: This is a false positive for the same callback-result correlation
+    # issue: solving `S` from `Awaitable[S] | S` widens the invariant
+    # `Thenable[S]` return instead of preserving the overload's `S`.
+    # error: [invalid-overload]
     def then(self, callback: Callable[[T], Awaitable[S]]) -> "Thenable[S]": ...
     @overload
     def then(self, callback: Callable[[T], S]) -> "Thenable[S]": ...

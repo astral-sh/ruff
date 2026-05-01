@@ -1423,25 +1423,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 let context_collection_enabled = self.is_context_collection_enabled();
 
                 let elements = union.elements(db);
-                if matches!(self.relation, TypeRelation::ConstraintSetAssignability)
-                    && !context_collection_enabled
-                    && elements.iter().any(|element| element.is_type_var())
-                {
-                    let non_bare_typevar_result = elements
-                        .iter()
-                        .filter(|element| !element.is_type_var())
-                        .when_any(db, self.constraints, |&elem_ty| {
-                            self.check_type_pair(db, source, elem_ty)
-                        });
-                    if !non_bare_typevar_result.is_never_satisfied(db) {
-                        return non_bare_typevar_result.or(
-                            db,
-                            self.constraints,
-                            is_new_type_of_union,
-                        );
-                    }
-                }
-
                 let result = elements
                     .iter()
                     .when_any(db, self.constraints, |&elem_ty| {

@@ -458,6 +458,10 @@ def sink(func: Callable[[], Union[Awaitable[T2], T2]], future: Future[T2]) -> No
 
 def f9(func: Callable[[], Union[Awaitable[T2], T2]]) -> Future[T2]:
     future: Future[T2] = Future()
+    # TODO: This is a false positive for the same limitation: solving `T2` from
+    # `Awaitable[T2] | T2` in the first argument widens the expected invariant
+    # `Future` type for the second argument.
+    # error: [invalid-argument-type]
     sink(func, future)
     return future
 ```

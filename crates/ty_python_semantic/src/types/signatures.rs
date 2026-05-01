@@ -3008,6 +3008,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: callable without ParamSpec
                 // other: `P`
                 (None, Some(([], target_bound_typevar))) => {
+                    if self.relation.is_implementation_compatibility()
+                        && source.parameters.is_gradual()
+                    {
+                        return result;
+                    }
+
                     let lower = Type::Callable(CallableType::new(
                         db,
                         CallableSignature::single(Signature::new_generic(
@@ -3031,6 +3037,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: callable without ParamSpec
                 // other: `Concatenate[<prefix_params>, P]`
                 (None, Some((target_prefix_params, target_bound_typevar))) => {
+                    if self.relation.is_implementation_compatibility()
+                        && source.parameters.is_gradual()
+                    {
+                        return result;
+                    }
+
                     // Loop over self parameters and target_prefix_params in a similar manner to the
                     // above loop
                     let mut parameters = ParametersZip {
@@ -3169,6 +3181,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: `P`
                 // other: callable without ParamSpec
                 (Some(([], source_bound_typevar)), None) => {
+                    if self.relation.is_implementation_compatibility()
+                        && target.parameters.is_gradual()
+                    {
+                        return result;
+                    }
+
                     let upper = Type::Callable(CallableType::new(
                         db,
                         CallableSignature::single(Signature::new_generic(
@@ -3192,6 +3210,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: `Concatenate[<prefix_params>, P]`
                 // other: callable without ParamSpec
                 (Some((source_prefix_params, source_bound_typevar)), None) => {
+                    if self.relation.is_implementation_compatibility()
+                        && target.parameters.is_gradual()
+                    {
+                        return result;
+                    }
+
                     let mut parameters = ParametersZip {
                         current_source: None,
                         current_target: None,
