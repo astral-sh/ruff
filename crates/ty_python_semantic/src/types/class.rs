@@ -1765,6 +1765,21 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Returns whether `name` is a non-init-only dataclass field on this class or one of its
+    /// superclasses.
+    pub(super) fn has_dataclass_instance_field(self, db: &'db dyn Db, name: &str) -> bool {
+        self.iter_mro(db).any(|superclass| {
+            let ClassBase::Class(class) = superclass else {
+                return false;
+            };
+            let Some((class_literal, specialization)) = class.static_class_literal(db) else {
+                return false;
+            };
+
+            class_literal.is_own_dataclass_instance_field(db, specialization, name)
+        })
+    }
+
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
     #[salsa::tracked(cycle_initial=into_callable_cycle_initial, heap_size=ruff_memory_usage::heap_size)]

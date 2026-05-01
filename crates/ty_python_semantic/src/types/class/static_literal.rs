@@ -1095,6 +1095,12 @@ impl<'db> StaticClassLiteral<'db> {
             }
         });
 
+        if self.is_own_dataclass_instance_field(db, specialization, name)
+            && !self.has_own_class_binding(db, name)
+        {
+            return Member::unbound();
+        }
+
         if member.is_undefined() {
             if let Some(synthesized_member) =
                 self.own_synthesized_member(db, specialization, inherited_generic_context, name)
@@ -2341,21 +2347,11 @@ impl<'db> StaticClassLiteral<'db> {
                                     .with_qualifiers(qualifiers),
                                 }
                             }
-                        } else if self.is_own_dataclass_instance_field(db, name)
-                            && declared_ty
-                                .class_member(db, "__get__".into())
-                                .place
-                                .is_undefined()
-                        {
+                        } else if self.is_own_dataclass_instance_field(db, None, name) {
                             // For dataclass-like classes, declared fields are assigned
                             // by the synthesized `__init__`, so they are instance
                             // attributes even without an explicit `self.x = ...`
                             // assignment in a method body.
-                            //
-                            // However, if the declared type is a descriptor (has
-                            // `__get__`), we return unbound so that the descriptor
-                            // protocol in `member_lookup_with_policy` can resolve
-                            // the attribute type through `__get__`.
                             Member {
                                 inner: declared.with_qualifiers(qualifiers),
                             }
@@ -2437,15 +2433,21 @@ impl<'db> StaticClassLiteral<'db> {
     /// should be treated as defining an instance attribute: dataclass fields are
     /// implicitly assigned in `__init__`, so they behave as instance attributes
     /// even though no explicit binding exists in the class body.
-    fn is_own_dataclass_instance_field(self, db: &'db dyn Db, name: &str) -> bool {
-        let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self, None) else {
+    pub(super) fn is_own_dataclass_instance_field(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        name: &str,
+    ) -> bool {
+        let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self, specialization)
+        else {
             return false;
         };
         if !matches!(field_policy, CodeGeneratorKind::DataclassLike(_)) {
             return false;
         }
 
-        let fields = self.own_fields(db, None, field_policy);
+        let fields = self.own_fields(db, specialization, field_policy);
         let Some(field) = fields.get(name) else {
             return false;
         };
@@ -2456,6 +2458,17 @@ impl<'db> StaticClassLiteral<'db> {
                 ..
             }
         )
+    }
+
+    fn has_own_class_binding(self, db: &'db dyn Db, name: &str) -> bool {
+        let body_scope = self.body_scope(db);
+        let table = place_table(db, body_scope);
+        let use_def = use_def_map(db, body_scope);
+        table.symbol_id(name).is_some_and(|symbol_id| {
+            !place_from_bindings(db, use_def.end_of_scope_symbol_bindings(symbol_id))
+                .place
+                .is_undefined()
+        })
     }
 
     /// Returns the converter's input type (i.e., the type of its first positional parameter) for a

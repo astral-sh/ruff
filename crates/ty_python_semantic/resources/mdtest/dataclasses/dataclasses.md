@@ -1365,7 +1365,8 @@ reveal_type(result_str)  # revealed: ChildOfParentDataclass[str]
 
 For the following descriptor, the return type of `__get__` and the type of the `value` parameter in
 `__set__` are the same. The generated `__init__` method takes an argument of this type (instead of
-the type of the descriptor), and the default value is also of this type:
+the type of the descriptor), and the default value is also of this type. Instance access to the
+dataclass field itself still uses the declared field type:
 
 ```py
 from typing import overload
@@ -1387,7 +1388,7 @@ class C:
 reveal_type(C.__init__)  # revealed: (self: C, upper: str = ...) -> None
 
 c = C("abc")
-reveal_type(c.upper)  # revealed: str
+reveal_type(c.upper)  # revealed: UppercaseString
 
 # This is also okay:
 C()
@@ -1433,7 +1434,7 @@ class C:
 reveal_type(C.__init__)  # revealed: (self: C, converter: str = "") -> None
 
 c = C("abc")
-reveal_type(c.converter)  # revealed: int
+reveal_type(c.converter)  # revealed: ConvertToLength
 
 # This is also okay:
 C()
