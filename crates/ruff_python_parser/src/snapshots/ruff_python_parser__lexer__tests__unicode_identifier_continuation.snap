@@ -1,0 +1,30 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+assertion_line: 2434
+expression: lex_source(source)
+---
+## Tokens
+```
+[
+    (
+        Name(
+            Name("aC"),
+        ),
+        0..5,
+    ),
+    (
+        Equal,
+        6..7,
+    ),
+    (
+        Int(
+            500,
+        ),
+        8..11,
+    ),
+    (
+        Newline,
+        11..11,
+    ),
+]
+```

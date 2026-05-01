@@ -682,9 +682,7 @@ impl<'src> Lexer<'src> {
         // We need to therefore do the same in our lexer, but applying NFKC normalization
         // unconditionally is extremely expensive. If we know an identifier is ASCII-only,
         // (by far the most common case), we can skip NFKC normalization of the identifier.
-        let mut is_ascii = first.is_ascii();
-        self.cursor
-            .eat_while(|c| is_identifier_continuation(c, &mut is_ascii));
+        let is_ascii = self.eat_identifier_continuation(first.is_ascii());
 
         let text = self.token_text();
 
@@ -745,6 +743,37 @@ impl<'src> Lexer<'src> {
                 self.current_value = TokenValue::Name(Name::new(text));
                 TokenKind::Name
             }
+        }
+    }
+
+    fn eat_identifier_continuation(&mut self, is_ascii: bool) -> bool {
+        self.eat_ascii_identifier_continuation();
+
+        if self.cursor.first().is_ascii() {
+            is_ascii
+        } else {
+            self.eat_unicode_identifier_continuation();
+            false
+        }
+    }
+
+    fn eat_ascii_identifier_continuation(&mut self) {
+        let bytes = self.cursor.rest().as_bytes();
+        let ascii_len = bytes
+            .iter()
+            .take_while(|&&byte| is_ascii_identifier_continuation_byte(byte))
+            .count();
+
+        if ascii_len > 0 {
+            self.cursor.skip_bytes(ascii_len);
+        }
+    }
+
+    #[cold]
+    fn eat_unicode_identifier_continuation(&mut self) {
+        while is_xid_continue(self.cursor.first()) {
+            self.cursor.bump();
+            self.eat_ascii_identifier_continuation();
         }
     }
 
@@ -1824,27 +1853,14 @@ const fn is_ascii_identifier_start(c: char) -> bool {
     matches!(c, 'a'..='z' | 'A'..='Z' | '_')
 }
 
+const fn is_ascii_identifier_continuation_byte(byte: u8) -> bool {
+    matches!(byte, b'a'..=b'z' | b'A'..=b'Z' | b'_' | b'0'..=b'9')
+}
+
 // Checks if the character c is a valid starting character as described
 // in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
 fn is_unicode_identifier_start(c: char) -> bool {
     is_xid_start(c)
-}
-
-/// Checks if the character c is a valid continuation character as described
-/// in <https://docs.python.org/3/reference/lexical_analysis.html#identifiers>.
-///
-/// Additionally, this function also keeps track of whether or not the total
-/// identifier is ASCII-only or not by mutably altering a reference to a
-/// boolean value passed in.
-fn is_identifier_continuation(c: char, identifier_is_ascii_only: &mut bool) -> bool {
-    // Arrange things such that ASCII codepoints never
-    // result in the slower `is_xid_continue` getting called.
-    if c.is_ascii() {
-        matches!(c, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9')
-    } else {
-        *identifier_is_ascii_only = false;
-        is_xid_continue(c)
-    }
 }
 
 enum LexedText<'a> {
@@ -2418,6 +2434,12 @@ if first:
         let source1 = "𝒞 = 500";
         let source2 = "C = 500";
         assert_eq!(get_tokens_only(source1), get_tokens_only(source2));
+    }
+
+    #[test]
+    fn test_unicode_identifier_continuation() {
+        let source = "a𝒞 = 500";
+        assert_snapshot!(lex_source(source));
     }
 
     fn triple_quoted_eol(eol: &str) -> LexerOutput {
