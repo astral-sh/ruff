@@ -314,6 +314,32 @@ impl FoldingRangeVisitor<'_> {
         }
     }
 
+    /// Attempts to find the start of the given token in the given range.
+    fn find_token_start(&self, target: TokenKind, search_range: TextRange) -> Option<TextSize> {
+        self.tokens
+            .in_range(search_range)
+            .iter()
+            .find(|tok| tok.kind() == target)
+            .map(Ranged::start)
+    }
+
+    /// Adds a folding range for the body of the given block, while leaving the block header visible.
+    fn add_block_body_range<T: Ranged>(&mut self, header_start: TextSize, block: &[T]) {
+        let (Some(first_block_statement), Some(last_block_statement)) =
+            (block.first(), block.last())
+        else {
+            return;
+        };
+        let Some(block_fold_start) = self.find_token_start(
+            TokenKind::Newline,
+            TextRange::new(header_start, first_block_statement.start()),
+        ) else {
+            return;
+        };
+
+        self.add_range(TextRange::new(block_fold_start, last_block_statement.end()));
+    }
+
     /// Add a folding range for function definitions, excluding decorators.
     fn add_function_def_range(&mut self, func: &StmtFunctionDef) {
         if let Some(decorator) = func.decorator_list.last() {
@@ -371,20 +397,15 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
             }
             AnyNodeRef::StmtIf(if_stmt) => {
                 // Fold each branch individually rather than the entire if block.
-                // The if clause range is from the start of the if to the end of its body.
-                if let Some(last_stmt) = if_stmt.body.last() {
-                    self.add_range(TextRange::new(if_stmt.start(), last_stmt.end()));
-                }
+                self.add_block_body_range(if_stmt.start(), &if_stmt.body);
+            }
+            AnyNodeRef::ElifElseClause(clause) => {
                 // Each elif/else clause has its own range.
-                for clause in &if_stmt.elif_else_clauses {
-                    self.add_range(clause.range());
-                }
+                self.add_block_body_range(clause.start(), &clause.body);
             }
             AnyNodeRef::StmtFor(for_stmt) => {
                 // Fold the for body separately from the else block.
-                if let Some(last_stmt) = for_stmt.body.last() {
-                    self.add_range(TextRange::new(for_stmt.start(), last_stmt.end()));
-                }
+                self.add_block_body_range(for_stmt.start(), &for_stmt.body);
                 if let (Some(first), Some(last)) = (for_stmt.orelse.first(), for_stmt.orelse.last())
                 {
                     self.add_range(TextRange::new(first.start(), last.end()));
@@ -392,9 +413,7 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
             }
             AnyNodeRef::StmtWhile(while_stmt) => {
                 // Fold the while body separately from the else block.
-                if let Some(last_stmt) = while_stmt.body.last() {
-                    self.add_range(TextRange::new(while_stmt.start(), last_stmt.end()));
-                }
+                self.add_block_body_range(while_stmt.start(), &while_stmt.body);
                 if let (Some(first), Some(last)) =
                     (while_stmt.orelse.first(), while_stmt.orelse.last())
                 {
@@ -402,13 +421,11 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
                 }
             }
             AnyNodeRef::StmtWith(with_stmt) => {
-                self.add_range(with_stmt.range());
+                self.add_block_body_range(with_stmt.start(), &with_stmt.body);
             }
             AnyNodeRef::StmtTry(try_stmt) => {
                 // Fold the try body separately from handlers, else, and finally.
-                if let Some(last_stmt) = try_stmt.body.last() {
-                    self.add_range(TextRange::new(try_stmt.start(), last_stmt.end()));
-                }
+                self.add_block_body_range(try_stmt.start(), &try_stmt.body);
                 // Exception handlers are folded via ExceptHandlerExceptHandler.
                 // Fold the else block if present.
                 if let (Some(first), Some(last)) = (try_stmt.orelse.first(), try_stmt.orelse.last())
@@ -423,17 +440,17 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
                 }
             }
             AnyNodeRef::StmtMatch(match_stmt) => {
-                self.add_range(match_stmt.range());
+                self.add_block_body_range(match_stmt.start(), &match_stmt.cases);
             }
 
             // Match cases within match statements
             AnyNodeRef::MatchCase(case) => {
-                self.add_range(case.range());
+                self.add_block_body_range(case.start(), &case.body);
             }
 
             // Exception handlers
             AnyNodeRef::ExceptHandlerExceptHandler(handler) => {
-                self.add_range(handler.range());
+                self.add_block_body_range(handler.start(), &handler.body);
             }
 
             // Multiline expressions
