@@ -2,27 +2,29 @@ use crate::completion;
 
 use ruff_db::{files::File, parsed::parsed_module};
 use ruff_diagnostics::Edit;
+use ruff_python_ast::NodeKind;
 use ruff_python_ast::find_node::covering_node;
-use ruff_text_size::TextRange;
+use ruff_python_ast::token::{Token, TokenKind, Tokens};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_project::Db;
 use ty_python_semantic::lint::LintId;
 use ty_python_semantic::suppress_single;
 use ty_python_semantic::types::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 
-/// A `QuickFix` Code Action
+/// A Code Action
 #[derive(Debug, Clone)]
-pub struct QuickFix {
+pub struct CodeAction {
     pub title: String,
     pub edits: Vec<Edit>,
     pub preferred: bool,
 }
 
-pub fn code_actions(
+pub fn diagnostic_code_actions(
     db: &dyn Db,
     file: File,
     diagnostic_range: TextRange,
     diagnostic_id: &str,
-) -> Vec<QuickFix> {
+) -> Vec<CodeAction> {
     let registry = db.lint_registry();
     let Ok(lint_id) = registry.get(diagnostic_id) else {
         return Vec::new();
@@ -40,7 +42,7 @@ pub fn code_actions(
     }
 
     // Suggest just suppressing the lint (always a valid option, but never ideal)
-    actions.push(QuickFix {
+    actions.push(CodeAction {
         title: format!("Ignore '{}' for this line", lint_id.name()),
         edits: suppress_single(db, file, lint_id, diagnostic_range).into_edits(),
         preferred: false,
@@ -49,11 +51,19 @@ pub fn code_actions(
     actions
 }
 
+pub fn refactor_code_actions(db: &dyn Db, file: File, range: TextRange) -> Vec<CodeAction> {
+    let mut actions = Vec::new();
+
+    actions.extend(unwrap_block(db, file, range));
+
+    actions
+}
+
 fn unresolved_fixes(
     db: &dyn Db,
     file: File,
     diagnostic_range: TextRange,
-) -> Option<impl Iterator<Item = QuickFix>> {
+) -> Option<impl Iterator<Item = CodeAction>> {
     let parsed = parsed_module(db, file).load(db);
     let node = covering_node(parsed.syntax().into(), diagnostic_range).node();
     let symbol = &node.expr_name()?.id;
@@ -61,7 +71,7 @@ fn unresolved_fixes(
     Some(
         completion::unresolved_fixes(db, file, &parsed, symbol, node)
             .into_iter()
-            .map(|import| QuickFix {
+            .map(|import| CodeAction {
                 title: import.label,
                 edits: vec![import.edit],
                 preferred: true,
@@ -69,10 +79,165 @@ fn unresolved_fixes(
     )
 }
 
+fn unwrap_block(db: &dyn Db, file: File, range: TextRange) -> Option<CodeAction> {
+    if !range.is_empty() {
+        return None;
+    }
+    let parsed = parsed_module(db, file).load(db);
+    let colon = parsed
+        .tokens()
+        .at_offset(range.start())
+        .find(|it| it.kind() == TokenKind::Colon)?;
+
+    let target = covering_node(parsed.syntax().into(), colon.range())
+        .ancestors()
+        .find(|it| {
+            matches!(
+                it.kind(),
+                NodeKind::StmtIf
+                    | NodeKind::StmtMatch
+                    | NodeKind::StmtTry
+                    | NodeKind::StmtWith
+                    | NodeKind::StmtFor
+                    | NodeKind::StmtWhile
+            )
+        })?;
+    let newline = parsed
+        .tokens()
+        .before(colon.start())
+        .iter()
+        .rfind(|it| it.kind().is_any_newline())?;
+    let keyword = parsed
+        .tokens()
+        .after(newline.end())
+        .iter()
+        .find(|it| it.kind().is_keyword() && target.range().contains_range(it.range()))?;
+
+    let (stmts, delete_range, _) = unwrap_block_trigger_ranges(&target, keyword)
+        .find(|(_, _, trigger_range)| range.intersect(*trigger_range).is_some())?;
+    let current_indent = IndentSpan::of(parsed.tokens(), target);
+    let stmts_indent = IndentSpan::of(parsed.tokens(), stmts.first()?);
+    let dedent = stmts_indent.len().checked_sub(current_indent.len())?;
+
+    let stmts_range = TextRange::new(stmts.first()?.start(), stmts.last()?.end());
+    let before = Edit::deletion(delete_range.start(), stmts_range.start());
+    let after = Edit::deletion(stmts_range.end(), delete_range.end());
+
+    let mut edits = vec![before, after];
+    for indent in IndentSpan::indent_spans(parsed.tokens().in_range(stmts_range)) {
+        edits.extend(indent.dedent(dedent));
+    }
+
+    Some(CodeAction {
+        title: "Unwrap this statements block".to_owned(),
+        edits,
+        preferred: false,
+    })
+}
+
+fn unwrap_block_trigger_ranges<'a>(
+    target: &ruff_python_ast::AnyNodeRef<'a>,
+    keyword: &Token,
+) -> impl Iterator<Item = (&'a [ruff_python_ast::Stmt], TextRange, TextRange)> {
+    let keyword = keyword.range();
+
+    let branches = target.as_stmt_if().into_iter().flat_map(|stmt_if| {
+        [&stmt_if.body]
+            .into_iter()
+            .chain(stmt_if.elif_else_clauses.iter().map(|it| &it.body))
+    });
+    let branches = branches.chain(target.as_stmt_try().into_iter().flat_map(|stmt_try| {
+        [&stmt_try.body]
+            .into_iter()
+            .chain(
+                stmt_try
+                    .handlers
+                    .iter()
+                    .filter_map(|it| Some(&it.as_except_handler()?.body)),
+            )
+            .chain([&stmt_try.orelse, &stmt_try.finalbody])
+    }));
+    let branches = branches.chain(
+        target
+            .as_stmt_while()
+            .into_iter()
+            .flat_map(|it| [&it.body, &it.orelse])
+            .chain(
+                target
+                    .as_stmt_for()
+                    .into_iter()
+                    .flat_map(|it| [&it.body, &it.orelse]),
+            ),
+    );
+    let branches = branches.chain(target.as_stmt_with().into_iter().map(|it| &it.body));
+
+    let trigger_ranges = branches.filter_map(move |body| {
+        let first = body.first()?.range();
+        (keyword.start() < first.start()).then(|| {
+            (
+                &body[..],
+                keyword.cover_offset(target.end()),
+                keyword.cover(first),
+            )
+        })
+    });
+
+    let trigger_ranges =
+        trigger_ranges.chain(target.as_stmt_match().into_iter().flat_map(|stmt_match| {
+            stmt_match
+                .cases
+                .iter()
+                .map(|case| (&case.body[..], stmt_match.range(), case.range))
+        }));
+
+    trigger_ranges
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct IndentSpan(TextRange);
+
+impl std::ops::Deref for IndentSpan {
+    type Target = TextRange;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl IndentSpan {
+    fn of(tokens: &Tokens, range: impl Ranged) -> Self {
+        let (before, _) = tokens.split_at(range.start());
+        IndentSpan::indent_spans(before).next().unwrap_or_default()
+    }
+
+    fn indent_spans(tokens: &[Token]) -> impl Iterator<Item = Self> {
+        let mut next_token = None;
+        tokens.iter().rev().filter_map(move |token| {
+            if !token.kind().is_any_newline() {
+                next_token = Some(token);
+                return None;
+            }
+            match next_token.take()? {
+                next_token if next_token.kind() == TokenKind::Indent => {
+                    Some(IndentSpan(next_token.range()))
+                }
+                next_token => Some(IndentSpan(TextRange::new(token.end(), next_token.start()))),
+            }
+        })
+    }
+
+    fn dedent(self, len: TextSize) -> Option<Edit> {
+        self.len()
+            .checked_sub(len)
+            .map(|_| Edit::range_deletion(TextRange::at(self.start(), len)))
+            .or_else(|| (!self.is_empty()).then(|| Edit::range_deletion(self.range())))
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
-    use crate::code_actions;
+    use crate::{diagnostic_code_actions, refactor_code_actions};
 
     use insta::assert_snapshot;
     use ruff_db::{
@@ -96,7 +261,7 @@ mod tests {
     fn add_ignore() {
         let test = CodeActionTest::with_source(r#"b = <START>a<END> / 10"#);
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:1:5
           |
@@ -112,7 +277,7 @@ mod tests {
     fn add_ignore_existing_comment() {
         let test = CodeActionTest::with_source(r#"b = <START>a<END> / 10  # fmt: off"#);
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:1:5
           |
@@ -129,7 +294,7 @@ mod tests {
         let test = CodeActionTest::with_source(r#"b = <START>a<END> / 10  "#);
 
         // Not an inline snapshot because of trailing whitespace.
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE));
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE));
     }
 
     #[test]
@@ -140,7 +305,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
@@ -161,7 +326,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
@@ -182,7 +347,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
@@ -205,7 +370,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:4:5
           |
@@ -228,7 +393,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
@@ -249,7 +414,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
@@ -270,7 +435,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
@@ -295,7 +460,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:3:9
           |
@@ -326,7 +491,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:3:9
           |
@@ -356,7 +521,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:3:9
           |
@@ -386,7 +551,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @r#"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:3:6
           |
@@ -414,7 +579,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @r#"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:4:5
           |
@@ -442,7 +607,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @r#"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
@@ -466,7 +631,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @r#"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
@@ -492,7 +657,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @r"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:4:11
           |
@@ -516,7 +681,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNDEFINED_REVEAL), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNDEFINED_REVEAL), @"
         info[code-action]: import typing.reveal_type
          --> main.py:2:1
           |
@@ -549,7 +714,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @r#"
         info[code-action]: import warnings.deprecated
          --> main.py:2:2
           |
@@ -586,7 +751,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @r#"
         info[code-action]: import warnings.deprecated
          --> main.py:4:2
           |
@@ -637,7 +802,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: import importlib.abc.ExecutionLoader
          --> main.py:2:1
           |
@@ -674,7 +839,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: import importlib.abc.ExecutionLoader
          --> main.py:3:1
           |
@@ -710,7 +875,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: import importlib.abc.ExecutionLoader
          --> main.py:3:1
           |
@@ -748,10 +913,403 @@ mod tests {
         ");
     }
 
+    #[test]
+    fn unwrap_block_if_refactor() {
+        let test = CodeActionTest::with_source(
+            r#"
+            if 1:
+                if True<START><END>:
+                    # comments
+                    foo
+                    bar()
+                    if 1:
+                        baz
+                        xxx
+                    ...
+                    # comments
+                ...
+        "#,
+        );
+
+        assert_snapshot!(test.refactor_code_actions(), @"
+        info[code-action(refactor)]: Unwrap this statements block
+         --> main.py:3:12
+          |
+        2 | if 1:
+        3 |     if True:
+          |            ^
+        4 |         # comments
+        5 |         foo
+          |
+        1  |
+        2  | if 1:
+           -     if True:
+           -         # comments
+           -         foo
+           -         bar()
+           -         if 1:
+           -             baz
+           -             xxx
+           -         ...
+        3  +     foo
+        4  +     bar()
+        5  +     if 1:
+        6  +         baz
+        7  +         xxx
+        8  +     ...
+        9  |         # comments
+        10 |     ...
+        ");
+    }
+
+    #[test]
+    fn unwrap_block_elif_refactor() {
+        let test = CodeActionTest::with_source(
+            r#"
+            if 1:
+                if False:
+                    xxx()
+                elif True<START><END>:
+                    foo
+                    bar()
+                    if 1:
+                        baz
+                        xxx
+                    ...
+                else:
+                    redundant()
+                ...
+        "#,
+        );
+
+        assert_snapshot!(test.refactor_code_actions(), @"
+        info[code-action(refactor)]: Unwrap this statements block
+         --> main.py:5:14
+          |
+        3 |     if False:
+        4 |         xxx()
+        5 |     elif True:
+          |              ^
+        6 |         foo
+        7 |         bar()
+          |
+        2  | if 1:
+        3  |     if False:
+        4  |         xxx()
+           -     elif True:
+           -         foo
+           -         bar()
+           -         if 1:
+           -             baz
+           -             xxx
+           -         ...
+           -     else:
+           -         redundant()
+        5  +     foo
+        6  +     bar()
+        7  +     if 1:
+        8  +         baz
+        9  +         xxx
+        10 +     ...
+        11 |     ...
+        ");
+    }
+
+    #[test]
+    fn unwrap_block_try_body_refactor() {
+        let test = CodeActionTest::with_source(
+            r#"
+            if 1:
+                try<START><END>:
+                    foo
+                    bar()
+                except:
+                    ...
+                ...
+        "#,
+        );
+
+        assert_snapshot!(test.refactor_code_actions(), @"
+        info[code-action(refactor)]: Unwrap this statements block
+         --> main.py:3:8
+          |
+        2 | if 1:
+        3 |     try:
+          |        ^
+        4 |         foo
+        5 |         bar()
+          |
+        1 |
+        2 | if 1:
+          -     try:
+          -         foo
+          -         bar()
+          -     except:
+          -         ...
+        3 +     foo
+        4 +     bar()
+        5 |     ...
+        ");
+    }
+
+    #[test]
+    fn unwrap_block_try_except_refactor() {
+        let test = CodeActionTest::with_source(
+            r#"
+            if 1:
+                try:
+                    ...
+                except<START><END>:
+                    foo
+                    bar()
+                ...
+        "#,
+        );
+
+        assert_snapshot!(test.refactor_code_actions(), @"
+        info[code-action(refactor)]: Unwrap this statements block
+         --> main.py:5:11
+          |
+        3 |     try:
+        4 |         ...
+        5 |     except:
+          |           ^
+        6 |         foo
+        7 |         bar()
+          |
+        2 | if 1:
+        3 |     try:
+        4 |         ...
+          -     except:
+          -         foo
+          -         bar()
+        5 +     foo
+        6 +     bar()
+        7 |     ...
+        ");
+    }
+
+    #[test]
+    fn unwrap_block_try_else_refactor() {
+        let test = CodeActionTest::with_source(
+            r#"
+            if 1:
+                try:
+                    ...
+                else<START><END>:
+                    foo
+                    bar()
+                ...
+        "#,
+        );
+
+        assert_snapshot!(test.refactor_code_actions(), @"
+        info[code-action(refactor)]: Unwrap this statements block
+         --> main.py:5:9
+          |
+        3 |     try:
+        4 |         ...
+        5 |     else:
+          |         ^
+        6 |         foo
+        7 |         bar()
+          |
+        2 | if 1:
+        3 |     try:
+        4 |         ...
+          -     else:
+          -         foo
+          -         bar()
+        5 +     foo
+        6 +     bar()
+        7 |     ...
+        ");
+    }
+
+    #[test]
+    fn unwrap_block_try_finally_refactor() {
+        let test = CodeActionTest::with_source(
+            r#"
+            if 1:
+                try:
+                    ...
+                except:
+                    ...
+                finally<START><END>:
+                    foo
+                    bar()
+                ...
+        "#,
+        );
+
+        assert_snapshot!(test.refactor_code_actions(), @"
+        info[code-action(refactor)]: Unwrap this statements block
+         --> main.py:7:12
+          |
+        5 |     except:
+        6 |         ...
+        7 |     finally:
+          |            ^
+        8 |         foo
+        9 |         bar()
+          |
+        4 |         ...
+        5 |     except:
+        6 |         ...
+          -     finally:
+          -         foo
+          -         bar()
+        7 +     foo
+        8 +     bar()
+        9 |     ...
+        ");
+    }
+
+    #[test]
+    fn unwrap_block_while_refactor() {
+        let test = CodeActionTest::with_source(
+            r#"
+            if 1:
+                while True<START><END>:
+                    foo
+                    bar()
+                ...
+        "#,
+        );
+
+        assert_snapshot!(test.refactor_code_actions(), @"
+        info[code-action(refactor)]: Unwrap this statements block
+         --> main.py:3:15
+          |
+        2 | if 1:
+        3 |     while True:
+          |               ^
+        4 |         foo
+        5 |         bar()
+          |
+        1 |
+        2 | if 1:
+          -     while True:
+          -         foo
+          -         bar()
+        3 +     foo
+        4 +     bar()
+        5 |     ...
+        ");
+    }
+
+    #[test]
+    fn unwrap_block_while_else_refactor() {
+        let test = CodeActionTest::with_source(
+            r#"
+            if 1:
+                while True:
+                    ...
+                else<START><END>:
+                    foo
+                    bar()
+                ...
+        "#,
+        );
+
+        assert_snapshot!(test.refactor_code_actions(), @"
+        info[code-action(refactor)]: Unwrap this statements block
+         --> main.py:5:9
+          |
+        3 |     while True:
+        4 |         ...
+        5 |     else:
+          |         ^
+        6 |         foo
+        7 |         bar()
+          |
+        2 | if 1:
+        3 |     while True:
+        4 |         ...
+          -     else:
+          -         foo
+          -         bar()
+        5 +     foo
+        6 +     bar()
+        7 |     ...
+        ");
+    }
+
+    #[test]
+    fn unwrap_block_match_case_refactor() {
+        let test = CodeActionTest::with_source(
+            r#"
+            if 1:
+                match x:
+                    case 0:
+                        ...
+                    case 1:<START><END>
+                        foo
+                        bar()
+                    case _:
+                        ...
+                ...
+        "#,
+        );
+
+        assert_snapshot!(test.refactor_code_actions(), @"
+        info[code-action(refactor)]: Unwrap this statements block
+         --> main.py:6:16
+          |
+        4 |         case 0:
+        5 |             ...
+        6 |         case 1:
+          |                ^
+        7 |             foo
+        8 |             bar()
+          |
+        1 |
+        2 | if 1:
+          -     match x:
+          -         case 0:
+          -             ...
+          -         case 1:
+          -             foo
+          -             bar()
+          -         case _:
+          -             ...
+        3 +     foo
+        4 +     bar()
+        5 |     ...
+        ");
+    }
+
+    #[test]
+    fn unwrap_block_if_refactor_without_newline() {
+        let test = CodeActionTest::with_source(
+            r#"
+            if 1:
+                if True<START><END>: foo; bar()
+                ...
+        "#,
+        );
+
+        assert_snapshot!(test.refactor_code_actions(), @"
+        info[code-action(refactor)]: Unwrap this statements block
+         --> main.py:3:12
+          |
+        2 | if 1:
+        3 |     if True: foo; bar()
+          |            ^
+        4 |     ...
+          |
+        1 |
+        2 | if 1:
+          -     if True: foo; bar()
+        3 +     foo; bar()
+        4 |     ...
+        ");
+    }
+
     pub(super) struct CodeActionTest {
         pub(super) db: ty_project::TestDb,
         pub(super) file: File,
-        pub(super) diagnostic_range: TextRange,
+        pub(super) range: TextRange,
     }
 
     impl CodeActionTest {
@@ -786,14 +1344,14 @@ mod tests {
             Self {
                 db,
                 file,
-                diagnostic_range: TextRange::new(
+                range: TextRange::new(
                     TextSize::try_from(start).unwrap(),
                     TextSize::try_from(end).unwrap(),
                 ),
             }
         }
 
-        pub(super) fn code_actions(&self, lint: &'static LintMetadata) -> String {
+        pub(super) fn diagnostic_code_actions(&self, lint: &'static LintMetadata) -> String {
             use std::fmt::Write;
 
             let mut buf = String::new();
@@ -804,7 +1362,7 @@ mod tests {
                 .context(0)
                 .format(DiagnosticFormat::Full);
 
-            for mut action in code_actions(&self.db, self.file, self.diagnostic_range, &lint.name) {
+            for mut action in diagnostic_code_actions(&self.db, self.file, self.range, &lint.name) {
                 let mut diagnostic = Diagnostic::new(
                     DiagnosticId::Lint(LintName::of("code-action")),
                     ruff_db::diagnostic::Severity::Info,
@@ -812,7 +1370,44 @@ mod tests {
                 );
 
                 diagnostic.annotate(Annotation::primary(
-                    Span::from(self.file).with_range(self.diagnostic_range),
+                    Span::from(self.file).with_range(self.range),
+                ));
+
+                if action.preferred {
+                    diagnostic.sub(SubDiagnostic::new(
+                        ruff_db::diagnostic::SubDiagnosticSeverity::Help,
+                        "This is a preferred code action",
+                    ));
+                }
+
+                let first_edit = action.edits.remove(0);
+                diagnostic.set_fix(Fix::safe_edits(first_edit, action.edits));
+
+                write!(buf, "{}", diagnostic.display(&self.db, &config)).unwrap();
+            }
+
+            buf
+        }
+
+        pub(super) fn refactor_code_actions(&self) -> String {
+            use std::fmt::Write;
+
+            let mut buf = String::new();
+
+            let config = DisplayDiagnosticConfig::new("ty")
+                .color(false)
+                .show_fix_diff(true)
+                .format(DiagnosticFormat::Full);
+
+            for mut action in refactor_code_actions(&self.db, self.file, self.range) {
+                let mut diagnostic = Diagnostic::new(
+                    DiagnosticId::Lint(LintName::of("code-action(refactor)")),
+                    ruff_db::diagnostic::Severity::Info,
+                    action.title,
+                );
+
+                diagnostic.annotate(Annotation::primary(
+                    Span::from(self.file).with_range(self.range),
                 ));
 
                 if action.preferred {

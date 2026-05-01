@@ -30,7 +30,7 @@ mod type_hierarchy;
 mod workspace_symbols;
 
 pub use all_symbols::{AllSymbolInfo, all_symbols};
-pub use code_action::{QuickFix, code_actions};
+pub use code_action::{CodeAction, diagnostic_code_actions, refactor_code_actions};
 pub use completion::{Completion, CompletionKind, CompletionSettings, completion};
 pub use doc_highlights::document_highlights;
 pub use document_symbols::document_symbols;

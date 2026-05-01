@@ -388,7 +388,7 @@ pub(crate) fn server_capabilities(
         position_encoding: Some(position_encoding.into()),
         code_action_provider: Some(types::CodeActionProviderCapability::Options(
             CodeActionOptions {
-                code_action_kinds: Some(vec![CodeActionKind::QUICKFIX]),
+                code_action_kinds: Some(vec![CodeActionKind::QUICKFIX, CodeActionKind::REFACTOR]),
                 ..CodeActionOptions::default()
             },
         )),
