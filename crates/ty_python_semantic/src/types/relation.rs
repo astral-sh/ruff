@@ -861,6 +861,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return self.always();
         }
 
+        if matches!(target, Type::LiteralValue(_) | Type::Union(_))
+            && let Some(source_literals) = source.enum_complement_literal_types(db)
+        {
+            return source_literals
+                .iter()
+                .copied()
+                .when_all(db, self.constraints, |literal| {
+                    self.check_type_pair(db, literal, target)
+                });
+        }
+
         // Handle constraint implication first. If either `source` or `target` is a typevar, check
         // the constraint set to see if the corresponding constraint is satisfied.
         if self.relation == TypeRelation::SubtypingAssuming
