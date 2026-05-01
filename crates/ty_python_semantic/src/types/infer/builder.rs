@@ -7916,8 +7916,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // therefore has no `ScopedUseId`, so resolve it from its binding definition instead.
             if let ast::ExprRef::Named(named) = expr_ref {
                 let place = if named.target.is_name_expr() {
-                    let definition = self.index.expect_single_definition(named);
-                    Place::bound(binding_type(db, definition))
+                    if let Some(definition) = self
+                        .index
+                        .try_definitions(named)
+                        .and_then(|definitions| definitions.first().copied())
+                    {
+                        Place::bound(binding_type(db, definition))
+                    } else {
+                        Place::bound(self.expression_type(&named.value))
+                    }
                 } else {
                     Place::Undefined
                 };

@@ -496,11 +496,17 @@ reveal_type(s)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(t)  # revealed: Unknown
 
-# PEP 572: walrus targets in comprehensions leak into the enclosing scope.
+# PEP 572: walrus targets in comprehensions leak into the enclosing scope, but
+# the target is only defined if the comprehension body runs at least once.
+# error: [possibly-unresolved-reference]
 reveal_type(g)  # revealed: int
+# error: [possibly-unresolved-reference]
 reveal_type(i)  # revealed: int
+# error: [possibly-unresolved-reference]
 reveal_type(k)  # revealed: int
+# error: [possibly-unresolved-reference]
 reveal_type(m)  # revealed: int
+# error: [possibly-unresolved-reference]
 reveal_type(q)  # revealed: int
 ```
 

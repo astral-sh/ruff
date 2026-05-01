@@ -1325,14 +1325,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     debug_assert!(matches!(category, DefinitionCategory::Binding));
                     debug_assert!(!is_loop_header);
 
+                    let reachability = DeferredWalrusReachability::from_constraint(
+                        self.current_use_def_map().reachability,
+                    );
                     self.record_temporary_walrus_definition_in_scope(
                         self.current_scope(),
                         self.scope_stack.len() - 1,
                         place_id,
                         definition,
-                        DeferredWalrusReachability::from_constraint(
-                            self.current_use_def_map().reachability,
-                        ),
+                        reachability,
                     );
 
                     self.deferred_walrus_definitions
@@ -1341,9 +1342,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             target_place: symbol_id.into(),
                             definition,
                             visible_after_scope: self.current_scope(),
-                            reachability: DeferredWalrusReachability::from_constraint(
-                                self.current_use_def_map().reachability,
-                            ),
+                            // The comprehension body can run zero times, so the binding that
+                            // leaks to the enclosing scope is never guaranteed by iteration alone.
+                            reachability: reachability
+                                .combine(DeferredWalrusReachability::Conditional),
                         });
                 } else {
                     self.add_definition(place_id, named);
@@ -1619,9 +1621,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .expect("deferred walrus target should be a symbol");
         let associated_member_ids = self.place_tables[scope]
             .associated_place_ids(place)
-            .iter()
-            .copied()
-            .collect::<Vec<_>>();
+            .to_vec();
         let pre_definition =
             self.use_def_maps[scope].single_symbol_snapshot(symbol, &associated_member_ids);
         let pre_definition_reachability = self.use_def_maps[scope].reachability;

@@ -210,6 +210,11 @@ reveal_type(a)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(i)  # revealed: Unknown
 
+# error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+[(x := 1).bit_length() for x in [0]]
+# error: [unresolved-reference]
+reveal_type(x)  # revealed: Unknown
+
 [x for x in range(3) if (lambda: (x := 1))()]
 # error: [unresolved-reference]
 reveal_type(x)  # revealed: Unknown
@@ -231,6 +236,11 @@ def returns_list() -> list[int]:
 [x for x in (y := returns_list())]
 # error: [unresolved-reference]
 reveal_type(y)  # revealed: Unknown
+
+# error: [invalid-syntax] "assignment expression cannot be used in a comprehension iterable expression"
+[x for x in (z := returns_list()).copy()]
+# error: [unresolved-reference]
+reveal_type(z)  # revealed: Unknown
 ```
 
 ## Multiple case assignments

@@ -33,7 +33,23 @@ class Iterable:
         return Iterator()
 
 [(a := b * 2) for b in Iterable()]
+# error: [possibly-unresolved-reference]
 reveal_type(a)  # revealed: int
+```
+
+### Comprehension may not iterate
+
+```py
+def items() -> list[int]:
+    return []
+
+y = "old"
+[(y := item) for item in items()]
+reveal_type(y)  # revealed: Literal["old"] | int
+
+[(z := item) for item in items()]
+# error: [possibly-unresolved-reference]
+reveal_type(z)  # revealed: int
 ```
 
 ### Comprehension filter
@@ -48,6 +64,7 @@ class Iterable:
         return Iterator()
 
 [c for d in Iterable() if (c := d - 10) > 0]
+# error: [possibly-unresolved-reference]
 reveal_type(c)  # revealed: int
 ```
 
@@ -186,7 +203,9 @@ class Iterable:
         return Iterator()
 
 {(e := f * 2): (g := f * 3) for f in Iterable()}
+# error: [possibly-unresolved-reference]
 reveal_type(e)  # revealed: int
+# error: [possibly-unresolved-reference]
 reveal_type(g)  # revealed: int
 ```
 
@@ -258,6 +277,7 @@ reveal_type(y)  # revealed: Literal["old"]
 
 ```py
 [[(x := y) for y in range(3)] for _ in range(3)]
+# error: [possibly-unresolved-reference]
 reveal_type(x)  # revealed: int
 ```
 
@@ -281,10 +301,12 @@ target definition being created.
 ```py
 # error: [unresolved-reference]
 [(x, x := y) for y in [1]]
+# error: [possibly-unresolved-reference]
 reveal_type(x)  # revealed: int
 
 # error: [unresolved-reference]
 [(q := q + 1) for _ in [0]]
+# error: [possibly-unresolved-reference]
 reveal_type(q)  # revealed: Unknown
 ```
 
@@ -296,6 +318,7 @@ expression, including assignment diagnostics.
 ```py
 x: int
 [(x := "bad") for _ in range(1)]  # error: [invalid-assignment]
+# error: [possibly-unresolved-reference]
 reveal_type(x)  # revealed: int
 ```
 
@@ -331,7 +354,7 @@ def _(x: int | None):
     ok = x is not None
     [(x := None) for _ in range(1)]
     if ok:
-        reveal_type(x)  # revealed: None
+        reveal_type(x)  # revealed: int | None
 ```
 
 ### Updates lazy snapshots in nested scopes
@@ -386,6 +409,6 @@ def outer() -> None:
     def inner() -> None:
         nonlocal x
         [(x := y) for y in range(3)]
-        reveal_type(x)  # revealed: int
+        reveal_type(x)  # revealed: int | Literal["hello"]
     inner()
 ```
