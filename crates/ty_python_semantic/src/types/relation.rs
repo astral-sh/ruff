@@ -13,7 +13,6 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
-use crate::types::typevar::TypeVarNonceGenerator;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -340,7 +339,6 @@ impl<'db> Type<'db> {
             relation: TypeRelation::SubtypingAssuming,
             context_tree: ErrorContextTree::disabled(),
             given: assuming,
-            next_nonce: TypeVarNonceGenerator::default(),
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
             signature_relation_visitor: &signature_relation_visitor,
@@ -377,7 +375,6 @@ impl<'db> Type<'db> {
             relation: TypeRelation::Assignability,
             context_tree: ErrorContextTree::enabled(),
             given: ConstraintSet::from_bool(&builder, false),
-            next_nonce: TypeVarNonceGenerator::default(),
             relation_visitor: &HasRelationToVisitor::default(&builder),
             disjointness_visitor: &IsDisjointVisitor::default(&builder),
             signature_relation_visitor: &SignatureRelationVisitor::default(),
@@ -507,7 +504,6 @@ impl<'db> Type<'db> {
             relation,
             context_tree: ErrorContextTree::disabled(),
             given: ConstraintSet::from_bool(constraints, false),
-            next_nonce: TypeVarNonceGenerator::default(),
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
             signature_relation_visitor: &signature_relation_visitor,
@@ -576,7 +572,6 @@ impl<'db> Type<'db> {
         let checker = EquivalenceChecker {
             constraints,
             given: ConstraintSet::from_bool(constraints, false),
-            next_nonce: TypeVarNonceGenerator::default(),
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
             signature_relation_visitor: &signature_relation_visitor,
@@ -621,7 +616,6 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             given: ConstraintSet::from_bool(constraints, false),
-            next_nonce: TypeVarNonceGenerator::default(),
             disjointness_visitor: &disjointness_visitor,
             relation_visitor: &relation_visitor,
             signature_relation_visitor: &signature_relation_visitor,
@@ -660,7 +654,6 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) relation: TypeRelation,
     context_tree: ErrorContextTree<'db>,
     pub(super) given: ConstraintSet<'db, 'c>,
-    next_nonce: TypeVarNonceGenerator<'db>,
 
     // N.B. these fields are private to reduce the risk of
     // "double-visiting" a given pair of types. You should
@@ -689,7 +682,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             relation: TypeRelation::Subtyping,
             context_tree: ErrorContextTree::disabled(),
             given: ConstraintSet::from_bool(constraints, false),
-            next_nonce: TypeVarNonceGenerator::default(),
             relation_visitor,
             disjointness_visitor,
             signature_relation_visitor,
@@ -710,7 +702,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             relation: TypeRelation::ConstraintSetAssignability,
             context_tree: ErrorContextTree::disabled(),
             given: ConstraintSet::from_bool(constraints, false),
-            next_nonce: TypeVarNonceGenerator::default(),
             relation_visitor,
             disjointness_visitor,
             signature_relation_visitor,
@@ -1905,7 +1896,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         EquivalenceChecker {
             constraints: self.constraints,
             given: self.given,
-            next_nonce: self.next_nonce.clone(),
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
@@ -1918,7 +1908,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             constraints: self.constraints,
             inferable: self.inferable,
             given: self.given,
-            next_nonce: self.next_nonce.clone(),
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
@@ -1957,7 +1946,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     given: ConstraintSet<'db, 'c>,
-    next_nonce: TypeVarNonceGenerator<'db>,
 
     // N.B. these fields are private to reduce the risk of
     // "double-visiting" a given pair of types. You should
@@ -1982,7 +1970,6 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             context_tree: ErrorContextTree::disabled(),
             given: self.given,
             inferable: InferableTypeVars::None,
-            next_nonce: self.next_nonce.clone(),
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
@@ -2024,7 +2011,6 @@ pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'db>,
     given: ConstraintSet<'db, 'c>,
-    next_nonce: TypeVarNonceGenerator<'db>,
 
     // N.B. these fields are private to reduce the risk of
     // "double-visiting" a given pair of types. You should
@@ -2051,7 +2037,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             constraints,
             inferable,
             given: ConstraintSet::from_bool(constraints, false),
-            next_nonce: TypeVarNonceGenerator::default(),
             disjointness_visitor,
             relation_visitor,
             signature_relation_visitor,
@@ -2069,7 +2054,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             inferable: self.inferable,
             context_tree: ErrorContextTree::disabled(),
             given: self.given,
-            next_nonce: self.next_nonce.clone(),
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
@@ -2081,7 +2065,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         EquivalenceChecker {
             constraints: self.constraints,
             given: self.given,
-            next_nonce: self.next_nonce.clone(),
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
