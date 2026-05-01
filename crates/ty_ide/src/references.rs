@@ -12,7 +12,7 @@
 
 use crate::goto::GotoTarget;
 use crate::{Db, DefinitionTargets, NavigationTarget, ReferenceKind, ReferenceTarget};
-use ruff_db::files::File;
+use ruff_db::files::{File, FileRange};
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{
@@ -71,8 +71,8 @@ impl ReferencesMode {
 
 /// Find all references to a symbol at the given position.
 /// Search for references across all files in the project.
-pub(crate) fn references(
-    db: &dyn Db,
+pub(crate) fn references<'db>(
+    db: &'db dyn Db,
     file: File,
     goto_target: &GotoTarget,
     mode: ReferencesMode,
@@ -161,10 +161,10 @@ pub(crate) fn references(
 ///
 /// This is intentionally narrower than a full cross-file references search to avoid turning
 /// common parameter names into a costly workspace-wide scan.
-fn references_for_parameter_keyword_arguments_across_files(
-    db: &dyn Db,
+fn references_for_parameter_keyword_arguments_across_files<'db>(
+    db: &'db dyn Db,
     file: File,
-    target_definitions: &DefinitionTargets,
+    target_definitions: &DefinitionTargets<'db>,
     target_text: &str,
     mode: ReferencesMode,
     references: &mut Vec<ReferenceTarget>,
@@ -190,10 +190,10 @@ fn references_for_parameter_keyword_arguments_across_files(
     }
 }
 
-fn references_for_keyword_arguments_in_file(
-    db: &dyn Db,
+fn references_for_keyword_arguments_in_file<'db>(
+    db: &'db dyn Db,
     file: File,
-    target_definitions: &DefinitionTargets,
+    target_definitions: &DefinitionTargets<'db>,
     target_text: &str,
     mode: ReferencesMode,
     references: &mut Vec<ReferenceTarget>,
@@ -269,23 +269,23 @@ fn source_contains_keyword_argument_candidate(source: &str, name: &str) -> bool 
 /// A symbol can resolve to multiple declaration targets (for example, overload groups or an
 /// import binding plus its underlying definition). Intersection semantics avoid missing valid
 /// references/renames when target ordering differs.
-fn navigation_targets_intersect(
-    target_definitions: &DefinitionTargets,
-    current_targets: &DefinitionTargets,
+fn definition_identities_intersect(
+    target_definitions: &DefinitionTargets<'_>,
+    current_targets: &DefinitionTargets<'_>,
 ) -> bool {
     target_definitions.iter().any(|target_definition| {
         current_targets
             .iter()
-            .any(|current_target| current_target.navigation() == target_definition.navigation())
+            .any(|current_target| current_target.identity() == target_definition.identity())
     })
 }
 
 /// Find all references to a local symbol within the current file.
 /// The behavior depends on the provided mode.
-fn references_for_file(
-    db: &dyn Db,
+fn references_for_file<'db>(
+    db: &'db dyn Db,
     file: File,
-    target_definitions: &DefinitionTargets,
+    target_definitions: &DefinitionTargets<'db>,
     target_text: &str,
     mode: ReferencesMode,
     references: &mut Vec<ReferenceTarget>,
@@ -331,7 +331,7 @@ fn is_symbol_externally_visible(goto_target: &GotoTarget<'_>) -> bool {
 /// when the owning callable is visible outside of the current module.
 fn parameter_owner_is_externally_visible(
     db: &dyn Db,
-    target_definitions: &DefinitionTargets,
+    target_definitions: &DefinitionTargets<'_>,
 ) -> bool {
     target_definitions
         .iter()
@@ -392,18 +392,18 @@ fn parameter_owner_is_externally_visible_for_target(
 }
 
 /// AST visitor to find all references to a specific symbol by comparing semantic definitions
-struct LocalReferencesFinder<'a> {
-    model: &'a SemanticModel<'a>,
-    tokens: &'a Tokens,
-    target_definitions: &'a DefinitionTargets,
-    references: &'a mut Vec<ReferenceTarget>,
+struct LocalReferencesFinder<'db, 'ast, 'refs> {
+    model: &'ast SemanticModel<'db>,
+    tokens: &'ast Tokens,
+    target_definitions: &'refs DefinitionTargets<'db>,
+    references: &'refs mut Vec<ReferenceTarget>,
     mode: ReferencesMode,
-    target_text: &'a str,
-    ancestors: Vec<AnyNodeRef<'a>>,
+    target_text: &'refs str,
+    ancestors: Vec<AnyNodeRef<'ast>>,
 }
 
 /// AST visitor that searches only keyword-argument labels for semantic matches against a target.
-struct KeywordArgumentReferencesFinder<'a>(LocalReferencesFinder<'a>);
+struct KeywordArgumentReferencesFinder<'db, 'ast, 'refs>(LocalReferencesFinder<'db, 'ast, 'refs>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum OccurrenceKind {
@@ -436,8 +436,8 @@ impl From<ast::ExprContext> for OccurrenceKind {
     }
 }
 
-impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
-    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+impl<'db, 'ast, 'refs> SourceOrderVisitor<'ast> for LocalReferencesFinder<'db, 'ast, 'refs> {
+    fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
         self.ancestors.push(node);
 
         match node {
@@ -541,14 +541,16 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
         TraversalSignal::Traverse
     }
 
-    fn leave_node(&mut self, node: AnyNodeRef<'a>) {
+    fn leave_node(&mut self, node: AnyNodeRef<'ast>) {
         debug_assert_eq!(self.ancestors.last(), Some(&node));
         self.ancestors.pop();
     }
 }
 
-impl<'a> SourceOrderVisitor<'a> for KeywordArgumentReferencesFinder<'a> {
-    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+impl<'db, 'ast, 'refs> SourceOrderVisitor<'ast>
+    for KeywordArgumentReferencesFinder<'db, 'ast, 'refs>
+{
+    fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
         self.0.ancestors.push(node);
 
         if let AnyNodeRef::Keyword(keyword) = node {
@@ -560,13 +562,13 @@ impl<'a> SourceOrderVisitor<'a> for KeywordArgumentReferencesFinder<'a> {
         TraversalSignal::Traverse
     }
 
-    fn leave_node(&mut self, node: AnyNodeRef<'a>) {
+    fn leave_node(&mut self, node: AnyNodeRef<'ast>) {
         debug_assert_eq!(self.0.ancestors.last(), Some(&node));
         self.0.ancestors.pop();
     }
 }
 
-impl LocalReferencesFinder<'_> {
+impl<'db, 'ast, 'refs> LocalReferencesFinder<'db, 'ast, 'refs> {
     /// Check if we should include declarations based on the current mode
     fn should_include_declaration(&self) -> bool {
         matches!(
@@ -604,7 +606,7 @@ impl LocalReferencesFinder<'_> {
     fn definitions_for_covering_node(
         &self,
         covering_node: &CoveringNode<'_>,
-    ) -> Option<DefinitionTargets> {
+    ) -> Option<DefinitionTargets<'db>> {
         // Use the start of the covering node as the offset. Any offset within
         // the node is fine here. Offsets matter only for import statements
         // where the identifier might be a multi-part module name.
@@ -633,7 +635,7 @@ impl LocalReferencesFinder<'_> {
         };
 
         // Check if any of the current definitions match our target definitions
-        if !navigation_targets_intersect(self.target_definitions, &current_definitions) {
+        if !definition_identities_intersect(self.target_definitions, &current_definitions) {
             return;
         }
 
@@ -658,13 +660,20 @@ impl LocalReferencesFinder<'_> {
     }
 
     /// Returns true if this store occurrence is the declaration to omit.
-    fn is_declaration_occurrence(&self, current_definitions: &DefinitionTargets) -> bool {
+    fn is_declaration_occurrence(&self, current_definitions: &DefinitionTargets<'_>) -> bool {
         self.target_definitions
             .declarations()
             .any(|target_declaration| {
-                current_definitions.origin_targets().any(|current_origin| {
-                    current_origin.navigation() == target_declaration.navigation()
-                })
+                navigation_contains_file_range(
+                    target_declaration.navigation(),
+                    current_definitions.origin(),
+                )
             })
     }
+}
+
+fn navigation_contains_file_range(navigation: &NavigationTarget, range: FileRange) -> bool {
+    navigation.file() == range.file()
+        && (navigation.focus_range() == range.range()
+            || navigation.full_range().contains_range(range.range()))
 }

@@ -160,24 +160,49 @@ impl From<FileRange> for NavigationTarget {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct DefinitionTarget {
-    navigation: NavigationTarget,
-    category: DefinitionCategory,
-    is_origin: bool,
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub(crate) enum DefinitionIdentity<'db> {
+    Definition(ty_python_core::definition::Definition<'db>),
+    Module(File),
+    FileWithRange(FileRange),
 }
 
-impl DefinitionTarget {
+impl<'db> From<ty_python_semantic::ResolvedDefinition<'db>> for DefinitionIdentity<'db> {
+    fn from(value: ty_python_semantic::ResolvedDefinition<'db>) -> Self {
+        match value {
+            ty_python_semantic::ResolvedDefinition::Definition(definition) => {
+                Self::Definition(definition)
+            }
+            ty_python_semantic::ResolvedDefinition::Module(file) => Self::Module(file),
+            ty_python_semantic::ResolvedDefinition::FileWithRange(file_range) => {
+                Self::FileWithRange(file_range)
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) struct DefinitionTarget<'db> {
+    identity: DefinitionIdentity<'db>,
+    navigation: NavigationTarget,
+    category: DefinitionCategory,
+}
+
+impl<'db> DefinitionTarget<'db> {
     pub(crate) fn new(
+        identity: DefinitionIdentity<'db>,
         navigation: NavigationTarget,
         category: DefinitionCategory,
-        is_origin: bool,
     ) -> Self {
         Self {
+            identity,
             navigation,
             category,
-            is_origin,
         }
+    }
+
+    pub(crate) fn identity(&self) -> DefinitionIdentity<'db> {
+        self.identity
     }
 
     pub(crate) fn navigation(&self) -> &NavigationTarget {
@@ -187,17 +212,19 @@ impl DefinitionTarget {
     pub(crate) fn category(&self) -> DefinitionCategory {
         self.category
     }
-
-    pub(crate) fn is_origin(&self) -> bool {
-        self.is_origin
-    }
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct DefinitionTargets(smallvec::SmallVec<[DefinitionTarget; 1]>);
+pub(crate) struct DefinitionTargets<'db> {
+    origin: FileRange,
+    targets: smallvec::SmallVec<[DefinitionTarget<'db>; 1]>,
+}
 
-impl DefinitionTargets {
-    pub(crate) fn unique(targets: impl IntoIterator<Item = DefinitionTarget>) -> Self {
+impl<'db> DefinitionTargets<'db> {
+    pub(crate) fn unique(
+        origin: FileRange,
+        targets: impl IntoIterator<Item = DefinitionTarget<'db>>,
+    ) -> Self {
         let unique: FxHashSet<_> = targets.into_iter().collect();
         let mut targets = unique.into_iter().collect::<Vec<_>>();
         targets.sort_by_key(|target| {
@@ -207,24 +234,31 @@ impl DefinitionTargets {
                 target.category,
             )
         });
-        Self(targets.into())
+        Self {
+            origin,
+            targets: targets.into(),
+        }
+    }
+
+    pub(crate) fn origin(&self) -> FileRange {
+        self.origin
     }
 
     pub(crate) fn navigation_targets(&self) -> NavigationTargets {
-        NavigationTargets::unique(self.0.iter().map(|target| target.navigation.clone()))
+        NavigationTargets::unique(self.targets.iter().map(|target| target.navigation.clone()))
     }
 
-    pub(crate) fn iter(&self) -> std::slice::Iter<'_, DefinitionTarget> {
-        self.0.iter()
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, DefinitionTarget<'db>> {
+        self.targets.iter()
     }
 
-    pub(crate) fn declarations(&self) -> impl Iterator<Item = &DefinitionTarget> {
+    pub(crate) fn declarations(&self) -> impl Iterator<Item = &DefinitionTarget<'db>> {
         let has_semantic_declaration = self
-            .0
+            .targets
             .iter()
             .any(|target| target.category().is_declaration());
         let first_binding = self
-            .0
+            .targets
             .iter()
             .filter(|target| target.category().is_binding())
             .min_by_key(|target| {
@@ -234,17 +268,13 @@ impl DefinitionTargets {
                 )
             });
 
-        self.0.iter().filter(move |target| {
+        self.targets.iter().filter(move |target| {
             if has_semantic_declaration {
                 target.category().is_declaration()
             } else {
                 first_binding.is_some_and(|first_binding| first_binding == *target)
             }
         })
-    }
-
-    pub(crate) fn origin_targets(&self) -> impl Iterator<Item = &DefinitionTarget> {
-        self.0.iter().filter(|target| target.is_origin())
     }
 }
 
