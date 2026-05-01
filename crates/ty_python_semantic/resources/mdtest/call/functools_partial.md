@@ -638,7 +638,8 @@ reveal_type(p())  # revealed: None
 
 ### Positional binding expression
 
-The initial refinement probe should not commit inference results for bound expressions:
+Partial-specific argument inference should not commit duplicate inference results for bound
+expressions:
 
 ```py
 from functools import partial
@@ -654,7 +655,7 @@ reveal_type(p())  # revealed: None
 
 ### Refinement probe diagnostics
 
-The initial refinement probe should not emit diagnostics that the refinement pass will emit again:
+Partial-specific argument inference should not emit duplicate diagnostics:
 
 ```py
 from functools import partial

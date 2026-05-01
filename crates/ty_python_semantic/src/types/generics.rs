@@ -852,7 +852,10 @@ impl<'db> GenericContext<'db> {
     /// [`specialize_partial`](Self::specialize_partial) if you might not have types for every
     /// typevar.)
     ///
-    /// The types you provide should not mention any of the typevars in this generic context.
+    /// The types you provide should not mention any of the typevars in this generic context;
+    /// otherwise, you will be left with a partial specialization. (Use
+    /// [`specialize_recursive`](Self::specialize_recursive) if your types might mention typevars
+    /// in this generic context.)
     pub(crate) fn specialize<'t, T>(self, db: &'db dyn Db, types: T) -> Specialization<'db>
     where
         T: Into<Cow<'t, [Type<'db>]>>,
@@ -1725,48 +1728,26 @@ pub struct TypeVarSubstitution<'db> {
 }
 
 impl<'db> TypeVarSubstitution<'db> {
-    fn normalize_mapping(
-        &self,
-        db: &'db dyn Db,
-        bound_typevar: BoundTypeVarInstance<'db>,
-        ty: Type<'db>,
-    ) -> TypeVarSubstitutionMapping<'db> {
+    fn insert(&mut self, db: &'db dyn Db, bound_typevar: BoundTypeVarInstance<'db>, ty: Type<'db>) {
         if ty.references_bound_typevar(db, bound_typevar) {
-            TypeVarSubstitutionMapping::Recursive
-        } else {
-            let ty = self.apply_to_type(db, ty);
-
-            // This is the usual occurs check for substitutions: neither open substitutions nor
-            // closed specializations can represent `T := F[T]` as a finite type.
-            if ty.references_bound_typevar(db, bound_typevar) {
-                TypeVarSubstitutionMapping::Recursive
-            } else {
-                TypeVarSubstitutionMapping::Acyclic(ty)
-            }
+            return;
         }
-    }
 
-    fn insert(
-        &mut self,
-        db: &'db dyn Db,
-        bound_typevar: BoundTypeVarInstance<'db>,
-        ty: Type<'db>,
-    ) -> TypeVarSubstitutionInsertion {
-        match self.normalize_mapping(db, bound_typevar, ty) {
-            TypeVarSubstitutionMapping::Acyclic(ty) => {
-                let update = TypeMapping::ApplySpecialization(ApplySpecialization::Single(
-                    bound_typevar,
-                    ty,
-                ));
-                for existing in self.types.values_mut() {
-                    *existing = existing.apply_type_mapping(db, &update, TypeContext::default());
-                }
+        let ty = self.apply_to_type(db, ty);
 
-                self.types.insert(bound_typevar.identity(db), ty);
-                TypeVarSubstitutionInsertion::Inserted
-            }
-            TypeVarSubstitutionMapping::Recursive => TypeVarSubstitutionInsertion::Recursive,
+        // This is the usual occurs check for substitutions: neither open substitutions nor
+        // closed specializations can represent `T := F[T]` as a finite type.
+        if ty.references_bound_typevar(db, bound_typevar) {
+            return;
         }
+
+        let update =
+            TypeMapping::ApplySpecialization(ApplySpecialization::Single(bound_typevar, ty));
+        for existing in self.types.values_mut() {
+            *existing = existing.apply_type_mapping(db, &update, TypeContext::default());
+        }
+
+        self.types.insert(bound_typevar.identity(db), ty);
     }
 
     fn default_type(db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> Type<'db> {
@@ -1807,16 +1788,6 @@ impl<'db> TypeVarSubstitution<'db> {
             TypeContext::default(),
         )
     }
-}
-
-enum TypeVarSubstitutionMapping<'db> {
-    Acyclic(Type<'db>),
-    Recursive,
-}
-
-enum TypeVarSubstitutionInsertion {
-    Inserted,
-    Recursive,
 }
 
 pub(crate) enum TypeVarSubstitutionProjection<'db> {
