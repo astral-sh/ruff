@@ -565,6 +565,22 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.node.solutions(db, builder)
     }
 
+    /// Visits each satisfying BDD path using only direct positive constraints.
+    ///
+    /// This deliberately ignores negative path edges and sequent-derived constraints. It is meant
+    /// for specialization inference, where we want evidence that came directly from the comparison
+    /// being specialized, not every fact needed to prove assignability.
+    pub(crate) fn for_each_direct_positive_constraint_path(
+        self,
+        builder: &'c ConstraintSetBuilder<'db>,
+        mut f: impl FnMut(&DirectPositiveConstraintPath<'db>),
+    ) {
+        self.verify_builder(builder);
+        let mut path = Vec::new();
+        self.node
+            .for_each_direct_positive_constraint_path(builder, &mut path, &mut f);
+    }
+
     #[expect(dead_code)] // Keep this around for debugging purposes
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
         self.node
@@ -905,6 +921,9 @@ pub struct TypeVarId;
 #[newtype_index]
 #[derive(salsa::Update, get_size2::GetSize)]
 pub struct ConstraintId;
+
+type DirectPositiveConstraintPathEntry<'db> = (Constraint<'db>, usize);
+type DirectPositiveConstraintPath<'db> = [DirectPositiveConstraintPathEntry<'db>];
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 enum NestedSubstitutionSide {
@@ -1651,6 +1670,36 @@ impl NodeId {
                             .for_each_path_inner(db, builder, f, path);
                     },
                 );
+            }
+        }
+    }
+
+    fn for_each_direct_positive_constraint_path<'db>(
+        self,
+        builder: &ConstraintSetBuilder<'db>,
+        path: &mut Vec<DirectPositiveConstraintPathEntry<'db>>,
+        f: &mut dyn FnMut(&DirectPositiveConstraintPath<'db>),
+    ) {
+        match self.node() {
+            Node::AlwaysTrue => f(path),
+            Node::AlwaysFalse => {}
+            Node::Interior(_) => {
+                let interior = builder.interior_node_data(self);
+                path.push((
+                    builder.constraint_data(interior.constraint),
+                    interior.source_order,
+                ));
+                interior
+                    .if_true
+                    .for_each_direct_positive_constraint_path(builder, path, f);
+                path.pop();
+
+                interior
+                    .if_uncertain
+                    .for_each_direct_positive_constraint_path(builder, path, f);
+                interior
+                    .if_false
+                    .for_each_direct_positive_constraint_path(builder, path, f);
             }
         }
     }

@@ -27,10 +27,10 @@ use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
-    MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, binding_type, declaration_type,
-    infer_definition_types,
+    ClassLiteral, FindLegacyTypeVarsVisitor, GenericAlias, IntersectionType, KnownClass,
+    KnownInstanceType, MaterializationKind, NominalInstanceType, Type, TypeAliasType, TypeContext,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator,
+    UnionType, any_over_type, binding_type, declaration_type, infer_definition_types,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -1857,14 +1857,117 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         Ok(())
     }
 
-    fn add_type_mappings_from_owned_constraint_set(
+    /// Infer type mappings from a constraint set without solving the full structural proof.
+    ///
+    /// Structural protocol assignability can introduce large numbers of derived constraints while
+    /// proving that overloaded members are compatible. Those derived facts are valuable for the
+    /// proof, but they are too much information for specialization inference: we only need direct
+    /// evidence for type variables that belong to the signature currently being specialized.
+    fn add_projected_type_mappings_from_constraint_set(
+        &mut self,
+        formal: Type<'db>,
+        set: ConstraintSet<'db, 'c>,
+        mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
+    ) -> Result<(), ()> {
+        let mut saw_path = false;
+        let mut mappings = Vec::new();
+
+        set.for_each_direct_positive_constraint_path(self.constraints, |path| {
+            saw_path = true;
+            for (constraint, source_order) in path {
+                if !constraint.typevar.is_inferable(self.db, self.inferable) {
+                    continue;
+                }
+
+                // Keep non-inferable typevars inside the candidate type. In a call like
+                // `collect[T](items: Iterable[T])` with an argument `list[S]`, `T` should be
+                // inferred as the caller's `S`, even though only `T` is inferable here.
+                let ty = if constraint.lower.is_never() {
+                    if constraint.upper == Type::object() {
+                        continue;
+                    }
+                    constraint.upper
+                } else {
+                    constraint.lower
+                };
+
+                mappings.push((*source_order, constraint.typevar, ty));
+            }
+        });
+
+        if !saw_path {
+            return Err(());
+        }
+
+        mappings.sort_by_key(|(source_order, _, _)| *source_order);
+
+        let mut seen = FxHashSet::default();
+        for (_, bound_typevar, ty) in mappings {
+            if !seen.insert((bound_typevar.identity(self.db), ty)) {
+                continue;
+            }
+            let variance = formal.variance_of(self.db, bound_typevar);
+            self.add_type_mapping(bound_typevar, ty, variance, &mut f);
+        }
+
+        Ok(())
+    }
+
+    fn add_projected_type_mappings_from_owned_constraint_set(
         &mut self,
         formal: Type<'db>,
         set: &'db OwnedConstraintSet<'db>,
         f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) -> Result<(), ()> {
         let set = self.constraints.load(self.db, set);
-        self.add_type_mappings_from_constraint_set(formal, set, f)
+        self.add_projected_type_mappings_from_constraint_set(formal, set, f)
+    }
+
+    fn references_inferable_typevar(&self, ty: Type<'db>) -> bool {
+        if self.inferable == InferableTypeVars::None {
+            return false;
+        }
+
+        any_over_type(
+            self.db,
+            ty,
+            false,
+            |ty| matches!(ty, Type::TypeVar(typevar) if typevar.is_inferable(self.db, self.inferable)),
+        )
+    }
+
+    fn infer_from_matching_generic_base(
+        &mut self,
+        formal_alias: GenericAlias<'db>,
+        actual_nominal: NominalInstanceType<'db>,
+        polarity: TypeVarVariance,
+        mut f: &mut dyn FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
+        seen: &mut FxHashSet<(Type<'db>, Type<'db>)>,
+    ) -> Result<bool, SpecializationError<'db>> {
+        let formal_origin = formal_alias.origin(self.db);
+        for base in actual_nominal.class(self.db).iter_mro(self.db) {
+            let ClassBase::Class(ClassType::Generic(base_alias)) = base else {
+                continue;
+            };
+            if formal_origin != base_alias.origin(self.db) {
+                continue;
+            }
+            let generic_context = formal_alias
+                .specialization(self.db)
+                .generic_context(self.db)
+                .variables(self.db);
+            let formal_specialization = formal_alias.specialization(self.db).types(self.db);
+            let base_specialization = base_alias.specialization(self.db).types(self.db);
+            for (typevar, formal_ty, base_ty) in
+                itertools::izip!(generic_context, formal_specialization, base_specialization)
+            {
+                let variance = typevar.variance_with_polarity(self.db, polarity);
+                self.infer_map_impl(*formal_ty, *base_ty, variance, &mut f, seen)?;
+            }
+            return Ok(true);
+        }
+
+        Ok(false)
     }
 
     /// Infer type mappings by comparing formal callable signatures against actual callables.
@@ -2349,7 +2452,28 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         formal_nominal.class(self.db).into_generic_alias()
                     }
 
-                    Type::ProtocolInstance(_) => {
+                    Type::ProtocolInstance(formal_protocol) => {
+                        // Tuple instances keep their element precision in `TupleSpec`, not in
+                        // their declared generic bases. Let structural protocol inference see that
+                        // tuple-specific shape instead of inferring from a lossy generic base.
+                        if actual_nominal.tuple_spec(self.db).is_none()
+                            && let Some(formal_nominal) = formal_protocol.to_nominal_instance()
+                            && let Some(formal_alias) =
+                                formal_nominal.class(self.db).into_generic_alias()
+                            && self.infer_from_matching_generic_base(
+                                formal_alias,
+                                actual_nominal,
+                                polarity,
+                                &mut f,
+                                seen,
+                            )?
+                        {
+                            return Ok(());
+                        }
+
+                        if !self.references_inferable_typevar(formal) {
+                            return Ok(());
+                        }
                         // TODO: For protocols, we use the new constraint set implementation, which
                         // will handle implicitly implemented protocols and generic protocols. We
                         // eventually want this logic to be used for _all_ nominal instances
@@ -2361,40 +2485,25 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // unsatisfied comparisons simply produced no type mappings), and avoids
                         // false positives for callable-wrapper patterns while this path is still
                         // a hybrid of old and new solver logic.
-                        let _ =
-                            self.add_type_mappings_from_owned_constraint_set(formal, when, &mut f);
+                        let _ = self.add_projected_type_mappings_from_owned_constraint_set(
+                            formal, when, &mut f,
+                        );
                         return Ok(());
                     }
 
                     _ => None,
                 };
 
-                if let Some(formal_alias) = formal_alias {
-                    let formal_origin = formal_alias.origin(self.db);
-                    for base in actual_nominal.class(self.db).iter_mro(self.db) {
-                        let ClassBase::Class(ClassType::Generic(base_alias)) = base else {
-                            continue;
-                        };
-                        if formal_origin != base_alias.origin(self.db) {
-                            continue;
-                        }
-                        let generic_context = formal_alias
-                            .specialization(self.db)
-                            .generic_context(self.db)
-                            .variables(self.db);
-                        let formal_specialization =
-                            formal_alias.specialization(self.db).types(self.db);
-                        let base_specialization = base_alias.specialization(self.db).types(self.db);
-                        for (typevar, formal_ty, base_ty) in itertools::izip!(
-                            generic_context,
-                            formal_specialization,
-                            base_specialization
-                        ) {
-                            let variance = typevar.variance_with_polarity(self.db, polarity);
-                            self.infer_map_impl(*formal_ty, *base_ty, variance, &mut f, seen)?;
-                        }
-                        return Ok(());
-                    }
+                if let Some(formal_alias) = formal_alias
+                    && self.infer_from_matching_generic_base(
+                        formal_alias,
+                        actual_nominal,
+                        polarity,
+                        &mut f,
+                        seen,
+                    )?
+                {
+                    return Ok(());
                 }
             }
 
@@ -2402,11 +2511,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // union, but the old solver isn't well-equipped to handle that (due to side effects
             // from even failed matches), so for now we handle this particular case.
             (formal @ Type::ProtocolInstance(_), actual @ Type::Union(_)) => {
+                if !self.references_inferable_typevar(formal) {
+                    return Ok(());
+                }
                 let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
                 // For protocol inference via constraint sets, keep unsatisfiable results non-fatal
                 // for now, matching the protocol constraint-set path in the nominal-instance
                 // arm above.
-                let _ = self.add_type_mappings_from_owned_constraint_set(formal, when, &mut f);
+                let _ = self
+                    .add_projected_type_mappings_from_owned_constraint_set(formal, when, &mut f);
                 return Ok(());
             }
 
@@ -2414,6 +2527,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // from matching the actual type's callable signature against the protocol's `__call__`
             // method signature.
             (Type::ProtocolInstance(formal_protocol), _) => {
+                if !self.references_inferable_typevar(formal) {
+                    return Ok(());
+                }
                 let Some(call_method) = formal_protocol.interface(self.db).call_method(self.db)
                 else {
                     return Ok(());

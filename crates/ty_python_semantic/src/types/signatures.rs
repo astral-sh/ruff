@@ -975,6 +975,16 @@ impl<'db> Signature<'db> {
             let mut builder = SpecializationBuilder::new(db, &constraints, inferable_typevars);
             builder.infer(expected_self_ty, self_type).ok()?;
             let specialization = builder.build_with(generic_context, |_, _| None);
+            // Inference can produce a candidate specialization that does not actually make the
+            // bound receiver compatible with the receiver annotation, especially for structural
+            // protocols. Only keep overloads whose specialized receiver still accepts `self_type`.
+            let specialized_expected_self_ty =
+                expected_self_ty.apply_specialization(db, specialization);
+            let when =
+                self_type.when_constraint_set_assignable_to_owned(db, specialized_expected_self_ty);
+            if !when.query(|_, when| when.is_always_satisfied(db)) {
+                return None;
+            }
             Some(
                 self.apply_specialization(db, specialization)
                     .bind_self(db, Some(typing_self_type)),

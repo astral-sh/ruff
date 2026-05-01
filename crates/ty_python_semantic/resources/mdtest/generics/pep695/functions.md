@@ -1202,6 +1202,19 @@ def g[S: (bool, str)](x: S) -> S:
     return f(x)  # error: [invalid-argument-type]
 ```
 
+## Inferring bounded typevars through iterable protocols
+
+```py
+from typing import Iterable
+
+def collect[T: str | bytes](items: Iterable[T]) -> list[T]:
+    return list(items)
+
+def test[S: str | bytes](items: list[S]) -> None:
+    reveal_type(collect(items))  # revealed: list[S@test]
+    bad: list[str] | list[bytes] = collect(items)  # error: [invalid-assignment]
+```
+
 ## Display ordering
 
 Where possible, we want the types that appear in inferred specializations to line up with the types

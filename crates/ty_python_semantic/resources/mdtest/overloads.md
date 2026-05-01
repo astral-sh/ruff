@@ -159,7 +159,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Any, Callable, Generic, TypeVar, overload
+from typing import Any, Callable, Generic, Protocol, TypeVar, overload
 
 class Box[T]:
     # Use the class type parameter so specializations remain meaningful.
@@ -229,6 +229,29 @@ class ReceiverGeneric[T]:
         return value
 
 reveal_type(ReceiverGeneric[str]().method)  # revealed: Overload[(value: str) -> str, (value: bytes) -> bytes]
+
+ProtocolSelfT = TypeVar("ProtocolSelfT")
+
+class ProtocolSelf(Protocol[ProtocolSelfT]):
+    def get(self) -> ProtocolSelfT: ...
+    def put(self, x: ProtocolSelfT) -> None: ...
+
+class BaseWithProtocolSelf:
+    @overload
+    def method(self: ProtocolSelf[ProtocolSelfT]) -> ProtocolSelfT: ...
+    @overload
+    def method(self) -> bytes: ...
+    def method(self) -> object:
+        return b""
+
+class ProtocolSelfImplementation(BaseWithProtocolSelf):
+    def get(self) -> int:
+        return 1
+
+    def put(self, x: str) -> None: ...
+
+good_protocol_receiver: Callable[[], bytes] = ProtocolSelfImplementation().method
+bad_protocol_receiver: Callable[[], int] = ProtocolSelfImplementation().method  # error: [invalid-assignment]
 ```
 
 ## Constructor
