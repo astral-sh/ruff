@@ -156,6 +156,13 @@ def keep_keyword_diagnostics(kwargs: Mapping[str, object]) -> None:
     maybe_td: TD = dict(x=missing, **kwargs)
     takes_mapping(maybe_td)
 
+def takes_dict(value: dict[str, object]) -> None: ...
+def takes_kwargs(**kwargs: object) -> None: ...
+def _(data: TD):
+    reveal_type(dict(data))  # revealed: dict[str, object]
+    takes_dict(dict(data))
+    takes_kwargs(**dict(data))
+
 # Note: the second variant (`d5_dict`) is not technically allowed by the `dict.__init__` overloads
 # in typeshed, which require the key type to be `str` when using keyword arguments. However, we
 # special-case this pattern to match the behavior of `d5_literal`.

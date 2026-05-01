@@ -1863,6 +1863,11 @@ def _(
     # error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`"
     reveal_type(person[str_key])  # revealed: Unknown
 
+    # Direct calls to the synthesized method accept any string key, including keys not declared
+    # by the TypedDict.
+    reveal_type(movie.__getitem__("anything"))  # revealed: object
+    reveal_type(movie.__getitem__(str_key))  # revealed: object
+
     # No error here:
     reveal_type(person[unknown_key])  # revealed: Unknown
 
@@ -2215,6 +2220,42 @@ def _(p: Person) -> None:
     reveal_type(type(p))  # revealed: <class 'dict[str, object]'>
 
     reveal_type(p.__class__)  # revealed: <class 'dict[str, object]'>
+```
+
+Passing a `TypedDict` to `dict()` copies it into a regular dictionary:
+
+```py
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title: str
+    year: int
+
+def takes_dict(value: dict[str, object]) -> None: ...
+def _(movie: Movie) -> None:
+    reveal_type(dict(movie))  # revealed: dict[str, object]
+    takes_dict(dict(movie))
+```
+
+Generic protocols that use `keys()` and `__getitem__()` can infer their type variables from a
+`TypedDict`:
+
+```py
+from _typeshed import SupportsKeysAndGetItem
+from typing import TypeVar, TypedDict
+
+class Movie(TypedDict):
+    title: str
+    year: int
+
+KT = TypeVar("KT")
+VT = TypeVar("VT")
+
+def copy(value: SupportsKeysAndGetItem[KT, VT]) -> dict[KT, VT]:
+    return dict(value)
+
+def _(movie: Movie) -> None:
+    reveal_type(copy(movie))  # revealed: dict[str, object]
 ```
 
 Also, the "attributes" on the class definition cannot be accessed. Neither on the class itself, nor

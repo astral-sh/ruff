@@ -50,6 +50,7 @@ use crate::types::signatures::{
     PartialApplication, PartialSignatureApplication,
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
+use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral,
@@ -4343,13 +4344,15 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument_index: usize,
         argument_type: Option<Type<'db>>,
     ) {
-        if let Some(Type::TypedDict(typed_dict)) = argument_type {
+        if let Some(unpacked_keys) =
+            argument_type.and_then(|ty| extract_unpacked_typed_dict_keys_from_value_type(db, ty))
+        {
             // Special case TypedDict because we know which keys are present.
-            for (name, field) in typed_dict.items(db) {
+            for (name, unpacked_key) in unpacked_keys {
                 let _ = self.match_keyword(
                     argument_index,
                     Argument::Keywords,
-                    Some(field.declared_ty),
+                    Some(unpacked_key.value_ty),
                     name.as_str(),
                 );
             }
@@ -5205,11 +5208,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         argument: Argument<'a>,
         argument_type: Type<'db>,
     ) {
-        if let Type::TypedDict(typed_dict) = argument_type {
-            for (argument_type, parameter_index) in typed_dict
-                .items(self.db)
+        if let Some(unpacked_keys) =
+            extract_unpacked_typed_dict_keys_from_value_type(self.db, argument_type)
+        {
+            for (unpacked_key, parameter_index) in unpacked_keys
                 .values()
-                .map(|field| field.declared_ty)
                 .zip(&self.argument_matches[argument_index].parameters)
             {
                 self.check_argument_type(
@@ -5217,7 +5220,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     argument_index,
                     adjusted_argument_index,
                     argument,
-                    argument_type,
+                    unpacked_key.value_ty,
                     *parameter_index,
                 );
             }
