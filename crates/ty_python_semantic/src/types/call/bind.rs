@@ -2766,6 +2766,15 @@ impl<'db> CallableBinding<'db> {
             return;
         }
 
+        // If any of the overloads being called are generic, we need to "freshen" their generic
+        // contexts. The typevars bound by this generic context might collide with other visible
+        // occurrences of the same generic context. This happens most often when referring to a
+        // generic function recursively within its body: the recursive reference should bind new
+        // copies of the typevars.
+        //
+        // We can use a single new nonce here for all of the generic overloads, since overloads are
+        // not able to share generic contexts. That means we cannot freshen two overloads in a way
+        // that causes their typevars to collide.
         let nonce = nonce_generator.next();
         for overload in &mut self.overloads {
             let Some(generic_context) = overload.signature.generic_context else {
