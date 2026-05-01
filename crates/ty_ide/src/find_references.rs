@@ -38,9 +38,20 @@ mod tests {
 
     impl CursorTest {
         fn references(&self) -> String {
-            let Some(mut reference_results) =
-                find_references(&self.db, self.cursor.file, self.cursor.offset, true)
-            else {
+            self.references_with_include_declaration(true)
+        }
+
+        fn references_without_declaration(&self) -> String {
+            self.references_with_include_declaration(false)
+        }
+
+        fn references_with_include_declaration(&self, include_declaration: bool) -> String {
+            let Some(mut reference_results) = find_references(
+                &self.db,
+                self.cursor.file,
+                self.cursor.offset,
+                include_declaration,
+            ) else {
                 return "No references found".to_string();
             };
 
@@ -493,6 +504,27 @@ cls = MyClass
         3 |
         4 | class MyClass:
           |       -------
+          |
+        "#);
+    }
+
+    #[test]
+    fn references_string_annotation_without_declaration() {
+        let test = cursor_test(
+            r#"
+        a: "MyCla<CURSOR>ss" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @r#"
+        info[references]: Found 1 references
+         --> main.py:2:5
+          |
+        2 | a: "MyClass" = 1
+          |     -------
           |
         "#);
     }
