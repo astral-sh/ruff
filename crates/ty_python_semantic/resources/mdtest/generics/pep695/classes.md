@@ -565,8 +565,10 @@ class D[T, U]:
     x: T
 
     @overload
+    # error: [invalid-overload]
     def __init__(self: "D[str, U]", u: U) -> None: ...
     @overload
+    # error: [invalid-overload]
     def __init__(self, t: T, u: U) -> None: ...
     def __init__(self, *args) -> None: ...
 

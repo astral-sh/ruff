@@ -449,8 +449,7 @@ reveal_type(accepts_t_or_list_of_t(1))  # revealed: Unknown
 def _(list_ofstr: list[str], list_of_int: list[int]):
     reveal_type(accepts_t_or_list_of_t(list_ofstr))  # revealed: str
 
-    # TODO: the error message here could be improved by referring to the second union element
-    # error: [invalid-argument-type] "Argument type `list[int]` does not satisfy upper bound `str` of type variable `T_str`"
+    # error: [invalid-argument-type] "Argument to function `accepts_t_or_list_of_t` is incorrect: Argument type `int` does not satisfy upper bound `str` of type variable `T_str`"
     reveal_type(accepts_t_or_list_of_t(list_of_int))  # revealed: Unknown
 ```
 
