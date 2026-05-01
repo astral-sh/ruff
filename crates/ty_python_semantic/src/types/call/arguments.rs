@@ -2,13 +2,14 @@ use std::borrow::Cow;
 use std::fmt::Display;
 
 use itertools::{Either, Itertools};
-use ruff_python_ast as ast;
-use rustc_hash::FxHashMap;
+use ruff_python_ast::{self as ast, name::Name};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::Db;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::tuple::Tuple;
-use crate::types::{KnownClass, Type, TypeContext};
+use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
+use crate::types::{ApplyTypeMappingVisitor, KnownClass, Type, TypeContext, TypeMapping};
 
 /// Maximum number of expanded types that can be generated from a single tuple's
 /// Cartesian product in [`expand_type`].
@@ -62,6 +63,20 @@ pub(crate) struct CallArgumentTypes<'db> {
     types: FxHashMap<Type<'db>, Type<'db>>,
 }
 
+/// The normalized arguments stored by a precise `functools.partial(...)` instance.
+#[derive(Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
+pub struct FunctoolsPartialBoundArguments<'db> {
+    arguments: Box<[FunctoolsPartialBoundArgument<'db>]>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
+enum FunctoolsPartialBoundArgument<'db> {
+    Positional(Type<'db>),
+    Variadic(Type<'db>),
+    Keyword(Name, Type<'db>),
+    Keywords(Type<'db>),
+}
+
 impl<'db> CallArgumentTypes<'db> {
     pub(crate) fn new(fallback_ty: Option<Type<'db>>) -> Self {
         Self {
@@ -110,6 +125,190 @@ impl<'db> CallArgumentTypes<'db> {
             .iter()
             .map(|(tcx, ty)| (TypeContext::new(Some(*tcx)), *ty))
             .chain(self.fallback_type.map(|ty| (TypeContext::default(), ty)))
+    }
+}
+
+impl<'db> FunctoolsPartialBoundArguments<'db> {
+    /// Rehydrate the stored arguments so they can be matched against the wrapped callable.
+    pub(crate) fn to_call_arguments(&self) -> CallArguments<'_, 'db> {
+        CallArguments {
+            items: self
+                .arguments
+                .iter()
+                .map(|argument| {
+                    let (argument, ty) = match argument {
+                        FunctoolsPartialBoundArgument::Positional(ty) => {
+                            (Argument::Positional, *ty)
+                        }
+                        FunctoolsPartialBoundArgument::Variadic(ty) => (Argument::Variadic, *ty),
+                        FunctoolsPartialBoundArgument::Keyword(name, ty) => {
+                            (Argument::Keyword(name.as_str()), *ty)
+                        }
+                        FunctoolsPartialBoundArgument::Keywords(ty) => (Argument::Keywords, *ty),
+                    };
+
+                    CallArgument {
+                        argument,
+                        types: CallArgumentTypes::new(Some(ty)),
+                    }
+                })
+                .collect(),
+        }
+    }
+
+    pub(crate) fn iter_types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+        self.arguments.iter().map(|argument| match argument {
+            FunctoolsPartialBoundArgument::Positional(ty)
+            | FunctoolsPartialBoundArgument::Variadic(ty)
+            | FunctoolsPartialBoundArgument::Keyword(_, ty)
+            | FunctoolsPartialBoundArgument::Keywords(ty) => *ty,
+        })
+    }
+
+    pub(crate) fn recursive_type_normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        self.try_map_types(|ty| ty.recursive_type_normalized_impl(db, div, nested))
+    }
+
+    pub(crate) fn apply_type_mapping_impl<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        self.map_types(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+    }
+
+    fn map_types(&self, mut f: impl FnMut(Type<'db>) -> Type<'db>) -> Self {
+        Self {
+            arguments: self
+                .arguments
+                .iter()
+                .map(|argument| match argument {
+                    FunctoolsPartialBoundArgument::Positional(ty) => {
+                        FunctoolsPartialBoundArgument::Positional(f(*ty))
+                    }
+                    FunctoolsPartialBoundArgument::Variadic(ty) => {
+                        FunctoolsPartialBoundArgument::Variadic(f(*ty))
+                    }
+                    FunctoolsPartialBoundArgument::Keyword(name, ty) => {
+                        FunctoolsPartialBoundArgument::Keyword(name.clone(), f(*ty))
+                    }
+                    FunctoolsPartialBoundArgument::Keywords(ty) => {
+                        FunctoolsPartialBoundArgument::Keywords(f(*ty))
+                    }
+                })
+                .collect(),
+        }
+    }
+
+    fn try_map_types(&self, mut f: impl FnMut(Type<'db>) -> Option<Type<'db>>) -> Option<Self> {
+        Some(Self {
+            arguments: self
+                .arguments
+                .iter()
+                .map(|argument| match argument {
+                    FunctoolsPartialBoundArgument::Positional(ty) => {
+                        Some(FunctoolsPartialBoundArgument::Positional(f(*ty)?))
+                    }
+                    FunctoolsPartialBoundArgument::Variadic(ty) => {
+                        Some(FunctoolsPartialBoundArgument::Variadic(f(*ty)?))
+                    }
+                    FunctoolsPartialBoundArgument::Keyword(name, ty) => Some(
+                        FunctoolsPartialBoundArgument::Keyword(name.clone(), f(*ty)?),
+                    ),
+                    FunctoolsPartialBoundArgument::Keywords(ty) => {
+                        Some(FunctoolsPartialBoundArgument::Keywords(f(*ty)?))
+                    }
+                })
+                .collect::<Option<Box<_>>>()?,
+        })
+    }
+
+    /// Return the effective bound arguments when another partial application wraps this one.
+    pub(crate) fn combined_with(&self, later: &Self) -> Self {
+        let mut arguments = self.arguments.to_vec();
+
+        for argument in &later.arguments {
+            if let FunctoolsPartialBoundArgument::Keyword(later_name, _) = argument {
+                arguments.retain(|existing| {
+                    !matches!(
+                        existing,
+                        FunctoolsPartialBoundArgument::Keyword(existing_name, _)
+                            if existing_name == later_name
+                    )
+                });
+            }
+
+            arguments.push(argument.clone());
+        }
+
+        Self {
+            arguments: arguments.into_boxed_slice(),
+        }
+    }
+
+    pub(crate) fn overridden_by(
+        &self,
+        db: &'db dyn Db,
+        call_arguments: &CallArguments<'_, 'db>,
+    ) -> FxHashSet<Name> {
+        let mut stored_keywords = FxHashSet::default();
+        for argument in &self.arguments {
+            match argument {
+                FunctoolsPartialBoundArgument::Keyword(name, _) => {
+                    stored_keywords.insert(name.clone());
+                }
+                FunctoolsPartialBoundArgument::Keywords(ty) => {
+                    if let Some(unpacked_keys) =
+                        extract_unpacked_typed_dict_keys_from_value_type(db, *ty)
+                    {
+                        stored_keywords.extend(
+                            unpacked_keys
+                                .into_iter()
+                                .filter_map(|(name, key)| key.is_required.then_some(name)),
+                        );
+                    }
+                }
+                FunctoolsPartialBoundArgument::Positional(_)
+                | FunctoolsPartialBoundArgument::Variadic(_) => {}
+            }
+        }
+
+        let mut overridden = FxHashSet::default();
+
+        for (argument, argument_types) in call_arguments.iter() {
+            match argument {
+                Argument::Keyword(name) => {
+                    let name = Name::new(name);
+                    if stored_keywords.contains(&name) {
+                        overridden.insert(name);
+                    }
+                }
+                Argument::Keywords => {
+                    let Some(unpacked_keys) = argument_types
+                        .get_default()
+                        .and_then(|ty| extract_unpacked_typed_dict_keys_from_value_type(db, ty))
+                    else {
+                        continue;
+                    };
+
+                    for (name, key) in unpacked_keys {
+                        if key.is_required && stored_keywords.contains(&name) {
+                            overridden.insert(name);
+                        }
+                    }
+                }
+                Argument::Synthetic | Argument::Positional | Argument::Variadic => {}
+            }
+        }
+
+        overridden
     }
 }
 
@@ -248,6 +447,62 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         }
     }
 
+    /// Create a new [`CallArguments`] excluding arguments at the specified source-order indices.
+    pub(crate) fn without_indices(&self, excluded_indices: &[usize]) -> Self {
+        Self {
+            items: self
+                .items
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| !excluded_indices.contains(index))
+                .map(|(_, item)| item.clone())
+                .collect(),
+        }
+    }
+
+    /// Store these call arguments in the precise `functools.partial(...)` instance.
+    pub(crate) fn to_functools_partial_bound_arguments(
+        &self,
+        db: &'db dyn Db,
+    ) -> FunctoolsPartialBoundArguments<'db> {
+        let mut arguments = Vec::with_capacity(self.items.len());
+
+        for item in &self.items {
+            let ty = item.types.get_default().unwrap_or(Type::unknown());
+            match item.argument {
+                Argument::Synthetic => {}
+                Argument::Positional => {
+                    arguments.push(FunctoolsPartialBoundArgument::Positional(ty));
+                }
+                Argument::Variadic => {
+                    arguments.push(FunctoolsPartialBoundArgument::Variadic(ty));
+                }
+                Argument::Keyword(name) => {
+                    arguments.push(FunctoolsPartialBoundArgument::Keyword(Name::new(name), ty));
+                }
+                Argument::Keywords => {
+                    if let Some(unpacked_keys) =
+                        extract_unpacked_typed_dict_keys_from_value_type(db, ty)
+                        && unpacked_keys.values().all(|key| key.is_required)
+                    {
+                        for (name, key) in unpacked_keys {
+                            arguments.push(FunctoolsPartialBoundArgument::Keyword(
+                                name.clone(),
+                                key.value_ty,
+                            ));
+                        }
+                    } else {
+                        arguments.push(FunctoolsPartialBoundArgument::Keywords(ty));
+                    }
+                }
+            }
+        }
+
+        FunctoolsPartialBoundArguments {
+            arguments: arguments.into_boxed_slice(),
+        }
+    }
+
     /// Returns the `functools.partial(...)` bound-argument slice when argument expansion is
     /// concrete enough for partial-application analysis.
     pub(crate) fn functools_partial_bound_arguments(&self, db: &'db dyn Db) -> Option<Self> {
@@ -266,12 +521,11 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 ),
                 // Optional TypedDict keys may be absent at runtime, so we can only refine
                 // `partial(...)` when every expanded key is guaranteed to be present.
-                Argument::Keywords => argument_ty.as_typed_dict().is_none_or(|typed_dict| {
-                    typed_dict
-                        .items(db)
-                        .values()
-                        .any(|field| !field.is_required())
-                }),
+                Argument::Keywords => {
+                    extract_unpacked_typed_dict_keys_from_value_type(db, argument_ty).is_none_or(
+                        |unpacked_keys| unpacked_keys.values().any(|key| !key.is_required),
+                    )
+                }
                 Argument::Positional | Argument::Synthetic | Argument::Keyword(_) => false,
             }
         }) {
