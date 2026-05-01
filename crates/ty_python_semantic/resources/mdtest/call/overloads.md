@@ -559,6 +559,47 @@ def _(actual_enum: ActualEnum, my_enum_instance: MyEnumSubclass):
     reveal_type(f(*(my_enum_instance,)))  # revealed: MyEnumSubclass
 ```
 
+#### Enum complement inside union
+
+A narrowed enum complement inside a union should be expanded to the remaining enum literals:
+
+`overloaded.pyi`:
+
+```pyi
+from enum import Enum
+from typing import Literal, overload
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+class Red: ...
+class Green: ...
+class Blue: ...
+class NoColor: ...
+
+@overload
+def f(x: Literal[Color.RED]) -> Red: ...
+@overload
+def f(x: Literal[Color.GREEN]) -> Green: ...
+@overload
+def f(x: Literal[Color.BLUE]) -> Blue: ...
+@overload
+def f(x: None) -> NoColor: ...
+```
+
+```py
+from overloaded import Blue, Color, Green, NoColor, f
+
+def _(x: Color | None):
+    if x is Color.RED:
+        return
+
+    result: Green | Blue | NoColor = f(x)
+    result_from_star: Green | Blue | NoColor = f(*(x,))
+```
+
 ### Expanding PEP 695 type alias
 
 ```toml
