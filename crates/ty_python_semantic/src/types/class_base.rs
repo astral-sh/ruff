@@ -270,11 +270,13 @@ impl<'db> ClassBase<'db> {
                     Self::try_from_type(db, alias.aliased_class().to_class_literal(db), subclass)
                 }
 
-                SpecialFormType::Callable => Self::try_from_type(
-                    db,
-                    todo_type!("Support for Callable as a base class"),
-                    subclass,
-                ),
+                SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
+                    Self::try_from_type(
+                        db,
+                        todo_type!("Support for Callable as a base class"),
+                        subclass,
+                    )
+                }
             },
         }
     }

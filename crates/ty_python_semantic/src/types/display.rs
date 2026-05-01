@@ -3082,7 +3082,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             KnownInstanceType::Callable(callable) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
-                f.with_type(Type::SpecialForm(SpecialFormType::Callable))
+                f.with_type(Type::SpecialForm(SpecialFormType::TypingCallable))
                     .write_str("typing.Callable")?;
                 f.write_str(" special-form '")?;
                 callable.display(self.db).fmt_detailed(f)?;
