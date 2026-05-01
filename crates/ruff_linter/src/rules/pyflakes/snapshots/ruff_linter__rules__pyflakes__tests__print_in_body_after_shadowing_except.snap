@@ -19,3 +19,4 @@ help: Remove assignment to unused variable `x`
 8  |         pass
 9  |
 10 |     # No error here, though it should arguably be an F821 error. `x` will
+note: This is an unsafe fix and may change runtime behavior

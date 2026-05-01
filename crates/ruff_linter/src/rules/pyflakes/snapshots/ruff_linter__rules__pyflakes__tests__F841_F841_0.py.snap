@@ -18,6 +18,7 @@ help: Remove assignment to unused variable `e`
 4 |     pass
 5 |
 6 |
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `z` is assigned to but never used
   --> F841_0.py:16:5
@@ -294,5 +295,47 @@ help: Remove assignment to unused variable `__class__`
 182 +                 pass  # F841
 183 |
 184 |
-185 | # OK, the `__class__` cell is nonlocal and declared as such.
+185 | # Removing `as e` in an except handler changes program behavior when a same-name variable
+note: This is an unsafe fix and may change runtime behavior
+
+F841 [*] Local variable `e` is assigned to but never used
+   --> F841_0.py:195:33
+    |
+193 |     try:
+194 |         1 / 0
+195 |     except ZeroDivisionError as e:
+    |                                 ^
+196 |         pass
+197 |     print(e)
+    |
+help: Remove assignment to unused variable `e`
+192 |     e = None
+193 |     try:
+194 |         1 / 0
+    -     except ZeroDivisionError as e:
+195 +     except ZeroDivisionError:
+196 |         pass
+197 |     print(e)
+198 |
+note: This is an unsafe fix and may change runtime behavior
+
+F841 [*] Local variable `e` is assigned to but never used
+   --> F841_0.py:204:29
+    |
+202 | try:
+203 |     1 / 0
+204 | except ZeroDivisionError as e:
+    |                             ^
+205 |     pass
+206 | print(e)
+    |
+help: Remove assignment to unused variable `e`
+201 | e = None
+202 | try:
+203 |     1 / 0
+    - except ZeroDivisionError as e:
+204 + except ZeroDivisionError:
+205 |     pass
+206 | print(e)
+207 |
 note: This is an unsafe fix and may change runtime behavior
