@@ -8463,6 +8463,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
         let mut call_arguments = self.prepare_call_arguments(arguments);
+        let callable_type =
+            Bindings::functools_partial_call_type(self.db(), callable_type, &call_arguments)
+                .unwrap_or(callable_type);
 
         // Special handling for `TypedDict` method calls
         if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
