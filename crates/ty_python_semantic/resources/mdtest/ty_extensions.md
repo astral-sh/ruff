@@ -493,29 +493,7 @@ def foo(x: "TypeOf[foo]"):
     reveal_type(x)  # revealed: def foo(x: def foo(...)) -> Unknown
 ```
 
-## Self-referential `TypeOf` in returned callables
-
-```toml
-[environment]
-python-version = "3.14"
-```
-
-```py
-from collections.abc import Callable
-from typing import Concatenate
-from ty_extensions import TypeOf, generic_context
-
-def foo[**P, T](
-    x: Callable[Concatenate[TypeOf[foo], ...], T],
-) -> Callable[Concatenate[TypeOf[foo], P], T]:
-    return x
-
-reveal_type(generic_context(foo))  # revealed: ty_extensions.GenericContext[T@foo]
-# revealed: def foo[T](x: (def foo(...), /, *args: Any, **kwargs: Any) -> T) -> ((def foo(...), /, *args: P'return.args, **kwargs: P'return.kwargs) -> T)
-reveal_type(foo)
-```
-
-## Mutually recursive `TypeOf` in returned callables
+## Recursive `TypeOf` in returned callables
 
 ```toml
 [environment]
@@ -529,30 +507,27 @@ from collections.abc import Callable
 from typing import Concatenate
 from ty_extensions import TypeOf, generic_context
 
-def foo[**P, T](
-    x: "Callable[Concatenate[TypeOf[bar], ...], T]",
-) -> "Callable[Concatenate[TypeOf[bar], P], T]":
+def self_recursive[**P, T](
+    x: Callable[Concatenate[TypeOf[self_recursive], ...], T],
+) -> Callable[Concatenate[TypeOf[self_recursive], P], T]:
     return x
 
-def bar[**P, T](
-    x: "Callable[Concatenate[TypeOf[foo], ...], T]",
-) -> "Callable[Concatenate[TypeOf[foo], P], T]":
+reveal_type(generic_context(self_recursive))  # revealed: ty_extensions.GenericContext[T@self_recursive]
+# revealed: def self_recursive[T](x: (def self_recursive(...), /, *args: Any, **kwargs: Any) -> T) -> ((def self_recursive(...), /, *args: P'return.args, **kwargs: P'return.kwargs) -> T)
+reveal_type(self_recursive)
+
+def mutual_first[**P, T](
+    x: Callable[Concatenate[TypeOf[mutual_second], ...], T],
+) -> Callable[Concatenate[TypeOf[mutual_second], P], T]:
     return x
 
-reveal_type(generic_context(foo))  # revealed: ty_extensions.GenericContext[T@foo]
-reveal_type(generic_context(bar))  # revealed: ty_extensions.GenericContext[T@bar]
-```
+def mutual_second[**P, T](
+    x: Callable[Concatenate[TypeOf[mutual_first], ...], T],
+) -> Callable[Concatenate[TypeOf[mutual_first], P], T]:
+    return x
 
-## `TypeOf` in generic returned callable parameters
-
-```toml
-[environment]
-python-version = "3.14"
-```
-
-```py
-from collections.abc import Callable
-from ty_extensions import TypeOf
+reveal_type(generic_context(mutual_first))  # revealed: ty_extensions.GenericContext[T@mutual_first]
+reveal_type(generic_context(mutual_second))  # revealed: ty_extensions.GenericContext[T@mutual_second]
 
 class Box[T]:
     @staticmethod
@@ -563,103 +538,50 @@ def factory[T]() -> Callable[[TypeOf[Box[T].method]], T]:
     raise NotImplementedError
 
 factory()(Box[int].method)
-```
-
-## Mutually recursive method `TypeOf` in returned callables
-
-```toml
-[environment]
-python-version = "3.14"
-```
-
-```py
-from __future__ import annotations
-
-from collections.abc import Callable
-from typing import Concatenate
-from ty_extensions import TypeOf, generic_context
 
 class Foo:
     @staticmethod
     def method[**P, T](
-        x: "Callable[Concatenate[TypeOf[Bar.method], ...], T]",
-    ) -> "Callable[Concatenate[TypeOf[Bar.method], P], T]":
+        x: Callable[Concatenate[TypeOf[Bar.method], ...], T],
+    ) -> Callable[Concatenate[TypeOf[Bar.method], P], T]:
         return x
 
 class Bar:
     @staticmethod
     def method[**P, T](
-        x: "Callable[Concatenate[TypeOf[Foo.method], ...], T]",
-    ) -> "Callable[Concatenate[TypeOf[Foo.method], P], T]":
+        x: Callable[Concatenate[TypeOf[Foo.method], ...], T],
+    ) -> Callable[Concatenate[TypeOf[Foo.method], P], T]:
         return x
 
 reveal_type(generic_context(Foo.method))  # revealed: ty_extensions.GenericContext[T@method]
 reveal_type(generic_context(Bar.method))  # revealed: ty_extensions.GenericContext[T@method]
-```
 
-## Self-referential function `__get__` `TypeOf` in returned callables
-
-```toml
-[environment]
-python-version = "3.14"
-```
-
-```py
-from __future__ import annotations
-
-from collections.abc import Callable
-from typing import Concatenate
-from ty_extensions import TypeOf, generic_context
-
-def foo[**P, T](
-    x: "Callable[Concatenate[TypeOf[foo.__get__], ...], T]",
-) -> "Callable[Concatenate[TypeOf[foo.__get__], P], T]":
+def dunder_get[**P, T](
+    x: Callable[Concatenate[TypeOf[dunder_get.__get__], ...], T],
+) -> Callable[Concatenate[TypeOf[dunder_get.__get__], P], T]:
     return x
 
-reveal_type(generic_context(foo))  # revealed: ty_extensions.GenericContext[T@foo]
-```
-
-## Self-referential type alias `TypeOf` in returned callables
-
-```toml
-[environment]
-python-version = "3.14"
-```
-
-```py
-from __future__ import annotations
-
-from collections.abc import Callable
-from typing import Concatenate
-from ty_extensions import TypeOf, generic_context
+reveal_type(generic_context(dunder_get))  # revealed: ty_extensions.GenericContext[T@dunder_get]
 
 def alias_get[**P, T](
-    x: "Callable[Concatenate[AliasGet, ...], T]",
-) -> "Callable[Concatenate[AliasGet, P], T]":
+    x: Callable[Concatenate[AliasGet, ...], T],
+) -> Callable[Concatenate[AliasGet, P], T]:
     return x
 
 type AliasGet = TypeOf[alias_get.__get__]
 
 reveal_type(generic_context(alias_get))  # revealed: ty_extensions.GenericContext[T@alias_get]
-```
 
-## Self-referential property `TypeOf` in returned callables
+type ReturnedCallableAlias[**P] = Callable[Concatenate[TypeOf[alias_return], P], int]
 
-```toml
-[environment]
-python-version = "3.14"
-```
-
-```py
-from __future__ import annotations
-
-from collections.abc import Callable
-from typing import Concatenate
-from ty_extensions import TypeOf, generic_context
+def alias_return[**P](
+    x: Callable[Concatenate[TypeOf[alias_return], ...], int],
+) -> ReturnedCallableAlias[P]:
+    return x
 
 def property_getter[**P, T](
     self: object,
-) -> "Callable[Concatenate[PropertyAlias, P], T]":
+) -> Callable[Concatenate[PropertyAlias, P], T]:
     raise NotImplementedError
 
 recursive_property = property(property_getter)

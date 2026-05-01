@@ -19,7 +19,7 @@ use crate::types::relation::{
 };
 use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
-use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
+use crate::types::type_alias::walk_manual_pep_695_type_alias;
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
 };
@@ -732,7 +732,12 @@ impl<'db> GenericContext<'db> {
                 // attribute that we want to recurse into, so we do it by hand.
                 match type_alias {
                     TypeAliasType::PEP695(type_alias) => {
-                        walk_pep_695_type_alias(db, type_alias, self);
+                        let value_type = type_alias.apply_function_specialization_impl(
+                            db,
+                            type_alias.raw_value_type(db),
+                            &ApplyTypeMappingVisitor::default(),
+                        );
+                        self.visit_type(db, value_type);
                     }
                     TypeAliasType::ManualPEP695(type_alias) => {
                         walk_manual_pep_695_type_alias(db, type_alias, self);

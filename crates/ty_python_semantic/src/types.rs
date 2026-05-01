@@ -4,7 +4,7 @@ use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
-use std::cell::{OnceCell, RefCell};
+use std::cell::OnceCell;
 use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
@@ -22,6 +22,7 @@ use smallvec::smallvec_inline;
 use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
 pub(crate) use self::callable::UpcastPolicy;
+pub(crate) use self::cyclic::ActiveRecursionDetector;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
 pub(crate) use self::diagnostic::register_lints;
@@ -86,7 +87,7 @@ pub use crate::types::typevar::{
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;
-use crate::{Db, FxIndexSet, FxOrderSet, Program};
+use crate::{Db, FxOrderSet, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator};
 use instance::Protocol;
@@ -339,28 +340,8 @@ pub(crate) enum RecursiveTypeNormalizationKey<'db> {
     Type(Type<'db>, bool),
 }
 
-#[derive(Debug, Default)]
-pub(crate) struct RecursiveTypeNormalizationVisitor<'db> {
-    seen: RefCell<FxIndexSet<RecursiveTypeNormalizationKey<'db>>>,
-}
-
-impl<'db> RecursiveTypeNormalizationVisitor<'db> {
-    pub(crate) fn visit<R>(
-        &self,
-        key: RecursiveTypeNormalizationKey<'db>,
-        on_cycle: impl FnOnce() -> R,
-        func: impl FnOnce() -> R,
-    ) -> R {
-        if !self.seen.borrow_mut().insert(key) {
-            return on_cycle();
-        }
-
-        let ret = func();
-
-        self.seen.borrow_mut().pop();
-        ret
-    }
-}
+pub(crate) type RecursiveTypeNormalizationVisitor<'db> =
+    ActiveRecursionDetector<RecursiveTypeNormalizationKey<'db>>;
 
 /// A [`CycleDetector`] that is used in `visit_specialization` methods.
 pub(crate) type SpecializationVisitor<'db> = CycleDetector<VisitSpecialization, Type<'db>, ()>;
@@ -2052,7 +2033,7 @@ impl<'db> Type<'db> {
             return None;
         }
         visitor.visit(
-            RecursiveTypeNormalizationKey::Type(self, nested),
+            &RecursiveTypeNormalizationKey::Type(self, nested),
             || None,
             || match self {
                 Type::Union(union) => {
@@ -5722,25 +5703,6 @@ impl<'db> Type<'db> {
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
             Type::FunctionLiteral(function) => visitor.visit(self, type_mapping, || {
-                if matches!(
-                    type_mapping,
-                    TypeMapping::ApplySpecialization(specialization)
-                        if matches!(specialization, ApplySpecialization::ReturnCallables(_))
-                ) {
-                    // Avoid rebuilding function literal signatures while rescoping returned callables.
-                    // Recursive `TypeOf[foo]` references can otherwise expand indefinitely, but
-                    // already-specialized function literals may still need this mapping if their
-                    // updated signatures mention moved typevars.
-                    return Type::FunctionLiteral(
-                        function.apply_type_mapping_for_return_callable_rescope_impl(
-                            db,
-                            type_mapping,
-                            tcx,
-                            visitor,
-                        ),
-                    );
-                }
-
                 match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
@@ -5767,12 +5729,7 @@ impl<'db> Type<'db> {
                     db,
                     method
                         .function(db)
-                        .apply_type_mapping_for_return_callable_rescope_impl(
-                            db,
-                            type_mapping,
-                            tcx,
-                            visitor,
-                        ),
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                     method
                         .self_instance(db)
                         .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -5819,12 +5776,7 @@ impl<'db> Type<'db> {
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
                 visitor.visit(self, type_mapping, || {
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
-                        function.apply_type_mapping_for_return_callable_rescope_impl(
-                            db,
-                            type_mapping,
-                            tcx,
-                            visitor,
-                        ),
+                        function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                     ))
                 })
             }
@@ -5832,12 +5784,7 @@ impl<'db> Type<'db> {
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)) => {
                 visitor.visit(self, type_mapping, || {
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(
-                        function.apply_type_mapping_for_return_callable_rescope_impl(
-                            db,
-                            type_mapping,
-                            tcx,
-                            visitor,
-                        ),
+                        function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                     ))
                 })
             }
@@ -5948,7 +5895,7 @@ impl<'db> Type<'db> {
 
                         _ => {
                             let value_type = alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-                            alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                            alias.apply_function_specialization_impl(db, value_type, visitor).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                         }
                     }
                 });
@@ -6943,6 +6890,13 @@ pub enum TypeMapping<'a, 'db> {
 }
 
 impl<'db> TypeMapping<'_, 'db> {
+    pub(crate) fn is_return_callable_typevar_rescope(&self) -> bool {
+        matches!(
+            self,
+            TypeMapping::ApplySpecialization(ApplySpecialization::ReturnCallables(_))
+        )
+    }
+
     /// Update the generic context of a [`Signature`] according to the current type mapping
     pub(crate) fn update_signature_generic_context(
         &self,

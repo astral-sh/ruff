@@ -82,9 +82,9 @@ use crate::types::relation::TypeRelationChecker;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    ApplySpecialization, ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance,
-    CallableType, ClassBase, ClassLiteral, ClassType, DynamicType, FindLegacyTypeVarsVisitor,
-    IntersectionBuilder, KnownClass, KnownInstanceType, RecursiveTypeNormalizationKey,
+    ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
+    ClassLiteral, ClassType, DynamicType, FindLegacyTypeVarsVisitor, IntersectionBuilder,
+    KnownClass, KnownInstanceType, RecursiveTypeNormalizationKey,
     RecursiveTypeNormalizationVisitor, SpecialFormType, SubclassOfInner, SubclassOfType,
     Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
     binding_type, definition_expression_type, infer_definition_types, walk_signature,
@@ -957,54 +957,33 @@ impl<'db> FunctionType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        let updated_signature =
-            self.signature(db)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let updated_last_definition_signature = self
-            .last_definition_signature(db)
-            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        Self::new(
-            db,
-            self.literal(db),
-            Some(updated_signature),
-            Some(updated_last_definition_signature),
-        )
-    }
-
-    /// Applies a type mapping to signatures that have already been updated on this function.
-    ///
-    /// This deliberately rewrites only [`FunctionType::updated_signature`] and
-    /// [`FunctionType::updated_last_definition_signature`]. If neither field is set, the
-    /// function is returned unchanged instead of rebuilding signatures from the underlying
-    /// [`FunctionLiteral`].
-    ///
-    /// This is used when rescoping type variables that appear only inside a returned
-    /// [`CallableType`]. For example:
-    ///
-    /// ```py
-    /// def outer[T]() -> Callable[[], Callable[[], T]]:
-    ///     def inner() -> T: ...
-    ///     return inner
-    /// ```
-    ///
-    /// During returned-callable rescoping, the outer `Callable[[], T]` is rewritten to use a
-    /// fresh `T@return`. If `inner` already has an updated signature, this method applies the same
-    /// mapping there so the updated signature stays consistent. If `inner` is still represented
-    /// solely by its function literal, there is nothing to rewrite here; rebuilding its signature
-    /// just for this mapping can re-enter recursive `TypeOf[inner]` evaluation.
-    pub(crate) fn apply_type_mapping_to_updated_signatures_impl<'a>(
-        self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
-    ) -> Self {
-        let updated_signature = self
-            .updated_signature(db)
-            .map(|signature| signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
-        let updated_last_definition_signature = self
-            .updated_last_definition_signature(db)
-            .map(|signature| signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+        // Returned-callable rescoping should not rebuild signatures from the
+        // function literal; doing so can re-enter recursive `TypeOf` evaluation.
+        let (updated_signature, updated_last_definition_signature) = if type_mapping
+            .is_return_callable_typevar_rescope()
+        {
+            (
+                self.updated_signature(db).map(|signature| {
+                    signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                }),
+                self.updated_last_definition_signature(db).map(|signature| {
+                    signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                }),
+            )
+        } else {
+            (
+                Some(
+                    self.signature(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ),
+                Some(self.last_definition_signature(db).apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                )),
+            )
+        };
 
         if updated_signature.is_none() && updated_last_definition_signature.is_none() {
             self
@@ -1015,26 +994,6 @@ impl<'db> FunctionType<'db> {
                 updated_signature,
                 updated_last_definition_signature,
             )
-        }
-    }
-
-    /// Applies a type mapping, using the reduced function rewrite needed for returned-callable
-    /// rescoping.
-    pub(crate) fn apply_type_mapping_for_return_callable_rescope_impl<'a>(
-        self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
-    ) -> Self {
-        if matches!(
-            type_mapping,
-            TypeMapping::ApplySpecialization(specialization)
-                if matches!(specialization, ApplySpecialization::ReturnCallables(_))
-        ) {
-            self.apply_type_mapping_to_updated_signatures_impl(db, type_mapping, tcx, visitor)
-        } else {
-            self.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
         }
     }
 
@@ -1301,7 +1260,7 @@ impl<'db> FunctionType<'db> {
         visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
         visitor.visit(
-            RecursiveTypeNormalizationKey::Function(self.literal(db), nested),
+            &RecursiveTypeNormalizationKey::Function(self.literal(db), nested),
             || None,
             || {
                 let literal = self.literal(db);
