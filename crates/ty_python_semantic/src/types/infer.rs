@@ -547,11 +547,24 @@ impl<'db> InferScope<'db> {
 #[derive(Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
 pub(crate) struct TypeContext<'db> {
     pub(crate) annotation: Option<Type<'db>>,
+    /// Whether this context comes from an annotated variable assignment (`x: T = ...`).
+    /// Used to restrict certain checks (e.g. redundant cast) to that specific syntactic form.
+    pub(crate) from_annotated_assignment: bool,
 }
 
 impl<'db> TypeContext<'db> {
     pub(crate) fn new(annotation: Option<Type<'db>>) -> Self {
-        Self { annotation }
+        Self {
+            annotation,
+            from_annotated_assignment: false,
+        }
+    }
+
+    pub(crate) fn for_annotated_assignment(annotation: Type<'db>) -> Self {
+        Self {
+            annotation: Some(annotation),
+            from_annotated_assignment: true,
+        }
     }
 
     // If the type annotation is a specialized instance of the given `KnownClass`, returns the
@@ -568,6 +581,7 @@ impl<'db> TypeContext<'db> {
     pub(crate) fn map(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
         Self {
             annotation: self.annotation.map(f),
+            from_annotated_assignment: self.from_annotated_assignment,
         }
     }
 

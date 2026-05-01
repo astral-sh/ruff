@@ -97,6 +97,85 @@ def f(x: RecursiveAlias):
     cast(RecursiveAlias, x)
 ```
 
+## Redundant casts in annotated assignments
+
+```py
+from typing import Any, Sequence, cast
+```
+
+When a `cast` call appears on the right-hand side of an annotated assignment, we check if the `cast`
+is really necessary. In some situations, the type annotation already serves the same purpose.
+
+For example, the following cast is redundant because `a_no_cast` has an inferred type of `int`
+regardless:
+
+```py
+def _(x_any: Any, x_int: int, x_bool: bool, x_sequence_any: Sequence[Any]):
+    # error: [redundant-cast] "Unnecessary cast to type `int` in annotated assignment"
+    a_cast: int = cast(int, x_any)
+    a_no_cast: int = x_any
+
+    reveal_type(a_no_cast)  # revealed: int
+```
+
+The same is true for all of these:
+
+```py
+    b_cast: Any = cast(Any, x_int)  # error: [redundant-cast]
+    b_no_cast: Any = x_int
+    reveal_type(b_no_cast)  # revealed: Any
+
+    c_cast: Sequence[Any] = cast(Sequence[Any], x_sequence_any)  # error: [redundant-cast]
+    c_no_cast: Sequence[Any] = x_sequence_any
+    reveal_type(c_no_cast)  # revealed: Sequence[Any]
+```
+
+On the other hand, this cast is *not* redundant, because it has observable effects on the inferred
+type:
+
+```py
+    a_cast: int = cast(int, x_bool)  # not redundant!
+    a_no_cast: int = x_bool
+
+    reveal_type(a_cast)  # revealed: int
+    reveal_type(a_no_cast)  # revealed: bool
+```
+
+Removing this downcast would lead to a type error, so it is certainly not redundant:
+
+```py
+    b_cast: bool = cast(bool, x_int)  # not redundant!
+```
+
+In the following situation, the cast is not redundant because it has observable effects on the
+inferred type (`Any | str` and `int` are not mutually assignable, so we prefer the inferred type for
+`c_no_cast` over the annotated type):
+
+```py
+    c_cast: Any | str = cast(Any | str, x_int)  # not redundant!
+    c_no_cast: Any | str = x_int
+    reveal_type(c_cast)  # revealed: Any | str
+    reveal_type(c_no_cast)  # revealed: int
+```
+
+The same is true in the following example:
+
+```py
+    d_cast: int | None = cast(int | None, x_int)  # not redundant!
+    d_no_cast: int | None = x_int
+    reveal_type(d_cast)  # revealed: int | None
+    reveal_type(d_no_cast)  # revealed: int
+```
+
+We only report these types of `redundant-cast` diagnostics for annotated assignments. The following
+`cast` is technically also redundant, but there might be a good reason to keep it (e.g. to be
+"notified" once the return type of that function changes):
+
+```py
+def returns_int(x_any: Any) -> int:
+    return cast(int, x_any)  # technically redundant, but no diagnostic
+```
+
 ## Diagnostic snapshots
 
 ```py
