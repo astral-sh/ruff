@@ -714,6 +714,30 @@ impl<'db> Bindings<'db> {
         })
     }
 
+    /// Returns bindings for the callable wrapped by `functools.partial(...)`, for use as type
+    /// context when inferring bound arguments.
+    pub(crate) fn functools_partial_argument_inference_bindings<'a>(
+        &self,
+        db: &'db dyn Db,
+        call_arguments: &CallArguments<'a, 'db>,
+    ) -> Option<Bindings<'db>> {
+        if !matches!(
+            self.callable_type,
+            Type::ClassLiteral(class) if class.is_known(db, KnownClass::FunctoolsPartial)
+        ) || self.argument_forms().len() <= 1
+        {
+            return None;
+        }
+
+        let wrapped_callable_ty = call_arguments
+            .argument_types(0)
+            .and_then(CallArgumentTypes::get_default)?;
+        let (_, refinement_bindings) =
+            Self::functools_partial_matched_bindings(db, wrapped_callable_ty, call_arguments)?;
+
+        Some(refinement_bindings)
+    }
+
     /// Maps each `CallableBinding` to a type and combines results while preserving
     /// the union-of-intersections structure:
     ///

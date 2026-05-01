@@ -241,6 +241,11 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             .map(|item| (item.argument, &mut item.types))
     }
 
+    /// Returns the mutable type slot for the argument at `index`, if present.
+    pub(crate) fn type_at_mut(&mut self, index: usize) -> Option<&mut CallArgumentTypes<'db>> {
+        self.items.get_mut(index).map(|item| &mut item.types)
+    }
+
     /// Create a new [`CallArguments`] starting from the specified index.
     pub(crate) fn start_from(&self, index: usize) -> Self {
         Self {

@@ -1646,6 +1646,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub enum ApplySpecialization<'a, 'db> {
     Specialization(Specialization<'db>),
+    Substitution(&'a TypeVarSubstitution<'db>),
     Partial {
         generic_context: GenericContext<'db>,
         types: &'a [Type<'db>],
@@ -1671,6 +1672,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
             ApplySpecialization::Specialization(specialization) => {
                 specialization.get(db, bound_typevar)
             }
+            ApplySpecialization::Substitution(substitution) => substitution.get(db, bound_typevar),
             ApplySpecialization::Partial {
                 generic_context,
                 types,
@@ -1714,6 +1716,84 @@ impl<'db> Type<'db> {
             TypeContext::default(),
         )
     }
+}
+
+/// An open substitution from type variables to types.
+///
+/// Unlike [`Specialization`], this does not fill defaults for every variable in a generic context.
+/// Unsolved variables are represented by absence from the map.
+#[derive(Clone, Debug, Default, Eq, PartialEq, get_size2::GetSize)]
+pub struct TypeVarSubstitution<'db> {
+    types: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+}
+
+impl<'db> TypeVarSubstitution<'db> {
+    fn insert(&mut self, db: &'db dyn Db, bound_typevar: BoundTypeVarInstance<'db>, ty: Type<'db>) {
+        if ty.references_bound_typevar(db, bound_typevar) {
+            return;
+        }
+
+        let ty = self.apply_to_type(db, ty);
+
+        // This is the usual occurs check for substitutions: neither open substitutions nor
+        // closed specializations can represent `T := F[T]` as a finite type.
+        if ty.references_bound_typevar(db, bound_typevar) {
+            return;
+        }
+
+        let update =
+            TypeMapping::ApplySpecialization(ApplySpecialization::Single(bound_typevar, ty));
+        for existing in self.types.values_mut() {
+            *existing = existing.apply_type_mapping(db, &update, TypeContext::default());
+        }
+
+        self.types.insert(bound_typevar.identity(db), ty);
+    }
+
+    fn default_type(db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> Type<'db> {
+        if typevar.is_paramspec(db) {
+            Type::paramspec_value_callable(db, Parameters::unknown())
+        } else {
+            Type::unknown()
+        }
+    }
+
+    fn default_or_fallback_type(
+        &self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> Type<'db> {
+        typevar.default_type(db).map_or_else(
+            || Self::default_type(db, typevar),
+            |default| self.apply_to_type(db, default),
+        )
+    }
+
+    pub(crate) fn get(
+        &self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> Option<Type<'db>> {
+        self.types.get(&bound_typevar.identity(db)).copied()
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.types.is_empty()
+    }
+
+    pub(crate) fn apply_to_type(&self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        ty.apply_type_mapping(
+            db,
+            &TypeMapping::ApplySpecialization(ApplySpecialization::Substitution(self)),
+            TypeContext::default(),
+        )
+    }
+}
+
+pub(crate) enum TypeVarSubstitutionProjection<'db> {
+    Default,
+    Substitute(Type<'db>),
+    Unsolved,
 }
 
 /// Performs type inference between parameter annotations and argument types, producing a
@@ -1767,6 +1847,37 @@ impl<'db> TypeVarInference<'db> {
             .map(|(typevar, inferred)| choose(typevar, inferred).or(inferred));
 
         self.generic_context(db).specialize_recursive(db, types)
+    }
+
+    /// Project this inference result into an open substitution with explicit handling for each
+    /// type variable.
+    pub(crate) fn substitution_with(
+        self,
+        db: &'db dyn Db,
+        mut choose: impl FnMut(
+            BoundTypeVarInstance<'db>,
+            Option<Type<'db>>,
+        ) -> TypeVarSubstitutionProjection<'db>,
+    ) -> TypeVarSubstitution<'db> {
+        let mut substitution = TypeVarSubstitution::default();
+
+        for (typevar, inferred) in self
+            .generic_context(db)
+            .variables(db)
+            .zip(self.types(db).iter().copied())
+        {
+            let ty = match choose(typevar, inferred) {
+                TypeVarSubstitutionProjection::Substitute(ty) => ty,
+                TypeVarSubstitutionProjection::Default => {
+                    inferred.unwrap_or_else(|| substitution.default_or_fallback_type(db, typevar))
+                }
+                TypeVarSubstitutionProjection::Unsolved => continue,
+            };
+
+            substitution.insert(db, typevar, ty);
+        }
+
+        substitution
     }
 }
 
@@ -1858,7 +1969,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         bound_typevar: BoundTypeVarInstance<'db>,
         ty: Type<'db>,
     ) {
-        let identity = bound_typevar.identity(self.db);
+        let db = self.db;
+        let identity = bound_typevar.identity(db);
         match self.types.entry(identity) {
             Entry::Occupied(mut entry) => {
                 // TODO: The spec says that when a ParamSpec is used multiple times in a signature,
@@ -1867,11 +1979,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // specialization from the first occurrence.
                 // https://github.com/astral-sh/ty/issues/1778
                 // https://github.com/astral-sh/ruff/pull/21445#discussion_r2591510145
-                if bound_typevar.is_paramspec(self.db) {
+                if bound_typevar.is_paramspec(db) {
                     return;
                 }
 
-                entry.get_mut().add(self.db, ty);
+                entry.get_mut().add(db, ty);
             }
             Entry::Vacant(entry) => {
                 entry.insert(UnionAccumulator::new(ty));
