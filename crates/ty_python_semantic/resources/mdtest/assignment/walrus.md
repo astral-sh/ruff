@@ -116,6 +116,21 @@ def declares_global_after_generator_walrus():
     global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
 ```
 
+### Conditional comprehension target
+
+Named expression targets in eager comprehensions preserve the reachability of the comprehension
+body.
+
+```py
+[(x := 1) for _ in [0] if False]
+# error: [unresolved-reference]
+reveal_type(x)  # revealed: Unknown
+
+y = "old"
+[(y := 1) for _ in [0] if False]
+reveal_type(y)  # revealed: Literal["old"]
+```
+
 ### Nested comprehension
 
 ```py

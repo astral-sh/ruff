@@ -1259,6 +1259,19 @@ impl<'db> UseDefMapBuilder<'db> {
         symbol: ScopedSymbolId,
         pre_definition: SingleSymbolSnapshot,
     ) {
+        self.record_and_negate_single_symbol_reachability_constraint(
+            reachability_id,
+            symbol,
+            pre_definition,
+        );
+    }
+
+    pub(super) fn record_and_negate_single_symbol_reachability_constraint(
+        &mut self,
+        reachability_id: ScopedReachabilityConstraintId,
+        symbol: ScopedSymbolId,
+        pre_definition: SingleSymbolSnapshot,
+    ) {
         let negated_reachability_id = self
             .reachability_constraints
             .add_not_constraint(reachability_id);

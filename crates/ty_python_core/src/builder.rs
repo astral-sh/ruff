@@ -116,6 +116,35 @@ struct DeferredWalrusDefinition<'db> {
     definition: Definition<'db>,
     /// The comprehension scope after which the binding next becomes visible.
     visible_after_scope: FileScopeId,
+    /// Whether the named expression target is reached unconditionally inside its comprehension.
+    reachability: DeferredWalrusReachability,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum DeferredWalrusReachability {
+    Always,
+    Never,
+    Conditional,
+}
+
+impl DeferredWalrusReachability {
+    fn from_constraint(reachability: ScopedReachabilityConstraintId) -> Self {
+        if reachability == ScopedReachabilityConstraintId::ALWAYS_TRUE {
+            Self::Always
+        } else if reachability == ScopedReachabilityConstraintId::ALWAYS_FALSE {
+            Self::Never
+        } else {
+            Self::Conditional
+        }
+    }
+
+    fn combine(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Never, _) | (_, Self::Never) => Self::Never,
+            (Self::Always, reachability) | (reachability, Self::Always) => reachability,
+            (Self::Conditional, Self::Conditional) => Self::Conditional,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -873,13 +902,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     debug_assert!(false, "deferred walrus target scope should still be active");
                     continue;
                 };
-                self.record_existing_definition_in_scope(
+                self.record_deferred_walrus_definition_in_scope(
                     deferred.target_scope,
                     scope_index,
                     deferred.target_place,
                     deferred.definition,
-                    DefinitionCategory::Binding,
-                    false,
+                    deferred.reachability,
                 );
             } else {
                 debug_assert_eq!(
@@ -899,12 +927,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 if added {
                     self.use_def_maps[current_scope].add_place(symbol_id.into());
                 }
+                deferred.reachability =
+                    deferred
+                        .reachability
+                        .combine(DeferredWalrusReachability::from_constraint(
+                            self.current_use_def_map().reachability,
+                        ));
                 let scope_index = self.scope_stack.len() - 1;
                 self.record_temporary_walrus_definition_in_scope(
                     current_scope,
                     scope_index,
                     symbol_id.into(),
                     deferred.definition,
+                    deferred.reachability,
                 );
                 deferred.visible_after_scope = current_scope;
                 self.deferred_walrus_definitions.push(deferred);
@@ -1151,6 +1186,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_use_def_map_mut().merge(state);
     }
 
+    fn walrus_reachability_constraint(
+        reachability: DeferredWalrusReachability,
+    ) -> ScopedReachabilityConstraintId {
+        match reachability {
+            DeferredWalrusReachability::Always => ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            DeferredWalrusReachability::Never => ScopedReachabilityConstraintId::ALWAYS_FALSE,
+            DeferredWalrusReachability::Conditional => ScopedReachabilityConstraintId::AMBIGUOUS,
+        }
+    }
+
     /// Add a symbol to the place table and the use-def map.
     /// Return the [`ScopedPlaceId`] that uniquely identifies the symbol in both.
     fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {
@@ -1274,6 +1319,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.scope_stack.len() - 1,
                         place_id,
                         definition,
+                        DeferredWalrusReachability::from_constraint(
+                            self.current_use_def_map().reachability,
+                        ),
                     );
 
                     self.deferred_walrus_definitions
@@ -1282,6 +1330,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             target_place: symbol_id.into(),
                             definition,
                             visible_after_scope: self.current_scope(),
+                            reachability: DeferredWalrusReachability::from_constraint(
+                                self.current_use_def_map().reachability,
+                            ),
                         });
                 } else {
                     self.add_definition(place_id, named);
@@ -1526,13 +1577,113 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .record_definition(scope_index, &self.use_def_maps[scope]);
     }
 
+    fn record_deferred_walrus_definition_in_scope(
+        &mut self,
+        scope: FileScopeId,
+        scope_index: usize,
+        place: ScopedPlaceId,
+        definition: Definition<'db>,
+        reachability: DeferredWalrusReachability,
+    ) {
+        if reachability == DeferredWalrusReachability::Never {
+            self.place_tables[scope].mark_bound(place);
+            self.use_def_maps[scope].record_binding_context(place, definition);
+            return;
+        }
+
+        if reachability == DeferredWalrusReachability::Always {
+            self.record_existing_definition_in_scope(
+                scope,
+                scope_index,
+                place,
+                definition,
+                DefinitionCategory::Binding,
+                false,
+            );
+            return;
+        }
+
+        let symbol = place
+            .as_symbol()
+            .expect("deferred walrus target should be a symbol");
+        let associated_member_ids = self.place_tables[scope]
+            .associated_place_ids(place)
+            .iter()
+            .copied()
+            .collect::<Vec<_>>();
+        let pre_definition =
+            self.use_def_maps[scope].single_symbol_snapshot(symbol, &associated_member_ids);
+        let pre_definition_reachability = self.use_def_maps[scope].reachability;
+        let walrus_reachability = Self::walrus_reachability_constraint(reachability);
+        self.use_def_maps[scope].reachability = self.use_def_maps[scope]
+            .reachability_constraints
+            .add_and_constraint(pre_definition_reachability, walrus_reachability);
+
+        self.record_existing_definition_in_scope(
+            scope,
+            scope_index,
+            place,
+            definition,
+            DefinitionCategory::Binding,
+            false,
+        );
+
+        self.use_def_maps[scope].record_and_negate_single_symbol_reachability_constraint(
+            walrus_reachability,
+            symbol,
+            pre_definition,
+        );
+        self.use_def_maps[scope].reachability = pre_definition_reachability;
+    }
+
     fn record_temporary_walrus_definition_in_scope(
         &mut self,
         scope: FileScopeId,
         scope_index: usize,
         place: ScopedPlaceId,
         definition: Definition<'db>,
+        reachability: DeferredWalrusReachability,
     ) {
+        if reachability == DeferredWalrusReachability::Never {
+            self.use_def_maps[scope].record_binding_context(place, definition);
+            return;
+        }
+
+        if reachability == DeferredWalrusReachability::Conditional {
+            let symbol = place
+                .as_symbol()
+                .expect("deferred walrus target should be a symbol");
+            let associated_member_ids = self.place_tables[scope]
+                .associated_place_ids(place)
+                .iter()
+                .copied()
+                .collect::<Vec<_>>();
+            let pre_definition =
+                self.use_def_maps[scope].single_symbol_snapshot(symbol, &associated_member_ids);
+            let pre_definition_reachability = self.use_def_maps[scope].reachability;
+            let walrus_reachability = Self::walrus_reachability_constraint(reachability);
+            self.use_def_maps[scope].reachability = self.use_def_maps[scope]
+                .reachability_constraints
+                .add_and_constraint(pre_definition_reachability, walrus_reachability);
+
+            self.use_def_maps[scope].record_binding(
+                place,
+                definition,
+                PreviousDefinitions::AreShadowed,
+            );
+            self.delete_associated_bindings_in_scope(scope, place);
+            self.use_def_maps[scope].record_and_negate_single_symbol_reachability_constraint(
+                walrus_reachability,
+                symbol,
+                pre_definition,
+            );
+            self.use_def_maps[scope].reachability = pre_definition_reachability;
+
+            self.try_node_context_stack_manager
+                .record_definition(scope_index, &self.use_def_maps[scope]);
+            return;
+        }
+
         self.use_def_maps[scope].record_binding(
             place,
             definition,
@@ -2253,7 +2404,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         for if_expr in &generator.ifs {
             self.visit_expr(if_expr);
-            let _ = self.record_expression_narrowing_constraint(if_expr);
+            let (predicate, _) = self.record_expression_narrowing_constraint(if_expr);
+            self.record_reachability_constraint(predicate);
         }
 
         for generator in generators_iter {
@@ -2271,7 +2423,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             for if_expr in &generator.ifs {
                 self.visit_expr(if_expr);
-                let _ = self.record_expression_narrowing_constraint(if_expr);
+                let (predicate, _) = self.record_expression_narrowing_constraint(if_expr);
+                self.record_reachability_constraint(predicate);
             }
         }
 
