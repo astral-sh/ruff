@@ -29,3 +29,22 @@ nok10 = "".join((foo, '"'))
 nok11 = ''.join((foo, "'"))
 nok12 = ''.join([foo, "'", '"'])
 nok13 = "".join([foo, "'", '"'])
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/21082
+# Mixing raw and non-raw strings can cause syntax errors or behavior changes
+# if not handled carefully.
+nok14 = "".join((r"", '"'))  # Mixed raw/non-raw; result contains quote character
+nok15 = "".join((r"", "\\"))  # Mixed raw/non-raw; result ends with odd number of backslashes
+nok16 = "".join((r"", "\0"))  # Mixed raw/non-raw; result contains null byte
+nok17 = "".join((r"", "\r"))  # Mixed raw/non-raw; result contains carriage return
+nok18 = "".join((r"", "\\r"))  # Mixed raw/non-raw; result contains backslash followed by literal r
+nok19 = "".join((r"", "\\\\"))  # Mixed raw/non-raw; result ends with even number of backslashes (safe)
+nok20 = "".join((r"", "\\\\\\"))  # Mixed raw/non-raw; result ends with odd number of backslashes (unsafe)
+
+# Test that all-raw strings still work (should be OK)
+ok7 = "".join((r"", r"something"))  # Both are raw - OK
+ok8 = "\n".join((r"line1", r'line2'))  # Both are raw - OK
+
+# Test that all-non-raw strings still work (should be OK)
+ok9 = "".join(("", '"'))  # Both are non-raw - OK
+ok10 = "\n".join(("line1", "line2"))  # Both are non-raw - OK
