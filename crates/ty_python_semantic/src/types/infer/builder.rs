@@ -3327,6 +3327,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let previous_typevar_binding_context =
                     self.typevar_binding_context.replace(definition);
 
+                // For unannotated name assignments (`x = expr`), signal that fact so that
+                // `check_call` can suggest using a type annotation instead of a cast.
+                let tcx = if target.as_name_expr().is_some() && tcx.annotation.is_none() {
+                    TypeContext::for_plain_name_assignment()
+                } else {
+                    tcx
+                };
+
                 let value_ty = if let Some(standalone_expression) = self.index.try_expression(value)
                 {
                     self.infer_standalone_expression_impl(value, standalone_expression, tcx)
@@ -3876,7 +3884,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let value_ty = value.as_ref().map(|value| {
                 self.infer_maybe_standalone_expression(
                     value,
-                    TypeContext::new(Some(annotated.inner_type())),
+                    TypeContext::for_annotated_assignment(annotated.inner_type()),
                 )
             });
 
@@ -4169,7 +4177,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let inferred_ty = self.infer_maybe_standalone_expression(
                 value,
-                TypeContext::new(Some(declared.inner_type())),
+                TypeContext::for_annotated_assignment(declared.inner_type()),
             );
 
             self.typevar_binding_context = previous_typevar_binding_context;
@@ -7361,6 +7369,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 &call_arguments,
                                 call_expression,
                                 self.file(),
+                                call_expression_tcx,
                             );
                         }
                     }

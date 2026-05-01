@@ -1890,6 +1890,7 @@ impl KnownFunction {
         call_arguments: &CallArguments<'_, 'db>,
         call_expression: &ast::ExprCall,
         file: File,
+        call_expression_tcx: TypeContext<'db>,
     ) {
         let db = context.db();
         let parameter_types = overload.parameter_types();
@@ -2055,27 +2056,53 @@ impl KnownFunction {
             }
 
             KnownFunction::Cast => {
-                let [Some(casted_type), Some(source_type)] = parameter_types else {
+                let [Some(target_type), Some(source_type)] = parameter_types else {
                     return;
                 };
                 let contains_unknown_or_todo = |ty: Type<'_>| {
                     ty.is_dynamic() && !matches!(ty, Type::Dynamic(DynamicType::Any))
                 };
-                if source_type.is_equivalent_to(db, *casted_type)
+                if source_type.is_equivalent_to(db, *target_type)
                     && !any_over_type(db, *source_type, true, contains_unknown_or_todo)
-                    && !any_over_type(db, *casted_type, true, contains_unknown_or_todo)
+                    && !any_over_type(db, *target_type, true, contains_unknown_or_todo)
                 {
                     if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
                         let source_display = source_type.display(db).to_string();
-                        let casted_display = casted_type.display(db).to_string();
+                        let target_display = target_type.display(db).to_string();
                         let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Value is already of type `{casted_display}`",
+                            "Value is already of type `{target_display}`",
                         ));
-                        if source_display != casted_display {
+                        if source_display != target_display {
                             diagnostic.info(format_args!(
-                                "`{casted_display}` is equivalent to `{source_display}`",
+                                "`{target_display}` is equivalent to `{source_display}`",
                             ));
                         }
+                    }
+                } else if call_expression_tcx.from_annotated_assignment
+                    && let Some(annotation) = call_expression_tcx.annotation
+                    && annotation.is_equivalent_to(db, *target_type)
+                    && source_type.is_assignable_to(db, annotation)
+                    && annotation.is_assignable_to(db, *source_type)
+                    && !any_over_type(db, *source_type, true, contains_unknown_or_todo)
+                    && !any_over_type(db, *target_type, true, contains_unknown_or_todo)
+                {
+                    if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
+                        builder.into_diagnostic(format_args!(
+                            "Unnecessary cast to type `{target}` in annotated assignment",
+                            target = target_type.display(db)
+                        ));
+                    }
+                } else if call_expression_tcx.from_plain_name_assignment
+                    && source_type.is_assignable_to(db, *target_type)
+                    && target_type.is_assignable_to(db, *source_type)
+                    && !any_over_type(db, *source_type, true, contains_unknown_or_todo)
+                    && !any_over_type(db, *target_type, true, contains_unknown_or_todo)
+                {
+                    if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
+                        builder.into_diagnostic(format_args!(
+                            "Cast to `{target}` can be replaced with a type annotation",
+                            target = target_type.display(db),
+                        ));
                     }
                 }
             }
