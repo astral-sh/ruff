@@ -896,6 +896,10 @@ enum NestedSubstitutionSide {
 /// lets [`PathAssignments`] apply each substitution shape at most once per path.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 struct NestedSubstitution {
+    /// NOTE: Keying `NestedSubstitution` by `constrained_typevar` instead of the specific constrained `ConstraintId` makes
+    /// deduplication apply across all constraints on that typevar.
+    /// This provides a performance benefit, but may weaken sequent saturation and can miss contradictions (or other implications) that depend on keeping both substitutions.
+    /// However, at present, there don't seem to be any cases where this is a problem (see ruff#24803 for details).
     constrained_typevar: TypeVarId,
     substituted_typevar: TypeVarId,
     side: NestedSubstitutionSide,
