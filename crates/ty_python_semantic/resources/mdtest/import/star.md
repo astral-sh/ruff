@@ -446,12 +446,15 @@ class Iterable:
 (d for d in Iterable())
 lambda e: (f := 42)
 
-# Definitions created by walruses in a comprehension scope are unique;
+# Definitions created by walruses in an eager comprehension scope are unique;
 # they "leak out" of the scope and are stored in the surrounding scope
 [(g := h * 2) for h in Iterable()]
 [i for j in Iterable() if (i := j - 10) > 0]
 {(k := l * 2): (m := l * 3) for l in Iterable()}
-list(((o := p * 2) for p in Iterable()))
+
+# Generator expression bodies are evaluated lazily, so their walrus targets
+# are not defined when the generator object is created.
+((o := p * 2) for p in Iterable())
 
 # A walrus expression nested inside several scopes *still* leaks out
 # to the global scope:
@@ -485,6 +488,8 @@ reveal_type(j)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(p)  # revealed: Unknown
 # error: [unresolved-reference]
+reveal_type(o)  # revealed: Unknown
+# error: [unresolved-reference]
 reveal_type(r)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(s)  # revealed: Unknown
@@ -496,7 +501,6 @@ reveal_type(g)  # revealed: int
 reveal_type(i)  # revealed: int
 reveal_type(k)  # revealed: int
 reveal_type(m)  # revealed: int
-reveal_type(o)  # revealed: int
 reveal_type(q)  # revealed: int
 ```
 

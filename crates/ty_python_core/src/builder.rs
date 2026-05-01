@@ -105,6 +105,19 @@ struct ScopeInfo<'ast> {
     narrowing_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct DeferredWalrusDefinition<'db> {
+    /// The scope that should receive the actual binding once all intervening comprehension scopes
+    /// have finished.
+    target_scope: FileScopeId,
+    /// The place in `target_scope` that the named expression binds.
+    target_place: ScopedPlaceId,
+    /// The definition associated with the named expression target.
+    definition: Definition<'db>,
+    /// The comprehension scope after which the binding next becomes visible.
+    visible_after_scope: FileScopeId,
+}
+
 #[derive(Clone)]
 struct BoolOpSnapshots {
     truthy: FlowSnapshot,
@@ -175,6 +188,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     semantic_checker: SemanticSyntaxChecker,
     in_try: bool,
     comprehension_iterable_nesting: u32,
+    active_comprehension_targets: Vec<FxHashSet<Name>>,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -206,6 +220,15 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 
     /// Alias metadata for predicate leaf names in the current file.
     alias_predicates: FxHashMap<ExpressionNodeKey, NarrowingAliasPredicate<'db>>,
+
+    /// Named-expression definitions that bind in an enclosing scope from inside a comprehension.
+    ///
+    /// These cannot be recorded in the enclosing scope immediately: doing so would make the
+    /// binding visible to reads that occur earlier in the same eager comprehension. Instead, we
+    /// record the binding locally for ordering inside the current comprehension, propagate it
+    /// outward through any enclosing comprehension scopes as each scope is popped, and only record
+    /// it in the true target scope once those eager scopes have been snapshotted.
+    deferred_walrus_definitions: Vec<DeferredWalrusDefinition<'db>>,
 }
 
 impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
@@ -250,9 +273,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             semantic_checker: SemanticSyntaxChecker::default(),
             in_try: false,
             comprehension_iterable_nesting: 0,
+            active_comprehension_targets: Vec::new(),
             semantic_syntax_errors: RefCell::default(),
             narrowing_aliases: FxHashMap::default(),
             alias_predicates: FxHashMap::default(),
+            deferred_walrus_definitions: Vec::new(),
         };
 
         builder.push_scope_with_parent(NodeWithScopeRef::Module, None);
@@ -401,6 +426,52 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn in_comprehension_iterable(&self) -> bool {
         self.comprehension_iterable_nesting > 0
+    }
+
+    fn has_rebound_comprehension_variable_error(&self, range: TextRange) -> bool {
+        self.semantic_syntax_errors.borrow().iter().any(|error| {
+            matches!(
+                error.kind,
+                SemanticSyntaxErrorKind::ReboundComprehensionVariable
+            ) && error.range == range
+        })
+    }
+
+    fn is_active_comprehension_target(&self, name: &Name) -> bool {
+        self.active_comprehension_targets
+            .iter()
+            .rev()
+            .any(|targets| targets.contains(name))
+    }
+
+    fn collect_comprehension_target_names(target: &'ast ast::Expr, names: &mut FxHashSet<Name>) {
+        match target {
+            ast::Expr::Name(name) => {
+                names.insert(name.id.clone());
+            }
+            ast::Expr::Tuple(tuple) => {
+                for elt in &tuple.elts {
+                    Self::collect_comprehension_target_names(elt, names);
+                }
+            }
+            ast::Expr::List(list) => {
+                for elt in &list.elts {
+                    Self::collect_comprehension_target_names(elt, names);
+                }
+            }
+            ast::Expr::Starred(starred) => {
+                Self::collect_comprehension_target_names(&starred.value, names);
+            }
+            _ => {}
+        }
+    }
+
+    fn active_comprehension_targets(generators: &'ast [ast::Comprehension]) -> FxHashSet<Name> {
+        let mut names = FxHashSet::default();
+        for generator in generators {
+            Self::collect_comprehension_target_names(&generator.target, &mut names);
+        }
+        names
     }
 
     fn with_comprehension_iterable_context(&mut self, visit: impl FnOnce(&mut Self)) {
@@ -784,6 +855,86 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         popped_scope_id
     }
 
+    fn propagate_deferred_walrus_definitions(&mut self, popped_scope: FileScopeId) {
+        if self.deferred_walrus_definitions.is_empty() {
+            return;
+        }
+
+        let mut deferred_definitions = std::mem::take(&mut self.deferred_walrus_definitions);
+        for mut deferred in deferred_definitions.drain(..) {
+            if deferred.visible_after_scope != popped_scope {
+                self.deferred_walrus_definitions.push(deferred);
+                continue;
+            }
+
+            let current_scope = self.current_scope();
+            if current_scope == deferred.target_scope {
+                let Some(scope_index) = self.scope_stack_index(deferred.target_scope) else {
+                    debug_assert!(false, "deferred walrus target scope should still be active");
+                    continue;
+                };
+                self.record_existing_definition_in_scope(
+                    deferred.target_scope,
+                    scope_index,
+                    deferred.target_place,
+                    deferred.definition,
+                    DefinitionCategory::Binding,
+                    false,
+                );
+            } else {
+                debug_assert_eq!(
+                    self.scopes[current_scope].kind(),
+                    ScopeKind::Comprehension,
+                    "deferred walrus bindings should only propagate through comprehension scopes",
+                );
+
+                let name = self.place_tables[deferred.target_scope]
+                    .place(deferred.target_place)
+                    .as_symbol()
+                    .expect("deferred walrus target should be a symbol")
+                    .name()
+                    .clone();
+                let (symbol_id, added) =
+                    self.place_tables[current_scope].add_symbol(Symbol::new(name));
+                if added {
+                    self.use_def_maps[current_scope].add_place(symbol_id.into());
+                }
+                let scope_index = self.scope_stack.len() - 1;
+                self.record_temporary_walrus_definition_in_scope(
+                    current_scope,
+                    scope_index,
+                    symbol_id.into(),
+                    deferred.definition,
+                );
+                deferred.visible_after_scope = current_scope;
+                self.deferred_walrus_definitions.push(deferred);
+            }
+        }
+    }
+
+    fn discard_deferred_walrus_definitions(&mut self, popped_scope: FileScopeId) {
+        if self.deferred_walrus_definitions.is_empty() {
+            return;
+        }
+
+        let mut deferred_definitions = std::mem::take(&mut self.deferred_walrus_definitions);
+        for deferred in deferred_definitions.drain(..) {
+            if deferred.visible_after_scope == popped_scope {
+                self.place_tables[deferred.target_scope].mark_bound(deferred.target_place);
+                self.use_def_maps[deferred.target_scope]
+                    .record_binding_context(deferred.target_place, deferred.definition);
+            } else {
+                self.deferred_walrus_definitions.push(deferred);
+            }
+        }
+    }
+
+    fn scope_stack_index(&self, scope: FileScopeId) -> Option<usize> {
+        self.scope_stack
+            .iter()
+            .position(|scope_info| scope_info.file_scope_id == scope)
+    }
+
     fn current_place_table(&self) -> &PlaceTableBuilder {
         let scope_id = self.current_scope();
         &self.place_tables[scope_id]
@@ -852,26 +1003,41 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    /// Invalidate any narrowing aliases affected by a new definition of `place`.
-    fn invalidate_narrowing_aliases_for(&mut self, place: ScopedPlaceId) {
-        let place_table = &self.place_tables[self.current_scope()];
-        let associated_members = place_table.associated_place_ids(place);
+    /// Invalidate any narrowing aliases in `scope` affected by a new definition of `place`.
+    fn invalidate_narrowing_aliases_for(&mut self, scope: FileScopeId, place: ScopedPlaceId) {
+        let place_table = &self.place_tables[scope];
+        let associated_members: Vec<ScopedPlaceId> = place_table
+            .associated_place_ids(place)
+            .iter()
+            .map(|member_id| ScopedPlaceId::from(*member_id))
+            .collect();
         let reassigned_alias_name = place
             .as_symbol()
-            .map(|symbol_id| place_table.symbol(symbol_id).name());
+            .map(|symbol_id| place_table.symbol(symbol_id).name().clone());
 
-        self.narrowing_aliases.retain(|name, alias| {
+        let should_retain_alias = |name: &Name, alias: &NarrowingAlias<'ast>| {
+            if alias.expression_scope != scope {
+                return true;
+            }
             // Drop aliases that narrow the reassigned place or any of its members.
             //  e.g. `is_none = x is None and ...; x = 1`
             !alias.narrowed_places.contains(&place)
                 //  e.g. `is_none = a.x is None; a = A()`
                 && !associated_members
                     .iter()
-                    .any(|m| alias.narrowed_places.contains(&(*m).into()))
+                    .any(|member| alias.narrowed_places.contains(member))
                 // Drop the alias whose own variable is the reassigned place.
                 // e.g. `is_none = x is None; is_none = False`
-                && reassigned_alias_name != Some(name)
-        });
+                && reassigned_alias_name.as_ref() != Some(name)
+        };
+
+        self.narrowing_aliases
+            .retain(|name, alias| should_retain_alias(name, alias));
+        for scope_info in &mut self.scope_stack {
+            scope_info
+                .narrowing_aliases
+                .retain(|name, alias| should_retain_alias(name, alias));
+        }
     }
 
     fn can_register_narrowing_alias(value: &ast::Expr) -> bool {
@@ -1079,7 +1245,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             Some(CurrentAssignment::Named(named)) => {
                 if let WalrusTargetScope::Enclosing {
                     file_scope_id: enclosing_scope,
-                    scope_index,
+                    scope_index: _,
                 } = self.walrus_target_scope()
                 {
                     // PEP 572: walrus in comprehension binds in enclosing scope.
@@ -1094,12 +1260,29 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     if added {
                         self.use_def_maps[enclosing_scope].add_place(symbol_id.into());
                     }
-                    self.push_additional_definition_in_scope(
-                        enclosing_scope,
-                        scope_index,
-                        symbol_id.into(),
-                        named,
+                    let (definition, num_definitions, category, is_loop_header) =
+                        self.create_definition_in_scope(enclosing_scope, symbol_id.into(), named);
+                    debug_assert_eq!(
+                        num_definitions, 1,
+                        "Attempted to create multiple `Definition`s associated with AST node {named:?}"
                     );
+                    debug_assert!(matches!(category, DefinitionCategory::Binding));
+                    debug_assert!(!is_loop_header);
+
+                    self.record_temporary_walrus_definition_in_scope(
+                        self.current_scope(),
+                        self.scope_stack.len() - 1,
+                        place_id,
+                        definition,
+                    );
+
+                    self.deferred_walrus_definitions
+                        .push(DeferredWalrusDefinition {
+                            target_scope: enclosing_scope,
+                            target_place: symbol_id.into(),
+                            definition,
+                            visible_after_scope: self.current_scope(),
+                        });
                 } else {
                     self.add_definition(place_id, named);
                 }
@@ -1181,21 +1364,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_use_def_map_mut().delete_binding(place);
     }
 
-    /// Create a [`Definition`] for `definition_node` in the given `scope`, recording it in
-    /// that scope's place table and use-def map.
-    ///
-    /// Returns a 3-element tuple: the newly created [`Definition`], the total number of
-    /// definitions now associated with the AST node, and the [`DefinitionCategory`].
-    ///
-    /// This is the low-level helper; callers that add definitions to the **current** scope
-    /// should normally use [`Self::push_additional_definition`] or [`Self::add_definition`],
-    /// which also update lazy snapshots and the try-node context stack.
-    fn add_definition_in_scope(
+    fn create_definition_in_scope(
         &mut self,
         scope: FileScopeId,
         place: ScopedPlaceId,
         definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
-    ) -> (Definition<'db>, usize, DefinitionCategory) {
+    ) -> (Definition<'db>, usize, DefinitionCategory, bool) {
         let definition_node: DefinitionNodeRef<'ast, 'db> = definition_node.into();
 
         // Note `definition_node` is guaranteed to be a child of `self.module`
@@ -1214,6 +1388,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             definitions.len()
         };
 
+        (definition, num_definitions, category, is_loop_header)
+    }
+
+    fn record_definition_effects_in_scope(
+        &mut self,
+        scope: FileScopeId,
+        place: ScopedPlaceId,
+        definition: Definition<'db>,
+        category: DefinitionCategory,
+        is_loop_header: bool,
+    ) {
         // We need to avoid marking places as bound as soon as we encounter a loop header
         // definition for them, because that would lead to false-positive semantic syntax errors in
         // cases like this:
@@ -1224,9 +1409,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // ```
         if category.is_binding() && !is_loop_header {
             self.place_tables[scope].mark_bound(place);
-            if scope == self.current_scope() {
-                self.invalidate_narrowing_aliases_for(place);
-            }
+            self.invalidate_narrowing_aliases_for(scope, place);
         }
         if category.is_declaration() {
             self.place_tables[scope].mark_declared(place);
@@ -1253,6 +1436,27 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
         }
+    }
+
+    /// Create a [`Definition`] for `definition_node` in the given `scope`, recording it in
+    /// that scope's place table and use-def map.
+    ///
+    /// Returns a 3-element tuple: the newly created [`Definition`], the total number of
+    /// definitions now associated with the AST node, and the [`DefinitionCategory`].
+    ///
+    /// This is the low-level helper; callers that add definitions to the **current** scope
+    /// should normally use [`Self::push_additional_definition`] or [`Self::add_definition`],
+    /// which also update lazy snapshots and the try-node context stack.
+    fn add_definition_in_scope(
+        &mut self,
+        scope: FileScopeId,
+        place: ScopedPlaceId,
+        definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
+    ) -> (Definition<'db>, usize, DefinitionCategory) {
+        let (definition, num_definitions, category, is_loop_header) =
+            self.create_definition_in_scope(scope, place, definition_node);
+
+        self.record_definition_effects_in_scope(scope, place, definition, category, is_loop_header);
 
         (definition, num_definitions, category)
     }
@@ -1299,6 +1503,45 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .record_definition(scope_index, &self.use_def_maps[scope]);
 
         (definition, num_definitions)
+    }
+
+    fn record_existing_definition_in_scope(
+        &mut self,
+        scope: FileScopeId,
+        scope_index: usize,
+        place: ScopedPlaceId,
+        definition: Definition<'db>,
+        category: DefinitionCategory,
+        is_loop_header: bool,
+    ) {
+        self.record_definition_effects_in_scope(scope, place, definition, category, is_loop_header);
+
+        if category.is_binding() {
+            if let Some(id) = place.as_symbol() {
+                self.update_lazy_snapshots(scope, id);
+            }
+        }
+
+        self.try_node_context_stack_manager
+            .record_definition(scope_index, &self.use_def_maps[scope]);
+    }
+
+    fn record_temporary_walrus_definition_in_scope(
+        &mut self,
+        scope: FileScopeId,
+        scope_index: usize,
+        place: ScopedPlaceId,
+        definition: Definition<'db>,
+    ) {
+        self.use_def_maps[scope].record_binding(
+            place,
+            definition,
+            PreviousDefinitions::AreShadowed,
+        );
+        self.delete_associated_bindings_in_scope(scope, place);
+
+        self.try_node_context_stack_manager
+            .record_definition(scope_index, &self.use_def_maps[scope]);
     }
 
     // Creates a definition for each key-value assignment in the dictionary.
@@ -1977,6 +2220,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         generators: &'ast [ast::Comprehension],
         visit_outer_elt: impl FnOnce(&mut Self),
     ) {
+        let is_generator_expression = matches!(scope, NodeWithScopeRef::GeneratorExpression(_));
         let mut generators_iter = generators.iter();
 
         let Some(generator) = generators_iter.next() else {
@@ -1995,6 +2239,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let saved_assignments = std::mem::take(&mut self.current_assignments);
 
         self.push_scope(scope);
+        self.active_comprehension_targets
+            .push(Self::active_comprehension_targets(generators));
 
         self.add_unpackable_assignment(
             &Unpackable::Comprehension {
@@ -2012,7 +2258,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         for generator in generators_iter {
             let value = self.add_standalone_expression(&generator.iter);
-            self.visit_expr(&generator.iter);
+            self.with_comprehension_iterable_context(|builder| builder.visit_expr(&generator.iter));
 
             self.add_unpackable_assignment(
                 &Unpackable::Comprehension {
@@ -2030,7 +2276,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
 
         visit_outer_elt(self);
-        self.pop_scope();
+        self.active_comprehension_targets
+            .pop()
+            .expect("active comprehension targets are pushed with comprehension scopes");
+        let popped_scope = self.pop_scope();
+        if is_generator_expression {
+            self.discard_deferred_walrus_definitions(popped_scope);
+        } else {
+            self.propagate_deferred_walrus_definitions(popped_scope);
+        }
 
         self.current_assignments = saved_assignments;
     }
@@ -3475,7 +3729,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         }
 
                         let place_id = self.add_place(target);
-                        self.invalidate_narrowing_aliases_for(place_id);
+                        self.invalidate_narrowing_aliases_for(self.current_scope(), place_id);
                         self.delete_binding(place_id);
                     }
                 }
@@ -3709,8 +3963,21 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
                 if node.target.is_name_expr() {
                     let walrus_target_scope = self.walrus_target_scope();
+                    let invalid_in_comprehension_iterable = self.in_comprehension_iterable();
+                    let target = node
+                        .target
+                        .as_name_expr()
+                        .expect("named expression target was checked as a name");
+                    let already_reported_rebound =
+                        self.has_rebound_comprehension_variable_error(target.range);
+                    let active_target_rebound =
+                        matches!(walrus_target_scope, WalrusTargetScope::Enclosing { .. })
+                            && !invalid_in_comprehension_iterable
+                            && self.is_active_comprehension_target(&target.id);
+                    let invalid_rebound_comprehension_variable =
+                        already_reported_rebound || active_target_rebound;
 
-                    if self.in_comprehension_iterable() {
+                    if invalid_in_comprehension_iterable {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::NamedExpressionInComprehensionIterable,
                             range: node.range,
@@ -3724,6 +3991,17 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             range: node.range,
                             python_version: self.python_version,
                         });
+                    }
+                    if active_target_rebound && !already_reported_rebound {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::ReboundComprehensionVariable,
+                            range: target.range,
+                            python_version: self.python_version,
+                        });
+                    }
+
+                    if invalid_in_comprehension_iterable || invalid_rebound_comprehension_variable {
+                        return;
                     }
 
                     // PEP 572: walrus in comprehension binds in the enclosing scope.

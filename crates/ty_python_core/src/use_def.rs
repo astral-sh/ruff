@@ -1101,6 +1101,29 @@ impl<'db> UseDefMapBuilder<'db> {
         );
     }
 
+    /// Record enough context to infer a definition without applying its binding to the current
+    /// flow state.
+    pub(super) fn record_binding_context(
+        &mut self,
+        place: ScopedPlaceId,
+        binding: Definition<'db>,
+    ) {
+        let bindings = match place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
+            ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
+        };
+
+        self.bindings_by_definition
+            .insert(binding, bindings.clone());
+
+        let place_state = match place {
+            ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
+            ScopedPlaceId::Member(member) => &mut self.member_states[member],
+        };
+        self.declarations_by_binding
+            .insert(binding, place_state.declarations().clone());
+    }
+
     pub(super) fn add_predicate(
         &mut self,
         predicate: PredicateOrLiteral<'db>,

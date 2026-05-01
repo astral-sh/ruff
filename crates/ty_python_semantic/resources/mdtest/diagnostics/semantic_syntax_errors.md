@@ -199,6 +199,20 @@ Walrus operators cannot rebind variables already in use as iterators:
 
 # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
 {y := 5 for y in range(10)}
+
+# error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+[(a := 0) for a in range(3)]
+# error: [unresolved-reference]
+reveal_type(a)  # revealed: Unknown
+
+# error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+[i for i in range(5) if (i := 0)]
+# error: [unresolved-reference]
+reveal_type(i)  # revealed: Unknown
+
+[x for x in range(3) if (lambda: (x := 1))()]
+# error: [unresolved-reference]
+reveal_type(x)  # revealed: Unknown
 ```
 
 ## Walrus in invalid comprehension contexts
@@ -215,7 +229,8 @@ def returns_list() -> list[int]:
 
 # error: [invalid-syntax] "assignment expression cannot be used in a comprehension iterable expression"
 [x for x in (y := returns_list())]
-reveal_type(y)  # revealed: list[int]
+# error: [unresolved-reference]
+reveal_type(y)  # revealed: Unknown
 ```
 
 ## Multiple case assignments

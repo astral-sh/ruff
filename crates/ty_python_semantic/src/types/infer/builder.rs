@@ -410,6 +410,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn extend_cross_scope_definition(&mut self, inference: &DefinitionInference<'db>) {
+        self.expressions.extend(inference.expressions.iter());
+
+        if let Some(extra) = &inference.extra {
+            self.context.extend(&extra.diagnostics);
+            self.extend_cycle_recovery(extra.cycle_recovery);
+            self.string_annotations
+                .extend(extra.string_annotations.iter().copied());
+            self.expected_types.extend(extra.expected_types.iter());
+            self.qualifiers.extend(extra.qualifiers.iter());
+            self.type_expression_flags
+                .extend(extra.type_expression_flags.iter());
+        }
+    }
+
+    fn extend_cross_scope_expression(&mut self, inference: &ExpressionInference<'db>) {
+        self.expressions.extend(inference.expressions.iter());
+
+        if let Some(extra) = &inference.extra {
+            // Diagnostics that depend on these expression types are emitted by the owning
+            // statement/scope inference. Copying expression diagnostics here would duplicate them.
+            self.extend_cycle_recovery(extra.cycle_recovery);
+            self.string_annotations
+                .extend(extra.string_annotations.iter().copied());
+            self.expected_types.extend(extra.expected_types.iter());
+            self.type_expression_flags
+                .extend(extra.type_expression_flags.iter());
+        }
+    }
+
     fn extend_statement(&mut self, inference: &StatementInference<'db>) {
         let inference = match inference {
             StatementInference::Other(inference) => inference,
@@ -6639,20 +6669,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
         if named.target.is_name_expr() {
             let db = self.db();
+            let definition = self
+                .index
+                .try_definitions(named)
+                .and_then(|definitions| definitions.first().copied());
 
             if let Some(expression) = self.index.try_expression(named.value.as_ref()) {
                 // PEP 572: walrus in comprehension binds in the enclosing scope.
-                // Infer the value via its standalone expression in this scope;
-                // the definition lives in the enclosing scope and will be
-                // inferred when that scope needs it.
-                let result = infer_expression_types(db, expression, TypeContext::default());
-                self.extend_expression(result);
-                result.expression_type(named.value.as_ref())
-            } else {
-                let definition = self.index.expect_single_definition(named);
+                // Infer the value via its standalone expression in this scope, where the
+                // comprehension iteration variables are visible. Also infer the enclosing
+                // definition so assignment diagnostics and declaration fallback are applied.
+                let expression_result =
+                    infer_expression_types(db, expression, TypeContext::default());
+                self.extend_expression(expression_result);
+
+                if let Some(definition) = definition {
+                    let definition_result = infer_definition_types(db, definition);
+                    self.extend_cross_scope_definition(definition_result);
+                    definition_result.binding_type(definition)
+                } else {
+                    expression_result.expression_type(named.value.as_ref())
+                }
+            } else if let Some(definition) = definition {
                 let result = infer_definition_types(db, definition);
                 self.extend_definition(result);
                 result.binding_type(definition)
+            } else {
+                self.infer_expression(&named.value, TypeContext::default())
             }
         } else {
             // For syntactically invalid targets, we still need to run type inference:
@@ -6679,10 +6722,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // PEP 572: walrus in a comprehension binds in the enclosing scope, but
         // the value references comprehension-scoped variables. The builder
         // registers the value as a standalone expression in the comprehension
-        // scope so we can infer it there. We must not `extend` the result
-        // because expression IDs are only meaningful within their own scope.
+        // scope so we can infer it there. We only copy expression-side
+        // results from that scope; bindings and declarations are scoped to
+        // the standalone expression's use-def map.
         let ty = if let Some(expression) = self.index.try_expression(value.as_ref()) {
             let result = infer_expression_types(self.db(), expression, add.type_context());
+            self.extend_cross_scope_expression(result);
             result.expression_type(value.as_ref())
         } else {
             self.infer_expression(value, add.type_context())

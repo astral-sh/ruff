@@ -78,8 +78,42 @@ class Iterable:
     def __iter__(self) -> Iterator:
         return Iterator()
 
-list(((h := i * 2) for i in Iterable()))
-reveal_type(h)  # revealed: int
+gen = ((h := i * 2) for i in Iterable())
+# error: [unresolved-reference]
+reveal_type(h)  # revealed: Unknown
+```
+
+### Generator expression target is bound lazily
+
+Named expression targets in generator expressions are not bound when the generator object is
+created.
+
+```py
+x = "s"
+gen = ((x := i) for i in range(3))
+reveal_type(x)  # revealed: Literal["s"]
+
+gen2 = ((y := i) for i in range(3))
+# error: [unresolved-reference]
+reveal_type(y)  # revealed: Unknown
+```
+
+### Generator expression target is local
+
+Even though generator expression targets are bound lazily, they are local bindings in the enclosing
+function scope.
+
+```py
+x = 0
+
+def reads_before_generator_walrus():
+    # error: [unresolved-reference]
+    reveal_type(x)  # revealed: Unknown
+    gen = ((x := 1) for _ in [0])
+
+def declares_global_after_generator_walrus():
+    gen = ((x := 1) for _ in [0])
+    global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
 ```
 
 ### Nested comprehension
@@ -87,6 +121,79 @@ reveal_type(h)  # revealed: int
 ```py
 [[(x := y) for y in range(3)] for _ in range(3)]
 reveal_type(x)  # revealed: int
+```
+
+### Named expression in later comprehension iterable
+
+Named expressions are invalid in every comprehension iterable expression, not only the leftmost
+iterable. Invalid named expressions in iterable expressions do not bind the target.
+
+```py
+[x for x in range(3) for y in (z := range(3))]  # error: [invalid-syntax]
+
+# error: [unresolved-reference]
+reveal_type(z)  # revealed: Unknown
+```
+
+### Read before named expression target is bound
+
+Reads that execute before a comprehension named expression target is assigned do not resolve to the
+target definition being created.
+
+```py
+# error: [unresolved-reference]
+[(x, x := y) for y in [1]]
+reveal_type(x)  # revealed: int
+
+# error: [unresolved-reference]
+[(q := q + 1) for _ in [0]]
+reveal_type(q)  # revealed: Unknown
+```
+
+### Assignment diagnostics for named expression target
+
+A named expression in a comprehension infers the enclosing-scope definition like a normal named
+expression, including assignment diagnostics.
+
+```py
+x: int
+[(x := "bad") for _ in range(1)]  # error: [invalid-assignment]
+reveal_type(x)  # revealed: int
+```
+
+### Contextual diagnostics for named expression value
+
+A named expression in a comprehension infers the value with the target's contextual type.
+
+```py
+from typing import Callable
+
+f: Callable[[int], int]
+[(f := lambda x: x.missing) for _ in [0]]  # error: [unresolved-attribute]
+```
+
+### Nested lazy scope captures named expression target
+
+Nested lazy scopes capture the enclosing-scope target, not the temporary comprehension binding used
+to order reads inside the comprehension.
+
+```py
+def _():
+    funcs = [(x := i, lambda: x)[1] for i in range(2)]
+    x = "s"
+    reveal_type(funcs[0]())  # revealed: int | str
+```
+
+### Named expression target invalidates aliases
+
+A named expression target that binds in an enclosing scope invalidates aliases in that target scope.
+
+```py
+def _(x: int | None):
+    ok = x is not None
+    [(x := None) for _ in range(1)]
+    if ok:
+        reveal_type(x)  # revealed: None
 ```
 
 ### Updates lazy snapshots in nested scopes
