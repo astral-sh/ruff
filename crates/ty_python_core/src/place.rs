@@ -650,11 +650,26 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
             self.add_narrowing_target(comparator, &mut places);
         }
 
+        let can_narrow_attribute_base =
+            matches!(&*expr_compare.ops, [ast::CmpOp::Eq | ast::CmpOp::NotEq]);
+        let can_narrow_subscript_base = matches!(
+            &*expr_compare.ops,
+            [ast::CmpOp::Eq | ast::CmpOp::NotEq | ast::CmpOp::Is | ast::CmpOp::IsNot]
+        );
+
         // For subscript expressions on either side, the subscript base can also be narrowed.
         // (TypedDict and tuple discriminated union narrowing.)
         for expr in std::iter::once(&*expr_compare.left).chain(&expr_compare.comparators) {
-            if let ast::Expr::Subscript(subscript) = expr
+            if can_narrow_subscript_base
+                && let ast::Expr::Subscript(subscript) = expr
                 && let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value)
+                && let Some(place) = self.places.place_id((&place_expr).into())
+            {
+                places.insert(place);
+            }
+            if can_narrow_attribute_base
+                && let ast::Expr::Attribute(attribute) = expr
+                && let Some(place_expr) = PlaceExpr::try_from_expr(&attribute.value)
                 && let Some(place) = self.places.place_id((&place_expr).into())
             {
                 places.insert(place);
@@ -759,6 +774,12 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                     places.insert(place);
                 }
             }
+        }
+        if let ast::Expr::Attribute(attribute) = subject_node
+            && let Some(place_expr) = PlaceExpr::try_from_expr(&attribute.value)
+            && let Some(place) = self.places.place_id((&place_expr).into())
+        {
+            places.insert(place);
         }
 
         // Handle Or patterns by recursing into each alternative
