@@ -2453,8 +2453,24 @@ const UNION_POLICY: TruncationPolicy = TruncationPolicy {
 
 impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        fn is_condensable(ty: Type<'_>) -> bool {
-            matches!(
+        /// Return the literal types that can be folded into a displayed `Literal[...]` group.
+        ///
+        /// Plain literal types are returned as-is. Small enum complements are expanded to their
+        /// remaining enum literals so a type like `Color & ~Literal[Color.RED]` can be displayed
+        /// with the same condensation rules as explicit enum-literal unions. Large complements
+        /// stay compact to keep diagnostics readable.
+        ///
+        /// ```python
+        /// from enum import Enum
+        ///
+        /// class Color(Enum):
+        ///     RED = 1
+        ///     BLUE = 2
+        ///
+        /// # Color excluding RED displays through the literal-group path for BLUE.
+        /// ```
+        fn condensable_literals<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
+            if matches!(
                 ty.as_literal_value_kind(),
                 Some(
                     LiteralValueTypeKind::Int(_)
@@ -2463,7 +2479,13 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                         | LiteralValueTypeKind::Bool(_)
                         | LiteralValueTypeKind::Enum(_)
                 )
-            )
+            ) {
+                return Some(vec![ty]);
+            }
+
+            ty.enum_complement(db).and_then(|complement| {
+                complement.remaining_literal_types_for_display(db, LITERAL_POLICY.max)
+            })
         }
 
         fn singleline_union_element_label<'db>(
@@ -2489,26 +2511,32 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
 
         let elements = self.ty.elements(self.db);
         let mut condensed_types = vec![];
+        let mut condensed_element_count = 0usize;
         let mut subclass_of_types = vec![];
         let element_labels: Vec<_> = elements
             .iter()
             .copied()
             .map(|element| {
-                (!is_condensable(element) && !element.is_subclass_of())
+                (condensable_literals(self.db, element).is_none() && !element.is_subclass_of())
                     .then(|| singleline_union_element_label(self.db, element, &self.settings))
             })
             .collect();
         let duplicate_ambiguous_labels = duplicate_ambiguous_labels(&element_labels);
 
         for element in elements.iter().copied() {
-            if is_condensable(element) {
-                condensed_types.push(element);
+            if let Some(literals) = condensable_literals(self.db, element) {
+                condensed_element_count += 1;
+                for literal in literals {
+                    if !condensed_types.contains(&literal) {
+                        condensed_types.push(literal);
+                    }
+                }
             } else if let Type::SubclassOf(subclass_of) = element {
                 subclass_of_types.push(subclass_of);
             }
         }
 
-        let total_entries = elements.len() - condensed_types.len() - subclass_of_types.len()
+        let total_entries = elements.len() - condensed_element_count - subclass_of_types.len()
             + usize::from(!condensed_types.is_empty())
             + usize::from(!subclass_of_types.is_empty());
 
@@ -2529,7 +2557,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                 break;
             }
 
-            if is_condensable(*element) {
+            if condensable_literals(self.db, *element).is_some() {
                 if let Some(condensed_types) = condensed_types.take() {
                     displayed_entries += 1;
                     join.entry(&DisplayLiteralGroup {
@@ -2718,6 +2746,20 @@ struct DisplayIntersectionType<'a, 'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayIntersectionType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        if let Some(literals) = Type::Intersection(*self.ty)
+            .enum_complement(self.db)
+            .and_then(|complement| {
+                complement.remaining_literal_types_for_display(self.db, LITERAL_POLICY.max)
+            })
+        {
+            return DisplayLiteralGroup {
+                literals,
+                db: self.db,
+                settings: self.settings.clone(),
+            }
+            .fmt_detailed(f);
+        }
+
         let tys = self
             .ty
             .positive(self.db)

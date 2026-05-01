@@ -58,6 +58,9 @@ def _(x: bool):
 
 ```py
 from enum import Enum
+from typing import Literal
+
+from ty_extensions import Intersection, Not
 
 class Answer(Enum):
     NO = 0
@@ -90,6 +93,24 @@ def _(x: Single | int):
         reveal_type(x)  # revealed: Single | int
     else:
         reveal_type(x)  # revealed: int
+
+class Color(Enum):
+    RED = "red"
+    GREEN = "green"
+    BLUE = "blue"
+
+def after_excluding_red(x: Color | int):
+    if x is Color.RED:
+        return
+
+    if x == Color.GREEN:
+        reveal_type(x)  # revealed: Literal[Color.GREEN] | int
+    else:
+        reveal_type(x)  # revealed: Literal[Color.BLUE] | int
+
+def enum_complement_rhs(x: Color, y: Intersection[Color, Not[Literal[Color.RED]]]):
+    if x == y:
+        reveal_type(x)  # revealed: Literal[Color.GREEN, Color.BLUE]
 ```
 
 This narrowing behavior is only safe if the enum has no custom `__eq__`/`__ne__` method:
