@@ -813,6 +813,60 @@ reveal_type(f)
 
 ### Overloads
 
+#### Return type filtering
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+class A: ...
+class B: ...
+class C: ...
+
+@overload
+def f1(x: A) -> A: ...
+@overload
+def f1(x: B) -> B: ...
+@overload
+def f1(x: C) -> C: ...
+@overload
+def f2(x: A) -> A: ...
+@overload
+def f2(x: B) -> A: ...
+```
+
+```py
+from typing import Callable
+from overloaded import f1, f2, A, B, C
+
+def change_return_type_a[**P](f: Callable[P, A]) -> Callable[P, C]:
+    def nested(*args: P.args, **kwargs: P.kwargs) -> C:
+        return C()
+    return nested
+
+def change_return_type_b[**P](f: Callable[P, B]) -> Callable[P, C]:
+    def nested(*args: P.args, **kwargs: P.kwargs) -> C:
+        return C()
+    return nested
+
+def change_union_return_type[**P](f: Callable[P, A | B]) -> Callable[P, C]:
+    def nested(*args: P.args, **kwargs: P.kwargs) -> C:
+        return C()
+    return nested
+
+reveal_type(change_return_type_a(f1))  # revealed: (x: A) -> C
+reveal_type(change_union_return_type(f1))  # revealed: Overload[(x: A) -> C, (x: B) -> C]
+
+reveal_type(change_return_type_a(f2))  # revealed: Overload[(x: A) -> C, (x: B) -> C]
+reveal_type(change_union_return_type(f2))  # revealed: Overload[(x: A) -> C, (x: B) -> C]
+
+# error: [invalid-argument-type]
+reveal_type(change_return_type_b(f2))  # revealed: (...) -> C
+```
+
+#### Parameter type filtering
+
 `overloaded.pyi`:
 
 ```pyi
@@ -822,38 +876,16 @@ from typing import overload
 def int_int(x: int) -> int: ...
 @overload
 def int_int(x: str) -> int: ...
-@overload
-def int_str(x: int) -> int: ...
-@overload
-def int_str(x: str) -> str: ...
-@overload
-def str_str(x: int) -> str: ...
-@overload
-def str_str(x: str) -> str: ...
 ```
 
 ```py
 from typing import Callable
-from overloaded import int_int, int_str, str_str
-
-def change_return_type[**P](f: Callable[P, int]) -> Callable[P, str]:
-    def nested(*args: P.args, **kwargs: P.kwargs) -> str:
-        return str(f(*args, **kwargs))
-    return nested
+from overloaded import int_int
 
 def with_parameters[**P](f: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> Callable[P, str]:
     def nested(*args: P.args, **kwargs: P.kwargs) -> str:
         return str(f(*args, **kwargs))
     return nested
-
-reveal_type(change_return_type(int_int))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
-
-# TODO: This shouldn't error and should pick the first overload because of the return type
-# error: [invalid-argument-type]
-reveal_type(change_return_type(int_str))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
-
-# error: [invalid-argument-type]
-reveal_type(change_return_type(str_str))  # revealed: (...) -> str
 
 # TODO: This should reveal the matching overload instead
 reveal_type(with_parameters(int_int, 1))  # revealed: Overload[(x: int) -> str, (x: str) -> str]

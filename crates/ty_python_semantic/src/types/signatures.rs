@@ -1361,15 +1361,28 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 (None, Some((target_tvar, target_return))) if source_overloads.len() > 1 => {
                     let lower = Type::Callable(CallableType::new(
                         db,
-                        CallableSignature::from_overloads(source_overloads.iter().map(
-                            |signature| {
-                                Signature::new_generic(
-                                    signature.generic_context,
-                                    signature.parameters().clone(),
-                                    Type::unknown(),
-                                )
-                            },
-                        )),
+                        CallableSignature::from_overloads(
+                            source_overloads
+                                .iter()
+                                .filter(|signature| {
+                                    !self
+                                        .without_context_collection(|| {
+                                            self.check_type_pair(
+                                                db,
+                                                signature.return_ty,
+                                                target_return,
+                                            )
+                                        })
+                                        .is_never_satisfied(db)
+                                })
+                                .map(|signature| {
+                                    Signature::new_generic(
+                                        signature.generic_context,
+                                        signature.parameters().clone(),
+                                        Type::unknown(),
+                                    )
+                                }),
+                        ),
                         CallableTypeKind::ParamSpecValue,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
