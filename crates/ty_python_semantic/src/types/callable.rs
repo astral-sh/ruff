@@ -213,6 +213,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypedDictTop
             | Type::TypedDict(_) => None,
 
             Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)) => {

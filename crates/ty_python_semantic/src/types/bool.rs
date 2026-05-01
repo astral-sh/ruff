@@ -213,7 +213,8 @@ impl<'db> Type<'db> {
             | Type::Never
             | Type::Callable(_)
             | Type::TypeIs(_)
-            | Type::TypeGuard(_) => Truthiness::Ambiguous,
+            | Type::TypeGuard(_)
+            | Type::TypedDictTop => Truthiness::Ambiguous,
 
             Type::TypedDict(td) => {
                 if td.items(db).values().any(TypedDictField::is_required) {
