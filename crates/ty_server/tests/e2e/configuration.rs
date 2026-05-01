@@ -179,16 +179,12 @@ reveal_type(sys.version_info[:2])
     let builder = TestServerBuilder::new()?;
     let python_home = builder.file_path(python_home);
     let sys_prefix = builder.file_path("venv");
-    let misleading_environment_uri = builder.file_uri(base_python);
 
     let workspace_options: ClientOptions = serde_json::from_value(json!({
         "pythonExtension": {
             "activeEnvironment": {
                 "executable": {
                     "sysPrefix": sys_prefix,
-                },
-                "environment": {
-                    "folderUri": misleading_environment_uri,
                 },
                 "version": {
                     "major": 3,

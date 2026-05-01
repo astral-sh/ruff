@@ -1343,10 +1343,6 @@ impl TestServerBuilder {
         self.test_context.root().join(path)
     }
 
-    pub(crate) fn file_uri(&self, path: impl AsRef<SystemPath>) -> Url {
-        Url::from_file_path(self.file_path(path).as_std_path()).expect("Path must be a valid URL")
-    }
-
     /// Write a file to the test directory
     pub(crate) fn with_file(
         self,

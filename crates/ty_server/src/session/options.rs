@@ -468,6 +468,7 @@ impl Combine for PythonExtension {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ActiveEnvironment {
     pub(crate) executable: PythonExecutable,
+    #[deprecated]
     pub(crate) environment: Option<PythonEnvironment>,
     pub(crate) version: Option<EnvironmentVersion>,
 }
@@ -478,11 +479,11 @@ pub(crate) struct EnvironmentVersion {
     pub(crate) major: i64,
     pub(crate) minor: i64,
     #[deprecated(
-        note = "Unused by the server. Use `major` and `minor` instead. This can be omitted when the Python Environments extension reports a major/minor-only version; Zed omits the entire `version` object."
+        note = "Not provided by all clients (Zed, VS Code when using the Python Environment extension). Use `major` and `minor` instead."
     )]
     pub(crate) patch: Option<i64>,
     #[deprecated(
-        note = "Unused by the server. Use `major` and `minor` instead. This is not provided by the Python Environments extension; Zed omits the entire `version` object."
+        note = "Not provided by all clients (Zed, VS Code when using the Python Environment extension)."
     )]
     pub(crate) sys_version: Option<String>,
 }
@@ -490,23 +491,19 @@ pub(crate) struct EnvironmentVersion {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonEnvironment {
-    #[deprecated(
-        note = "Unused by the server. Use `executable.sysPrefix` instead. This can point to a Python executable instead of an environment root; Zed omits the entire `environment` object."
-    )]
+    #[deprecated]
     pub(crate) folder_uri: Option<Url>,
-    #[deprecated(
-        note = "Unused by the server. This is not provided by the Python Environments extension; Zed omits the entire `environment` object."
-    )]
+    #[deprecated]
     #[serde(rename = "type")]
     pub(crate) kind: Option<String>,
-    #[deprecated(note = "Unused by the server. Zed omits the entire `environment` object.")]
+    #[deprecated]
     pub(crate) name: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonExecutable {
-    #[deprecated(note = "Unused by the server. Use `sys_prefix` instead.")]
+    #[deprecated]
     pub(crate) uri: Option<Url>,
     pub(crate) sys_prefix: SystemPathBuf,
 }
