@@ -73,6 +73,83 @@ state_by_key = {key: state.state for key in keys() if (state := get_state(key)) 
 reveal_type(state_by_key)  # revealed: dict[str, str]
 ```
 
+### Comprehension filter narrowing after earlier filter
+
+```py
+class Sensor:
+    is_on: bool | None
+
+def make_sensor(key: str) -> Sensor:
+    return Sensor()
+
+def sensor_keys() -> list[str]:
+    return []
+
+def enabled(key: str) -> bool:
+    return True
+
+sensors = [sensor for key in sensor_keys() if enabled(key) if (sensor := make_sensor(key)).is_on is not None]
+reveal_type(sensors)  # revealed: list[Sensor]
+```
+
+### Comprehension element short-circuit
+
+```py
+def values() -> list[int]:
+    return []
+
+def flag() -> bool:
+    return True
+
+short_circuited = [flag() and (value := item) and value for item in values()]
+reveal_type(short_circuited)  # revealed: list[int]
+```
+
+### Comprehension boolean filter narrowing
+
+```py
+class Stats:
+    strength: int
+
+def stat_keys() -> list[str]:
+    return []
+
+def get_stats(key: str) -> Stats | None:
+    return Stats()
+
+stat_values = [stats.strength for key in stat_keys() if key and (stats := get_stats(key))]
+reveal_type(stat_values)  # revealed: list[int]
+```
+
+### Comprehension if-expression after earlier filter
+
+```py
+def sensor_keys() -> list[str]:
+    return []
+
+def enabled(key: str) -> bool:
+    return True
+
+def check(value: object) -> bool:
+    return True
+
+if_expression_values = {
+    name: original.upper() if check(original := name) else original for name in sensor_keys() if enabled(name)
+}
+reveal_type(if_expression_values)  # revealed: dict[str, str]
+```
+
+### Comprehension filter can bypass walrus
+
+```py
+def values() -> list[int]:
+    return []
+
+def _(flag: bool):
+    # error: [possibly-unresolved-reference]
+    return [x for _ in values() if flag or (x := 1)]
+```
+
 ### Generator expression narrowing
 
 ```py

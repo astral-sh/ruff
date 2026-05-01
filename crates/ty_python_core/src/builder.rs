@@ -1186,6 +1186,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_use_def_map_mut().merge(state);
     }
 
+    fn flow_snapshot_for_test(&self, test: &'ast ast::Expr) -> BoolOpSnapshot {
+        let no_branch_taken = self.flow_snapshot();
+        let bool_op_snapshots = self
+            .bool_op_snapshots_by_node
+            .get(&ExpressionNodeKey::from(test));
+        BoolOpSnapshot {
+            before: no_branch_taken,
+            after: bool_op_snapshots.cloned(),
+        }
+    }
+
     fn walrus_reachability_constraint(
         reachability: DeferredWalrusReachability,
     ) -> ScopedReachabilityConstraintId {
@@ -1646,41 +1657,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ) {
         if reachability == DeferredWalrusReachability::Never {
             self.use_def_maps[scope].record_binding_context(place, definition);
-            return;
-        }
-
-        if reachability == DeferredWalrusReachability::Conditional {
-            let symbol = place
-                .as_symbol()
-                .expect("deferred walrus target should be a symbol");
-            let associated_member_ids = self.place_tables[scope]
-                .associated_place_ids(place)
-                .iter()
-                .copied()
-                .collect::<Vec<_>>();
-            let pre_definition =
-                self.use_def_maps[scope].single_symbol_snapshot(symbol, &associated_member_ids);
-            let pre_definition_reachability = self.use_def_maps[scope].reachability;
-            let walrus_reachability = Self::walrus_reachability_constraint(reachability);
-            self.use_def_maps[scope].reachability = self.use_def_maps[scope]
-                .reachability_constraints
-                .add_and_constraint(pre_definition_reachability, walrus_reachability);
-
-            self.use_def_maps[scope].record_binding(
-                place,
-                definition,
-                PreviousDefinitions::AreShadowed,
-            );
-            self.delete_associated_bindings_in_scope(scope, place);
-            self.use_def_maps[scope].record_and_negate_single_symbol_reachability_constraint(
-                walrus_reachability,
-                symbol,
-                pre_definition,
-            );
-            self.use_def_maps[scope].reachability = pre_definition_reachability;
-
-            self.try_node_context_stack_manager
-                .record_definition(scope_index, &self.use_def_maps[scope]);
             return;
         }
 
@@ -2404,6 +2380,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         for if_expr in &generator.ifs {
             self.visit_expr(if_expr);
+            let bool_op_snapshot = self.flow_snapshot_for_test(if_expr);
+            self.flow_restore(bool_op_snapshot.truthy());
             let (predicate, _) = self.record_expression_narrowing_constraint(if_expr);
             self.record_reachability_constraint(predicate);
         }
@@ -2423,6 +2401,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             for if_expr in &generator.ifs {
                 self.visit_expr(if_expr);
+                let bool_op_snapshot = self.flow_snapshot_for_test(if_expr);
+                self.flow_restore(bool_op_snapshot.truthy());
                 let (predicate, _) = self.record_expression_narrowing_constraint(if_expr);
                 self.record_reachability_constraint(predicate);
             }
