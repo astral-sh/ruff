@@ -24,7 +24,8 @@ use crate::types::constraints::{
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
-    ApplySpecialization, GenericContext, InferableTypeVars, Specialization, walk_generic_context,
+    ApplySpecialization, GenericContext, InferableTypeVars, Specialization, TypeVarInference,
+    walk_generic_context,
 };
 use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
@@ -104,7 +105,7 @@ pub struct CallableSignature<'db> {
 pub(crate) struct PartialSignatureApplication<'db> {
     signature: Signature<'db>,
     partial_application: PartialApplication<'db>,
-    specialization: Option<Specialization<'db>>,
+    inference: Option<TypeVarInference<'db>>,
     unspecialized_return_ty: Type<'db>,
 }
 
@@ -113,13 +114,13 @@ impl<'db> PartialSignatureApplication<'db> {
     pub(crate) fn new(
         signature: Signature<'db>,
         partial_application: PartialApplication<'db>,
-        specialization: Option<Specialization<'db>>,
+        inference: Option<TypeVarInference<'db>>,
         unspecialized_return_ty: Type<'db>,
     ) -> Self {
         Self {
             signature,
             partial_application,
-            specialization,
+            inference,
             unspecialized_return_ty,
         }
     }
@@ -184,7 +185,7 @@ impl<'db> CallableSignature<'db> {
             let signature = overload.signature.partially_apply(
                 db,
                 &overload.partial_application,
-                overload.specialization,
+                overload.inference,
                 overload.unspecialized_return_ty,
             );
             let dedup_key = signature.clone().with_definition(None);
@@ -941,23 +942,20 @@ impl<'db> Signature<'db> {
         &self,
         db: &'db dyn Db,
         partial_application: &PartialApplication<'db>,
-        specialization: Option<Specialization<'db>>,
+        inference: Option<TypeVarInference<'db>>,
         unspecialized_return_ty: Type<'db>,
     ) -> Self {
         let signature_specialization =
-            self.partial_application_specialization(db, partial_application, specialization);
+            self.partial_application_specialization(db, partial_application, inference);
         let signature = signature_specialization.map_or_else(
             || self.clone(),
             |specialization| self.apply_specialization(db, specialization),
         );
 
         let parameters = signature.parameters().as_slice();
-        let return_ty = specialization.map_or_else(
+        let return_ty = signature_specialization.map_or_else(
             || unspecialized_return_ty,
-            |specialization| {
-                unspecialized_return_ty
-                    .apply_specialization(db, signature_specialization.unwrap_or(specialization))
-            },
+            |specialization| unspecialized_return_ty.apply_specialization(db, specialization),
         );
 
         let mut remaining = Vec::with_capacity(parameters.len());
@@ -1024,12 +1022,12 @@ impl<'db> Signature<'db> {
         &self,
         db: &'db dyn Db,
         partial_application: &PartialApplication<'db>,
-        specialization: Option<Specialization<'db>>,
+        inference: Option<TypeVarInference<'db>>,
     ) -> Option<Specialization<'db>> {
-        let specialization = specialization?;
-        let Some(generic_context) = self.generic_context else {
-            return Some(specialization);
-        };
+        let inference = inference?;
+        let generic_context = self
+            .generic_context
+            .unwrap_or_else(|| inference.generic_context(db));
 
         let promoted_typevars: FxHashSet<BoundTypeVarIdentity<'db>> = generic_context
             .variables(db)
@@ -1048,22 +1046,14 @@ impl<'db> Signature<'db> {
             .collect();
 
         if promoted_typevars.is_empty() {
-            return Some(specialization);
+            return Some(inference.specialization(db));
         }
 
-        Some(generic_context.specialize_recursive(
-            db,
-            generic_context.variables(db).map(|typevar| {
-                let ty = specialization
-                    .get(db, typevar)
-                    .unwrap_or(Type::TypeVar(typevar));
-                Some(if promoted_typevars.contains(&typevar.identity(db)) {
-                    ty.promote(db)
-                } else {
-                    ty
-                })
-            }),
-        ))
+        Some(inference.specialization_with(db, |typevar, inferred| {
+            promoted_typevars
+                .contains(&typevar.identity(db))
+                .then(|| inferred.map_or(Type::TypeVar(typevar), |ty| ty.promote(db)))
+        }))
     }
 
     fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {

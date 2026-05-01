@@ -1729,6 +1729,47 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
 /// type with respect to the type variable.
 pub(crate) type TypeVarAssignment<'db> = (BoundTypeVarIdentity<'db>, TypeVarVariance, Type<'db>);
 
+/// The result of type variable inference before choosing how to handle unsolved type variables.
+///
+/// A `Some` entry means inference solved the corresponding type variable to that type. A `None`
+/// entry means the type variable was not solved and should be projected according to the use site.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) struct TypeVarInference<'db> {
+    pub(crate) generic_context: GenericContext<'db>,
+    #[returns(deref)]
+    types: Box<[Option<Type<'db>>]>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for TypeVarInference<'_> {}
+
+impl<'db> TypeVarInference<'db> {
+    /// Project this inference result into a closed specialization.
+    pub(crate) fn specialization(self, db: &'db dyn Db) -> Specialization<'db> {
+        self.specialization_with(db, |_, _| None)
+    }
+
+    /// Project this inference result into a specialization with explicit handling for each
+    /// type variable.
+    ///
+    /// The hook receives the type variable and its inferred type, if any. Returning `Some` overrides
+    /// the projection for that variable. Returning `None` uses the inferred type if present,
+    /// otherwise the type variable's default.
+    pub(crate) fn specialization_with(
+        self,
+        db: &'db dyn Db,
+        mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<Type<'db>>) -> Option<Type<'db>>,
+    ) -> Specialization<'db> {
+        let types = self
+            .generic_context(db)
+            .variables(db)
+            .zip(self.types(db).iter().copied())
+            .map(|(typevar, inferred)| choose(typevar, inferred).or(inferred));
+
+        self.generic_context(db).specialize_recursive(db, types)
+    }
+}
+
 impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     pub(crate) fn new(
         db: &'db dyn Db,
@@ -1762,11 +1803,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         ) -> Option<Type<'db>>,
     ) -> Specialization<'db> {
         let db = self.db;
-        let types = generic_context
-            .variables_inner(db)
-            .iter()
-            .map(|(identity, variable)| {
-                match self.types.get_mut(identity) {
+        let types =
+            generic_context
+                .variables_inner(db)
+                .iter()
+                .map(|(identity, variable)| match self.types.get_mut(identity) {
                     Some(mapped_ty) => {
                         let mapped_ty = mapped_ty.get_or_build(db);
                         // The typevar was inferred — present both bounds as the inferred type.
@@ -1774,10 +1815,30 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         Some(chosen.unwrap_or(mapped_ty))
                     }
                     None => choose(*variable, None),
-                }
-            });
+                });
 
         generic_context.specialize_recursive(db, types)
+    }
+
+    /// Build raw type-variable inference, preserving which type variables were left unsolved.
+    pub(crate) fn build_inference_with(
+        &mut self,
+        generic_context: GenericContext<'db>,
+        mut choose: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>) -> Option<Type<'db>>,
+    ) -> TypeVarInference<'db> {
+        let db = self.db;
+        let types: Box<[_]> = generic_context
+            .variables_inner(db)
+            .iter()
+            .map(|(identity, variable)| {
+                self.types.get_mut(identity).map(|mapped_ty| {
+                    let mapped_ty = mapped_ty.get_or_build(db);
+                    choose(*variable, mapped_ty).unwrap_or(mapped_ty)
+                })
+            })
+            .collect();
+
+        TypeVarInference::new(db, generic_context, types)
     }
 
     /// Insert a type mapping for a bound typevar.
