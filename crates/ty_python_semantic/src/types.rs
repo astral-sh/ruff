@@ -5781,9 +5781,9 @@ impl<'db> Type<'db> {
                 ))
             }
 
-            Type::Callable(callable) => {
+            Type::Callable(callable) => visitor.visit(self, type_mapping, || {
                 Type::Callable(callable.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-            }
+            }),
 
             Type::GenericAlias(generic) => {
                 Type::GenericAlias(generic.apply_type_mapping_impl(db, type_mapping, tcx, visitor))

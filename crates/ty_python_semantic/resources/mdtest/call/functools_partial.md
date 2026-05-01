@@ -636,6 +636,36 @@ reveal_type(p)  # revealed: partial[(*, distributions: Sequence[Literal["sdist",
 reveal_type(p())  # revealed: None
 ```
 
+### Positional binding expression
+
+The initial refinement probe should not commit inference results for bound expressions:
+
+```py
+from functools import partial
+from typing import Sequence
+
+def build(distributions: Sequence[str]) -> None:
+    pass
+
+p = partial(build, (x := ["wheel"]))
+reveal_type(p)  # revealed: partial[() -> None]
+reveal_type(p())  # revealed: None
+```
+
+### Refinement probe diagnostics
+
+The initial refinement probe should not emit diagnostics that the refinement pass will emit again:
+
+```py
+from functools import partial
+from typing import Sequence
+
+def build(distributions: Sequence[str]) -> None:
+    pass
+
+partial(build, 1 + "x")  # error: [unsupported-operator]
+```
+
 ### Overloaded functions with remaining params
 
 ```py

@@ -5115,7 +5115,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let original_argument_types = argument_types.clone();
         let original_bindings = bindings.clone();
 
-        self.infer_all_argument_types(
+        let mut probe_builder = self.speculate();
+        probe_builder.infer_all_argument_types(
             ast_arguments.clone(),
             argument_types,
             infer_argument_ty,
@@ -5135,6 +5136,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some(refinement_bindings) =
             bindings.argument_inference_refinement_request(db, argument_types)
         else {
+            self.extend(probe_builder);
             return result;
         };
 
