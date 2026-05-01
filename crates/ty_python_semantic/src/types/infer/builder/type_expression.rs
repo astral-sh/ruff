@@ -1684,6 +1684,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     subscript_ty
                 })
             }
+            Type::Intersection(intersection) => {
+                self.infer_type_expression(slice);
+                intersection.map_positive(self.db(), |element| {
+                    let mut speculative_builder = self.speculate();
+                    let subscript_ty =
+                        speculative_builder.infer_subscript_type_expression(subscript, *element);
+                    self.context.extend(&speculative_builder.context.finish());
+                    subscript_ty
+                })
+            }
             _ => {
                 if !self.in_string_annotation() {
                     self.infer_expression(slice, TypeContext::default());
