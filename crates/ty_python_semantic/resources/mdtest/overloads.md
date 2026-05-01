@@ -592,6 +592,23 @@ def parameter_type(x: int) -> int | str:
     return 1
 ```
 
+Generic overloads are left to the full implementation-consistency check.
+
+```py
+from typing import TypeVar, overload
+
+T = TypeVar("T")
+
+@overload
+def generic_parameter_type(x: T) -> T: ...
+@overload
+def generic_parameter_type(x: str) -> str: ...
+def generic_parameter_type(x: int) -> int | str:
+    return x
+```
+
+### Implementation consistency parameter mismatch diagnostics
+
 Non-generic implementation checks require parameter names and positional-only forms to line up with
 each overload signature.
 
@@ -608,7 +625,7 @@ class ColumnSelector:
     @overload
     def _extract(self, row_key: int) -> object: ...
     @overload
-    # error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+    # snapshot: invalid-overload
     def _extract(self, column_key: int) -> object: ...
     def _extract(self, row_key: int | None = None, column_key: int | None = None) -> object:
         return object()
@@ -617,25 +634,72 @@ class PositionalOnlyWithKwargs:
     @overload
     def update(self, params: Iterable[tuple[str, str | Iterable[str]]], /, **kwds: str) -> None: ...
     @overload
-    # error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+    # snapshot: invalid-overload
     def update(self, **kwds: str | Iterable[str]) -> None: ...
     def update(self, params=(), /, **kwds) -> None:
         pass
 ```
 
-Generic overloads are left to the full implementation-consistency check.
+```snapshot
+error[invalid-overload]: Implementation does not accept all arguments of this overload
+  --> src/mdtest_snippet.py:9:9
+   |
+ 9 |     def _extract(self, column_key: int) -> object: ...
+   |         ^^^^^^^^
+10 |     def _extract(self, row_key: int | None = None, column_key: int | None = None) -> object:
+   |         -------- Implementation defined here
+   |
+info: Implementation signature `(self, row_key: int | None = None, column_key: int | None = None) -> object` is not assignable to overload signature `(self, column_key: int) -> object`
+info: the parameter named `row_key` does not match `column_key` (and can be used as a keyword parameter)
+
+
+error[invalid-overload]: Implementation does not accept all arguments of this overload
+  --> src/mdtest_snippet.py:18:9
+   |
+18 |     def update(self, **kwds: str | Iterable[str]) -> None: ...
+   |         ^^^^^^
+19 |     def update(self, params=(), /, **kwds) -> None:
+   |         ------ Implementation defined here
+   |
+info: Implementation signature `(self, params=..., /, **kwds) -> None` is not assignable to overload signature `(self, **kwds: Iterable[str]) -> None`
+info: parameter `self` is positional-only but must also accept keyword arguments
+```
+
+### Implementation consistency return type diagnostics
+
+Non-generic implementation checks show why an overload return type is not assignable to the
+implementation return type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
-from typing import TypeVar, overload
-
-T = TypeVar("T")
+from typing import overload
 
 @overload
-def generic_parameter_type(x: T) -> T: ...
+# snapshot: invalid-overload
+def return_tuple(x: int) -> tuple[str]: ...
 @overload
-def generic_parameter_type(x: str) -> str: ...
-def generic_parameter_type(x: int) -> int | str:
-    return x
+def return_tuple(x: str) -> tuple[int]: ...
+def return_tuple(x: int | str) -> tuple[int]:
+    return (1,)
+```
+
+```snapshot
+error[invalid-overload]: Overload return type is not assignable to implementation return type
+ --> src/mdtest_snippet.py:5:5
+  |
+5 | def return_tuple(x: int) -> tuple[str]: ...
+  |     ^^^^^^^^^^^^
+6 | @overload
+7 | def return_tuple(x: str) -> tuple[int]: ...
+8 | def return_tuple(x: int | str) -> tuple[int]:
+  |     ------------ Implementation defined here
+  |
+info: Overload returns `tuple[str]`, which is not assignable to implementation return type `tuple[int]`
+info: the first tuple element is not compatible: `str` is not assignable to `int`
 ```
 
 ### Inconsistent decorators
