@@ -51,6 +51,52 @@ class Iterable:
 reveal_type(c)  # revealed: int
 ```
 
+### Comprehension filter narrowing
+
+```py
+class State:
+    state: str
+
+def get_state(key: str) -> State | None:
+    return State()
+
+def keys() -> list[str]:
+    return []
+
+states = [state for key in keys() if (state := get_state(key)) is not None]
+reveal_type(states)  # revealed: list[State]
+
+state_names = {state.state for key in keys() if (state := get_state(key)) is not None}
+reveal_type(state_names)  # revealed: set[str]
+
+state_by_key = {key: state.state for key in keys() if (state := get_state(key)) is not None}
+reveal_type(state_by_key)  # revealed: dict[str, str]
+```
+
+### Generator expression narrowing
+
+```py
+class Literal:
+    fallback: str
+
+class Proper: ...
+
+def get_proper(item: object) -> Literal | Proper:
+    return Literal()
+
+def items() -> list[object]:
+    return []
+
+any(isinstance(p := get_proper(item), Literal) and p.fallback for item in items())
+```
+
+### Dict comprehension key captured by nested comprehension
+
+```py
+phase_sensors = {(phase_name := str(phase)): [phase_name for _ in range(1)] for phase in range(3)}
+reveal_type(phase_sensors)  # revealed: dict[str, list[str]]
+```
+
 ### Dict comprehension
 
 ```py

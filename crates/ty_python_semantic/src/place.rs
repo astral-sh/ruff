@@ -595,7 +595,29 @@ pub(super) fn place_from_bindings<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
 ) -> PlaceWithDefinition<'db> {
-    place_from_bindings_impl(db, bindings_with_constraints, RequiresExplicitReExport::No)
+    place_from_bindings_impl(
+        db,
+        bindings_with_constraints,
+        RequiresExplicitReExport::No,
+        None,
+    )
+}
+
+/// Infer the combined type from an iterator of bindings for a specific place.
+///
+/// This is needed when a binding's definition is owned by a different scope than the local place
+/// being read, such as a walrus target inside a comprehension.
+pub(super) fn place_from_bindings_for_place<'db>(
+    db: &'db dyn Db,
+    bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
+    place: ScopedPlaceId,
+) -> PlaceWithDefinition<'db> {
+    place_from_bindings_impl(
+        db,
+        bindings_with_constraints,
+        RequiresExplicitReExport::No,
+        Some(place),
+    )
 }
 
 /// Build a declared type from a [`DeclarationsIterator`].
@@ -908,7 +930,7 @@ pub(crate) fn place_by_id<'db>(
     // inferred type, without unioning with `Unknown`, because it cannot be modified.
     if let Some(qualifiers) = declared.is_bare_final() {
         let bindings = all_considered_bindings();
-        return place_from_bindings_impl(db, bindings, requires_explicit_reexport)
+        return place_from_bindings_impl(db, bindings, requires_explicit_reexport, Some(place_id))
             .place
             .with_qualifiers(qualifiers);
     }
@@ -927,7 +949,9 @@ pub(crate) fn place_by_id<'db>(
             qualifiers,
         } if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
             let bindings = all_considered_bindings();
-            match place_from_bindings_impl(db, bindings, requires_explicit_reexport).place {
+            match place_from_bindings_impl(db, bindings, requires_explicit_reexport, Some(place_id))
+                .place
+            {
                 Place::Defined(DefinedPlace {
                     ty: inferred,
                     origin,
@@ -971,7 +995,8 @@ pub(crate) fn place_by_id<'db>(
         } => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
-            let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport);
+            let inferred =
+                place_from_bindings_impl(db, bindings, requires_explicit_reexport, Some(place_id));
 
             let place = match inferred.place {
                 // Place is possibly undeclared and definitely unbound
@@ -1014,7 +1039,8 @@ pub(crate) fn place_by_id<'db>(
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
             let mut inferred =
-                place_from_bindings_impl(db, bindings, requires_explicit_reexport).place;
+                place_from_bindings_impl(db, bindings, requires_explicit_reexport, Some(place_id))
+                    .place;
 
             if boundness_analysis == BoundnessAnalysis::AssumeBound {
                 if let Place::Defined(defined) = inferred {
@@ -1346,6 +1372,7 @@ fn place_from_bindings_impl<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
+    narrowing_place: Option<ScopedPlaceId>,
 ) -> PlaceWithDefinition<'db> {
     let predicates = bindings_with_constraints.predicates();
     let reachability_constraints = bindings_with_constraints.reachability_constraints();
@@ -1477,7 +1504,11 @@ fn place_from_bindings_impl<'db>(
 
             first_definition.get_or_insert(binding);
             let binding_ty = binding_type(db, binding);
-            Some(narrowing_constraint.narrow(db, binding_ty, binding.place(db)))
+            Some(narrowing_constraint.narrow(
+                db,
+                binding_ty,
+                narrowing_place.unwrap_or_else(|| binding.place(db)),
+            ))
         },
     );
 
