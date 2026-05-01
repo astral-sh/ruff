@@ -155,7 +155,38 @@ impl<'a> SectionContexts<'a> {
         // Skip the first line, which is the summary.
         let mut previous_line = lines.next();
 
+        // Track the indentation of an active RST directive (e.g., `.. code-block:: python`).
+        // Lines indented deeper than this are the directive body and should be skipped
+        // from section detection. See: https://github.com/astral-sh/ruff/issues/23562
+        let mut directive_indent: Option<TextSize> = None;
+
         while let Some(line) = lines.next() {
+            let trimmed = line.trim_start();
+
+            // Detect RST directive start (lines like `.. code-block:: yaml`)
+            if trimmed.starts_with(".. ") {
+                directive_indent = Some(leading_space(&line).text_len());
+                previous_line = Some(line);
+                continue;
+            }
+
+            // If inside a directive body, skip indented lines (the directive body)
+            if let Some(dir_indent) = directive_indent {
+                if line.trim().is_empty() {
+                    // Blank lines don't end directive bodies
+                    previous_line = Some(line);
+                    continue;
+                }
+                let current_indent = leading_space(&line).text_len();
+                if current_indent > dir_indent {
+                    // Still inside the directive body
+                    previous_line = Some(line);
+                    continue;
+                }
+                // Indentation returned to or above directive level — we've exited
+                directive_indent = None;
+            }
+
             if let Some(section_kind) = suspected_as_section(&line, style) {
                 let indent = leading_space(&line);
                 let indent_size = indent.text_len();
