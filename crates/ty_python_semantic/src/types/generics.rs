@@ -732,12 +732,7 @@ impl<'db> GenericContext<'db> {
                 // attribute that we want to recurse into, so we do it by hand.
                 match type_alias {
                     TypeAliasType::PEP695(type_alias) => {
-                        let value_type = type_alias.apply_function_specialization_impl(
-                            db,
-                            type_alias.raw_value_type(db),
-                            &ApplyTypeMappingVisitor::default(),
-                        );
-                        self.visit_type(db, value_type);
+                        self.visit_type(db, type_alias.value_type(db));
                     }
                     TypeAliasType::ManualPEP695(type_alias) => {
                         walk_manual_pep_695_type_alias(db, type_alias, self);
@@ -1652,6 +1647,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub enum ApplySpecialization<'a, 'db> {
     Specialization(Specialization<'db>),
+    TypeAlias(Specialization<'db>),
     Partial {
         generic_context: GenericContext<'db>,
         types: &'a [Type<'db>],
@@ -1674,7 +1670,8 @@ impl<'db> ApplySpecialization<'_, 'db> {
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Option<Type<'db>> {
         match self {
-            ApplySpecialization::Specialization(specialization) => {
+            ApplySpecialization::Specialization(specialization)
+            | ApplySpecialization::TypeAlias(specialization) => {
                 specialization.get(db, bound_typevar)
             }
             ApplySpecialization::Partial {

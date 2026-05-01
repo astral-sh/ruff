@@ -77,33 +77,22 @@ impl<'db> PEP695TypeAliasType<'db> {
             let specialization = self
                 .specialization(db)
                 .unwrap_or_else(|| generic_context.default_specialization(db, None));
-            ty.apply_specialization(db, specialization)
-        } else {
-            ty
-        }
-    }
-
-    pub(super) fn apply_function_specialization_impl(
-        self,
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
-    ) -> Type<'db> {
-        if let Some(generic_context) = self.generic_context(db) {
-            let specialization = self
-                .specialization(db)
-                .unwrap_or_else(|| generic_context.default_specialization(db, None));
             let type_mapping = match specialization.materialization_kind(db) {
-                None => TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
-                    specialization,
-                )),
+                None => {
+                    TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(specialization))
+                }
                 Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
-                    specialization: ApplySpecialization::Specialization(specialization),
+                    specialization: ApplySpecialization::TypeAlias(specialization),
                     materialization_kind,
                 },
             };
 
-            ty.apply_type_mapping_impl(db, &type_mapping, TypeContext::default(), visitor)
+            ty.apply_type_mapping_impl(
+                db,
+                &type_mapping,
+                TypeContext::default(),
+                &ApplyTypeMappingVisitor::default(),
+            )
         } else {
             ty
         }
@@ -288,16 +277,9 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub(super) fn apply_function_specialization_impl(
-        self,
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
-    ) -> Type<'db> {
+    pub(super) fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         match self {
-            TypeAliasType::PEP695(type_alias) => {
-                type_alias.apply_function_specialization_impl(db, ty, visitor)
-            }
+            TypeAliasType::PEP695(type_alias) => type_alias.apply_function_specialization(db, ty),
             TypeAliasType::ManualPEP695(_) => ty,
         }
     }

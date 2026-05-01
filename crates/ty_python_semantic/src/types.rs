@@ -5895,19 +5895,28 @@ impl<'db> Type<'db> {
 
                         _ => {
                             let value_type = alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-                            alias.apply_function_specialization_impl(db, value_type, visitor).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                            alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                         }
                     }
                 });
 
-                let is_recursive = any_over_type(db, alias.raw_value_type(db).expand_eagerly(db), false, |ty| ty.is_divergent());
+                let is_recursive = any_over_type(
+                    db,
+                    alias.raw_value_type(db).expand_eagerly(db),
+                    false,
+                    |ty| ty.is_divergent(),
+                );
+                let contains_cycle_fallback = alias.specialization(db).is_some()
+                    && any_over_type(db, mapped, false, |ty| {
+                        matches!(ty, Type::Dynamic(DynamicType::Any))
+                    });
 
                 // If the type mapping does not result in any change to this (non-recursive) type alias, do not expand it.
                 //
                 // TODO: The rule that recursive type aliases must be expanded could potentially be removed, but doing so would
                 // currently cause a stack overflow, as the current recursive type alias specialization/expansion mechanism is
                 // incomplete.
-                if !is_recursive && alias.value_type(db) == mapped {
+                if !is_recursive && !contains_cycle_fallback && alias.value_type(db) == mapped {
                     self
                 } else {
                     mapped
@@ -6649,18 +6658,9 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
         let v = match self {
             Type::ClassLiteral(class_literal) => class_literal.variance_of(db, typevar),
 
-            Type::FunctionLiteral(function_type) => {
-                // TODO: do we need to replace self?
-                function_type.signature(db).variance_of(db, typevar)
-            }
+            Type::FunctionLiteral(function_type) => function_type.variance_of(db, typevar),
 
-            Type::BoundMethod(method_type) => {
-                // TODO: do we need to replace self?
-                method_type
-                    .function(db)
-                    .signature(db)
-                    .variance_of(db, typevar)
-            }
+            Type::BoundMethod(method_type) => method_type.function(db).variance_of(db, typevar),
 
             Type::NominalInstance(nominal_instance_type) => {
                 nominal_instance_type.variance_of(db, typevar)
@@ -6890,13 +6890,6 @@ pub enum TypeMapping<'a, 'db> {
 }
 
 impl<'db> TypeMapping<'_, 'db> {
-    pub(crate) fn is_return_callable_typevar_rescope(&self) -> bool {
-        matches!(
-            self,
-            TypeMapping::ApplySpecialization(ApplySpecialization::ReturnCallables(_))
-        )
-    }
-
     /// Update the generic context of a [`Signature`] according to the current type mapping
     pub(crate) fn update_signature_generic_context(
         &self,

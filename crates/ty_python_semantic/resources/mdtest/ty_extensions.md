@@ -504,7 +504,7 @@ python-version = "3.14"
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Concatenate
+from typing import Concatenate, Protocol, TypedDict
 from ty_extensions import TypeOf, generic_context
 
 def self_recursive[**P, T](
@@ -528,6 +528,30 @@ def mutual_second[**P, T](
 
 reveal_type(generic_context(mutual_first))  # revealed: ty_extensions.GenericContext[T@mutual_first]
 reveal_type(generic_context(mutual_second))  # revealed: ty_extensions.GenericContext[T@mutual_second]
+
+class VarianceClass[T]:
+    x: Callable[[TypeOf[variance_class]], T]
+
+def variance_class[T](x: TypeOf[variance_class]) -> VarianceClass[T]:
+    raise NotImplementedError
+
+reveal_type(variance_class)  # revealed: def variance_class[T](x: def variance_class(...)) -> VarianceClass[T]
+
+class VarianceProtocol[T](Protocol):
+    x: Callable[[TypeOf[variance_protocol]], T]
+
+def variance_protocol[T](x: TypeOf[variance_protocol]) -> VarianceProtocol[T]:
+    raise NotImplementedError
+
+reveal_type(variance_protocol)  # revealed: def variance_protocol[T](x: def variance_protocol(...)) -> VarianceProtocol[T]
+
+class VarianceTypedDict[T](TypedDict):
+    x: Callable[[TypeOf[variance_typed_dict]], T]
+
+def variance_typed_dict[T](x: TypeOf[variance_typed_dict]) -> VarianceTypedDict[T]:
+    raise NotImplementedError
+
+reveal_type(variance_typed_dict)  # revealed: def variance_typed_dict[T](x: def variance_typed_dict(...)) -> VarianceTypedDict[T]
 
 class Box[T]:
     @staticmethod
@@ -577,6 +601,14 @@ type ReturnedCallableAlias[**P] = Callable[Concatenate[TypeOf[alias_return], P],
 def alias_return[**P](
     x: Callable[Concatenate[TypeOf[alias_return], ...], int],
 ) -> ReturnedCallableAlias[P]:
+    return x
+
+type ChainedReturnedCallableAlias[**P] = ReturnedCallableAliasTarget[P]
+type ReturnedCallableAliasTarget[**P] = Callable[Concatenate[TypeOf[alias_chain_return], P], int]
+
+def alias_chain_return[**P](
+    x: Callable[Concatenate[TypeOf[alias_chain_return], ...], int],
+) -> ChainedReturnedCallableAlias[P]:
     return x
 
 def property_getter[**P, T](
