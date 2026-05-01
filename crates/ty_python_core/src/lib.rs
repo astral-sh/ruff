@@ -502,6 +502,13 @@ impl<'db> SemanticIndex<'db> {
         &self.definitions_by_node[&definition_key.into()]
     }
 
+    pub fn try_definitions(
+        &self,
+        definition_key: impl Into<DefinitionNodeKey>,
+    ) -> Option<&Definitions<'db>> {
+        self.definitions_by_node.get(&definition_key.into())
+    }
+
     /// Returns the [`definition::Definition`] salsa ingredient for `definition_key`.
     ///
     /// ## Panics

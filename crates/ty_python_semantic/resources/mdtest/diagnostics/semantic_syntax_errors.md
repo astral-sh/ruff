@@ -199,6 +199,55 @@ Walrus operators cannot rebind variables already in use as iterators:
 
 # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
 {y := 5 for y in range(10)}
+
+# error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+[(a := 0) for a in range(3)]
+# error: [unresolved-reference]
+reveal_type(a)  # revealed: Unknown
+
+# error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+[i for i in range(5) if (i := 0)]
+# error: [unresolved-reference]
+reveal_type(i)  # revealed: Unknown
+
+# error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+[(x := 1).bit_length() for x in [0]]
+# error: [unresolved-reference]
+reveal_type(x)  # revealed: Unknown
+
+[x for x in range(3) if (lambda: (x := 1))()]
+# error: [unresolved-reference]
+reveal_type(x)  # revealed: Unknown
+```
+
+## Walrus in invalid comprehension contexts
+
+```py
+class C:
+    # error: [invalid-syntax] "assignment expression within a comprehension cannot be used in a class body"
+    [(x := y) for y in range(3)]
+    # error: [unresolved-reference]
+    reveal_type(x)  # revealed: Unknown
+
+class D:
+    # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+    [x for x in [0] if (x := 1)]
+
+    # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+    [(y := 1) for y in [0]]
+
+def returns_list() -> list[int]:
+    return [1, 2, 3]
+
+# error: [invalid-syntax] "assignment expression cannot be used in a comprehension iterable expression"
+[x for x in (y := returns_list())]
+# error: [unresolved-reference]
+reveal_type(y)  # revealed: Unknown
+
+# error: [invalid-syntax] "assignment expression cannot be used in a comprehension iterable expression"
+[x for x in (z := returns_list()).copy()]
+# error: [unresolved-reference]
+reveal_type(z)  # revealed: Unknown
 ```
 
 ## Multiple case assignments

@@ -446,12 +446,15 @@ class Iterable:
 (d for d in Iterable())
 lambda e: (f := 42)
 
-# Definitions created by walruses in a comprehension scope are unique;
+# Definitions created by walruses in an eager comprehension scope are unique;
 # they "leak out" of the scope and are stored in the surrounding scope
 [(g := h * 2) for h in Iterable()]
 [i for j in Iterable() if (i := j - 10) > 0]
 {(k := l * 2): (m := l * 3) for l in Iterable()}
-list(((o := p * 2) for p in Iterable()))
+
+# Generator expression bodies are evaluated lazily, so their walrus targets
+# are not defined when the generator object is created.
+((o := p * 2) for p in Iterable())
 
 # A walrus expression nested inside several scopes *still* leaks out
 # to the global scope:
@@ -485,28 +488,26 @@ reveal_type(j)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(p)  # revealed: Unknown
 # error: [unresolved-reference]
+reveal_type(o)  # revealed: Unknown
+# error: [unresolved-reference]
 reveal_type(r)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(s)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(t)  # revealed: Unknown
 
-# TODO: these should all reveal `Unknown | int` and should not emit errors.
-# (We don't generally model elsewhere in ty that bindings from walruses
-# "leak" from comprehension scopes into outer scopes, but we should.)
-# See https://github.com/astral-sh/ruff/issues/16954
-# error: [unresolved-reference]
-reveal_type(g)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(i)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(k)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(m)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(o)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(q)  # revealed: Unknown
+# PEP 572: walrus targets in comprehensions leak into the enclosing scope, but
+# the target is only defined if the comprehension body runs at least once.
+# error: [possibly-unresolved-reference]
+reveal_type(g)  # revealed: int
+# error: [possibly-unresolved-reference]
+reveal_type(i)  # revealed: int
+# error: [possibly-unresolved-reference]
+reveal_type(k)  # revealed: int
+# error: [possibly-unresolved-reference]
+reveal_type(m)  # revealed: int
+# error: [possibly-unresolved-reference]
+reveal_type(q)  # revealed: int
 ```
 
 ### An annotation without a value is a definition in a stub but not a `.py` file

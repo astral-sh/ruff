@@ -1101,6 +1101,45 @@ impl<'db> UseDefMapBuilder<'db> {
         );
     }
 
+    /// Record enough context to infer a definition without applying its binding to the current
+    /// flow state.
+    pub(super) fn record_binding_context(
+        &mut self,
+        place: ScopedPlaceId,
+        binding: Definition<'db>,
+    ) {
+        let bindings = match place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
+            ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
+        };
+
+        self.bindings_by_definition
+            .insert(binding, bindings.clone());
+
+        let place_state = match place {
+            ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
+            ScopedPlaceId::Member(member) => &mut self.member_states[member],
+        };
+        self.declarations_by_binding
+            .insert(binding, place_state.declarations().clone());
+    }
+
+    pub(super) fn place_has_live_binding(
+        &self,
+        place: ScopedPlaceId,
+        binding: Definition<'db>,
+    ) -> bool {
+        let live_bindings = match place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
+            ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
+        };
+
+        live_bindings.iter().any(|live_binding| {
+            self.all_definitions[live_binding.binding()]
+                .is_defined_and(|definition| definition == binding)
+        })
+    }
+
     pub(super) fn add_predicate(
         &mut self,
         predicate: PredicateOrLiteral<'db>,
@@ -1231,6 +1270,19 @@ impl<'db> UseDefMapBuilder<'db> {
     ///
     /// [significant regressions]: https://github.com/astral-sh/ruff/pull/17286#issuecomment-2786755746
     pub(super) fn record_and_negate_star_import_reachability_constraint(
+        &mut self,
+        reachability_id: ScopedReachabilityConstraintId,
+        symbol: ScopedSymbolId,
+        pre_definition: SingleSymbolSnapshot,
+    ) {
+        self.record_and_negate_single_symbol_reachability_constraint(
+            reachability_id,
+            symbol,
+            pre_definition,
+        );
+    }
+
+    pub(super) fn record_and_negate_single_symbol_reachability_constraint(
         &mut self,
         reachability_id: ScopedReachabilityConstraintId,
         symbol: ScopedSymbolId,
@@ -1490,10 +1542,9 @@ impl<'db> UseDefMapBuilder<'db> {
         let is_forwarding_symbol = enclosing_place_expr
             .as_symbol()
             .is_some_and(|symbol| symbol.is_global() || symbol.is_nonlocal());
-        let stores_visible_bindings = enclosing_place_expr.is_bound()
-            && bindings
-                .iter()
-                .any(|binding| !binding.binding().is_unbound());
+        let stores_visible_bindings = bindings
+            .iter()
+            .any(|binding| !binding.binding().is_unbound());
         // Names bound in class scopes are never visible to nested scopes (but
         // attributes/subscripts are visible), so we never need to save eager scope bindings in a
         // class scope. There is one exception to this rule: annotation scopes can see names
@@ -1501,9 +1552,11 @@ impl<'db> UseDefMapBuilder<'db> {
         // `nonlocal` symbols in the enclosing scope are forwarding declarations, so nested scopes
         // should continue walking outward instead of treating any bindings here as owned by this
         // scope. However, if the enclosing scope actually rebound the forwarded name, that visible
-        // state needs to be snapshotted so nested scopes can see the rebound type.
+        // state needs to be snapshotted so nested scopes can see the rebound type. Temporary
+        // comprehension-local walrus bindings also have visible binding state without being marked
+        // bound in the place table; eager nested scopes still need to snapshot those bindings.
         if (is_class_symbol && !is_parent_of_annotation_scope)
-            || !enclosing_place_expr.is_bound()
+            || (!enclosing_place_expr.is_bound() && !stores_visible_bindings)
             || (is_forwarding_symbol && !stores_visible_bindings)
         {
             self.enclosing_snapshots.push(EnclosingSnapshot::Constraint(
