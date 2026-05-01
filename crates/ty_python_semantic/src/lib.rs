@@ -8,7 +8,9 @@ use crate::suppression::{
 };
 use crate::types::check_types;
 pub use db::Db;
-pub use diagnostic::add_inferred_python_version_hint_to_diagnostic;
+pub use diagnostic::{
+    add_inferred_python_version_hint_to_diagnostic, inferred_python_version_source_annotation,
+};
 pub use fixes::{fix_all_diagnostics, suppress_all_diagnostics};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;

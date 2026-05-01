@@ -510,7 +510,9 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
 
 class MIMEPart(Message[_HeaderRegistryT_co, _HeaderRegistryParamT_contra]):
     def __init__(self, policy: Policy[Any] | None = None) -> None: ...
-    def get_body(self, preferencelist: Sequence[str] = ("related", "html", "plain")) -> MIMEPart[_HeaderRegistryT_co] | None:
+    def get_body(
+        self, preferencelist: Sequence[str] = ("related", "html", "plain")
+    ) -> MIMEPart[_HeaderRegistryT_co, _HeaderRegistryParamT_contra] | None:
         """Return best candidate mime part for display as 'body' of message.
 
         Do a depth first search, starting with self, looking for the first part
@@ -543,7 +545,7 @@ class MIMEPart(Message[_HeaderRegistryT_co, _HeaderRegistryParamT_contra]):
         non-multipart.
         """
 
-    def iter_parts(self) -> Iterator[MIMEPart[_HeaderRegistryT_co]]:
+    def iter_parts(self) -> Iterator[MIMEPart[_HeaderRegistryT_co, _HeaderRegistryParamT_contra]]:
         """Return an iterator over all immediate subparts of a multipart.
 
         Return an empty iterator for a non-multipart.
@@ -573,4 +575,4 @@ class MIMEPart(Message[_HeaderRegistryT_co, _HeaderRegistryParamT_contra]):
 
     def is_attachment(self) -> bool: ...
 
-class EmailMessage(MIMEPart): ...
+class EmailMessage(MIMEPart[_HeaderRegistryT_co, _HeaderRegistryParamT_contra]): ...

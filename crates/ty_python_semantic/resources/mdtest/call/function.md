@@ -1363,6 +1363,37 @@ f(**Foo1(a=1, b="b"))
 f(**Foo2(a=1))
 ```
 
+### TypedDict union
+
+```py
+from typing_extensions import TypedDict
+
+class GoodA(TypedDict):
+    a: int
+    b: int
+
+class GoodB(TypedDict):
+    a: int
+    b: int
+
+class BadA(TypedDict):
+    a: int
+    b: str
+
+class BadB(TypedDict):
+    a: int
+    b: str
+
+def needs_known_keys(*, a: int, b: int, c: int) -> None: ...
+def takes_int_kwargs(**kwargs: int) -> None: ...
+def _(good: GoodA | GoodB, bad: BadA | BadB) -> None:
+    # error: [missing-argument] "No argument provided for required parameter `c` of function `needs_known_keys`"
+    needs_known_keys(**good)
+
+    # error: [invalid-argument-type] "Argument to function `takes_int_kwargs` is incorrect: Expected `int`, found `str`"
+    takes_int_kwargs(**bad)
+```
+
 ### Keys must be strings
 
 The keys of the mapping passed to a double-starred argument must be strings.
