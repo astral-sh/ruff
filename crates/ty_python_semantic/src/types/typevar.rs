@@ -665,10 +665,6 @@ impl TypeVarNonce {
         self.0
     }
 
-    pub(crate) const fn is_fresh(self) -> bool {
-        self.0 != 0
-    }
-
     pub(crate) fn increment(self) -> Self {
         Self(
             self.0
@@ -702,7 +698,7 @@ pub(crate) struct TypeVarNonceGenerator<'db> {
     inner: Rc<RefCell<TypeVarNonceGeneratorInner<'db>>>,
 }
 
-impl<'db> Default for TypeVarNonceGenerator<'db> {
+impl Default for TypeVarNonceGenerator<'_> {
     fn default() -> Self {
         Self {
             inner: Rc::new(RefCell::new(TypeVarNonceGeneratorInner {
@@ -835,27 +831,6 @@ impl<'db> BoundTypeVarInstance<'db> {
             paramspec_attr: self.paramspec_attr(db),
             freshness: self.freshness(db),
         }
-    }
-
-    #[expect(dead_code, reason = "used by follow-up deterministic freshening work")]
-    pub(crate) fn is_fresh(self, db: &'db dyn Db) -> bool {
-        self.freshness(db).is_fresh()
-    }
-
-    #[expect(dead_code, reason = "used by follow-up deterministic freshening work")]
-    pub(crate) fn has_same_base_identity(self, db: &'db dyn Db, other: Self) -> bool {
-        self.identity(db).has_same_base_identity(other.identity(db))
-    }
-
-    #[expect(dead_code, reason = "used by follow-up deterministic freshening work")]
-    pub(crate) fn freshen(self, db: &'db dyn Db, delta: u32) -> Self {
-        Self::new(
-            db,
-            self.typevar(db),
-            self.binding_context(db),
-            self.paramspec_attr(db),
-            self.freshness(db).add(delta),
-        )
     }
 
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db Name {
@@ -1395,22 +1370,6 @@ pub struct BoundTypeVarIdentity<'db> {
     pub(super) paramspec_attr: Option<ParamSpecAttrKind>,
     /// The freshness nonce for this bound typevar occurrence; `0` is the source-level occurrence.
     pub(super) freshness: TypeVarNonce,
-}
-
-impl<'db> BoundTypeVarIdentity<'db> {
-    pub(crate) fn has_same_base_identity(mut self, mut other: Self) -> bool {
-        self.freshness = TypeVarNonce::NONE;
-        other.freshness = TypeVarNonce::NONE;
-        self == other
-    }
-
-    #[expect(dead_code, reason = "used by follow-up deterministic freshening work")]
-    pub(crate) fn freshen(self, delta: u32) -> Self {
-        Self {
-            freshness: self.freshness.add(delta),
-            ..self
-        }
-    }
 }
 
 #[salsa::tracked(
