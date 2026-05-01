@@ -833,6 +833,89 @@ def _(d: Intersection[Single, Not[Single]]) -> None:
 
 def _(e: Intersection[Single | int, Not[Single]]) -> None:
     reveal_type(e)  # revealed: int
+
+class LargeColor(Enum):
+    M00 = 0
+    M01 = 1
+    M02 = 2
+    M03 = 3
+    M04 = 4
+    M05 = 5
+    M06 = 6
+    M07 = 7
+    M08 = 8
+    M09 = 9
+    M10 = 10
+    M11 = 11
+    M12 = 12
+    M13 = 13
+    M14 = 14
+    M15 = 15
+    M16 = 16
+    M17 = 17
+    M18 = 18
+    M19 = 19
+    M20 = 20
+    M21 = 21
+    M22 = 22
+    M23 = 23
+    M24 = 24
+    M25 = 25
+    M26 = 26
+    M27 = 27
+    M28 = 28
+    M29 = 29
+    M30 = 30
+    M31 = 31
+    M32 = 32
+
+type LargeM00 = Literal[LargeColor.M00]
+type LargeFirst = Literal[
+    LargeColor.M00,
+    LargeColor.M01,
+    LargeColor.M02,
+    LargeColor.M03,
+    LargeColor.M04,
+    LargeColor.M05,
+    LargeColor.M06,
+    LargeColor.M07,
+    LargeColor.M08,
+    LargeColor.M09,
+    LargeColor.M10,
+]
+type LargeMiddle = Literal[
+    LargeColor.M11,
+    LargeColor.M12,
+    LargeColor.M13,
+    LargeColor.M14,
+    LargeColor.M15,
+    LargeColor.M16,
+    LargeColor.M17,
+    LargeColor.M18,
+    LargeColor.M19,
+    LargeColor.M20,
+    LargeColor.M21,
+]
+type LargeLast = Literal[
+    LargeColor.M22,
+    LargeColor.M23,
+    LargeColor.M24,
+    LargeColor.M25,
+    LargeColor.M26,
+    LargeColor.M27,
+    LargeColor.M28,
+    LargeColor.M29,
+    LargeColor.M30,
+    LargeColor.M31,
+    LargeColor.M32,
+]
+type AllLarge = LargeFirst | LargeMiddle | LargeLast
+
+def _(a: Intersection[LargeColor, Not[LargeM00]]) -> None:
+    reveal_type(a)  # revealed: LargeColor & ~Literal[LargeColor.M00]
+
+def _(b: Intersection[LargeColor, Not[AllLarge]]) -> None:
+    reveal_type(b)  # revealed: Never
 ```
 
 ## Addition of a type to an intersection with many non-disjoint types
