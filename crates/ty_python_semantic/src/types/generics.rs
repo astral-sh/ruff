@@ -1746,7 +1746,7 @@ impl get_size2::GetSize for TypeVarInference<'_> {}
 impl<'db> TypeVarInference<'db> {
     /// Project this inference result into a closed specialization.
     pub(crate) fn specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        self.specialization_with(db, |_, _| None)
+        type_var_inference_specialization(db, self)
     }
 
     /// Project this inference result into a specialization with explicit handling for each
@@ -1768,6 +1768,14 @@ impl<'db> TypeVarInference<'db> {
 
         self.generic_context(db).specialize_recursive(db, types)
     }
+}
+
+#[salsa::tracked]
+fn type_var_inference_specialization<'db>(
+    db: &'db dyn Db,
+    inference: TypeVarInference<'db>,
+) -> Specialization<'db> {
+    inference.specialization_with(db, |_, _| None)
 }
 
 impl<'db, 'c> SpecializationBuilder<'db, 'c> {
