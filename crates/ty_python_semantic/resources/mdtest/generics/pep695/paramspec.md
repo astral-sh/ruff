@@ -287,6 +287,27 @@ def f[**P](func: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
     reveal_type(kwargs["key"])  # revealed: object
 ```
 
+### Overload matching refines `ParamSpec`
+
+When a `ParamSpec` specializes to an overloaded callable, arguments passed to `P.args` and
+`P.kwargs` select the matching overload.
+
+```py
+from typing import Callable, overload
+
+def select[**P](func: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> Callable[P, None]:
+    return func
+
+@overload
+def overloaded(x: int) -> None: ...
+@overload
+def overloaded(x: str) -> None: ...
+def overloaded(x: int | str) -> None: ...
+
+reveal_type(select(overloaded, 1))  # revealed: (x: int) -> None
+reveal_type(select(overloaded, ""))  # revealed: (x: str) -> None
+```
+
 ## Specializing generic classes explicitly
 
 ```py
@@ -855,12 +876,11 @@ reveal_type(change_return_type(int_str))  # revealed: Overload[(x: int) -> str, 
 # error: [invalid-argument-type]
 reveal_type(change_return_type(str_str))  # revealed: (...) -> str
 
-# TODO: This should reveal the matching overload instead
-reveal_type(with_parameters(int_int, 1))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
-reveal_type(with_parameters(int_int, "a"))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+reveal_type(with_parameters(int_int, 1))  # revealed: (x: int) -> str
+reveal_type(with_parameters(int_int, "a"))  # revealed: (x: str) -> str
 
 # error: [invalid-argument-type] "Argument to function `with_parameters` is incorrect: Expected `int`, found `None`"
-reveal_type(with_parameters(int_int, None))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+reveal_type(with_parameters(int_int, None))  # revealed: (x: int) -> str
 
 def foo(int_or_str: int | str):
     # Argument type expansion leads to matching both overloads.
@@ -868,13 +888,12 @@ def foo(int_or_str: int | str):
     reveal_type(with_parameters(int_int, int_or_str))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
 
 # Keyword argument matching should also work
-# TODO: This should reveal the matching overload instead
-reveal_type(with_parameters(int_int, x=1))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
-reveal_type(with_parameters(int_int, x="a"))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+reveal_type(with_parameters(int_int, x=1))  # revealed: (x: int) -> str
+reveal_type(with_parameters(int_int, x="a"))  # revealed: (x: str) -> str
 
 # No matching overload should error
 # error: [invalid-argument-type]
-reveal_type(with_parameters(int_int, 1.5))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+reveal_type(with_parameters(int_int, 1.5))  # revealed: (x: int) -> str
 ```
 
 ### Overloads with multiple parameters

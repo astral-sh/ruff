@@ -42,7 +42,8 @@ use crate::types::function::{
     OverloadLiteral,
 };
 use crate::types::generics::{
-    GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
+    ApplySpecialization, GenericContext, InferableTypeVars, Specialization, SpecializationBuilder,
+    SpecializationError,
 };
 use crate::types::known_instance::FieldInstance;
 use crate::types::signatures::{
@@ -52,12 +53,12 @@ use crate::types::signatures::{
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
-    BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral,
-    DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias, InternedConstraintSet,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext,
-    TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, list_members,
+    ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
+    ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias,
+    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType,
+    TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
+    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -4783,7 +4784,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         let specialization = builder.build_with(generic_context, maybe_promote);
 
-        self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
         self.specialization = Some(specialization);
     }
 
@@ -5132,10 +5132,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             FailingOverloadSelection::AffectsOverloadResolution,
                         )
                         .unwrap_or(0);
-                    // TODO: We should also update the specialization for the `ParamSpec` to reflect
-                    // the matching overload here.
+                    let binding = &callable_binding.overloads()[index];
+                    self.refine_paramspec_specialization(paramspec, binding);
                     self.errors.extend(
-                        callable_binding.overloads()[index]
+                        binding
                             .errors
                             .iter()
                             .cloned()
@@ -5144,10 +5144,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 }
             }
             MatchingOverloadIndex::Single(index) => {
-                // TODO: We should also update the specialization for the `ParamSpec` to reflect the
-                // matching overload here.
+                let binding = &callable_binding.overloads()[index];
+                self.refine_paramspec_specialization(paramspec, binding);
                 self.errors.extend(
-                    callable_binding.overloads()[index]
+                    binding
                         .errors
                         .iter()
                         .cloned()
@@ -5174,6 +5174,41 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
 
         true
+    }
+
+    fn refine_paramspec_specialization(
+        &mut self,
+        paramspec: BoundTypeVarInstance<'db>,
+        binding: &Binding<'db>,
+    ) {
+        let Some(specialization) = self.specialization else {
+            return;
+        };
+
+        let signature = binding.specialization.map_or_else(
+            || binding.signature.clone(),
+            |specialization| {
+                binding.signature.apply_type_mapping_impl(
+                    self.db,
+                    &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
+                        specialization,
+                    )),
+                    TypeContext::default(),
+                    &ApplyTypeMappingVisitor::default(),
+                )
+            },
+        );
+        let paramspec_value = Type::Callable(CallableType::new(
+            self.db,
+            CallableSignature::single(signature.with_return_type(Type::unknown())),
+            CallableTypeKind::ParamSpecValue,
+        ));
+
+        if let Some(specialization) =
+            specialization.replace_typevar(self.db, paramspec, paramspec_value)
+        {
+            self.specialization = Some(specialization);
+        }
     }
 
     fn check_variadic_argument_type(
@@ -5289,7 +5324,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        (self.inferable_typevars, self.specialization, self.return_ty)
+        let return_ty = if let Some(specialization) = self.specialization {
+            self.return_ty.apply_specialization(self.db, specialization)
+        } else {
+            self.return_ty
+        };
+
+        (self.inferable_typevars, self.specialization, return_ty)
     }
 }
 

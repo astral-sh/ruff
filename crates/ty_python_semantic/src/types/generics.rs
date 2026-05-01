@@ -1088,6 +1088,32 @@ impl<'db> Specialization<'db> {
         self.types(db).get(index).copied()
     }
 
+    /// Returns a copy of this specialization with a single type variable mapped to `ty`.
+    ///
+    /// Returns `None` if the type variable is not part of this specialization's generic context.
+    pub(crate) fn replace_typevar(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+    ) -> Option<Self> {
+        let generic_context = self.generic_context(db);
+        let index = generic_context
+            .variables_inner(db)
+            .get_index_of(&bound_typevar.identity(db))?;
+
+        let mut types = self.types(db).to_vec();
+        types[index] = ty;
+
+        Some(Specialization::new(
+            db,
+            generic_context,
+            types.into_boxed_slice(),
+            self.materialization_kind(db),
+            self.tuple_inner(db),
+        ))
+    }
+
     /// Applies a specialization to this specialization. This is used, for instance, when a generic
     /// class inherits from a generic alias:
     ///
