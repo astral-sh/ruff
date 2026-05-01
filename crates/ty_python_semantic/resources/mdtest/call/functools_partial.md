@@ -1471,6 +1471,31 @@ def handle(
 handler: Handler = partial(handle, context=Context())
 ```
 
+A `partial` result is also assignable to a protocol that models `__call__` as a callable attribute.
+
+```py
+from functools import partial
+from typing import Any, Callable, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class PartialLike(Protocol[T]):
+    __call__: Callable[..., T]
+
+    @property
+    def func(self) -> Callable[..., T]: ...
+    @property
+    def args(self) -> tuple[Any, ...]: ...
+    @property
+    def keywords(self) -> dict[str, Any]: ...
+
+def f(x: int) -> int:
+    return x
+
+partial_like: PartialLike[int] = partial(f)
+partial_like_bad: PartialLike[str] = partial(f)  # error: [invalid-assignment]
+```
+
 ### Accessing `__call__` directly
 
 `__call__` on a `partial` result should reflect the refined callable signature, not the broad
