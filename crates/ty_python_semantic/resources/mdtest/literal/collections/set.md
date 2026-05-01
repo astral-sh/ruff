@@ -28,7 +28,7 @@ reveal_type(x)  # revealed: set[(_: int) -> int]
 ## Mixed set
 
 ```py
-# revealed: set[int | tuple[int, int] | tuple[int, int, int]]
+# revealed: set[int | tuple[int, ...]]
 reveal_type({1, (1, 2), (1, 2, 3)})
 ```
 

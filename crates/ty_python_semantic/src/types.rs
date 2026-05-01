@@ -139,6 +139,7 @@ mod subclass_of;
 #[cfg(test)]
 pub(crate) mod tests;
 mod tuple;
+mod tuple_size_promotion;
 mod type_alias;
 mod typed_dict;
 mod typevar;
