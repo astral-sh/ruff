@@ -291,6 +291,8 @@ RET504 [*] Unnecessary assignment to `x` before `return` statement
 462 |               )
 463 |     return x
     |            ^
+464 |
+465 | # https://github.com/astral-sh/ruff/issues/17292
     |
 help: Remove unnecessary assignment
 458 |     return x
@@ -300,4 +302,95 @@ help: Remove unnecessary assignment
 461 +     return (1
 462 |               )
     -     return x
+463 |
+464 | # https://github.com/astral-sh/ruff/issues/17292
+465 | # Variable used in finally — no RET504
+note: This is an unsafe fix and may change runtime behavior
+
+RET504 [*] Unnecessary assignment to `result` before `return` statement
+   --> RET504.py:484:16
+    |
+482 |     try:
+483 |         result = compute()
+484 |         return result
+    |                ^^^^^^
+485 |     except Exception as e:
+486 |         log(result)
+    |
+help: Remove unnecessary assignment
+480 | def f():
+481 |     result = None
+482 |     try:
+    -         result = compute()
+    -         return result
+483 +         return compute()
+484 |     except Exception as e:
+485 |         log(result)
+486 |
+note: This is an unsafe fix and may change runtime behavior
+
+RET504 [*] Unnecessary assignment to `result` before `return` statement
+   --> RET504.py:496:16
+    |
+494 |         entry = lookup()
+495 |         result = to_dict(entry)
+496 |         return result
+    |                ^^^^^^
+497 |
+498 | # Variable NOT used in finally — RET504 should still fire
+    |
+help: Remove unnecessary assignment
+492 |         entry = fetch()
+493 |     except AlreadyExists:
+494 |         entry = lookup()
+    -         result = to_dict(entry)
+    -         return result
+495 +         return to_dict(entry)
+496 |
+497 | # Variable NOT used in finally — RET504 should still fire
+498 | def f():
+note: This is an unsafe fix and may change runtime behavior
+
+RET504 [*] Unnecessary assignment to `x` before `return` statement
+   --> RET504.py:502:16
+    |
+500 |     try:
+501 |         x = foo()
+502 |         return x
+    |                ^
+503 |     finally:
+504 |         log("done")
+    |
+help: Remove unnecessary assignment
+498 | # Variable NOT used in finally — RET504 should still fire
+499 | def f():
+500 |     try:
+    -         x = foo()
+    -         return x
+501 +         return foo()
+502 |     finally:
+503 |         log("done")
+504 |
+note: This is an unsafe fix and may change runtime behavior
+
+RET504 [*] Unnecessary assignment to `x` before `return` statement
+   --> RET504.py:522:16
+    |
+520 |     try:
+521 |         x = foo()
+522 |         return x
+    |                ^
+523 |     finally:
+524 |         x = "done"
+    |
+help: Remove unnecessary assignment
+518 | # Write-only in finally — RET504 should still fire
+519 | def f():
+520 |     try:
+    -         x = foo()
+    -         return x
+521 +         return foo()
+522 |     finally:
+523 |         x = "done"
+524 |
 note: This is an unsafe fix and may change runtime behavior

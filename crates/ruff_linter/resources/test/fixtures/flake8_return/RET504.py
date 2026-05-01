@@ -461,3 +461,74 @@ def f():
     x = (1
               )
     return x
+
+# https://github.com/astral-sh/ruff/issues/17292
+# Variable used in finally — no RET504
+def f():
+    out = ""
+    try:
+        out = foo()
+        return out
+    except Exception as e:
+        out = str(e)
+    finally:
+        log(out)
+
+# Variable read in except handler alone — RET504 fires (the except is an
+# alternative path: if it runs, the assignment never completed, so removing
+# the assignment can't change what the handler observes).
+def f():
+    result = None
+    try:
+        result = compute()
+        return result
+    except Exception as e:
+        log(result)
+
+# Return inside an except handler — RET504 fires. The `return result` is
+# not itself "observation" of the assignment; finalbody is empty.
+def f():
+    try:
+        entry = fetch()
+    except AlreadyExists:
+        entry = lookup()
+        result = to_dict(entry)
+        return result
+
+# Variable NOT used in finally — RET504 should still fire
+def f():
+    try:
+        x = foo()
+        return x
+    finally:
+        log("done")
+
+# Nested try — variable used in outer finally
+def f():
+    x = ""
+    try:
+        try:
+            x = foo()
+            return x
+        except:
+            pass
+    finally:
+        log(x)
+
+# Write-only in finally — RET504 should still fire
+def f():
+    try:
+        x = foo()
+        return x
+    finally:
+        x = "done"
+
+# Closure in finally captures the name — conservative: no RET504
+def f():
+    try:
+        x = foo()
+        return x
+    finally:
+        def _cleanup():
+            log(x)
+        _cleanup()
