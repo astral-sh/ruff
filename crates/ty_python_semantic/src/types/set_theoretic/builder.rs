@@ -129,6 +129,90 @@ fn merge_truthiness_guarded_pair<'db>(
     }
 }
 
+/// Combine union elements that cover more of the same enum class.
+///
+/// Enum complements are intersections like `Color & ~Literal[Color.RED]`. When a union contains
+/// such a complement plus other complements or literals from the same enum, this rewrites the
+/// element list to a single complement with the shared exclusions removed.
+///
+/// ```python
+/// from enum import Enum
+///
+/// class Color(Enum):
+///     RED = 1
+///     BLUE = 2
+///
+/// # (Color excluding RED) | Literal[Color.RED] simplifies to Color.
+/// ```
+fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'db>>) -> bool {
+    for complement_index in 0..types.len() {
+        let Some((enum_class, mut shared_excluded_names)) =
+            types[complement_index].enum_complement_excluded_member_names(db)
+        else {
+            continue;
+        };
+        let Some(metadata) = enum_metadata(db, enum_class) else {
+            continue;
+        };
+
+        let mut remove_indices = Vec::new();
+        for (index, ty) in types.iter().enumerate() {
+            if index == complement_index {
+                continue;
+            }
+
+            if let Some((other_enum_class, other_excluded_names)) =
+                ty.enum_complement_excluded_member_names(db)
+            {
+                if other_enum_class == enum_class {
+                    shared_excluded_names.retain(|name| other_excluded_names.contains(name));
+                    remove_indices.push(index);
+                }
+                continue;
+            }
+
+            let Some(enum_literal) = ty.as_enum_literal() else {
+                continue;
+            };
+            if enum_literal.enum_class(db) != enum_class {
+                continue;
+            }
+
+            let Some(canonical_name) = metadata.resolve_member(enum_literal.name(db)) else {
+                continue;
+            };
+            shared_excluded_names.remove(canonical_name);
+            remove_indices.push(index);
+        }
+
+        if !remove_indices.is_empty() {
+            types[complement_index] = enum_class.to_non_generic_instance(db);
+            for name in metadata
+                .members
+                .keys()
+                .filter(|name| shared_excluded_names.contains(*name))
+            {
+                types[complement_index] = IntersectionBuilder::new(db)
+                    .add_positive(types[complement_index])
+                    .add_negative(Type::enum_literal(EnumLiteralType::new(
+                        db,
+                        enum_class,
+                        name.clone(),
+                    )))
+                    .build();
+            }
+
+            remove_indices.sort_unstable();
+            for index in remove_indices.into_iter().rev() {
+                types.swap_remove(index);
+            }
+            return true;
+        }
+    }
+
+    false
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LiteralKind<'db> {
     Int,
@@ -889,6 +973,11 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn try_build(self) -> Option<Type<'db>> {
+        let db = self.db;
+        let unpack_aliases = self.unpack_aliases;
+        let cycle_recovery = self.cycle_recovery;
+        let recursively_defined = self.recursively_defined;
+
         let type_count = self.elements.iter().map(UnionElement::type_count).sum();
         let mut types = Vec::with_capacity(type_count);
         for element in self.elements {
@@ -897,7 +986,7 @@ impl<'db> UnionBuilder<'db> {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
                         Type::from(
                             LiteralValueType::new(literal, promotable)
-                                .with_recursively_defined(self.recursively_defined),
+                                .with_recursively_defined(recursively_defined),
                         )
                     }));
                 }
@@ -905,7 +994,7 @@ impl<'db> UnionBuilder<'db> {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
                         Type::from(
                             LiteralValueType::new(literal, promotable)
-                                .with_recursively_defined(self.recursively_defined),
+                                .with_recursively_defined(recursively_defined),
                         )
                     }));
                 }
@@ -913,7 +1002,7 @@ impl<'db> UnionBuilder<'db> {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
                         Type::from(
                             LiteralValueType::new(literal, promotable)
-                                .with_recursively_defined(self.recursively_defined),
+                                .with_recursively_defined(recursively_defined),
                         )
                     }));
                 }
@@ -921,20 +1010,32 @@ impl<'db> UnionBuilder<'db> {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
                         Type::from(
                             LiteralValueType::new(literal, promotable)
-                                .with_recursively_defined(self.recursively_defined),
+                                .with_recursively_defined(recursively_defined),
                         )
                     }));
                 }
                 UnionElement::Type(ty) => types.push(ty),
             }
         }
+
+        if normalize_enum_complement_unions(db, &mut types) {
+            let builder = UnionBuilder::new(db)
+                .unpack_aliases(unpack_aliases)
+                .cycle_recovery(cycle_recovery)
+                .recursively_defined(recursively_defined);
+            return types
+                .into_iter()
+                .fold(builder, UnionBuilder::add)
+                .try_build();
+        }
+
         match types.len() {
             0 => None,
             1 => Some(types[0]),
             _ => Some(Type::Union(UnionType::new(
-                self.db,
+                db,
                 types.into_boxed_slice(),
-                self.recursively_defined,
+                recursively_defined,
             ))),
         }
     }
@@ -1142,6 +1243,22 @@ struct InnerIntersectionBuilder<'db> {
 }
 
 impl<'db> InnerIntersectionBuilder<'db> {
+    /// Return `true` when an intersection excludes every member of an enum class.
+    ///
+    /// This recognizes enum complements that have become empty, such as
+    /// `Color & ~Literal[Color.RED] & ~Literal[Color.BLUE]` for a two-member enum.
+    ///
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Color(Enum):
+    ///     RED = 1
+    ///     BLUE = 2
+    ///
+    /// def f(color: Color):
+    ///     if color is not Color.RED and color is not Color.BLUE:
+    ///         reveal_type(color)  # Never
+    /// ```
     fn has_empty_enum_complement(&self, db: &'db dyn Db) -> bool {
         for positive in &self.positive {
             let Type::NominalInstance(instance) = positive else {

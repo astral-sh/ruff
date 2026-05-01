@@ -693,6 +693,27 @@ class E(Enum):
     });
 }
 
+/// Benchmark repeated enum-membership narrowing against tuple literals.
+///
+/// The generated Python mirrors code that partitions one large enum with `if`/`elif` membership
+/// tests, where each test narrows the remaining enum-complement type.
+///
+/// ```python
+/// from enum import Enum, auto
+///
+/// class SomeEnum(Enum):
+///     A1 = auto()
+///     A2 = auto()
+///     A3 = auto()
+///     B10 = auto()
+///
+/// def get_default_mi_attrs(some_enum: SomeEnum):
+///     if some_enum in (SomeEnum.A1, SomeEnum.A2, SomeEnum.A3):
+///         return 0
+///     elif some_enum in (SomeEnum.B10,):
+///         return 1
+///     return None
+/// ```
 fn benchmark_many_enum_membership_narrowing(criterion: &mut Criterion) {
     const NUM_GROUPS: usize = 5;
     const MEMBERS_PER_GROUP: usize = 10;
