@@ -1189,14 +1189,16 @@ reveal_type(p(1, b="world", c=3.14))  # revealed: bool
 
 ### Overriding keyword-bound generic args at call time
 
-TODO: preserve the override branch when a keyword-bound generic is rebound at call time. Currently,
-bound keyword arguments specialize the stored partial signature.
+Keyword-bound arguments specialize the displayed partial signature, but callers can still override
+those keywords at call time. The direct partial call preserves the original generic relationship
+between the surviving parameters.
 
 ```py
 from functools import partial
-from typing import TypeVar
+from typing import TypeVar, TypedDict
 
 T = TypeVar("T")
+U = TypeVar("U")
 
 def pair(a: T, b: T) -> tuple[T, T]:
     return (a, b)
@@ -1204,7 +1206,44 @@ def pair(a: T, b: T) -> tuple[T, T]:
 p = partial(pair, b=1)
 reveal_type(p)  # revealed: partial[(a: int, *, b: int = 1) -> tuple[int, int]]
 p("x")  # error: [invalid-argument-type]
-p(1, b="y")  # error: [invalid-argument-type]
+reveal_type(p("x", b="y"))  # revealed: tuple[Literal["x", "y"], Literal["x", "y"]]
+reveal_type(p(1, b="y"))  # revealed: tuple[Literal[1, "y"], Literal[1, "y"]]
+reveal_type(p(2, b=3))  # revealed: tuple[Literal[2, 3], Literal[2, 3]]
+
+class BoundPairKwargs(TypedDict):
+    b: int
+
+bound_kwargs: BoundPairKwargs = {"b": 1}
+p_from_kwargs = partial(pair, **bound_kwargs)
+reveal_type(p_from_kwargs)  # revealed: partial[(a: int, *, b: int = ...) -> tuple[int, int]]
+reveal_type(p_from_kwargs("x", b="y"))  # revealed: tuple[Literal["x", "y"], Literal["x", "y"]]
+
+class PairKwargs(TypedDict):
+    b: str
+
+kwargs: PairKwargs = {"b": "y"}
+reveal_type(p("x", **kwargs))  # revealed: tuple[str, str]
+
+def pair2(a: T, b: T) -> tuple[T, T]:
+    return (a, b)
+
+flag: bool = True
+union_p = partial(pair if flag else pair2, b=1)
+reveal_type(union_p("x", b="y"))  # revealed: tuple[Literal["x", "y"], Literal["x", "y"]]
+
+def triple(a: T, b: T, c: U) -> tuple[T, T, U]:
+    return (a, b, c)
+
+nested_p = partial(partial(triple, b=1), c=0)
+reveal_type(nested_p("x", b="y"))  # revealed: tuple[Literal["x", "y"], Literal["x", "y"], int]
+
+class BoundTripleKwargs(TypedDict):
+    b: int
+    c: int
+
+bound_triple_kwargs: BoundTripleKwargs = {"b": 1, "c": 0}
+p_from_multi_kwargs = partial(triple, **bound_triple_kwargs)
+reveal_type(p_from_multi_kwargs("x", b="y"))  # revealed: tuple[Literal["x", "y"], Literal["x", "y"], int]
 ```
 
 ## Assignability and partial object behavior

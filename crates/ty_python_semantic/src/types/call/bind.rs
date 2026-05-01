@@ -51,14 +51,15 @@ use crate::types::signatures::{
     PartialApplication, PartialSignatureApplication,
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
-use crate::types::typevar::BoundTypeVarIdentity;
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarIdentity};
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral,
     DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias, InternedConstraintSet,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext,
     TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, list_members,
+    WrapperDescriptorKind, call::FunctoolsPartialBoundArguments, enums,
+    known_instance::FunctoolsPartialInstance, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -207,6 +208,26 @@ impl<'db> CallableItem<'db> {
                     db,
                     partial_overload,
                     bound_call_arguments,
+                )?,
+            ),
+            CallableItem::Constructor(_) => None,
+        }
+    }
+
+    /// Returns the reduced callable for a direct partial call that overrides stored keywords.
+    fn functools_partial_callable_for_keyword_overrides(
+        &self,
+        db: &'db dyn Db,
+        bound_call_arguments: &CallArguments<'_, 'db>,
+        overridden_keywords: &FxHashSet<Name>,
+    ) -> Option<CallableType<'db>> {
+        match self {
+            CallableItem::Regular(binding) => CallableType::partially_apply(
+                db,
+                binding.partial_signature_applications_for_keyword_overrides(
+                    db,
+                    bound_call_arguments,
+                    overridden_keywords,
                 )?,
             ),
             CallableItem::Constructor(_) => None,
@@ -796,6 +817,125 @@ impl<'db> Bindings<'db> {
         Some((bound_call_arguments, partial_bindings))
     }
 
+    /// Synthesizes the callable for this specific direct call to a precise
+    /// `functools.partial(...)` instance when runtime keywords override stored keywords.
+    pub(crate) fn functools_partial_call_type(
+        db: &'db dyn Db,
+        callable_type: Type<'db>,
+        call_arguments: &CallArguments<'_, 'db>,
+    ) -> Option<Type<'db>> {
+        fn transform<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            call_arguments: &CallArguments<'_, 'db>,
+            changed: &mut bool,
+        ) -> Type<'db> {
+            match ty {
+                Type::KnownInstance(
+                    KnownInstanceType::FunctoolsPartial(partial)
+                    | KnownInstanceType::FunctoolsPartialCall(partial),
+                ) => {
+                    let Some(callable) =
+                        Bindings::functools_partial_call_callable(db, partial, call_arguments)
+                    else {
+                        return ty;
+                    };
+
+                    *changed = true;
+                    Type::Callable(callable)
+                }
+                Type::Union(union) => union.map(db, |element| {
+                    transform(db, *element, call_arguments, changed)
+                }),
+                Type::Intersection(intersection) => intersection.map_positive(db, |element| {
+                    transform(db, *element, call_arguments, changed)
+                }),
+                _ => ty,
+            }
+        }
+
+        let mut changed = false;
+        let ty = transform(db, callable_type, call_arguments, &mut changed);
+        changed.then_some(ty)
+    }
+
+    /// Synthesizes the callable for this specific direct call to a precise
+    /// `functools.partial(...)` instance when runtime keywords override stored keywords.
+    pub(crate) fn functools_partial_call_callable(
+        db: &'db dyn Db,
+        partial: FunctoolsPartialInstance<'db>,
+        call_arguments: &CallArguments<'_, 'db>,
+    ) -> Option<CallableType<'db>> {
+        let (wrapped_callable_ty, bound_arguments) = Self::flatten_functools_partial(db, partial);
+        let overridden_keywords = bound_arguments.overridden_by(db, call_arguments);
+        if overridden_keywords.is_empty() {
+            return None;
+        }
+
+        let bound_call_arguments = bound_arguments.to_call_arguments();
+        wrapped_callable_ty.try_upcast_to_callable(db)?;
+
+        let mut partial_bindings = wrapped_callable_ty
+            .bindings(db)
+            .match_parameters(db, &bound_call_arguments);
+        for binding in partial_bindings.iter_flat_mut() {
+            binding.clear_missing_argument_errors_for_partial_application();
+        }
+        for constructor in partial_bindings.iter_constructor_items_mut() {
+            if let Some(downstream) = constructor.downstream_constructor_mut() {
+                downstream.clear_deferred_constructor_errors_for_partial_application();
+            }
+        }
+
+        let partial_bindings = match partial_bindings.check_types(
+            db,
+            &ConstraintSetBuilder::new(),
+            &bound_call_arguments,
+            TypeContext::default(),
+            &[],
+        ) {
+            Ok(bindings) => bindings,
+            Err(CallError(_, bindings)) => *bindings,
+        };
+
+        let partial_callables: SmallVec<[CallableType<'db>; 1]> = partial_bindings
+            .iter_callable_items()
+            .filter_map(|partial_item| {
+                partial_item.functools_partial_callable_for_keyword_overrides(
+                    db,
+                    &bound_call_arguments,
+                    &overridden_keywords,
+                )
+            })
+            .collect();
+
+        if partial_callables.is_empty() {
+            None
+        } else {
+            Some(CallableTypes::from_elements(partial_callables).merge_to_single(db))
+        }
+    }
+
+    fn flatten_functools_partial(
+        db: &'db dyn Db,
+        partial: FunctoolsPartialInstance<'db>,
+    ) -> (Type<'db>, FunctoolsPartialBoundArguments<'db>) {
+        let wrapped = partial.wrapped(db).inner(db);
+        match wrapped {
+            Type::KnownInstance(
+                KnownInstanceType::FunctoolsPartial(inner)
+                | KnownInstanceType::FunctoolsPartialCall(inner),
+            ) => {
+                let (wrapped, bound_arguments) = Self::flatten_functools_partial(db, inner);
+                (
+                    wrapped,
+                    bound_arguments.combined_with(&partial.bound_arguments(db)),
+                )
+            }
+            _ => (wrapped, partial.bound_arguments(db)),
+        }
+    }
+
     /// Synthesizes the precise `functools.partial(...)` type for the already-matched bindings.
     ///
     /// Wrapped unions and intersections keep their original callable structure by partially
@@ -808,12 +948,18 @@ impl<'db> Bindings<'db> {
         partial_overload: &mut Binding<'db>,
         bound_call_arguments: &CallArguments<'a, 'db>,
     ) -> Type<'db> {
+        let bound_arguments = bound_call_arguments.to_functools_partial_bound_arguments(db);
+
         if wrapped_callable_ty.is_union() || wrapped_callable_ty.is_intersection() {
             return self.map_item_types(db, |partial_item| {
                 partial_item
                     .functools_partial_callable(db, partial_overload, bound_call_arguments)
                     .map(|callable| {
-                        callable.into_precise_functools_partial_instance(db, wrapped_callable_ty)
+                        callable.into_precise_functools_partial_instance(
+                            db,
+                            wrapped_callable_ty,
+                            bound_arguments.clone(),
+                        )
                     })
             });
         }
@@ -828,8 +974,11 @@ impl<'db> Bindings<'db> {
         if partial_callables.is_empty() {
             Type::Never
         } else {
-            CallableTypes::from_elements(partial_callables)
-                .into_precise_functools_partial_instance(db, wrapped_callable_ty)
+            CallableTypes::from_elements(partial_callables).into_precise_functools_partial_instance(
+                db,
+                wrapped_callable_ty,
+                bound_arguments,
+            )
         }
     }
 
@@ -2690,6 +2839,13 @@ enum FailingOverloadSelection {
     ReportableForPartial,
 }
 
+#[derive(Clone, Debug)]
+struct PartialKeywordOverride {
+    argument_index: usize,
+    parameter_index: usize,
+    argument_name: Name,
+}
+
 impl FailingOverloadSelection {
     /// Returns whether this selection mode should count the given error.
     fn includes(self, error: &BindingError<'_>) -> bool {
@@ -2869,10 +3025,57 @@ impl<'db> CallableBinding<'db> {
             .into_iter()
             .filter_map(|index| {
                 self.overloads().get(index).map(|overload| {
-                    overload.partial_signature_application(signature_arguments.as_ref(), db)
+                    overload.partial_signature_applications(signature_arguments.as_ref(), db)
+                })
+            })
+            .flatten()
+            .collect();
+        (!applications.is_empty()).then_some(applications)
+    }
+
+    /// Selects the reduced signature applications for a direct `functools.partial(...)` call where
+    /// runtime keywords override stored keywords.
+    fn partial_signature_applications_for_keyword_overrides(
+        &self,
+        db: &'db dyn Db,
+        bound_call_arguments: &CallArguments<'_, 'db>,
+        overridden_keywords: &FxHashSet<Name>,
+    ) -> Option<SmallVec<[PartialSignatureApplication<'db>; 1]>> {
+        if self.overloads().is_empty() {
+            return None;
+        }
+
+        let selected_overload_indexes = match self.matching_partial_overload_index() {
+            MatchingOverloadIndex::Single(index) => vec![index],
+            MatchingOverloadIndex::Multiple(indexes) => indexes,
+            MatchingOverloadIndex::None => {
+                if self.overloads().len() > 1 {
+                    return None;
+                }
+
+                vec![
+                    self.best_failing_overload_index(
+                        FailingOverloadSelection::ReportableForPartial,
+                    )
+                    .unwrap_or(0),
+                ]
+            }
+        };
+
+        let signature_arguments = bound_call_arguments.with_self(self.bound_type);
+        let applications: SmallVec<_> = selected_overload_indexes
+            .into_iter()
+            .filter_map(|index| {
+                self.overloads().get(index).and_then(|overload| {
+                    overload.partial_signature_application_for_keyword_overrides(
+                        signature_arguments.as_ref(),
+                        overridden_keywords,
+                        db,
+                    )
                 })
             })
             .collect();
+
         (!applications.is_empty()).then_some(applications)
     }
 
@@ -5660,6 +5863,152 @@ impl<'db> Binding<'db> {
         }
 
         partial_application
+    }
+
+    /// Packages the information needed to synthesize this overload's reduced partial signature.
+    fn partial_signature_applications(
+        &self,
+        arguments: &CallArguments<'_, 'db>,
+        db: &'db dyn Db,
+    ) -> SmallVec<[PartialSignatureApplication<'db>; 1]> {
+        smallvec![self.partial_signature_application(arguments, db)]
+    }
+
+    /// Returns the reduced signature for a call that overrides stored generic keywords.
+    fn partial_signature_application_for_keyword_overrides(
+        &self,
+        arguments: &CallArguments<'_, 'db>,
+        overridden_keywords: &FxHashSet<Name>,
+        db: &'db dyn Db,
+    ) -> Option<PartialSignatureApplication<'db>> {
+        let candidates = self.partial_keyword_override_candidates(arguments, db);
+        let mut excluded_argument_indices = SmallVec::<[usize; 4]>::new();
+        let mut required_keyword_parameters = SmallVec::<[usize; 4]>::new();
+
+        for candidate in candidates {
+            if !overridden_keywords.contains(&candidate.argument_name) {
+                continue;
+            }
+
+            excluded_argument_indices.push(candidate.argument_index);
+            required_keyword_parameters.push(candidate.parameter_index);
+        }
+
+        if excluded_argument_indices.is_empty() {
+            return None;
+        }
+
+        let filtered_arguments = arguments.without_indices(&excluded_argument_indices);
+        self.partial_signature_application_with_required_keywords(
+            &filtered_arguments,
+            &required_keyword_parameters,
+            db,
+        )
+    }
+
+    /// Returns keyword-bound parameters that may need a separate call-time override branch.
+    fn partial_keyword_override_candidates(
+        &self,
+        arguments: &CallArguments<'_, 'db>,
+        db: &'db dyn Db,
+    ) -> SmallVec<[PartialKeywordOverride; 2]> {
+        let Some(generic_context) = self.signature.generic_context else {
+            return SmallVec::new();
+        };
+
+        let typevars: SmallVec<[TypeVarIdentity<'db>; 4]> = generic_context
+            .variables(db)
+            .map(|typevar| typevar.typevar(db).identity(db))
+            .collect();
+        if typevars.is_empty() {
+            return SmallVec::new();
+        }
+
+        let partial_application = self.partial_application(arguments);
+        let parameters = self.signature.parameters().as_slice();
+        arguments
+            .iter()
+            .enumerate()
+            .filter_map(|(argument_index, (argument, _))| {
+                let Argument::Keyword(argument_name) = argument else {
+                    return None;
+                };
+
+                let argument_matches = self.argument_matches.get(argument_index)?;
+                if !argument_matches.matched {
+                    return None;
+                }
+
+                let [parameter_index] = argument_matches.parameters.as_slice() else {
+                    return None;
+                };
+
+                if partial_application.is_positionally_bound(*parameter_index) {
+                    return None;
+                }
+
+                let parameter = &parameters[*parameter_index];
+                if parameter.is_positional_only()
+                    || parameter.is_variadic()
+                    || parameter.is_keyword_variadic()
+                {
+                    return None;
+                }
+
+                let annotated_ty = parameter.annotated_type();
+                typevars
+                    .iter()
+                    .any(|identity| annotated_ty.references_typevar(db, *identity))
+                    .then_some(PartialKeywordOverride {
+                        argument_index,
+                        parameter_index: *parameter_index,
+                        argument_name: Name::new(argument_name),
+                    })
+            })
+            .collect()
+    }
+
+    /// Synthesizes a reduced partial signature after removing overridden stored keywords.
+    fn partial_signature_application_with_required_keywords(
+        &self,
+        arguments: &CallArguments<'_, 'db>,
+        required_keyword_parameters: &[usize],
+        db: &'db dyn Db,
+    ) -> Option<PartialSignatureApplication<'db>> {
+        let mut binding = self.clone();
+        binding.reset(db);
+
+        let mut argument_forms = ArgumentForms::new(arguments.len());
+        binding.match_parameters(db, arguments, &mut argument_forms);
+        binding.clear_missing_argument_errors_for_partial_application();
+        binding.check_types(
+            db,
+            &ConstraintSetBuilder::new(),
+            arguments,
+            TypeContext::default(),
+        );
+
+        if binding
+            .errors
+            .iter()
+            .any(BindingError::is_relevant_for_partial_application)
+        {
+            return None;
+        }
+
+        let mut partial_application = binding.partial_application(arguments);
+        for &parameter_index in required_keyword_parameters {
+            if !partial_application.is_positionally_bound(parameter_index) {
+                partial_application.bind_by_keyword(parameter_index, None);
+            }
+        }
+
+        Some(PartialSignatureApplication::new(
+            binding.signature.clone(),
+            partial_application,
+            binding.inference,
+            binding.unspecialized_return_type(db),
+        ))
     }
 
     /// Packages the information needed to synthesize this overload's reduced partial signature.

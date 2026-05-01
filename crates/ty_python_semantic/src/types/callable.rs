@@ -10,6 +10,7 @@ use crate::{
         InternedType, KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy,
         Parameter, Parameters, Signature, SubclassOfInner, Type, TypeContext, TypeMapping,
         TypeVarBoundOrConstraints, UnionType,
+        call::FunctoolsPartialBoundArguments,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
@@ -398,9 +399,15 @@ impl<'db> CallableType<'db> {
         self,
         db: &'db dyn Db,
         wrapped: Type<'db>,
+        bound_arguments: FunctoolsPartialBoundArguments<'db>,
     ) -> Type<'db> {
         Type::KnownInstance(KnownInstanceType::FunctoolsPartial(
-            FunctoolsPartialInstance::new(db, InternedType::new(db, wrapped), self),
+            FunctoolsPartialInstance::new(
+                db,
+                InternedType::new(db, wrapped),
+                self,
+                bound_arguments,
+            ),
         ))
     }
 
@@ -531,12 +538,7 @@ impl<'db> CallableTypes<'db> {
         Self::from_elements(self.0.iter().map(|element| f(*element)))
     }
 
-    /// Merges reduced callables into one precise `functools.partial(...)` instance type.
-    pub(crate) fn into_precise_functools_partial_instance(
-        self,
-        db: &'db dyn Db,
-        wrapped: Type<'db>,
-    ) -> Type<'db> {
+    pub(crate) fn merge_to_single(self, db: &'db dyn Db) -> CallableType<'db> {
         let mut overloads = Vec::new();
         let mut seen_overloads = FxHashSet::default();
 
@@ -557,7 +559,17 @@ impl<'db> CallableTypes<'db> {
             CallableSignature::from_overloads(overloads),
             CallableTypeKind::Regular,
         )
-        .into_precise_functools_partial_instance(db, wrapped)
+    }
+
+    /// Merges reduced callables into one precise `functools.partial(...)` instance type.
+    pub(crate) fn into_precise_functools_partial_instance(
+        self,
+        db: &'db dyn Db,
+        wrapped: Type<'db>,
+        bound_arguments: FunctoolsPartialBoundArguments<'db>,
+    ) -> Type<'db> {
+        self.merge_to_single(db)
+            .into_precise_functools_partial_instance(db, wrapped, bound_arguments)
     }
 }
 

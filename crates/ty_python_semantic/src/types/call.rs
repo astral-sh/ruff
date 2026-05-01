@@ -7,6 +7,7 @@ use ruff_python_ast as ast;
 
 mod arguments;
 pub(crate) mod bind;
+pub(crate) use arguments::FunctoolsPartialBoundArguments;
 pub(super) use arguments::{Argument, CallArguments};
 pub(super) use bind::{Binding, Bindings, CallableBinding, MatchedArgument};
 
