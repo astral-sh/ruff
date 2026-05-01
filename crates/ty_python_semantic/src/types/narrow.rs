@@ -1,7 +1,6 @@
 use crate::Db;
 use crate::reachability::{ReachabilityConstraintsExtension, sequence_pattern_type};
 use crate::subscript::PyIndex;
-use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::special_form::TypeQualifier;
@@ -540,6 +539,21 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
         // for an object to compare equal to itself.
         return true;
     }
+
+    let left_alternatives = left_ty.finite_single_valued_union_alternatives(db);
+    if !left_alternatives.is_empty() {
+        return left_alternatives
+            .into_iter()
+            .any(|ty| could_compare_equal(db, ty, right_ty));
+    }
+
+    let right_alternatives = right_ty.finite_single_valued_union_alternatives(db);
+    if !right_alternatives.is_empty() {
+        return right_alternatives
+            .into_iter()
+            .any(|ty| could_compare_equal(db, left_ty, ty));
+    }
+
     match (left_ty, right_ty) {
         // In order to be sure a union type cannot compare equal to another type, it
         // must be true that no element of the union can compare equal to that type.
@@ -950,18 +964,28 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 lhs_ty: Type<'db>,
                 rhs_ty: Type<'db>,
             ) -> bool {
-                match lhs_ty {
-                    Type::Union(union) => union
+                if let Type::Union(union) = lhs_ty {
+                    return union
                         .elements(db)
                         .iter()
-                        .all(|ty| can_narrow_to_rhs(db, *ty, rhs_ty)),
-                    // Either `rhs_ty` is a string literal, in which case we can narrow to it (no
-                    // other string literal could compare equal to it), or it is not a string
-                    // literal, in which case (given that it is single-valued), LiteralString
-                    // cannot compare equal to it.
-                    ty if ty.is_subtype_of(db, Type::literal_string()) => true,
-                    _ => !could_compare_equal(db, lhs_ty, rhs_ty),
+                        .all(|ty| can_narrow_to_rhs(db, *ty, rhs_ty));
                 }
+
+                let alternatives = lhs_ty.finite_single_valued_union_alternatives(db);
+                if !alternatives.is_empty() {
+                    return alternatives
+                        .into_iter()
+                        .all(|ty| can_narrow_to_rhs(db, ty, rhs_ty));
+                }
+
+                // Either `rhs_ty` is a string literal, in which case we can narrow to it (no other
+                // string literal could compare equal to it), or it is not a string literal, in which
+                // case (given that it is single-valued), LiteralString cannot compare equal to it.
+                if lhs_ty.is_subtype_of(db, Type::literal_string()) {
+                    return true;
+                }
+
+                !could_compare_equal(db, lhs_ty, rhs_ty)
             }
 
             // Filter `ty` to just the types that cannot be equal to `rhs_ty`.
@@ -970,40 +994,25 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 ty: Type<'db>,
                 rhs_ty: Type<'db>,
             ) -> Type<'db> {
-                match ty {
-                    Type::Union(union) => {
-                        union.map(db, |ty| filter_to_cannot_be_equal(db, *ty, rhs_ty))
-                    }
-                    // Treat `bool` as `Literal[True, False]`.
-                    Type::NominalInstance(instance)
-                        if instance.has_known_class(db, KnownClass::Bool) =>
-                    {
-                        UnionType::from_elements(
-                            db,
-                            [Type::bool_literal(true), Type::bool_literal(false)]
-                                .into_iter()
-                                .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
-                        )
-                    }
-                    // Treat enums as a union of their members.
-                    Type::NominalInstance(instance)
-                        if enum_metadata(db, instance.class_literal(db)).is_some() =>
-                    {
-                        UnionType::from_elements(
-                            db,
-                            enum_member_literals(db, instance.class_literal(db), None)
-                                .expect("Calling `enum_member_literals` on an enum class")
-                                .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
-                        )
-                    }
-                    _ => {
-                        if !could_compare_equal(db, ty, rhs_ty) {
-                            // Cannot compare equal to rhs, so keep this type
-                            ty
-                        } else {
-                            Type::Never
-                        }
-                    }
+                if let Type::Union(union) = ty {
+                    return union.map(db, |ty| filter_to_cannot_be_equal(db, *ty, rhs_ty));
+                }
+
+                let alternatives = ty.finite_single_valued_union_alternatives(db);
+                if !alternatives.is_empty() {
+                    return UnionType::from_elements(
+                        db,
+                        alternatives
+                            .into_iter()
+                            .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
+                    );
+                }
+
+                if !could_compare_equal(db, ty, rhs_ty) {
+                    // Cannot compare equal to rhs, so keep this type
+                    ty
+                } else {
+                    Type::Never
                 }
             }
             Some(if can_narrow_to_rhs(self.db, lhs_ty, rhs_ty) {
@@ -1065,10 +1074,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     if element.is_single_valued(self.db) {
                         continue;
                     }
-                    // Skip types that are handled specially (LiteralString, bool, enum).
+                    // Skip types that are handled specially (LiteralString, bool, enum, enum
+                    // complements).
                     if element.is_subtype_of(self.db, Type::literal_string())
-                        || element.is_bool(self.db)
-                        || (element.is_enum(self.db) && !element.overrides_equality(self.db))
+                        || !element
+                            .finite_single_valued_union_alternatives(self.db)
+                            .is_empty()
                     {
                         continue;
                     }
@@ -1110,8 +1121,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 for element in lhs_union.elements(self.db) {
                     if element.is_single_valued(self.db)
                         || element.is_subtype_of(self.db, Type::literal_string())
-                        || element.is_bool(self.db)
-                        || (element.is_enum(self.db) && !element.overrides_equality(self.db))
+                        || !element
+                            .finite_single_valued_union_alternatives(self.db)
+                            .is_empty()
                     {
                         single_builder = single_builder.add(*element);
                     } else {

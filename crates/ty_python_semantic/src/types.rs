@@ -58,7 +58,8 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
-pub(crate) use crate::types::enums::{EnumMetadata, enum_metadata};
+use crate::types::enums::enum_member_literals;
+pub(crate) use crate::types::enums::{EnumComplement, enum_metadata};
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
     FunctionType, KnownFunction,
@@ -1052,11 +1053,12 @@ impl<'db> Type<'db> {
         })
     }
 
-    /// Return the components of an enum-complement intersection.
+    /// Return the enum-complement represented by this intersection type.
     ///
-    /// An enum complement is an intersection containing exactly one enum instance type and zero or
-    /// more negated enum literals from the same class, such as `Color & ~Literal[Color.RED]`.
-    /// The returned names are canonicalized so enum aliases exclude the member they alias.
+    /// An enum complement is an intersection containing exactly one enum instance type, optional
+    /// dynamic positive components, and zero or more negated enum literals from the same class, such
+    /// as `Color & ~Literal[Color.RED]` or `Color & Any & ~Literal[Color.RED]`. Excluded names are
+    /// canonicalized so enum aliases exclude the member they alias.
     ///
     /// ```python
     /// from enum import Enum
@@ -1069,16 +1071,17 @@ impl<'db> Type<'db> {
     ///     if color is not Color.RED:
     ///         reveal_type(color)  # Color, excluding Color.RED
     /// ```
-    fn enum_complement(
-        self,
-        db: &'db dyn Db,
-    ) -> Option<(ClassLiteral<'db>, &'db EnumMetadata<'db>, FxHashSet<Name>)> {
+    pub(crate) fn enum_complement(self, db: &'db dyn Db) -> Option<EnumComplement<'db>> {
         let Type::Intersection(intersection) = self else {
             return None;
         };
 
         let mut enum_class = None;
         for positive in intersection.positive(db) {
+            if matches!(positive, Type::Dynamic(_)) {
+                continue;
+            }
+
             let Type::NominalInstance(instance) = positive else {
                 return None;
             };
@@ -1106,125 +1109,23 @@ impl<'db> Type<'db> {
             excluded_names.insert(canonical_name.clone());
         }
 
-        Some((enum_class, metadata, excluded_names))
-    }
-
-    /// Expand an enum complement to the enum literals that remain possible.
-    ///
-    /// For `Color & ~Literal[Color.RED]`, this returns the literal types for every canonical
-    /// `Color` member except `RED`. Complements with no excluded members return `None` because
-    /// there is nothing more precise to expand.
-    ///
-    /// ```python
-    /// from enum import Enum
-    ///
-    /// class Color(Enum):
-    ///     RED = 1
-    ///     BLUE = 2
-    ///
-    /// def f(color: Color):
-    ///     if color is not Color.RED:
-    ///         reveal_type(color)  # Literal[Color.BLUE]
-    /// ```
-    pub(crate) fn enum_complement_literal_types(self, db: &'db dyn Db) -> Option<Vec<Type<'db>>> {
-        let (enum_class, metadata, excluded_names) = self.enum_complement(db)?;
-
-        if excluded_names.is_empty() {
-            return None;
-        }
-
-        Some(
-            metadata
-                .members
-                .keys()
-                .filter(|name| !excluded_names.contains(*name))
-                .map(|name| Type::enum_literal(EnumLiteralType::new(db, enum_class, name.clone())))
-                .collect(),
-        )
-    }
-
-    /// Return the enum class and canonical member names excluded by an enum complement.
-    ///
-    /// This is useful when two complement types need to be combined without first expanding every
-    /// remaining member into a `Literal[...]` type.
-    ///
-    /// ```python
-    /// from enum import Enum
-    ///
-    /// class Color(Enum):
-    ///     RED = 1
-    ///     BLUE = 2
-    ///
-    /// def f(color: Color):
-    ///     if color is not Color.RED:
-    ///         reveal_type(color)  # Color, excluding Color.RED
-    /// ```
-    pub(crate) fn enum_complement_excluded_member_names(
-        self,
-        db: &'db dyn Db,
-    ) -> Option<(ClassLiteral<'db>, FxHashSet<Name>)> {
-        let (enum_class, _, excluded_names) = self.enum_complement(db)?;
-
-        if excluded_names.is_empty() {
-            return None;
-        }
-
-        Some((enum_class, excluded_names))
-    }
-
-    /// Return the type of a member attribute for all enum literals remaining in a complement.
-    ///
-    /// This handles `.name`, `.value`, `._name_`, and `._value_` on a narrowed enum complement by
-    /// unioning the corresponding attribute type from each remaining canonical enum member.
-    ///
-    /// ```python
-    /// from enum import Enum
-    ///
-    /// class Color(Enum):
-    ///     RED = 1
-    ///     BLUE = 2
-    ///
-    /// def f(color: Color):
-    ///     if color is not Color.RED:
-    ///         reveal_type(color.name)  # Literal["BLUE"]
-    /// ```
-    pub(crate) fn enum_complement_member_type(
-        self,
-        db: &'db dyn Db,
-        member_name: &str,
-    ) -> Option<Type<'db>> {
-        let (enum_class, metadata, excluded_names) = self.enum_complement(db)?;
-
-        if excluded_names.is_empty() {
-            return None;
-        }
-
-        let is_enum_subclass =
-            Type::ClassLiteral(enum_class).is_subtype_of(db, KnownClass::Enum.to_subclass_of(db));
-        let mut builder = UnionBuilder::new(db);
-        let mut found_member = false;
-
-        for name in metadata
-            .members
-            .keys()
-            .filter(|name| !excluded_names.contains(*name))
-        {
-            let member_ty = (match member_name {
-                "name" if is_enum_subclass => metadata.name_type(db, name),
-                "_name_" => metadata.name_type(db, name),
-                "value" if is_enum_subclass => metadata.value_type(name),
-                "_value_" => metadata.value_type(name),
-                _ => None,
-            })?;
-
-            builder = builder.add(member_ty);
-            found_member = true;
-        }
-
-        found_member.then(|| builder.build())
+        Some(EnumComplement::new(enum_class, metadata, excluded_names))
     }
 
     /// Return `true` if this type is an enum instance type.
+    ///
+    /// This recognizes instance types like `Color`, not individual enum literals like
+    /// `Literal[Color.RED]`.
+    ///
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Color(Enum):
+    ///     RED = 1
+    ///     BLUE = 2
+    ///
+    /// def f(color: Color): ...
+    /// ```
     fn is_enum(&self, db: &'db dyn Db) -> bool {
         self.enum_class(db).is_some()
     }
@@ -1831,21 +1732,88 @@ impl<'db> Type<'db> {
         }) || ty.is_multi_valued_single_valued_union_component(db)
     }
 
+    /// Return `true` if this type can participate in single-valued-union narrowing.
+    ///
+    /// A component can be literally single-valued, like `Literal[1]`, or a finite multi-valued
+    /// domain whose alternatives can each be treated as single-valued, like `bool` or an enum
+    /// complement.
+    ///
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Color(Enum):
+    ///     RED = 1
+    ///     BLUE = 2
+    ///
+    /// def f(color: Color):
+    ///     if color is not Color.RED:
+    ///         # `color` is a multi-valued component, but its remaining alternatives are
+    ///         # single-valued enum literals.
+    ///         reveal_type(color)  # Literal[Color.BLUE]
+    /// ```
     fn is_single_valued_union_component(&self, db: &'db dyn Db) -> bool {
         self.is_single_valued(db) || self.is_multi_valued_single_valued_union_component(db)
     }
 
+    /// Split a finite domain into the single-valued alternatives used by equality and membership
+    /// narrowing.
+    ///
+    /// This covers finite multi-valued types that `Type::is_single_valued_union_component` treats
+    /// as splittable, such as `bool`, enums, and compact enum complements. `LiteralString` is
+    /// intentionally excluded because it is not finite.
+    pub(crate) fn finite_single_valued_union_alternatives(self, db: &'db dyn Db) -> Vec<Type<'db>> {
+        let ty = self.resolve_type_alias(db);
+
+        if let Some(literals) = ty
+            .enum_complement(db)
+            .and_then(|complement| complement.remaining_literal_types(db))
+        {
+            if literals
+                .iter()
+                .all(|literal| literal.is_single_valued_union_component(db))
+            {
+                return literals;
+            }
+            return Vec::new();
+        }
+
+        match ty {
+            Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Bool) => {
+                vec![Type::bool_literal(true), Type::bool_literal(false)]
+            }
+            Type::NominalInstance(instance)
+                if enum_metadata(db, instance.class_literal(db)).is_some()
+                    && !ty.overrides_equality(db) =>
+            {
+                enum_member_literals(db, instance.class_literal(db), None)
+                    .expect("Calling `enum_member_literals` on an enum class")
+                    .collect()
+            }
+            _ => Vec::new(),
+        }
+    }
+
+    /// Return `true` for multi-valued domains that can be handled by single-valued narrowing.
+    ///
+    /// This covers types that are not themselves single-valued, but can be safely handled by the
+    /// equality and membership narrowing logic that works over single-valued alternatives, such as
+    /// `bool`, `LiteralString`, enums that do not override equality, and enum complements.
+    ///
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Color(Enum):
+    ///     RED = 1
+    ///     BLUE = 2
+    ///
+    /// def f(color: Color | int):
+    ///     if color is not Color.RED:
+    ///         reveal_type(color)  # int | Literal[Color.BLUE]
+    /// ```
     fn is_multi_valued_single_valued_union_component(&self, db: &'db dyn Db) -> bool {
         let ty = self.resolve_type_alias(db);
-        ty.enum_complement_literal_types(db)
-            .is_some_and(|literals| {
-                literals
-                    .iter()
-                    .all(|literal| literal.is_single_valued_union_component(db))
-            })
-            || ty.is_bool(db)
+        !ty.finite_single_valued_union_alternatives(db).is_empty()
             || ty.is_subtype_of(db, Type::literal_string())
-            || (ty.is_enum(db) && !ty.overrides_equality(db))
     }
 
     /// Create a promotable string literal.
@@ -2470,16 +2438,12 @@ impl<'db> Type<'db> {
                 // our model due to [`UnionBuilder::build`].
                 false
             }
-            Type::Intersection(..) => {
-                // Here, we assume that all intersection types that are singletons would have
-                // been reduced to a different form via [`IntersectionBuilder::build`] by now.
-                // For example:
-                //
-                //   bool & ~Literal[False]   = Literal[True]
-                //   None & (None | int)      = None | None & int = None
-                //
-                false
-            }
+            Type::Intersection(..) => self
+                .enum_complement(db)
+                .and_then(|complement| complement.remaining_literal_types(db))
+                .is_some_and(
+                    |literals| matches!(literals.as_slice(), [literal] if literal.is_singleton(db)),
+                ),
             Type::AlwaysTruthy | Type::AlwaysFalsy => false,
             Type::TypeIs(type_is) => type_is.is_bound(db),
             Type::TypeGuard(type_guard) => type_guard.is_bound(db),
@@ -2564,7 +2528,6 @@ impl<'db> Type<'db> {
             | Type::Divergent(_)
             | Type::Never
             | Type::Union(..)
-            | Type::Intersection(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::Callable(_)
@@ -2572,6 +2535,13 @@ impl<'db> Type<'db> {
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_) => false,
+
+            Type::Intersection(..) => self
+                .enum_complement(db)
+                .and_then(|complement| complement.remaining_literal_types(db))
+                .is_some_and(|literals| {
+                    matches!(literals.as_slice(), [literal] if literal.is_single_valued(db))
+                }),
         }
     }
 
@@ -3395,7 +3365,9 @@ impl<'db> Type<'db> {
 
             Type::Intersection(intersection) => {
                 if matches!(name_str, "name" | "_name_" | "value" | "_value_")
-                    && let Some(member_ty) = self.enum_complement_member_type(db, name_str)
+                    && let Some(member_ty) = self
+                        .enum_complement(db)
+                        .and_then(|complement| complement.member_type(db, name_str))
                 {
                     Place::bound(member_ty).into()
                 } else {

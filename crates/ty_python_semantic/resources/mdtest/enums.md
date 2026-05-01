@@ -2235,7 +2235,9 @@ def _(answer: Answer):
 
 ```py
 from enum import Enum
+from typing import Any
 from typing_extensions import Literal, assert_never, assert_type, overload
+from ty_extensions import Intersection
 
 class Color(Enum):
     RED = 1
@@ -2266,6 +2268,18 @@ def color_value_without_red(color: Color) -> Literal[2, 3]:
         raise ValueError()
     reveal_type(color.value)  # revealed: Literal[2, 3]
     return color.value
+
+def color_value_without_red_and_with_any(color: Intersection[Color, Any]) -> Literal[2, 3]:
+    if color is Color.RED:
+        raise ValueError()
+    reveal_type(color.value)  # revealed: Literal[2, 3]
+    return color.value
+
+def color_truthy_without_red(color: Color) -> int:
+    if color is Color.RED:
+        raise ValueError()
+    if color:
+        return 1
 
 def color_after_merge(color: Color) -> None:
     if color is Color.RED:

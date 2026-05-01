@@ -2455,9 +2455,10 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         /// Return the literal types that can be folded into a displayed `Literal[...]` group.
         ///
-        /// Plain literal types are returned as-is. Enum complements are expanded to their
+        /// Plain literal types are returned as-is. Small enum complements are expanded to their
         /// remaining enum literals so a type like `Color & ~Literal[Color.RED]` can be displayed
-        /// with the same condensation rules as explicit enum-literal unions.
+        /// with the same condensation rules as explicit enum-literal unions. Large complements
+        /// stay compact to keep diagnostics readable.
         ///
         /// ```python
         /// from enum import Enum
@@ -2482,7 +2483,9 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                 return Some(vec![ty]);
             }
 
-            ty.enum_complement_literal_types(db)
+            ty.enum_complement(db).and_then(|complement| {
+                complement.remaining_literal_types_for_display(db, LITERAL_POLICY.max)
+            })
         }
 
         fn singleline_union_element_label<'db>(
@@ -2791,7 +2794,11 @@ struct DisplayIntersectionType<'a, 'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayIntersectionType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        if let Some(literals) = Type::Intersection(*self.ty).enum_complement_literal_types(self.db)
+        if let Some(literals) = Type::Intersection(*self.ty)
+            .enum_complement(self.db)
+            .and_then(|complement| {
+                complement.remaining_literal_types_for_display(self.db, LITERAL_POLICY.max)
+            })
         {
             return DisplayLiteralGroup {
                 literals,

@@ -101,6 +101,11 @@ static_assert(is_single_valued(Literal[NormalEnum.NO]))
 static_assert(is_single_valued(Literal[NormalEnum.YES]))
 static_assert(not is_single_valued(NormalEnum))
 
+def _(value: NormalEnum) -> None:
+    if value is NormalEnum.NO:
+        return
+    static_assert(is_single_valued(TypeOf[value]))
+
 static_assert(is_single_valued(Literal[SingleValuedEnum.VALUE]))
 static_assert(is_single_valued(SingleValuedEnum))
 

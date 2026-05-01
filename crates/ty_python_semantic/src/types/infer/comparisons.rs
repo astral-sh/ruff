@@ -169,12 +169,18 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
     };
 
-    if let Some(left_literals) = left.enum_complement_literal_types(db) {
+    if let Some(left_literals) = left
+        .enum_complement(db)
+        .and_then(|complement| complement.remaining_literal_types(db))
+    {
         let left = UnionType::from_elements(db, left_literals);
         return infer_binary_type_comparison(context, left, op, right, range, visitor);
     }
 
-    if let Some(right_literals) = right.enum_complement_literal_types(db) {
+    if let Some(right_literals) = right
+        .enum_complement(db)
+        .and_then(|complement| complement.remaining_literal_types(db))
+    {
         let right = UnionType::from_elements(db, right_literals);
         return infer_binary_type_comparison(context, left, op, right, range, visitor);
     }

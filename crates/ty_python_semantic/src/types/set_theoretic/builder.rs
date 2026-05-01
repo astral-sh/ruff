@@ -146,14 +146,16 @@ fn merge_truthiness_guarded_pair<'db>(
 /// ```
 fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'db>>) -> bool {
     for complement_index in 0..types.len() {
-        let Some((enum_class, mut shared_excluded_names)) =
-            types[complement_index].enum_complement_excluded_member_names(db)
-        else {
+        let Some(complement) = types[complement_index].enum_complement(db) else {
             continue;
         };
-        let Some(metadata) = enum_metadata(db, enum_class) else {
+        if !complement.has_excluded_members() {
             continue;
-        };
+        }
+        let enum_class = complement.enum_class();
+        let metadata = enum_metadata(db, enum_class).expect("Enum complement class is an enum");
+        let mut shared_excluded_names: FxHashSet<_> =
+            complement.excluded_member_names().cloned().collect();
 
         let mut remove_indices = Vec::new();
         for (index, ty) in types.iter().enumerate() {
@@ -161,11 +163,11 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
                 continue;
             }
 
-            if let Some((other_enum_class, other_excluded_names)) =
-                ty.enum_complement_excluded_member_names(db)
-            {
-                if other_enum_class == enum_class {
-                    shared_excluded_names.retain(|name| other_excluded_names.contains(name));
+            if let Some(other_complement) = ty.enum_complement(db) {
+                if other_complement.enum_class() == enum_class
+                    && other_complement.has_excluded_members()
+                {
+                    shared_excluded_names.retain(|name| other_complement.excludes_member(name));
                     remove_indices.push(index);
                 }
                 continue;

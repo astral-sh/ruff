@@ -6,7 +6,7 @@ A type is a singleton type iff it has exactly one inhabitant.
 
 ```py
 from typing_extensions import Literal, Never, Callable
-from ty_extensions import is_singleton, static_assert
+from ty_extensions import TypeOf, is_singleton, static_assert
 from enum import Enum
 
 class Answer(Enum):
@@ -23,6 +23,11 @@ static_assert(is_singleton(Literal[Answer.YES]))
 static_assert(is_singleton(Literal[Answer.NO]))
 static_assert(is_singleton(Literal[Single.VALUE]))
 static_assert(is_singleton(Single))
+
+def _(answer: Answer) -> None:
+    if answer is Answer.NO:
+        return
+    static_assert(is_singleton(TypeOf[answer]))
 
 static_assert(is_singleton(type[bool]))
 

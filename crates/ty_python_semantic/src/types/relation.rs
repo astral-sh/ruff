@@ -862,7 +862,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
 
         if matches!(target, Type::LiteralValue(_) | Type::Union(_))
-            && let Some(source_literals) = source.enum_complement_literal_types(db)
+            && let Some(source_literals) = source
+                .enum_complement(db)
+                .and_then(|complement| complement.remaining_literal_types(db))
         {
             return source_literals
                 .iter()

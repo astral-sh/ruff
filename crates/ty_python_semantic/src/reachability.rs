@@ -339,6 +339,17 @@ fn enum_literal_subject_names<'db>(
     ///
     /// Returns `None` for non-enum literals or literals from a different enum class, since match
     /// exhaustiveness for enum-literal unions can only be decided within a single enum class.
+    ///
+    /// ```python
+    /// from enum import Enum
+    /// from typing import Literal
+    ///
+    /// class Color(Enum):
+    ///     RED = 1
+    ///     BLUE = 2
+    ///
+    /// def f(color: Literal[Color.RED, Color.BLUE]): ...
+    /// ```
     fn add_enum_literal<'db>(
         db: &'db dyn Db,
         enum_class: &mut Option<ClassLiteral<'db>>,

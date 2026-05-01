@@ -123,6 +123,221 @@ impl<'db> EnumMetadata<'db> {
     }
 }
 
+/// A compact representation of an enum type with excluded members.
+///
+/// This corresponds to intersection types like `Color & ~Literal[Color.RED]`. Keeping the
+/// complement compact lets the type lattice preserve the exclusion without eagerly expanding the
+/// enum into a literal union. Callers that need finite alternatives can ask for the remaining
+/// literal types explicitly.
+///
+/// ```python
+/// from enum import Enum
+///
+/// class Color(Enum):
+///     RED = 1
+///     BLUE = 2
+///
+/// def f(color: Color):
+///     if color is not Color.RED:
+///         reveal_type(color)  # Color, excluding Color.RED
+/// ```
+#[derive(Debug, Clone)]
+pub(crate) struct EnumComplement<'db> {
+    enum_class: ClassLiteral<'db>,
+    metadata: &'db EnumMetadata<'db>,
+    excluded_names: FxHashSet<Name>,
+}
+
+impl<'db> EnumComplement<'db> {
+    /// Create a compact enum complement from an enum class, its metadata, and canonical excluded
+    /// member names.
+    pub(crate) fn new(
+        enum_class: ClassLiteral<'db>,
+        metadata: &'db EnumMetadata<'db>,
+        excluded_names: FxHashSet<Name>,
+    ) -> Self {
+        Self {
+            enum_class,
+            metadata,
+            excluded_names,
+        }
+    }
+
+    /// Return the enum class whose members are represented by this complement.
+    ///
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Color(Enum):
+    ///     RED = 1
+    ///     BLUE = 2
+    ///
+    /// def f(color: Color):
+    ///     if color is not Color.RED:
+    ///         reveal_type(color)  # Color, excluding Color.RED
+    ///         # The enum class is `Color`.
+    /// ```
+    pub(crate) fn enum_class(&self) -> ClassLiteral<'db> {
+        self.enum_class
+    }
+
+    /// Return `true` if at least one enum member has been excluded from this complement.
+    ///
+    /// Complements without exclusions are treated like the enum instance type itself and should
+    /// not be expanded to a literal union.
+    pub(crate) fn has_excluded_members(&self) -> bool {
+        !self.excluded_names.is_empty()
+    }
+
+    /// Iterate over the canonical enum-member names excluded by this complement.
+    ///
+    /// Enum aliases are normalized before constructing the complement, so the returned names are
+    /// the canonical members whose values are no longer possible.
+    ///
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Color(Enum):
+    ///     RED = 1
+    ///     ALSO_RED = 1
+    ///     BLUE = 2
+    ///
+    /// def f(color: Color):
+    ///     if color is not Color.ALSO_RED:
+    ///         reveal_type(color)  # Color, excluding Color.RED
+    /// ```
+    pub(crate) fn excluded_member_names(&self) -> impl Iterator<Item = &Name> {
+        self.excluded_names.iter()
+    }
+
+    /// Return `true` if the given canonical enum-member name is excluded by this complement.
+    ///
+    /// Callers should pass canonical member names, not alias names. Use `EnumMetadata::resolve_member`
+    /// before calling this when starting from a possibly aliased enum literal.
+    pub(crate) fn excludes_member(&self, name: &Name) -> bool {
+        self.excluded_names.contains(name)
+    }
+
+    /// Count the canonical enum members still represented by this complement.
+    fn remaining_member_count(&self) -> usize {
+        self.metadata
+            .members
+            .keys()
+            .filter(|name| !self.excluded_names.contains(*name))
+            .count()
+    }
+
+    /// Expand this complement to the enum literals that remain possible.
+    ///
+    /// Returns `None` if the complement has no exclusions, because `Color` is a better
+    /// representation than an eagerly expanded union of all `Color` members.
+    ///
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Color(Enum):
+    ///     RED = 1
+    ///     BLUE = 2
+    ///
+    /// def f(color: Color):
+    ///     if color is not Color.RED:
+    ///         reveal_type(color)  # Literal[Color.BLUE]
+    /// ```
+    pub(crate) fn remaining_literal_types(&self, db: &'db dyn Db) -> Option<Vec<Type<'db>>> {
+        if !self.has_excluded_members() {
+            return None;
+        }
+
+        Some(
+            self.metadata
+                .members
+                .keys()
+                .filter(|name| !self.excluded_names.contains(*name))
+                .map(|name| {
+                    Type::enum_literal(EnumLiteralType::new(db, self.enum_class, name.clone()))
+                })
+                .collect(),
+        )
+    }
+
+    /// Expand this complement for display only if the resulting `Literal[...]` remains concise.
+    ///
+    /// This keeps small enum complements readable as literal groups while preserving the compact
+    /// intersection form for large generated enums.
+    ///
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Color(Enum):
+    ///     RED = 1
+    ///     BLUE = 2
+    ///
+    /// def f(color: Color):
+    ///     if color is not Color.RED:
+    ///         reveal_type(color)  # Literal[Color.BLUE]
+    /// ```
+    pub(crate) fn remaining_literal_types_for_display(
+        &self,
+        db: &'db dyn Db,
+        max_literals: usize,
+    ) -> Option<Vec<Type<'db>>> {
+        let remaining_count = self.remaining_member_count();
+        if remaining_count == 0 || remaining_count > max_literals {
+            return None;
+        }
+
+        self.remaining_literal_types(db)
+    }
+
+    /// Return the type of a member attribute for all enum literals remaining in this complement.
+    ///
+    /// This handles `.name`, `.value`, `._name_`, and `._value_` by unioning the corresponding
+    /// attribute type from each remaining canonical enum member.
+    ///
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Color(Enum):
+    ///     RED = 1
+    ///     BLUE = 2
+    ///
+    /// def f(color: Color):
+    ///     if color is not Color.RED:
+    ///         reveal_type(color.name)  # Literal["BLUE"]
+    ///         reveal_type(color.value)  # Literal[2]
+    /// ```
+    pub(crate) fn member_type(&self, db: &'db dyn Db, member_name: &str) -> Option<Type<'db>> {
+        if !self.has_excluded_members() {
+            return None;
+        }
+
+        let is_enum_subclass = Type::ClassLiteral(self.enum_class)
+            .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db));
+        let mut builder = UnionBuilder::new(db);
+        let mut found_member = false;
+
+        for name in self
+            .metadata
+            .members
+            .keys()
+            .filter(|name| !self.excluded_names.contains(*name))
+        {
+            let member_ty = (match member_name {
+                "name" if is_enum_subclass => self.metadata.name_type(db, name),
+                "_name_" => self.metadata.name_type(db, name),
+                "value" if is_enum_subclass => self.metadata.value_type(name),
+                "_value_" => self.metadata.value_type(name),
+                _ => None,
+            })?;
+
+            builder = builder.add(member_ty);
+            found_member = true;
+        }
+
+        found_member.then(|| builder.build())
+    }
+}
+
 /// Returns the set of names listed in an enum's `_ignore_` attribute.
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn enum_ignored_names<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -> FxHashSet<Name> {
