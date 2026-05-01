@@ -1437,6 +1437,35 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             let rhs_ty = inference.expression_type(right);
 
             // Narrowing for:
+            // - `if d.get("key") is not None`
+            // - `if d.get("key") is None`
+            // - `if None is not d.get("key")`
+            // - `if None is d.get("key")`
+            if let ast::Expr::Call(call) = left
+                && let Some((place, constraint)) =
+                    self.narrow_dict_get_call(inference, call, rhs_ty, *op, is_positive)
+            {
+                constraints
+                    .entry(place)
+                    .and_modify(|existing| {
+                        *existing = existing.merge_constraint_and(constraint.clone());
+                    })
+                    .or_insert(constraint);
+            }
+
+            if let ast::Expr::Call(call) = right
+                && let Some((place, constraint)) =
+                    self.narrow_dict_get_call(inference, call, lhs_ty, *op, is_positive)
+            {
+                constraints
+                    .entry(place)
+                    .and_modify(|existing| {
+                        *existing = existing.merge_constraint_and(constraint.clone());
+                    })
+                    .or_insert(constraint);
+            }
+
+            // Narrowing for:
             // - `if type(x) is Y`
             // - `if type(x) is not Y`
             // - `if Y is type(x)`
@@ -2060,6 +2089,63 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         } else {
             None
         }
+    }
+
+    /// Narrow the matching subscript place for a `dict.get` call proven to return a non-`None`
+    /// value.
+    ///
+    /// For example, given `d: dict[str, int | None]`, `d.get("key") is not None` proves that
+    /// `d["key"]` exists and has type `int`:
+    /// ```python
+    /// if d.get("key") is not None:
+    ///     reveal_type(d["key"])  # int
+    /// ```
+    ///
+    /// The inverse branch is intentionally not narrowed. `d.get("key") is None` can mean either
+    /// that the key is missing or that the stored value is `None`, so a later `d["key"]` access
+    /// still has the declared value type and may raise `KeyError`.
+    fn narrow_dict_get_call(
+        &self,
+        inference: &ExpressionInference<'db>,
+        call: &ast::ExprCall,
+        other_type: Type<'db>,
+        op: ast::CmpOp,
+        is_positive: bool,
+    ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
+        let effective_op = if is_positive { op } else { op.negate() };
+        if effective_op != ast::CmpOp::IsNot || !other_type.is_none(self.db) {
+            return None;
+        }
+
+        let ast::Expr::Attribute(attribute) = call.func.as_ref() else {
+            return None;
+        };
+
+        if !is_dict_instance(self.db, inference.expression_type(attribute.value.as_ref())) {
+            return None;
+        }
+
+        let place_expr = PlaceExpr::try_from_get_method_call(call)?;
+        let place = self.places().place_id(&place_expr)?;
+        Some((
+            place,
+            NarrowingConstraint::intersection(Type::none(self.db).negate(self.db)),
+        ))
+    }
+}
+
+fn is_dict_instance<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty.resolve_type_alias(db) {
+        Type::NominalInstance(instance) => instance.has_known_class(db, KnownClass::Dict),
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .any(|element| is_dict_instance(db, *element)),
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| is_dict_instance(db, *element)),
+        _ => false,
     }
 }
 

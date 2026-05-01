@@ -461,6 +461,18 @@ def _(d: dict[str, str | None]):
     if d["a"] is not None:
         reveal_type(d["a"])  # revealed: str
         reveal_type(d["b"])  # revealed: str | None
+
+def dict_get(d: dict[str, str | None]):
+    if d.get("a") is not None:
+        reveal_type(d["a"])  # revealed: str
+        reveal_type(d["b"])  # revealed: str | None
+    else:
+        reveal_type(d["a"])  # revealed: str | None
+
+    if d.get("a") is None:
+        return
+
+    reveal_type(d["a"])  # revealed: str
 ```
 
 ## Combined attribute and subscript narrowing
