@@ -18,6 +18,7 @@ mod tests {
     use crate::{assert_diagnostics, assert_diagnostics_diff};
 
     #[test_case(Path::new("full_name.py"))]
+    #[test_case(Path::new("bytes_paths.py"))]
     #[test_case(Path::new("import_as.py"))]
     #[test_case(Path::new("import_from_as.py"))]
     #[test_case(Path::new("import_from.py"))]
@@ -106,6 +107,7 @@ mod tests {
     }
 
     #[test_case(Path::new("full_name.py"))]
+    #[test_case(Path::new("bytes_paths.py"))]
     #[test_case(Path::new("import_as.py"))]
     #[test_case(Path::new("import_from_as.py"))]
     #[test_case(Path::new("import_from.py"))]
