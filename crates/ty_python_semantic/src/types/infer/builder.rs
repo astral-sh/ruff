@@ -8075,7 +8075,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
                         EnclosingSnapshotResult::FoundBindings(bindings) => {
-                            let place = place_from_bindings(db, bindings).place.map_type(|ty| {
+                            let enclosing_place_table =
+                                self.index.place_table(enclosing_scope_file_id);
+                            let place = if let Some(place_id) =
+                                enclosing_place_table.place_id(place_expr)
+                            {
+                                place_from_bindings_for_place(db, bindings, place_id).place
+                            } else {
+                                place_from_bindings(db, bindings).place
+                            }
+                            .map_type(|ty| {
                                 self.narrow_place_with_applicable_constraints(
                                     place_expr,
                                     ty,
@@ -8219,14 +8228,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 return Place::Undefined.into();
                             }
                             EnclosingSnapshotResult::FoundBindings(bindings) => {
-                                let place =
-                                    place_from_bindings(db, bindings).place.map_type(|ty| {
-                                        self.narrow_place_with_applicable_constraints(
-                                            place_expr,
-                                            ty,
-                                            &constraint_keys,
-                                        )
-                                    });
+                                let global_place_table =
+                                    self.index.place_table(FileScopeId::global());
+                                let place = if let Some(place_id) =
+                                    global_place_table.place_id(place_expr)
+                                {
+                                    place_from_bindings_for_place(db, bindings, place_id).place
+                                } else {
+                                    place_from_bindings(db, bindings).place
+                                }
+                                .map_type(|ty| {
+                                    self.narrow_place_with_applicable_constraints(
+                                        place_expr,
+                                        ty,
+                                        &constraint_keys,
+                                    )
+                                });
                                 constraint_keys.push((
                                     FileScopeId::global(),
                                     ConstraintKey::NestedScope(file_scope_id),

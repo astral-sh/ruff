@@ -52,6 +52,15 @@ reveal_type(y)  # revealed: Literal["old"] | int
 reveal_type(z)  # revealed: int
 ```
 
+### Shadowed comprehension assignment
+
+```py
+x = 0
+[(x := None, x := 1) for _ in range(1)]
+x.bit_length()
+reveal_type(x)  # revealed: Literal[0, 1]
+```
+
 ### Comprehension filter
 
 ```py
@@ -88,6 +97,9 @@ reveal_type(state_names)  # revealed: set[str]
 
 state_by_key = {key: state.state for key in keys() if (state := get_state(key)) is not None}
 reveal_type(state_by_key)  # revealed: dict[str, str]
+
+nested_state_names = [[state.state for _ in [0]] for key in keys() if (state := get_state(key)) is not None]
+reveal_type(nested_state_names)  # revealed: list[list[str]]
 ```
 
 ### Comprehension filter narrowing after earlier filter

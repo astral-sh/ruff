@@ -1124,6 +1124,22 @@ impl<'db> UseDefMapBuilder<'db> {
             .insert(binding, place_state.declarations().clone());
     }
 
+    pub(super) fn place_has_live_binding(
+        &self,
+        place: ScopedPlaceId,
+        binding: Definition<'db>,
+    ) -> bool {
+        let live_bindings = match place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
+            ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
+        };
+
+        live_bindings.iter().any(|live_binding| {
+            self.all_definitions[live_binding.binding()]
+                .is_defined_and(|definition| definition == binding)
+        })
+    }
+
     pub(super) fn add_predicate(
         &mut self,
         predicate: PredicateOrLiteral<'db>,

@@ -229,6 +229,13 @@ class C:
     # error: [unresolved-reference]
     reveal_type(x)  # revealed: Unknown
 
+class D:
+    # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+    [x for x in [0] if (x := 1)]
+
+    # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+    [(y := 1) for y in [0]]
+
 def returns_list() -> list[int]:
     return [1, 2, 3]
 
