@@ -2164,7 +2164,7 @@ impl<'db> Bindings<'db> {
                                 .parameters()
                                 .iter()
                                 .zip(overload.parameter_types())
-                                .filter(|(param, ty)| ty.is_some() && !param.is_keyword_only())
+                                .filter(|(param, ty)| ty.is_some() && param.is_positional())
                                 .map(|(_, ty)| ty)
                                 .next()
                                 .copied()
@@ -2341,7 +2341,7 @@ impl<'db> Bindings<'db> {
                                     .parameters()
                                     .iter()
                                     .zip(overload.parameter_types())
-                                    .filter(|(param, ty)| ty.is_some() && !param.is_keyword_only())
+                                    .filter(|(param, ty)| ty.is_some() && param.is_positional())
                                     .map(|(_, ty)| ty);
 
                                 let first_positional = positional_args.next();

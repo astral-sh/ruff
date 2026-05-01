@@ -1458,6 +1458,13 @@ impl<'db> Type<'db> {
     }
 
     /// Apply dataclass parameters to a class-like type, preserving generic specialization.
+    ///
+    /// This is used when resolving decorators that return the same class object with dataclass
+    /// metadata applied, including parameterized class objects:
+    ///
+    /// ```py
+    /// C = make_dataclass("C", [], decorator=dataclass)
+    /// ```
     pub(crate) fn try_with_dataclass_params(
         self,
         db: &'db dyn Db,

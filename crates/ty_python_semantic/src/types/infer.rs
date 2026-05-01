@@ -50,6 +50,7 @@ use salsa;
 use salsa::plumbing::AsId;
 
 use crate::Db;
+use crate::types::class::DynamicDataclassLiteral;
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
@@ -842,6 +843,10 @@ struct DefinitionInferenceExtra<'db> {
     /// For function definitions, the undecorated type of the function.
     undecorated_type: Option<Type<'db>>,
 
+    /// For `make_dataclass(..., decorator=...)` definitions, the intermediate class created
+    /// before `decorator` is called.
+    functional_dataclass: Option<DynamicDataclassLiteral<'db>>,
+
     /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
     /// Only populated for expressions that have non-empty qualifiers.
     qualifiers: FxHashMap<ExpressionNodeKey, TypeQualifiers>,
@@ -991,6 +996,16 @@ impl<'db> DefinitionInference<'db> {
 
     pub(crate) fn undecorated_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.undecorated_type)
+    }
+
+    /// Return the functional dataclass literal produced by this definition, if any.
+    ///
+    /// This lets post-inference checks recover the `make_dataclass(...)` class even when the
+    /// binding's final type is affected by Python 3.14 `decorator=`.
+    pub(crate) fn functional_dataclass(&self) -> Option<DynamicDataclassLiteral<'db>> {
+        self.extra
+            .as_ref()
+            .and_then(|extra| extra.functional_dataclass)
     }
 
     pub(crate) fn function_type(&self, definition: Definition<'db>) -> Option<FunctionType<'db>> {

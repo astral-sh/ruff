@@ -130,6 +130,25 @@ impl<'db> StaticClassLiteral<'db> {
         })
     }
 
+    /// Returns `true` if this class inherits from a functional dataclass
+    /// (`DynamicDataclassLiteral`) whose fields were determined dynamically.
+    pub(crate) fn dataclass_base_has_unknown_fields(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> bool {
+        self.iter_mro(db, specialization).skip(1).any(|base| {
+            let Some(class) = base.into_class() else {
+                return false;
+            };
+
+            matches!(
+                class.class_literal(db),
+                ClassLiteral::DynamicDataclass(dataclass) if !dataclass.has_known_fields(db)
+            )
+        })
+    }
+
     /// Returns `true` if this class is a dataclass-like class.
     ///
     /// This covers `@dataclass`-decorated classes, as well as classes created via
@@ -766,7 +785,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     /// Checks if the given dataclass parameter flag is set for this class.
     /// This checks both the `dataclass_params` and `transformer_params`.
-    fn has_dataclass_param(
+    pub(crate) fn has_dataclass_param(
         self,
         db: &'db dyn Db,
         field_policy: CodeGeneratorKind<'db>,
@@ -1353,6 +1372,11 @@ impl<'db> StaticClassLiteral<'db> {
                     return None;
                 }
 
+                if self.dataclass_base_has_unknown_fields(db, specialization) {
+                    let signature = Signature::new(Parameters::gradual_form(), Type::none(db));
+                    return Some(Type::function_like_callable(db, signature));
+                }
+
                 let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
                     // TODO: could be `Self`.
                     .with_annotated_type(instance_ty);
@@ -1635,14 +1659,18 @@ impl<'db> StaticClassLiteral<'db> {
                         .map(|(name, field)| (name.clone(), field.clone())),
                 ),
                 FieldSource::DynamicDataclass(dataclass) => Either::Right(Either::Left(
-                    dataclass.fields(db).iter().filter_map(|field| {
-                        (!field.class_var).then(|| {
+                    dataclass
+                        .fields(db)
+                        .iter()
+                        .filter(|field| !field.class_var)
+                        .map(|field| {
                             (
                                 field.name.clone(),
                                 Field {
                                     declared_ty: field.ty,
                                     kind: FieldKind::Dataclass {
                                         default_ty: field.default_ty,
+                                        class_default_ty: field.class_default_ty,
                                         init_only: field.init_only,
                                         init: field.init,
                                         kw_only: field.kw_only,
@@ -1655,8 +1683,7 @@ impl<'db> StaticClassLiteral<'db> {
                                     first_declaration: None,
                                 },
                             )
-                        })
-                    }),
+                        }),
                 )),
                 FieldSource::DynamicTypedDict(typeddict) => Either::Right(Either::Right(
                     typeddict.items(db).iter().map(|(name, td_field)| {
@@ -1818,6 +1845,7 @@ impl<'db> StaticClassLiteral<'db> {
 
                 default_ty =
                     default_ty.map(|ty| ty.apply_optional_specialization(db, specialization));
+                let mut class_default_ty = default_ty;
 
                 let mut init = true;
                 let mut kw_only = None;
@@ -1825,6 +1853,7 @@ impl<'db> StaticClassLiteral<'db> {
                 let mut converter = None;
                 if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
                     default_ty = field.default_type(db);
+                    class_default_ty = field.class_default_type(db);
                     init = field.init(db);
                     kw_only = field.kw_only(db);
                     alias = field.alias(db);
@@ -1835,6 +1864,7 @@ impl<'db> StaticClassLiteral<'db> {
                     CodeGeneratorKind::NamedTuple => FieldKind::NamedTuple { default_ty },
                     CodeGeneratorKind::DataclassLike(_) => FieldKind::Dataclass {
                         default_ty,
+                        class_default_ty,
                         init_only: attr.is_init_var(),
                         init,
                         kw_only,

@@ -717,7 +717,10 @@ impl<'db> ClassLiteral<'db> {
                     .dataclass_params(db)
                     .flags(db)
                     .contains(DataclassFlags::SLOTS);
-                let has_fields = !dataclass.fields(db).is_empty();
+                let has_fields = dataclass
+                    .fields(db)
+                    .iter()
+                    .any(|field| !field.class_var && !field.init_only);
                 if has_slots && has_fields {
                     Some(DisjointBase::due_to_dunder_slots(
                         ClassLiteral::DynamicDataclass(dataclass),
@@ -2237,6 +2240,8 @@ pub(crate) enum FieldKind<'db> {
     Dataclass {
         /// The type of the default value for this field
         default_ty: Option<Type<'db>>,
+        /// The type of the default value that remains as a class attribute.
+        class_default_ty: Option<Type<'db>>,
         /// Whether or not this field is "init-only". If this is true, it only appears in the
         /// `__init__` signature, but is not accessible as a real field
         init_only: bool,

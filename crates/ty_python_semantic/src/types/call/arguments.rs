@@ -199,7 +199,17 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             .collect()
     }
 
-    /// Append synthetic keyword arguments to this argument list.
+    /// Append keyword arguments that do not necessarily come from the call expression's AST.
+    ///
+    /// This is used for runtime-generated calls such as the Python 3.14
+    /// `make_dataclass(..., decorator=decorator)` path:
+    ///
+    /// ```py
+    /// decorator(cls, init=True, repr=True, eq=True, ...)
+    /// ```
+    ///
+    /// Diagnostics for these arguments must be reported on a source-backed node supplied by the
+    /// caller, because these appended keywords may not have corresponding `ast::Keyword`s.
     pub(crate) fn with_keyword_arguments(
         mut self,
         keyword_tys: impl IntoIterator<Item = (&'a str, Type<'db>)>,

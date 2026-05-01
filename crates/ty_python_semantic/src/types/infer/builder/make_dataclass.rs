@@ -9,33 +9,35 @@ use smallvec::SmallVec;
 use super::{
     DeferredExpressionState, InferenceRegion, TypeInferenceBuilder, dynamic_class::DynamicClassKind,
 };
-use crate::FxIndexMap;
 use crate::Program;
-use crate::types::call::{CallArguments, CallError};
+use crate::types::call::{CallArguments, CallError, CallErrorKind};
 use crate::types::class::{
-    ClassLiteral, CodeGeneratorKind, DataclassFieldSpec, DataclassSpec, DynamicDataclassAnchor,
-    DynamicDataclassLiteral, DynamicMetaclassConflict, FieldKind,
+    ClassLiteral, CodeGeneratorKind, DataclassFieldSpec, DataclassSpec, DynamicClassAnchor,
+    DynamicClassLiteral, DynamicDataclassAnchor, DynamicDataclassLiteral, DynamicMetaclassConflict,
+    FieldKind,
 };
 use crate::types::diagnostic::{
-    CYCLIC_CLASS_DEFINITION, DATACLASS_FIELD_ORDER, DUPLICATE_BASE, INCONSISTENT_MRO,
-    INVALID_ARGUMENT_TYPE, INVALID_DATACLASS, IncompatibleBases, MISSING_ARGUMENT,
+    CYCLIC_CLASS_DEFINITION, DATACLASS_FIELD_ORDER, DUPLICATE_BASE, DUPLICATE_KW_ONLY,
+    INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_BASE, INVALID_DATACLASS,
+    INVALID_DATACLASS_OVERRIDE, INVALID_PARAMETER_DEFAULT, IncompatibleBases, MISSING_ARGUMENT,
     PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
-    report_conflicting_metaclass_from_bases, report_instance_layout_conflict,
-    report_mismatched_type_name,
+    UNSUPPORTED_DYNAMIC_BASE, report_conflicting_metaclass_from_bases,
+    report_instance_layout_conflict, report_mismatched_type_name,
 };
 use crate::types::function::KnownFunction;
 use crate::types::mro::DynamicMroErrorKind;
 use crate::types::{
     ClassBase, DATACLASS_FLAGS, DataclassFlags, DataclassParams, KnownClass, KnownInstanceType,
     SubclassOfType, Type, TypeContext, TypeQualifiers, UnionType,
-    add_inferred_python_version_hint_to_diagnostic,
+    add_inferred_python_version_hint_to_diagnostic, extract_fixed_length_iterable_element_types,
 };
+use crate::{FxIndexMap, FxOrderSet};
 use ty_python_core::definition::Definition;
 
 struct MakeDataclassDecoratorConfig<'db, 'ast> {
     raw_dataclass_params: DataclassParams<'db>,
     decorator_arg: Option<(&'ast ast::Expr, Type<'db>)>,
-    decorator_keyword_types: Vec<(&'ast str, Type<'db>)>,
+    decorator_keyword_types: Vec<(&'static str, Type<'db>)>,
 }
 
 struct MakeDataclassDecoratorResolution<'db> {
@@ -90,6 +92,201 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    /// Report the runtime error for repeated `KW_ONLY` pseudo-fields.
+    ///
+    /// ```py
+    /// make_dataclass("C", [("_", KW_ONLY), ("again", KW_ONLY)])
+    /// ```
+    fn report_duplicate_make_dataclass_kw_only(
+        &self,
+        field_name: &Name,
+        first_field_name: &Name,
+        field_source: &ast::Expr,
+    ) {
+        if let Some(builder) = self.context.report_lint(&DUPLICATE_KW_ONLY, field_source) {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "`make_dataclass()` field list has more than one field annotated with `KW_ONLY`"
+            ));
+            diagnostic.info(format_args!(
+                "`KW_ONLY` fields: `{first_field_name}`, `{field_name}`"
+            ));
+        }
+    }
+
+    /// Validate a functional dataclass field default against the declared field type.
+    ///
+    /// This handles both explicit 3-tuple defaults and defaults supplied through `namespace`:
+    ///
+    /// ```py
+    /// make_dataclass("C", [("x", int, "s")])
+    /// make_dataclass("C", [("x", int)], namespace={"x": "s"})
+    /// ```
+    fn check_make_dataclass_field_default(
+        &self,
+        field_ty: Type<'db>,
+        default: &MakeDataclassFieldDefault<'db>,
+        default_expr: &ast::Expr,
+    ) {
+        let Some(default_ty) = default.default_ty else {
+            return;
+        };
+        let db = self.db();
+        if !default_ty.is_assignable_to(db, field_ty)
+            && let Some(builder) = self
+                .context
+                .report_lint(&INVALID_PARAMETER_DEFAULT, default_expr)
+        {
+            builder.into_diagnostic(format_args!(
+                "Default value of type `{}` is not assignable to annotated parameter type `{}`",
+                default_ty.display(db),
+                field_ty.display(db)
+            ));
+        }
+    }
+
+    /// Report namespace entries that dataclass processing refuses to overwrite.
+    ///
+    /// Examples include ordering methods with `order=True`, frozen setters, generated `__hash__`,
+    /// and generated `__slots__`.
+    fn report_make_dataclass_namespace_override(
+        &self,
+        class_name: &Name,
+        attr_name: &Name,
+        node: &ast::Expr,
+        flags: DataclassFlags,
+    ) {
+        if matches!(attr_name.as_str(), "__setattr__" | "__delattr__")
+            && flags.contains(DataclassFlags::FROZEN)
+            && let Some(builder) = self.context.report_lint(&INVALID_DATACLASS_OVERRIDE, node)
+        {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Cannot overwrite attribute `{attr_name}` in frozen dataclass `{class_name}`"
+            ));
+            diagnostic.info(attr_name);
+        }
+
+        if matches!(
+            attr_name.as_str(),
+            "__lt__" | "__le__" | "__gt__" | "__ge__"
+        ) && flags.contains(DataclassFlags::ORDER)
+            && let Some(builder) = self.context.report_lint(&INVALID_DATACLASS_OVERRIDE, node)
+        {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Cannot overwrite attribute `{attr_name}` in dataclass `{class_name}` with `order=True`"
+            ));
+            diagnostic.info(attr_name);
+        }
+
+        if attr_name == "__hash__"
+            && flags.contains(DataclassFlags::UNSAFE_HASH)
+            && let Some(builder) = self.context.report_lint(&INVALID_DATACLASS_OVERRIDE, node)
+        {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Cannot overwrite attribute `__hash__` in dataclass `{class_name}` with `unsafe_hash=True`"
+            ));
+            diagnostic.info(attr_name);
+        }
+
+        if attr_name == "__slots__"
+            && flags.contains(DataclassFlags::SLOTS)
+            && let Some(builder) = self.context.report_lint(&INVALID_DATACLASS_OVERRIDE, node)
+        {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Cannot overwrite attribute `__slots__` in dataclass `{class_name}` with `slots=True`"
+            ));
+            diagnostic.info(attr_name);
+        }
+    }
+
+    /// Validate all statically visible namespace entries against generated dataclass members.
+    ///
+    /// For literal dictionaries, diagnostics are reported on the offending value expression. For a
+    /// typed dynamic namespace, diagnostics are reported on the namespace expression because there
+    /// is no key-specific AST node.
+    fn check_invalid_make_dataclass_namespace_overrides(
+        &self,
+        class_name: &Name,
+        dataclass_params: DataclassParams<'db>,
+        namespace_arg: Option<(&ast::Expr, Type<'db>)>,
+        members: &[(Name, Type<'db>)],
+    ) {
+        let Some((namespace_arg, _)) = namespace_arg else {
+            return;
+        };
+
+        let flags = dataclass_params.flags(self.db());
+        if let ast::Expr::Dict(dict) = namespace_arg {
+            for item in &dict.items {
+                let Some(key_expr) = item.key.as_ref() else {
+                    continue;
+                };
+                let Some(key_name) = self.expression_type(key_expr).as_string_literal() else {
+                    continue;
+                };
+                self.report_make_dataclass_namespace_override(
+                    class_name,
+                    &Name::new(key_name.value(self.db())),
+                    &item.value,
+                    flags,
+                );
+            }
+        } else {
+            for (member_name, _) in members {
+                self.report_make_dataclass_namespace_override(
+                    class_name,
+                    member_name,
+                    namespace_arg,
+                    flags,
+                );
+            }
+        }
+    }
+
+    /// Check dataclass flag combinations that CPython rejects before class creation.
+    ///
+    /// ```py
+    /// make_dataclass("C", [], order=True, eq=False)
+    /// make_dataclass("C", [], weakref_slot=True)
+    /// ```
+    fn check_invalid_make_dataclass_flag_combinations(
+        &self,
+        flags: DataclassFlags,
+        order_keyword: Option<&ast::Expr>,
+        weakref_slot_keyword: Option<&ast::Expr>,
+    ) {
+        if flags.contains(DataclassFlags::ORDER)
+            && !flags.contains(DataclassFlags::EQ)
+            && let Some(builder) = order_keyword
+                .and_then(|keyword| self.context.report_lint(&INVALID_DATACLASS, keyword))
+        {
+            builder.into_diagnostic("`order=True` requires `eq=True` in `make_dataclass()`");
+        }
+
+        if flags.contains(DataclassFlags::WEAKREF_SLOT)
+            && !flags.contains(DataclassFlags::SLOTS)
+            && let Some(builder) = weakref_slot_keyword
+                .and_then(|keyword| self.context.report_lint(&INVALID_DATACLASS, keyword))
+        {
+            builder
+                .into_diagnostic("`weakref_slot=True` requires `slots=True` in `make_dataclass()`");
+        }
+    }
+
+    /// Return whether omitted or explicit `decorator=` means standard dataclass processing.
+    ///
+    /// On Python 3.14, `decorator=dataclass` is equivalent to omitting `decorator`, while an
+    /// arbitrary callable is not assumed to synthesize dataclass behavior.
+    fn make_dataclass_uses_standard_dataclass_decorator(
+        &self,
+        decorator_arg: Option<(&ast::Expr, Type<'db>)>,
+    ) -> bool {
+        decorator_arg.is_none_or(|(_, decorator_ty)| {
+            decorator_ty
+                .as_function_literal()
+                .is_some_and(|function| function.is_known(self.db(), KnownFunction::Dataclass))
+        })
+    }
+
     /// Report diagnostics for required non-keyword-only fields after defaulted fields.
     fn check_invalid_make_dataclass_field_order(
         &self,
@@ -135,6 +332,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         has_invalid_field_order
     }
 
+    /// Extract dataclass field-specifier metadata from a default value.
+    ///
+    /// For normal dataclass processing, `field(default=..., init=False, kw_only=True)` controls
+    /// constructor synthesis. For plain custom decorators, only the class default matters because
+    /// the decorator might not run dataclass processing.
     fn make_dataclass_field_default(
         &self,
         default_ty_value: Type<'db>,
@@ -177,8 +379,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    /// Build the stored field spec for one functional dataclass field.
     fn make_dataclass_field_spec(
-        &self,
         name: Name,
         ty: Type<'db>,
         default: Option<MakeDataclassFieldDefault<'db>>,
@@ -209,20 +411,51 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    /// Infer a field annotation and record whether it is an `InitVar` or `ClassVar`.
     fn infer_make_dataclass_field_annotation(
         &mut self,
         annotation: &ast::Expr,
         deferred_state: DeferredExpressionState,
+        erase_bound_typevars_for: Option<Definition<'db>>,
     ) -> (Type<'db>, bool, bool) {
         let annotation = self.infer_annotation_expression(annotation, deferred_state);
         let qualifiers = annotation.qualifiers();
+        let ty = self
+            .erase_bound_make_dataclass_typevars(annotation.inner_type(), erase_bound_typevars_for);
         (
-            annotation.inner_type(),
+            ty,
             qualifiers.contains(TypeQualifiers::INIT_VAR),
             qualifiers.contains(TypeQualifiers::CLASS_VAR),
         )
     }
 
+    /// Erase type variables that are bound only by an unsupported dynamic dataclass generic class.
+    ///
+    /// A base like `Generic[T]` or `Base[T]` binds `T` for CPython class creation, but
+    /// `DynamicDataclassLiteral` is not yet represented as a generic class. Returning `Unknown`
+    /// avoids synthesizing unusable constructor parameters like `x: T@C`.
+    fn erase_bound_make_dataclass_typevars(
+        &self,
+        ty: Type<'db>,
+        erase_bound_typevars_for: Option<Definition<'db>>,
+    ) -> Type<'db> {
+        let Some(binding_context) = erase_bound_typevars_for else {
+            return ty;
+        };
+
+        let mut typevars = FxOrderSet::default();
+        ty.find_legacy_typevars(self.db(), Some(binding_context), &mut typevars);
+        if typevars.is_empty() {
+            ty
+        } else {
+            Type::unknown()
+        }
+    }
+
+    /// Collect inherited dataclass fields from the explicit base MRO.
+    ///
+    /// The order matches dataclass processing: shared ancestors are considered before more-specific
+    /// bases so redeclared fields inherit defaults from the nearest applicable base.
     fn inherited_make_dataclass_fields(
         &self,
         bases: &[ClassBase<'db>],
@@ -232,7 +465,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut mro = Vec::new();
 
         for base in bases {
-            mro.extend(base.mro(db, None));
+            for mro_base in base.mro(db, None) {
+                // Reverse iteration below should see shared ancestors before more-specific bases.
+                if let Some(position) = mro.iter().position(|seen| *seen == mro_base) {
+                    mro.remove(position);
+                }
+                mro.push(mro_base);
+            }
         }
 
         for base in mro.into_iter().rev() {
@@ -265,6 +504,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     else {
                         continue;
                     };
+                    let kw_only_default =
+                        static_class.has_dataclass_param(db, field_policy, DataclassFlags::KW_ONLY);
 
                     for (field_name, field) in
                         static_class.own_fields(db, specialization, field_policy)
@@ -275,6 +516,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                         let FieldKind::Dataclass {
                             default_ty,
+                            class_default_ty,
                             init_only,
                             init,
                             kw_only,
@@ -291,9 +533,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 name: field_name.clone(),
                                 ty: field.declared_ty,
                                 default_ty: *default_ty,
-                                class_default_ty: *default_ty,
+                                class_default_ty: *class_default_ty,
                                 init: *init,
-                                kw_only: Some(kw_only.unwrap_or(false)),
+                                kw_only: Some(kw_only.unwrap_or(kw_only_default)),
                                 alias: alias.as_ref().map(|alias| Name::new(alias.as_ref())),
                                 converter: *converter,
                                 init_only: *init_only,
@@ -312,6 +554,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         Some(fields)
     }
 
+    /// Apply class defaults inherited from base dataclass fields to redeclared fields.
+    ///
+    /// This models runtime behavior where redeclaring `x` without a default can inherit an existing
+    /// class attribute default from a base dataclass, but not a `default_factory`.
     fn apply_inherited_make_dataclass_defaults(
         fields: &mut [DataclassFieldSpec<'db>],
         inherited_fields: &FxIndexMap<Name, DataclassFieldSpec<'db>>,
@@ -319,11 +565,63 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         for field in fields {
             if field.default_ty.is_none()
                 && let Some(inherited_field) = inherited_fields.get(&field.name)
-                && inherited_field.default_ty.is_some()
+                && let Some(class_default_ty) = inherited_field.class_default_ty
             {
-                field.default_ty = inherited_field.default_ty;
-                field.class_default_ty = inherited_field.class_default_ty;
+                field.default_ty = Some(class_default_ty);
+                field.class_default_ty = Some(class_default_ty);
             }
+        }
+    }
+
+    /// Build namespace members for a non-dataclass-like `decorator=`.
+    ///
+    /// `make_dataclass` still adds explicit field defaults to the class namespace before calling a
+    /// custom decorator, even if that decorator just returns the plain class:
+    ///
+    /// ```py
+    /// Plain = make_dataclass("Plain", [("x", int, 1)], decorator=identity)
+    /// ```
+    fn make_dataclass_plain_decorator_members(
+        &self,
+        dataclass: DynamicDataclassLiteral<'db>,
+    ) -> Box<[(Name, Type<'db>)]> {
+        let db = self.db();
+        let mut members: FxIndexMap<Name, Type<'db>> =
+            dataclass.members(db).iter().cloned().collect();
+
+        if dataclass.has_known_fields(db) {
+            for field in dataclass.fields(db) {
+                if let Some(class_default_ty) = field.class_default_ty {
+                    members.insert(field.name.clone(), class_default_ty);
+                }
+            }
+        }
+
+        members.into_iter().collect()
+    }
+
+    /// Validate that a dynamic `fields` expression has a runtime-compatible shape.
+    ///
+    /// Literal field lists are parsed into a precise spec. Non-literal expressions are gradual, but
+    /// still need to be assignable to an iterable of field definitions.
+    fn check_make_dataclass_fields_argument_type(
+        &self,
+        fields_arg: &ast::Expr,
+        fields_ty: Type<'db>,
+    ) {
+        let db = self.db();
+        let valid_type = KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
+        if !fields_ty.is_assignable_to(db, valid_type)
+            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
+        {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Invalid argument to parameter `fields` of `make_dataclass()`"
+            ));
+            diagnostic.set_primary_message(format_args!(
+                "Expected `{}`, found `{}`",
+                valid_type.display(db),
+                fields_ty.display(db)
+            ));
         }
     }
 
@@ -602,7 +900,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let decorator_config = self.make_dataclass_decorator_config(decorator_keyword_inputs, true);
         let raw_dataclass_params = decorator_config.raw_dataclass_params;
-        let (members, has_dynamic_namespace) = namespace_arg
+        let (provisional_members, provisional_has_dynamic_namespace) = namespace_arg
             .map(|(namespace_arg, namespace_type)| {
                 self.extract_dynamic_namespace_members(namespace_arg, namespace_type, true)
             })
@@ -641,7 +939,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let name = name.unwrap_or_else(|| Name::new_static("<unknown>"));
 
         let scope = self.scope();
-        let scope_offset = definition.is_none().then(|| {
+        let scope_offset = {
             let call_node_index = call_expr.node_index.load();
             let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
             let anchor_u32 = scope_anchor
@@ -651,7 +949,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .as_u32()
                 .expect("call node should not be NodeIndex::NONE");
             call_u32 - anchor_u32
-        });
+        };
 
         if let Some(definition) = definition {
             self.deferred.insert(definition);
@@ -664,14 +962,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Some(definition) => DynamicDataclassAnchor::Definition(definition),
                 None => DynamicDataclassAnchor::ScopeOffset {
                     scope,
-                    offset: scope_offset.expect("dangling make_dataclass should have offset"),
+                    offset: scope_offset,
                     spec: DataclassSpec::unknown(db),
                 },
             },
-            members.clone(),
-            has_dynamic_namespace,
+            provisional_members,
+            provisional_has_dynamic_namespace,
             &decorator_config,
         );
+        let (members, has_dynamic_namespace) = self
+            .extract_make_dataclass_namespace_members(namespace_arg, effective_dataclass_params);
+        if self.make_dataclass_uses_standard_dataclass_decorator(decorator_config.decorator_arg) {
+            self.check_invalid_make_dataclass_namespace_overrides(
+                &name,
+                effective_dataclass_params,
+                namespace_arg,
+                &members,
+            );
+        }
 
         let (anchor, disjoint_bases): (DynamicDataclassAnchor<'db>, IncompatibleBases<'db>) =
             match definition {
@@ -680,7 +988,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     IncompatibleBases::default(),
                 ),
                 None => {
-                    let (bases, disjoint_bases) =
+                    let (bases, disjoint_bases, _has_generic_base) =
                         self.infer_dangling_make_dataclass_bases(bases_arg, &name);
                     let spec = self.infer_dangling_make_dataclass_spec(
                         fields_arg,
@@ -692,8 +1000,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     (
                         DynamicDataclassAnchor::ScopeOffset {
                             scope,
-                            offset: scope_offset
-                                .expect("dangling make_dataclass should have offset"),
+                            offset: scope_offset,
                             spec,
                         },
                         disjoint_bases,
@@ -710,15 +1017,53 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             has_dynamic_namespace,
         );
 
+        if definition.is_some() && decorator_config.decorator_arg.is_some() {
+            self.functional_dataclass = Some(dataclass);
+        }
+
         if definition.is_none() {
             self.check_dynamic_dataclass_mro(dataclass, call_expr, disjoint_bases, bases_arg);
         }
 
         if let Some((decorator_expr, decorator_ty)) = decorator_config.decorator_arg {
+            let decorated_class_ty =
+                if make_dataclass_decorator_type_is_dataclass_like(db, decorator_ty) {
+                    Type::ClassLiteral(dataclass.into())
+                } else {
+                    Type::ClassLiteral(
+                        DynamicClassLiteral::new(
+                            db,
+                            dataclass.name(db).clone(),
+                            DynamicClassAnchor::ScopeOffset {
+                                scope,
+                                offset: scope_offset,
+                                explicit_bases: bases_arg
+                                    .and_then(|(bases_node, _)| {
+                                        extract_fixed_length_iterable_element_types(
+                                            db,
+                                            bases_node,
+                                            |expr| self.expression_type(expr),
+                                        )
+                                    })
+                                    .unwrap_or_else(|| {
+                                        if bases_arg.is_some() {
+                                            Box::from([Type::unknown()])
+                                        } else {
+                                            Box::default()
+                                        }
+                                    }),
+                            },
+                            self.make_dataclass_plain_decorator_members(dataclass),
+                            dataclass.has_dynamic_namespace(db),
+                            None,
+                        )
+                        .into(),
+                    )
+                };
             self.resolve_make_dataclass_decorator(
                 decorator_expr,
                 decorator_ty,
-                Type::ClassLiteral(dataclass.into()),
+                decorated_class_ty,
                 &decorator_config.decorator_keyword_types,
                 effective_dataclass_params,
                 true,
@@ -772,6 +1117,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    /// Infer the dataclass flags and synthetic decorator keyword types for a `make_dataclass` call.
+    ///
+    /// Python 3.14 forwards dataclass options to custom decorators:
+    ///
+    /// ```py
+    /// make_dataclass("C", [], frozen=True, decorator=decorator)
+    /// # calls: decorator(cls, init=True, repr=True, eq=True, frozen=True, ...)
+    /// ```
+    ///
+    /// The returned config is used both to determine provisional dataclass semantics and to type
+    /// check the eventual decorator call.
     fn make_dataclass_decorator_config<'a>(
         &mut self,
         keyword_types: impl IntoIterator<Item = (&'a str, &'a ast::Expr, Type<'db>)>,
@@ -781,7 +1137,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let bool_type = KnownClass::Bool.to_instance(db);
         let mut dataclass_flags = self.make_dataclass_default_flags();
         let mut decorator_arg = None;
-        let mut decorator_keyword_types = Vec::new();
+        let mut order_keyword = None;
+        let mut weakref_slot_keyword = None;
+        let mut decorator_keyword_types: Vec<_> = DATACLASS_FLAGS
+            .iter()
+            .filter(|(param, _)| {
+                Self::make_dataclass_keyword_minimum_version(param).is_none_or(|minimum_version| {
+                    self.make_dataclass_keyword_is_supported(minimum_version)
+                })
+            })
+            .map(|(param, flag)| (*param, Type::bool_literal(dataclass_flags.contains(*flag))))
+            .collect();
 
         for (param, keyword_expr, keyword_ty) in keyword_types {
             if param == "decorator" {
@@ -789,11 +1155,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 continue;
             }
 
-            let Some(flag) = Self::make_dataclass_flag(param) else {
+            let Some((canonical_param, flag)) = Self::make_dataclass_flag(param) else {
                 continue;
             };
+            match canonical_param {
+                "order" => order_keyword = Some(keyword_expr),
+                "weakref_slot" => weakref_slot_keyword = Some(keyword_expr),
+                _ => {}
+            }
 
-            decorator_keyword_types.push((param, keyword_ty));
+            if let Some((_, ty)) = decorator_keyword_types
+                .iter_mut()
+                .find(|(keyword, _)| *keyword == canonical_param)
+            {
+                *ty = keyword_ty;
+            }
 
             if report_invalid_types && !keyword_ty.is_assignable_to(db, bool_type) {
                 if let Some(builder) = self
@@ -817,6 +1193,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         }
 
+        if report_invalid_types
+            && self.make_dataclass_uses_standard_dataclass_decorator(decorator_arg)
+        {
+            self.check_invalid_make_dataclass_flag_combinations(
+                dataclass_flags,
+                order_keyword,
+                weakref_slot_keyword,
+            );
+        }
+
         MakeDataclassDecoratorConfig {
             raw_dataclass_params: DataclassParams::from_flags(db, dataclass_flags),
             decorator_arg,
@@ -824,6 +1210,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    /// Type check and evaluate the synthetic Python 3.14 decorator call.
+    ///
+    /// The class object is passed as the first positional argument and dataclass flags are passed as
+    /// keywords. Synthetic keyword failures are reported on the `decorator=` expression, because the
+    /// forwarded keywords do not have source AST nodes.
     fn resolve_make_dataclass_decorator(
         &mut self,
         decorator_expr: &ast::Expr,
@@ -838,7 +1229,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let return_ty = decorator_ty
             .try_call(self.db(), &call_arguments)
             .map(|bindings| bindings.return_type(self.db()))
-            .unwrap_or_else(|CallError(_, bindings)| {
+            .unwrap_or_else(|CallError(error_kind, bindings)| {
                 if decorator_ty
                     .as_function_literal()
                     .is_some_and(|function| function.is_known(self.db(), KnownFunction::Dataclass))
@@ -849,7 +1240,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
 
                 if report_errors {
-                    bindings.report_diagnostics(&self.context, decorator_expr.into());
+                    match error_kind {
+                        CallErrorKind::BindingError => {
+                            self.report_invalid_make_dataclass_decorator(decorator_expr);
+                        }
+                        CallErrorKind::NotCallable | CallErrorKind::PossiblyNotCallable => {
+                            bindings.report_diagnostics(&self.context, decorator_expr.into());
+                        }
+                    }
                 }
                 bindings.return_type(self.db())
             });
@@ -867,6 +1265,34 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    /// Report a decorator that is callable but incompatible with `make_dataclass` keyword
+    /// forwarding.
+    ///
+    /// This intentionally reports a single diagnostic on `decorator=...` instead of one diagnostic
+    /// per synthetic keyword:
+    ///
+    /// ```py
+    /// def no_kwargs(cls): ...
+    /// make_dataclass("C", [], decorator=no_kwargs)
+    /// ```
+    fn report_invalid_make_dataclass_decorator(&self, decorator_expr: &ast::Expr) {
+        if let Some(builder) = self
+            .context
+            .report_lint(&INVALID_ARGUMENT_TYPE, decorator_expr)
+        {
+            let mut diagnostic = builder
+                .into_diagnostic("Invalid argument to parameter `decorator` of `make_dataclass()`");
+            diagnostic.set_primary_message(
+                "Decorator must accept the dataclass keyword arguments generated by `make_dataclass()`",
+            );
+        }
+    }
+
+    /// Determine the effective dataclass params after applying an explicit `decorator=`.
+    ///
+    /// A dataclass-like decorator can change the params of the provisional class; a plain custom
+    /// decorator leaves us with the raw `make_dataclass` flags as fallback metadata for validation
+    /// that happens before the decorator result is known.
     fn make_dataclass_effective_params<'a>(
         &mut self,
         name: &Name,
@@ -900,12 +1326,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         .effective_dataclass_params
     }
 
-    fn make_dataclass_flag(keyword: &str) -> Option<DataclassFlags> {
+    /// Map a `make_dataclass` flag keyword to its canonical flag name and bit.
+    fn make_dataclass_flag(keyword: &str) -> Option<(&'static str, DataclassFlags)> {
         DATACLASS_FLAGS
             .iter()
-            .find_map(|(flag_name, flag)| (*flag_name == keyword).then_some(*flag))
+            .find_map(|(flag_name, flag)| (*flag_name == keyword).then_some((*flag_name, *flag)))
     }
 
+    /// Return whether a keyword affects either dataclass flags or Python 3.14 decorator handling.
     fn is_make_dataclass_decorator_keyword(keyword: &str) -> bool {
         keyword == "decorator" || Self::make_dataclass_flag(keyword).is_some()
     }
@@ -943,7 +1371,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let InferenceRegion::Deferred(definition) = self.region else {
             return;
         };
-        let previous_context = self.typevar_binding_context.replace(definition);
 
         let decorator_keyword_inputs: Vec<_> = arguments
             .keywords
@@ -970,37 +1397,112 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let decorator_config =
             self.make_dataclass_decorator_config(decorator_keyword_inputs, false);
         let raw_dataclass_params = decorator_config.raw_dataclass_params;
-        let (members, has_dynamic_namespace) = arguments
-            .find_keyword("namespace")
-            .map(|namespace_kw| {
-                let namespace_ty = self
-                    .try_expression_type(&namespace_kw.value)
-                    .unwrap_or_else(|| {
-                        self.infer_expression(&namespace_kw.value, TypeContext::default())
-                    });
-                self.extract_dynamic_namespace_members(&namespace_kw.value, namespace_ty, true)
+        let namespace_arg = arguments.find_keyword("namespace").map(|namespace_kw| {
+            let namespace_ty = self
+                .try_expression_type(&namespace_kw.value)
+                .unwrap_or_else(|| {
+                    self.infer_expression(&namespace_kw.value, TypeContext::default())
+                });
+            (&namespace_kw.value, namespace_ty)
+        });
+        let (provisional_members, provisional_has_dynamic_namespace) = namespace_arg
+            .map(|(namespace_arg, namespace_type)| {
+                self.extract_dynamic_namespace_members(namespace_arg, namespace_type, true)
             })
             .unwrap_or_default();
         let effective_dataclass_params = self.make_dataclass_effective_params(
             &name,
             raw_dataclass_params,
             DynamicDataclassAnchor::Definition(definition),
-            members.clone(),
-            has_dynamic_namespace,
+            provisional_members,
+            provisional_has_dynamic_namespace,
             &decorator_config,
         );
+        let (members, _has_dynamic_namespace) = self
+            .extract_make_dataclass_namespace_members(namespace_arg, effective_dataclass_params);
 
-        let bases: Box<[ClassBase<'db>]> = if let Some(bases_kw) = arguments.find_keyword("bases") {
+        if let Some(bases_kw) = arguments.find_keyword("bases") {
+            let previous_context = self.typevar_binding_context.replace(definition);
             self.infer_expression(&bases_kw.value, TypeContext::default());
             let bases_type = self.expression_type(&bases_kw.value);
-            self.resolve_make_dataclass_bases(&bases_kw.value, bases_type, &name)
-                .0
-        } else {
-            Box::default()
-        };
+            let (bases, _disjoint, has_generic_base) =
+                self.resolve_make_dataclass_bases(&bases_kw.value, bases_type, &name);
+            self.typevar_binding_context = previous_context;
 
-        self.infer_make_dataclass_fields(fields_arg, bases, effective_dataclass_params, &members);
-        self.typevar_binding_context = previous_context;
+            let previous_context =
+                has_generic_base.then(|| self.typevar_binding_context.replace(definition));
+            self.infer_make_dataclass_fields(
+                fields_arg,
+                bases,
+                effective_dataclass_params,
+                &members,
+                has_generic_base.then_some(definition),
+            );
+            if let Some(previous_context) = previous_context {
+                self.typevar_binding_context = previous_context;
+            }
+        } else {
+            self.infer_make_dataclass_fields(
+                fields_arg,
+                Box::default(),
+                effective_dataclass_params,
+                &members,
+                None,
+            );
+        }
+    }
+
+    /// Extract statically known namespace members for a `make_dataclass` class.
+    ///
+    /// Namespace values are inferred with active dataclass field specifiers so calls like
+    /// `namespace={"x": field(default=1, init=False)}` preserve `FieldInstance` metadata for field
+    /// synthesis.
+    fn extract_make_dataclass_namespace_members(
+        &mut self,
+        namespace_arg: Option<(&ast::Expr, Type<'db>)>,
+        dataclass_params: DataclassParams<'db>,
+    ) -> (Box<[(Name, Type<'db>)]>, bool) {
+        let Some((namespace_arg, namespace_type)) = namespace_arg else {
+            return (Box::default(), false);
+        };
+        let db = self.db();
+        let field_specifiers = dataclass_params.field_specifiers(db);
+        self.with_dataclass_field_specifiers(field_specifiers, |this| {
+            if namespace_arg.is_none_literal_expr() || namespace_type.is_none(db) {
+                return (Box::default(), false);
+            }
+
+            if let ast::Expr::Dict(dict) = namespace_arg {
+                let all_keys_are_string_literals = dict.items.iter().all(|item| {
+                    item.key
+                        .as_ref()
+                        .is_some_and(|key| this.expression_type(key).is_string_literal())
+                });
+                let members = dict
+                    .items
+                    .iter()
+                    .filter_map(|item| {
+                        let key_expr = item.key.as_ref()?;
+                        let key_name = this.expression_type(key_expr).as_string_literal()?;
+                        let key_name = Name::new(key_name.value(db));
+                        let mut speculative = this.speculate();
+                        let value_ty =
+                            speculative.infer_expression(&item.value, TypeContext::default());
+                        Some((key_name, value_ty))
+                    })
+                    .collect();
+                (members, !all_keys_are_string_literals)
+            } else if let Type::TypedDict(typed_dict) = namespace_type {
+                let members = typed_dict
+                    .items(db)
+                    .iter()
+                    .map(|(name, field)| (name.clone(), field.declared_ty))
+                    .collect();
+                (members, true)
+            } else {
+                (Box::default(), true)
+            }
+        })
     }
 
     /// Infer the field and base specification for an inline `make_dataclass(...)` call.
@@ -1015,27 +1517,39 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         dataclass_params: DataclassParams<'db>,
         namespace_members: &[(Name, Type<'db>)],
     ) -> DataclassSpec<'db> {
-        self.infer_make_dataclass_fields(fields_arg, bases, dataclass_params, namespace_members)
+        self.infer_make_dataclass_fields(
+            fields_arg,
+            bases,
+            dataclass_params,
+            namespace_members,
+            None,
+        )
     }
 
+    /// Resolve explicit bases for an inline `make_dataclass(...)` call.
     fn infer_dangling_make_dataclass_bases(
         &mut self,
         bases_arg: Option<(&ast::Expr, Type<'db>)>,
         name: &Name,
-    ) -> (Box<[ClassBase<'db>]>, IncompatibleBases<'db>) {
+    ) -> (Box<[ClassBase<'db>]>, IncompatibleBases<'db>, bool) {
         if let Some((bases_node, bases_type)) = bases_arg {
             self.resolve_make_dataclass_bases(bases_node, bases_type, name)
         } else {
-            (Box::default(), IncompatibleBases::default())
+            (Box::default(), IncompatibleBases::default(), false)
         }
     }
 
+    /// Resolve and validate the `bases=` tuple for a functional dataclass.
+    ///
+    /// This accepts runtime-valid parameterized bases such as `Generic[T]` and `Base[T]`, reports
+    /// non-class entries like `bases=(42,)`, and returns whether a generic base binds field
+    /// annotation type variables.
     fn resolve_make_dataclass_bases(
         &mut self,
         bases_node: &ast::Expr,
         bases_type: Type<'db>,
         name: &Name,
-    ) -> (Box<[ClassBase<'db>]>, IncompatibleBases<'db>) {
+    ) -> (Box<[ClassBase<'db>]>, IncompatibleBases<'db>, bool) {
         let db = self.db();
         let Some(explicit_bases) =
             self.extract_explicit_bases(bases_node, bases_type, DynamicClassKind::MakeDataclass)
@@ -1043,8 +1557,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return (
                 Box::from([ClassBase::unknown()]),
                 IncompatibleBases::default(),
+                false,
             );
         };
+        let has_generic_base = explicit_bases.iter().any(|base| {
+            matches!(
+                base,
+                Type::GenericAlias(_)
+                    | Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))
+            )
+        });
 
         let disjoint = self.validate_dynamic_type_bases(
             bases_node,
@@ -1052,11 +1574,48 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             name,
             DynamicClassKind::MakeDataclass,
         );
-        let class_bases = explicit_bases
-            .iter()
-            .filter_map(|ty| ClassBase::try_from_type(db, *ty, None))
-            .collect();
-        (class_bases, disjoint)
+        let bases_tuple_elts = bases_node
+            .as_tuple_expr()
+            .map(|tuple| tuple.elts.as_slice());
+        let mut class_bases = Vec::with_capacity(explicit_bases.len());
+
+        for (idx, base_ty) in explicit_bases.iter().enumerate() {
+            let diagnostic_node = bases_tuple_elts
+                .and_then(|elts| elts.get(idx))
+                .unwrap_or(bases_node);
+
+            if let Some(class_base) = ClassBase::try_from_type(db, *base_ty, None) {
+                class_bases.push(class_base);
+                continue;
+            }
+
+            if base_ty.is_assignable_to(db, KnownClass::Type.to_instance(db)) {
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&UNSUPPORTED_DYNAMIC_BASE, diagnostic_node)
+                {
+                    let mut diagnostic = builder.into_diagnostic("Unsupported class base");
+                    diagnostic
+                        .set_primary_message(format_args!("Has type `{}`", base_ty.display(db)));
+                    diagnostic.info(format_args!(
+                        "ty cannot determine a MRO for class `{name}` due to this base"
+                    ));
+                    diagnostic.info("Only class objects or `Any` are supported as class bases");
+                }
+            } else if let Some(builder) = self.context.report_lint(&INVALID_BASE, diagnostic_node) {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Invalid class base with type `{}`",
+                    base_ty.display(db)
+                ));
+                if bases_tuple_elts.is_none() {
+                    diagnostic.info(format_args!("Element {} of the tuple is invalid", idx + 1));
+                }
+            }
+
+            class_bases.push(ClassBase::unknown());
+        }
+
+        (class_bases.into_boxed_slice(), disjoint, has_generic_base)
     }
 
     /// Infer fields from a `make_dataclass` fields argument.
@@ -1072,6 +1631,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         bases: Box<[ClassBase<'db>]>,
         dataclass_params: DataclassParams<'db>,
         namespace_members: &[(Name, Type<'db>)],
+        erase_bound_typevars_for: Option<Definition<'db>>,
     ) -> DataclassSpec<'db> {
         #[derive(Debug, Copy, Clone, PartialEq, Eq)]
         enum SequenceKind {
@@ -1102,7 +1662,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         &[UnionType::from_elements(db, element_types.iter().copied())],
                     ),
                 };
-            let namespace_default = |builder: &Self, name: &Name| {
+            let namespace_default = |builder: &Self, name: &Name, kw_only_default: bool| {
                 namespace_members
                     .iter()
                     .find_map(|(member_name, ty)| (member_name == name).then_some(*ty))
@@ -1119,24 +1679,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ast::Expr::List(list) => &list.elts,
                 ast::Expr::Tuple(tuple) => &tuple.elts,
                 _ => {
-                    this.infer_expression(fields_arg, TypeContext::default());
+                    let fields_ty = this.infer_expression(fields_arg, TypeContext::default());
+                    this.check_make_dataclass_fields_argument_type(fields_arg, fields_ty);
                     return DataclassSpec::unknown_with_bases(db, bases);
                 }
             };
 
             let mut fields = Vec::with_capacity(elements.len());
             let mut field_sources = Vec::with_capacity(elements.len());
+            let mut field_names = Vec::with_capacity(elements.len());
             let mut has_dynamic_fields = false;
+            let mut field_kw_only_default = kw_only_default;
+            let mut kw_only_sentinel_field: Option<Name> = None;
 
             for (i, elt) in elements.iter().enumerate() {
                 if let ast::Expr::StringLiteral(string_lit) = elt {
                     let name = Name::new(string_lit.value.to_str());
-                    let default = namespace_default(this, &name);
-                    fields.push(this.make_dataclass_field_spec(
+                    field_names.push(name.clone());
+                    let default = namespace_default(this, &name, field_kw_only_default);
+                    fields.push(Self::make_dataclass_field_spec(
                         name,
                         Type::any(),
                         default,
-                        kw_only_default,
+                        field_kw_only_default,
                         false,
                         false,
                     ));
@@ -1162,8 +1727,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     [name_expr, type_expr] => {
                         let name_ty = this.infer_expression(name_expr, TypeContext::default());
                         let deferred_state = this.deferred_state;
-                        let (field_ty, init_only, class_var) =
-                            this.infer_make_dataclass_field_annotation(type_expr, deferred_state);
+                        let (field_ty, init_only, class_var) = this
+                            .infer_make_dataclass_field_annotation(
+                                type_expr,
+                                deferred_state,
+                                erase_bound_typevars_for,
+                            );
                         this.store_expression_type(
                             elt,
                             field_spec_expression_type(field_spec_kind, &[name_ty, field_ty]),
@@ -1171,12 +1740,31 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                         if let Some(name_lit) = name_ty.as_string_literal() {
                             let field_name = Name::new(name_lit.value(db));
-                            let default = namespace_default(this, &field_name);
-                            fields.push(this.make_dataclass_field_spec(
+                            field_names.push(field_name.clone());
+                            if field_ty.is_instance_of(db, KnownClass::KwOnly) {
+                                if let Some(first_field_name) = &kw_only_sentinel_field {
+                                    this.report_duplicate_make_dataclass_kw_only(
+                                        &field_name,
+                                        first_field_name,
+                                        elt,
+                                    );
+                                } else {
+                                    kw_only_sentinel_field = Some(field_name);
+                                }
+                                field_kw_only_default = true;
+                                continue;
+                            }
+
+                            let default =
+                                namespace_default(this, &field_name, field_kw_only_default);
+                            if let Some(default) = &default {
+                                this.check_make_dataclass_field_default(field_ty, default, elt);
+                            }
+                            fields.push(Self::make_dataclass_field_spec(
                                 field_name,
                                 field_ty,
                                 default,
-                                kw_only_default,
+                                field_kw_only_default,
                                 init_only,
                                 class_var,
                             ));
@@ -1204,8 +1792,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     [name_expr, type_expr, default_expr] => {
                         let name_ty = this.infer_expression(name_expr, TypeContext::default());
                         let deferred_state = this.deferred_state;
-                        let (field_ty, init_only, class_var) =
-                            this.infer_make_dataclass_field_annotation(type_expr, deferred_state);
+                        let (field_ty, init_only, class_var) = this
+                            .infer_make_dataclass_field_annotation(
+                                type_expr,
+                                deferred_state,
+                                erase_bound_typevars_for,
+                            );
                         let default_ty_value =
                             this.infer_expression(default_expr, TypeContext::default());
                         this.store_expression_type(
@@ -1218,16 +1810,36 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                         if let Some(name_lit) = name_ty.as_string_literal() {
                             let field_name = Name::new(name_lit.value(db));
+                            field_names.push(field_name.clone());
+                            if field_ty.is_instance_of(db, KnownClass::KwOnly) {
+                                if let Some(first_field_name) = &kw_only_sentinel_field {
+                                    this.report_duplicate_make_dataclass_kw_only(
+                                        &field_name,
+                                        first_field_name,
+                                        elt,
+                                    );
+                                } else {
+                                    kw_only_sentinel_field = Some(field_name);
+                                }
+                                field_kw_only_default = true;
+                                continue;
+                            }
+
                             let default = this.make_dataclass_field_default(
                                 default_ty_value,
-                                kw_only_default,
+                                field_kw_only_default,
                                 respect_field_specifier_metadata,
                             );
-                            fields.push(this.make_dataclass_field_spec(
+                            this.check_make_dataclass_field_default(
+                                field_ty,
+                                &default,
+                                default_expr,
+                            );
+                            fields.push(Self::make_dataclass_field_spec(
                                 field_name,
                                 field_ty,
                                 Some(default),
-                                kw_only_default,
+                                field_kw_only_default,
                                 init_only,
                                 class_var,
                             ));
@@ -1277,7 +1889,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .unwrap_or_default();
             Self::apply_inherited_make_dataclass_defaults(&mut fields, &inherited_fields);
 
-            let field_names: Vec<Name> = fields.iter().map(|field| field.name.clone()).collect();
             this.check_invalid_make_dataclass_field_names(&field_names, fields_arg);
             let has_invalid_field_order = this.check_invalid_make_dataclass_field_order(
                 &inherited_fields,
@@ -1298,6 +1909,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         })
     }
 
+    /// Return the default dataclass flags used by `dataclasses.make_dataclass`.
     fn make_dataclass_default_flags(&self) -> DataclassFlags {
         let mut flags = DataclassFlags::INIT | DataclassFlags::REPR | DataclassFlags::EQ;
         if self.in_stub()
@@ -1308,6 +1920,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         flags
     }
 
+    /// Return the Python version that introduced a `make_dataclass` keyword.
     fn make_dataclass_keyword_minimum_version(keyword: &str) -> Option<PythonVersion> {
         match keyword {
             "match_args" | "kw_only" | "slots" => Some(PythonVersion::PY310),
@@ -1318,10 +1931,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    /// Return whether a version-gated `make_dataclass` keyword is available in the current file.
     fn make_dataclass_keyword_is_supported(&self, minimum_version: PythonVersion) -> bool {
         self.in_stub() || Program::get(self.db()).python_version(self.db()) >= minimum_version
     }
 
+    /// Report use of a `make_dataclass` keyword that is unavailable for the configured Python
+    /// version.
     fn report_make_dataclass_unsupported_keyword(
         &self,
         keyword: &ast::Keyword,
@@ -1403,4 +2019,26 @@ pub(in super::super) fn report_dynamic_dataclass_mro_errors<'db>(
     }
 
     false
+}
+
+/// Return whether a `decorator=` value is expected to perform dataclass-like processing.
+///
+/// This is intentionally narrower than "callable": a plain decorator can return the unprocessed
+/// class or a completely different object, while `dataclass` and `dataclass_transform`-marked
+/// decorators participate in dataclass validation.
+pub(in super::super) fn make_dataclass_decorator_type_is_dataclass_like<'db>(
+    db: &'db dyn crate::Db,
+    decorator_ty: Type<'db>,
+) -> bool {
+    match decorator_ty {
+        Type::DataclassDecorator(_) => true,
+        Type::FunctionLiteral(function) => {
+            function.is_known(db, KnownFunction::Dataclass)
+                || function
+                    .iter_overloads_and_implementation(db)
+                    .rev()
+                    .any(|overload| overload.dataclass_transformer_params(db).is_some())
+        }
+        _ => false,
+    }
 }

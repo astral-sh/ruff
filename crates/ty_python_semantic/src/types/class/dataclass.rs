@@ -203,6 +203,7 @@ pub struct DataclassSpec<'db> {
 }
 
 impl<'db> DataclassSpec<'db> {
+    /// Create a field spec for a functional dataclass whose `fields` argument is statically known.
     pub(crate) fn known(
         db: &'db dyn Db,
         fields: Box<[DataclassFieldSpec<'db>]>,
@@ -211,14 +212,22 @@ impl<'db> DataclassSpec<'db> {
         Self::new(db, fields, true, bases)
     }
 
+    /// Create a field spec for a functional dataclass whose fields and bases are both unknown.
     pub(crate) fn unknown(db: &'db dyn Db) -> Self {
         Self::new(db, Box::default(), false, Box::default())
     }
 
+    /// Create a field spec with unknown fields but known bases.
+    ///
+    /// For example, in `make_dataclass("C", get_fields(), bases=(Base,))`, constructor
+    /// synthesis is gradual because the fields are dynamic, but inherited members and MRO checks
+    /// still need the explicit base list.
     pub(crate) fn unknown_with_bases(db: &'db dyn Db, bases: Box<[ClassBase<'db>]>) -> Self {
         Self::new(db, Box::default(), false, bases)
     }
 
+    /// Normalize recursive field, default, converter, and base types inside the functional
+    /// dataclass spec.
     pub(crate) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -291,6 +300,10 @@ impl<'db> DataclassSpec<'db> {
 
 impl get_size2::GetSize for DataclassSpec<'_> {}
 
+/// Cycle recovery for deferred functional dataclass field specs.
+///
+/// Recursive `make_dataclass()` definitions can depend on their own deferred field spec while
+/// resolving forward references, so cycles fall back to unknown fields.
 fn dynamic_dataclass_spec_cycle_initial<'db>(
     db: &'db dyn Db,
     _id: salsa::Id,
@@ -303,6 +316,15 @@ fn dynamic_dataclass_spec_cycle_initial<'db>(
     cycle_initial = dynamic_dataclass_spec_cycle_initial,
     heap_size = ruff_memory_usage::heap_size
 )]
+/// Compute the deferred field and base spec for an assigned `make_dataclass()` call.
+///
+/// The eager call path stores a `DataclassSpec` on the `fields` argument when the field list is
+/// literal. Deferred inference reads that cached spec so forward references and recursive types
+/// are resolved in the assignment's binding context:
+///
+/// ```py
+/// Node = make_dataclass("Node", [("next", "Node | None")])
+/// ```
 fn deferred_functional_dataclass_spec<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -388,6 +410,10 @@ pub struct DynamicDataclassLiteral<'db> {
 impl get_size2::GetSize for DynamicDataclassLiteral<'_> {}
 
 #[expect(clippy::unnecessary_wraps)]
+/// Cycle recovery for dynamic dataclass MRO computation.
+///
+/// A cyclic or otherwise unresolved base graph still needs an MRO-shaped value so member lookup can
+/// continue with an error type for the class itself.
 fn dynamic_dataclass_mro_cycle_initial<'db>(
     db: &'db dyn Db,
     _id: salsa::Id,
@@ -399,6 +425,11 @@ fn dynamic_dataclass_mro_cycle_initial<'db>(
     ))
 }
 
+/// Resolve the metaclass implied by dynamic dataclass bases.
+///
+/// This mirrors the normal class rule: the selected metaclass must be a subclass of every base
+/// metaclass. `Generic[...]` contributes `type`, because it is a typing sentinel rather than a
+/// runtime base class.
 pub(super) fn dynamic_metaclass_from_bases<'db>(
     db: &'db dyn Db,
     bases: &[ClassBase<'db>],
@@ -407,11 +438,16 @@ pub(super) fn dynamic_metaclass_from_bases<'db>(
         return Ok(KnownClass::Type.to_class_literal(db));
     };
 
-    let mut candidate = candidate_base.metaclass(db);
+    let base_metaclass = |base: &ClassBase<'db>| match base {
+        ClassBase::Generic => KnownClass::Type.to_class_literal(db),
+        _ => base.metaclass(db),
+    };
+
+    let mut candidate = base_metaclass(candidate_base);
     let mut candidate_base = candidate_base;
 
     for base in rest {
-        let base_metaclass = base.metaclass(db);
+        let base_metaclass = base_metaclass(base);
 
         let Some(candidate_class) = candidate.to_class_type(db) else {
             continue;
@@ -461,6 +497,8 @@ impl<'db> DynamicDataclassLiteral<'db> {
         Type::instance(db, ClassType::NonGeneric(self.into()))
     }
 
+    /// Return the source range for diagnostics that should point at the `make_dataclass()` class
+    /// creation expression.
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let scope = self.scope(db);
         let file = scope.file(db);
@@ -491,6 +529,10 @@ impl<'db> DynamicDataclassLiteral<'db> {
         Span::from(self.scope(db).file(db)).with_range(self.header_range(db))
     }
 
+    /// Return this functional dataclass's field/base spec, computing it lazily for assigned calls.
+    ///
+    /// Assigned calls defer field inference so forward references use the assignment's binding
+    /// context; inline calls store their spec eagerly in the scope-offset anchor.
     fn spec(self, db: &'db dyn Db) -> DataclassSpec<'db> {
         match self.anchor(db) {
             DynamicDataclassAnchor::Definition(definition) => {
@@ -512,6 +554,8 @@ impl<'db> DynamicDataclassLiteral<'db> {
         self.spec(db).bases(db)
     }
 
+    /// Convert stored field metadata into the simpler representation used to synthesize dataclass
+    /// methods.
     fn field_info_from_spec(
         field: &DataclassFieldSpec<'db>,
         kw_only_default: bool,
@@ -526,6 +570,21 @@ impl<'db> DynamicDataclassLiteral<'db> {
         }
     }
 
+    /// Collect the merged field list used for synthesized dataclass members.
+    ///
+    /// Runtime dataclasses synthesize methods from fields inherited through the MRO as well as from
+    /// fields declared on the new class:
+    ///
+    /// ```py
+    /// @dataclass
+    /// class Base:
+    ///     x: int
+    ///
+    /// Derived = make_dataclass("Derived", [("y", int)], bases=(Base,))
+    /// ```
+    ///
+    /// If any dynamic dataclass in the MRO has unknown fields, the merged field list is unknown and
+    /// callers should fall back to gradual synthesized members.
     fn fields_for_synthesis(self, db: &'db dyn Db) -> Option<Vec<DataclassFieldInfo<'db>>> {
         let mut fields = FxIndexMap::default();
 
@@ -561,6 +620,8 @@ impl<'db> DynamicDataclassLiteral<'db> {
                     else {
                         continue;
                     };
+                    let kw_only_default =
+                        static_class.has_dataclass_param(db, field_policy, DataclassFlags::KW_ONLY);
 
                     for (field_name, field) in
                         static_class.own_fields(db, specialization, field_policy)
@@ -591,7 +652,7 @@ impl<'db> DynamicDataclassLiteral<'db> {
                                 ty: field.declared_ty,
                                 default_ty: *default_ty,
                                 init: *init,
-                                kw_only: kw_only.unwrap_or(false),
+                                kw_only: kw_only.unwrap_or(kw_only_default),
                                 converter: *converter,
                             },
                         );
@@ -607,6 +668,11 @@ impl<'db> DynamicDataclassLiteral<'db> {
         Some(fields.into_values().collect())
     }
 
+    /// Return the converter input type for a field declared by this functional dataclass or one of
+    /// its dataclass bases.
+    ///
+    /// This supports constructor synthesis for field specifiers that accept one type at
+    /// initialization time and store another type on the instance.
     pub(super) fn converter_input_type_for_field(
         self,
         db: &'db dyn Db,
@@ -637,6 +703,10 @@ impl<'db> DynamicDataclassLiteral<'db> {
         heap_size = ruff_memory_usage::heap_size,
         cycle_initial = dynamic_dataclass_mro_cycle_initial
     )]
+    /// Compute this dynamic dataclass's C3 MRO from its explicit bases.
+    ///
+    /// `make_dataclass("C", fields, bases=(A, B))` creates a real class at runtime, so it can fail
+    /// with the same duplicate-base or inconsistent-MRO errors as a class statement.
     pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
         Mro::of_dynamic(db, self.into())
     }
@@ -645,6 +715,10 @@ impl<'db> DynamicDataclassLiteral<'db> {
         MroIterator::new(db, ClassLiteral::DynamicDataclass(self), None)
     }
 
+    /// Resolve the metaclass for this dynamic dataclass from its explicit bases.
+    ///
+    /// If the MRO is already known to be invalid, return an unknown subclass type so metaclass
+    /// diagnostics do not cascade from the MRO failure.
     pub(crate) fn try_metaclass(
         self,
         db: &'db dyn Db,
@@ -663,6 +737,10 @@ impl<'db> DynamicDataclassLiteral<'db> {
             .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown())
     }
 
+    /// Look up fields declared directly on this functional dataclass instance.
+    ///
+    /// If the field list is dynamic, unknown instance attributes are treated as `Any`, matching the
+    /// gradual constructor fallback for `make_dataclass("C", get_fields())`.
     pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
         for field in self.fields(db) {
             if field.name.as_str() == name && !field.init_only && !field.class_var {
@@ -677,6 +755,7 @@ impl<'db> DynamicDataclassLiteral<'db> {
         Member::unbound()
     }
 
+    /// Look up an instance member through the dynamic dataclass MRO.
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         match MroLookup::new(db, self.iter_mro(db)).instance_member(name) {
             InstanceMemberResult::Done(result) => result,
@@ -686,6 +765,11 @@ impl<'db> DynamicDataclassLiteral<'db> {
         }
     }
 
+    /// Look up a class member through the dynamic dataclass MRO.
+    ///
+    /// Unknown-field functional dataclasses keep class member lookup gradual except for members
+    /// where falling back to `object` is important, such as `__new__` or `__init__` when
+    /// `init=False`.
     pub(crate) fn class_member(
         self,
         db: &'db dyn Db,
@@ -703,12 +787,21 @@ impl<'db> DynamicDataclassLiteral<'db> {
         };
 
         if !self.has_known_fields(db) && result.place.is_undefined() {
+            let flags = self.dataclass_params(db).flags(db);
+            if name == "__new__" || (name == "__init__" && !flags.contains(DataclassFlags::INIT)) {
+                return result;
+            }
             return Place::bound(Type::any()).into();
         }
 
         result
     }
 
+    /// Look up class members defined directly by this functional dataclass.
+    ///
+    /// The lookup order mirrors runtime class creation: field class defaults, explicit namespace
+    /// entries, then synthesized dataclass members such as `__init__`, `__slots__`, and
+    /// `__dataclass_fields__`.
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
         if matches!(name, "__dataclass_fields__" | "__dataclass_params__")
             && let Some(ty) = self.synthesized_class_member(db, name)
@@ -743,12 +836,15 @@ impl<'db> DynamicDataclassLiteral<'db> {
             .unwrap_or_default()
     }
 
+    /// Return an explicitly supplied namespace member for this dynamic dataclass.
     fn namespace_member(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
         self.members(db)
             .iter()
             .find_map(|(member_name, ty)| (name == member_name).then_some(*ty))
     }
 
+    /// Return whether the namespace defines an ordering method that dataclass processing would
+    /// refuse to overwrite with `order=True`.
     pub(crate) fn has_own_ordering_method(self, db: &'db dyn Db) -> bool {
         const ORDERING_METHODS: &[&str] = &["__lt__", "__le__", "__gt__", "__ge__"];
         ORDERING_METHODS
@@ -756,6 +852,10 @@ impl<'db> DynamicDataclassLiteral<'db> {
             .any(|name| !self.own_class_member(db, name).is_undefined())
     }
 
+    /// Return this dynamic dataclass with updated dataclass parameters.
+    ///
+    /// This is used when resolving decorators such as `decorator=dataclass` that apply dataclass
+    /// metadata to the provisional class object.
     pub(crate) fn with_dataclass_params(
         self,
         db: &'db dyn Db,
@@ -771,6 +871,16 @@ impl<'db> DynamicDataclassLiteral<'db> {
         )
     }
 
+    /// Synthesize class members generated by dataclass processing for a functional dataclass.
+    ///
+    /// Field-dependent members such as `__init__`, `__match_args__`, and precise `__slots__` use
+    /// the merged field list when it is known. Field-independent members like frozen
+    /// `__setattr__` and the default `__hash__ = None` can still be synthesized when fields are
+    /// dynamic:
+    ///
+    /// ```py
+    /// C = make_dataclass("C", get_fields(), frozen=True)
+    /// ```
     fn synthesized_class_member(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
         let instance_ty = self.to_instance(db);
         let params = self.dataclass_params(db);
@@ -778,11 +888,23 @@ impl<'db> DynamicDataclassLiteral<'db> {
 
         if !self.has_known_fields(db) {
             match name {
-                "__new__" | "__init__" => {
-                    let signature = Signature::new(Parameters::gradual_form(), instance_ty);
+                "__init__" if flags.contains(DataclassFlags::INIT) => {
+                    let signature = Signature::new(Parameters::gradual_form(), Type::none(db));
                     return Some(Type::function_like_callable(db, signature));
                 }
-                _ => {}
+                "__slots__"
+                    if Program::get(db).python_version(db) >= PythonVersion::PY310
+                        && flags.contains(DataclassFlags::SLOTS) =>
+                {
+                    return Some(Type::homogeneous_tuple(db, KnownClass::Str.to_instance(db)));
+                }
+                _ => {
+                    if let Some(ty) =
+                        synthesize_dataclass_dunder_method(db, name, instance_ty, flags)
+                    {
+                        return Some(ty);
+                    }
+                }
             }
         }
 
@@ -796,13 +918,36 @@ impl<'db> DynamicDataclassLiteral<'db> {
 
         let Some(fields) = self.fields_for_synthesis(db) else {
             match name {
-                "__new__" | "__init__" => {
-                    let signature = Signature::new(Parameters::gradual_form(), instance_ty);
+                "__init__" if flags.contains(DataclassFlags::INIT) => {
+                    let signature = Signature::new(Parameters::gradual_form(), Type::none(db));
                     return Some(Type::function_like_callable(db, signature));
                 }
-                _ => return None,
+                "__slots__"
+                    if Program::get(db).python_version(db) >= PythonVersion::PY310
+                        && flags.contains(DataclassFlags::SLOTS) =>
+                {
+                    return Some(Type::homogeneous_tuple(db, KnownClass::Str.to_instance(db)));
+                }
+                _ => return synthesize_dataclass_dunder_method(db, name, instance_ty, flags),
             }
         };
+
+        if name == "__slots__"
+            && Program::get(db).python_version(db) >= PythonVersion::PY310
+            && flags.contains(DataclassFlags::SLOTS)
+        {
+            let slots = self
+                .fields(db)
+                .iter()
+                .filter(|field| !field.init_only && !field.class_var)
+                .map(|field| Type::string_literal(db, &field.name))
+                .chain(
+                    (flags.contains(DataclassFlags::WEAKREF_SLOT)
+                        && flags.contains(DataclassFlags::SLOTS))
+                    .then(|| Type::string_literal(db, "__weakref__")),
+                );
+            return Some(Type::heterogeneous_tuple(db, slots));
+        }
 
         synthesize_dataclass_class_member(db, name, instance_ty, flags, fields.into_iter())
     }

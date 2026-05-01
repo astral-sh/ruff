@@ -81,9 +81,16 @@ reveal_mro(Point2)  # revealed: (<class 'Point2'>, <class 'object'>)
 The third element of a 3-tuple specifies a default value:
 
 ```py
-from dataclasses import make_dataclass
+from dataclasses import field, make_dataclass
 
 PointWithDefault = make_dataclass("PointWithDefault", [("x", int), ("y", int, 0)])
+BadDefault = make_dataclass("BadDefault", [("x", int, "s")])  # error: [invalid-parameter-default]
+BadFieldDefault = make_dataclass("BadFieldDefault", [("x", int, field(default="s"))])  # error: [invalid-parameter-default]
+BadNamespaceDefault = make_dataclass(
+    "BadNamespaceDefault",
+    [("x", int)],  # error: [invalid-parameter-default]
+    namespace={"x": "s"},
+)
 
 # error: [missing-argument] "No argument provided for required parameter `x`"
 PointWithDefault()
@@ -215,6 +222,40 @@ KwOnlyFirst(1, x=2)
 reveal_type(KwOnlyFirst.__init__)  # revealed: (self: KwOnlyFirst, y: int, *, x: int) -> None
 ```
 
+## `KW_ONLY` sentinel fields
+
+```py
+from dataclasses import KW_ONLY, make_dataclass
+
+KwOnlySentinel = make_dataclass("KwOnlySentinel", [("x", int), ("_", KW_ONLY), ("y", int)])
+KwOnlySentinelDefault = make_dataclass(
+    "KwOnlySentinelDefault",
+    [("x", int), ("_", KW_ONLY, 0), ("y", int)],
+)
+DuplicateKwOnlySentinel = make_dataclass(
+    "DuplicateKwOnlySentinel",
+    [("a", KW_ONLY), ("b", int), ("c", KW_ONLY)],  # error: [duplicate-kw-only]
+)
+DuplicateKwOnlySentinelName = make_dataclass(
+    "DuplicateKwOnlySentinelName",
+    [("x", int), ("x", KW_ONLY)],  # error: [invalid-dataclass]
+)
+KeywordKwOnlySentinelName = make_dataclass(
+    "KeywordKwOnlySentinelName",
+    [("class", KW_ONLY)],  # error: [invalid-dataclass]
+)
+
+KwOnlySentinel(1, y=2)
+KwOnlySentinelDefault(1, y=2)
+# error: [missing-argument]
+KwOnlySentinel(1, 2)  # error: [too-many-positional-arguments]
+# error: [missing-argument]
+KwOnlySentinelDefault(1, 2)  # error: [too-many-positional-arguments]
+
+reveal_type(KwOnlySentinel.__init__)  # revealed: (self: KwOnlySentinel, x: int, *, y: int) -> None
+reveal_type(KwOnlySentinelDefault.__init__)  # revealed: (self: KwOnlySentinelDefault, x: int, *, y: int) -> None
+```
+
 ## Fields with `kw_only=False` overriding class-level `kw_only=True`
 
 Per-field `kw_only=False` overrides the class-level default:
@@ -337,6 +378,13 @@ reveal_type(p1 == p2)  # revealed: bool
 from dataclasses import make_dataclass
 
 PointOrder = make_dataclass("PointOrder", [("x", int), ("y", int)], order=True)
+BadOrderEq = make_dataclass("BadOrderEq", [], order=True, eq=False)  # error: [invalid-dataclass]
+InvalidOrderOverride = make_dataclass(
+    "InvalidOrderOverride",
+    [("x", int)],
+    order=True,
+    namespace={"__lt__": lambda self, other: True},  # error: [invalid-dataclass-override]
+)
 
 p1 = PointOrder(1, 2)
 p2 = PointOrder(3, 4)
@@ -402,6 +450,12 @@ p2 = PointWithLt(2)
 from dataclasses import make_dataclass
 
 PointFrozen = make_dataclass("PointFrozen", [("x", int), ("y", int)], frozen=True)
+InvalidFrozenOverride = make_dataclass(
+    "InvalidFrozenOverride",
+    [("x", int)],
+    frozen=True,
+    namespace={"__setattr__": lambda self, name, value: None},  # error: [invalid-dataclass-override]
+)
 
 p = PointFrozen(1, 2)
 
@@ -419,6 +473,12 @@ p.y = 56  # error: [invalid-assignment]
 from dataclasses import make_dataclass
 
 PointUnsafeHash = make_dataclass("PointUnsafeHash", [("x", int), ("y", int)], unsafe_hash=True)
+InvalidHashOverride = make_dataclass(
+    "InvalidHashOverride",
+    [("x", int)],
+    unsafe_hash=True,
+    namespace={"__hash__": lambda self: 0},  # error: [invalid-dataclass-override]
+)
 
 p = PointUnsafeHash(1, 2)
 
@@ -482,13 +542,21 @@ Functional dataclasses with `slots=True` and non-empty fields are understood as 
 causing an `instance-layout-conflict` error when combined with other slotted classes:
 
 ```py
-from dataclasses import make_dataclass
+from dataclasses import InitVar, make_dataclass
+from typing import ClassVar
 
 PointSlots = make_dataclass("PointSlots", [("x", int), ("y", int)], slots=True)
+InvalidSlotsOverride = make_dataclass(
+    "InvalidSlotsOverride",
+    [("x", int)],
+    slots=True,
+    namespace={"__slots__": ("x",)},  # error: [invalid-dataclass-override]
+)
 
 p = PointSlots(1, 2)
 reveal_type(p.x)  # revealed: int
 reveal_type(p.y)  # revealed: int
+reveal_type(PointSlots.__slots__)  # revealed: tuple[Literal["x"], Literal["y"]]
 
 # Combining two slotted classes with non-empty __slots__ causes a layout conflict
 OtherSlots = make_dataclass("OtherSlots", [("z", int)], slots=True)
@@ -499,6 +567,15 @@ class Combined(PointSlots, OtherSlots): ...  # error: [instance-layout-conflict]
 EmptySlots = make_dataclass("EmptySlots", [], slots=True)
 
 class CombinedWithEmpty(PointSlots, EmptySlots): ...  # No error
+
+# ClassVar and InitVar pseudo-fields do not create slots.
+PseudoSlots = make_dataclass(
+    "PseudoSlots",
+    [("version", ClassVar[int], 1), ("temp", InitVar[str])],
+    slots=True,
+)
+
+class CombinedWithPseudo(PseudoSlots, OtherSlots): ...  # No error
 ```
 
 ### `weakref_slot=True`
@@ -516,12 +593,14 @@ from dataclasses import make_dataclass
 import weakref
 
 PointWeakref = make_dataclass("PointWeakref", [("x", int)], slots=True, weakref_slot=True)
+BadWeakref = make_dataclass("BadWeakref", [], weakref_slot=True)  # error: [invalid-dataclass]
 
 p = PointWeakref(1)
 reveal_type(p.x)  # revealed: int
 
 # __weakref__ attribute is available
 reveal_type(p.__weakref__)  # revealed: Any | None
+reveal_type(PointWeakref.__slots__)  # revealed: tuple[Literal["x"], Literal["__weakref__"]]
 ```
 
 ### Combining multiple flags
@@ -662,10 +741,16 @@ reveal_type(ChildSpecial.version)  # revealed: Literal["v1"]
 Dataclass base fields are included when `make_dataclass` creates a derived dataclass:
 
 ```py
-from dataclasses import make_dataclass
+from dataclasses import dataclass, field, make_dataclass
 
 BaseData = make_dataclass("BaseData", [("x", int)])
 DerivedData = make_dataclass("DerivedData", [("y", str)], bases=(BaseData,))
+
+FrozenBaseData = make_dataclass("FrozenBaseData", [("x", int)], frozen=True)
+# error: [invalid-frozen-dataclass-subclass]
+NonFrozenFromFrozen = make_dataclass("NonFrozenFromFrozen", [("y", int)], bases=(FrozenBaseData,))
+# error: [invalid-frozen-dataclass-subclass]
+FrozenFromNonFrozen = make_dataclass("FrozenFromNonFrozen", [("y", int)], bases=(BaseData,), frozen=True)
 
 reveal_type(DerivedData.__init__)  # revealed: (self: DerivedData, x: int, y: str) -> None
 
@@ -676,6 +761,75 @@ reveal_type(good.y)  # revealed: str
 # error: [invalid-argument-type]
 # error: [missing-argument]
 DerivedData("s")
+
+BaseFactory = make_dataclass("BaseFactory", [("items", list[int], field(default_factory=list))])
+DerivedFactory = make_dataclass("DerivedFactory", [("items", list[int])], bases=(BaseFactory,))
+
+reveal_type(DerivedFactory.__init__)  # revealed: (self: DerivedFactory, items: list[int]) -> None
+
+DerivedFactory([1])
+DerivedFactory()  # error: [missing-argument]
+
+@dataclass
+class StaticFactoryBase:
+    items: list[int] = field(default_factory=list)
+
+StaticFactoryDerived = make_dataclass("StaticFactoryDerived", [("items", list[int])], bases=(StaticFactoryBase,))
+
+reveal_type(StaticFactoryDerived.__init__)  # revealed: (self: StaticFactoryDerived, items: list[int]) -> None
+
+StaticFactoryDerived([1])
+StaticFactoryDerived()  # error: [missing-argument]
+
+@dataclass(kw_only=True)
+class StaticKwOnlyBase:
+    x: int
+
+StaticKwOnlyDerived = make_dataclass("StaticKwOnlyDerived", [("y", int)], bases=(StaticKwOnlyBase,))
+
+reveal_type(StaticKwOnlyDerived.__init__)  # revealed: (self: StaticKwOnlyDerived, y: int, *, x: int) -> None
+
+StaticKwOnlyDerived(1, x=2)
+
+@dataclass(kw_only=True)
+class StaticKwOnlyDefaultBase:
+    x: int = 0
+
+StaticKwOnlyDefaultDerived = make_dataclass("StaticKwOnlyDefaultDerived", [("y", int)], bases=(StaticKwOnlyDefaultBase,))
+
+reveal_type(StaticKwOnlyDefaultDerived.__init__)  # revealed: (self: StaticKwOnlyDefaultDerived, y: int, *, x: int = 0) -> None
+
+StaticKwOnlyDefaultDerived(1, x=2)
+
+@dataclass(frozen=True)
+class StaticFrozenBase:
+    x: int
+
+# error: [invalid-frozen-dataclass-subclass]
+DynamicFromStaticFrozen = make_dataclass("DynamicFromStaticFrozen", [("y", int)], bases=(StaticFrozenBase,))
+
+@dataclass
+class StaticNonFrozenBase:
+    x: int
+
+# error: [invalid-frozen-dataclass-subclass]
+DynamicFrozenFromStatic = make_dataclass("DynamicFrozenFromStatic", [("y", int)], bases=(StaticNonFrozenBase,), frozen=True)
+
+@dataclass
+class Top:
+    x: int = 1
+
+@dataclass
+class Left(Top):
+    pass
+
+@dataclass
+class Right(Top):
+    x: int = 2
+
+DefaultFromRight = make_dataclass("DefaultFromRight", [("x", int)], bases=(Left, Right))
+
+reveal_type(DefaultFromRight.__init__)  # revealed: (self: DefaultFromRight, x: int = 2) -> None
 ```
 
 Dynamic dataclass instance attributes follow the full C3 MRO:
@@ -739,6 +893,8 @@ PointDynamic = make_dataclass("PointDynamic", fields)
 
 p = PointDynamic(1)  # No error - accepts any arguments
 reveal_type(p.x)  # revealed: Any
+reveal_type(PointDynamic.__init__)  # revealed: (...) -> None
+reveal_type(PointDynamic.__hash__)  # revealed: None
 
 # The class is still inferred as inheriting directly from `object`
 # (`Unknown` is not inserted into the MRO)
@@ -747,6 +903,18 @@ reveal_mro(PointDynamic)  # revealed: (<class 'PointDynamic'>, <class 'object'>)
 # ...but nonetheless, we assume that all attributes are available,
 # similar to attribute access on `Unknown`
 reveal_type(p.unknown)  # revealed: Any
+
+PointDynamicNoInit = make_dataclass("PointDynamicNoInit", fields, init=False)
+
+PointDynamicNoInit()
+PointDynamicNoInit(1)  # error: [too-many-positional-arguments]
+
+PointDynamicFrozen = make_dataclass("PointDynamicFrozen", fields, frozen=True)
+frozen = PointDynamicFrozen()
+frozen.x = 1  # error: [invalid-assignment]
+
+not_fields = 1
+BadFields = make_dataclass("BadFields", not_fields)  # error: [invalid-argument-type]
 ```
 
 Explicit bases are preserved even if the fields argument is dynamic:
@@ -765,6 +933,25 @@ fields = get_fields()
 DynamicDerived = make_dataclass("DynamicDerived", fields, bases=(Base,))
 
 reveal_mro(DynamicDerived)  # revealed: (<class 'DynamicDerived'>, <class 'Base'>, <class 'object'>)
+```
+
+Static dataclasses that inherit from a functional dataclass with dynamic fields also use gradual
+constructor signatures:
+
+```py
+from dataclasses import dataclass, make_dataclass
+from typing import Any
+
+def get_dynamic_fields() -> Any: ...
+
+DynamicBase = make_dataclass("DynamicBase", get_dynamic_fields())
+
+@dataclass
+class StaticChild(DynamicBase):
+    y: int
+
+StaticChild("dynamic", y=1)
+StaticChild()
 ```
 
 ## Starred arguments
@@ -964,7 +1151,7 @@ Point2 = make_dataclass("Point2", [("x", int)], decorator=dataclass)
 ### Valid `namespace`
 
 ```py
-from dataclasses import make_dataclass
+from dataclasses import field, make_dataclass
 from typing import TypedDict
 
 Point1 = make_dataclass("Point1", [("x", int)], namespace=None)
@@ -973,6 +1160,11 @@ NSDefault = make_dataclass(
     "NSDefault",
     [("x", int), "y"],
     namespace={"x": 1, "y": "default"},
+)
+NSFieldDefault = make_dataclass(
+    "NSFieldDefault",
+    [("x", int)],
+    namespace={"x": field(default=1, init=False)},
 )
 
 class Namespace(TypedDict):
@@ -985,8 +1177,12 @@ reveal_type(Point3.version)  # revealed: int
 reveal_type(NSDefault.__init__)  # revealed: (self: NSDefault, x: int = 1, y: Any = "default") -> None
 reveal_type(NSDefault.x)  # revealed: Literal[1]
 reveal_type(NSDefault.y)  # revealed: Literal["default"]
+reveal_type(NSFieldDefault.__init__)  # revealed: (self: NSFieldDefault) -> None
+reveal_type(NSFieldDefault.x)  # revealed: Literal[1]
 
 NSDefault()
+NSFieldDefault()
+NSFieldDefault(2)  # error: [too-many-positional-arguments]
 ```
 
 ### Valid `module`
@@ -1017,6 +1213,85 @@ Point = make_dataclass("Point", [("x", int)], decorator=dataclass)
 
 p = Point(1)
 reveal_type(p.x)  # revealed: int
+
+InvalidDecoratorFactory = make_dataclass(
+    "InvalidDecoratorFactory",
+    [],
+    decorator=dataclass(frozen=True),  # error: [invalid-argument-type]
+)
+```
+
+### Plain `decorator=` does not synthesize dataclass methods
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from dataclasses import dataclass, make_dataclass
+
+def identity[T](cls: type[T], **kwargs: object) -> type[T]:
+    return cls
+
+Plain = make_dataclass("Plain", [("x", int, 1)], decorator=identity)
+
+reveal_type(Plain.__init__)  # revealed: def __init__(self) -> None
+reveal_type(Plain.x)  # revealed: Literal[1]
+reveal_type(Plain().x)  # revealed: Literal[1]
+
+Plain()
+Plain(1)  # error: [too-many-positional-arguments]
+
+@dataclass
+class NonFrozenBase:
+    x: int
+
+def return_answer(cls: type[object], **kwargs: object) -> int:
+    return 1
+
+answer = make_dataclass(
+    "Answer",
+    [],
+    bases=(NonFrozenBase,),
+    frozen=True,
+    decorator=return_answer,
+)
+reveal_type(answer)  # revealed: int
+```
+
+### Explicit standard `decorator=` validates dataclass semantics
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from dataclasses import dataclass, make_dataclass
+
+BadOrderEqExplicitDecorator = make_dataclass(
+    "BadOrderEqExplicitDecorator",
+    [],
+    order=True,  # error: [invalid-dataclass]
+    eq=False,
+    decorator=dataclass,
+)
+
+BadWeakrefExplicitDecorator = make_dataclass(
+    "BadWeakrefExplicitDecorator",
+    [],
+    weakref_slot=True,  # error: [invalid-dataclass]
+    decorator=dataclass,
+)
+
+InvalidFrozenOverrideExplicitDecorator = make_dataclass(
+    "InvalidFrozenOverrideExplicitDecorator",
+    [("x", int)],
+    frozen=True,
+    namespace={"__setattr__": lambda self, name, value: None},  # error: [invalid-dataclass-override]
+    decorator=dataclass,
+)
 ```
 
 ### `decorator=` passes dataclass kwargs through
@@ -1052,11 +1327,15 @@ from typing_extensions import Any, dataclass_transform
 
 def fancy_field(*, init: bool = True, kw_only: bool = False, alias: str | None = None) -> Any: ...
 @dataclass_transform(field_specifiers=(fancy_field,), kw_only_default=True)
-def fancy_model[T](cls: type[T], *, kw_only: bool = False) -> type[T]:
+def fancy_model[T](cls: type[T], *, kw_only: bool = False, **kwargs: object) -> type[T]:
     return cls
 
 @dataclass_transform()
-def plain_model[T](cls: type[T]) -> type[T]:
+def plain_model[T](cls: type[T], **kwargs: object) -> type[T]:
+    return cls
+
+@dataclass_transform(kw_only_default=True)
+def defaulted_model[T](cls: type[T], *, kw_only: bool = True, **kwargs: object) -> type[T]:
     return cls
 
 FancyPerson = make_dataclass(
@@ -1075,9 +1354,15 @@ PlainPerson = make_dataclass(
     [("id", int, field(init=False))],
     decorator=plain_model,
 )
+DefaultedPerson = make_dataclass(
+    "DefaultedPerson",
+    [("name", str)],
+    decorator=defaulted_model,
+)
 
 reveal_type(FancyPerson.__init__)  # revealed: (self: FancyPerson, name: str, *, age: int | None) -> None
 reveal_type(PlainPerson.__init__)  # revealed: (self: PlainPerson, id: int = ...) -> None
+reveal_type(DefaultedPerson.__init__)  # revealed: (self: DefaultedPerson, name: str) -> None
 ```
 
 ### `decorator=` respects field-specifier converters
@@ -1095,7 +1380,7 @@ def model_field[T, R](*, converter: Callable[[T], R]) -> R:
     raise NotImplementedError
 
 @dataclass_transform(field_specifiers=(model_field,))
-def model[T](cls: type[T]) -> type[T]:
+def model[T](cls: type[T], **kwargs: object) -> type[T]:
     return cls
 
 def str_to_int(value: str) -> int:
@@ -1143,6 +1428,12 @@ from dataclasses import make_dataclass
 
 # error: [call-non-callable] "Object of type `Literal[1]` is not callable"
 BadDecorator = make_dataclass("BadDecorator", [("x", int)], decorator=1)
+
+def no_kwargs(cls: type[object]) -> type[object]:
+    return cls
+
+# error: [invalid-argument-type] "Invalid argument to parameter `decorator` of `make_dataclass()`"
+BadDecoratorKwargs = make_dataclass("BadDecoratorKwargs", [("x", int)], decorator=no_kwargs)
 ```
 
 ### Invalid field definitions
@@ -1201,17 +1492,43 @@ reveal_type(Allowed(1)._x)  # revealed: int
 
 ### TypedDict and Generic bases
 
-These special forms are not allowed as bases for classes created via `make_dataclass()`.
+`TypedDict` and bare `Generic` are not allowed as bases for classes created via `make_dataclass()`.
+Subscripted `Generic[...]` bases are valid.
 
 ```py
 from dataclasses import make_dataclass
-from typing import TypedDict, Generic
+from typing import Generic, TypeVar, TypedDict
+
+T = TypeVar("T")
+
+FreeTypeVarDataclass = make_dataclass("FreeTypeVarDataclass", [("x", T)])  # error: [unbound-type-variable]
+
+FreeTypeVarDataclass(1)
+FreeTypeVarDataclass("s")
 
 # error: [invalid-base] "Invalid base for class created via `make_dataclass()`"
 A = make_dataclass("A", [("x", int)], bases=(TypedDict,))
 
 # error: [invalid-base] "Invalid base for class created via `make_dataclass()`"
 B = make_dataclass("B", [("x", int)], bases=(Generic,))
+
+GenericDataclass = make_dataclass("GenericDataclass", [("x", T)], bases=(Generic[T],))
+
+GenericDataclass(1)
+GenericDataclass[int]
+
+class Base(Generic[T]): ...
+
+DerivedFromGenericBase = make_dataclass("DerivedFromGenericBase", [("x", T)], bases=(Base[T],))
+DerivedFromGenericBase(1)
+```
+
+### Non-class bases
+
+```py
+from dataclasses import make_dataclass
+
+BadBase = make_dataclass("BadBase", [("x", int)], bases=(42,))  # error: [invalid-base]
 ```
 
 ### Protocol base
@@ -1363,6 +1680,28 @@ class A: ...
 
 # error: [duplicate-base] "Duplicate base class <class 'A'> in class `Dup`"
 Dup = make_dataclass("Dup", [("x", int)], bases=(A, A))
+
+# error: [duplicate-base] "Duplicate base class <class 'A'> in class `AnnotatedDup`"
+AnnotatedDup: type = make_dataclass("AnnotatedDup", [("x", int)], bases=(A, A))
+```
+
+The intermediate class is still validated before a custom decorator return type is used:
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from dataclasses import make_dataclass
+
+class A: ...
+
+def return_answer(cls: type[object], **kwargs: object) -> int:
+    return 1
+
+# error: [duplicate-base] "Duplicate base class <class 'A'> in class `DecoratedDup`"
+DecoratedDup = make_dataclass("DecoratedDup", [], bases=(A, A), decorator=return_answer)
 ```
 
 ### Inconsistent MRO (deferred)

@@ -41,7 +41,9 @@ use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::CallableTypeKind;
-use crate::types::class::{ClassLiteral, CodeGeneratorKind, MethodDecorator};
+use crate::types::class::{
+    ClassLiteral, CodeGeneratorKind, DynamicDataclassLiteral, MethodDecorator,
+};
 use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
@@ -138,7 +140,9 @@ mod typed_dict;
 mod typevar;
 
 use super::comparisons::{self, BinaryComparisonVisitor};
-pub(super) use make_dataclass::report_dynamic_dataclass_mro_errors;
+pub(super) use make_dataclass::{
+    make_dataclass_decorator_type_is_dataclass_like, report_dynamic_dataclass_mro_errors,
+};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 struct TypeAndRange<'db> {
@@ -317,6 +321,10 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// For function definitions, the undecorated type of the function.
     undecorated_type: Option<Type<'db>>,
 
+    /// For `make_dataclass(..., decorator=...)` definitions, the intermediate class created
+    /// before `decorator` is called.
+    functional_dataclass: Option<DynamicDataclassLiteral<'db>>,
+
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
@@ -363,6 +371,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             typevar_binding_context: None,
             deferred: VecSet::default(),
             undecorated_type: None,
+            functional_dataclass: None,
             cycle_recovery: None,
             dataclass_field_specifiers: SmallVec::new(),
         }
@@ -561,6 +570,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.expression_cache = None;
     }
 
+    /// Temporarily install dataclass field specifiers while inferring expressions in a dataclass
+    /// context.
+    ///
+    /// This lets `field()`-like calls preserve metadata such as `init=False`, aliases, converters,
+    /// and keyword-only defaults only while inferring dataclass fields or namespace defaults.
     fn with_dataclass_field_specifiers<T>(
         &mut self,
         field_specifiers: &[Type<'db>],
@@ -9099,6 +9113,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            functional_dataclass: _,
 
             // builder only state
             expression_cache: _,
@@ -9179,6 +9194,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            functional_dataclass: _,
 
             // builder only state
             expression_cache: _,
@@ -9285,6 +9301,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return_types_and_ranges: _,
             dataclass_field_specifiers: _,
             undecorated_type: _,
+            functional_dataclass: _,
             typevar_binding_context: _,
             deferred_state: _,
             index: _,
@@ -9323,6 +9340,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred,
             cycle_recovery,
             undecorated_type,
+            functional_dataclass,
             called_functions,
 
             // builder only state
@@ -9343,6 +9361,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || !expected_types.is_empty()
             || cycle_recovery.is_some()
             || undecorated_type.is_some()
+            || functional_dataclass.is_some()
             || !deferred.is_empty()
             || !called_functions.is_empty()
             || !qualifiers.is_empty()
@@ -9364,6 +9383,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 deferred: deferred.into_boxed_slice(),
                 diagnostics,
                 undecorated_type,
+                functional_dataclass,
                 qualifiers,
             })
         });
@@ -9416,6 +9436,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            functional_dataclass: _,
 
             // Builder only state
             expression_cache: _,
@@ -9486,6 +9507,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: _,
             called_functions: _,
             undecorated_type: _,
+            functional_dataclass: _,
             qualifiers: _,
             type_expression_flags: _,
         } = *self;
@@ -9528,6 +9550,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            functional_dataclass: _,
 
             // builder only state
             expression_cache: _,
