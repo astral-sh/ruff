@@ -84,7 +84,8 @@ expression: initialization_result
           "number",
           "decorator",
           "builtinConstant",
-          "typeParameter"
+          "typeParameter",
+          "enumMember"
         ],
         "tokenModifiers": [
           "definition",
