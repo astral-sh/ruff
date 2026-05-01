@@ -2453,8 +2453,8 @@ const UNION_POLICY: TruncationPolicy = TruncationPolicy {
 
 impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        fn is_condensable(ty: Type<'_>) -> bool {
-            matches!(
+        fn condensable_literals<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
+            if matches!(
                 ty.as_literal_value_kind(),
                 Some(
                     LiteralValueTypeKind::Int(_)
@@ -2463,7 +2463,11 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                         | LiteralValueTypeKind::Bool(_)
                         | LiteralValueTypeKind::Enum(_)
                 )
-            )
+            ) {
+                return Some(vec![ty]);
+            }
+
+            ty.enum_complement_literal_types(db)
         }
 
         fn singleline_union_element_label<'db>(
@@ -2494,15 +2498,19 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
             .iter()
             .copied()
             .map(|element| {
-                (!is_condensable(element) && !element.is_subclass_of())
+                (condensable_literals(self.db, element).is_none() && !element.is_subclass_of())
                     .then(|| singleline_union_element_label(self.db, element, &self.settings))
             })
             .collect();
         let duplicate_ambiguous_labels = duplicate_ambiguous_labels(&element_labels);
 
         for element in elements.iter().copied() {
-            if is_condensable(element) {
-                condensed_types.push(element);
+            if let Some(literals) = condensable_literals(self.db, element) {
+                for literal in literals {
+                    if !condensed_types.contains(&literal) {
+                        condensed_types.push(literal);
+                    }
+                }
             } else if let Type::SubclassOf(subclass_of) = element {
                 subclass_of_types.push(subclass_of);
             }
@@ -2529,7 +2537,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                 break;
             }
 
-            if is_condensable(*element) {
+            if condensable_literals(self.db, *element).is_some() {
                 if let Some(condensed_types) = condensed_types.take() {
                     displayed_entries += 1;
                     join.entry(&DisplayLiteralGroup {
@@ -2658,6 +2666,12 @@ const LITERAL_POLICY: TruncationPolicy = TruncationPolicy {
 
 impl<'db> FmtDetailed<'db> for DisplayLiteralGroup<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        if let Some(enum_class) = self.full_enum_class() {
+            return enum_class
+                .display_with(self.db, self.settings.clone())
+                .fmt_detailed(f);
+        }
+
         f.with_type(Type::SpecialForm(SpecialFormType::Literal))
             .write_str("Literal")?;
         f.write_char('[')?;
@@ -2690,6 +2704,34 @@ impl<'db> FmtDetailed<'db> for DisplayLiteralGroup<'db> {
     }
 }
 
+impl<'db> DisplayLiteralGroup<'db> {
+    fn full_enum_class(&self) -> Option<ClassLiteral<'db>> {
+        let mut enum_class = None;
+        let mut names = FxHashSet::default();
+
+        for literal in &self.literals {
+            let enum_literal = literal.as_enum_literal()?;
+            let class = enum_literal.enum_class(self.db);
+            if let Some(existing_class) = enum_class {
+                if existing_class != class {
+                    return None;
+                }
+            } else {
+                enum_class = Some(class);
+            }
+
+            let metadata = crate::types::enum_metadata(self.db, class)?;
+            let name = enum_literal.name(self.db);
+            let canonical_name = metadata.resolve_member(name).unwrap_or(name);
+            names.insert(canonical_name.clone());
+        }
+
+        let enum_class = enum_class?;
+        let metadata = crate::types::enum_metadata(self.db, enum_class)?;
+        (names.len() == metadata.members.len()).then_some(enum_class)
+    }
+}
+
 impl Display for DisplayLiteralGroup<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
@@ -2718,6 +2760,16 @@ struct DisplayIntersectionType<'a, 'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayIntersectionType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        if let Some(literals) = Type::Intersection(*self.ty).enum_complement_literal_types(self.db)
+        {
+            return DisplayLiteralGroup {
+                literals,
+                db: self.db,
+                settings: self.settings.clone(),
+            }
+            .fmt_detailed(f);
+        }
+
         let tys = self
             .ty
             .positive(self.db)

@@ -198,11 +198,14 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, IntersectionBuilder, KnownClass, NarrowingConstraint, Type, TypeContext,
-        UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
+        CallableTypes, ClassLiteral, IntersectionBuilder, KnownClass, NarrowingConstraint, Type,
+        TypeContext, UnionBuilder, UnionType, enum_metadata, infer_expression_type,
+        infer_narrowing_constraint,
     },
 };
+use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
+use rustc_hash::FxHashSet;
 use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
     SemanticIndex, Truthiness, UseDefMap,
@@ -309,6 +312,83 @@ fn type_excluded_by_previous_patterns<'db>(
     builder.build()
 }
 
+fn enum_class_from_subject<'db>(
+    db: &'db dyn Db,
+    subject_ty: Type<'db>,
+) -> Option<ClassLiteral<'db>> {
+    if let Some(enum_class) = subject_ty.enum_class(db) {
+        return Some(enum_class);
+    }
+
+    if let Type::TypeVar(bound_typevar) = subject_ty
+        && let Some(upper_bound) = bound_typevar.typevar(db).upper_bound(db)
+    {
+        return upper_bound.enum_class(db);
+    }
+
+    None
+}
+
+fn enum_member_pattern_name<'db>(
+    db: &'db dyn Db,
+    enum_class: ClassLiteral<'db>,
+    kind: &PatternPredicateKind<'db>,
+) -> Option<Name> {
+    let PatternPredicateKind::Value(value) = kind else {
+        return None;
+    };
+
+    let enum_literal =
+        infer_expression_type(db, *value, TypeContext::default()).as_enum_literal()?;
+    (enum_literal.enum_class(db) == enum_class).then(|| enum_literal.name(db).clone())
+}
+
+fn analyze_enum_value_pattern_predicate<'db>(
+    db: &'db dyn Db,
+    predicate: PatternPredicate<'db>,
+    subject_ty: Type<'db>,
+) -> Option<Truthiness> {
+    let enum_class = enum_class_from_subject(db, subject_ty)?;
+    let metadata = enum_metadata(db, enum_class)?;
+
+    let current_name = enum_member_pattern_name(db, enum_class, predicate.kind(db))?;
+    let current_name = metadata
+        .resolve_member(&current_name)
+        .unwrap_or(&current_name)
+        .clone();
+
+    let mut excluded_names = FxHashSet::default();
+    let mut previous_predicate = predicate;
+    while let Some(previous) = previous_predicate.previous_predicate(db) {
+        previous_predicate = *previous;
+
+        if previous_predicate.guard(db).is_some() {
+            continue;
+        }
+
+        let previous_name = enum_member_pattern_name(db, enum_class, previous_predicate.kind(db))?;
+        let previous_name = metadata
+            .resolve_member(&previous_name)
+            .unwrap_or(&previous_name)
+            .clone();
+        excluded_names.insert(previous_name);
+    }
+
+    if excluded_names.contains(&current_name) {
+        return Some(Truthiness::AlwaysFalse);
+    }
+
+    if metadata.members.len().saturating_sub(excluded_names.len()) == 1 {
+        if predicate.guard(db).is_some() {
+            Some(Truthiness::Ambiguous)
+        } else {
+            Some(Truthiness::AlwaysTrue)
+        }
+    } else {
+        Some(Truthiness::Ambiguous)
+    }
+}
+
 /// Analyze a pattern predicate to determine its static truthiness.
 ///
 /// This is a Salsa tracked function to enable memoization. Without memoization, for a match
@@ -321,6 +401,10 @@ fn type_excluded_by_previous_patterns<'db>(
 )]
 fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'db>) -> Truthiness {
     let subject_ty = infer_expression_type(db, predicate.subject(db), TypeContext::default());
+
+    if let Some(truthiness) = analyze_enum_value_pattern_predicate(db, predicate, subject_ty) {
+        return truthiness;
+    }
 
     let narrowed_subject = IntersectionBuilder::new(db)
         .add_positive(subject_ty)

@@ -1,7 +1,7 @@
 use compact_str::ToCompactString;
 use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use std::borrow::Cow;
 use std::cell::OnceCell;
@@ -58,7 +58,7 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
-use crate::types::enums::enum_metadata;
+pub(crate) use crate::types::enums::enum_metadata;
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
     FunctionType, KnownFunction,
@@ -1030,10 +1030,67 @@ impl<'db> Type<'db> {
         self.is_instance_of(db, KnownClass::Bool)
     }
 
-    fn is_enum(&self, db: &'db dyn Db) -> bool {
-        self.as_nominal_instance().is_some_and(|instance| {
-            crate::types::enums::enum_metadata(db, instance.class_literal(db)).is_some()
+    pub(crate) fn enum_class(self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
+        self.as_nominal_instance().and_then(|instance| {
+            let class = instance.class_literal(db);
+            crate::types::enums::enum_metadata(db, class)
+                .is_some()
+                .then_some(class)
         })
+    }
+
+    pub(crate) fn enum_complement_literal_types(self, db: &'db dyn Db) -> Option<Vec<Type<'db>>> {
+        let Type::Intersection(intersection) = self else {
+            return None;
+        };
+
+        let mut enum_class = None;
+        for positive in intersection.positive(db) {
+            let Type::NominalInstance(instance) = positive else {
+                return None;
+            };
+
+            let class = instance.class_literal(db);
+            if crate::types::enums::enum_metadata(db, class).is_none() {
+                return None;
+            }
+
+            if enum_class.replace(class).is_some() {
+                return None;
+            }
+        }
+
+        let enum_class = enum_class?;
+        let metadata = crate::types::enums::enum_metadata(db, enum_class)?;
+
+        let mut excluded_names = FxHashSet::default();
+        for negative in intersection.negative(db) {
+            let enum_literal = negative.as_enum_literal()?;
+            if enum_literal.enum_class(db) != enum_class {
+                return None;
+            }
+
+            let name = enum_literal.name(db);
+            let canonical_name = metadata.resolve_member(name).unwrap_or(name);
+            excluded_names.insert(canonical_name.clone());
+        }
+
+        if excluded_names.is_empty() {
+            return None;
+        }
+
+        Some(
+            metadata
+                .members
+                .keys()
+                .filter(|name| !excluded_names.contains(*name))
+                .map(|name| Type::enum_literal(EnumLiteralType::new(db, enum_class, name.clone())))
+                .collect(),
+        )
+    }
+
+    fn is_enum(&self, db: &'db dyn Db) -> bool {
+        self.enum_class(db).is_some()
     }
 
     fn is_typealias_special_form(&self) -> bool {
