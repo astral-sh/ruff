@@ -714,23 +714,24 @@ impl<'db> Default for TypeVarNonceGenerator<'db> {
 }
 
 impl<'db> TypeVarNonceGenerator<'db> {
-    pub(crate) fn seed_all(&self, generic_contexts: impl IntoIterator<Item = GenericContext<'db>>) {
+    pub(crate) fn record_enclosing_scopes(
+        &self,
+        generic_contexts: impl IntoIterator<Item = GenericContext<'db>>,
+    ) {
         let mut inner = self.inner.borrow_mut();
         inner.seen.extend(generic_contexts);
     }
 
-    pub(crate) fn next_if_seeded(
-        &self,
-        generic_context: GenericContext<'db>,
-    ) -> Option<TypeVarNonce> {
+    pub(crate) fn should_freshen(&self, generic_context: GenericContext<'db>) -> bool {
         let mut inner = self.inner.borrow_mut();
-        if inner.seen.contains(&generic_context) {
-            let nonce = inner.next;
-            inner.next = nonce.increment();
-            Some(nonce)
-        } else {
-            None
-        }
+        !inner.seen.insert(generic_context)
+    }
+
+    pub(crate) fn next(&self) -> TypeVarNonce {
+        let mut inner = self.inner.borrow_mut();
+        let nonce = inner.next;
+        inner.next = nonce.increment();
+        nonce
     }
 }
 

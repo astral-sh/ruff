@@ -49,7 +49,7 @@ use crate::types::signatures::{
     CallableSignature, Parameter, ParameterForm, ParameterKind, Parameters, ParametersKind,
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonce, TypeVarNonceGenerator};
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassLiteral, DATACLASS_FLAGS,
     DataclassFlags, DataclassParams, GenericAlias, InternedConstraintSet, IntersectionType,
@@ -780,7 +780,7 @@ impl<'db> Bindings<'db> {
     ) {
         let enclosing_generic_contexts = self.enclosing_generic_contexts.take();
         if let Some(enclosing_generic_contexts) = enclosing_generic_contexts.as_deref() {
-            nonce_generator.seed_all(enclosing_generic_contexts.iter().copied());
+            nonce_generator.record_enclosing_scopes(enclosing_generic_contexts.iter().copied());
         }
         for item in self.iter_callable_items_mut() {
             item.freshen_generic_contexts_in_place(db, nonce_generator);
@@ -2675,22 +2675,13 @@ impl<'db> CallableBinding<'db> {
             return;
         }
 
-        let mut freshening_nonces = Vec::with_capacity(self.overloads.len());
-        for overload in &self.overloads {
-            freshening_nonces.push(
-                overload
-                    .signature
-                    .generic_context
-                    .and_then(|context| nonce_generator.next_if_seeded(context)),
-            );
-        }
-        if freshening_nonces.iter().all(Option::is_none) {
-            return;
-        }
-
-        for (overload, nonce) in self.overloads.iter_mut().zip(freshening_nonces) {
-            if let Some(nonce) = nonce {
-                overload.freshen_generic_context(db, nonce);
+        let nonce = nonce_generator.next();
+        for overload in &mut self.overloads {
+            let Some(generic_context) = overload.signature.generic_context else {
+                continue;
+            };
+            if nonce_generator.should_freshen(generic_context) {
+                overload.freshen_bound_typevars(db, nonce.value());
             }
         }
     }
@@ -5221,12 +5212,12 @@ impl<'db> Binding<'db> {
         }
     }
 
-    fn freshen_generic_context(&mut self, db: &'db dyn Db, nonce: TypeVarNonce) {
+    fn freshen_bound_typevars(&mut self, db: &'db dyn Db, delta: u32) {
         if self.signature.generic_context.is_none() {
             return;
         }
 
-        self.signature = self.signature.freshen_generic_context(db, nonce);
+        self.signature = self.signature.freshen_bound_typevars(db, delta);
         self.return_ty = self.initial_return_type(db);
     }
 

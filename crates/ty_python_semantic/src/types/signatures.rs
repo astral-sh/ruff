@@ -666,11 +666,7 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn freshen_generic_context(&self, db: &'db dyn Db, nonce: TypeVarNonce) -> Self {
-        self.freshen_generic_context_by_delta(db, nonce.value())
-    }
-
-    pub(crate) fn freshen_generic_context_by_delta(&self, db: &'db dyn Db, delta: u32) -> Self {
+    pub(crate) fn freshen_bound_typevars(&self, db: &'db dyn Db, delta: u32) -> Self {
         let Some(generic_context) = self.generic_context else {
             return self.clone();
         };
@@ -1283,7 +1279,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .max_typevar_freshness_matching_generic_context(db, generic_context)
                 .map(|freshness| freshness.increment().value())
         {
-            freshened_source = source.freshen_generic_context_by_delta(db, delta);
+            freshened_source = source.freshen_bound_typevars(db, delta);
             &freshened_source
         } else {
             source
@@ -1295,7 +1291,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .max_typevar_freshness_matching_generic_context(db, generic_context)
                 .map(|freshness| freshness.increment().value())
         {
-            freshened_target = target.freshen_generic_context_by_delta(db, delta);
+            freshened_target = target.freshen_bound_typevars(db, delta);
             &freshened_target
         } else {
             target

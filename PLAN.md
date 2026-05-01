@@ -18,7 +18,7 @@
 - [x] The helper `ConstraintSet::mentions_any_typevar` was removed after it became unused.
 - [x] Confirmed that strict "seed only enclosing contexts + freshen on second/later occurrence" still times out on the scikit-learn/NumPy repro.
 - [x] Debugged the remaining timeout: relation freshening repeatedly revisits the same NumPy `ndarray` dunder overload signatures against the same scikit-learn `Array` protocol methods. These appear to be repeated proof-search visits, not genuine sibling/recursive callable occurrences.
-- [ ] **Important exploratory code state:** relation-side signature freshening is currently disabled in `crates/ty_python_semantic/src/types/signatures.rs` via `let next_freshening_nonce = |_signature: &Signature<'db>| None;`. This was only to confirm semantics/perf. Focused mdtests fail in this state (`type_properties/implies_subtype_of.md` generic callable assertions). Do not treat this as the final implementation.
+- [x] Relation-side signature freshening has been re-enabled with deterministic collision-avoidance freshening in `crates/ty_python_semantic/src/types/signatures.rs`. The temporary `let next_freshening_nonce = |_signature: &Signature<'db>| None;` exploratory state has been removed.
 
 ## Problem statement
 
@@ -130,7 +130,9 @@ The relation `TypeOf[identity2] <: Callable[[str], str]` does not see the ambien
   - If mdtests need to exercise explicit freshening, add a dedicated mdtest-only extension helper that applies the same `generic_context + delta` freshening operation.
 
 - [x] **Direct call freshening.**
-  - Keep the current direct-call freshening approach unless implementation reveals a new problem.
+  - Direct calls still use occurrence-count freshening, but the nonce generator now separates recording/decision from nonce allocation: `record_enclosing_scopes`, `should_freshen`, and `next`.
+  - `should_freshen` records unseeded generic contexts as they are encountered, so a second occurrence of an initially unseeded context is freshened correctly.
+  - Call-site freshening applies one shared nonce/delta to all overloads that need freshening without first collecting an intermediate nonce vector.
   - This remains compatible with the deterministic freshening operation shape (`generic_context + delta`).
 
 - [ ] **Caching after deterministic freshening.**
@@ -141,7 +143,7 @@ The relation `TypeOf[identity2] <: Callable[[str], str]` does not see the ambien
 
 ### Phase 0: Restore a known exploratory baseline
 
-- [x] Current code is in an exploratory state with relation freshening disabled and no library guard.
+- [x] Started from an exploratory state with relation freshening disabled and no library guard.
 - [x] Before implementation, inspect `jj diff --git` and this file. Decided to build on the current exploratory diff in a follow-up jj revision.
 - [x] Ensure no debug `eprintln!` statements remain before running tests.
 
@@ -167,7 +169,7 @@ The relation `TypeOf[identity2] <: Callable[[str], str]` does not see the ambien
 ### Phase 3: Add generic-context bumping
 
 - [x] Add an `ApplyTypeMapping` variant or dedicated visitor that bumps all typevars bound by a specific `GenericContext` by one shared `delta`.
-  - Recast existing `TypeMapping::FreshenBoundTypeVars` to store a `delta`; added `Signature::freshen_generic_context_by_delta`.
+  - Recast existing `TypeMapping::FreshenBoundTypeVars` to store a `delta`; added `Signature::freshen_bound_typevars`.
 - [x] Ensure it updates the signature's `generic_context` consistently with parameter and return types.
 - [x] Keep ParamSpecs unchanged initially, unless explicitly supported.
   - The delta mapping skips freshening ParamSpec typevars themselves, but still freshens non-ParamSpec typevars in the same generic context.
@@ -178,6 +180,7 @@ The relation `TypeOf[identity2] <: Callable[[str], str]` does not see the ambien
 - [x] Remove relation-side dependency on `TypeVarNonceGenerator::seen`.
 - [x] In `check_signature_pair`, deterministically freshen each side's generic context by scanning the full opposite signature for colliding base identities.
 - [x] If both sides have exactly the same `GenericContext`, freshen rhs only as a cheap optimization.
+  - Implemented as two simple checks: freshen source only when its generic context differs from target's; freshen target whenever it collides.
 - [x] Preserve free/free typevar sharing.
 - [x] Re-enable relation freshening; remove the temporary `None` closure.
 - [x] Run focused mdtests:
