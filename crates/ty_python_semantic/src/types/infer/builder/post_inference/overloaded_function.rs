@@ -6,12 +6,13 @@ use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
 
 use crate::{
+    Db,
     place::{DefinedPlace, Definedness, Place, place_from_bindings},
     types::{
         KnownClass, Type, binding_type,
         context::InferContext,
         diagnostic::INVALID_OVERLOAD,
-        function::{FunctionDecorators, FunctionType, KnownFunction},
+        function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
     },
 };
 use ty_python_core::{
@@ -84,6 +85,15 @@ pub(crate) fn check_overloaded_function<'db>(
     let (overloads, implementation) = function.overloads_and_implementation(db);
     if overloads.is_empty() {
         return;
+    }
+
+    let binding_decorator_inconsistencies =
+        binding_decorator_inconsistencies(db, overloads, implementation.as_ref());
+
+    if let Some(implementation) = implementation
+        && binding_decorator_inconsistencies.is_empty()
+    {
+        check_non_generic_overload_implementation_consistency(context, overloads, implementation);
     }
 
     // Check that the overloaded function has at least two overloads
@@ -159,38 +169,15 @@ pub(crate) fn check_overloaded_function<'db>(
         }
     }
 
-    for (decorator, name) in [
-        (FunctionDecorators::CLASSMETHOD, "classmethod"),
-        (FunctionDecorators::STATICMETHOD, "staticmethod"),
-    ] {
-        let mut decorator_present = false;
-        let mut decorator_missing = vec![];
-
-        for function in overloads.iter().chain(implementation.as_ref()) {
-            if function.has_known_decorator(db, decorator) {
-                decorator_present = true;
-            } else {
-                decorator_missing.push(function);
-            }
-        }
-
-        if !decorator_present {
-            // Both overloads and implementation does not have the decorator
-            continue;
-        }
-        if decorator_missing.is_empty() {
-            // All overloads and implementation have the decorator
-            continue;
-        }
-
+    for inconsistency in binding_decorator_inconsistencies {
         let function_node = function.node(db, context.file(), context.module());
         if let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name) {
             let mut diagnostic = builder.into_diagnostic(format_args!(
-                "Overloaded function `{}` does not use the `@{name}` decorator \
+                "Overloaded function `{}` does not use the `@{}` decorator \
                     consistently",
-                &function_node.name
+                &function_node.name, inconsistency.decorator_name
             ));
-            for function in decorator_missing {
+            for function in inconsistency.missing {
                 diagnostic.annotate(
                     context
                         .secondary(function.focus_range(db, context.module()))
@@ -273,4 +260,139 @@ pub(crate) fn check_overloaded_function<'db>(
             }
         }
     }
+}
+
+/// Check non-generic overload signatures against their implementation.
+///
+/// This is the first, deliberately narrow pass at overload implementation consistency. It reports
+/// only when the overloads and implementation are all non-generic; generic signatures require
+/// careful treatment of type-variable domains.
+fn check_non_generic_overload_implementation_consistency<'db>(
+    context: &InferContext<'db, '_>,
+    overloads: &'db [OverloadLiteral<'db>],
+    implementation: OverloadLiteral<'db>,
+) {
+    if !context.is_lint_enabled(&INVALID_OVERLOAD) {
+        return;
+    }
+
+    let db = context.db();
+    let implementation_signature = implementation.signature(db);
+
+    if !implementation_signature.is_non_generic(db) {
+        return;
+    }
+
+    let overload_signatures = overloads
+        .iter()
+        .map(|overload| (overload, overload.signature(db)))
+        .collect::<Vec<_>>();
+
+    if overload_signatures
+        .iter()
+        .any(|(_, signature)| !signature.is_non_generic(db))
+    {
+        return;
+    }
+
+    for (overload, overload_signature) in overload_signatures {
+        let function_node = overload.node(db, context.file(), context.module());
+        let parameters_are_consistent = implementation_signature
+            .are_non_generic_implementation_parameters_consistent_with(db, &overload_signature);
+        let return_type_is_consistent = overload_signature
+            .return_ty
+            .is_assignable_to(db, implementation_signature.return_ty);
+
+        if parameters_are_consistent && return_type_is_consistent {
+            continue;
+        }
+
+        let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name) else {
+            continue;
+        };
+        let message = match (parameters_are_consistent, return_type_is_consistent) {
+            (false, true) => "Implementation does not accept all arguments of this overload",
+            (true, false) => "Overload return type is not assignable to implementation return type",
+            (false, false) => "Overload signature is not consistent with implementation",
+            (true, true) => continue,
+        };
+        let mut diagnostic = builder.into_diagnostic(format_args!("{message}"));
+        if !parameters_are_consistent {
+            diagnostic.info("Implementation does not accept all arguments of this overload");
+        }
+        if !return_type_is_consistent {
+            diagnostic.info(format_args!(
+                "Overload returns `{}`, which is not assignable to implementation return type `{}`",
+                overload_signature.return_ty.display(db),
+                implementation_signature.return_ty.display(db),
+            ));
+        }
+        diagnostic.annotate(
+            context
+                .secondary(implementation.focus_range(db, context.module()))
+                .message(format_args!("Implementation defined here")),
+        );
+    }
+}
+
+/// A decorator that is applied inconsistently across an overload set.
+struct BindingDecoratorInconsistency<'db, 'a> {
+    /// The user-facing name of the decorator, without the leading `@`.
+    decorator_name: &'static str,
+    /// The overloads or implementation that are missing this decorator.
+    missing: Vec<&'a OverloadLiteral<'db>>,
+}
+
+/// Finds binding-affecting decorator inconsistencies across an overload set.
+///
+/// `@classmethod` and `@staticmethod` affect the callable shape used for overload
+/// implementation consistency checks. This returns a value for each decorator that appears on at
+/// least one overload or implementation, but is missing from another.
+///
+/// For example, given:
+///
+/// ```py
+/// @overload
+/// @staticmethod
+/// def f(x: int) -> int: ...
+///
+/// @overload
+/// def f(x: str) -> str: ...
+///
+/// def f(x: int | str) -> int | str: ...
+/// ```
+///
+/// this returns one `staticmethod` inconsistency whose `missing` entries are the second overload
+/// and the implementation.
+fn binding_decorator_inconsistencies<'db, 'a>(
+    db: &dyn Db,
+    overloads: &'a [OverloadLiteral<'db>],
+    implementation: Option<&'a OverloadLiteral<'db>>,
+) -> Vec<BindingDecoratorInconsistency<'db, 'a>> {
+    const DECORATORS: [(FunctionDecorators, &str); 2] = [
+        (FunctionDecorators::CLASSMETHOD, "classmethod"),
+        (FunctionDecorators::STATICMETHOD, "staticmethod"),
+    ];
+
+    let mut inconsistencies = Vec::new();
+    for (decorator, decorator_name) in DECORATORS {
+        let mut decorator_present = false;
+        let mut missing = vec![];
+
+        for function in overloads.iter().chain(implementation) {
+            if function.has_known_decorator(db, decorator) {
+                decorator_present = true;
+            } else {
+                missing.push(function);
+            }
+        }
+
+        if decorator_present && !missing.is_empty() {
+            inconsistencies.push(BindingDecoratorInconsistency {
+                decorator_name,
+                missing,
+            });
+        }
+    }
+    inconsistencies
 }
