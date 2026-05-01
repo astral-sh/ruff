@@ -2235,7 +2235,7 @@ def _(answer: Answer):
 
 ```py
 from enum import Enum
-from typing_extensions import Literal, assert_never, assert_type
+from typing_extensions import Literal, assert_never, assert_type, overload
 
 class Color(Enum):
     RED = 1
@@ -2304,6 +2304,18 @@ def color_compare_without_red(color: Color) -> None:
         return
     reveal_type(color == Color.RED)  # revealed: Literal[False]
     reveal_type(color != Color.RED)  # revealed: Literal[True]
+
+@overload
+def color_overload(color: Literal[Color.GREEN]) -> Literal["green"]: ...
+@overload
+def color_overload(color: Literal[Color.BLUE]) -> Literal["blue"]: ...
+def color_overload(color: Color) -> str:
+    return color.name.lower()
+
+def color_overload_without_red(color: Color) -> None:
+    if color is Color.RED:
+        return
+    reveal_type(color_overload(color))  # revealed: Literal["green", "blue"]
 
 def color_name_misses_one_variant(color: Color) -> str:
     if color is Color.RED:

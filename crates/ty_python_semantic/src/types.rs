@@ -1814,27 +1814,36 @@ impl<'db> Type<'db> {
     pub(crate) fn is_union_of_single_valued(&self, db: &'db dyn Db) -> bool {
         let ty = self.resolve_type_alias(db);
         ty.as_union().is_some_and(|union| {
-            union.elements(db).iter().all(|ty| {
-                ty.is_single_valued(db)
-                    || ty.is_bool(db)
-                    || ty.is_subtype_of(db, Type::literal_string())
-                    || (ty.is_enum(db) && !ty.overrides_equality(db))
-            })
-        }) || ty.is_bool(db)
-            || ty.is_subtype_of(db, Type::literal_string())
-            || (ty.is_enum(db) && !ty.overrides_equality(db))
+            union
+                .elements(db)
+                .iter()
+                .all(|ty| ty.is_single_valued_union_component(db))
+        }) || ty.is_multi_valued_single_valued_union_component(db)
     }
 
     pub(crate) fn is_union_with_single_valued(&self, db: &'db dyn Db) -> bool {
         let ty = self.resolve_type_alias(db);
         ty.as_union().is_some_and(|union| {
-            union.elements(db).iter().any(|ty| {
-                ty.is_single_valued(db)
-                    || ty.is_bool(db)
-                    || ty.is_subtype_of(db, Type::literal_string())
-                    || (ty.is_enum(db) && !ty.overrides_equality(db))
+            union
+                .elements(db)
+                .iter()
+                .any(|ty| ty.is_single_valued_union_component(db))
+        }) || ty.is_multi_valued_single_valued_union_component(db)
+    }
+
+    fn is_single_valued_union_component(&self, db: &'db dyn Db) -> bool {
+        self.is_single_valued(db) || self.is_multi_valued_single_valued_union_component(db)
+    }
+
+    fn is_multi_valued_single_valued_union_component(&self, db: &'db dyn Db) -> bool {
+        let ty = self.resolve_type_alias(db);
+        ty.enum_complement_literal_types(db)
+            .is_some_and(|literals| {
+                literals
+                    .iter()
+                    .all(|literal| literal.is_single_valued_union_component(db))
             })
-        }) || ty.is_bool(db)
+            || ty.is_bool(db)
             || ty.is_subtype_of(db, Type::literal_string())
             || (ty.is_enum(db) && !ty.overrides_equality(db))
     }
@@ -3384,17 +3393,17 @@ impl<'db> Type<'db> {
                 elem.member_lookup_with_policy(db, name_str.into(), policy)
             }),
 
-            Type::Intersection(_)
+            Type::Intersection(intersection) => {
                 if matches!(name_str, "name" | "_name_" | "value" | "_value_")
-                    && let Some(member_ty) = self.enum_complement_member_type(db, name_str) =>
-            {
-                Place::bound(member_ty).into()
+                    && let Some(member_ty) = self.enum_complement_member_type(db, name_str)
+                {
+                    Place::bound(member_ty).into()
+                } else {
+                    intersection.map_with_boundness_and_qualifiers(db, |elem| {
+                        elem.member_lookup_with_policy(db, name_str.into(), policy)
+                    })
+                }
             }
-
-            Type::Intersection(intersection) => intersection
-                .map_with_boundness_and_qualifiers(db, |elem| {
-                    elem.member_lookup_with_policy(db, name_str.into(), policy)
-                }),
 
             Type::Dynamic(..) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
 

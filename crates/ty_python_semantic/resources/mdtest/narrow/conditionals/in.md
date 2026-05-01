@@ -251,6 +251,14 @@ def _(x: Color):
         reveal_type(x)  # revealed: Literal[Color.RED, Color.GREEN]
     else:
         reveal_type(x)  # revealed: Literal[Color.BLUE]
+
+def after_excluding_red(x: Color):
+    if x is Color.RED:
+        return
+    if x in (Color.GREEN,):
+        reveal_type(x)  # revealed: Literal[Color.GREEN]
+    else:
+        reveal_type(x)  # revealed: Literal[Color.BLUE]
 ```
 
 ## Union with enum and `int`
