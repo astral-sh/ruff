@@ -312,21 +312,51 @@ fn type_excluded_by_previous_patterns<'db>(
     builder.build()
 }
 
-fn enum_class_from_subject<'db>(
+fn enum_literal_subject_names<'db>(
     db: &'db dyn Db,
     subject_ty: Type<'db>,
-) -> Option<ClassLiteral<'db>> {
-    if let Some(enum_class) = subject_ty.enum_class(db) {
-        return Some(enum_class);
+) -> Option<(ClassLiteral<'db>, FxHashSet<Name>)> {
+    fn add_enum_literal<'db>(
+        db: &'db dyn Db,
+        enum_class: &mut Option<ClassLiteral<'db>>,
+        names: &mut FxHashSet<Name>,
+        ty: Type<'db>,
+    ) -> Option<()> {
+        let enum_literal = ty.as_enum_literal()?;
+        let class = enum_literal.enum_class(db);
+
+        if let Some(existing_class) = *enum_class {
+            if existing_class != class {
+                return None;
+            }
+        } else {
+            *enum_class = Some(class);
+        }
+
+        let metadata = enum_metadata(db, class)?;
+        let name = enum_literal.name(db);
+        let canonical_name = metadata.resolve_member(name).unwrap_or(name);
+        names.insert(canonical_name.clone());
+        Some(())
     }
 
-    if let Type::TypeVar(bound_typevar) = subject_ty
-        && let Some(upper_bound) = bound_typevar.typevar(db).upper_bound(db)
-    {
-        return upper_bound.enum_class(db);
+    let mut enum_class = None;
+    let mut names = FxHashSet::default();
+
+    match subject_ty {
+        Type::LiteralValue(_) => {
+            add_enum_literal(db, &mut enum_class, &mut names, subject_ty)?;
+        }
+        Type::Union(union) => {
+            for element in union.elements(db) {
+                add_enum_literal(db, &mut enum_class, &mut names, *element)?;
+            }
+        }
+        Type::TypeAlias(alias) => return enum_literal_subject_names(db, alias.value_type(db)),
+        _ => return None,
     }
 
-    None
+    Some((enum_class?, names))
 }
 
 fn enum_member_pattern_name<'db>(
@@ -340,24 +370,24 @@ fn enum_member_pattern_name<'db>(
 
     let enum_literal =
         infer_expression_type(db, *value, TypeContext::default()).as_enum_literal()?;
-    (enum_literal.enum_class(db) == enum_class).then(|| enum_literal.name(db).clone())
+    if enum_literal.enum_class(db) != enum_class {
+        return None;
+    }
+
+    let metadata = enum_metadata(db, enum_class)?;
+    let name = enum_literal.name(db);
+    let canonical_name = metadata.resolve_member(name).unwrap_or(name);
+    Some(canonical_name.clone())
 }
 
-fn analyze_enum_value_pattern_predicate<'db>(
+fn analyze_enum_literal_union_pattern_predicate<'db>(
     db: &'db dyn Db,
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
 ) -> Option<Truthiness> {
-    let enum_class = enum_class_from_subject(db, subject_ty)?;
-    let metadata = enum_metadata(db, enum_class)?;
-
+    let (enum_class, mut remaining_names) = enum_literal_subject_names(db, subject_ty)?;
     let current_name = enum_member_pattern_name(db, enum_class, predicate.kind(db))?;
-    let current_name = metadata
-        .resolve_member(&current_name)
-        .unwrap_or(&current_name)
-        .clone();
 
-    let mut excluded_names = FxHashSet::default();
     let mut previous_predicate = predicate;
     while let Some(previous) = previous_predicate.previous_predicate(db) {
         previous_predicate = *previous;
@@ -367,18 +397,14 @@ fn analyze_enum_value_pattern_predicate<'db>(
         }
 
         let previous_name = enum_member_pattern_name(db, enum_class, previous_predicate.kind(db))?;
-        let previous_name = metadata
-            .resolve_member(&previous_name)
-            .unwrap_or(&previous_name)
-            .clone();
-        excluded_names.insert(previous_name);
+        remaining_names.remove(&previous_name);
     }
 
-    if excluded_names.contains(&current_name) {
+    if !remaining_names.contains(&current_name) {
         return Some(Truthiness::AlwaysFalse);
     }
 
-    if metadata.members.len().saturating_sub(excluded_names.len()) == 1 {
+    if remaining_names.len() == 1 {
         if predicate.guard(db).is_some() {
             Some(Truthiness::Ambiguous)
         } else {
@@ -402,7 +428,9 @@ fn analyze_enum_value_pattern_predicate<'db>(
 fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'db>) -> Truthiness {
     let subject_ty = infer_expression_type(db, predicate.subject(db), TypeContext::default());
 
-    if let Some(truthiness) = analyze_enum_value_pattern_predicate(db, predicate, subject_ty) {
+    if let Some(truthiness) =
+        analyze_enum_literal_union_pattern_predicate(db, predicate, subject_ty)
+    {
         return truthiness;
     }
 

@@ -2493,6 +2493,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
 
         let elements = self.ty.elements(self.db);
         let mut condensed_types = vec![];
+        let mut condensed_element_count = 0usize;
         let mut subclass_of_types = vec![];
         let element_labels: Vec<_> = elements
             .iter()
@@ -2506,6 +2507,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
 
         for element in elements.iter().copied() {
             if let Some(literals) = condensable_literals(self.db, element) {
+                condensed_element_count += 1;
                 for literal in literals {
                     if !condensed_types.contains(&literal) {
                         condensed_types.push(literal);
@@ -2516,7 +2518,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
             }
         }
 
-        let total_entries = elements.len() - condensed_types.len() - subclass_of_types.len()
+        let total_entries = elements.len() - condensed_element_count - subclass_of_types.len()
             + usize::from(!condensed_types.is_empty())
             + usize::from(!subclass_of_types.is_empty());
 

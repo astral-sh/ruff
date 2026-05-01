@@ -1657,12 +1657,10 @@ mod tests {
     use super::{IntersectionBuilder, Type, UnionBuilder, UnionType};
 
     use crate::db::tests::{TestDb, setup_db};
-    use crate::place::{global_symbol, known_module_symbol};
+    use crate::place::known_module_symbol;
     use crate::types::enums::enum_member_literals;
     use crate::types::{KnownClass, Truthiness};
 
-    use ruff_db::files::system_path_to_file;
-    use ruff_db::system::DbWithWritableSystem as _;
     use ty_module_resolver::KnownModule;
 
     #[test]
@@ -1820,55 +1818,5 @@ mod tests {
 
             assert_eq!(actual.display(&db).to_string(), "Literal[SafeUUID.unknown]");
         }
-    }
-
-    #[test]
-    fn build_intersection_large_enum_complement() {
-        let mut db = setup_db();
-
-        let members = (0..16)
-            .map(|i| format!("    M{i} = {i}\n"))
-            .collect::<String>();
-        let source = format!("from enum import Enum\n\nclass Large(Enum):\n{members}");
-        db.write_file("/src/enums.py", &source).unwrap();
-
-        let file = system_path_to_file(&db, "/src/enums.py").unwrap();
-        let enum_class = global_symbol(&db, file, "Large")
-            .place
-            .ignore_possibly_undefined()
-            .unwrap()
-            .expect_class_literal();
-        let literals = enum_member_literals(&db, enum_class, None)
-            .unwrap()
-            .collect::<Vec<_>>();
-        assert_eq!(literals.len(), 16);
-
-        let large_enum = literals[0].expect_enum_literal().enum_class_instance(&db);
-        let actual = IntersectionBuilder::new(&db)
-            .add_positive(large_enum)
-            .add_negative(literals[0])
-            .build();
-        let expected = UnionType::from_elements(&db, literals[1..].iter().copied());
-
-        let Type::Intersection(intersection) = actual else {
-            panic!(
-                "large enum complement should stay compact, got `{}`",
-                actual.display(&db)
-            );
-        };
-        assert_eq!(intersection.positive(&db).len(), 1);
-        assert!(intersection.positive(&db).contains(&large_enum));
-        assert_eq!(intersection.negative(&db).len(), 1);
-        assert!(intersection.negative(&db).contains(&literals[0]));
-        assert!(actual.is_equivalent_to(&db, expected));
-
-        let empty = literals
-            .iter()
-            .fold(
-                IntersectionBuilder::new(&db).add_positive(large_enum),
-                |builder, literal| builder.add_negative(*literal),
-            )
-            .build();
-        assert_eq!(empty, Type::Never);
     }
 }

@@ -2235,7 +2235,7 @@ def _(answer: Answer):
 
 ```py
 from enum import Enum
-from typing_extensions import assert_never
+from typing_extensions import Literal, assert_never
 
 class Color(Enum):
     RED = 1
@@ -2260,6 +2260,12 @@ def color_name_without_assertion(color: Color) -> str:
         return "Green"
     elif color is Color.BLUE:
         return "Blue"
+
+def color_value_without_red(color: Color) -> Literal[2, 3]:
+    if color is Color.RED:
+        raise ValueError()
+    reveal_type(color.value)  # revealed: Literal[2, 3]
+    return color.value
 
 def color_name_misses_one_variant(color: Color) -> str:
     if color is Color.RED:
@@ -2287,8 +2293,8 @@ python-version = "3.10"
 ```
 
 ```py
-from enum import Enum
-from typing_extensions import assert_never
+from enum import Enum, IntEnum
+from typing_extensions import Literal, assert_never
 
 class Color(Enum):
     RED = 1
@@ -2331,6 +2337,20 @@ def singleton_check(value: Singleton) -> str:
     match value:
         case Singleton.VALUE:
             return "Singleton value"
+        case _:
+            assert_never(value)
+
+class ThreadSubset(IntEnum):
+    WARP = 1
+    WARPGROUP = 2
+    BLOCK = 3
+
+def thread_subset_name(value: Literal[ThreadSubset.WARPGROUP, ThreadSubset.WARP]) -> str:
+    match value:
+        case ThreadSubset.WARPGROUP:
+            return "Warpgroup"
+        case ThreadSubset.WARP:
+            return "Warp"
         case _:
             assert_never(value)
 ```
