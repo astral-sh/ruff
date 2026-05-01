@@ -5856,14 +5856,12 @@ impl<'db> Type<'db> {
                 }
                 KnownInstanceType::FunctoolsPartial(_)
                 | KnownInstanceType::FunctoolsPartialCall(_)
-                | KnownInstanceType::Range { .. } => {
-                    Err(InvalidTypeExpressionError {
-                        invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
-                            *self, scope_id
-                        )],
-                        fallback_type: Type::unknown(),
-                    })
-                }
+                | KnownInstanceType::Range { .. } => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
+                        *self, scope_id
+                    )],
+                    fallback_type: Type::unknown(),
+                }),
             },
 
             Type::SpecialForm(special_form) => special_form
