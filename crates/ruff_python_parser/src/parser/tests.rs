@@ -1,4 +1,4 @@
-use crate::{Mode, ParseOptions, parse, parse_expression, parse_module};
+use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
 
 #[test]
 fn test_modes() {
@@ -178,4 +178,126 @@ fn test_tstring_fstring_middle_fuzzer() {
     let error = parsed.unwrap_err();
 
     insta::assert_debug_snapshot!(error);
+}
+
+#[test]
+fn recursion_limit_nested_parens() {
+    let src = format!("{}1{}", "(".repeat(1_000), ")".repeat(1_000));
+    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
+    let err = parse(&src, opts).unwrap_err();
+    assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
+}
+
+#[test]
+fn recursion_limit_normal_python_unaffected() {
+    // 50 levels is well above what real-world Python ever produces and well
+    // below the default cap — the point is to confirm the default doesn't
+    // reject ordinary input.
+    let src = format!("x = {}1{}", "(".repeat(50), ")".repeat(50));
+    parse_module(&src).unwrap();
+}
+
+#[test]
+fn recursion_limit_nested_def_blocks() {
+    // Nested function definitions exercise instrumentation on
+    // `parse_statement` rather than `parse_lhs_expression`. Each level
+    // needs one more leading tab to make indentation valid.
+    let depth = 400;
+    let mut src = String::new();
+    for i in 0..depth {
+        src.push_str(&"\t".repeat(i));
+        src.push_str("def f():\n");
+    }
+    src.push_str(&"\t".repeat(depth));
+    src.push_str("pass\n");
+    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
+    let err = parse(&src, opts).unwrap_err();
+    assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
+}
+
+#[test]
+fn recursion_limit_nested_lists() {
+    let src = format!("{}1{}", "[".repeat(1_000), "]".repeat(1_000));
+    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
+    let err = parse(&src, opts).unwrap_err();
+    assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
+}
+
+#[test]
+fn recursion_limit_nested_match_patterns() {
+    // Deeply parenthesised match patterns — exercises pattern-parsing
+    // instrumentation in addition to statement / expression paths.
+    let mut src = String::from("match x:\n case ");
+    for _ in 0..600 {
+        src.push('(');
+    }
+    src.push('y');
+    for _ in 0..600 {
+        src.push(')');
+    }
+    src.push_str(": pass\n");
+    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
+    let err = parse(&src, opts).unwrap_err();
+    assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
+}
+
+#[test]
+fn recursion_limit_binary_paren_interplay() {
+    // `1+(1+(1+(1+...)))` — each level alternates a binary operator and a
+    // parenthesised sub-expression, exactly like the pattern described in
+    // the tracking issue.
+    let depth = 2_000;
+    let mut src = String::new();
+    for _ in 0..depth {
+        src.push_str("1+(");
+    }
+    src.push('1');
+    for _ in 0..depth {
+        src.push(')');
+    }
+    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
+    let err = parse(&src, opts).unwrap_err();
+    assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
+}
+
+#[test]
+fn recursion_limit_first_error_is_recursion_not_noise() {
+    // When the limit is hit the outer parser frames will emit secondary
+    // errors as they unwind. Callers read the first error via `into_result`
+    // / `Parsed::errors()`, so `RecursionLimitExceeded` must come first, and
+    // the drain-to-EOF inside `enter_recursion` should keep the total count
+    // small rather than producing one noisy error per unwound frame.
+    let src = format!("{}1{}", "(".repeat(2_000), ")".repeat(2_000));
+    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(50);
+    let parsed = crate::parse_unchecked(&src, opts);
+    let errors = parsed.errors();
+    let first = errors.first().expect("expected at least one error");
+    assert!(matches!(
+        first.error,
+        ParseErrorType::RecursionLimitExceeded
+    ));
+    // Exactly one `RecursionLimitExceeded` — guards against a regression
+    // where the unwind loops and re-triggers the limit check.
+    let recursion_errors = errors
+        .iter()
+        .filter(|e| matches!(e.error, ParseErrorType::RecursionLimitExceeded))
+        .count();
+    assert_eq!(recursion_errors, 1);
+    // Small, bounded tail of follow-up errors from the unwinding frames.
+    // Today this is 0; the generous cap is a regression gate, not a spec.
+    assert!(
+        errors.len() <= 8,
+        "expected a small number of errors, got {}: {errors:?}",
+        errors.len(),
+    );
+}
+
+#[test]
+fn recursion_limit_default_set() {
+    let opts = ParseOptions::from(Mode::Module);
+    // Guards against someone accidentally unsetting the default. Real-world
+    // Python never approaches this depth, and the value must stay within the
+    // threading stack's capacity — see the const's docs in `options.rs`.
+    assert!(opts.max_recursion_depth() >= 200);
+    assert!(opts.max_recursion_depth() <= 2000);
 }

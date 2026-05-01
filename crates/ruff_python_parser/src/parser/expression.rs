@@ -328,6 +328,32 @@ impl<'src> Parser<'src> {
         left_precedence: OperatorPrecedence,
         context: ExpressionContext,
     ) -> ParsedExpr {
+        let range = self.current_token_range();
+        if let Some(scope) = self.enter_recursion(range) {
+            let result = self.parse_lhs_expression_inner(left_precedence, context);
+            scope.exit(self);
+            result
+        } else {
+            // The recursion limit has been exceeded; return the standard
+            // expression-recovery node (an empty `Name` with the `Invalid`
+            // context).
+            ParsedExpr {
+                expr: Expr::Name(ast::ExprName {
+                    range: self.missing_node_range(),
+                    id: Name::empty(),
+                    ctx: ExprContext::Invalid,
+                    node_index: AtomicNodeIndex::NONE,
+                }),
+                is_parenthesized: false,
+            }
+        }
+    }
+
+    fn parse_lhs_expression_inner(
+        &mut self,
+        left_precedence: OperatorPrecedence,
+        context: ExpressionContext,
+    ) -> ParsedExpr {
         let start = self.node_start();
         let token = self.current_token_kind();
 
@@ -1798,11 +1824,17 @@ impl<'src> Parser<'src> {
 
         let format_spec = if self.eat(TokenKind::Colon) {
             let spec_start = self.node_start();
-            let elements = self.parse_interpolated_string_elements(
-                flags,
-                InterpolatedStringElementsKind::FormatSpec(string_kind),
-                string_kind,
-            );
+            let elements = if let Some(scope) = self.enter_recursion(self.current_token_range()) {
+                let elements = self.parse_interpolated_string_elements(
+                    flags,
+                    InterpolatedStringElementsKind::FormatSpec(string_kind),
+                    string_kind,
+                );
+                scope.exit(self);
+                elements
+            } else {
+                ast::InterpolatedStringElements::from(vec![])
+            };
             Some(Box::new(ast::InterpolatedStringFormatSpec {
                 range: self.node_range(spec_start),
                 elements,
