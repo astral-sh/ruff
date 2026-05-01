@@ -11,6 +11,7 @@
 mod constructor;
 
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fmt;
 
@@ -50,13 +51,14 @@ use crate::types::signatures::{
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassLiteral, DATACLASS_FLAGS,
     DataclassFlags, DataclassParams, GenericAlias, InternedConstraintSet, IntersectionType,
     KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, NominalInstanceType,
-    PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints,
-    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
-    list_members,
+    PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -66,6 +68,81 @@ use ty_python_core::scope::NodeWithScopeKind;
 use ty_python_core::{EvaluationMode, semantic_index};
 
 pub(crate) use self::constructor::ConstructorCallableKind;
+
+fn generic_contexts_mentioned_in_type<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> FxOrderSet<GenericContext<'db>> {
+    struct GenericContextCollector<'db> {
+        generic_contexts: RefCell<FxOrderSet<GenericContext<'db>>>,
+        recursion_guard: TypeCollector<'db>,
+    }
+
+    impl<'db> GenericContextCollector<'db> {
+        fn visit_signature(&self, db: &'db dyn Db, signature: &Signature<'db>) {
+            if let Some(generic_context) = signature.generic_context {
+                self.generic_contexts.borrow_mut().insert(generic_context);
+            }
+            for parameter in signature.parameters() {
+                self.visit_type(db, parameter.annotated_type());
+                if let Some(default_ty) = parameter.default_type() {
+                    self.visit_type(db, default_ty);
+                }
+            }
+            self.visit_type(db, signature.return_ty);
+        }
+    }
+
+    impl<'db> TypeVisitor<'db> for GenericContextCollector<'db> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            false
+        }
+
+        fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
+            for signature in &callable.signatures(db).overloads {
+                self.visit_signature(db, signature);
+            }
+        }
+
+        fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
+            for signature in &function.signature(db).overloads {
+                self.visit_signature(db, signature);
+            }
+            self.visit_signature(db, function.last_definition_signature(db));
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+    }
+
+    let collector = GenericContextCollector {
+        generic_contexts: RefCell::default(),
+        recursion_guard: TypeCollector::default(),
+    };
+    collector.visit_type(db, ty);
+    collector.generic_contexts.into_inner()
+}
+
+fn freshen_generic_contexts_in_type<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    generic_contexts: FxOrderSet<GenericContext<'db>>,
+    nonce_generator: &TypeVarNonceGenerator<'db>,
+) -> Type<'db> {
+    generic_contexts
+        .into_iter()
+        .fold(ty, |ty, generic_context| {
+            ty.apply_type_mapping(
+                db,
+                &TypeMapping::FreshenBoundTypeVars {
+                    generic_context,
+                    delta: nonce_generator.next().value(),
+                },
+                TypeContext::default(),
+            )
+        })
+}
 
 /// Priority levels for call errors in intersection types.
 /// Higher values indicate more specific errors that should take precedence.
@@ -2364,11 +2441,25 @@ impl<'db> Bindings<'db> {
                             continue;
                         };
 
+                        let nonce_generator = TypeVarNonceGenerator::default();
+                        let ty_a = freshen_generic_contexts_in_type(
+                            db,
+                            *ty_a,
+                            generic_contexts_mentioned_in_type(db, *ty_a),
+                            &nonce_generator,
+                        );
+                        let ty_b = freshen_generic_contexts_in_type(
+                            db,
+                            *ty_b,
+                            generic_contexts_mentioned_in_type(db, *ty_b),
+                            &nonce_generator,
+                        );
+
                         let constraints = ConstraintSetBuilder::new();
                         let result = constraints.into_owned(|constraints| {
                             ty_a.when_subtype_of_assuming(
                                 db,
-                                *ty_b,
+                                ty_b,
                                 constraints.load(db, tracked.constraints(db)),
                                 constraints,
                                 InferableTypeVars::None,
