@@ -2453,6 +2453,21 @@ const UNION_POLICY: TruncationPolicy = TruncationPolicy {
 
 impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        /// Return the literal types that can be folded into a displayed `Literal[...]` group.
+        ///
+        /// Plain literal types are returned as-is. Enum complements are expanded to their
+        /// remaining enum literals so a type like `Color & ~Literal[Color.RED]` can be displayed
+        /// with the same condensation rules as explicit enum-literal unions.
+        ///
+        /// ```python
+        /// from enum import Enum
+        ///
+        /// class Color(Enum):
+        ///     RED = 1
+        ///     BLUE = 2
+        ///
+        /// # Color excluding RED displays through the literal-group path for BLUE.
+        /// ```
         fn condensable_literals<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
             if matches!(
                 ty.as_literal_value_kind(),
@@ -2707,6 +2722,20 @@ impl<'db> FmtDetailed<'db> for DisplayLiteralGroup<'db> {
 }
 
 impl<'db> DisplayLiteralGroup<'db> {
+    /// Return the enum class if this literal group contains every canonical member of one enum.
+    ///
+    /// This lets the display collapse a full enum-literal set back to the enum class instead of
+    /// showing a long `Literal[...]` list.
+    ///
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Color(Enum):
+    ///     RED = 1
+    ///     BLUE = 2
+    ///
+    /// # Literal[Color.RED, Color.BLUE] displays as Color.
+    /// ```
     fn full_enum_class(&self) -> Option<ClassLiteral<'db>> {
         let mut enum_class = None;
         let mut names = FxHashSet::default();

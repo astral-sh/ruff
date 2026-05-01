@@ -1030,6 +1030,19 @@ impl<'db> Type<'db> {
         self.is_instance_of(db, KnownClass::Bool)
     }
 
+    /// Return the enum class for an instance type if this type is an enum instance.
+    ///
+    /// This identifies the class behind values annotated as an enum instance, such as `Color` in
+    /// the following example:
+    ///
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Color(Enum):
+    ///     RED = 1
+    ///
+    /// def f(color: Color): ...
+    /// ```
     pub(crate) fn enum_class(self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
         self.as_nominal_instance().and_then(|instance| {
             let class = instance.class_literal(db);
@@ -1039,6 +1052,23 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Return the components of an enum-complement intersection.
+    ///
+    /// An enum complement is an intersection containing exactly one enum instance type and zero or
+    /// more negated enum literals from the same class, such as `Color & ~Literal[Color.RED]`.
+    /// The returned names are canonicalized so enum aliases exclude the member they alias.
+    ///
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Color(Enum):
+    ///     RED = 1
+    ///     BLUE = 2
+    ///
+    /// def f(color: Color):
+    ///     if color is not Color.RED:
+    ///         reveal_type(color)  # Color, excluding Color.RED
+    /// ```
     fn enum_complement(
         self,
         db: &'db dyn Db,
@@ -1079,6 +1109,23 @@ impl<'db> Type<'db> {
         Some((enum_class, metadata, excluded_names))
     }
 
+    /// Expand an enum complement to the enum literals that remain possible.
+    ///
+    /// For `Color & ~Literal[Color.RED]`, this returns the literal types for every canonical
+    /// `Color` member except `RED`. Complements with no excluded members return `None` because
+    /// there is nothing more precise to expand.
+    ///
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Color(Enum):
+    ///     RED = 1
+    ///     BLUE = 2
+    ///
+    /// def f(color: Color):
+    ///     if color is not Color.RED:
+    ///         reveal_type(color)  # Literal[Color.BLUE]
+    /// ```
     pub(crate) fn enum_complement_literal_types(self, db: &'db dyn Db) -> Option<Vec<Type<'db>>> {
         let (enum_class, metadata, excluded_names) = self.enum_complement(db)?;
 
@@ -1096,6 +1143,51 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Return the enum class and canonical member names excluded by an enum complement.
+    ///
+    /// This is useful when two complement types need to be combined without first expanding every
+    /// remaining member into a `Literal[...]` type.
+    ///
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Color(Enum):
+    ///     RED = 1
+    ///     BLUE = 2
+    ///
+    /// def f(color: Color):
+    ///     if color is not Color.RED:
+    ///         reveal_type(color)  # Color, excluding Color.RED
+    /// ```
+    pub(crate) fn enum_complement_excluded_member_names(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<(ClassLiteral<'db>, FxHashSet<Name>)> {
+        let (enum_class, _, excluded_names) = self.enum_complement(db)?;
+
+        if excluded_names.is_empty() {
+            return None;
+        }
+
+        Some((enum_class, excluded_names))
+    }
+
+    /// Return the type of a member attribute for all enum literals remaining in a complement.
+    ///
+    /// This handles `.name`, `.value`, `._name_`, and `._value_` on a narrowed enum complement by
+    /// unioning the corresponding attribute type from each remaining canonical enum member.
+    ///
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Color(Enum):
+    ///     RED = 1
+    ///     BLUE = 2
+    ///
+    /// def f(color: Color):
+    ///     if color is not Color.RED:
+    ///         reveal_type(color.name)  # Literal["BLUE"]
+    /// ```
     pub(crate) fn enum_complement_member_type(
         self,
         db: &'db dyn Db,
@@ -1132,20 +1224,7 @@ impl<'db> Type<'db> {
         found_member.then(|| builder.build())
     }
 
-    pub(crate) fn enum_complement_single_literal_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let (enum_class, metadata, excluded_names) = self.enum_complement(db)?;
-
-        if metadata.members.len().checked_sub(excluded_names.len())? != 1 {
-            return None;
-        }
-
-        metadata
-            .members
-            .keys()
-            .find(|name| !excluded_names.contains(*name))
-            .map(|name| Type::enum_literal(EnumLiteralType::new(db, enum_class, name.clone())))
-    }
-
+    /// Return `true` if this type is an enum instance type.
     fn is_enum(&self, db: &'db dyn Db) -> bool {
         self.enum_class(db).is_some()
     }

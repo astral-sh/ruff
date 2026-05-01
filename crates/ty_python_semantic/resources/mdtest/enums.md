@@ -2235,7 +2235,7 @@ def _(answer: Answer):
 
 ```py
 from enum import Enum
-from typing_extensions import Literal, assert_never
+from typing_extensions import Literal, assert_never, assert_type
 
 class Color(Enum):
     RED = 1
@@ -2266,6 +2266,44 @@ def color_value_without_red(color: Color) -> Literal[2, 3]:
         raise ValueError()
     reveal_type(color.value)  # revealed: Literal[2, 3]
     return color.value
+
+def color_after_merge(color: Color) -> None:
+    if color is Color.RED:
+        merged = color
+    else:
+        merged = color
+    reveal_type(merged)  # revealed: Color
+    assert_type(merged, Color)
+
+def color_after_different_complement_merge(color: Color, flag: bool) -> None:
+    if flag:
+        if color is Color.RED:
+            return
+        merged = color
+    else:
+        if color is Color.GREEN:
+            return
+        merged = color
+    reveal_type(merged)  # revealed: Color
+    assert_type(merged, Color)
+
+def color_after_shared_complement_merge(color: Color, flag: bool) -> None:
+    if color is Color.RED:
+        return
+    if flag:
+        merged = color
+    else:
+        if color is Color.GREEN:
+            return
+        merged = color
+    reveal_type(merged)  # revealed: Literal[Color.GREEN, Color.BLUE]
+    assert_type(merged, Literal[Color.GREEN, Color.BLUE])
+
+def color_compare_without_red(color: Color) -> None:
+    if color is Color.RED:
+        return
+    reveal_type(color == Color.RED)  # revealed: Literal[False]
+    reveal_type(color != Color.RED)  # revealed: Literal[True]
 
 def color_name_misses_one_variant(color: Color) -> str:
     if color is Color.RED:
@@ -2353,6 +2391,23 @@ def thread_subset_name(value: Literal[ThreadSubset.WARPGROUP, ThreadSubset.WARP]
             return "Warp"
         case _:
             assert_never(value)
+
+class CustomEq(Enum):
+    A = 1
+    B = 2
+
+    def __eq__(self, other: object) -> bool:
+        return False
+
+def custom_eq_match(value: Literal[CustomEq.A, CustomEq.B]) -> str:
+    match value:
+        case CustomEq.A:
+            return "A"
+        case CustomEq.B:
+            return "B"
+        case _:
+            reveal_type(value)  # revealed: CustomEq
+            return "default"
 ```
 
 ## `if` statements (function syntax)
