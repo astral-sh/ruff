@@ -3601,6 +3601,13 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     }
                 }
             }
+            ast::Expr::Call(call) => {
+                walk_expr(self, expr);
+
+                if let Some(place_expr) = PlaceExpr::try_from_get_method_call(call) {
+                    self.add_place(place_expr);
+                }
+            }
             ast::Expr::Named(node) => {
                 // TODO walrus in comprehensions is implicitly nonlocal
                 self.visit_expr(&node.value);
