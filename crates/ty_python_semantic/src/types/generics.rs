@@ -28,10 +28,10 @@ use crate::types::typevar::{
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
-    MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, binding_type, declaration_type,
-    infer_definition_types,
+    ClassLiteral, FindLegacyTypeVarsVisitor, GenericAlias, IntersectionType, KnownClass,
+    KnownInstanceType, MaterializationKind, NominalInstanceType, Type, TypeAliasType, TypeContext,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator,
+    UnionType, any_over_type, binding_type, declaration_type, infer_definition_types,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -1375,6 +1375,26 @@ impl<'db> Specialization<'db> {
         checker.check_specialization_pair(db, self, other)
     }
 
+    fn when_constraint_set_assignable_to<'c>(
+        self,
+        db: &'db dyn Db,
+        target: Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        let checker = TypeRelationChecker::constraint_set_assignability(
+            constraints,
+            &relation_visitor,
+            &disjointness_visitor,
+            &signature_relation_visitor,
+            &materialization_visitor,
+        );
+        checker.check_specialization_pair(db, self, target)
+    }
+
     pub(crate) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
@@ -2071,6 +2091,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             .collect()
     }
 
+    /// Builds a specialization without applying defaults to type variables that were not
+    /// inferred by this builder.
+    pub(crate) fn build_preserving_unmapped(
+        &mut self,
+        generic_context: GenericContext<'db>,
+    ) -> Specialization<'db> {
+        self.build_with(generic_context, |typevar, bounds| {
+            bounds.is_none().then_some(Type::TypeVar(typevar))
+        })
+    }
+
     fn insert_hash_map_type_mapping(
         &mut self,
         bound_typevar: BoundTypeVarInstance<'db>,
@@ -2095,6 +2126,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 entry.insert(UnionAccumulator::new(ty));
             }
         }
+    }
+
+    /// Inserts an already solved type mapping without adding another pending constraint.
+    pub(crate) fn insert_type_mapping(
+        &mut self,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+    ) {
+        self.insert_hash_map_type_mapping(bound_typevar, ty);
     }
 
     fn intersect_pending_typevar_constraint(
@@ -2177,6 +2217,79 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
         }
         Ok(())
+    }
+
+    fn references_inferable_typevar(&self, ty: Type<'db>) -> bool {
+        if self.inferable == InferableTypeVars::None {
+            return false;
+        }
+
+        any_over_type(
+            self.db,
+            ty,
+            false,
+            |ty| matches!(ty, Type::TypeVar(typevar) if typevar.is_inferable(self.db, self.inferable)),
+        )
+    }
+
+    /// Infers a matching nominal protocol base through the constraint solver.
+    ///
+    /// Protocol arguments can contain unions or narrowed structural types. Keep those relations
+    /// intact instead of recursively extracting independent type mappings from each argument.
+    fn infer_from_matching_protocol_generic_base(
+        &mut self,
+        formal_alias: GenericAlias<'db>,
+        actual_nominal: NominalInstanceType<'db>,
+        polarity: TypeVarVariance,
+    ) -> bool {
+        let formal_origin = formal_alias.origin(self.db);
+        for base in actual_nominal.class(self.db).iter_mro(self.db) {
+            let ClassBase::Class(ClassType::Generic(base_alias)) = base else {
+                continue;
+            };
+            if formal_origin != base_alias.origin(self.db) {
+                continue;
+            }
+
+            let formal_specialization = formal_alias.specialization(self.db);
+            let base_specialization = base_alias.specialization(self.db);
+            let when = match polarity {
+                TypeVarVariance::Covariant => base_specialization
+                    .when_constraint_set_assignable_to(
+                        self.db,
+                        formal_specialization,
+                        self.constraints,
+                    ),
+                TypeVarVariance::Contravariant => formal_specialization
+                    .when_constraint_set_assignable_to(
+                        self.db,
+                        base_specialization,
+                        self.constraints,
+                    ),
+                TypeVarVariance::Invariant => base_specialization
+                    .when_constraint_set_assignable_to(
+                        self.db,
+                        formal_specialization,
+                        self.constraints,
+                    )
+                    .and(self.db, self.constraints, || {
+                        formal_specialization.when_constraint_set_assignable_to(
+                            self.db,
+                            base_specialization,
+                            self.constraints,
+                        )
+                    }),
+                TypeVarVariance::Bivariant => ConstraintSet::from_bool(self.constraints, true),
+            };
+
+            if self.add_type_mappings_from_constraint_set(when).is_ok() {
+                self.pending.intersect(self.db, self.constraints, when);
+                return true;
+            }
+            return false;
+        }
+
+        false
     }
 
     /// Infer type mappings by comparing formal callable signatures against actual callables.
@@ -2634,7 +2747,28 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         formal_nominal.class(self.db).into_generic_alias()
                     }
 
-                    Type::ProtocolInstance(_) => {
+                    Type::ProtocolInstance(formal_protocol) => {
+                        // Match declared protocol bases through the constraint solver so
+                        // disjunctive or narrowed protocol arguments remain correlated. Avoid
+                        // this path when the actual type contains a tuple specialization, since
+                        // tuple element precision is not represented in generic bases.
+                        if !any_over_type(self.db, actual, false, |ty| {
+                            ty.tuple_instance_spec(self.db).is_some()
+                        }) && let Some(formal_nominal) = formal_protocol.to_nominal_instance()
+                            && let Some(formal_alias) =
+                                formal_nominal.class(self.db).into_generic_alias()
+                            && self.infer_from_matching_protocol_generic_base(
+                                formal_alias,
+                                actual_nominal,
+                                polarity,
+                            )
+                        {
+                            return Ok(());
+                        }
+
+                        if !self.references_inferable_typevar(formal) {
+                            return Ok(());
+                        }
                         // TODO: For protocols, we use the new constraint set implementation, which
                         // will handle implicitly implemented protocols and generic protocols. We
                         // eventually want this logic to be used for _all_ nominal instances
@@ -2689,6 +2823,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // union, but the old solver isn't well-equipped to handle that (due to side effects
             // from even failed matches), so for now we handle this particular case.
             (formal @ Type::ProtocolInstance(_), actual @ Type::Union(_)) => {
+                if !self.references_inferable_typevar(formal) {
+                    return Ok(());
+                }
                 let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
                 let when = self.constraints.load(self.db, when);
                 // For protocol inference via constraint sets, keep unsatisfiable results non-fatal
@@ -2716,6 +2853,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // from matching the actual type's callable signature against the protocol's `__call__`
             // method signature.
             (Type::ProtocolInstance(formal_protocol), _) => {
+                if !self.references_inferable_typevar(formal) {
+                    return Ok(());
+                }
                 let Some(call_method) = formal_protocol.interface(self.db).call_method(self.db)
                 else {
                     return Ok(());

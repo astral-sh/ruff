@@ -962,24 +962,48 @@ def flatten(*iterables: Iterable[FlatT]) -> list[FlatT]:
 def flatten_covariant(*iterables: Iterable[FlatT]) -> tuple[FlatT, ...]:
     return tuple(x for iterable in iterables for x in iterable)
 
-reveal_type(flatten("abc", (1, 2, 3)))  # revealed: list[LiteralString | int]
-reveal_type(flatten_covariant("abc", (1, 2, 3)))  # revealed: tuple[LiteralString | Literal[1, 2, 3], ...]
+# TODO: Preserve LiteralString for literal receivers while rejecting its overload for plain str.
+reveal_type(flatten("abc", (1, 2, 3)))  # revealed: list[str | int]
+reveal_type(flatten_covariant("abc", (1, 2, 3)))  # revealed: tuple[str | Literal[1, 2, 3], ...]
 
 def literal_string_case(literal_string: LiteralString):
-    reveal_type(flatten(literal_string, (1, 2, 3)))  # revealed: list[LiteralString | int]
+    reveal_type(flatten(literal_string, (1, 2, 3)))  # revealed: list[str | int]
 
 def literal_string_case(string: str):
-    # TODO: revealed: list[str | int]
-    # str has an __iter__ overload that returns LiteralString elements when self is a LiteralString.
-    # We currently including `LiteralString ≤ FlatT` in our constraint set because of that overload,
-    # even though the overload should not be selectable since `str ≰ LiteralString`.
-    reveal_type(flatten(string, (1, 2, 3)))  # revealed: list[LiteralString | int]
+    reveal_type(flatten(string, (1, 2, 3)))  # revealed: list[str | int]
 
 reveal_type(flatten(b"abc"))  # revealed: list[int]
 reveal_type(flatten(b"abc", ("x",)))  # revealed: list[int | str]
 # TODO: we could have `Literal[97, 98, 99]` instead of `int` in the next two lines
 reveal_type(flatten_covariant(b"abc"))  # revealed: tuple[int, ...]
 reveal_type(flatten_covariant(b"abc", ("x",)))  # revealed: tuple[int | Literal["x"], ...]
+```
+
+## Inferring bounded typevars through iterable protocols
+
+```py
+from typing import Iterable, Iterator, NamedTuple, TypeVar
+
+S = TypeVar("S", bound=str | bytes)
+T = TypeVar("T", bound=str | bytes)
+
+def collect(items: Iterable[T]) -> list[T]:
+    return list(items)
+
+def test(items: list[S]) -> None:
+    reveal_type(collect(items))  # revealed: list[S@test]
+    bad: list[str] | list[bytes] = collect(items)  # error: [invalid-assignment]
+
+class Diff(NamedTuple):
+    removed: set[str]
+    added: set[str]
+    source_sha: str
+
+    def __iter__(self) -> Iterator[str]:
+        yield ""
+
+def named_tuple_with_custom_iterator(diff: Diff) -> None:
+    reveal_type(list(diff))  # revealed: list[str]
 ```
 
 ## Inferring typevars in intersections (formal type position)

@@ -60,7 +60,7 @@ use crate::types::{
     TypeAliasType, TypeContext, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator,
     UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
 };
-use crate::{DisplaySettings, FxOrderSet, Program};
+use crate::{DisplaySettings, FxIndexMap, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
 use ty_module_resolver::KnownModule;
@@ -4637,7 +4637,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let return_with_tcx = Some(self.return_ty).zip(self.call_expression_tcx.annotation);
 
         self.inferable_typevars = generic_context.inferable_typevars(self.db);
+        if self.infer_protocol_receiver_specialization(constraints, generic_context) {
+            return;
+        }
+
         let mut builder = SpecializationBuilder::new(self.db, constraints, self.inferable_typevars);
+        for receiver in self.signature.bound_receiver_constraints() {
+            let _ = builder.infer(receiver.expected, receiver.actual);
+        }
 
         // Type variables for which we inferred a declared type based on a partially specialized
         // type from an outer generic context. For these type variables, we may infer types that
@@ -4787,6 +4794,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // produce more precise diagnostics.
         if !assignable_to_declared_type {
             builder = SpecializationBuilder::new(self.db, constraints, self.inferable_typevars);
+            for receiver in self.signature.bound_receiver_constraints() {
+                let _ = builder.infer(receiver.expected, receiver.actual);
+            }
             specialization_errors.clear();
 
             self.infer_argument_constraints(
@@ -4871,6 +4881,372 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
         self.specialization = Some(specialization);
+    }
+
+    /// Infers generic bound-method calls while retaining the relationship established by a
+    /// structural protocol receiver.
+    ///
+    /// A structural receiver can satisfy `Protocol[T]` along several paths, or only constrain one
+    /// bound of `T`. Inferring a concrete `T` from the receiver before seeing the remaining
+    /// arguments either merges unrelated paths or makes a widenable bound too precise. Solve the
+    /// receiver and argument obligations together instead.
+    fn infer_protocol_receiver_specialization(
+        &mut self,
+        constraints: &ConstraintSetBuilder<'db>,
+        generic_context: GenericContext<'db>,
+    ) -> bool {
+        if !self.has_protocol_receiver_constraint_source() {
+            return false;
+        }
+
+        let mut when = ConstraintSet::from_bool(constraints, true);
+        for receiver in self.signature.bound_receiver_constraints() {
+            when = when.and(self.db, constraints, || {
+                self.when_protocol_receiver_assignable_to(
+                    receiver.actual,
+                    receiver.expected,
+                    constraints,
+                )
+            });
+        }
+
+        let parameters = self.signature.parameters();
+        let mut invalid_argument = None;
+        let mut invalid_synthetic_argument = None;
+
+        for (argument_index, adjusted_argument_index, argument, argument_types) in
+            self.enumerate_argument_types()
+        {
+            for (parameter_index, variadic_argument_type) in
+                self.argument_matches[argument_index].iter()
+            {
+                if self.is_gradual_variadic_parameter(parameter_index) {
+                    continue;
+                }
+
+                let parameter = &parameters[parameter_index];
+                let declared_type = parameter.annotated_type();
+                if !declared_type.has_typevar(self.db) {
+                    continue;
+                }
+
+                let argument_type = argument_types.get_for_declared_type(declared_type);
+                let argument_type = variadic_argument_type.unwrap_or(argument_type);
+                when = when.and(self.db, constraints, || {
+                    if matches!(argument, Argument::Synthetic)
+                        && matches!(declared_type, Type::ProtocolInstance(_))
+                    {
+                        self.when_protocol_receiver_assignable_to(
+                            argument_type,
+                            declared_type,
+                            constraints,
+                        )
+                    } else {
+                        argument_type.when_constraint_set_assignable_to(
+                            self.db,
+                            declared_type,
+                            constraints,
+                        )
+                    }
+                });
+
+                let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
+                    && !parameter.is_variadic();
+                let context = (
+                    argument_index,
+                    adjusted_argument_index,
+                    ParameterContext::new(parameter, parameter_index, positional),
+                    declared_type,
+                    argument_type,
+                );
+                if matches!(argument, Argument::Synthetic) {
+                    invalid_synthetic_argument = Some(context);
+                } else {
+                    invalid_argument = Some(context);
+                }
+            }
+        }
+
+        let argument_when = when;
+        let mut when =
+            argument_when.remove_noninferable(self.db, constraints, self.inferable_typevars);
+
+        // Preserve the existing bidirectional-inference behavior: an eligible return context is
+        // a preferred additional constraint, but must not turn an otherwise valid call into an
+        // argument error.
+        if let Some(tcx) = self.call_expression_tcx.annotation
+            && tcx
+                .filter_union(self.db, |ty| ty.may_prefer_declared_type(self.db))
+                .may_prefer_declared_type(self.db)
+        {
+            let return_ty =
+                self.return_ty
+                    .filter_disjoint_elements(self.db, tcx, self.inferable_typevars);
+            let tcx = tcx.filter_disjoint_elements(self.db, return_ty, self.inferable_typevars);
+            let contextual_when = argument_when
+                .and(self.db, constraints, || {
+                    return_ty.when_constraint_set_assignable_to(self.db, tcx, constraints)
+                })
+                .remove_noninferable(self.db, constraints, self.inferable_typevars);
+            if !contextual_when.is_never_satisfied(self.db) {
+                when = contextual_when;
+            }
+        }
+
+        match when.solutions(self.db, constraints) {
+            Solutions::Unsatisfiable => {
+                if let Some((
+                    argument_index,
+                    adjusted_argument_index,
+                    parameter,
+                    expected_ty,
+                    provided_ty,
+                )) = invalid_argument.or(invalid_synthetic_argument)
+                {
+                    self.constraint_set_errors[argument_index] = true;
+                    self.errors.push(BindingError::InvalidArgumentType {
+                        parameter,
+                        argument_index: adjusted_argument_index,
+                        expected_ty,
+                        provided_ty,
+                    });
+                }
+            }
+            Solutions::Unconstrained => return false,
+            Solutions::Constrained(solutions) => {
+                let mut return_ty = UnionBuilder::new(self.db);
+                let mut single_specialization = None;
+                let mut valid_solution_count = 0;
+
+                for solution in solutions {
+                    let mut builder =
+                        SpecializationBuilder::new(self.db, constraints, self.inferable_typevars);
+                    for binding in solution {
+                        builder.insert_type_mapping(binding.bound_typevar, binding.solution);
+                    }
+                    let specialization = builder.build_with(generic_context, |typevar, bounds| {
+                        self.promote_inferred_typevar(typevar, bounds)
+                    });
+
+                    // A constraint-set path can satisfy only one member of a non-expandable
+                    // container argument. Reject those partial paths after specialization; leave
+                    // top-level expandable arguments to overload argument expansion below.
+                    let arguments_are_valid = self.enumerate_argument_types().all(
+                        |(argument_index, _, argument, argument_types)| {
+                            self.argument_matches[argument_index].iter().all(
+                                |(parameter_index, variadic_argument_type)| {
+                                    let declared_type = self.signature.parameters()
+                                        [parameter_index]
+                                        .annotated_type();
+                                    if !declared_type.has_typevar(self.db) {
+                                        return true;
+                                    }
+                                    let argument_type =
+                                        variadic_argument_type.unwrap_or_else(|| {
+                                            argument_types.get_for_declared_type(declared_type)
+                                        });
+                                    // A synthetic receiver with unresolved type variables is an
+                                    // input to bidirectional inference and can be legitimately
+                                    // refined by this specialization.
+                                    if matches!(argument, Argument::Synthetic)
+                                        && argument_type.has_typevar(self.db)
+                                    {
+                                        return true;
+                                    }
+                                    is_expandable_type(self.db, argument_type)
+                                        || argument_type
+                                            .when_assignable_to(
+                                                self.db,
+                                                declared_type
+                                                    .apply_specialization(self.db, specialization),
+                                                constraints,
+                                                InferableTypeVars::None,
+                                            )
+                                            .is_always_satisfied(self.db)
+                                },
+                            )
+                        },
+                    );
+                    if !arguments_are_valid {
+                        continue;
+                    }
+
+                    valid_solution_count += 1;
+                    return_ty
+                        .add_in_place(self.return_ty.apply_specialization(self.db, specialization));
+                    if valid_solution_count == 1 {
+                        single_specialization = Some(specialization);
+                    } else {
+                        single_specialization = None;
+                    }
+                }
+
+                if valid_solution_count == 0 {
+                    if let Some((
+                        argument_index,
+                        adjusted_argument_index,
+                        parameter,
+                        expected_ty,
+                        provided_ty,
+                    )) = invalid_argument.or(invalid_synthetic_argument)
+                    {
+                        self.constraint_set_errors[argument_index] = true;
+                        self.errors.push(BindingError::InvalidArgumentType {
+                            parameter,
+                            argument_index: adjusted_argument_index,
+                            expected_ty,
+                            provided_ty,
+                        });
+                    }
+                    return true;
+                }
+
+                self.return_ty = return_ty.build();
+                self.specialization = single_specialization;
+            }
+        }
+
+        true
+    }
+
+    /// Returns receiver-derived constraints for a generic protocol overload.
+    ///
+    /// A gradual receiver can be consistent with multiple structural paths, but no individual
+    /// path is evidence about which materialization the receiver has. Merge its possible
+    /// specializations before later argument constraints are added; fully static receivers retain
+    /// their path correlation.
+    fn when_protocol_receiver_assignable_to<'c>(
+        &self,
+        actual: Type<'db>,
+        expected: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let when = actual.when_constraint_set_assignable_to(self.db, expected, constraints);
+        if !actual.has_dynamic(self.db) {
+            return when;
+        }
+
+        let when = when.remove_noninferable(self.db, constraints, self.inferable_typevars);
+        let Solutions::Constrained(solutions) = when.solutions(self.db, constraints) else {
+            return when;
+        };
+
+        let solution_count = solutions.len();
+        let mut collapsed: FxIndexMap<
+            BoundTypeVarIdentity<'db>,
+            (BoundTypeVarInstance<'db>, UnionAccumulator<'db>, usize),
+        > = FxIndexMap::default();
+        for solution in solutions {
+            for binding in solution {
+                collapsed
+                    .entry(binding.bound_typevar.identity(self.db))
+                    .and_modify(|(_, accumulated, count)| {
+                        accumulated.add(self.db, binding.solution);
+                        *count += 1;
+                    })
+                    .or_insert_with(|| {
+                        (
+                            binding.bound_typevar,
+                            UnionAccumulator::new(binding.solution),
+                            1,
+                        )
+                    });
+            }
+        }
+
+        // A path that does not solve a type variable contributes no receiver evidence for it.
+        collapsed
+            .into_values()
+            .filter_map(|(typevar, solution, count)| {
+                (count == solution_count).then_some((typevar, solution))
+            })
+            .fold(
+                ConstraintSet::from_bool(constraints, true),
+                |when, (typevar, solution)| {
+                    let solution = solution.into_type(self.db);
+                    when.and(self.db, constraints, || {
+                        ConstraintSet::constrain_typevar(
+                            self.db,
+                            constraints,
+                            typevar,
+                            solution,
+                            solution,
+                        )
+                    })
+                },
+            )
+    }
+
+    fn has_protocol_receiver_constraint_source(&self) -> bool {
+        if !self.signature.bound_receiver_constraints().is_empty() {
+            return true;
+        }
+
+        self.enumerate_argument_types()
+            .any(|(argument_index, _, argument, _)| {
+                matches!(argument, Argument::Synthetic)
+                    && self.argument_matches[argument_index].parameters.iter().any(
+                        |parameter_index| {
+                            let ty = self.signature.parameters()[*parameter_index].annotated_type();
+                            matches!(ty, Type::ProtocolInstance(_)) && ty.has_typevar(self.db)
+                        },
+                    )
+            })
+    }
+
+    fn promote_inferred_typevar(
+        &self,
+        typevar: BoundTypeVarInstance<'db>,
+        bounds: Option<(Type<'db>, Type<'db>)>,
+    ) -> Option<Type<'db>> {
+        let (lower, _upper) = bounds?;
+        let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
+
+        // For constrained TypeVars, the inferred type is already one of the
+        // constraints. Promoting literals would produce a type that doesn't
+        // match any constraint.
+        if matches!(
+            bound_or_constraints,
+            Some(TypeVarBoundOrConstraints::Constraints(_))
+        ) {
+            return None;
+        }
+
+        let mut variance_in_return = TypeVarVariance::Bivariant;
+
+        // Find all occurrences of the type variable in the return type.
+        self.return_ty
+            .visit_specialization(self.db, |ty, variance| {
+                if ty != Type::TypeVar(typevar) {
+                    return;
+                }
+
+                variance_in_return = variance_in_return.join(variance);
+            });
+
+        // Promotion is only useful if the type variable is in non-covariant position
+        // in the return type.
+        if variance_in_return.is_covariant() {
+            return None;
+        }
+
+        // With the pending-constraint solve path, upper-bound-only constraints expose a
+        // vacuous lower bound of `Never`, which is not evidence for literal promotion.
+        if lower.is_never() {
+            return None;
+        }
+
+        let promoted = lower.promote(self.db);
+
+        // If the TypeVar has an upper bound, only use the promoted type if it
+        // still satisfies the bound.
+        if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
+            if !promoted.is_assignable_to(self.db, bound) {
+                return None;
+            }
+        }
+
+        Some(promoted)
     }
 
     fn infer_argument_constraints<'c>(

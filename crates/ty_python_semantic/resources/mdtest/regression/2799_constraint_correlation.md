@@ -14,7 +14,7 @@ python-version = "3.13"
 ```
 
 ```py
-from typing import Generic, Protocol, TypeVar, overload
+from typing import Any, Generic, Never, Protocol, TypeVar, overload
 
 T = TypeVar("T")
 T_contra = TypeVar("T_contra")
@@ -39,7 +39,18 @@ class Series(ElementOpsMixin[T], Generic[T]):
     def mul(self, other):
         raise NotImplementedError
 
+    @overload
+    def gradual_mul(self: Supports_ProtoMul[T_contra, S2], other: T_contra) -> "Series[S2]": ...
+    @overload
+    def gradual_mul(self: "Series[Never]", other: object) -> "Series[Any]": ...
+    def gradual_mul(self, other):
+        raise NotImplementedError
+
 def _(left: Series[bool]):
     # revealed: Series[bool]
     reveal_type(left.mul(True))
+
+def _(left: Series[Any]):
+    # revealed: Series[Any]
+    reveal_type(left.gradual_mul(True))
 ```

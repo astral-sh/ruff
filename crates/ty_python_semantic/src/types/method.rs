@@ -101,11 +101,9 @@ impl<'db> BoundMethodType<'db> {
 
             let self_instance = self.self_instance(db);
             return CallableSignature::from_overloads(
-                function_signature
-                    .overloads
-                    .iter()
-                    .filter(|signature| signature.can_bind_self_to(db, self_instance))
-                    .map(|signature| signature.bind_self(db, Some(typing_self_type))),
+                function_signature.overloads.iter().flat_map(|signature| {
+                    signature.bind_self_to(db, self_instance, typing_self_type)
+                }),
             );
         };
 
