@@ -265,24 +265,46 @@ impl ProjectDatabase {
                         metadata.apply_overrides(overrides);
                     }
 
-                    match metadata.to_program_settings(
+                    let program_settings_diagnostics = match metadata.to_program_settings(
                         self.system(),
                         self.vendored(),
                         &FallibleStrategy,
                     ) {
-                        Ok(program_settings) => {
+                        Ok((program_settings, diagnostics)) => {
                             let program = Program::get(self);
                             program.update_from_settings(self, program_settings);
+                            diagnostics
                         }
                         Err(error) => {
                             tracing::error!(
                                 "Failed to convert metadata to program settings, continuing without applying them: {error}"
                             );
+                            Vec::new()
                         }
-                    }
+                    };
+
+                    let (settings, settings_diagnostics) = match metadata.options().to_settings(
+                        self,
+                        metadata.root(),
+                        &FallibleStrategy,
+                    ) {
+                        Ok((settings, diagnostics)) => (Some(settings), diagnostics),
+                        Err(error) => {
+                            tracing::warn!(
+                                "Keeping old project configuration because loading the new settings failed with: {error}"
+                            );
+                            (None, vec![error.into_diagnostic()])
+                        }
+                    };
 
                     tracing::debug!("Reloading project after structural change");
-                    project.reload(self, metadata);
+                    project.reload(
+                        self,
+                        metadata,
+                        settings,
+                        settings_diagnostics,
+                        program_settings_diagnostics,
+                    );
                 }
                 Err(error) => {
                     tracing::error!(
@@ -298,8 +320,21 @@ impl ProjectDatabase {
                 self.vendored(),
                 &FallibleStrategy,
             ) {
-                Ok(program_settings) => {
+                Ok((program_settings, program_settings_diagnostics)) => {
                     program.update_from_settings(self, program_settings);
+                    let settings_diagnostics = match project.metadata(self).options().to_settings(
+                        self,
+                        project.metadata(self).root(),
+                        &FallibleStrategy,
+                    ) {
+                        Ok((_, diagnostics)) => diagnostics,
+                        Err(error) => vec![error.into_diagnostic()],
+                    };
+                    project.update_settings_diagnostics(
+                        self,
+                        settings_diagnostics,
+                        program_settings_diagnostics,
+                    );
                 }
                 Err(error) => {
                     tracing::error!("Failed to resolve program settings: {error}");
