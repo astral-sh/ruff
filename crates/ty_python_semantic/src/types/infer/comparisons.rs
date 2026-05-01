@@ -169,6 +169,14 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
     };
 
+    if let Some(left) = left.enum_complement_single_literal_type(db) {
+        return infer_binary_type_comparison(context, left, op, right, range, visitor);
+    }
+
+    if let Some(right) = right.enum_complement_single_literal_type(db) {
+        return infer_binary_type_comparison(context, left, op, right, range, visitor);
+    }
+
     let comparison_result = match (left, right) {
         (Type::Union(union), other) => {
             let mut builder = UnionBuilder::new(db);

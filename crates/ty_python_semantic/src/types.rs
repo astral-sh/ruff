@@ -58,7 +58,7 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
-pub(crate) use crate::types::enums::enum_metadata;
+pub(crate) use crate::types::enums::{EnumMetadata, enum_metadata};
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
     FunctionType, KnownFunction,
@@ -1039,7 +1039,10 @@ impl<'db> Type<'db> {
         })
     }
 
-    pub(crate) fn enum_complement_literal_types(self, db: &'db dyn Db) -> Option<Vec<Type<'db>>> {
+    fn enum_complement(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<(ClassLiteral<'db>, &'db EnumMetadata<'db>, FxHashSet<Name>)> {
         let Type::Intersection(intersection) = self else {
             return None;
         };
@@ -1051,9 +1054,7 @@ impl<'db> Type<'db> {
             };
 
             let class = instance.class_literal(db);
-            if crate::types::enums::enum_metadata(db, class).is_none() {
-                return None;
-            }
+            crate::types::enums::enum_metadata(db, class)?;
 
             if enum_class.replace(class).is_some() {
                 return None;
@@ -1075,6 +1076,12 @@ impl<'db> Type<'db> {
             excluded_names.insert(canonical_name.clone());
         }
 
+        Some((enum_class, metadata, excluded_names))
+    }
+
+    pub(crate) fn enum_complement_literal_types(self, db: &'db dyn Db) -> Option<Vec<Type<'db>>> {
+        let (enum_class, metadata, excluded_names) = self.enum_complement(db)?;
+
         if excluded_names.is_empty() {
             return None;
         }
@@ -1087,6 +1094,56 @@ impl<'db> Type<'db> {
                 .map(|name| Type::enum_literal(EnumLiteralType::new(db, enum_class, name.clone())))
                 .collect(),
         )
+    }
+
+    pub(crate) fn enum_complement_member_type(
+        self,
+        db: &'db dyn Db,
+        member_name: &str,
+    ) -> Option<Type<'db>> {
+        let (enum_class, metadata, excluded_names) = self.enum_complement(db)?;
+
+        if excluded_names.is_empty() {
+            return None;
+        }
+
+        let is_enum_subclass =
+            Type::ClassLiteral(enum_class).is_subtype_of(db, KnownClass::Enum.to_subclass_of(db));
+        let mut builder = UnionBuilder::new(db);
+        let mut found_member = false;
+
+        for name in metadata
+            .members
+            .keys()
+            .filter(|name| !excluded_names.contains(*name))
+        {
+            let member_ty = (match member_name {
+                "name" if is_enum_subclass => metadata.name_type(db, name),
+                "_name_" => metadata.name_type(db, name),
+                "value" if is_enum_subclass => metadata.value_type(name),
+                "_value_" => metadata.value_type(name),
+                _ => None,
+            })?;
+
+            builder = builder.add(member_ty);
+            found_member = true;
+        }
+
+        found_member.then(|| builder.build())
+    }
+
+    pub(crate) fn enum_complement_single_literal_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let (enum_class, metadata, excluded_names) = self.enum_complement(db)?;
+
+        if metadata.members.len().checked_sub(excluded_names.len())? != 1 {
+            return None;
+        }
+
+        metadata
+            .members
+            .keys()
+            .find(|name| !excluded_names.contains(*name))
+            .map(|name| Type::enum_literal(EnumLiteralType::new(db, enum_class, name.clone())))
     }
 
     fn is_enum(&self, db: &'db dyn Db) -> bool {
@@ -3247,6 +3304,13 @@ impl<'db> Type<'db> {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.member_lookup_with_policy(db, name_str.into(), policy)
             }),
+
+            Type::Intersection(_)
+                if matches!(name_str, "name" | "_name_" | "value" | "_value_")
+                    && let Some(member_ty) = self.enum_complement_member_type(db, name_str) =>
+            {
+                Place::bound(member_ty).into()
+            }
 
             Type::Intersection(intersection) => intersection
                 .map_with_boundness_and_qualifiers(db, |elem| {
