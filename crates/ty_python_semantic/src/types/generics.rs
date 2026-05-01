@@ -1729,6 +1729,8 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
 /// type with respect to the type variable.
 pub(crate) type TypeVarAssignment<'db> = (BoundTypeVarIdentity<'db>, TypeVarVariance, Type<'db>);
 
+type ProjectedTypeMappingCandidate<'db> = (usize, BoundTypeVarInstance<'db>, Type<'db>);
+
 impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     pub(crate) fn new(
         db: &'db dyn Db,
@@ -1824,6 +1826,41 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         self.insert_type_mapping(bound_typevar, ty);
     }
 
+    fn projected_type_mapping_candidates_from_constraint_set(
+        &self,
+        set: ConstraintSet<'db, 'c>,
+    ) -> Result<Vec<Vec<ProjectedTypeMappingCandidate<'db>>>, ()> {
+        let mut saw_path = false;
+        let mut candidates = Vec::new();
+
+        set.for_each_direct_positive_constraint_path(self.constraints, |path| {
+            saw_path = true;
+            let mut path_candidates = Vec::new();
+            for (constraint, source_order) in path {
+                if !constraint.typevar.is_inferable(self.db, self.inferable) {
+                    continue;
+                }
+
+                // Keep non-inferable typevars inside the candidate type. In a call like
+                // `collect[T](items: Iterable[T])` with an argument `list[S]`, `T` should be
+                // inferred as the caller's `S`, even though only `T` is inferable here.
+                let ty = if constraint.lower.is_never() {
+                    if constraint.upper == Type::object() {
+                        continue;
+                    }
+                    constraint.upper
+                } else {
+                    constraint.lower
+                };
+
+                path_candidates.push((*source_order, constraint.typevar, ty));
+            }
+            candidates.push(path_candidates);
+        });
+
+        if saw_path { Ok(candidates) } else { Err(()) }
+    }
+
     /// Finds all of the valid specializations of a constraint set, and adds their type mappings to
     /// the specialization that this builder is building up.
     ///
@@ -1869,36 +1906,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         set: ConstraintSet<'db, 'c>,
         mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) -> Result<(), ()> {
-        let mut saw_path = false;
-        let mut mappings = Vec::new();
+        let candidates = self.projected_type_mapping_candidates_from_constraint_set(set)?;
 
-        set.for_each_direct_positive_constraint_path(self.constraints, |path| {
-            saw_path = true;
-            for (constraint, source_order) in path {
-                if !constraint.typevar.is_inferable(self.db, self.inferable) {
-                    continue;
-                }
-
-                // Keep non-inferable typevars inside the candidate type. In a call like
-                // `collect[T](items: Iterable[T])` with an argument `list[S]`, `T` should be
-                // inferred as the caller's `S`, even though only `T` is inferable here.
-                let ty = if constraint.lower.is_never() {
-                    if constraint.upper == Type::object() {
-                        continue;
-                    }
-                    constraint.upper
-                } else {
-                    constraint.lower
-                };
-
-                mappings.push((*source_order, constraint.typevar, ty));
-            }
-        });
-
-        if !saw_path {
-            return Err(());
-        }
-
+        let mut mappings = candidates.into_iter().flatten().collect_vec();
         mappings.sort_by_key(|(source_order, _, _)| *source_order);
 
         let mut seen = FxHashSet::default();
@@ -1921,6 +1931,42 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> Result<(), ()> {
         let set = self.constraints.load(self.db, set);
         self.add_projected_type_mappings_from_constraint_set(formal, set, f)
+    }
+
+    pub(crate) fn projected_specializations_from_owned_constraint_set(
+        &self,
+        formal: Type<'db>,
+        set: &'db OwnedConstraintSet<'db>,
+        generic_context: GenericContext<'db>,
+    ) -> Result<Vec<Specialization<'db>>, ()> {
+        let set = self.constraints.load(self.db, set);
+        let candidates = self.projected_type_mapping_candidates_from_constraint_set(set)?;
+        let mut specializations = Vec::new();
+        let mut seen = FxHashSet::default();
+
+        for mut mappings in candidates {
+            if mappings.is_empty() {
+                continue;
+            }
+            mappings.sort_by_key(|(source_order, _, _)| *source_order);
+
+            let mut builder = Self::new(self.db, self.constraints, self.inferable);
+            let mut seen_mappings = FxHashSet::default();
+            for (_, bound_typevar, ty) in mappings {
+                if !seen_mappings.insert((bound_typevar.identity(self.db), ty)) {
+                    continue;
+                }
+                let variance = formal.variance_of(self.db, bound_typevar);
+                builder.add_type_mapping(bound_typevar, ty, variance, |(_, _, ty)| Some(ty));
+            }
+
+            let specialization = builder.build_with(generic_context, |_, _| None);
+            if seen.insert(specialization) {
+                specializations.push(specialization);
+            }
+        }
+
+        Ok(specializations)
     }
 
     fn references_inferable_typevar(&self, ty: Type<'db>) -> bool {

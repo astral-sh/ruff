@@ -252,6 +252,28 @@ class ProtocolSelfImplementation(BaseWithProtocolSelf):
 
 good_protocol_receiver: Callable[[], bytes] = ProtocolSelfImplementation().method
 bad_protocol_receiver: Callable[[], int] = ProtocolSelfImplementation().method  # error: [invalid-assignment]
+
+class ProtocolPathSelf(Protocol[ProtocolSelfT]):
+    def get(self) -> list[ProtocolSelfT]: ...
+
+class BaseWithProtocolPathSelf:
+    @overload
+    def method(self: ProtocolPathSelf[ProtocolSelfT]) -> ProtocolSelfT: ...
+    @overload
+    def method(self) -> bytes: ...
+    def method(self) -> object:
+        return b""
+
+class ProtocolPathSelfImplementation(BaseWithProtocolPathSelf):
+    @overload
+    def get(self) -> list[int]: ...
+    @overload
+    def get(self) -> list[str]: ...
+    def get(self) -> list[int] | list[str]:
+        return [1]
+
+good_projected_path_receiver: Callable[[], int | str] = ProtocolPathSelfImplementation().method
+bad_projected_path_receiver: Callable[[], float] = ProtocolPathSelfImplementation().method  # error: [invalid-assignment]
 ```
 
 ## Constructor

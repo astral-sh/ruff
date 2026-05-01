@@ -975,20 +975,38 @@ impl<'db> Signature<'db> {
             let mut builder = SpecializationBuilder::new(db, &constraints, inferable_typevars);
             builder.infer(expected_self_ty, self_type).ok()?;
             let specialization = builder.build_with(generic_context, |_, _| None);
-            // Inference can produce a candidate specialization that does not actually make the
-            // bound receiver compatible with the receiver annotation, especially for structural
-            // protocols. Only keep overloads whose specialized receiver still accepts `self_type`.
-            let specialized_expected_self_ty =
-                expected_self_ty.apply_specialization(db, specialization);
-            let when =
-                self_type.when_constraint_set_assignable_to_owned(db, specialized_expected_self_ty);
-            if !when.query(|_, when| when.is_always_satisfied(db)) {
+            let bind_if_valid = |specialization| {
+                // Inference can produce a candidate specialization that does not actually make the
+                // bound receiver compatible with the receiver annotation, especially for structural
+                // protocols. Only keep overloads whose specialized receiver still accepts
+                // `self_type`.
+                let specialized_expected_self_ty =
+                    expected_self_ty.apply_specialization(db, specialization);
+                let when = self_type
+                    .when_constraint_set_assignable_to_owned(db, specialized_expected_self_ty);
+                when.query(|_, when| when.is_always_satisfied(db)).then(|| {
+                    self.apply_specialization(db, specialization)
+                        .bind_self(db, Some(typing_self_type))
+                })
+            };
+
+            if let Some(signature) = bind_if_valid(specialization) {
+                return Some(signature);
+            }
+
+            if !matches!(expected_self_ty, Type::ProtocolInstance(_)) {
                 return None;
             }
-            Some(
-                self.apply_specialization(db, specialization)
-                    .bind_self(db, Some(typing_self_type)),
-            )
+
+            let when = self_type.when_constraint_set_assignable_to_owned(db, expected_self_ty);
+            let specializations = builder
+                .projected_specializations_from_owned_constraint_set(
+                    expected_self_ty,
+                    when,
+                    generic_context,
+                )
+                .ok()?;
+            specializations.into_iter().find_map(bind_if_valid)
         }
     }
 
