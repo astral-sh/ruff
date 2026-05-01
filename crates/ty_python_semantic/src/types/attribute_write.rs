@@ -11,7 +11,9 @@ use ty_module_resolver::KnownModule;
 
 use super::call::CallArguments;
 use super::callable::CallableTypeKind;
-use super::{IntersectionType, KnownClass, MemberLookupPolicy, Type, TypeQualifiers};
+use super::{
+    IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Type, TypeQualifiers,
+};
 use crate::Db;
 use crate::place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, builtins_symbol};
 
@@ -506,7 +508,17 @@ pub(super) fn assignment_attribute_members<'db>(
     object_ty: Type<'db>,
     attribute: &str,
 ) -> Option<(PlaceAndQualifiers<'db>, Option<PlaceAndQualifiers<'db>>)> {
-    let meta_attr = object_ty.class_member(db, attribute.into());
+    // Precise `functools.partial` instances synthesize a refined `__call__` member instead of
+    // using the broad signature from typeshed.
+    let meta_attr = if attribute == "__call__"
+        && matches!(
+            object_ty,
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_))
+        ) {
+        object_ty.member(db, attribute)
+    } else {
+        object_ty.class_member(db, attribute.into())
+    };
     let needs_fallback = matches!(
         meta_attr.place,
         Place::Defined(DefinedPlace {
