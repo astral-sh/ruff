@@ -956,6 +956,13 @@ impl<'db> FunctionType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        if type_mapping.is_return_callable_mapping() {
+            // Return-callable mappings target the outer `CallableType` in a function's
+            // return annotation. Nested function literals are payload inside that
+            // callable, not separate rewrite targets.
+            return self;
+        }
+
         let updated_signature =
             self.signature(db)
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
