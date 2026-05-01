@@ -14,8 +14,8 @@ use ruff_linter::settings::types::{PythonVersion, RequiredVersion};
 use crate::options::{Options, validate_required_version};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-struct Tools {
-    ruff: Option<Options>,
+pub struct Tools {
+    pub ruff: Option<Options>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -28,6 +28,13 @@ struct Project {
 pub struct Pyproject {
     tool: Option<Tools>,
     project: Option<Project>,
+}
+
+#[derive(Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct ScriptMetadata {
+    pub tool: Option<Tools>,
+    #[serde(alias = "requires-python", alias = "requires_python")]
+    pub requires_python: Option<VersionSpecifiers>,
 }
 
 impl Pyproject {
@@ -73,6 +80,28 @@ fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
 /// Parse a `pyproject.toml` file.
 fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
     parse_toml(path, &["tool", "ruff"])
+}
+
+/// Parse PEP 723 script metadata
+pub fn parse_script_metadata(contents: &str) -> Result<ScriptMetadata> {
+    // Parse the TOML document once into a spanned representation so we can:
+    // - Inspect `required-version` without triggering strict deserialization errors.
+    // - Deserialize with precise spans (line/column and excerpt) on errors.
+    let root =
+        toml::de::DeTable::parse(contents).with_context(|| "Failed to parse inline metadata")?;
+
+    check_required_version(root.get_ref(), &["tool", "ruff"])?;
+
+    let deserializer = toml::de::Deserializer::from(root);
+    let metadata = ScriptMetadata::deserialize(deserializer)
+        .map_err(|mut err| {
+            // `Deserializer::from` doesn't have access to the original input, but we do.
+            // Attach it so TOML errors include line/column and a source excerpt.
+            err.set_input(Some(contents));
+            err
+        })
+        .with_context(|| "Failed to parse inline metadata")?;
+    Ok(metadata)
 }
 
 /// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
@@ -236,7 +265,9 @@ fn get_fallback_target_version(dir: &Path) -> Option<PythonVersion> {
 }
 
 /// Infer the minimum supported [`PythonVersion`] from a `requires-python` specifier.
-fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<PythonVersion> {
+pub fn get_minimum_supported_version(
+    requires_version: &VersionSpecifiers,
+) -> Option<PythonVersion> {
     /// Truncate a version to its major and minor components.
     fn major_minor(version: &Version) -> Option<Version> {
         let major = version.release().first()?;
