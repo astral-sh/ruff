@@ -45,6 +45,7 @@ use crate::types::{
     TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
+use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
 /// Extract `(core, guard)` from truthiness-guarded intersections.
@@ -338,6 +339,14 @@ const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 256;
 /// Huge enums are not uncommon (especially in generated code), and it's annoying
 /// if reachability analysis etc. fails when analysing these enums.
 const MAX_NON_RECURSIVE_UNION_ENUM_LITERALS: usize = 8192;
+/// Expand enum complements up to this size to preserve the exact literal-union representation used
+/// for common small enums. Above this threshold, keep complements compact as `Enum & ~Literal[...]`
+/// to avoid repeatedly expanding large enums during narrowing.
+const MAX_ENUM_COMPLEMENT_EXPANSION_MEMBERS: usize = 32;
+
+fn should_expand_enum_complement(member_count: usize) -> bool {
+    member_count <= MAX_ENUM_COMPLEMENT_EXPANSION_MEMBERS
+}
 
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
@@ -1020,30 +1029,35 @@ impl<'db> IntersectionBuilder<'db> {
             Type::NominalInstance(instance)
                 if enum_metadata(self.db, instance.class_literal(self.db)).is_some() =>
             {
-                let mut contains_enum_literal_as_negative_element = false;
-                for intersection in &self.intersections {
-                    if intersection.negative.iter().any(|negative| {
-                        negative
-                            .as_enum_literal()
-                            .is_some_and(|lit| lit.enum_class_instance(self.db) == ty)
-                    }) {
-                        contains_enum_literal_as_negative_element = true;
-                        break;
-                    }
-                }
+                let db = self.db;
+                let enum_class = instance.class_literal(db);
+                let metadata =
+                    enum_metadata(db, enum_class).expect("Class of enum instance is an enum");
 
-                if contains_enum_literal_as_negative_element {
+                let should_expand = should_expand_enum_complement(metadata.members.len())
+                    && self.intersections.iter().any(|intersection| {
+                        intersection.negative.iter().any(|negative| {
+                            negative
+                                .as_enum_literal()
+                                .is_some_and(|lit| lit.enum_class_instance(db) == ty)
+                        })
+                    });
+
+                if should_expand {
                     // If we have an enum literal of this enum already in the negative side of
                     // the intersection, expand the instance into the union of enum members, and
                     // add that union to the intersection.
+                    //
+                    // For large enums, keep the compact `Enum & ~Literal[...]` representation
+                    // instead. Expanding those complements can dominate narrowing performance.
+                    //
                     // Note: we manually construct a `UnionType` here instead of going through
                     // `UnionBuilder` because we would simplify the union to just the enum instance
                     // and end up in this branch again.
-                    let db = self.db;
                     self.add_positive_impl(
                         Type::Union(UnionType::new(
                             db,
-                            enum_member_literals(db, instance.class_literal(db), None)
+                            enum_member_literals(db, enum_class, None)
                                 .expect("Calling `enum_member_literals` on an enum class")
                                 .collect::<Box<[_]>>(),
                             RecursivelyDefined::No,
@@ -1052,7 +1066,7 @@ impl<'db> IntersectionBuilder<'db> {
                     )
                 } else {
                     for inner in &mut self.intersections {
-                        inner.add_positive(self.db, ty);
+                        inner.add_positive(db, ty);
                     }
                     self
                 }
@@ -1133,7 +1147,19 @@ impl<'db> IntersectionBuilder<'db> {
             }
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Enum(enum_literal) => {
-                    let enum_instance = enum_literal.enum_class_instance(self.db);
+                    let db = self.db;
+                    let enum_class = enum_literal.enum_class(db);
+                    let metadata =
+                        enum_metadata(db, enum_class).expect("Class of enum literal is an enum");
+
+                    if !should_expand_enum_complement(metadata.members.len()) {
+                        for inner in &mut self.intersections {
+                            inner.add_negative(db, ty);
+                        }
+                        return self;
+                    }
+
+                    let enum_instance = enum_literal.enum_class_instance(db);
 
                     // Partition intersections into those that contain the enum instance and those that don't.
                     // For intersections containing the enum, we need to expand to remaining members.
@@ -1147,19 +1173,14 @@ impl<'db> IntersectionBuilder<'db> {
                         // No inner intersection contains the enum, just add negative normally
                         self.intersections = other_intersections;
                         for inner in &mut self.intersections {
-                            inner.add_negative(self.db, ty);
+                            inner.add_negative(db, ty);
                         }
                         self
                     } else {
-                        let db = self.db;
                         let remaining_members = UnionType::from_elements(
                             db,
-                            enum_member_literals(
-                                db,
-                                enum_literal.enum_class(db),
-                                Some(enum_literal.name(db)),
-                            )
-                            .expect("Calling `enum_member_literals` on an enum class"),
+                            enum_member_literals(db, enum_class, Some(enum_literal.name(db)))
+                                .expect("Calling `enum_member_literals` on an enum class"),
                         );
 
                         // For enum-containing intersections, add the remaining members as positive
@@ -1230,6 +1251,43 @@ struct InnerIntersectionBuilder<'db> {
 }
 
 impl<'db> InnerIntersectionBuilder<'db> {
+    /// Return `true` when a compact large-enum complement excludes every member of the enum class.
+    fn has_empty_large_enum_complement(&self, db: &'db dyn Db) -> bool {
+        for positive in &self.positive {
+            let Type::NominalInstance(instance) = positive else {
+                continue;
+            };
+
+            let enum_class = instance.class_literal(db);
+            let Some(metadata) = enum_metadata(db, enum_class) else {
+                continue;
+            };
+            if should_expand_enum_complement(metadata.members.len()) {
+                continue;
+            }
+
+            let mut excluded_names = FxHashSet::default();
+            for negative in &self.negative {
+                let Some(enum_literal) = negative.as_enum_literal() else {
+                    continue;
+                };
+                if enum_literal.enum_class(db) != enum_class {
+                    continue;
+                }
+
+                let name = enum_literal.name(db);
+                let canonical_name = metadata.resolve_member(name).unwrap_or(name);
+                excluded_names.insert(canonical_name.clone());
+            }
+
+            if excluded_names.len() == metadata.members.len() {
+                return true;
+            }
+        }
+
+        false
+    }
+
     /// Adds a positive type to this intersection.
     fn add_positive(&mut self, db: &'db dyn Db, mut new_positive: Type<'db>) {
         // `Never & T` -> `Never`
@@ -1583,6 +1641,10 @@ impl<'db> InnerIntersectionBuilder<'db> {
     }
 
     fn build(mut self, db: &'db dyn Db) -> Type<'db> {
+        if self.has_empty_large_enum_complement(db) {
+            return Type::Never;
+        }
+
         self.simplify_constrained_typevars(db);
 
         // If any typevars are in `self.positive`, speculatively solve all bounded type variables
