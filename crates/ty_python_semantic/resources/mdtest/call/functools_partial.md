@@ -706,6 +706,26 @@ p = partial(f, **kwargs)
 reveal_type(p)  # revealed: partial[(a: int, *, b: str = ...) -> bool]
 ```
 
+### Kwargs splat with union of TypedDicts
+
+```py
+from functools import partial
+from typing import TypedDict
+
+class KwargsA(TypedDict):
+    b: str
+
+class KwargsB(TypedDict):
+    b: str
+
+def f(*, b: str) -> bool:
+    return True
+
+def make(kwargs: KwargsA | KwargsB) -> None:
+    p = partial(f, **kwargs)
+    reveal_type(p)  # revealed: partial[(*, b: str = ...) -> bool]
+```
+
 ### Mixed keywords and kwargs splat
 
 ```py
