@@ -410,9 +410,25 @@ reveal_type(accepts_t_or_list_of_t(1))  # revealed: Unknown
 def _(list_ofstr: list[str], list_of_int: list[int]):
     reveal_type(accepts_t_or_list_of_t(list_ofstr))  # revealed: str
 
-    # TODO: the error message here could be improved by referring to the second union element
-    # error: [invalid-argument-type] "Argument type `list[int]` does not satisfy upper bound `str` of type variable `T`"
+    # error: [invalid-argument-type] "Argument type `int` does not satisfy upper bound `str` of type variable `T`"
     reveal_type(accepts_t_or_list_of_t(list_of_int))  # revealed: Unknown
+```
+
+When the union contains both a bare typevar and another element that uses the same typevar, we
+prefer a matching non-bare element for inference. Otherwise, the bare typevar would infer the whole
+argument type and produce an unnecessarily wide solution.
+
+```py
+def accepts_t_or_list_of_t_unbounded[T](x: T | list[T]) -> T:
+    raise NotImplementedError
+
+def accepts_list_of_t_or_t_unbounded[T](x: list[T] | T) -> T:
+    raise NotImplementedError
+
+def _(list_of_int: list[int], list_of_str: list[str], string: str):
+    reveal_type(accepts_t_or_list_of_t_unbounded(list_of_int))  # revealed: int
+    reveal_type(accepts_list_of_t_or_t_unbounded(list_of_str))  # revealed: str
+    reveal_type(accepts_t_or_list_of_t_unbounded(string))  # revealed: str
 ```
 
 Here, we make sure that `S` is solved as `Literal[1]` instead of a union of the two literals, which
