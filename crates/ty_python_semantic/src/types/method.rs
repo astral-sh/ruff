@@ -6,9 +6,14 @@ use crate::{
     types::{
         CallableType, KnownClass, LiteralValueType, LiteralValueTypeKind, Parameter, Parameters,
         PropertyInstanceType, Signature, StringLiteralType, Type, UnionType,
-        callable::CallableTypeKind, constraints::ConstraintSet, function::FunctionType,
-        known_instance::InternedConstraintSet, relation::TypeRelationChecker,
-        signatures::CallableSignature, visitor,
+        callable::CallableTypeKind,
+        constraints::{ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension},
+        function::FunctionType,
+        generics::InferableTypeVars,
+        known_instance::InternedConstraintSet,
+        relation::TypeRelationChecker,
+        signatures::CallableSignature,
+        visitor,
     },
 };
 
@@ -76,6 +81,11 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
+    /// Returns this method's callable signatures after binding the receiver and pruning overloads
+    /// whose receiver annotations cannot accept this bound method's receiver.
+    ///
+    /// For example, when binding `Base[int].method`, an overload with receiver `self: Base[str]`
+    /// is removed before the remaining overloads have their `self` parameter bound away.
     #[salsa::tracked(cycle_initial=|_, _, _| CallableSignature::bottom(), heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> CallableSignature<'db> {
         let function_signature = self.function(db).signature(db);
@@ -93,6 +103,59 @@ impl<'db> BoundMethodType<'db> {
         };
 
         CallableSignature::single(signature.bind_self(db, Some(typing_self_type)))
+    }
+
+    /// Returns `true` if this bound method's underlying function has multiple overloads.
+    fn is_overloaded(self, db: &'db dyn Db) -> bool {
+        self.function(db).signature(db).iter().nth(1).is_some()
+    }
+
+    /// Returns `true` if any overload has a receiver annotation that is narrower than the bound
+    /// method receiver.
+    ///
+    /// For example, an overload with receiver `self: Base[str]` is receiver-specific when the bound
+    /// method receiver is `Base[T]`.
+    pub(crate) fn has_receiver_specific_overloads(self, db: &'db dyn Db) -> bool {
+        if !self.is_overloaded(db) {
+            return false;
+        }
+
+        let self_instance = self.self_instance(db);
+        let typing_self_type = self.typing_self_type(db);
+
+        self.function(db).signature(db).iter().any(|signature| {
+            !signature.has_unconditional_receiver(db, self_instance, typing_self_type)
+        })
+    }
+
+    /// Returns `true` if any receiver-specific overload can bind to some, but not all,
+    /// specializations of this bound method's receiver.
+    ///
+    /// For example, an overload with receiver `self: Base[str]` is conditionally applicable for
+    /// `Base[T]`: it applies when `T` is `str`, but not for every possible `T`.
+    pub(crate) fn has_conditionally_applicable_receiver_overloads(self, db: &'db dyn Db) -> bool {
+        // The conditional path is for receiver-specific overloads. For single-signature methods,
+        // normal callable assignability handles `Self` return types while preserving full parameter
+        // checks.
+        if !self.is_overloaded(db) {
+            return false;
+        }
+
+        let function_signature = self.function(db).signature(db);
+        let self_instance = self.self_instance(db);
+
+        function_signature.iter().any(|signature| {
+            let constraints = ConstraintSetBuilder::new();
+            let receiver_bindable =
+                signature.when_self_bindable_to(db, self_instance, &constraints);
+
+            !receiver_bindable.is_never_satisfied(db)
+                && !receiver_bindable.satisfied_by_all_typevars(
+                    db,
+                    &constraints,
+                    InferableTypeVars::None,
+                )
+        })
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -125,6 +188,140 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         self.check_function_pair(db, source.function(db), target.function(db))
             .and(db, self.constraints, || {
                 self.check_type_pair(db, target.self_instance(db), source.self_instance(db))
+            })
+    }
+
+    /// Checks whether a source bound method satisfies the callable contract represented by a
+    /// target bound method.
+    ///
+    /// This is stricter than upcasting both methods to callables when the target has
+    /// receiver-specific overloads: each target overload is checked only under the receiver
+    /// condition where it can actually bind. It is also more precise than normal bound-method
+    /// binding for the source, because it only combines source overloads whose receiver conditions
+    /// are available whenever the target overload applies.
+    ///
+    /// For example, if the target has an overload guarded by `self: Base[str]`, the source only
+    /// needs to satisfy that overload for the receiver specializations where the guard holds.
+    pub(super) fn check_bound_method_callable_contract_pair(
+        &self,
+        db: &'db dyn Db,
+        source: BoundMethodType<'db>,
+        target: BoundMethodType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let source_function_signature = source.function(db).signature(db);
+        let source_self_instance = source.self_instance(db);
+        let source_typing_self_type = source.typing_self_type(db);
+        let target_function_signature = target.function(db).signature(db);
+        let target_self_instance = target.self_instance(db);
+        let target_typing_self_type = target.typing_self_type(db);
+
+        target_function_signature
+            .iter()
+            .when_all(db, self.constraints, |target_signature| {
+                let target_receiver_bindable = target_signature.when_self_bindable_to(
+                    db,
+                    target_self_instance,
+                    self.constraints,
+                );
+
+                // If the target overload cannot bind to the superclass receiver at all, it is not
+                // part of the callable contract that the source needs to satisfy.
+                if target_receiver_bindable.is_never_satisfied(db) {
+                    return self.always();
+                }
+
+                let target_bound_signature =
+                    target_signature.bind_self(db, Some(target_typing_self_type));
+                let target_bound_callable = CallableSignature::single(target_bound_signature);
+
+                let available_source_bound_callable =
+                    CallableSignature::from_overloads(source_function_signature.iter().filter_map(
+                        |source_signature| {
+                            let source_receiver_bindable = source_signature.when_self_bindable_to(
+                                db,
+                                source_self_instance,
+                                self.constraints,
+                            );
+
+                            // The aggregate check binds `self` away, so only combine receiver-guarded
+                            // source overloads when the target receiver guard implies the source guard.
+                            // Keep class type variables universal here; otherwise overloads available
+                            // for only some subclass specializations could be combined unsoundly.
+                            let available_when_target_applies =
+                                source_signature.has_unconditional_receiver(
+                                    db,
+                                    source_self_instance,
+                                    source_typing_self_type,
+                                ) || (!target_receiver_bindable.is_always_satisfied(db)
+                                    && target_receiver_bindable
+                                        .implies(db, self.constraints, || source_receiver_bindable)
+                                        .satisfied_by_all_typevars(
+                                            db,
+                                            self.constraints,
+                                            InferableTypeVars::None,
+                                        ));
+
+                            available_when_target_applies.then(|| {
+                                source_signature.bind_self(db, Some(source_typing_self_type))
+                            })
+                        },
+                    ));
+
+                let available_source_assignable = available_source_bound_callable
+                    .when_constraint_set_assignable_to(
+                        db,
+                        &target_bound_callable,
+                        self.constraints,
+                    );
+
+                // A disjunctive target receiver can be covered by distinct source overloads that
+                // are each available for only one branch of the target condition. Keep the source
+                // receiver condition attached to each source overload; otherwise, overloads for
+                // incompatible receiver specializations could be combined after binding `self`
+                // away.
+                let guarded_source_assignable = source_function_signature.iter().when_any(
+                    db,
+                    self.constraints,
+                    |source_signature| {
+                        let source_receiver_bindable = source_signature.when_self_bindable_to(
+                            db,
+                            source_self_instance,
+                            self.constraints,
+                        );
+
+                        let source_assignable =
+                            source_receiver_bindable.and(db, self.constraints, || {
+                                let source_bound_signature =
+                                    source_signature.bind_self(db, Some(source_typing_self_type));
+                                let source_bound_callable =
+                                    CallableSignature::single(source_bound_signature);
+
+                                source_bound_callable.when_constraint_set_assignable_to(
+                                    db,
+                                    &target_bound_callable,
+                                    self.constraints,
+                                )
+                            });
+
+                        source_assignable.reduce_inferable(
+                            db,
+                            self.constraints,
+                            source_signature.inferable_typevars(db).iter(db),
+                        )
+                    },
+                );
+
+                let source_assignable =
+                    available_source_assignable
+                        .or(db, self.constraints, || guarded_source_assignable);
+
+                target_receiver_bindable
+                    .implies(db, self.constraints, || source_assignable)
+                    .reduce_inferable(
+                        db,
+                        self.constraints,
+                        target_signature.inferable_typevars(db).iter(db),
+                    )
             })
     }
 }

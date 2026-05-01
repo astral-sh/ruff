@@ -3813,8 +3813,30 @@ impl<'db> Type<'db> {
 
             Type::BoundMethod(bound_method) => {
                 let signature = bound_method.function(db).signature(db);
-                CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
-                    .with_bound_type(bound_method.self_instance(db))
+                let self_instance = bound_method.self_instance(db);
+                let indexed_overloads = signature.overloads.iter().cloned().enumerate();
+                let indexed_overloads = if signature.overloads.len() == 1 {
+                    indexed_overloads.collect_vec()
+                } else {
+                    let receiver_applicable = indexed_overloads
+                        .filter(|(_, signature)| signature.can_bind_self_to(db, self_instance))
+                        .collect_vec();
+                    if receiver_applicable.is_empty() {
+                        // Keep calls diagnostic as overload mismatches instead of treating a
+                        // pruned overload set as a non-callable object.
+                        signature
+                            .overloads
+                            .iter()
+                            .cloned()
+                            .enumerate()
+                            .collect_vec()
+                    } else {
+                        receiver_applicable
+                    }
+                };
+
+                CallableBinding::from_indexed_overloads(self, indexed_overloads)
+                    .with_bound_type(self_instance)
                     .into()
             }
 

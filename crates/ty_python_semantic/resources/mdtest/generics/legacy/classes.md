@@ -698,8 +698,8 @@ C[int]("string")  # error: [no-matching-overload]
 C[int](b"bytes")
 C[int](12)
 
-C[None]("string")  # error: [no-matching-overload]
-C[None](b"bytes")  # error: [no-matching-overload]
+C[None]("string")  # error: [invalid-argument-type]
+C[None](b"bytes")  # error: [invalid-argument-type]
 C[None](12)
 
 class D(Generic[T, U]):

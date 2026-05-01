@@ -219,6 +219,8 @@ class Reader(Generic[T_co]):
 
 def union_receiver(reader: Reader[int | str]):
     reveal_type(reader.get)  # revealed: Overload[]
+    # error: [no-matching-overload]
+    reveal_type(reader.get(1))  # revealed: Unknown
 ```
 
 ## Constructor

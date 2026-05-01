@@ -1165,6 +1165,7 @@ b = ClassSelector(class_=MyClass)
 reveal_type(b)  # revealed: ClassSelector[MyClass | None]
 
 # Explicit constructor specializations still reject incompatible inferred `self` types.
+# error: [missing-argument]
 ClassSelector[int](class_=MyClass)  # error: [invalid-argument-type]
 
 class RequiredClassSelector(Generic[T]):

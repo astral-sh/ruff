@@ -36,10 +36,10 @@ use crate::types::typed_dict::{
 };
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
-    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind,
-    ParameterDescription, SelfBinding, TypeContext, TypeMapping, UnionBuilder, VarianceInferable,
-    infer_complete_scope_types, todo_type,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ClassBase,
+    ClassType, ErrorContext, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind,
+    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping, UnionBuilder,
+    VarianceInferable, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -87,6 +87,105 @@ fn function_signature_type_expression_flags<'db>(
         // expression is in the PEP-695 type params sub-scope
         infer_complete_scope_types(db, scope).type_expression_flags(expression)
     }
+}
+
+/// Returns the specialization of `target` that appears in `class`'s MRO.
+///
+/// This is stricter than nominal assignability: it only matches a base with the
+/// same class literal as `target`, and returns the specialization that the MRO
+/// gives for `class`.
+///
+/// # Examples
+///
+/// When checking `Child[int]` against `Base[T]`, this returns the `Base[int]`
+/// entry from `Child[int]`'s MRO.
+///
+/// When checking `Child[int]` against an unrelated `Other[T]`, this returns
+/// `None`.
+fn matching_mro_base<'db>(
+    db: &'db dyn Db,
+    class: ClassType<'db>,
+    target: ClassType<'db>,
+) -> Option<ClassType<'db>> {
+    class
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .find(|base| base.class_literal(db) == target.class_literal(db))
+}
+
+/// Returns whether a receiver annotation applies to every instance of the receiver base.
+///
+/// Receiver-specific overloads are only conditional when their receiver narrows
+/// the specialization from the corresponding MRO base. Wildcard-like
+/// annotations are unconditional because they accept every specialization of
+/// the receiver base.
+///
+/// # Examples
+///
+/// For an MRO base of `Child[T]`, annotations like `Child[T]` and `Child[Any]`
+/// are unconditional.
+///
+/// An annotation like `Child[int]` is conditional because it only applies to
+/// `Child[int]`, not to `Child[str]`.
+fn receiver_annotation_applies_to_all_specializations<'db>(
+    db: &'db dyn Db,
+    receiver_base: ClassType<'db>,
+    annotation: ClassType<'db>,
+) -> bool {
+    if receiver_base == annotation {
+        return true;
+    }
+
+    let Some((receiver_specialization, annotation_specialization)) = receiver_base
+        .class_literal_and_specialization(db)
+        .1
+        .zip(annotation.class_literal_and_specialization(db).1)
+    else {
+        return false;
+    };
+
+    receiver_specialization
+        .types(db)
+        .iter()
+        .zip_eq(annotation_specialization.types(db))
+        .all(|(receiver_ty, annotation_ty)| {
+            annotation_ty.is_dynamic()
+                || annotation_ty.is_type_var()
+                || receiver_ty == annotation_ty
+        })
+}
+
+/// Returns the receiver bindability condition for receiver-specific protocol overloads.
+///
+/// Protocol receiver checks use the specialization from the receiver's MRO instead of
+/// variance-aware assignability. This keeps overload pruning aligned with the protocol
+/// specialization the receiver actually implements.
+///
+/// # Examples
+///
+/// If `TaskStatus[T]` is contravariant and the bound receiver has MRO base
+/// `TaskStatus[object]`, an overload annotated with `self: TaskStatus[None]` should not apply.
+/// Even though `TaskStatus[object]` is assignable to `TaskStatus[None]`, the receiver's protocol
+/// specialization is not equivalent to `TaskStatus[None]`.
+fn protocol_receiver_bindability<'db, 'c>(
+    db: &'db dyn Db,
+    self_type: Type<'db>,
+    expected_self_ty: Type<'db>,
+    constraints: &'c ConstraintSetBuilder<'db>,
+) -> Option<ConstraintSet<'db, 'c>> {
+    let (Some(self_class), Some(expected_class)) = (
+        self_type.nominal_class(db),
+        expected_self_ty.nominal_class(db),
+    ) else {
+        return None;
+    };
+
+    if !expected_class.is_protocol(db) {
+        return None;
+    }
+
+    matching_mro_base(db, self_class, expected_class)
+        .map(|base| Type::instance(db, base).when_equivalent_to(db, expected_self_ty, constraints))
 }
 
 /// The signature of a single callable. If the callable is overloaded, there is a separate
@@ -904,6 +1003,10 @@ impl<'db> Signature<'db> {
     ///
     /// This is used to prune impossible overloads when a method is bound to a concrete receiver.
     /// If a signature has no positional first parameter, we conservatively keep it.
+    ///
+    /// For example, when binding a method to `Base[int]`, a signature whose receiver annotation is
+    /// `self: Base[str]` can be pruned, while a signature whose receiver is unannotated or
+    /// annotated as `self: Base[int]` can remain.
     pub(crate) fn can_bind_self_to(&self, db: &'db dyn Db, self_type: Type<'db>) -> bool {
         // A dynamic receiver might be compatible with any explicit receiver annotation.
         if self_type.is_dynamic() {
@@ -950,16 +1053,171 @@ impl<'db> Signature<'db> {
             }
         }
 
+        if let (Some(self_class), Some(expected_class)) = (
+            self_type.nominal_class(db),
+            expected_self_ty.nominal_class(db),
+        ) && matching_mro_base(db, self_class, expected_class).is_some_and(|base| {
+            receiver_annotation_applies_to_all_specializations(db, base, expected_class)
+        }) {
+            return true;
+        }
+
         let inferable_typevars = self.inferable_typevars(db);
         if inferable_typevars == InferableTypeVars::None {
-            let when = self_type.when_constraint_set_assignable_to_owned(db, expected_self_ty);
-            when.query(|_, when| when.is_always_satisfied(db))
+            let constraints = ConstraintSetBuilder::new();
+            if let Some(bindable) =
+                protocol_receiver_bindability(db, self_type, expected_self_ty, &constraints)
+            {
+                bindable.is_always_satisfied(db)
+            } else {
+                let when = self_type.when_constraint_set_assignable_to_owned(db, expected_self_ty);
+                when.query(|_, when| when.is_always_satisfied(db))
+            }
         } else {
             let constraints = ConstraintSetBuilder::new();
-            self_type
-                .when_assignable_to(db, expected_self_ty, &constraints, inferable_typevars)
-                .is_always_satisfied(db)
+            let bindable =
+                protocol_receiver_bindability(db, self_type, expected_self_ty, &constraints)
+                    .unwrap_or_else(|| {
+                        self_type.when_assignable_to(
+                            db,
+                            expected_self_ty,
+                            &constraints,
+                            inferable_typevars,
+                        )
+                    });
+
+            !bindable
+                .reduce_inferable(db, &constraints, inferable_typevars.iter(db))
+                .is_never_satisfied(db)
         }
+    }
+
+    /// Returns the constraints under which this signature's first parameter can accept the bound
+    /// `self` type.
+    ///
+    /// This is the constraint-preserving form of [`Signature::can_bind_self_to`]. Callers that
+    /// need to validate another relationship under the receiver match can use the returned
+    /// constraint set as an implication guard.
+    ///
+    /// For example, checking whether `Base[T]` can bind to `self: Base[str]` returns the condition
+    /// `T == str` instead of immediately reducing the answer to `false`.
+    pub(crate) fn when_self_bindable_to<'c>(
+        &self,
+        db: &'db dyn Db,
+        self_type: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        // A dynamic receiver might be compatible with any explicit receiver annotation.
+        if self_type.is_dynamic() {
+            return ConstraintSet::from_bool(constraints, true);
+        }
+
+        // Without a first parameter, there is no receiver annotation to check.
+        let Some(first_parameter) = self.parameters.get(0) else {
+            return ConstraintSet::from_bool(constraints, true);
+        };
+
+        // If there is no positional receiver, this signature cannot be pruned based on `self`.
+        if !first_parameter.is_positional() {
+            return ConstraintSet::from_bool(constraints, true);
+        }
+
+        let mut expected_self_ty = first_parameter.annotated_type();
+        let accepts_any_or_exact_self =
+            |ty: Type<'db>| ty.is_dynamic() || ty.is_object() || ty == self_type;
+
+        // Avoid the more expensive normalization below for receiver annotations that already
+        // accept all values, or already exactly match the bound receiver.
+        if accepts_any_or_exact_self(expected_self_ty) {
+            return ConstraintSet::from_bool(constraints, true);
+        }
+
+        // TODO: Expand type aliases here so `type Alias = Self` in a class body
+        // participates in receiver-specific overload pruning.
+        expected_self_ty = expected_self_ty.bind_self_typevars(db, self_type);
+
+        // `Self` binding can make the receiver annotation trivially compatible.
+        if accepts_any_or_exact_self(expected_self_ty) {
+            return ConstraintSet::from_bool(constraints, true);
+        }
+
+        // A specialized receiver can make generic receiver annotations concrete enough to compare.
+        if let Some(self_specialization) = self_type.class_specialization(db) {
+            expected_self_ty =
+                expected_self_ty.apply_optional_specialization(db, Some(self_specialization));
+
+            // Specialization can also make the receiver annotation trivially compatible.
+            if accepts_any_or_exact_self(expected_self_ty) {
+                return ConstraintSet::from_bool(constraints, true);
+            }
+        }
+
+        // Receiver-specific protocol overloads should be guarded by the specialization that the
+        // receiver actually has for that protocol, not by variance-aware assignability. For
+        // example, if `TaskStatus[T]` is contravariant and the bound receiver has MRO base
+        // `TaskStatus[object]`, an overload annotated with `self: TaskStatus[None]` should not
+        // apply just because `TaskStatus[object]` is assignable to `TaskStatus[None]`.
+        if let Some(bindable) =
+            protocol_receiver_bindability(db, self_type, expected_self_ty, constraints)
+        {
+            return bindable;
+        }
+
+        self_type.when_constraint_set_assignable_to(db, expected_self_ty, constraints)
+    }
+
+    /// Returns `true` if this signature's receiver is not specialized to a narrower receiver than
+    /// the bound method receiver.
+    ///
+    /// For example, when binding a method on `Base[T]`, receiver annotations like `self`,
+    /// `self: Self`, or `self: Base[T]` are unconditional. A receiver annotation like
+    /// `self: Base[str]` is conditional because it only applies to some specializations of
+    /// `Base[T]`. A receiver annotation like `self: WideBase[T]` is also unconditional for a
+    /// method bound to `Child[T]` if `Child` inherits from `WideBase`.
+    pub(crate) fn has_unconditional_receiver(
+        &self,
+        db: &'db dyn Db,
+        self_instance: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) -> bool {
+        if self_instance.is_dynamic() {
+            return true;
+        }
+
+        let Some(first_parameter) = self.parameters().get(0) else {
+            return true;
+        };
+
+        if !first_parameter.is_positional() {
+            return true;
+        }
+
+        if !first_parameter.should_annotation_be_displayed() {
+            return true;
+        }
+
+        let self_annotation = first_parameter.annotated_type();
+        if self_annotation.is_dynamic()
+            || self_annotation.is_object()
+            || matches!(self_annotation, Type::TypeVar(typevar) if typevar.typevar(db).is_self(db))
+            || self_annotation == self_instance
+            || self_annotation == typing_self_type
+        {
+            return true;
+        }
+
+        if let (Some(self_class), Some(annotation_class)) = (
+            self_instance.nominal_class(db),
+            self_annotation.nominal_class(db),
+        ) {
+            // Compare full `ClassType`s from the specialized MRO, not just class literals, so
+            // `Child[str]` remains receiver-specific for a method bound to `Child[T]`.
+            return matching_mro_base(db, self_class, annotation_class).is_some_and(|base| {
+                receiver_annotation_applies_to_all_specializations(db, base, annotation_class)
+            });
+        }
+
+        false
     }
 
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
@@ -1149,7 +1407,7 @@ impl<'db> Signature<'db> {
 
     /// Returns the type variables introduced by this signature that should be existentially
     /// quantified when checking callable compatibility.
-    fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {
+    pub(crate) fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {
         match self.generic_context {
             Some(generic_context) => generic_context.inferable_typevars(db),
             None => InferableTypeVars::None,

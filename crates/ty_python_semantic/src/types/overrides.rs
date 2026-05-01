@@ -527,7 +527,27 @@ fn check_class_declaration<'db>(
 
             let superclass_type_as_type = superclass_type_as_callable.into_type(db);
 
-            if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_type) {
+            // Bound methods can carry receiver-specific overload conditions that are erased when
+            // they are converted to a callable type.
+            let target_method = match superclass_type {
+                Type::BoundMethod(method) => Some(method),
+                _ => None,
+            };
+
+            // Use the conditional bound-method contract path when there is a target bound method;
+            // otherwise, fall back to normal assignability to the upcast callable.
+            let method_is_assignable = target_method.map_or_else(
+                || type_on_subclass_instance.is_assignable_to(db, superclass_type_as_type),
+                |target_method| {
+                    type_on_subclass_instance.is_assignable_to_bound_method_callable_contract(
+                        db,
+                        target_method,
+                        superclass_type_as_type,
+                    )
+                },
+            );
+
+            if method_is_assignable {
                 continue;
             }
 
@@ -541,7 +561,18 @@ fn check_class_declaration<'db>(
                     // The immediate parent already defines this method and is different from the
                     // current ancestor we're checking. Check if the immediate parent's method
                     // is also incompatible with this ancestor.
-                    if !immediate_parent_type.is_assignable_to(db, superclass_type_as_type) {
+                    let immediate_parent_is_assignable = target_method.map_or_else(
+                        || immediate_parent_type.is_assignable_to(db, superclass_type_as_type),
+                        |target_method| {
+                            immediate_parent_type.is_assignable_to_bound_method_callable_contract(
+                                db,
+                                target_method,
+                                superclass_type_as_type,
+                            )
+                        },
+                    );
+
+                    if !immediate_parent_is_assignable {
                         // The immediate parent already has an LSP violation with this ancestor.
                         // Don't report the same violation for the child.
                         continue;

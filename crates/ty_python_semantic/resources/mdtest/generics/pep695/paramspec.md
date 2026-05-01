@@ -943,10 +943,11 @@ t1 = Task(returns_str)
 reveal_type(t1)  # revealed: Task[(x: int), str]
 reveal_type(t1(1))  # revealed: str
 reveal_type(t1(x=1))  # revealed: str
-# error: [no-matching-overload]
-reveal_type(t1("a"))  # revealed: Unknown
-# error: [no-matching-overload]
-reveal_type(t1(y=1))  # revealed: Unknown
+# error: [invalid-argument-type]
+reveal_type(t1("a"))  # revealed: str
+# error: [unknown-argument]
+# error: [missing-argument]
+reveal_type(t1(y=1))  # revealed: str
 
 t2 = Task(never_returns)
 # TODO: This should be `Task[(x: int), Never]`

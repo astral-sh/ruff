@@ -1987,6 +1987,30 @@ c: Child[str] = Child()
 c.add("x")
 ```
 
+Receiver-specific overload checks for explicitly inherited protocols must preserve the full callable
+contract, not just receiver coverage:
+
+```py
+from typing import Generic, Protocol, TypeVar, overload
+
+S = TypeVar("S")
+
+class P(Protocol[S]):
+    @overload
+    def method(self: "P[str]") -> str: ...
+    @overload
+    def method(self: "P[int]") -> int: ...
+    def method(self) -> object: ...
+
+class Impl(P[S], Generic[S]):
+    @overload
+    def method(self: "Impl[str]") -> int: ...
+    @overload
+    def method(self: "Impl[int]") -> int: ...
+    def method(self) -> int:  # error: [invalid-method-override]
+        return 1
+```
+
 A callable instance attribute is not sufficient for a type to satisfy a protocol with a method
 member: a method member specified by a protocol `P` must exist on the *meta-type* of `T` for `T` to
 be a subtype of `P`:
