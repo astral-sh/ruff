@@ -156,6 +156,13 @@ impl Server {
                         // paths into account.
                         // self.try_register_file_watcher(&client);
                     }
+
+                    Action::UpdateWorkspaceConfigs(workspaces_with_options) => {
+                        tracing::debug!("Updating workspace configs");
+
+                        self.session
+                            .update_workspace_folders(&client, workspaces_with_options);
+                    }
                 },
             }
         }
@@ -217,6 +224,9 @@ pub(crate) enum Action {
     /// Initialize the workspace after the server received
     /// the options from the client.
     InitializeWorkspaces(Vec<(Url, ClientOptions)>),
+
+    // Apply updates after pulling configuration on workspace/didChangeConfiguration
+    UpdateWorkspaceConfigs(Vec<(Url, ClientOptions)>),
 }
 
 #[derive(Debug)]

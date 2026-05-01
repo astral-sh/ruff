@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, anyhow};
 use lsp_server::{Message, RequestId};
-use lsp_types::notification::{DidChangeWatchedFiles, Exit, Notification};
+use lsp_types::notification::{DidChangeConfiguration, DidChangeWatchedFiles, Exit, Notification};
 use lsp_types::request::{
     DocumentDiagnosticRequest, RegisterCapability, Request, Shutdown, UnregisterCapability,
     WorkspaceDiagnosticRequest,
@@ -781,6 +781,38 @@ impl Session {
             },
         );
     }
+    // Updates workspace folders from a workspace/didChangeConfiguration request.
+    pub(crate) fn update_workspace_folders(
+        &mut self,
+        client: &Client,
+        workspace_folders: Vec<(Url, ClientOptions)>,
+    ) {
+        let mut global_options: Option<GlobalOptions> = None;
+
+        for (url, client_options) in workspace_folders {
+            // Like initialize_workspace_folders, the last workspace determines the global options
+            global_options = Some(
+                self.initialization_options
+                    .options
+                    .global
+                    .clone()
+                    .combine(client_options.global.clone()),
+            );
+
+            self.update_workspace(&url, client, &client_options);
+        }
+        if let Some(global_options) = global_options {
+            let global_settings = global_options.into_settings();
+            self.global_settings = Arc::new(global_settings);
+        }
+        if let Some(check_mode) = self.global_settings.diagnostic_mode().to_check_mode() {
+            for project in self.projects.values_mut() {
+                project.db.set_check_mode(check_mode);
+            }
+        }
+
+        self.register_capabilities(client);
+    }
 
     /// Removes a workspace folder at the given URL.
     ///
@@ -888,6 +920,78 @@ impl Session {
         }
     }
 
+    // Update workspace given new client options
+    //
+    // Intended to be used when handling `workspace/didChangeConfiguration`.
+    // Replaces [WorkspaceSettings], and compares and replaces the [Project.settings] if the
+    // resolved [ProjectMetadata] does not match.
+    fn update_workspace(&mut self, url: &Url, client: &Client, client_options: &ClientOptions) {
+        let Ok(root) = url.to_file_path() else {
+            tracing::debug!("Ignoring workspace with non-path root: {url}");
+            return;
+        };
+
+        // Realistically I don't think this can fail because we got the path from a Url
+        let root = match SystemPathBuf::from_path_buf(root) {
+            Ok(root) => root,
+            Err(root) => {
+                tracing::debug!(
+                    "Ignoring workspace with non-UTF8 root: {root}",
+                    root = root.display()
+                );
+                return;
+            }
+        };
+
+        let options = self
+            .initialization_options
+            .options
+            .workspace
+            .clone()
+            .combine(client_options.workspace.clone());
+
+        let Some(workspace) = self.workspaces.workspaces.get_mut(&root) else {
+            return;
+        };
+
+        let workspace_settings =
+            Arc::new(options.into_settings(&root, client, &*self.native_system));
+
+        workspace.settings = workspace_settings.clone();
+
+        let db = self.project_db_mut(&AnySystemPath::System(root.clone()));
+
+        let system = db.system();
+
+        let configuration_file = workspace_settings
+            .project_options_overrides()
+            .and_then(|settings| settings.config_file_override.as_ref());
+
+        let metadata = if let Some(configuration_file) = configuration_file {
+            ProjectMetadata::from_config_file(configuration_file.clone(), &root, system)
+        } else {
+            ProjectMetadata::discover(&root, system)
+        };
+
+        match metadata {
+            Ok(mut metadata) => {
+                let _ = metadata.apply_configuration_files(system);
+                if let Some(overrides) = workspace_settings.project_options_overrides() {
+                    metadata.apply_overrides(overrides);
+                }
+
+                tracing::debug!("Replacing project settings for {}", root);
+                db.project().reload(db, metadata);
+            }
+            _ => {
+                tracing::debug!(
+                    "Could not retrieve metadata, skipping project settings update for {}",
+                    root
+                );
+            }
+        }
+    }
+
     /// Registers the dynamic capabilities with the client as per the resolved global settings.
     ///
     /// ## Diagnostic capability
@@ -899,12 +1003,34 @@ impl Session {
     ///
     /// This capability is used to enable / disable rename functionality as per the
     /// `ty.experimental.rename` global setting.
+    ///
+    /// ## Did change configuration capability
+    ///
+    /// This capability is used to enable or disable didChangeConfiguration requests
     fn register_capabilities(&mut self, client: &Client) {
         static DIAGNOSTIC_REGISTRATION_ID: &str = "ty/textDocument/diagnostic";
         static FILE_WATCHER_REGISTRATION_ID: &str = "ty/workspace/didChangeWatchedFiles";
+        static DID_CHANGE_CONFIGURATION_ID: &str = "ty/workspace/didChangeConfiguration";
 
         let mut registrations = vec![];
         let mut unregistrations = vec![];
+
+        if self
+            .resolved_client_capabilities
+            .supports_change_conf_notifications()
+        {
+            if self.registrations.contains(DidChangeConfiguration::METHOD) {
+                unregistrations.push(Unregistration {
+                    id: DID_CHANGE_CONFIGURATION_ID.into(),
+                    method: DidChangeConfiguration::METHOD.into(),
+                });
+            }
+            registrations.push(Registration {
+                id: DID_CHANGE_CONFIGURATION_ID.into(),
+                method: DidChangeConfiguration::METHOD.into(),
+                register_options: Some(serde_json::to_value(()).unwrap()),
+            });
+        }
 
         if self
             .resolved_client_capabilities
