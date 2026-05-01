@@ -693,6 +693,65 @@ class E(Enum):
     });
 }
 
+fn benchmark_many_enum_membership_narrowing(criterion: &mut Criterion) {
+    const NUM_GROUPS: usize = 5;
+    const MEMBERS_PER_GROUP: usize = 10;
+
+    setup_rayon();
+
+    let mut code = "\
+from enum import Enum, auto
+
+class SomeEnum(Enum):
+"
+    .to_string();
+
+    for group in 0..NUM_GROUPS {
+        for member in 0..MEMBERS_PER_GROUP {
+            writeln!(
+                &mut code,
+                "    {}{} = auto()",
+                (b'A' + u8::try_from(group).unwrap()) as char,
+                member + 1
+            )
+            .ok();
+        }
+        code.push('\n');
+    }
+
+    code.push_str("def get_default_mi_attrs(some_enum: SomeEnum):\n");
+    for (index, members) in [
+        "SomeEnum.A1, SomeEnum.A2, SomeEnum.A3",
+        "SomeEnum.B10,",
+        "SomeEnum.C1, SomeEnum.C2",
+        "SomeEnum.D4,",
+        "SomeEnum.E9,",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        if index == 0 {
+            writeln!(&mut code, "    if some_enum in ({members}):").ok();
+        } else {
+            writeln!(&mut code, "    elif some_enum in ({members}):").ok();
+        }
+        writeln!(&mut code, "        return {index}").ok();
+    }
+    code.push_str("    return None\n");
+
+    criterion.bench_function("ty_micro[many_enum_membership_narrowing]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Regression benchmark for protocol-to-protocol non-assignability when the target protocol
 /// has one more member than the source protocol.
 ///
@@ -1216,6 +1275,7 @@ criterion_group!(
     benchmark_complex_constrained_attributes_3,
     benchmark_many_enum_members,
     benchmark_many_enum_members_2,
+    benchmark_many_enum_membership_narrowing,
     benchmark_many_protocol_members_mismatch,
     benchmark_gradual_vararg_call,
     benchmark_vararg_parameter_type_accumulation,
