@@ -508,17 +508,17 @@ fn custom_init<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<FunctionType
     }
 }
 
-pub(crate) fn enum_member_literals<'a, 'db: 'a>(
+#[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn enum_member_literals<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
-    exclude_member: Option<&'a Name>,
-) -> Option<impl Iterator<Item = Type<'a>> + 'a> {
+) -> Option<Box<[Type<'db>]>> {
     enum_metadata(db, class).map(|metadata| {
         metadata
             .members
             .keys()
-            .filter(move |name| Some(*name) != exclude_member)
             .map(move |name| Type::enum_literal(EnumLiteralType::new(db, class, name.clone())))
+            .collect()
     })
 }
 

@@ -561,11 +561,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                 };
             }
 
-            if let Some(enum_members) = enum_member_literals(db, class.class_literal(db), None) {
-                return Some(enum_members.collect());
-            }
-
-            None
+            enum_member_literals(db, class.class_literal(db)).map(<[_]>::to_vec)
         }
         Type::Union(union) => Some(union.elements(db).to_vec()),
         // For type aliases, expand the underlying value type.

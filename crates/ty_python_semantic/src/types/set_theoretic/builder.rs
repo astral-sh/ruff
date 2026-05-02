@@ -1043,9 +1043,8 @@ impl<'db> IntersectionBuilder<'db> {
                     self.add_positive_impl(
                         Type::Union(UnionType::new(
                             db,
-                            enum_member_literals(db, instance.class_literal(db), None)
-                                .expect("Calling `enum_member_literals` on an enum class")
-                                .collect::<Box<[_]>>(),
+                            enum_member_literals(db, instance.class_literal(db))
+                                .expect("Calling `enum_member_literals` on an enum class"),
                             RecursivelyDefined::No,
                         )),
                         seen_aliases,
@@ -1152,14 +1151,13 @@ impl<'db> IntersectionBuilder<'db> {
                         self
                     } else {
                         let db = self.db;
+                        let this_member = Type::enum_literal(enum_literal);
                         let remaining_members = UnionType::from_elements(
                             db,
-                            enum_member_literals(
-                                db,
-                                enum_literal.enum_class(db),
-                                Some(enum_literal.name(db)),
-                            )
-                            .expect("Calling `enum_member_literals` on an enum class"),
+                            enum_member_literals(db, enum_literal.enum_class(db))
+                                .expect("Calling `enum_member_literals` on an enum class")
+                                .iter()
+                                .filter(|&member| member != &this_member),
                         );
 
                         // For enum-containing intersections, add the remaining members as positive
@@ -1717,9 +1715,7 @@ mod tests {
             .ignore_possibly_undefined()
             .unwrap();
 
-        let literals = enum_member_literals(&db, safe_uuid_class.expect_class_literal(), None)
-            .unwrap()
-            .collect::<Vec<_>>();
+        let literals = enum_member_literals(&db, safe_uuid_class.expect_class_literal()).unwrap();
         assert_eq!(literals.len(), 3);
 
         // SafeUUID.safe
