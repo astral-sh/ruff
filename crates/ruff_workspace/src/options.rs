@@ -3293,7 +3293,7 @@ pub struct PydocstyleOptions {
     /// docstring sections.
     ///
     /// Enabling a convention will disable any rules that are not included
-    /// in the specified convention. As such, the intended workflow is to 
+    /// in the specified convention. As such, the intended workflow is to
     /// enable a convention and then selectively enable or disable any
     /// additional rules on top of it.
     ///
@@ -3360,7 +3360,7 @@ pub struct PydocstyleOptions {
     /// [`D408`](rules/missing-section-underline-after-name.md),
     /// [`D409`](rules/mismatched-section-underline-length.md), and
     /// [`D413`](rules/missing-blank-line-after-last-section.md).
-    /// 
+    ///
     /// To enable an additional rule that's excluded from the convention,
     /// select the desired rule via its fully qualified rule code (e.g.,
     /// `D400` instead of `D4` or `D40`):
