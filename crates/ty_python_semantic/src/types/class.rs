@@ -1333,17 +1333,16 @@ impl<'db> ClassType<'db> {
         {
             // As above, tuple element specs do not make two direct aliases incompatible as
             // runtime classes.
-            if self_alias.specialization(db).tuple(db).is_some()
-                && other_alias.specialization(db).tuple(db).is_some()
-            {
+            let self_specialization = self_alias.specialization(db);
+            let other_specialization = other_alias.specialization(db);
+            if self_specialization.tuple(db).is_some() && other_specialization.tuple(db).is_some() {
                 return true;
             }
 
-            return !self_alias
-                .specialization(db)
+            return !self_specialization
                 .is_disjoint_from(
                     db,
-                    other_alias.specialization(db),
+                    other_specialization,
                     constraints,
                     InferableTypeVars::None,
                 )
@@ -1362,14 +1361,11 @@ impl<'db> ClassType<'db> {
             .filter_map(ClassType::into_generic_alias)
             .any(|self_alias| {
                 other_generic_bases.iter().any(|other_alias| {
-                    if self_alias.origin(db) != other_alias.origin(db) {
-                        return false;
-                    }
-
-                    specializations_are_incompatible_in_mro(
-                        self_alias.specialization(db),
-                        other_alias.specialization(db),
-                    )
+                    self_alias.origin(db) == other_alias.origin(db)
+                        && specializations_are_incompatible_in_mro(
+                            self_alias.specialization(db),
+                            other_alias.specialization(db),
+                        )
                 })
             })
         {

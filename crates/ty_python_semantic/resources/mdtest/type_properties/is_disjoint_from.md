@@ -268,7 +268,10 @@ class FinalA: ...
 class Invariant(Generic[U]):
     pass
 
-class Covariant(Generic[T_co], Invariant[T_co]):
+class CovariantBase(Generic[T_co]):
+    pass
+
+class Covariant(CovariantBase[T_co], Generic[T_co]):
     pass
 
 LeftWithFreeAlias: TypeAlias = Invariant[FreeAlias]
@@ -281,7 +284,7 @@ static_assert(not is_disjoint_from(LeftWithFreeAlias, RightWithConcrete))
 LeftWithInheritedBase: TypeAlias = Covariant[FinalA]
 RightWithInheritedBase: TypeAlias = Covariant[B]
 
-# The direct `Covariant[...]` aliases can overlap even though their inherited invariant bases
+# The direct `Covariant[...]` aliases can overlap even though their inherited generic bases
 # appear disjoint.
 static_assert(not is_disjoint_from(LeftWithInheritedBase, RightWithInheritedBase))
 ```

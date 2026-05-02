@@ -1642,22 +1642,6 @@ fn specialization_variance<'db>(
     }
 }
 
-fn type_or_alias_value_has_typevar<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    any_over_type(db, ty, true, |ty| matches!(ty, Type::TypeVar(_)))
-}
-
-fn type_or_alias_value_has_typevar_or_typevar_instance<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-) -> bool {
-    any_over_type(db, ty, true, |ty| {
-        matches!(
-            ty,
-            Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_)
-        )
-    })
-}
-
 impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     /// Return `true` if a type can safely participate in specialization disjointness shortcuts.
     ///
@@ -1666,7 +1650,14 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     /// type as another type variable, so treating either as definitive evidence of disjointness
     /// would make overload filtering and union simplification too eager.
     fn type_is_static_for_specialization_disjointness(db: &'db dyn Db, ty: Type<'db>) -> bool {
-        if ty.is_dynamic() || type_or_alias_value_has_typevar_or_typevar_instance(db, ty) {
+        if ty.is_dynamic()
+            || any_over_type(db, ty, true, |ty| {
+                matches!(
+                    ty,
+                    Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_)
+                )
+            })
+        {
             return false;
         }
 
@@ -1676,19 +1667,6 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 
         visitor.is_equivalent_to_materialization(db, ty, top)
             && visitor.is_equivalent_to_materialization(db, ty, bottom)
-    }
-
-    /// Return `true` if every type argument in a specialization is static enough for the
-    /// MRO incompatibility shortcut.
-    fn specialization_is_static_for_mro_incompatibility_check(
-        db: &'db dyn Db,
-        specialization: Specialization<'db>,
-    ) -> bool {
-        specialization
-            .types(db)
-            .iter()
-            .copied()
-            .all(|ty| Self::type_is_static_for_specialization_disjointness(db, ty))
     }
 
     /// Return the constraints under which two invariant specialization arguments are disjoint.
@@ -1784,9 +1762,14 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 
         // For non-static arguments like `Any` or an unresolved `T`, stay conservative: they can
         // materialize or specialize to a type that makes the two bases compatible.
-        if !Self::specialization_is_static_for_mro_incompatibility_check(db, left)
-            || !Self::specialization_is_static_for_mro_incompatibility_check(db, right)
-        {
+        let specialization_is_static = |specialization: Specialization<'db>| {
+            specialization
+                .types(db)
+                .iter()
+                .copied()
+                .all(|ty| Self::type_is_static_for_specialization_disjointness(db, ty))
+        };
+        if !specialization_is_static(left) || !specialization_is_static(right) {
             return self.never();
         }
 
@@ -2459,8 +2442,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
         // Pairs with no type variables cannot contribute any mapping. Look through nested alias
         // values here so `list[Alias[T]]` still reaches structural inference.
-        if !type_or_alias_value_has_typevar(self.db, formal)
-            && !type_or_alias_value_has_typevar(self.db, actual)
+        if !any_over_type(self.db, formal, true, |ty| matches!(ty, Type::TypeVar(_)))
+            && !any_over_type(self.db, actual, true, |ty| matches!(ty, Type::TypeVar(_)))
         {
             return Ok(());
         }
