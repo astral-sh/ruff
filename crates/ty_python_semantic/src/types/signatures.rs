@@ -34,12 +34,12 @@ use crate::types::typed_dict::{
     UnpackedTypedDictKey, extract_unpacked_typed_dict_keys_from_kwargs_annotation,
     extract_unpacked_typed_dict_keys_from_value_type,
 };
-use crate::types::typevar::BoundTypeVarIdentity;
+use crate::types::typevar::{BoundTypeVarIdentity, max_typevar_freshness_matching_generic_context};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind,
-    ParameterDescription, SelfBinding, TypeContext, TypeMapping, UnionBuilder, VarianceInferable,
-    infer_complete_scope_types, todo_type,
+    ParameterDescription, SelfBinding, TypeContext, TypeMapping, TypeVarNonce, UnionBuilder,
+    VarianceInferable, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -781,6 +781,65 @@ impl<'db> Signature<'db> {
         }
     }
 
+    pub(crate) fn freshen_bound_typevars(&self, db: &'db dyn Db, delta: u32) -> Self {
+        let Some(generic_context) = self.generic_context else {
+            return self.clone();
+        };
+
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::FreshenBoundTypeVars {
+                generic_context,
+                delta,
+            },
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
+    }
+
+    pub(crate) fn max_typevar_freshness_matching_generic_context(
+        &self,
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+    ) -> Option<TypeVarNonce> {
+        let mut max_freshness = None;
+        let mut update = |freshness| {
+            max_freshness = max_freshness.max(freshness);
+        };
+
+        if let Some(signature_generic_context) = self.generic_context {
+            for typevar in signature_generic_context.variables(db) {
+                update(max_typevar_freshness_matching_generic_context(
+                    db,
+                    Type::TypeVar(typevar),
+                    generic_context,
+                ));
+            }
+        }
+
+        for param in &self.parameters {
+            update(max_typevar_freshness_matching_generic_context(
+                db,
+                param.annotated_type(),
+                generic_context,
+            ));
+            if let Some(default_ty) = param.default_type() {
+                update(max_typevar_freshness_matching_generic_context(
+                    db,
+                    default_ty,
+                    generic_context,
+                ));
+            }
+        }
+        update(max_typevar_freshness_matching_generic_context(
+            db,
+            self.return_ty,
+            generic_context,
+        ));
+
+        max_freshness
+    }
+
     pub(crate) fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
@@ -1475,18 +1534,35 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        // If either signature is generic, their typevars should also be considered inferable when
-        // checking whether one signature is a subtype/etc of the other, since we only need to find
-        // one specialization that causes the check to succeed.
-        //
-        // TODO: We should alpha-rename these typevars, too, to correctly handle when a generic
-        // callable refers to typevars from within the context that defines them. This primarily
-        // comes up when referring to a generic function recursively from within its body:
-        //
-        //     def identity[T](t: T) -> T:
-        //         # Here, TypeOf[identity2] is a generic callable that should consider T to be
-        //         # inferable, even though other uses of T in the function body are non-inferable.
-        //         return t
+        // If either signature is generic, freshen that signature's typevars before considering
+        // them inferable for this relation. The relation only needs to find one specialization of
+        // each generic callable that causes the check to succeed, but those callable-local
+        // specializations must not collide with any same-source typevars in the other signature.
+        let freshened_source;
+        let source = if source.generic_context != target.generic_context
+            && let Some(generic_context) = source.generic_context
+            && let Some(delta) = target
+                .max_typevar_freshness_matching_generic_context(db, generic_context)
+                .map(|freshness| freshness.increment().value())
+        {
+            freshened_source = source.freshen_bound_typevars(db, delta);
+            &freshened_source
+        } else {
+            source
+        };
+
+        let freshened_target;
+        let target = if let Some(generic_context) = target.generic_context
+            && let Some(delta) = source
+                .max_typevar_freshness_matching_generic_context(db, generic_context)
+                .map(|freshness| freshness.increment().value())
+        {
+            freshened_target = target.freshen_bound_typevars(db, delta);
+            &freshened_target
+        } else {
+            target
+        };
+
         let source_inferable = source.inferable_typevars(db);
         let target_inferable = target.inferable_typevars(db);
         let inferable = source_inferable.merge(db, target_inferable);

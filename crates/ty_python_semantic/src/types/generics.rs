@@ -209,6 +209,11 @@ pub(crate) fn typing_self<'db>(
     )
 }
 
+/// The set of bound typevar occurrences that can be solved by the current inference context.
+///
+/// Membership is keyed by [`BoundTypeVarIdentity`], including any freshness nonce. This lets a
+/// fresh generic-callable occurrence be inferable without making the surrounding source-level
+/// typevar inferable.
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) enum InferableTypeVars<'db> {
     None,
@@ -288,7 +293,11 @@ impl<'db> InferableTypeVars<'db> {
     }
 }
 
-/// A list of formal type variables for a generic function, class, or type alias.
+/// A list of formal type variables for a generic function, class, type alias, or fresh callable
+/// occurrence.
+///
+/// Variables are keyed by bound occurrence identity, so freshened copies of the same source-level
+/// generic context can coexist without collapsing into each other.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct GenericContext<'db> {
     #[returns(ref)]
@@ -473,6 +482,20 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
     ) -> impl ExactSizeIterator<Item = BoundTypeVarInstance<'db>> + Clone {
         self.variables_inner(db).values().copied()
+    }
+
+    pub(crate) fn contains(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> bool {
+        let bound_typevar = if bound_typevar.is_paramspec(db) {
+            bound_typevar.without_paramspec_attr(db)
+        } else {
+            bound_typevar
+        };
+        self.variables_inner(db)
+            .contains_key(&bound_typevar.identity(db))
     }
 
     /// Returns `true` if this generic context contains exactly one `ParamSpec` and no other type

@@ -11,6 +11,7 @@
 mod constructor;
 
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fmt;
 
@@ -51,14 +52,15 @@ use crate::types::signatures::{
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
-use crate::types::typevar::BoundTypeVarIdentity;
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral,
     DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias, InternedConstraintSet,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext,
-    TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, list_members,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder,
+    UnionType, WrapperDescriptorKind, enums, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -68,6 +70,81 @@ use ty_python_core::scope::NodeWithScopeKind;
 use ty_python_core::{EvaluationMode, semantic_index};
 
 pub(crate) use self::constructor::ConstructorCallableKind;
+
+fn generic_contexts_mentioned_in_type<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> FxOrderSet<GenericContext<'db>> {
+    struct GenericContextCollector<'db> {
+        generic_contexts: RefCell<FxOrderSet<GenericContext<'db>>>,
+        recursion_guard: TypeCollector<'db>,
+    }
+
+    impl<'db> GenericContextCollector<'db> {
+        fn visit_signature(&self, db: &'db dyn Db, signature: &Signature<'db>) {
+            if let Some(generic_context) = signature.generic_context {
+                self.generic_contexts.borrow_mut().insert(generic_context);
+            }
+            for parameter in signature.parameters() {
+                self.visit_type(db, parameter.annotated_type());
+                if let Some(default_ty) = parameter.default_type() {
+                    self.visit_type(db, default_ty);
+                }
+            }
+            self.visit_type(db, signature.return_ty);
+        }
+    }
+
+    impl<'db> TypeVisitor<'db> for GenericContextCollector<'db> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            false
+        }
+
+        fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
+            for signature in &callable.signatures(db).overloads {
+                self.visit_signature(db, signature);
+            }
+        }
+
+        fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
+            for signature in &function.signature(db).overloads {
+                self.visit_signature(db, signature);
+            }
+            self.visit_signature(db, function.last_definition_signature(db));
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+    }
+
+    let collector = GenericContextCollector {
+        generic_contexts: RefCell::default(),
+        recursion_guard: TypeCollector::default(),
+    };
+    collector.visit_type(db, ty);
+    collector.generic_contexts.into_inner()
+}
+
+fn freshen_generic_contexts_in_type<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    generic_contexts: FxOrderSet<GenericContext<'db>>,
+    nonce_generator: &TypeVarNonceGenerator<'db>,
+) -> Type<'db> {
+    generic_contexts
+        .into_iter()
+        .fold(ty, |ty, generic_context| {
+            ty.apply_type_mapping(
+                db,
+                &TypeMapping::FreshenBoundTypeVars {
+                    generic_context,
+                    delta: nonce_generator.next().value(),
+                },
+                TypeContext::default(),
+            )
+        })
+}
 
 /// Priority levels for call errors in intersection types.
 /// Higher values indicate more specific errors that should take precedence.
@@ -79,6 +156,15 @@ enum CallErrorPriority {
     TopCallable = 1,
     /// Specific binding error (invalid argument type, missing argument, etc.).
     BindingError = 2,
+}
+
+fn generic_context_has_paramspec<'db>(
+    db: &'db dyn Db,
+    generic_context: GenericContext<'db>,
+) -> bool {
+    generic_context
+        .variables(db)
+        .any(|typevar| typevar.is_paramspec(db))
 }
 
 /// A single callable item within the union/intersection structure.
@@ -161,6 +247,21 @@ impl<'db> CallableItem<'db> {
     fn set_downstream_constructor(&mut self, bindings: &Bindings<'db>) {
         if let Some(binding) = self.as_constructor_mut() {
             binding.set_downstream_constructor(bindings.clone());
+        }
+    }
+
+    fn freshen_generic_contexts_in_place(
+        &mut self,
+        db: &'db dyn Db,
+        nonce_generator: &TypeVarNonceGenerator<'db>,
+    ) {
+        match self {
+            CallableItem::Regular(binding) => {
+                binding.freshen_generic_contexts_in_place(db, nonce_generator);
+            }
+            // TODO: Constructor freshening also has to keep constructor instance context in sync
+            // with `__new__`/`__init__` signatures.
+            CallableItem::Constructor(_) => {}
         }
     }
 
@@ -373,6 +474,14 @@ pub(crate) struct Bindings<'db> {
 
     /// Whether each argument will be used as a value and/or a type form in this call.
     argument_forms: ArgumentForms,
+
+    /// Generic contexts that enclose this call site, if known.
+    ///
+    /// This is an optimization hint for deciding when direct-call generic freshening is needed.
+    /// `None` means the caller did not provide the information, so we conservatively freshen every
+    /// eligible generic callable. `Some([])` means the caller knows there are no enclosing generic
+    /// contexts, so freshening can be skipped.
+    enclosing_generic_contexts: Option<Box<[GenericContext<'db>]>>,
 }
 
 impl<'db> Bindings<'db> {
@@ -505,6 +614,7 @@ impl<'db> Bindings<'db> {
             argument_forms: ArgumentForms::new(0),
             implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound,
+            enclosing_generic_contexts: None,
         }
     }
 
@@ -538,6 +648,7 @@ impl<'db> Bindings<'db> {
             implicit_dunder_init_is_possibly_unbound,
             elements,
             argument_forms: ArgumentForms::new(0),
+            enclosing_generic_contexts: None,
         }
     }
 
@@ -582,6 +693,14 @@ impl<'db> Bindings<'db> {
             return self;
         };
         self.apply_generic_context_in_place(db, generic_context);
+        self
+    }
+
+    pub(crate) fn with_enclosing_generic_contexts(
+        mut self,
+        enclosing_generic_contexts: impl IntoIterator<Item = GenericContext<'db>>,
+    ) -> Self {
+        self.enclosing_generic_contexts = Some(enclosing_generic_contexts.into_iter().collect());
         self
     }
 
@@ -842,6 +961,7 @@ impl<'db> Bindings<'db> {
             argument_forms: self.argument_forms,
             implicit_dunder_new_is_possibly_unbound: self.implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound: self.implicit_dunder_init_is_possibly_unbound,
+            enclosing_generic_contexts: self.enclosing_generic_contexts,
             elements: self
                 .elements
                 .into_iter()
@@ -854,6 +974,21 @@ impl<'db> Bindings<'db> {
 
     pub(crate) fn map(self, f: impl Fn(CallableBinding<'db>) -> CallableBinding<'db>) -> Self {
         self.map_with(&f)
+    }
+
+    fn freshen_generic_contexts_in_place(
+        &mut self,
+        db: &'db dyn Db,
+        nonce_generator: &TypeVarNonceGenerator<'db>,
+    ) {
+        let enclosing_generic_contexts = self.enclosing_generic_contexts.take();
+        if let Some(enclosing_generic_contexts) = enclosing_generic_contexts.as_deref() {
+            nonce_generator.record_enclosing_scopes(enclosing_generic_contexts.iter().copied());
+        }
+        for item in self.iter_callable_items_mut() {
+            item.freshen_generic_contexts_in_place(db, nonce_generator);
+        }
+        self.enclosing_generic_contexts = enclosing_generic_contexts;
     }
 
     /// Match the arguments of a call site against the parameters of a collection of possibly
@@ -870,6 +1005,8 @@ impl<'db> Bindings<'db> {
         db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
+        let nonce_generator = TypeVarNonceGenerator::default();
+        self.freshen_generic_contexts_in_place(db, &nonce_generator);
         self.match_parameters_in_place(db, arguments);
         self
     }
@@ -2430,11 +2567,25 @@ impl<'db> Bindings<'db> {
                             continue;
                         };
 
+                        let nonce_generator = TypeVarNonceGenerator::default();
+                        let ty_a = freshen_generic_contexts_in_type(
+                            db,
+                            *ty_a,
+                            generic_contexts_mentioned_in_type(db, *ty_a),
+                            &nonce_generator,
+                        );
+                        let ty_b = freshen_generic_contexts_in_type(
+                            db,
+                            *ty_b,
+                            generic_contexts_mentioned_in_type(db, *ty_b),
+                            &nonce_generator,
+                        );
+
                         let constraints = ConstraintSetBuilder::new();
                         let result = constraints.into_owned(|constraints| {
                             ty_a.when_subtype_of_assuming(
                                 db,
-                                *ty_b,
+                                ty_b,
                                 constraints.load(db, tracked.constraints(db)),
                                 constraints,
                                 InferableTypeVars::None,
@@ -2592,6 +2743,7 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
             argument_forms: ArgumentForms::new(0),
             implicit_dunder_new_is_possibly_unbound: false,
             implicit_dunder_init_is_possibly_unbound: false,
+            enclosing_generic_contexts: None,
         }
     }
 }
@@ -2617,6 +2769,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             argument_forms: ArgumentForms::new(0),
             implicit_dunder_new_is_possibly_unbound: false,
             implicit_dunder_init_is_possibly_unbound: false,
+            enclosing_generic_contexts: None,
         }
     }
 }
@@ -2740,6 +2893,50 @@ impl<'db> CallableBinding<'db> {
         };
         for overload in &mut self.overloads {
             overload.signature = overload.signature.bind_self(db, Some(bound_self));
+        }
+    }
+
+    fn freshen_generic_contexts_in_place(
+        &mut self,
+        db: &'db dyn Db,
+        nonce_generator: &TypeVarNonceGenerator<'db>,
+    ) {
+        if self
+            .overloads
+            .iter()
+            .all(|overload| overload.signature.generic_context.is_none())
+        {
+            return;
+        }
+
+        // ParamSpec freshening needs relation-side support so `Callable[P, R]` inference doesn't
+        // quantify away `P` before call specialization can use it.
+        if self.overloads.iter().any(|overload| {
+            overload
+                .signature
+                .generic_context
+                .is_some_and(|generic_context| generic_context_has_paramspec(db, generic_context))
+        }) {
+            return;
+        }
+
+        // If any of the overloads being called are generic, we need to "freshen" their generic
+        // contexts. The typevars bound by this generic context might collide with other visible
+        // occurrences of the same generic context. This happens most often when referring to a
+        // generic function recursively within its body: the recursive reference should bind new
+        // copies of the typevars.
+        //
+        // We can use a single new nonce here for all of the generic overloads, since overloads are
+        // not able to share generic contexts. That means we cannot freshen two overloads in a way
+        // that causes their typevars to collide.
+        let nonce = nonce_generator.next();
+        for overload in &mut self.overloads {
+            let Some(generic_context) = overload.signature.generic_context else {
+                continue;
+            };
+            if nonce_generator.should_freshen(generic_context) {
+                overload.freshen_bound_typevars(db, nonce.value());
+            }
         }
     }
 
@@ -5405,6 +5602,15 @@ impl<'db> Binding<'db> {
         if self.callable_type == before {
             self.callable_type = after;
         }
+    }
+
+    fn freshen_bound_typevars(&mut self, db: &'db dyn Db, delta: u32) {
+        if self.signature.generic_context.is_none() {
+            return;
+        }
+
+        self.signature = self.signature.freshen_bound_typevars(db, delta);
+        self.return_ty = self.initial_return_type(db);
     }
 
     fn match_parameters(

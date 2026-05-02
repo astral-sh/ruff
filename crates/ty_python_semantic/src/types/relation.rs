@@ -653,7 +653,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) inferable: InferableTypeVars<'db>,
     pub(super) relation: TypeRelation,
     context_tree: ErrorContextTree<'db>,
-    given: ConstraintSet<'db, 'c>,
+    pub(super) given: ConstraintSet<'db, 'c>,
 
     // N.B. these fields are private to reduce the risk of
     // "double-visiting" a given pair of types. You should

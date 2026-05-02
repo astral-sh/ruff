@@ -627,10 +627,11 @@ struct ConstraintSetStorage<'db> {
     /// structures.
     constraints: IndexVec<ConstraintId, Constraint<'db>>,
 
-    /// Typevars are interned so that they have a stable ordering within this builder, which does
-    /// not depend on their salsa IDs. (The salsa IDs are not stable, since each typevar can be
-    /// used (possibly indirectly) in expressions in different files, and there are no guarantees
-    /// about the order or the speed that we process each file.)
+    /// Typevars are interned by bound occurrence identity so that they have a stable ordering
+    /// within this builder, which does not depend on their salsa IDs. (The salsa IDs are not
+    /// stable, since each typevar can be used (possibly indirectly) in expressions in different
+    /// files, and there are no guarantees about the order or the speed that we process each file.)
+    /// Fresh callable occurrences of the same source-level typevar are distinct identities here.
     ///
     /// The ordering of typevars within this arena defines which typevars can be the lower/upper
     /// bounds of another (e.g., whether we encode `T ≤ U` as `Never ≤ T ≤ U` or `T ≤ U ≤ object`).
