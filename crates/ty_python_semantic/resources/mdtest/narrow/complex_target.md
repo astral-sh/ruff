@@ -452,12 +452,20 @@ def dict_get(d: dict[str, str | None]):
         reveal_type(d["a"])  # revealed: str
         reveal_type(d["b"])  # revealed: str | None
     else:
-        reveal_type(d["a"])  # revealed: str | None
+        reveal_type(d["a"])  # revealed: None
 
     if d.get("a") is None:
         return
 
     reveal_type(d["a"])  # revealed: str
+
+def dict_get_walrus(d: dict[str, str | None]):
+    if (value := d.get("a")) is None:
+        reveal_type(value)  # revealed: None
+        reveal_type(d["a"])  # revealed: None
+    else:
+        reveal_type(value)  # revealed: str
+        reveal_type(d["a"])  # revealed: str
 
 from typing_extensions import NotRequired, TypedDict
 
