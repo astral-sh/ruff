@@ -89,6 +89,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Infer a subscript slice without inheriting literal promotion from an enclosing expression.
+    ///
+    /// For example, the key in:
+    ///
+    /// ```python
+    /// value = items["exact-key"]
+    /// ```
+    ///
+    /// must remain the string literal `"exact-key"` so that tuple, `Literal`, and `TypedDict`
+    /// subscript handling can resolve the precise element or field type.
     fn infer_subscript_slice(&mut self, slice: &ast::Expr, tcx: TypeContext<'db>) -> Type<'db> {
         self.with_inference_flag(InferenceFlags::PROMOTE_LITERALS, false, |builder| {
             builder.infer_expression(slice, tcx)

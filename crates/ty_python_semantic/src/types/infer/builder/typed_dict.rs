@@ -64,6 +64,15 @@ impl<'expr> TypedDictConstructorForm<'expr> {
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Preserve string literal keys while inferring `TypedDict` fields, even when the enclosing
     /// collection enables large-literal promotion.
+    ///
+    /// For example, the key in:
+    ///
+    /// ```python
+    /// movie: Movie = {"name": "Blade Runner"}
+    /// ```
+    ///
+    /// must remain the literal `"name"` so the value expression can be inferred against the
+    /// declared `Movie["name"]` field type.
     fn infer_typed_dict_key_expression(&mut self, key: &ast::Expr) -> Type<'db> {
         if let Some(key_ty) = self.try_expression_type(key) {
             return key_ty.as_string_literal().map_or_else(

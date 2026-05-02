@@ -373,6 +373,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.cycle_recovery
     }
 
+    /// Temporarily set an inference flag while running `f`, then restore its previous value.
+    ///
+    /// This is used for expression-local inference modes where a parent node needs different
+    /// behavior from its children without permanently changing the builder state.
     fn with_inference_flag<T>(
         &mut self,
         flag: InferenceFlags,
@@ -385,16 +389,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         result
     }
 
+    /// Infer an expression with literal promotion enabled for nested collection and call
+    /// boundaries, then promote the expression's immediate result.
+    ///
+    /// For example, a very large literal such as:
+    ///
+    /// ```python
+    /// xs = [1, 2, 3, ...]
+    /// ```
+    ///
+    /// is inferred as a widened `list[int]`-style type instead of accumulating a very large union
+    /// of singleton literal types.
     fn infer_expression_with_promoted_literals(
-        &mut self,
-        expression: &ast::Expr,
-        tcx: TypeContext<'db>,
-    ) -> Type<'db> {
-        self.infer_expression_with_promoted_literal_children(expression, tcx)
-            .promote(self.db())
-    }
-
-    fn infer_expression_with_promoted_literal_children(
         &mut self,
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
@@ -402,6 +408,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.with_inference_flag(InferenceFlags::PROMOTE_LITERALS, true, |builder| {
             builder.infer_expression(expression, tcx)
         })
+        .promote(self.db())
+    }
+
+    /// Return whether literal-heavy child expressions should be inferred in widened form.
+    ///
+    /// This becomes true either when the current collection exceeds the precise-inference arity
+    /// limit, or when a parent expression has already enabled promotion. For example, both the
+    /// outer and nested list literals may be widened in:
+    ///
+    /// ```python
+    /// xs = [[1, 2], [3, 4], ...]
+    /// ```
+    fn should_promote_literals(&self, arity: usize) -> bool {
+        arity > Self::MAX_PRECISE_LITERAL_INFERENCE_ARITY
+            || self
+                .inference_flags()
+                .contains(InferenceFlags::PROMOTE_LITERALS)
     }
 
     fn extend_cycle_recovery(&mut self, other: Option<Type<'db>>) {
@@ -5172,10 +5195,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let constraints = ConstraintSetBuilder::new();
-        let promote_literals = arguments_types.len() > Self::MAX_PRECISE_LITERAL_INFERENCE_ARITY
-            || self
-                .inference_flags()
-                .contains(InferenceFlags::PROMOTE_LITERALS);
+        let promote_literals = self.should_promote_literals(arguments_types.len());
         let iter = itertools::izip!(
             0..,
             arguments_types.iter_mut(),
@@ -5819,11 +5839,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 TypeContext::default()
             };
-            if tuple.len() > Self::MAX_PRECISE_LITERAL_INFERENCE_ARITY
-                || self
-                    .inference_flags()
-                    .contains(InferenceFlags::PROMOTE_LITERALS)
-            {
+            if self.should_promote_literals(tuple.len()) {
                 // Widen nested literals while recursively inferring very large tuples,
                 // to avoid pathological performance issues in subexpressions.
                 self.infer_expression_with_promoted_literals(elt, ctx)
@@ -6063,10 +6079,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
-        let promote_literals = elts.len() > Self::MAX_PRECISE_LITERAL_INFERENCE_ARITY
-            || self
-                .inference_flags()
-                .contains(InferenceFlags::PROMOTE_LITERALS);
+        let promote_literals = self.should_promote_literals(elts.len());
 
         // Extract the type variable `T` from `list[T]` in typeshed.
         let elt_tys = |collection_class: KnownClass| {
@@ -7066,6 +7079,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_call_expression_impl(call_expression, callable_type, tcx)
     }
 
+    /// Infer the callable expression in a call without inheriting literal promotion from the call's
+    /// argument or result inference.
+    ///
+    /// In code such as:
+    ///
+    /// ```python
+    /// factories[0](large_literal)
+    /// ```
+    ///
+    /// the subscripted callable target still needs its precise type even if the call arguments are
+    /// being widened to avoid pathological literal unions.
     fn infer_call_function_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         self.with_inference_flag(InferenceFlags::PROMOTE_LITERALS, false, |builder| {
             builder.infer_maybe_standalone_expression(expression, TypeContext::default())
