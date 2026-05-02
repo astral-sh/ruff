@@ -3359,10 +3359,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // If the RHS is not a standalone expression, this is a simple assignment
                     // (single target, no unpackings). That means it's a valid syntactic form
                     // for a legacy TypeVar creation; check for that.
-                    let callable_type = self.infer_maybe_standalone_expression(
-                        call_expr.func.as_ref(),
-                        TypeContext::default(),
-                    );
+                    let callable_type =
+                        self.infer_call_function_expression(call_expr.func.as_ref());
 
                     let ty = if let Some(namedtuple_kind) =
                         NamedTupleKind::from_type(self.db(), callable_type)
@@ -7049,10 +7047,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_expression: &ast::ExprCall,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let callable_type =
-            self.infer_maybe_standalone_expression(&call_expression.func, TypeContext::default());
+        let callable_type = self.infer_call_function_expression(&call_expression.func);
 
         self.infer_call_expression_impl(call_expression, callable_type, tcx)
+    }
+
+    fn infer_call_function_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        self.with_inference_flag(InferenceFlags::PROMOTE_LITERALS, false, |builder| {
+            builder.infer_maybe_standalone_expression(expression, TypeContext::default())
+        })
     }
 
     fn infer_call_expression_impl(

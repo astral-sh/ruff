@@ -43,6 +43,91 @@ reveal_type(f("a", "b"))  # revealed: Unknown
 reveal_type(f(*("a", "b")))  # revealed: Unknown
 ```
 
+## Large Literal Diagnostics Preserve Callee Names
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: str) -> str: ...
+```
+
+```py
+from overloaded import f
+
+large = {
+    "k0": None,
+    "k1": None,
+    "k2": None,
+    "k3": None,
+    "k4": None,
+    "k5": None,
+    "k6": None,
+    "k7": None,
+    "k8": None,
+    "k9": None,
+    "k10": None,
+    "k11": None,
+    "k12": None,
+    "k13": None,
+    "k14": None,
+    "k15": None,
+    "k16": None,
+    "k17": None,
+    "k18": None,
+    "k19": None,
+    "k20": None,
+    "k21": None,
+    "k22": None,
+    "k23": None,
+    "k24": None,
+    "k25": None,
+    "k26": None,
+    "k27": None,
+    "k28": None,
+    "k29": None,
+    "k30": None,
+    "k31": None,
+    "k32": None,
+    "k33": None,
+    "k34": None,
+    "k35": None,
+    "k36": None,
+    "k37": None,
+    "k38": None,
+    "k39": None,
+    "k40": None,
+    "k41": None,
+    "k42": None,
+    "k43": None,
+    "k44": None,
+    "k45": None,
+    "k46": None,
+    "k47": None,
+    "k48": None,
+    "k49": None,
+    "k50": None,
+    "k51": None,
+    "k52": None,
+    "k53": None,
+    "k54": None,
+    "k55": None,
+    "k56": None,
+    "k57": None,
+    "k58": None,
+    "k59": None,
+    "k60": None,
+    "k61": None,
+    "k62": None,
+    "k63": None,
+    "bad": f(1.0),  # error: [no-matching-overload] "No overload of function `f` matches arguments"
+}
+```
+
 ## Type checking
 
 The second step is to perform type checking. This is done for all the overloads that passed the
