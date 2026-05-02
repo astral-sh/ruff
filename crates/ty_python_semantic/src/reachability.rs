@@ -388,6 +388,15 @@ pub(crate) trait ReachabilityConstraintsExtension<'db> {
         predicates: &Predicates<'db>,
         id: ScopedReachabilityConstraintId,
     ) -> Truthiness;
+
+    /// Analyze reachability for a constraint, memoizing intermediate results.
+    fn evaluate_cached(
+        &self,
+        db: &'db dyn Db,
+        predicates: &Predicates<'db>,
+        id: ScopedReachabilityConstraintId,
+        cache: &mut FxHashMap<ScopedReachabilityConstraintId, Truthiness>,
+    ) -> Truthiness;
 }
 
 impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
@@ -437,38 +446,44 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         &self,
         db: &'db dyn Db,
         predicates: &Predicates<'db>,
-        mut id: ScopedReachabilityConstraintId,
+        id: ScopedReachabilityConstraintId,
+    ) -> Truthiness {
+        let mut cache = FxHashMap::default();
+        self.evaluate_cached(db, predicates, id, &mut cache)
+    }
+
+    /// Analyze reachability for a constraint, memoizing intermediate results.
+    fn evaluate_cached(
+        &self,
+        db: &'db dyn Db,
+        predicates: &Predicates<'db>,
+        id: ScopedReachabilityConstraintId,
+        cache: &mut FxHashMap<ScopedReachabilityConstraintId, Truthiness>,
     ) -> Truthiness {
         type Id = ScopedReachabilityConstraintId;
 
-        loop {
-            let node = match id {
-                Id::ALWAYS_TRUE => return Truthiness::AlwaysTrue,
-                Id::AMBIGUOUS => return Truthiness::Ambiguous,
-                Id::ALWAYS_FALSE => return Truthiness::AlwaysFalse,
-                _ => {
-                    // `id` gives us the index of this node in the IndexVec that we used when
-                    // constructing this BDD. When finalizing the builder, we threw away any
-                    // interior nodes that weren't marked as used. The `used_indices` bit vector
-                    // lets us verify that this node was marked as used, and the rank of that bit
-                    // in the bit vector tells us where this node lives in the "condensed"
-                    // `used_interiors` vector.
-                    let raw_index = id.as_u32() as usize;
-                    debug_assert!(
-                        self.used_indices().get_bit(raw_index).unwrap_or(false),
-                        "all used reachability constraints should have been marked as used",
-                    );
-                    let index = self.used_indices().rank(raw_index) as usize;
-                    self.used_interiors()[index]
-                }
-            };
-            let predicate = &predicates[node.atom()];
-            match analyze_single(db, predicate) {
-                Truthiness::AlwaysTrue => id = node.if_true(),
-                Truthiness::Ambiguous => id = node.if_ambiguous(),
-                Truthiness::AlwaysFalse => id = node.if_false(),
-            }
+        if let Some(cached) = cache.get(&id) {
+            return *cached;
         }
+
+        let result = match id {
+            Id::ALWAYS_TRUE => Truthiness::AlwaysTrue,
+            Id::AMBIGUOUS => Truthiness::Ambiguous,
+            Id::ALWAYS_FALSE => Truthiness::AlwaysFalse,
+            _ => {
+                let node = self.get_interior_node(id);
+                let predicate = &predicates[node.atom()];
+                let branch = match analyze_single(db, predicate) {
+                    Truthiness::AlwaysTrue => node.if_true(),
+                    Truthiness::Ambiguous => node.if_ambiguous(),
+                    Truthiness::AlwaysFalse => node.if_false(),
+                };
+                self.evaluate_cached(db, predicates, branch, cache)
+            }
+        };
+
+        cache.insert(id, result);
+        result
     }
 }
 
@@ -515,15 +530,7 @@ impl<'db> NarrowingContext<'_, 'db> {
             return *cached;
         }
         if self.cache.len() >= MAX_NARROWING_STATES {
-            return if self
-                .constraints
-                .evaluate(self.db, self.predicates, id)
-                .may_be_true()
-            {
-                apply_accumulated_narrowing(self.db, self.base_ty, accumulated)
-            } else {
-                Type::Never
-            };
+            return apply_accumulated_narrowing(self.db, self.base_ty, accumulated);
         }
 
         let result = match id {

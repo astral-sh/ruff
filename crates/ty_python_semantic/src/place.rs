@@ -608,9 +608,11 @@ fn evaluate_reachability_cached<'db>(
     reachability_constraint: ScopedReachabilityConstraintId,
     cache: &mut FxHashMap<ScopedReachabilityConstraintId, Truthiness>,
 ) -> Truthiness {
-    *cache.entry(reachability_constraint).or_insert_with(|| {
-        reachability_constraints.evaluate(db, predicates, reachability_constraint)
-    })
+    if let Some(cached) = cache.get(&reachability_constraint) {
+        return *cached;
+    }
+
+    reachability_constraints.evaluate_cached(db, predicates, reachability_constraint, cache)
 }
 
 /// Build a declared type from a [`DeclarationsIterator`].
@@ -1276,13 +1278,14 @@ fn loop_header_reachability_impl<'db>(
     let mut reachable_bindings = FxIndexSet::default();
     let mut reachability_cache = FxHashMap::default();
     let live_bindings: Vec<_> = loop_header.bindings_for_place(place).collect();
-    let use_exact_reachability = live_bindings.len() <= 8
-        && use_def.reachability_constraints().used_interiors().len() <= 128;
+    let live_binding_count = live_bindings.len();
+    let use_exact_reachability =
+        live_binding_count <= 8 && use_def.reachability_constraints().used_interiors().len() <= 128;
 
     for live_binding in live_bindings {
-        let reachability = if is_cycle_initial || !use_exact_reachability {
+        let reachability = if is_cycle_initial {
             Truthiness::Ambiguous
-        } else {
+        } else if use_exact_reachability {
             evaluate_reachability_cached(
                 db,
                 use_def.predicates(),
@@ -1290,6 +1293,12 @@ fn loop_header_reachability_impl<'db>(
                 live_binding.reachability_constraint(),
                 &mut reachability_cache,
             )
+        } else if live_binding.reachability_constraint()
+            == ScopedReachabilityConstraintId::ALWAYS_FALSE
+        {
+            Truthiness::AlwaysFalse
+        } else {
+            Truthiness::Ambiguous
         };
         // Skip unreachable bindings.
         if reachability.is_always_false() {
