@@ -29,8 +29,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
     MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, binding_type, declaration_type,
-    infer_definition_types,
+    TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, any_over_type, binding_type,
+    declaration_type, infer_definition_types,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -1592,68 +1592,19 @@ fn specialization_variance<'db>(
 }
 
 fn type_or_alias_value_has_typevar<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    type_or_alias_value_contains_typevar(db, ty, false)
+    any_over_type(db, ty, true, |ty| matches!(ty, Type::TypeVar(_)))
 }
 
 fn type_or_alias_value_has_typevar_or_typevar_instance<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
 ) -> bool {
-    type_or_alias_value_contains_typevar(db, ty, true)
-}
-
-/// Return `true` if a type contains a type variable, including one hidden behind a type alias.
-fn type_or_alias_value_contains_typevar<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    include_typevar_instance: bool,
-) -> bool {
-    struct HasTypeVarVisitor<'db> {
-        found_typevar: Cell<bool>,
-        include_typevar_instance: bool,
-        recursion_guard: TypeCollector<'db>,
-    }
-
-    impl<'db> TypeVisitor<'db> for HasTypeVarVisitor<'db> {
-        fn should_visit_lazy_type_attributes(&self) -> bool {
-            false
-        }
-
-        fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
-            match type_alias {
-                TypeAliasType::PEP695(type_alias) => {
-                    walk_pep_695_type_alias(db, type_alias, self);
-                }
-                TypeAliasType::ManualPEP695(type_alias) => {
-                    walk_manual_pep_695_type_alias(db, type_alias, self);
-                }
-            }
-        }
-
-        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-            if self.found_typevar.get() {
-                return;
-            }
-
-            if matches!(ty, Type::TypeVar(_))
-                || matches!(ty, Type::KnownInstance(KnownInstanceType::TypeVar(_)))
-                    && self.include_typevar_instance
-            {
-                self.found_typevar.set(true);
-                return;
-            }
-
-            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-        }
-    }
-
-    let visitor = HasTypeVarVisitor {
-        found_typevar: Cell::new(false),
-        include_typevar_instance,
-        recursion_guard: TypeCollector::default(),
-    };
-    visitor.visit_type(db, ty);
-    visitor.found_typevar.get()
+    any_over_type(db, ty, true, |ty| {
+        matches!(
+            ty,
+            Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_)
+        )
+    })
 }
 
 impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {

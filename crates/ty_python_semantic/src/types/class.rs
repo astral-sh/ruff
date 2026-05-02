@@ -1194,21 +1194,12 @@ impl<'db> ClassType<'db> {
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, target: ClassType<'db>) -> bool {
         let constraints = ConstraintSetBuilder::new();
-        self.is_subclass_of_with_constraints(db, target, &constraints)
-    }
-
-    pub(super) fn is_subclass_of_with_constraints(
-        self,
-        db: &'db dyn Db,
-        target: ClassType<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
-    ) -> bool {
-        let relation_visitor = HasRelationToVisitor::default(constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let relation_visitor = HasRelationToVisitor::default(&constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::subtyping(
-            constraints,
+            &constraints,
             InferableTypeVars::None,
             &relation_visitor,
             &disjointness_visitor,
