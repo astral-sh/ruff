@@ -328,7 +328,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         InternedType::new(db, argument_ty),
                     ));
                 }
-                SpecialFormType::Callable => {
+                SpecialFormType::TypingCallable => {
                     let callable = self
                         .infer_callable_type(subscript)
                         .as_callable()

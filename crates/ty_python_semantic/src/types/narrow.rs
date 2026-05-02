@@ -266,7 +266,8 @@ impl ClassInfoConstraintFunction {
 
                 // We don't have a good meta-type for `Callable`s right now,
                 // so only apply `isinstance()` narrowing, not `issubclass()`
-                SpecialFormType::Callable => (self == ClassInfoConstraintFunction::IsInstance)
+                SpecialFormType::TypingCallable => (self
+                    == ClassInfoConstraintFunction::IsInstance)
                     .then(|| Type::Callable(CallableType::unknown(db)).top_materialization(db)),
 
                 // `InitVar` is a class at runtime, so can be used in `isinstance()`,
