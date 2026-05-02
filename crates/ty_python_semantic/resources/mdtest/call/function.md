@@ -9,6 +9,26 @@ def get_int() -> int:
 reveal_type(get_int())  # revealed: int
 ```
 
+## Large Literal Diagnostics Preserve Callee Names
+
+```py
+def takes_int(x: int) -> None: ...
+
+# fmt: off
+large = [
+    None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None,
+    takes_int("bad"),  # error: [invalid-argument-type] "Argument to function `takes_int` is incorrect"
+]
+# fmt: on
+```
+
 ## Gradual variadic parameters
 
 ```py

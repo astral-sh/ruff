@@ -333,6 +333,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// for most use cases, but we can reevaluate it later if useful.
     pub(super) const MAX_STRING_LITERAL_SIZE: usize = 4096;
 
+    /// Above this arity, recursive literal inference is widened to avoid pathological behavior.
+    const MAX_PRECISE_LITERAL_INFERENCE_ARITY: usize = 64;
+
     /// Creates a new builder for inferring types in a region.
     pub(super) fn new(
         db: &'db dyn Db,
@@ -368,6 +371,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn fallback_type(&self) -> Option<Type<'db>> {
         self.cycle_recovery
+    }
+
+    fn with_inference_flag<T>(
+        &mut self,
+        flag: InferenceFlags,
+        set_to: bool,
+        f: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        let previous = self.context.inference_flags.replace(flag, set_to);
+        let result = f(self);
+        self.context.inference_flags.set(flag, previous);
+        result
+    }
+
+    fn infer_expression_with_promoted_literals(
+        &mut self,
+        expression: &ast::Expr,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        self.with_inference_flag(InferenceFlags::PROMOTE_LITERALS, true, |builder| {
+            builder.infer_expression(expression, tcx)
+        })
+        .promote(self.db())
+    }
+
+    fn should_promote_literals(&self, arity: usize) -> bool {
+        arity > Self::MAX_PRECISE_LITERAL_INFERENCE_ARITY
+            || self
+                .inference_flags()
+                .contains(InferenceFlags::PROMOTE_LITERALS)
     }
 
     fn extend_cycle_recovery(&mut self, other: Option<Type<'db>>) {
@@ -3334,10 +3367,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // If the RHS is not a standalone expression, this is a simple assignment
                     // (single target, no unpackings). That means it's a valid syntactic form
                     // for a legacy TypeVar creation; check for that.
-                    let callable_type = self.infer_maybe_standalone_expression(
-                        call_expr.func.as_ref(),
-                        TypeContext::default(),
-                    );
+                    let callable_type =
+                        self.infer_call_function_expression(call_expr.func.as_ref());
 
                     let ty = if let Some(namedtuple_kind) =
                         NamedTupleKind::from_type(self.db(), callable_type)
@@ -5140,6 +5171,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let constraints = ConstraintSetBuilder::new();
+        let promote_literals = self.should_promote_literals(arguments_types.len());
         let iter = itertools::izip!(
             0..,
             arguments_types.iter_mut(),
@@ -5148,6 +5180,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         let mut overloads_with_binding: Vec<(&Binding<'db>, &CallableBinding<'db>)> = Vec::new();
+        let mut infer_argument = |builder: &mut Self, arg_expr| {
+            if promote_literals {
+                builder
+                    .with_inference_flag(InferenceFlags::PROMOTE_LITERALS, true, |builder| {
+                        infer_argument_ty(builder, arg_expr)
+                    })
+                    .promote(builder.db())
+            } else {
+                infer_argument_ty(builder, arg_expr)
+            }
+        };
 
         bindings.visit_type_context_callables(&mut |binding| {
             add_overloads_from_binding(&mut overloads_with_binding, binding);
@@ -5248,12 +5291,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some((parameter, parameter_tcx)) = parameter_tcx(overload, binding) {
                     argument_types.insert(
                         parameter.annotated_type(),
-                        infer_argument_ty(self, (argument_index, ast_argument, parameter_tcx)),
+                        infer_argument(self, (argument_index, ast_argument, parameter_tcx)),
                     );
                 } else {
                     argument_types.insert(
                         TypeContext::default(),
-                        infer_argument_ty(
+                        infer_argument(
                             self,
                             (argument_index, ast_argument, TypeContext::default()),
                         ),
@@ -5264,7 +5307,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // to bidirectional type inference.
                 argument_types.insert(
                     TypeContext::default(),
-                    infer_argument_ty(self, (argument_index, ast_argument, TypeContext::default())),
+                    infer_argument(self, (argument_index, ast_argument, TypeContext::default())),
                 );
 
                 // Infer the type of each argument once with each distinct parameter type as type context.
@@ -5289,7 +5332,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // type context is only used as a hint to infer a more assignable argument type, and should not lead
                     // to diagnostics for non-matching overloads.
                     let mut speculative_builder = self.speculate();
-                    let inferred_ty = infer_argument_ty(
+                    let inferred_ty = infer_argument(
                         &mut speculative_builder,
                         (argument_index, ast_argument, parameter_tcx),
                     );
@@ -5701,11 +5744,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         tuple: &ast::ExprTuple,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        /// If a tuple literal has more elements than this constant,
-        /// we promote `Literal` types when inferring the elements of the tuple.
-        /// This provides a huge speedup on files that have very large unannotated tuple literals.
-        const MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE: usize = 64;
-
         let ast::ExprTuple {
             range: _,
             node_index: _,
@@ -5777,10 +5815,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 TypeContext::default()
             };
-            if tuple.len() > MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE {
-                // Promote literals for very large unannotated tuples,
-                // to avoid pathological performance issues
-                self.infer_expression(elt, ctx).promote(db)
+            if self.should_promote_literals(tuple.len()) {
+                // Widen nested literals while recursively inferring very large tuples,
+                // to avoid pathological performance issues in subexpressions.
+                self.infer_expression_with_promoted_literals(elt, ctx)
             } else {
                 self.infer_expression(elt, ctx)
             }
@@ -6017,6 +6055,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
+        let promote_literals = self.should_promote_literals(elts.len());
+
         // Extract the type variable `T` from `list[T]` in typeshed.
         let elt_tys = |collection_class: KnownClass| {
             let collection_alias = collection_class
@@ -6199,7 +6239,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for elts in elts {
             // An unpacking expression for a dictionary.
             if let &[None, Some(value_expr)] = elts.as_slice() {
-                let unpack_ty = infer_elt_expression(self, (1, value_expr, tcx));
+                let unpack_ty = if promote_literals {
+                    self.with_inference_flag(InferenceFlags::PROMOTE_LITERALS, true, |builder| {
+                        infer_elt_expression(builder, (1, value_expr, tcx))
+                    })
+                } else {
+                    infer_elt_expression(self, (1, value_expr, tcx))
+                };
 
                 let Some((unpacked_key_ty, unpacked_value_ty)) =
                     unpack_ty.unpack_keys_and_items(self.db())
@@ -6254,8 +6300,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     });
 
-                let inferred_elt_ty =
-                    infer_elt_expression(self, (i, elt, TypeContext::new(elt_tcx)));
+                let inferred_elt_ty = if promote_literals {
+                    self.with_inference_flag(InferenceFlags::PROMOTE_LITERALS, true, |builder| {
+                        infer_elt_expression(builder, (i, elt, TypeContext::new(elt_tcx)))
+                    })
+                } else {
+                    infer_elt_expression(self, (i, elt, TypeContext::new(elt_tcx)))
+                };
 
                 // Simplify the inference based on a non-covariant declared type.
                 if let Some(elt_tcx) =
@@ -6999,10 +7050,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_expression: &ast::ExprCall,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let callable_type =
-            self.infer_maybe_standalone_expression(&call_expression.func, TypeContext::default());
+        let callable_type = self.infer_call_function_expression(&call_expression.func);
 
         self.infer_call_expression_impl(call_expression, callable_type, tcx)
+    }
+
+    fn infer_call_function_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        self.with_inference_flag(InferenceFlags::PROMOTE_LITERALS, false, |builder| {
+            builder.infer_maybe_standalone_expression(expression, TypeContext::default())
+        })
     }
 
     fn infer_call_expression_impl(

@@ -43,6 +43,37 @@ reveal_type(f("a", "b"))  # revealed: Unknown
 reveal_type(f(*("a", "b")))  # revealed: Unknown
 ```
 
+## Large Literal Diagnostics Preserve Callee Names
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: str) -> str: ...
+```
+
+```py
+from overloaded import f
+
+# fmt: off
+large = [
+    None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None,
+    f(1.0),  # error: [no-matching-overload] "No overload of function `f` matches arguments"
+]
+# fmt: on
+```
+
 ## Type checking
 
 The second step is to perform type checking. This is done for all the overloads that passed the
