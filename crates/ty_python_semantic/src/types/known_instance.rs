@@ -6,7 +6,7 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassType, GenericContext,
         InferenceFlags, InvalidTypeExpressionError, KnownClass, StringLiteralType, Type,
         TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder,
-        class::NamedTupleSpec,
+        class::{DataclassSpec, NamedTupleSpec},
         constraints::OwnedConstraintSet,
         generics::{Specialization, walk_generic_context},
         newtype::NewType,
@@ -118,6 +118,9 @@ pub enum KnownInstanceType<'db> {
     /// A `functools.partial(func, ...)` call result where we could determine
     /// the remaining callable signature after binding some arguments.
     FunctoolsPartial(FunctoolsPartialInstance<'db>),
+
+    /// The inferred spec for a functional `make_dataclass` class.
+    DataclassSpec(DataclassSpec<'db>),
 }
 
 pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -145,6 +148,9 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         KnownInstanceType::Field(field) => {
             if let Some(default_ty) = field.default_type(db) {
                 visitor.visit_type(db, default_ty);
+            }
+            if let Some(class_default_ty) = field.class_default_type(db) {
+                visitor.visit_type(db, class_default_ty);
             }
             if let Some((input_ty, output_ty)) = field.converter(db) {
                 visitor.visit_type(db, input_ty);
@@ -175,6 +181,18 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         }
         KnownInstanceType::FunctoolsPartial(partial) => {
             visitor.visit_callable_type(db, partial.partial(db));
+        }
+        KnownInstanceType::DataclassSpec(spec) => {
+            for field in spec.fields(db) {
+                visitor.visit_type(db, field.ty);
+                if let Some(default) = field.default_ty {
+                    visitor.visit_type(db, default);
+                }
+                if let Some((input_ty, output_ty)) = field.converter {
+                    visitor.visit_type(db, input_ty);
+                    visitor.visit_type(db, output_ty);
+                }
+            }
         }
     }
 }
@@ -241,6 +259,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::FunctoolsPartial(partial) => partial
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Self::FunctoolsPartial),
+            Self::DataclassSpec(spec) => spec
+                .recursive_type_normalized_impl(db, div, true)
+                .map(Self::DataclassSpec),
         }
     }
 
@@ -267,7 +288,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Callable(_) => KnownClass::GenericAlias,
             Self::LiteralStringAlias(_) => KnownClass::Str,
             Self::NewType(_) => KnownClass::NewType,
-            Self::NamedTupleSpec(_) => KnownClass::Sequence,
+            Self::NamedTupleSpec(_) | Self::DataclassSpec(_) => KnownClass::Sequence,
             Self::FunctoolsPartial(_) => KnownClass::FunctoolsPartial,
         }
     }
@@ -358,6 +379,7 @@ impl<'db> KnownInstanceType<'db> {
             | KnownInstanceType::Literal(_)
             | KnownInstanceType::LiteralStringAlias(_)
             | KnownInstanceType::NamedTupleSpec(_)
+            | KnownInstanceType::DataclassSpec(_)
             | KnownInstanceType::NewType(_) => {
                 // TODO: For some of these, we may need to apply the type mapping to inner types.
                 Type::KnownInstance(self)
@@ -380,6 +402,10 @@ pub struct FieldInstance<'db> {
     /// The type of the default value for this field. This is derived from the `default` or
     /// `default_factory` arguments to `dataclasses.field()`.
     pub default_type: Option<Type<'db>>,
+
+    /// The type of the default value that remains as an attribute on the class. This is only
+    /// present for an actual `default`, not for `default_factory`.
+    pub class_default_type: Option<Type<'db>>,
 
     /// Whether this field is part of the `__init__` signature, or not.
     pub init: bool,
@@ -415,6 +441,15 @@ impl<'db> FieldInstance<'db> {
             ),
             None => None,
         };
+        let class_default_type = match self.class_default_type(db) {
+            Some(default) if nested => Some(default.recursive_type_normalized_impl(db, div, true)?),
+            Some(default) => Some(
+                default
+                    .recursive_type_normalized_impl(db, div, true)
+                    .unwrap_or(div),
+            ),
+            None => None,
+        };
         let converter = match self.converter(db) {
             Some((input_ty, output_ty)) if nested => Some((
                 input_ty.recursive_type_normalized_impl(db, div, true)?,
@@ -433,6 +468,7 @@ impl<'db> FieldInstance<'db> {
         Some(FieldInstance::new(
             db,
             default_type,
+            class_default_type,
             self.init(db),
             self.kw_only(db),
             self.alias(db),

@@ -11,18 +11,23 @@ use crate::types::diagnostic::{
 use crate::types::enums::is_enum_class_by_inheritance;
 use crate::types::infer::builder::TypeInferenceBuilder;
 use crate::types::mro::{DynamicMroError, DynamicMroErrorKind};
-use crate::types::{ClassBase, KnownClass, Type, extract_fixed_length_iterable_element_types};
+use crate::types::{
+    ClassBase, KnownClass, KnownInstanceType, Type, extract_fixed_length_iterable_element_types,
+};
 
-/// Whether a dynamic class is being created via `type()` or `types.new_class()`.
+/// Whether a dynamic class-like value is being created via `type()`, `types.new_class()`,
+/// or `make_dataclass()`.
 ///
 /// This is used to adjust validation rules and diagnostic messages for dynamic class
 /// creation. For example, `types.new_class()` properly handles metaclasses and
-/// `__mro_entries__`, so enum-specific restrictions only apply to `type()`, while
-/// `Generic` and `TypedDict` bases are rejected for both entry points.
+/// `__mro_entries__`, so enum-specific restrictions only apply to `type()` and
+/// `make_dataclass()`. `Generic` and `TypedDict` bases are rejected for dynamic
+/// classes except for `make_dataclass()` with a subscripted `Generic[...]` base.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum DynamicClassKind {
     TypeCall,
     NewClass,
+    MakeDataclass,
 }
 
 impl DynamicClassKind {
@@ -30,11 +35,61 @@ impl DynamicClassKind {
         match self {
             Self::TypeCall => "type()",
             Self::NewClass => "types.new_class()",
+            Self::MakeDataclass => "make_dataclass()",
         }
     }
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
+    /// Extract statically visible members from a dynamic class namespace argument.
+    ///
+    /// This shared helper is used by `type(...)`, `types.new_class(...)`, and
+    /// `make_dataclass(...)`-style class factories. It returns both the known members and whether
+    /// the namespace may contain additional dynamic members.
+    pub(super) fn extract_dynamic_namespace_members(
+        &self,
+        namespace_arg: &ast::Expr,
+        namespace_type: Type<'db>,
+        none_is_empty_namespace: bool,
+    ) -> (Box<[(Name, Type<'db>)]>, bool) {
+        let db = self.db();
+
+        if none_is_empty_namespace
+            && (namespace_arg.is_none_literal_expr() || namespace_type.is_none(db))
+        {
+            return (Box::default(), false);
+        }
+
+        if let ast::Expr::Dict(dict) = namespace_arg {
+            let all_keys_are_string_literals = dict.items.iter().all(|item| {
+                item.key
+                    .as_ref()
+                    .is_some_and(|key| self.expression_type(key).is_string_literal())
+            });
+            let members = dict
+                .items
+                .iter()
+                .filter_map(|item| {
+                    let key_expr = item.key.as_ref()?;
+                    let key_name = self.expression_type(key_expr).as_string_literal()?;
+                    let key_name = Name::new(key_name.value(db));
+                    let value_ty = self.expression_type(&item.value);
+                    Some((key_name, value_ty))
+                })
+                .collect();
+            (members, !all_keys_are_string_literals)
+        } else if let Type::TypedDict(typed_dict) = namespace_type {
+            let members = typed_dict
+                .items(db)
+                .iter()
+                .map(|(name, field)| (name.clone(), field.declared_ty))
+                .collect();
+            (members, true)
+        } else {
+            (Box::default(), true)
+        }
+    }
+
     /// Extract base classes from the bases argument of a `type()` or `types.new_class()` call.
     ///
     /// Emits a diagnostic if `bases_type` is not a valid bases iterable for the given kind.
@@ -49,7 +104,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let fn_name = kind.function_name();
         let formal_parameter_type = match kind {
-            DynamicClassKind::TypeCall => Type::homogeneous_tuple(db, Type::object()),
+            DynamicClassKind::TypeCall | DynamicClassKind::MakeDataclass => {
+                Type::homogeneous_tuple(db, Type::object())
+            }
             DynamicClassKind::NewClass => {
                 KnownClass::Iterable.to_specialized_instance(db, &[Type::object()])
             }
@@ -105,6 +162,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
 
             match class_base {
+                ClassBase::Generic
+                    if kind == DynamicClassKind::MakeDataclass
+                        && matches!(
+                            base,
+                            Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))
+                        ) => {}
                 ClassBase::Generic | ClassBase::TypedDict => {
                     if let Some(builder) = self.context.report_lint(&INVALID_BASE, diagnostic_node)
                     {
@@ -169,20 +232,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         continue;
                     }
 
-                    if kind == DynamicClassKind::TypeCall
-                        && let Some((static_class, _)) = class_type.static_class_literal(db)
+                    if matches!(
+                        kind,
+                        DynamicClassKind::TypeCall | DynamicClassKind::MakeDataclass
+                    ) && let Some((static_class, _)) = class_type.static_class_literal(db)
                         && is_enum_class_by_inheritance(db, static_class)
                     {
                         if let Some(builder) =
                             self.context.report_lint(&INVALID_BASE, diagnostic_node)
                         {
-                            let mut diagnostic = builder
-                                .into_diagnostic("Invalid base for class created via `type()`");
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Invalid base for class created via `{fn_name}`"
+                            ));
                             diagnostic.set_primary_message(format_args!(
                                 "Has type `{}`",
                                 base.display(db)
                             ));
-                            diagnostic.info("Creating an enum class via `type()` is not supported");
+                            diagnostic.info(format_args!(
+                                "Creating an enum class via `{fn_name}` is not supported"
+                            ));
                             diagnostic.info(format_args!(
                                 "Consider using `Enum(\"{name}\", [])` instead"
                             ));

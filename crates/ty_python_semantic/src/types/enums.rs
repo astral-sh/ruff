@@ -200,7 +200,9 @@ pub(crate) fn enum_metadata<'db>(
             // ```
             return None;
         }
-        ClassLiteral::DynamicNamedTuple(..) | ClassLiteral::DynamicTypedDict(..) => return None,
+        ClassLiteral::DynamicNamedTuple(..)
+        | ClassLiteral::DynamicDataclass(..)
+        | ClassLiteral::DynamicTypedDict(..) => return None,
         ClassLiteral::DynamicEnum(enum_lit) => {
             let spec = enum_lit.spec(db);
             if !spec.has_known_members(db) {

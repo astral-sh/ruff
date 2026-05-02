@@ -1457,6 +1457,37 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Apply dataclass parameters to a class-like type, preserving generic specialization.
+    ///
+    /// This is used when resolving decorators that return the same class object with dataclass
+    /// metadata applied, including parameterized class objects:
+    ///
+    /// ```py
+    /// C = make_dataclass("C", [], decorator=dataclass)
+    /// ```
+    pub(crate) fn try_with_dataclass_params(
+        self,
+        db: &'db dyn Db,
+        dataclass_params: DataclassParams<'db>,
+    ) -> Option<Self> {
+        match self {
+            Type::ClassLiteral(class_literal) => Some(Type::from(
+                class_literal.with_dataclass_params(db, Some(dataclass_params)),
+            )),
+            Type::GenericAlias(generic_alias) => {
+                let new_origin = generic_alias
+                    .origin(db)
+                    .with_dataclass_params(db, Some(dataclass_params));
+                Some(Type::GenericAlias(GenericAlias::new(
+                    db,
+                    new_origin,
+                    generic_alias.specialization(db),
+                )))
+            }
+            _ => None,
+        }
+    }
+
     pub const fn is_property_instance(&self) -> bool {
         matches!(self, Type::PropertyInstance(..))
     }
@@ -5390,6 +5421,10 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec_inline![InvalidTypeExpression::NamedTupleSpec],
                     fallback_type: Type::unknown(),
                 }),
+                KnownInstanceType::DataclassSpec(_) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec_inline![InvalidTypeExpression::DataclassSpec],
+                    fallback_type: Type::unknown(),
+                }),
                 KnownInstanceType::UnionType(instance) => {
                     // Cloning here is cheap if the result is a `Type` (which is `Copy`). It's more
                     // expensive if there are errors.
@@ -6124,6 +6159,7 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::Literal(_)
                 | KnownInstanceType::LiteralStringAlias(_)
                 | KnownInstanceType::NamedTupleSpec(_)
+                | KnownInstanceType::DataclassSpec(_)
                 | KnownInstanceType::NewType(_)
                 | KnownInstanceType::FunctoolsPartial(_) => {
                     // TODO: For some of these, we may need to try to find legacy typevars in inner types.
@@ -7215,6 +7251,8 @@ enum InvalidTypeExpression<'db> {
     Specialization,
     /// Same for `NamedTupleSpec`
     NamedTupleSpec,
+    /// Same for `DataclassSpec`
+    DataclassSpec,
     /// Same for `typing.TypedDict`
     TypedDict,
     /// Same for `typing.TypeAlias`, anywhere except for as the sole annotation on an annotated
@@ -7287,6 +7325,9 @@ impl<'db> InvalidTypeExpression<'db> {
                     ),
                     InvalidTypeExpression::NamedTupleSpec => {
                         write!(f, "`NamedTupleSpec` is not allowed in {location}s")
+                    }
+                    InvalidTypeExpression::DataclassSpec => {
+                        write!(f, "`DataclassSpec` is not allowed in {location}s")
                     }
                     InvalidTypeExpression::TypedDict => write!(
                         f,

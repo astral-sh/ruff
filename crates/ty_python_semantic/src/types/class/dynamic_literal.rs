@@ -2,6 +2,7 @@ use ruff_db::{diagnostic::Span, parsed::parsed_module};
 use ruff_python_ast::{self as ast, NodeIndex, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 
+use super::dataclass::dynamic_metaclass_from_bases;
 use crate::{
     Db, TypeQualifiers,
     place::{Place, PlaceAndQualifiers},
@@ -273,53 +274,7 @@ impl<'db> DynamicClassLiteral<'db> {
             .filter_map(|base_type| ClassBase::try_from_type(db, *base_type, None))
             .collect();
 
-        // If all bases failed to convert, return type as the metaclass.
-        if bases.is_empty() {
-            return Ok(KnownClass::Type.to_class_literal(db));
-        }
-
-        // Start with the first base's metaclass as the candidate.
-        let mut candidate = bases[0].metaclass(db);
-
-        // Track which base the candidate metaclass came from.
-        let (mut candidate_base, rest) = bases.split_first().unwrap();
-
-        // Reconcile with other bases' metaclasses.
-        for base in rest {
-            let base_metaclass = base.metaclass(db);
-
-            // Get the ClassType for comparison.
-            let Some(candidate_class) = candidate.to_class_type(db) else {
-                // If candidate isn't a class type, keep it as is.
-                continue;
-            };
-            let Some(base_metaclass_class) = base_metaclass.to_class_type(db) else {
-                continue;
-            };
-
-            // If base's metaclass is more derived, use it.
-            if base_metaclass_class.is_subclass_of(db, candidate_class) {
-                candidate = base_metaclass;
-                candidate_base = base;
-                continue;
-            }
-
-            // If candidate is already more derived, keep it.
-            if candidate_class.is_subclass_of(db, base_metaclass_class) {
-                continue;
-            }
-
-            // Conflict: neither metaclass is a subclass of the other.
-            // Python raises `TypeError: metaclass conflict` at runtime.
-            return Err(DynamicMetaclassConflict {
-                metaclass1: candidate_class,
-                base1: *candidate_base,
-                metaclass2: base_metaclass_class,
-                base2: *base,
-            });
-        }
-
-        Ok(candidate)
+        dynamic_metaclass_from_bases(db, &bases)
     }
 
     /// Iterate over the MRO of this class using C3 linearization.
@@ -424,7 +379,7 @@ impl<'db> DynamicClassLiteral<'db> {
     /// an error (duplicate bases or C3 linearization failure).
     #[salsa::tracked(returns(ref), cycle_initial=dynamic_class_try_mro_cycle_initial, heap_size = ruff_memory_usage::heap_size)]
     pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
-        Mro::of_dynamic_class(db, self)
+        Mro::of_dynamic(db, self.into())
     }
 
     /// Return `Some()` if this dynamic class is known to be a [`DisjointBase`].
