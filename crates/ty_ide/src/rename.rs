@@ -282,7 +282,6 @@ def fu<CURSOR>nc():
           |
         2 | def func():
           |     ^^^^
-        3 |     pass
           |
         ");
     }
@@ -327,7 +326,6 @@ class DataProcessor:
           |
         2 | def func(x):
           |     ^^^^
-        3 |     return x * 2
           |
          ::: module.py:2:19
           |
@@ -366,7 +364,6 @@ instance = ExampleClass(old_name="test")
         info[rename]: Rename symbol (found 3 locations)
          --> example_rename_2.py:3:24
           |
-        2 | class ExampleClass:
         3 |     def __init__(self, old_name: str) -> None:
           |                        ^^^^^^^^
         4 |         self.old_name = old_name
@@ -374,8 +371,6 @@ instance = ExampleClass(old_name="test")
           |
          ::: example_rename.py:4:25
           |
-        2 | from example_rename_2 import ExampleClass
-        3 |
         4 | instance = ExampleClass(old_name="test")
           |                         --------
           |
@@ -402,7 +397,6 @@ instance = ExampleClass(old_name="test")
         3 |
         4 | class MyClass:
           |       -------
-        5 |     """some docs"""
           |
         "#);
     }
@@ -427,7 +421,6 @@ instance = ExampleClass(old_name="test")
         3 |
         4 | class MyClass:
           |       -------
-        5 |     """some docs"""
           |
         "#);
     }
@@ -466,7 +459,6 @@ instance = ExampleClass(old_name="test")
         3 |
         4 | class MyClass:
           |       -------
-        5 |     """some docs"""
           |
         "#);
     }
@@ -519,7 +511,6 @@ instance = ExampleClass(old_name="test")
         3 |
         4 | class MyClass:
           |       -------
-        5 |     """some docs"""
           |
         "#);
     }
@@ -553,8 +544,6 @@ instance = ExampleClass(old_name="test")
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:4:22
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", ab]:
           |                      ^^
         5 |             x = ab
@@ -578,8 +567,6 @@ instance = ExampleClass(old_name="test")
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:4:22
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", ab]:
           |                      ^^
         5 |             x = ab
@@ -603,8 +590,6 @@ instance = ExampleClass(old_name="test")
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:4:23
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", *ab]:
           |                       ^^
         5 |             x = ab
@@ -628,8 +613,6 @@ instance = ExampleClass(old_name="test")
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:4:23
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", *ab]:
           |                       ^^
         5 |             x = ab
@@ -653,8 +636,6 @@ instance = ExampleClass(old_name="test")
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:4:37
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", ("a" | "b") as ab]:
           |                                     ^^
         5 |             x = ab
@@ -678,8 +659,6 @@ instance = ExampleClass(old_name="test")
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:4:37
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", ("a" | "b") as ab]:
           |                                     ^^
         5 |             x = ab
@@ -709,8 +688,6 @@ instance = ExampleClass(old_name="test")
         info[rename]: Rename symbol (found 2 locations)
           --> main.py:10:30
            |
-         8 | def my_func(event: Click):
-         9 |     match event:
         10 |         case Click(x, button=ab):
            |                              ^^
         11 |             x = ab
@@ -740,8 +717,6 @@ instance = ExampleClass(old_name="test")
         info[rename]: Rename symbol (found 2 locations)
           --> main.py:10:30
            |
-         8 | def my_func(event: Click):
-         9 |     match event:
         10 |         case Click(x, button=ab):
            |                              ^^
         11 |             x = ab
@@ -767,27 +742,22 @@ instance = ExampleClass(old_name="test")
             "#,
         );
 
-        assert_snapshot!(test.rename("XY"), @r#"
+        assert_snapshot!(test.rename("XY"), @"
         info[rename]: Rename symbol (found 3 locations)
           --> main.py:2:7
            |
          2 | class Click:
            |       ^^^^^
-         3 |     __match_args__ = ("position", "button")
-         4 |     def __init__(self, pos, btn):
            |
           ::: main.py:8:20
            |
-         6 |         self.button: str = btn
-         7 |
          8 | def my_func(event: Click):
            |                    -----
          9 |     match event:
         10 |         case Click(x, button=ab):
            |              -----
-        11 |             x = ab
            |
-        "#);
+        ");
     }
 
     #[test]
@@ -859,7 +829,6 @@ instance = ExampleClass(old_name="test")
         info[rename]: Rename symbol (found 3 locations)
          --> main.py:3:15
           |
-        2 | from typing import Callable
         3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
           |               ^^                          --        --
           |
@@ -879,7 +848,6 @@ instance = ExampleClass(old_name="test")
         info[rename]: Rename symbol (found 3 locations)
          --> main.py:3:15
           |
-        2 | from typing import Callable
         3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
           |               ^^                          --        --
           |
@@ -1067,14 +1035,11 @@ value1 = func_alias()
           |
         2 | def original_function():
           |     ^^^^^^^^^^^^^^^^^
-        3 |     return 'Hello from source'
           |
          ::: consumer.py:2:20
           |
         2 | from middle import original_function as func_alias
           |                    -----------------
-        3 |
-        4 | def process():
           |
          ::: middle.py:2:20
           |
@@ -1226,6 +1191,119 @@ result = func(10, y=20)
     }
 
     #[test]
+    fn rename_keyword_argument_typeddict_field() {
+        let test = cursor_test(
+            "
+from typing import TypedDict
+
+class TD(TypedDict):
+    f<CURSOR>: int
+    g: str
+
+TD(f=1)
+",
+        );
+
+        assert_snapshot!(test.rename("z"), @"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:5:5
+          |
+        5 |     f: int
+          |     ^
+        6 |     g: str
+        7 |
+        8 | TD(f=1)
+          |    -
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_typeddict_field_from_keyword_argument() {
+        let test = cursor_test(
+            "
+from typing import TypedDict
+
+class TD(TypedDict):
+    f: int
+    g: str
+
+TD(f<CURSOR>=1)
+",
+        );
+
+        assert_snapshot!(test.rename("z"), @"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:5:5
+          |
+        5 |     f: int
+          |     ^
+        6 |     g: str
+        7 |
+        8 | TD(f=1)
+          |    -
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_keyword_argument_namedtuple_field() {
+        let test = cursor_test(
+            "
+from typing import NamedTuple
+
+class NT(NamedTuple):
+    f<CURSOR>: int
+    g: str
+
+NT(f=1)
+",
+        );
+
+        assert_snapshot!(test.rename("z"), @"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:5:5
+          |
+        5 |     f: int
+          |     ^
+        6 |     g: str
+        7 |
+        8 | NT(f=1)
+          |    -
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_keyword_argument_dataclass_field() {
+        let test = cursor_test(
+            "
+from dataclasses import dataclass
+
+@dataclass
+class DC:
+    f<CURSOR>: int
+    g: str
+
+DC(f=1)
+",
+        );
+
+        assert_snapshot!(test.rename("z"), @"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:6:5
+          |
+        6 |     f: int
+          |     ^
+        7 |     g: str
+        8 |
+        9 | DC(f=1)
+          |    -
+          |
+        ");
+    }
+
+    #[test]
     fn import_alias() {
         let test = CursorTest::builder()
             .source(
@@ -1244,13 +1322,11 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:3:20
           |
-        2 | import warnings
         3 | import warnings as abc
           |                    ^^^
         4 |
         5 | x = abc
           |     ---
-        6 | y = warnings
           |
         ");
     }
@@ -1333,13 +1409,11 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:3:20
           |
-        2 | import warnings
         3 | import warnings as abc
           |                    ^^^
         4 |
         5 | x = abc
           |     ---
-        6 | y = warnings
           |
         ");
     }
@@ -1369,8 +1443,6 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 1 locations)
          --> mypackage/__init__.py:4:5
           |
-        2 | from .subpkg.submod import val
-        3 |
         4 | x = subpkg
           |     ^^^^^^
           |
@@ -1581,7 +1653,6 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 6 locations)
           --> lib.py:5:5
            |
-         4 | @overload
          5 | def test() -> None: ...
            |     ^^^^
          6 | @overload
@@ -1593,7 +1664,6 @@ result = func(10, y=20)
         10 |
         11 | def test(a: Any) -> Any:
            |     ----
-        12 |     return a
            |
           ::: main.py:2:17
            |
@@ -1641,8 +1711,6 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 5 locations)
           --> lib.py:6:9
            |
-         4 | class Test:
-         5 |     @overload
          6 |     def test() -> None: ...
            |         ^^^^
          7 |     @overload
@@ -1654,12 +1722,9 @@ result = func(10, y=20)
         11 |
         12 |     def test(a: Any) -> Any:
            |         ----
-        13 |         return a
            |
           ::: main.py:4:8
            |
-         2 | from lib import Test
-         3 |
          4 | Test().test("test")
            |        ----
            |
@@ -1708,7 +1773,6 @@ result = func(10, y=20)
            |
           ::: lib.py:5:5
            |
-         4 | @overload
          5 | def test() -> None: ...
            |     ----
          6 | @overload
@@ -1720,7 +1784,6 @@ result = func(10, y=20)
         10 |
         11 | def test(a: Any) -> Any:
            |     ----
-        12 |     return a
            |
         "#);
     }
@@ -1751,16 +1814,11 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 2 locations)
          --> lib.py:4:9
           |
-        2 | class Foo:
-        3 |     @property
         4 |     def my_property(self) -> int:
           |         ^^^^^^^^^^^
-        5 |         return 42
           |
          ::: main.py:4:13
           |
-        2 | from lib import Foo
-        3 |
         4 | print(Foo().my_property)
           |             -----------
           |
@@ -1798,8 +1856,6 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 5 locations)
          --> lib.py:4:9
           |
-        2 | class Foo:
-        3 |     @property
         4 |     def my_property(self) -> int:
           |         ^^^^^^^^^^^
         5 |         return 42
@@ -1808,12 +1864,9 @@ result = func(10, y=20)
           |      -----------
         8 |     def my_property(self, value: int) -> None:
           |         -----------
-        9 |         pass
           |
          ::: main.py:4:13
           |
-        2 | from lib import Foo
-        3 |
         4 | print(Foo().my_property)
           |             -----------
         5 | Foo().my_property = 56
@@ -1853,8 +1906,6 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 5 locations)
          --> lib.py:4:9
           |
-        2 | class Foo:
-        3 |     @property
         4 |     def my_property(self) -> int:
           |         ^^^^^^^^^^^
         5 |         return 42
@@ -1863,12 +1914,9 @@ result = func(10, y=20)
           |      -----------
         8 |     def my_property(self) -> None:
           |         -----------
-        9 |         pass
           |
          ::: main.py:4:13
           |
-        2 | from lib import Foo
-        3 |
         4 | print(Foo().my_property)
           |             -----------
         5 | del Foo().my_property
@@ -1913,8 +1961,6 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 8 locations)
           --> lib.py:4:9
            |
-         2 | class Foo:
-         3 |     @property
          4 |     def my_property(self) -> int:
            |         ^^^^^^^^^^^
          5 |         return 42
@@ -1929,12 +1975,9 @@ result = func(10, y=20)
            |      -----------
         12 |     def my_property(self) -> None:
            |         -----------
-        13 |         pass
            |
           ::: main.py:4:13
            |
-         2 | from lib import Foo
-         3 |
          4 | print(Foo().my_property)
            |             -----------
          5 | Foo().my_property = 56
@@ -1978,8 +2021,6 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 5 locations)
          --> lib.py:4:9
           |
-        2 | class Foo:
-        3 |     @property
         4 |     def my_property(self) -> int:
           |         ^^^^^^^^^^^
         5 |         return 42
@@ -1988,12 +2029,9 @@ result = func(10, y=20)
           |      -----------
         8 |     def my_property(self, value: int) -> None:
           |         -----------
-        9 |         pass
           |
          ::: main.py:4:13
           |
-        2 | from lib import Foo
-        3 |
         4 | print(Foo().my_property)
           |             -----------
         5 | Foo().my_property = 56
@@ -2035,8 +2073,6 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 5 locations)
          --> lib.py:4:9
           |
-        2 | class Foo:
-        3 |     @property
         4 |     def my_property(self) -> int:
           |         ^^^^^^^^^^^
         5 |         return 42
@@ -2045,12 +2081,9 @@ result = func(10, y=20)
           |      -----------
         8 |     def my_property(self, value: int) -> None:
           |         -----------
-        9 |         pass
           |
          ::: main.py:4:13
           |
-        2 | from lib import Foo
-        3 |
         4 | print(Foo().my_property)
           |             -----------
         5 | Foo().my_property = 56
@@ -2092,8 +2125,6 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 5 locations)
          --> main.py:4:13
           |
-        2 | from lib import Foo
-        3 |
         4 | print(Foo().my_property)
           |             ^^^^^^^^^^^
         5 | Foo().my_property = 56
@@ -2101,8 +2132,6 @@ result = func(10, y=20)
           |
          ::: lib.py:4:9
           |
-        2 | class Foo:
-        3 |     @property
         4 |     def my_property(self) -> int:
           |         -----------
         5 |         return 42
@@ -2111,7 +2140,6 @@ result = func(10, y=20)
           |      -----------
         8 |     def my_property(self, value: int) -> None:
           |         -----------
-        9 |         pass
           |
         ");
     }
@@ -2148,8 +2176,6 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 3 locations)
          --> lib.py:4:9
           |
-        2 | class Foo:
-        3 |     @property
         4 |     def alpha(self) -> int:
           |         ^^^^^
         5 |         return 1
@@ -2158,7 +2184,6 @@ result = func(10, y=20)
           |      -----
         8 |     def alpha(self, value: int) -> None:
           |         -----
-        9 |         pass
           |
         ");
     }
@@ -2193,16 +2218,12 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 2 locations)
           --> lib.py:8:5
            |
-         6 | registry = Registry()
-         7 |
          8 | def my_func():
            |     ^^^^^^^
          9 |     pass
         10 |
         11 | @my_func.setter
            |  -------
-        12 | def my_func():
-        13 |     pass
            |
         ");
     }
@@ -2242,13 +2263,10 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 2 locations)
           --> lib.py:11:2
            |
-         9 |     pass
-        10 |
         11 | @my_func.setter
            |  -------
         12 | def my_func():
            |     ^^^^^^^
-        13 |     pass
            |
         ");
     }
@@ -2278,16 +2296,12 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 2 locations)
          --> lib.py:4:9
           |
-        2 | class Foo:
-        3 |     @property
         4 |     def my_getter(self) -> int:
           |         ^^^^^^^^^
         5 |         return 42
         6 |
         7 |     @my_getter.setter
           |      ---------
-        8 |     def my_setter(self, value: int) -> None:
-        9 |         pass
           |
         ");
     }
@@ -2319,7 +2333,6 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 3 locations)
           --> foo.py:5:5
            |
-         4 | @singledispatch
          5 | def f(x: object):
            |     ^
          6 |     raise NotImplementedError
@@ -2331,8 +2344,6 @@ result = func(10, y=20)
         11 |
         12 | @f.register
            |  -
-        13 | def _(x: str) -> int:
-        14 |     return int(x)
            |
         "#);
     }
@@ -2365,7 +2376,6 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 4 locations)
           --> foo.py:5:5
            |
-         4 | @singledispatch
          5 | def f(x):
            |     ^
          6 |     raise NotImplementedError
@@ -2379,8 +2389,6 @@ result = func(10, y=20)
         12 |
         13 | @f.register(str)
            |  -
-        14 | def _(x) -> int:
-        15 |     return int(x)
            |
         "#);
     }
@@ -2413,8 +2421,6 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 3 locations)
           --> foo.py:6:9
            |
-         4 | class Foo:
-         5 |     @singledispatchmethod
          6 |     def f(self, x: object):
            |         ^
          7 |         raise NotImplementedError
@@ -2426,8 +2432,6 @@ result = func(10, y=20)
         12 |
         13 |     @f.register
            |      -
-        14 |     def _(self, x: str) -> int:
-        15 |         return int(x)
            |
         "#);
     }
@@ -2463,8 +2467,6 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 3 locations)
           --> foo.py:7:9
            |
-         5 |     @singledispatchmethod
-         6 |     @staticmethod
          7 |     def f(self, x):
            |         ^
          8 |         raise NotImplementedError
@@ -2477,8 +2479,6 @@ result = func(10, y=20)
         14 |
         15 |     @f.register
            |      -
-        16 |     @staticmethod
-        17 |     def _(x: str) -> int:
            |
         "#);
     }
@@ -2515,8 +2515,6 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 4 locations)
           --> foo.py:7:9
            |
-         5 |     @singledispatchmethod
-         6 |     @classmethod
          7 |     def f(cls, x):
            |         ^
          8 |         raise NotImplementedError
@@ -2531,8 +2529,6 @@ result = func(10, y=20)
            |      -
         16 |     @f.register(float)
            |      -
-        17 |     @staticmethod
-        18 |     def _(cls, x) -> int:
            |
         "#);
     }
@@ -2566,7 +2562,6 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 5 locations)
           --> foo.py:3:5
            |
-         2 | class Test:
          3 |     attribute: str
            |     ^^^^^^^^^
          4 |
@@ -2581,8 +2576,6 @@ result = func(10, y=20)
            |
           ::: foo.py:15:9
            |
-        13 | c = Child("test")
-        14 |
         15 | print(c.attribute)
            |         ---------
         16 | c.attribute = "new_value"
@@ -2622,8 +2615,6 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 5 locations)
          --> main.py:4:13
           |
-        2 | from lib import Foo
-        3 |
         4 | print(Foo().my_property)
           |             ^^^^^^^^^^^
         5 | Foo().my_property = 56
@@ -2631,8 +2622,6 @@ result = func(10, y=20)
           |
          ::: lib.py:4:9
           |
-        2 | class Foo:
-        3 |     @property
         4 |     def my_property(self) -> int:
           |         -----------
         5 |         return 42
@@ -2641,7 +2630,6 @@ result = func(10, y=20)
           |      -----------
         8 |     def my_property(self, value: int) -> None:
           |         -----------
-        9 |         pass
           |
         ");
     }
@@ -2679,12 +2667,8 @@ result = func(10, y=20)
         info[rename]: Rename symbol (found 1 locations)
          --> main.py:4:14
           |
-        2 | class Test:
-        3 |     def __init__(self, value: str):
         4 |         self.attribute = value
           |              ^^^^^^^^^
-        5 |
-        6 | class Child(Test):
           |
         ");
     }

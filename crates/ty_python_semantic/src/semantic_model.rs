@@ -15,7 +15,7 @@ use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{
-    Type, TypeQualifiers, binding_type, declaration_type, infer_complete_scope_types,
+    CycleDetector, Type, TypeQualifiers, binding_type, declaration_type, infer_complete_scope_types,
 };
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
@@ -437,6 +437,77 @@ impl<'db> SemanticModel<'db> {
             _ => TypeQualifiers::empty(),
         }
     }
+
+    /// Returns completion candidates for a string-literal expression based on its expected type.
+    pub fn expected_string_literal_completions(
+        &self,
+        string_expr: &ast::ExprStringLiteral,
+    ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
+        struct StringLiteralCandidates;
+        type StringLiteralCandidatesVisitor<'db> = CycleDetector<
+            StringLiteralCandidates,
+            Type<'db>,
+            Vec<ExpectedStringLiteralCompletion<'db>>,
+        >;
+
+        fn collect<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            visitor: &StringLiteralCandidatesVisitor<'db>,
+        ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
+            match ty {
+                Type::LiteralValue(literal) => literal
+                    .as_string()
+                    .map(|string_literal| {
+                        let value = string_literal.value(db).to_string();
+                        vec![ExpectedStringLiteralCompletion {
+                            ty: Type::string_literal(db, &value),
+                            value,
+                        }]
+                    })
+                    .unwrap_or_default(),
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .flat_map(|element| collect(db, *element, visitor))
+                    .collect(),
+                Type::Intersection(intersection) => intersection
+                    .positive(db)
+                    .iter()
+                    .flat_map(|element| collect(db, *element, visitor))
+                    .collect(),
+                Type::TypeAlias(alias) => {
+                    visitor.visit(ty, || collect(db, alias.value_type(db), visitor))
+                }
+                _ => Vec::new(),
+            }
+        }
+
+        let Some(expected_ty) = self.string_literal_completion_expected_type(string_expr) else {
+            return Vec::new();
+        };
+
+        let mut candidates = collect(
+            self.db,
+            expected_ty,
+            &StringLiteralCandidatesVisitor::default(),
+        );
+        candidates.sort_unstable_by(|left, right| left.value.cmp(&right.value));
+        candidates.dedup_by(|left, right| left.value == right.value);
+        candidates
+    }
+
+    fn string_literal_completion_expected_type(
+        &self,
+        string_expr: &ast::ExprStringLiteral,
+    ) -> Option<Type<'db>> {
+        let expr = ast::ExprRef::from(string_expr);
+        let index = semantic_index(self.db, self.file);
+        let file_scope = index.try_expression_scope_id(&self.expr_ref_in_ast(expr))?;
+        let scope = file_scope.to_scope_id(self.db, self.file);
+
+        infer_complete_scope_types(self.db, scope).try_expected_type(expr)
+    }
 }
 
 /// The type and definition of a symbol.
@@ -498,6 +569,12 @@ pub struct Completion<'db> {
     /// use it mainly in tests so that we can write less
     /// noisy tests.
     pub builtin: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExpectedStringLiteralCompletion<'db> {
+    pub value: String,
+    pub ty: Type<'db>,
 }
 
 pub trait HasType {

@@ -159,6 +159,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPED_DICT_STATEMENT);
     registry.register_lint(&INVALID_TYPED_DICT_FIELD);
     registry.register_lint(&INVALID_TYPED_DICT_HEADER);
+    registry.register_lint(&INVALID_ATTRIBUTE_OVERRIDE);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
@@ -3167,6 +3168,41 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Detects attribute overrides that change whether an inherited attribute
+    /// is a class variable or an instance variable.
+    ///
+    /// This rule currently only covers class-variable and instance-variable
+    /// category changes.
+    ///
+    /// ## Why is this bad?
+    /// Pure class variables and instance variables have different access and
+    /// assignment behavior. Overriding one with the other violates the
+    /// [Liskov Substitution Principle] ("LSP"), because code that is valid for
+    /// the superclass may no longer be valid for the subclass.
+    ///
+    /// ## Example
+    /// ```python
+    /// from typing import ClassVar
+    ///
+    /// class Base:
+    ///     instance_attr: int
+    ///     class_attr: ClassVar[int]
+    ///
+    /// class Sub(Base):
+    ///     instance_attr: ClassVar[int]  # error: [invalid-attribute-override]
+    ///     class_attr: int  # error: [invalid-attribute-override]
+    /// ```
+    ///
+    /// [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
+    pub(crate) static INVALID_ATTRIBUTE_OVERRIDE = {
+        summary: "detects attribute overrides that change class-variable or instance-variable behavior",
+        status: LintStatus::stable("0.0.33"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Detects method overrides that violate the [Liskov Substitution Principle] ("LSP").
     ///
     /// The LSP states that an instance of a subtype should be substitutable for an instance of its supertype.
@@ -5106,12 +5142,20 @@ pub(crate) fn report_invalid_or_unsupported_base(
 
             match mro_entries_call_error {
                 CallDunderError::MethodNotAvailable => {}
-                CallDunderError::PossiblyUnbound { .. } => {
+                CallDunderError::PossiblyUnbound { unbound_on, .. } => {
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` may have an `__mro_entries__` attribute, but it may be missing",
                         base_type.display(db)
                     ));
+                    if let Some(unbound_on) = unbound_on {
+                        for ty in unbound_on {
+                            diagnostic.info(format_args!(
+                                "`{}` does not implement `__mro_entries__`",
+                                ty.display(db)
+                            ));
+                        }
+                    }
                 }
                 CallDunderError::CallError(CallErrorKind::NotCallable, _) => {
                     explain_mro_entries(&mut diagnostic);
@@ -5248,9 +5292,16 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                     ));
                 } else {
                     diagnostic.set_primary_message(format_args!("Unknown key \"{key}\""));
-                    diagnostic.set_concise_message(format_args!(
-                        "Unknown key \"{key}\" for TypedDict `{typed_dict_name}`",
-                    ));
+                    if let Some(full_ty) = full_object_ty {
+                        diagnostic.set_concise_message(format_args!(
+                            "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` (subscripted object has type `{full_ty}`)",
+                            full_ty = full_ty.display(db),
+                        ));
+                    } else {
+                        diagnostic.set_concise_message(format_args!(
+                            "Unknown key \"{key}\" for TypedDict `{typed_dict_name}`",
+                        ));
+                    }
                 }
             }
             _ => {
@@ -5693,9 +5744,10 @@ pub(super) fn report_invalid_method_override<'db>(
             ty: Type::FunctionLiteral(superclass_function),
             ..
         }) = class_member(superclass)
-        && let Ok(superclass_function_kind) =
+        && let Some(superclass_function_kind) =
             MethodDecorator::try_from_fn_type(db, superclass_function)
-        && let Ok(subclass_function_kind) = MethodDecorator::try_from_fn_type(db, subclass_function)
+        && let Some(subclass_function_kind) =
+            MethodDecorator::try_from_fn_type(db, subclass_function)
         && superclass_function_kind != subclass_function_kind
     {
         diagnostic.info(format_args!(

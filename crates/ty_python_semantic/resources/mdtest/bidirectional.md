@@ -35,8 +35,7 @@ def _(l: list[int] | None = None):
     reveal_type(l1)  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
 
     l2: list[int] = l or list()
-    # it would be better if this were `list[int]`? (https://github.com/astral-sh/ty/issues/136)
-    reveal_type(l2)  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
+    reveal_type(l2)  # revealed: list[int]
 
 def f[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
@@ -98,10 +97,14 @@ x: list[int | str] = list1(42) * 3
 `typed_dict.py`:
 
 ```py
-from typing import Callable, Hashable, Mapping, TypedDict
+from typing import Any, Callable, Hashable, Mapping, TypedDict
+from typing_extensions import Never
 
 class TD(TypedDict):
     x: int
+
+class BadTD(TypedDict):
+    x: str
 
 d1_literal = {"x": 1}
 d1_dict = dict(x=1)
@@ -111,9 +114,11 @@ reveal_type(d1_dict)  # revealed: dict[str, int]
 
 d2_literal: TD = {"x": 1}
 d2_dict: TD = dict(x=1)
+d2_unpack: TD = dict(**d2_literal)
 
 reveal_type(d2_literal)  # revealed: TD
 reveal_type(d2_dict)  # revealed: TD
+reveal_type(d2_unpack)  # revealed: TD
 
 d3_literal: dict[str, int] = {"x": 1}
 d3_dict: dict[str, int] = dict(x=1)
@@ -126,6 +131,30 @@ d4_invalid_dict: TD = dict(x="1")  # error: [invalid-argument-type]
 
 reveal_type(d4_invalid_literal)  # revealed: TD
 reveal_type(d4_invalid_dict)  # revealed: TD
+
+def unpack_invalid_typed_dict(src: BadTD) -> TD:
+    # The fast path should validate TypedDict-shaped unpacks even when they are not assignable to
+    # the target. That preserves the key-level TypedDict diagnostic instead of falling back to a
+    # broad `dict[str, str]` assignment error.
+    # error: [invalid-argument-type] "Invalid argument to key "x" with declared type `int` on TypedDict `TD`: value of type `str`"
+    return dict(**src)
+
+def return_any_unpack(src: Any) -> TD:
+    return dict(**src)
+
+def pass_never_unpack(src: Never) -> None:
+    takes_td(dict(**src))
+
+def takes_mapping(value: Mapping[str, object]) -> None:
+    pass
+
+def keep_keyword_diagnostics(kwargs: Mapping[str, object]) -> None:
+    # The TypedDict-aware `dict(...)` fast path should not lose diagnostics from named keywords
+    # when unsupported `**kwargs` forces it to fall back to ordinary dict inference.
+    # error: [unresolved-reference] "Name `missing` used when not defined"
+    # error: [invalid-assignment]
+    maybe_td: TD = dict(x=missing, **kwargs)
+    takes_mapping(maybe_td)
 
 # Note: the second variant (`d5_dict`) is not technically allowed by the `dict.__init__` overloads
 # in typeshed, which require the key type to be `str` when using keyword arguments. However, we
@@ -140,6 +169,15 @@ def return_literal() -> TD:
 
 def return_dict() -> TD:
     return dict(x=1)
+
+def return_unpack(src: TD) -> TD:
+    return dict(**src)
+
+def takes_td(value: TD) -> None:
+    pass
+
+def pass_unpack(src: TD) -> None:
+    takes_td(dict(**src))
 
 def return_invalid_literal() -> TD:
     # TODO: ideally, this would only emit the first error, but not `invalid-return-type` (like the `return_invalid_dict` case below).
@@ -474,6 +512,9 @@ from typing import Callable, TypedDict
 class Bar(TypedDict):
     bar: int
 
+def id[T](x: T) -> T:
+    return x
+
 f1 = lambda x: {"bar": 1}
 reveal_type(f1)  # revealed: (x) -> dict[str, int]
 
@@ -485,26 +526,49 @@ reveal_type(f2)  # revealed: (x: int) -> Bar
 f3: Callable[[int], Bar] = lambda x: {}
 reveal_type(f3)  # revealed: (int, /) -> Bar
 
-# TODO: This should reveal `str`.
-f4: Callable[[str], str] = lambda x: reveal_type(x)  # revealed: Unknown
-reveal_type(f4)  # revealed: (x: str) -> Unknown
+f4: Callable[[str], str] = lambda x: reveal_type(x)  # revealed: str
+reveal_type(f4)  # revealed: (x: str) -> str
+
+f5: Callable[[str], str] = id(lambda x: reveal_type(x))  # revealed: str
+reveal_type(f5)  # revealed: (x: str) -> str
 
 # TODO: This should not error once we support `Unpack`.
 # error: [invalid-assignment]
-f5: Callable[[*tuple[int, ...]], None] = lambda x, y, z: None
-reveal_type(f5)  # revealed: (tuple[int, ...], /) -> None
+f6: Callable[[*tuple[int, ...]], None] = lambda x, y, z: None
+reveal_type(f6)  # revealed: (tuple[int, ...], /) -> None
 
-f6: Callable[[int, str], None] = lambda *args: None
-reveal_type(f6)  # revealed: (*args) -> None
+f7: Callable[[int, str], None] = lambda *args: None
+reveal_type(f7)  # revealed: (*args) -> None
 
 # N.B. `Callable` annotations only support positional parameters.
 # error: [invalid-assignment]
-f7: Callable[[int], None] = lambda *, x=1: None
-reveal_type(f7)  # revealed: (int, /) -> None
+f8: Callable[[int], None] = lambda *, x=1: None
+reveal_type(f8)  # revealed: (int, /) -> None
 
 # TODO: This should reveal `(*args: int, *, x=1) -> None` once we support `Unpack`.
-f8: Callable[[*tuple[int, ...], int], None] = lambda *args, x=1: None
-reveal_type(f8)  # revealed: (*args, *, x=1) -> None
+f9: Callable[[*tuple[int, ...], int], None] = lambda *args, x=1: None
+reveal_type(f9)  # revealed: (*args, *, x=1) -> None
+
+f10: Callable[[str, int, str], tuple[str, int, str]] = lambda x, y, z: reveal_type((x, y, z))  # revealed: tuple[str, int, str]
+reveal_type(f10)  # revealed: (x: str, y: int, z: str) -> tuple[str, int, str]
+
+# TODO: This should reveal `tuple[int, ...]` once we support `Unpack`.
+f11: Callable[[*tuple[int, ...]], tuple[int, ...]] = lambda *args: reveal_type(args)  # revealed: tuple[Unknown, ...]
+reveal_type(f11)  # revealed: (*args) -> tuple[Unknown, ...]
+
+# TODO: Better generic call inference.
+def _(x: list[int]):
+    f12 = list(map(lambda y: y + 1, x))
+    reveal_type(f12)  # revealed: list[Unknown]
+
+def _() -> Callable[[int], int]:
+    return id(lambda x: reveal_type(x))  # revealed: int
+
+def _():
+    def takes_callable(_: Callable[[int], int]): ...
+
+    takes_callable(lambda x: reveal_type(x))  # revealed: int
+    takes_callable(id(id(lambda x: reveal_type(x))))  # revealed: int
 
 def _(x: bool):
     signatures = {
@@ -520,10 +584,10 @@ def _(x: bool):
 We do not currently account for type annotations present later in the scope:
 
 ```py
-f9 = lambda: [1]
+f12 = lambda: [1]
 # TODO: This should not error.
-_: list[int | str] = f9()  # error: [invalid-assignment]
-reveal_type(f9)  # revealed: () -> list[int]
+_: list[int | str] = f12()  # error: [invalid-assignment]
+reveal_type(f12)  # revealed: () -> list[int]
 ```
 
 ## Dunder Calls

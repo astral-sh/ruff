@@ -38,9 +38,20 @@ mod tests {
 
     impl CursorTest {
         fn references(&self) -> String {
-            let Some(mut reference_results) =
-                find_references(&self.db, self.cursor.file, self.cursor.offset, true)
-            else {
+            self.references_with_include_declaration(true)
+        }
+
+        fn references_without_declaration(&self) -> String {
+            self.references_with_include_declaration(false)
+        }
+
+        fn references_with_include_declaration(&self, include_declaration: bool) -> String {
+            let Some(mut reference_results) = find_references(
+                &self.db,
+                self.cursor.file,
+                self.cursor.offset,
+                include_declaration,
+            ) else {
                 return "No references found".to_string();
             };
 
@@ -143,7 +154,6 @@ def outer_function():
         info[references]: Found 9 references
           --> main.py:3:5
            |
-         2 | def outer_function():
          3 |     counter = 0
            |     -------
          4 |
@@ -170,8 +180,6 @@ def outer_function():
         18 |     decrement()
         19 |     final = counter
            |             -------
-        20 |
-        21 |     return increment, decrement
            |
         ");
     }
@@ -255,8 +263,6 @@ except ValueError as err:
         info[references]: Found 4 references
           --> main.py:4:29
            |
-         2 | try:
-         3 |     x = 1 / 0
          4 | except ZeroDivisionError as err:
            |                             ---
          5 |     print(f'Error: {err}')
@@ -290,15 +296,12 @@ match x:
         info[references]: Found 3 references
          --> main.py:3:20
           |
-        2 | match x:
         3 |     case [a, b] as pattern:
           |                    -------
         4 |         print(f'Matched: {pattern}')
           |                           -------
         5 |         return pattern
           |                -------
-        6 |     case _:
-        7 |         pass
           |
         ");
     }
@@ -319,7 +322,6 @@ match data:
         info[references]: Found 4 references
          --> main.py:3:29
           |
-        2 | match data:
         3 |     case {'a': a, 'b': b, **rest}:
           |                             ----
         4 |         print(f'Rest data: {rest}')
@@ -358,11 +360,9 @@ value = my_function
            |
          2 | def my_function():
            |     -----------
-         3 |     return 42
            |
           ::: main.py:6:11
            |
-         5 | # Call the function multiple times
          6 | result1 = my_function()
            |           -----------
          7 | result2 = my_function()
@@ -414,7 +414,6 @@ test("test")
         info[references]: Found 6 references
           --> lib.py:5:5
            |
-         4 | @overload
          5 | def test() -> None: ...
            |     ----
          6 | @overload
@@ -426,7 +425,6 @@ test("test")
         10 |
         11 | def test(a: Any) -> Any:
            |     ----
-        12 |     return a
            |
           ::: main.py:2:17
            |
@@ -466,12 +464,9 @@ cls = MyClass
            |
          2 | class MyClass:
            |       -------
-         3 |     def __init__(self):
-         4 |         pass
            |
           ::: main.py:7:8
            |
-         6 | # Create instances
          7 | obj1 = MyClass()
            |        -------
          8 | obj2 = MyClass()
@@ -480,11 +475,9 @@ cls = MyClass
         10 | # Use in type annotations
         11 | def process(instance: MyClass) -> MyClass:
            |                       -------     -------
-        12 |     return instance
            |
           ::: main.py:15:7
            |
-        14 | # Reference the class itself
         15 | cls = MyClass
            |       -------
            |
@@ -511,7 +504,27 @@ cls = MyClass
         3 |
         4 | class MyClass:
           |       -------
-        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn references_string_annotation_without_declaration() {
+        let test = cursor_test(
+            r#"
+        a: "MyCla<CURSOR>ss" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @r#"
+        info[references]: Found 1 references
+         --> main.py:2:5
+          |
+        2 | a: "MyClass" = 1
+          |     -------
           |
         "#);
     }
@@ -536,7 +549,6 @@ cls = MyClass
         3 |
         4 | class MyClass:
           |       -------
-        5 |     """some docs"""
           |
         "#);
     }
@@ -575,7 +587,6 @@ cls = MyClass
         3 |
         4 | class MyClass:
           |       -------
-        5 |     """some docs"""
           |
         "#);
     }
@@ -628,7 +639,6 @@ cls = MyClass
         3 |
         4 | class MyClass:
           |       -------
-        5 |     """some docs"""
           |
         "#);
     }
@@ -691,8 +701,6 @@ cls = MyClass
         info[references]: Found 2 references
          --> main.py:4:22
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", ab]:
           |                      --
         5 |             x = ab
@@ -716,8 +724,6 @@ cls = MyClass
         info[references]: Found 2 references
          --> main.py:4:22
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", ab]:
           |                      --
         5 |             x = ab
@@ -741,8 +747,6 @@ cls = MyClass
         info[references]: Found 2 references
          --> main.py:4:23
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", *ab]:
           |                       --
         5 |             x = ab
@@ -766,8 +770,6 @@ cls = MyClass
         info[references]: Found 2 references
          --> main.py:4:23
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", *ab]:
           |                       --
         5 |             x = ab
@@ -791,8 +793,6 @@ cls = MyClass
         info[references]: Found 2 references
          --> main.py:4:37
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", ("a" | "b") as ab]:
           |                                     --
         5 |             x = ab
@@ -816,8 +816,6 @@ cls = MyClass
         info[references]: Found 2 references
          --> main.py:4:37
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", ("a" | "b") as ab]:
           |                                     --
         5 |             x = ab
@@ -847,8 +845,6 @@ cls = MyClass
         info[references]: Found 2 references
           --> main.py:10:30
            |
-         8 | def my_func(event: Click):
-         9 |     match event:
         10 |         case Click(x, button=ab):
            |                              --
         11 |             x = ab
@@ -878,8 +874,6 @@ cls = MyClass
         info[references]: Found 2 references
           --> main.py:10:30
            |
-         8 | def my_func(event: Click):
-         9 |     match event:
         10 |         case Click(x, button=ab):
            |                              --
         11 |             x = ab
@@ -905,27 +899,22 @@ cls = MyClass
             "#,
         );
 
-        assert_snapshot!(test.references(), @r#"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 3 references
           --> main.py:2:7
            |
          2 | class Click:
            |       -----
-         3 |     __match_args__ = ("position", "button")
-         4 |     def __init__(self, pos, btn):
            |
           ::: main.py:8:20
            |
-         6 |         self.button: str = btn
-         7 |
          8 | def my_func(event: Click):
            |                    -----
          9 |     match event:
         10 |         case Click(x, button=ab):
            |              -----
-        11 |             x = ab
            |
-        "#);
+        ");
     }
 
     #[test]
@@ -997,7 +986,6 @@ cls = MyClass
         info[references]: Found 3 references
          --> main.py:3:15
           |
-        2 | from typing import Callable
         3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
           |               --                          --        --
           |
@@ -1017,7 +1005,6 @@ cls = MyClass
         info[references]: Found 3 references
          --> main.py:3:15
           |
-        2 | from typing import Callable
         3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
           |               --                          --        --
           |
@@ -1123,7 +1110,6 @@ class DataProcessor:
           |
         2 | def func(x):
           |     ----
-        3 |     return x * 2
           |
         ");
     }
@@ -1159,8 +1145,6 @@ def process_model():
         info[references]: Found 5 references
          --> main.py:6:19
           |
-        4 | def process_model():
-        5 |     model = MyModel()
         6 |     value = model.attr
           |                   ----
         7 |     model.attr = 100
@@ -1170,7 +1154,6 @@ def process_model():
           |
          ::: models.py:3:5
           |
-        2 | class MyModel:
         3 |     attr = 42
           |     ----
         4 |
@@ -1206,20 +1189,130 @@ instance = ExampleClass(old_name="test")
         info[references]: Found 3 references
          --> example_rename.py:4:25
           |
-        2 | from example_rename_2 import ExampleClass
-        3 |
         4 | instance = ExampleClass(old_name="test")
           |                         --------
           |
          ::: example_rename_2.py:3:24
           |
-        2 | class ExampleClass:
         3 |     def __init__(self, old_name: str) -> None:
           |                        --------
         4 |         self.old_name = old_name
           |                         --------
           |
         "#);
+    }
+
+    #[test]
+    fn references_keyword_argument_typeddict_field() {
+        let test = cursor_test(
+            "
+from typing import TypedDict
+
+class TD(TypedDict):
+    f<CURSOR>: int
+    g: str
+
+TD(f=1)
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> main.py:5:5
+          |
+        5 |     f: int
+          |     -
+        6 |     g: str
+        7 |
+        8 | TD(f=1)
+          |    -
+          |
+        ");
+    }
+
+    #[test]
+    fn references_typeddict_field_from_keyword_argument() {
+        let test = cursor_test(
+            "
+from typing import TypedDict
+
+class TD(TypedDict):
+    f: int
+    g: str
+
+TD(f<CURSOR>=1)
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> main.py:5:5
+          |
+        5 |     f: int
+          |     -
+        6 |     g: str
+        7 |
+        8 | TD(f=1)
+          |    -
+          |
+        ");
+    }
+
+    #[test]
+    fn references_keyword_argument_namedtuple_field() {
+        let test = cursor_test(
+            "
+from typing import NamedTuple
+
+class NT(NamedTuple):
+    f<CURSOR>: int
+    g: str
+
+NT(f=1)
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> main.py:5:5
+          |
+        5 |     f: int
+          |     -
+        6 |     g: str
+        7 |
+        8 | NT(f=1)
+          |    -
+          |
+        ");
+    }
+
+    #[test]
+    fn references_keyword_argument_dataclass_field() {
+        let test = cursor_test(
+            "
+from dataclasses import dataclass
+
+@dataclass
+class DC:
+    f<CURSOR>: int
+    g: str
+
+DC(f=1)
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> main.py:6:5
+          |
+        6 |     f: int
+          |     -
+        7 |     g: str
+        8 |
+        9 | DC(f=1)
+          |    -
+          |
+        ");
     }
 
     #[test]
@@ -1246,8 +1339,6 @@ result = func(value=42)
         info[references]: Found 3 references
          --> main.py:4:15
           |
-        2 | from utils import func
-        3 |
         4 | result = func(value=42)
           |               -----
           |
@@ -1286,7 +1377,6 @@ async def main():
         info[references]: Found 3 references
          --> main.py:5:23
           |
-        4 | async def main():
         5 |     return await func(value=42)
           |                       -----
           |
@@ -1325,8 +1415,6 @@ instance = ExampleClass(old_name="test")
         info[references]: Found 1 references
          --> example_rename_2.py:4:14
           |
-        2 | class ExampleClass:
-        3 |     def __init__(self, old_name: str) -> None:
         4 |         self.old_name = old_name
           |              --------
           |
@@ -1363,12 +1451,10 @@ result = func(value=10)
         info[references]: Found 2 references
          --> outer.py:3:15
           |
-        2 | def outer():
         3 |     def inner(value: int):
           |               -----
         4 |         return value * 2
           |                -----
-        5 |     return inner
           |
         ");
     }
@@ -1402,21 +1488,15 @@ result = instance.method(old_name="world")
         info[references]: Found 3 references
          --> example_rename.py:4:25
           |
-        2 | from example_rename_2 import ExampleClass
-        3 |
         4 | instance = ExampleClass(old_name="test")
           |                         --------
-        5 | result = instance.method(old_name="world")
           |
          ::: example_rename_2.py:3:24
           |
-        2 | class ExampleClass:
         3 |     def __init__(self, old_name: str) -> None:
           |                        --------
         4 |         self.old_name = old_name
           |                         --------
-        5 |
-        6 |     def method(self, old_name: str) -> str:
           |
         "#);
     }
@@ -1500,7 +1580,6 @@ func<CURSOR>_alias()
           |
         2 | class Path:
           |       ----
-        3 |     def __init__(self, path: str): ...
           |
         "#);
     }
@@ -1524,13 +1603,11 @@ func<CURSOR>_alias()
         info[references]: Found 2 references
          --> main.py:3:20
           |
-        2 | import warnings
         3 | import warnings as abc
           |                    ---
         4 |
         5 | x = abc
           |     ---
-        6 | y = warnings
           |
         ");
     }
@@ -1554,13 +1631,11 @@ func<CURSOR>_alias()
         info[references]: Found 2 references
          --> main.py:3:20
           |
-        2 | import warnings
         3 | import warnings as abc
           |                    ---
         4 |
         5 | x = abc
           |     ---
-        6 | y = warnings
           |
         ");
     }
@@ -1590,7 +1665,6 @@ func<CURSOR>_alias()
         4 |
         5 | y = xyz
           |     ---
-        6 | z = deprecated
           |
         ");
     }
@@ -1620,7 +1694,6 @@ func<CURSOR>_alias()
         4 |
         5 | y = xyz
           |     ---
-        6 | z = deprecated
           |
         ");
     }
@@ -1650,8 +1723,6 @@ func<CURSOR>_alias()
         info[references]: Found 1 references
          --> mypackage/__init__.py:4:5
           |
-        2 | from .subpkg.submod import val
-        3 |
         4 | x = subpkg
           |     ------
           |

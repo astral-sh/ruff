@@ -34,7 +34,9 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
-  CONFORMANCE_SUITE_COMMIT: ba681644208317f5b89f737087ab029cc103d99b
+  # Line-tables-only debug info: faster builds, backtraces still work.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CONFORMANCE_SUITE_COMMIT: 5a701a037b5243df1f39622b642893d865f06205
   PYTHON_VERSION: 3.12
 
 jobs:
@@ -46,8 +48,11 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           path: ruff
-          fetch-depth: 0
           persist-credentials: false
+
+      # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
+      - name: Fetch full history without tags
+        run: git -C ruff fetch --no-tags --filter=blob:none --unshallow origin
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -66,6 +71,9 @@ jobs:
 
       - name: Install Rust toolchain
         run: rustup show
+
+      - name: "Install mold"
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
 
       - name: Compute diagnostic diff
         shell: bash

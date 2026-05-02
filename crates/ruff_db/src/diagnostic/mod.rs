@@ -1050,6 +1050,9 @@ pub enum DiagnosticId {
     /// Use of a deprecated setting.
     DeprecatedSetting,
 
+    /// Use of a Python version that ty doesn't support.
+    UnsupportedPythonVersion,
+
     /// The code needs to be formatted.
     Unformatted,
 
@@ -1109,6 +1112,7 @@ impl DiagnosticId {
             DiagnosticId::UnnecessaryOverridesSection => "unnecessary-overrides-section",
             DiagnosticId::UselessOverridesSection => "useless-overrides-section",
             DiagnosticId::DeprecatedSetting => "deprecated-setting",
+            DiagnosticId::UnsupportedPythonVersion => "unsupported-python-version",
             DiagnosticId::Unformatted => "unformatted",
             DiagnosticId::InvalidCliOption => "invalid-cli-option",
             DiagnosticId::PreviewFeature => "preview-feature",

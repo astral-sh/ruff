@@ -47,15 +47,18 @@ use crate::types::generics::{
 use crate::types::known_instance::FieldInstance;
 use crate::types::signatures::{
     CallableSignature, Parameter, ParameterForm, ParameterKind, Parameters, ParametersKind,
+    PartialApplication, PartialSignatureApplication,
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
+use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
-    BoundMethodType, BoundTypeVarInstance, CallableType, ClassLiteral, DATACLASS_FLAGS,
-    DataclassFlags, DataclassParams, GenericAlias, InternedConstraintSet, IntersectionType,
-    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, NominalInstanceType,
-    PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints,
-    TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral,
+    DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias, InternedConstraintSet,
+    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
+    NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -188,6 +191,26 @@ impl<'db> CallableItem<'db> {
 
     fn callable_type(&self) -> Type<'db> {
         self.callable().callable_type
+    }
+
+    /// Returns the reduced callable synthesized from this callable item.
+    fn functools_partial_callable<'a>(
+        &self,
+        db: &'db dyn Db,
+        partial_overload: &mut Binding<'db>,
+        bound_call_arguments: &CallArguments<'a, 'db>,
+    ) -> Option<CallableType<'db>> {
+        match self {
+            CallableItem::Regular(binding) => CallableType::partially_apply(
+                db,
+                binding.partial_signature_applications(
+                    db,
+                    partial_overload,
+                    bound_call_arguments,
+                )?,
+            ),
+            CallableItem::Constructor(_) => None,
+        }
     }
 
     fn map<F>(self, f: &F) -> CallableItem<'db>
@@ -651,26 +674,33 @@ impl<'db> Bindings<'db> {
             .filter_map(CallableItem::as_constructor_mut)
     }
 
-    fn collect_type_context_callables<'a>(&'a self, out: &mut Vec<&'a CallableBinding<'db>>) {
-        for item in self.iter_callable_items() {
-            out.push(item.callable());
+    fn clear_deferred_constructor_errors_for_partial_application(&mut self) {
+        for binding in self.iter_flat_mut() {
+            binding.clear_deferred_constructor_errors_for_partial_application();
+        }
 
-            if let Some(constructor) = item.as_constructor()
-                && let Some(downstream) = &constructor.downstream_constructor
-            {
-                downstream.collect_type_context_callables(out);
+        for constructor in self.iter_constructor_items_mut() {
+            if let Some(downstream) = constructor.downstream_constructor_mut() {
+                downstream.clear_deferred_constructor_errors_for_partial_application();
             }
         }
     }
 
-    /// Returns the callables that should contribute argument type context, including deferred
+    /// Visits the callables that should contribute argument type context, including deferred
     /// constructor callables that are relevant to the matched upstream constructor path.
-    pub(crate) fn iter_type_context_callables(
-        &self,
-    ) -> impl Iterator<Item = &CallableBinding<'db>> + '_ {
-        let mut callables = Vec::new();
-        self.collect_type_context_callables(&mut callables);
-        callables.into_iter()
+    pub(crate) fn visit_type_context_callables<'a>(
+        &'a self,
+        visit: &mut impl FnMut(&'a CallableBinding<'db>),
+    ) {
+        for item in self.iter_callable_items() {
+            visit(item.callable());
+
+            if let Some(constructor) = item.as_constructor()
+                && let Some(downstream) = &constructor.downstream_constructor
+            {
+                downstream.visit_type_context_callables(visit);
+            }
+        }
     }
 
     /// Returns `true` if every element of the union contains an intersection element with a matching
@@ -709,6 +739,98 @@ impl<'db> Bindings<'db> {
         }
 
         UnionType::from_elements(db, element_types)
+    }
+
+    /// Maps each `CallableItem` to a type and combines results while preserving
+    /// the union-of-intersections structure:
+    ///
+    /// - callable items inside an element are intersected
+    /// - elements are unioned
+    fn map_item_types(
+        &self,
+        db: &'db dyn Db,
+        mut map: impl FnMut(&CallableItem<'db>) -> Option<Type<'db>>,
+    ) -> Type<'db> {
+        let mut element_types = Vec::with_capacity(self.elements.len());
+        for element in &self.elements {
+            let mut item_types = Vec::new();
+            for item in element.items() {
+                if let Some(ty) = map(item) {
+                    item_types.push(ty);
+                }
+            }
+
+            if !item_types.is_empty() {
+                element_types.push(IntersectionType::from_elements(db, item_types));
+            }
+        }
+
+        UnionType::from_elements(db, element_types)
+    }
+
+    /// Builds matched bindings for the callable wrapped by `functools.partial(...)`.
+    ///
+    /// This handles the shared partial-specific preprocessing (callable validation and argument
+    /// normalization) used by both inference and known-call evaluation.
+    pub(crate) fn functools_partial_matched_bindings<'a>(
+        db: &'db dyn Db,
+        wrapped_callable_ty: Type<'db>,
+        call_arguments: &CallArguments<'a, 'db>,
+    ) -> Option<(CallArguments<'a, 'db>, Bindings<'db>)> {
+        // We can only infer bound-argument context from an actual callable.
+        wrapped_callable_ty.try_upcast_to_callable(db)?;
+
+        let bound_call_arguments = call_arguments.functools_partial_bound_arguments(db)?;
+
+        let mut partial_bindings = wrapped_callable_ty
+            .bindings(db)
+            .match_parameters(db, &bound_call_arguments);
+        for binding in partial_bindings.iter_flat_mut() {
+            binding.clear_missing_argument_errors_for_partial_application();
+        }
+        for constructor in partial_bindings.iter_constructor_items_mut() {
+            if let Some(downstream) = constructor.downstream_constructor_mut() {
+                downstream.clear_deferred_constructor_errors_for_partial_application();
+            }
+        }
+        Some((bound_call_arguments, partial_bindings))
+    }
+
+    /// Synthesizes the precise `functools.partial(...)` type for the already-matched bindings.
+    ///
+    /// Wrapped unions and intersections keep their original callable structure by partially
+    /// applying each callable item independently. A single wrapped callable instead exposes one
+    /// reduced callable whose overload set is merged before being wrapped as `partial[...]`.
+    fn functools_partial_type<'a>(
+        &self,
+        db: &'db dyn Db,
+        wrapped_callable_ty: Type<'db>,
+        partial_overload: &mut Binding<'db>,
+        bound_call_arguments: &CallArguments<'a, 'db>,
+    ) -> Type<'db> {
+        if wrapped_callable_ty.is_union() || wrapped_callable_ty.is_intersection() {
+            return self.map_item_types(db, |partial_item| {
+                partial_item
+                    .functools_partial_callable(db, partial_overload, bound_call_arguments)
+                    .map(|callable| {
+                        callable.into_precise_functools_partial_instance(db, wrapped_callable_ty)
+                    })
+            });
+        }
+
+        let partial_callables: SmallVec<[CallableType<'db>; 1]> = self
+            .iter_callable_items()
+            .filter_map(|partial_item| {
+                partial_item.functools_partial_callable(db, partial_overload, bound_call_arguments)
+            })
+            .collect();
+
+        if partial_callables.is_empty() {
+            Type::Never
+        } else {
+            CallableTypes::from_elements(partial_callables)
+                .into_precise_functools_partial_instance(db, wrapped_callable_ty)
+        }
     }
 
     fn map_with<F>(self, f: &F) -> Self
@@ -884,7 +1006,9 @@ impl<'db> Bindings<'db> {
         call_arguments: &'a CallArguments<'a, 'db>,
         argument_index: usize,
     ) -> Type<'db> {
-        let argument_types = &call_arguments.types()[argument_index];
+        let argument_types = call_arguments
+            .argument_types(argument_index)
+            .expect("argument index should be valid");
 
         // If there is a single matching parameter, return the argument type inferred against
         // its declared type.
@@ -2418,6 +2542,14 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        Some(KnownClass::FunctoolsPartial) => {
+                            if let Some(new_return_type) =
+                                overload.functools_partial_return_type(db, call_arguments)
+                            {
+                                overload.set_return_type(new_return_type);
+                            }
+                        }
+
                         Some(KnownClass::Tuple) if overload_index == 1 => {
                             // `tuple(range(42))` => `tuple[int, ...]`
                             // BUT `tuple((1, 2))` => `tuple[Literal[1], Literal[2]]` rather than `tuple[Literal[1, 2], ...]`
@@ -2550,6 +2682,24 @@ pub(crate) struct CallableBinding<'db> {
     overloads: SmallVec<[Binding<'db>; 1]>,
 }
 
+#[derive(Copy, Clone)]
+enum FailingOverloadSelection {
+    /// Consider all errors that participate in overload filtering.
+    AffectsOverloadResolution,
+    /// Consider only errors that are reported during `functools.partial(...)` construction.
+    ReportableForPartial,
+}
+
+impl FailingOverloadSelection {
+    /// Returns whether this selection mode should count the given error.
+    fn includes(self, error: &BindingError<'_>) -> bool {
+        match self {
+            Self::AffectsOverloadResolution => error.affects_overload_resolution(),
+            Self::ReportableForPartial => error.is_relevant_for_partial_application(),
+        }
+    }
+}
+
 impl<'db> CallableBinding<'db> {
     pub(crate) fn from_overloads(
         signature_type: Type<'db>,
@@ -2582,6 +2732,8 @@ impl<'db> CallableBinding<'db> {
         }
     }
 
+    /// Rewrites overload signatures as if an implicit bound receiver argument had already been
+    /// consumed.
     pub(crate) fn bake_bound_type_into_overloads(&mut self, db: &'db dyn Db) {
         let Some(bound_self) = self.bound_type.take() else {
             return;
@@ -2589,6 +2741,139 @@ impl<'db> CallableBinding<'db> {
         for overload in &mut self.overloads {
             overload.signature = overload.signature.bind_self(db, Some(bound_self));
         }
+    }
+
+    /// Ignore missing-argument errors when constructing `functools.partial(...)`.
+    ///
+    /// Partial application intentionally leaves some parameters unbound, so we still want to
+    /// type-check all explicitly bound arguments against each overload.
+    fn clear_missing_argument_errors_for_partial_application(&mut self) {
+        for overload in &mut self.overloads {
+            overload.clear_missing_argument_errors_for_partial_application();
+        }
+    }
+
+    /// Ignore downstream constructor call-shape errors when constructing
+    /// `functools.partial(...)`.
+    ///
+    /// The merged partial signature decides which parameters remain callable, so downstream
+    /// arity/name mismatches caused by as-yet-unbound constructor parameters should not reject
+    /// partial construction. Explicit bound-argument type errors are still preserved.
+    fn clear_deferred_constructor_errors_for_partial_application(&mut self) {
+        for overload in &mut self.overloads {
+            overload.clear_deferred_constructor_errors_for_partial_application();
+        }
+    }
+
+    /// Chooses which overload to use as the source for diagnostics when no overload fully matches.
+    ///
+    /// If step 1 of overload resolution identified a single arity match, we keep using that
+    /// overload as the diagnostic source. Otherwise, we rank failing overloads by error quality:
+    /// fewer unknown-argument errors and fewer relevant errors are preferred.
+    fn best_failing_overload_index(&self, selection: FailingOverloadSelection) -> Option<usize> {
+        self.matching_overload_before_type_checking.or_else(|| {
+            self.overloads
+                .iter()
+                .enumerate()
+                .filter_map(|(index, overload)| {
+                    let mut relevant_count = 0;
+                    let mut unknown_argument_count = 0;
+
+                    for error in &overload.errors {
+                        if !selection.includes(error) {
+                            continue;
+                        }
+                        relevant_count += 1;
+                        if matches!(error, BindingError::UnknownArgument { .. }) {
+                            unknown_argument_count += 1;
+                        }
+                    }
+
+                    (relevant_count > 0).then_some((index, unknown_argument_count, relevant_count))
+                })
+                .min_by_key(|(_, unknown_argument_count, relevant_count)| {
+                    (*unknown_argument_count, *relevant_count)
+                })
+                .map(|(index, _, _)| index)
+        })
+    }
+
+    /// Returns the matching overload indexes when `functools.partial(...)` ignores errors that are
+    /// only relevant at invocation time.
+    fn matching_partial_overload_index(&self) -> MatchingOverloadIndex {
+        let mut matching_overloads = self.overloads.iter().enumerate().filter(|(_, overload)| {
+            !overload
+                .errors
+                .iter()
+                .any(BindingError::is_relevant_for_partial_application)
+        });
+        match matching_overloads.next() {
+            None => MatchingOverloadIndex::None,
+            Some((first, _)) => {
+                if let Some((second, _)) = matching_overloads.next() {
+                    let mut indexes = vec![first, second];
+                    for (index, _) in matching_overloads {
+                        indexes.push(index);
+                    }
+                    MatchingOverloadIndex::Multiple(indexes)
+                } else {
+                    MatchingOverloadIndex::Single(first)
+                }
+            }
+        }
+    }
+
+    /// Selects the reduced signature applications for this `functools.partial(...)` binding.
+    ///
+    /// Diagnostics for invalid bound arguments are still reported back to the outer `partial(...)`
+    /// overload. Callable construction happens in the callable layer after this summary is built.
+    fn partial_signature_applications<'a>(
+        &self,
+        db: &'db dyn Db,
+        partial_overload: &mut Binding<'db>,
+        bound_call_arguments: &CallArguments<'a, 'db>,
+    ) -> Option<SmallVec<[PartialSignatureApplication<'db>; 1]>> {
+        if self.overloads().is_empty() {
+            return None;
+        }
+
+        let selected_overload_indexes = match self.matching_partial_overload_index() {
+            MatchingOverloadIndex::Single(index) => vec![index],
+            MatchingOverloadIndex::Multiple(indexes) => indexes,
+            MatchingOverloadIndex::None => {
+                let source_overload_index = self
+                    .best_failing_overload_index(FailingOverloadSelection::ReportableForPartial)
+                    .unwrap_or(0);
+                let source_errors = &self.overloads()[source_overload_index].errors;
+                for error in source_errors {
+                    if error.is_relevant_for_partial_application() {
+                        let error = error.clone().maybe_apply_argument_index_offset(Some(1));
+                        if !partial_overload.errors.contains(&error) {
+                            partial_overload.errors.push(error);
+                        }
+                    }
+                }
+
+                // When no overload is compatible with the bound arguments, don't manufacture a
+                // precise reduced signature from an arbitrary overloaded callable shape.
+                if self.overloads().len() > 1 {
+                    return None;
+                }
+
+                vec![source_overload_index]
+            }
+        };
+
+        let signature_arguments = bound_call_arguments.with_self(self.bound_type);
+        let applications: SmallVec<_> = selected_overload_indexes
+            .into_iter()
+            .filter_map(|index| {
+                self.overloads().get(index).map(|overload| {
+                    overload.partial_signature_application(signature_arguments.as_ref(), db)
+                })
+            })
+            .collect();
+        (!applications.is_empty()).then_some(applications)
     }
 
     pub(crate) fn with_bound_type(mut self, bound_type: Type<'db>) -> Self {
@@ -3038,7 +3323,7 @@ impl<'db> CallableBinding<'db> {
                 let slots = overload
                     .argument_matches
                     .iter()
-                    .zip(arguments.types())
+                    .zip(arguments.iter_types())
                     .flat_map(move |(matched_argument, argument_types)| {
                         matched_argument.iter().map(
                             move |(parameter_index, variadic_argument_type)| {
@@ -4059,13 +4344,15 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument_index: usize,
         argument_type: Option<Type<'db>>,
     ) {
-        if let Some(Type::TypedDict(typed_dict)) = argument_type {
-            // Special case TypedDict because we know which keys are present.
-            for (name, field) in typed_dict.items(db) {
+        if let Some(unpacked_keys) =
+            argument_type.and_then(|ty| extract_unpacked_typed_dict_keys_from_value_type(db, ty))
+        {
+            // Special case TypedDict-shaped values because we know which keys are present.
+            for (name, unpacked_key) in unpacked_keys {
                 let _ = self.match_keyword(
                     argument_index,
                     Argument::Keywords,
-                    Some(field.declared_ty),
+                    Some(unpacked_key.value_ty),
                     name.as_str(),
                 );
             }
@@ -4237,8 +4524,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         return_ty: Type<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
     ) -> Self {
-        let parameter_count = parameter_tys.len();
-
         Self {
             db,
             signature_type,
@@ -4246,9 +4531,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             arguments,
             argument_matches,
             parameter_tys,
-            parameter_ty_builders: std::iter::repeat_with(|| None)
-                .take(parameter_count)
-                .collect(),
+            parameter_ty_builders: Vec::new(),
             call_expression_tcx,
             return_ty,
             errors,
@@ -4333,29 +4616,30 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 let return_ty =
                     return_ty.filter_disjoint_elements(self.db, tcx, self.inferable_typevars);
                 let tcx = tcx.filter_disjoint_elements(self.db, return_ty, self.inferable_typevars);
-                let set = return_ty
-                    .when_constraint_set_assignable_to(self.db, tcx, constraints)
-                    .remove_noninferable(self.db, constraints, self.inferable_typevars);
+                let path_bounds = return_ty.assignable_solutions_with_inferable(
+                    self.db,
+                    tcx,
+                    self.inferable_typevars,
+                );
 
                 // Use `solutions_with` to determine per-typevar variance from the raw
                 // lower/upper bounds on each BDD path.
                 let mut variance_map: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
                     FxHashMap::default();
-                let solutions =
-                    set.solutions_with(self.db, constraints, |typevar, variance, lower, upper| {
-                        let identity = typevar.identity(self.db);
-                        variance_map
-                            .entry(identity)
-                            .and_modify(|current| *current = current.join(variance))
-                            .or_insert(variance);
-                        PathBounds::default_solve(self.db, constraints, typevar, lower, upper)
-                    });
+                let solutions = path_bounds.solve_with(|typevar, variance, lower, upper| {
+                    let identity = typevar.identity(self.db);
+                    variance_map
+                        .entry(identity)
+                        .and_modify(|current| *current = current.join(variance))
+                        .or_insert(variance);
+                    PathBounds::default_solve(self.db, constraints, typevar, lower, upper)
+                });
 
                 let Solutions::Constrained(solutions) = solutions else {
                     return None;
                 };
 
-                let mut preferred: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
+                let mut preferred: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>> =
                     FxHashMap::default();
 
                 for solution in &solutions {
@@ -4399,13 +4683,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
                         preferred
                             .entry(identity)
-                            .and_modify(|existing| {
-                                *existing =
-                                    UnionType::from_two_elements(self.db, *existing, inferred_ty);
-                            })
-                            .or_insert(inferred_ty);
+                            .and_modify(|existing| existing.add(self.db, inferred_ty))
+                            .or_insert_with(|| UnionAccumulator::new(inferred_ty));
                     }
                 }
+
+                let preferred: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> = preferred
+                    .into_iter()
+                    .map(|(identity, accumulator)| (identity, accumulator.into_type(self.db)))
+                    .collect();
 
                 // Add preferred types to the builder so they serve as the base mapping
                 // when argument inference adds more types.
@@ -4452,50 +4738,51 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Attempt to promote any promotable types assigned to the specialization.
         // The hook receives (typevar, lower_bound, upper_bound) and returns Some(ty) to
         // override the default solution, or None to keep it.
-        let maybe_promote =
-            |typevar: BoundTypeVarInstance<'db>, lower: Type<'db>, _upper: Type<'db>| {
-                let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
+        let maybe_promote = |typevar: BoundTypeVarInstance<'db>,
+                             bounds: Option<(Type<'db>, Type<'db>)>| {
+            let (lower, _upper) = bounds?;
+            let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
 
-                // For constrained TypeVars, the inferred type is already one of the
-                // constraints. Promoting literals would produce a type that doesn't
-                // match any constraint.
-                if matches!(
-                    bound_or_constraints,
-                    Some(TypeVarBoundOrConstraints::Constraints(_))
-                ) {
-                    return None;
-                }
+            // For constrained TypeVars, the inferred type is already one of the
+            // constraints. Promoting literals would produce a type that doesn't
+            // match any constraint.
+            if matches!(
+                bound_or_constraints,
+                Some(TypeVarBoundOrConstraints::Constraints(_))
+            ) {
+                return None;
+            }
 
-                let mut variance_in_return = TypeVarVariance::Bivariant;
+            let mut variance_in_return = TypeVarVariance::Bivariant;
 
-                // Find all occurrences of the type variable in the return type.
-                self.return_ty
-                    .visit_specialization(self.db, |ty, variance| {
-                        if ty != Type::TypeVar(typevar) {
-                            return;
-                        }
-
-                        variance_in_return = variance_in_return.join(variance);
-                    });
-
-                // Promotion is only useful if the type variable is in non-covariant position
-                // in the return type.
-                if variance_in_return.is_covariant() {
-                    return None;
-                }
-
-                let promoted = lower.promote(self.db);
-
-                // If the TypeVar has an upper bound, only use the promoted type if it
-                // still satisfies the bound.
-                if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
-                    if !promoted.is_assignable_to(self.db, bound) {
-                        return None;
+            // Find all occurrences of the type variable in the return type.
+            self.return_ty
+                .visit_specialization(self.db, |ty, variance| {
+                    if ty != Type::TypeVar(typevar) {
+                        return;
                     }
-                }
 
-                Some(promoted)
-            };
+                    variance_in_return = variance_in_return.join(variance);
+                });
+
+            // Promotion is only useful if the type variable is in non-covariant position
+            // in the return type.
+            if variance_in_return.is_covariant() {
+                return None;
+            }
+
+            let promoted = lower.promote(self.db);
+
+            // If the TypeVar has an upper bound, only use the promoted type if it
+            // still satisfies the bound.
+            if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
+                if !promoted.is_assignable_to(self.db, bound) {
+                    return None;
+                }
+            }
+
+            Some(promoted)
+        };
 
         let specialization = builder.build_with(generic_context, maybe_promote);
 
@@ -4611,12 +4898,21 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
         // We still update the actual type of the parameter in this binding to match the argument,
         // even if the argument type is not assignable to the expected parameter type.
-        if let Some(builder) = &mut self.parameter_ty_builders[parameter_index] {
+        if let Some(builder) = self
+            .parameter_ty_builders
+            .get_mut(parameter_index)
+            .and_then(Option::as_mut)
+        {
             builder.add_in_place(argument_type);
         } else if let Some(existing) = self.parameter_tys[parameter_index] {
             let mut builder = UnionBuilder::new(self.db);
             builder.add_in_place(existing);
             builder.add_in_place(argument_type);
+            if self.parameter_ty_builders.is_empty() {
+                self.parameter_ty_builders = std::iter::repeat_with(|| None)
+                    .take(self.parameter_tys.len())
+                    .collect();
+            }
             self.parameter_ty_builders[parameter_index] = Some(builder);
         } else {
             self.parameter_tys[parameter_index] = Some(argument_type);
@@ -4835,7 +5131,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     );
                 } else {
                     let index = callable_binding
-                        .matching_overload_before_type_checking
+                        .best_failing_overload_index(
+                            FailingOverloadSelection::AffectsOverloadResolution,
+                        )
                         .unwrap_or(0);
                     // TODO: We should also update the specialization for the `ParamSpec` to reflect
                     // the matching overload here.
@@ -4910,11 +5208,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         argument: Argument<'a>,
         argument_type: Type<'db>,
     ) {
-        if let Type::TypedDict(typed_dict) = argument_type {
-            for (argument_type, parameter_index) in typed_dict
-                .items(self.db)
+        if let Some(unpacked_keys) =
+            extract_unpacked_typed_dict_keys_from_value_type(self.db, argument_type)
+        {
+            for (argument_type, parameter_index) in unpacked_keys
                 .values()
-                .map(|field| field.declared_ty)
+                .map(|unpacked_key| unpacked_key.value_ty)
                 .zip(&self.argument_matches[argument_index].parameters)
             {
                 self.check_argument_type(
@@ -5248,6 +5547,131 @@ impl<'db> Binding<'db> {
     /// argument was matched to that parameter.
     pub(crate) fn parameter_types(&self) -> &[Option<Type<'db>>] {
         &self.parameter_tys
+    }
+
+    /// Returns the reduced callable type exposed by this `functools.partial(...)` overload.
+    fn functools_partial_return_type<'a>(
+        &mut self,
+        db: &'db dyn Db,
+        call_arguments: &CallArguments<'a, 'db>,
+    ) -> Option<Type<'db>> {
+        // `partial(...)` receives the wrapped callable as its first explicit argument (after
+        // constructor receiver handling).
+        let func_ty = match self.parameter_types() {
+            [Some(func_ty), ..] => *func_ty,
+            _ => return None,
+        };
+        let fallback_return_type =
+            KnownClass::FunctoolsPartial.to_specialized_instance(db, &[Type::unknown()]);
+
+        let (bound_call_arguments, partial_bindings) =
+            Bindings::functools_partial_matched_bindings(db, func_ty, call_arguments)?;
+
+        // Reuse call-binding machinery to resolve which wrapped overloads are compatible with
+        // bound arguments and to surface binding diagnostics.
+        let partial_bindings = match partial_bindings.check_types(
+            db,
+            &ConstraintSetBuilder::new(),
+            &bound_call_arguments,
+            TypeContext::default(),
+            &[],
+        ) {
+            Ok(bindings) => bindings,
+            Err(CallError(_, bindings)) => *bindings,
+        };
+        let new_return_type =
+            partial_bindings.functools_partial_type(db, func_ty, self, &bound_call_arguments);
+
+        Some(if new_return_type.is_never() {
+            fallback_return_type
+        } else {
+            new_return_type
+        })
+    }
+
+    /// `functools.partial(...)` is allowed to leave required parameters unbound.
+    fn clear_missing_argument_errors_for_partial_application(&mut self) {
+        self.errors
+            .retain(|error| !matches!(error, BindingError::MissingArguments { .. }));
+    }
+
+    /// Downstream constructor validation is deferred until after partial signatures are merged.
+    fn clear_deferred_constructor_errors_for_partial_application(&mut self) {
+        self.errors.retain(|error| {
+            !matches!(
+                error,
+                BindingError::MissingArguments { .. }
+                    | BindingError::UnknownArgument { .. }
+                    | BindingError::PositionalOnlyParameterAsKwarg { .. }
+                    | BindingError::TooManyPositionalArguments { .. }
+                    | BindingError::ParameterAlreadyAssigned { .. }
+            )
+        });
+    }
+
+    /// Collects the parameter-level effects of a `functools.partial(...)` application.
+    fn partial_application(&self, arguments: &CallArguments<'_, 'db>) -> PartialApplication<'db> {
+        let parameters = self.signature.parameters().as_slice();
+        let mut partial_application = PartialApplication::new(parameters.len());
+
+        for ((argument, argument_ty), argument_matches) in
+            arguments.iter().zip(&self.argument_matches)
+        {
+            match argument {
+                Argument::Positional | Argument::Synthetic | Argument::Variadic => {
+                    for (parameter_index, _) in argument_matches.iter() {
+                        let parameter = &parameters[parameter_index];
+                        if parameter.is_positional()
+                            && parameter.annotated_type() != Type::Never
+                            && !parameter.is_variadic()
+                            && !parameter.is_keyword_variadic()
+                        {
+                            partial_application.bind_positionally(parameter_index);
+                        }
+                    }
+                }
+                Argument::Keyword(_) | Argument::Keywords => {
+                    for (parameter_index, matched_ty) in argument_matches.iter() {
+                        if partial_application.is_positionally_bound(parameter_index) {
+                            continue;
+                        }
+
+                        let parameter = &parameters[parameter_index];
+                        if parameter.is_positional_only()
+                            || parameter.is_variadic()
+                            || parameter.is_keyword_variadic()
+                        {
+                            continue;
+                        }
+
+                        partial_application.bind_by_keyword(
+                            parameter_index,
+                            (parameter.annotated_type() != Type::Never).then(|| {
+                                matched_ty.unwrap_or_else(|| {
+                                    argument_ty.get_default().unwrap_or_else(Type::unknown)
+                                })
+                            }),
+                        );
+                    }
+                }
+            }
+        }
+
+        partial_application
+    }
+
+    /// Packages the information needed to synthesize this overload's reduced partial signature.
+    fn partial_signature_application(
+        &self,
+        arguments: &CallArguments<'_, 'db>,
+        db: &'db dyn Db,
+    ) -> PartialSignatureApplication<'db> {
+        PartialSignatureApplication::new(
+            self.signature.clone(),
+            self.partial_application(arguments),
+            self.specialization,
+            self.unspecialized_return_type(db),
+        )
     }
 
     /// Returns the bound type for the specified parameter, or `None` if no argument was matched to
@@ -5705,6 +6129,27 @@ pub(crate) enum BindingError<'db> {
 }
 
 impl BindingError<'_> {
+    /// Returns whether this error is relevant to `functools.partial(...)` construction.
+    ///
+    /// These errors are used both to filter incompatible wrapped overloads and to report
+    /// statically-detectable call-shape errors at construction time. (Runtime `functools.partial`
+    /// can defer some call-shape errors until invocation.)
+    ///
+    /// For example, `partial(f, 1)` should ignore `MissingArguments` for the parameters that stay
+    /// unbound, while `partial(f, "x")` should still report `InvalidArgumentType` immediately.
+    fn is_relevant_for_partial_application(&self) -> bool {
+        matches!(
+            self,
+            Self::InvalidArgumentType { .. }
+                | Self::InvalidKeyType { .. }
+                | Self::UnknownArgument { .. }
+                | Self::PositionalOnlyParameterAsKwarg { .. }
+                | Self::TooManyPositionalArguments { .. }
+                | Self::ParameterAlreadyAssigned { .. }
+                | Self::SpecializationError { .. }
+        )
+    }
+
     pub(crate) fn maybe_apply_argument_index_offset(mut self, offset: Option<usize>) -> Self {
         if let Some(offset) = offset {
             self.apply_argument_index_offset(offset);

@@ -4,10 +4,10 @@
   suppressNotifications: ["prEditedNotification"],
   extends: ["github>astral-sh/renovate-config"],
   labels: ["internal"],
-  schedule: ["before 4am on Monday"],
+  schedule: ["before 4am on Wednesday"],
   semanticCommits: "disabled",
   separateMajorMinor: false,
-  enabledManagers: ["github-actions", "pre-commit", "cargo", "pep621", "pip_requirements", "npm"],
+  enabledManagers: ["github-actions", "pre-commit", "cargo", "pep621", "pip_requirements", "npm", "custom.regex"],
   cargo: {
     // See https://docs.renovatebot.com/configuration-options/#rangestrategy
     rangeStrategy: "update-lockfile",
@@ -87,6 +87,12 @@
       description: "Weekly update of NPM development dependencies",
     },
     {
+      groupName: "ESLint dependencies",
+      matchManagers: ["npm"],
+      matchPackageNames: ["@eslint/js", "eslint"],
+      description: "Weekly update of ESLint dependencies",
+    },
+    {
       groupName: "Monaco",
       matchManagers: ["npm"],
       matchPackageNames: ["monaco"],
@@ -97,7 +103,62 @@
       matchManagers: ["cargo"],
       matchPackageNames: ["strum", "strum_macros"],
       description: "Weekly update of strum dependencies",
-    }
+    },
+    {
+      commitMessageTopic: "MSRV",
+      matchManagers: ["custom.regex"],
+      matchDepNames: ["msrv"],
+      // We have a rolling support policy for the MSRV
+      // 2 releases back * 6 weeks per release * 7 days per week + 1
+      minimumReleaseAge: "85 days",
+      internalChecksFilter: "strict",
+      groupName: "MSRV",
+    },
+    {
+      matchManagers: ["custom.regex"],
+      matchDepNames: ["rust"],
+      commitMessageTopic: "Rust",
+    },
+    {
+      matchManagers: ["custom.regex"],
+      matchDepNames: ["maturin"],
+      commitMessageTopic: "maturin",
+    },
+  ],
+  customManagers: [
+    // Maturin version used in maturin-action
+    {
+      customType: "regex",
+      managerFilePatterns: [
+        "/.github/workflows/build-binaries\\.yml$/",
+      ],
+      matchStrings: ["maturin-version: (?<currentValue>v\\d+\\.\\d+\\.\\d+)"],
+      depNameTemplate: "maturin",
+      packageNameTemplate: "PyO3/maturin",
+      datasourceTemplate: "github-releases",
+    },
+    // Minimum supported Rust toolchain version
+    {
+      customType: "regex",
+      managerFilePatterns: ["/(^|/)Cargo\\.toml?$/"],
+      matchStrings: [
+        'rust-version\\s*=\\s*"(?<currentValue>\\d+\\.\\d+(\\.\\d+)?)"',
+      ],
+      depNameTemplate: "msrv",
+      packageNameTemplate: "rust-lang/rust",
+      datasourceTemplate: "github-releases",
+    },
+    // Rust toolchain version
+    {
+      customType: "regex",
+      managerFilePatterns: ["/(^|/)rust-toolchain\\.toml?$/"],
+      matchStrings: [
+        'channel\\s*=\\s*"(?<currentValue>\\d+\\.\\d+(\\.\\d+)?)"',
+      ],
+      depNameTemplate: "rust",
+      packageNameTemplate: "rust-lang/rust",
+      datasourceTemplate: "github-releases",
+    },
   ],
   vulnerabilityAlerts: {
     commitMessageSuffix: "",
