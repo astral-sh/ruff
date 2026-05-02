@@ -367,6 +367,18 @@ impl<'db> EnumComplement<'db> {
 
         found_member.then(|| builder.build())
     }
+
+    /// Return `true` if users can spell an equivalent type for this complement.
+    pub(crate) fn is_spellable(&self, db: &'db dyn Db) -> bool {
+        // A plain enum complement is an implementation detail for a type that users can still spell
+        // as a union of the remaining enum literals. Complements with `rest` components, such as
+        // `Color & Any & ~Literal[Color.RED]`, are not equivalent to that literal union because the
+        // additional intersection components must remain.
+        !self.has_rest()
+            && self
+                .remaining_literal_types(db)
+                .is_some_and(|literals| literals.iter().all(|literal| literal.is_spellable(db)))
+    }
 }
 
 /// Returns the set of names listed in an enum's `_ignore_` attribute.

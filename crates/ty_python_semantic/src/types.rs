@@ -1953,8 +1953,10 @@ impl<'db> Type<'db> {
             | Type::TypeVar(_)
             | Type::TypeAlias(_)
             | Type::SubclassOf(_)=> true,
-            Type::Intersection(_)
-            | Type::Divergent(_)
+            Type::Intersection(_) => self
+                .enum_complement(db)
+                .is_some_and(|complement| complement.is_spellable(db)),
+            Type::Divergent(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
             | Type::BoundMethod(_)
