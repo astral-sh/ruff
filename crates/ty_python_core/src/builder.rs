@@ -776,13 +776,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let Some(value) = value else { return };
         let target_name = &target_name_expr.id;
 
-        if !Self::can_register_narrowing_alias(value) {
+        if !self.can_register_narrowing_alias(value) {
             return;
         }
 
+        // Register any aliases referenced by this expression so chained aliases can resolve back
+        // to the original narrowing expression.
+        self.register_narrowing_alias_predicates(value);
+
         let place_table = self.current_place_table();
-        let narrowed_places =
+        let mut narrowed_places =
             PossiblyNarrowedPlacesBuilder::new(self.db, place_table).expression(value);
+        self.remove_alias_leaf_places(value, &mut narrowed_places);
+        self.add_alias_narrowed_places(value, &mut narrowed_places);
 
         // Don't register if the target itself is one of the narrowed places (e.g. `x = x is None`),
         // since the alias would be invalidated immediately by this same assignment.
@@ -824,24 +830,23 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         });
     }
 
-    fn can_register_narrowing_alias(value: &ast::Expr) -> bool {
+    fn can_register_narrowing_alias(&self, value: &ast::Expr) -> bool {
         match value {
-            // Bare names are too common to treat as alias candidates on every assignment,
-            // and doing so would noticeably degrade performance. Excluding them only means
-            // we don't infer truthiness narrowing for arbitrary chained aliases.
-            ast::Expr::Name(_) => false,
+            // Bare names are too common to treat as alias candidates on every assignment, so only
+            // use them when they already refer to a known narrowing alias.
+            ast::Expr::Name(name) => self.narrowing_aliases.contains_key(&name.id),
             ast::Expr::Compare(_) | ast::Expr::Call(_) => true,
             ast::Expr::UnaryOp(unary) if unary.op == ast::UnaryOp::Not => {
-                Self::can_register_narrowing_alias(&unary.operand)
+                self.can_register_narrowing_alias(&unary.operand)
             }
             ast::Expr::BoolOp(bool_op) => bool_op
                 .values
                 .iter()
-                .any(Self::can_register_narrowing_alias),
+                .any(|value| self.can_register_narrowing_alias(value)),
             ast::Expr::If(expr_if) => {
-                Self::can_register_narrowing_alias(&expr_if.test)
-                    || Self::can_register_narrowing_alias(&expr_if.body)
-                    || Self::can_register_narrowing_alias(&expr_if.orelse)
+                self.can_register_narrowing_alias(&expr_if.test)
+                    || self.can_register_narrowing_alias(&expr_if.body)
+                    || self.can_register_narrowing_alias(&expr_if.orelse)
             }
             _ => false,
         }
@@ -908,18 +913,52 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Add narrowed places from aliased expressions to the possibly-narrowed set.
     fn add_alias_narrowed_places(&self, expr: &ast::Expr, places: &mut PossiblyNarrowedPlaces) {
+        self.add_alias_narrowed_places_impl(expr, places, &mut FxHashSet::default());
+    }
+
+    /// Remove intermediate alias variables when expanding an alias.
+    ///
+    /// For `is_not_none = not is_none`, later rebinding `is_none` does not change the already
+    /// computed value of `is_not_none`; the useful chained-alias dependency is the original
+    /// narrowed place, not the intermediate boolean alias.
+    fn remove_alias_leaf_places(&self, expr: &ast::Expr, places: &mut PossiblyNarrowedPlaces) {
+        let place_table = self.current_place_table();
         Self::walk_narrowing_alias_predicate(expr, &mut |leaf| {
             let key = ExpressionNodeKey::from(leaf);
-            if let Some(alias_predicate) = self.alias_predicates.get(&key) {
-                let aliased_node = alias_predicate
-                    .expression
-                    .node_ref(self.db)
-                    .node(self.module);
-                let aliased_places =
-                    PossiblyNarrowedPlacesBuilder::new(self.db, self.current_place_table())
-                        .expression(aliased_node);
-                places.extend(aliased_places);
+            if self.alias_predicates.contains_key(&key)
+                && let Some(place_expr) = PlaceExpr::try_from_expr(leaf)
+                && let Some(place) = place_table.place_id((&place_expr).into())
+            {
+                places.remove(&place);
             }
+        });
+    }
+
+    fn add_alias_narrowed_places_impl(
+        &self,
+        expr: &ast::Expr,
+        places: &mut PossiblyNarrowedPlaces,
+        visited_alias_leaves: &mut FxHashSet<ExpressionNodeKey>,
+    ) {
+        Self::walk_narrowing_alias_predicate(expr, &mut |leaf| {
+            let key = ExpressionNodeKey::from(leaf);
+            if !visited_alias_leaves.insert(key) {
+                return;
+            }
+            let Some(alias_predicate) = self.alias_predicates.get(&key) else {
+                return;
+            };
+
+            let aliased_node = alias_predicate
+                .expression
+                .node_ref(self.db)
+                .node(self.module);
+            let mut aliased_places =
+                PossiblyNarrowedPlacesBuilder::new(self.db, self.current_place_table())
+                    .expression(aliased_node);
+            self.remove_alias_leaf_places(aliased_node, &mut aliased_places);
+            places.extend(aliased_places);
+            self.add_alias_narrowed_places_impl(aliased_node, places, visited_alias_leaves);
         });
     }
 
