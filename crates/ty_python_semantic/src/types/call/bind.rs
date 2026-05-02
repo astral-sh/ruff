@@ -54,11 +54,11 @@ use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral,
-    DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias, InternedConstraintSet,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext,
-    TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, list_members,
+    DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
+    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType,
+    TypeAliasType, TypeContext, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator,
+    UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -4569,6 +4569,29 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         })
     }
 
+    /// Returns argument-index mappings for arguments matched to the expanded `ParamSpec` component.
+    ///
+    /// `prefix_len` is the number of non-ParamSpec prefix parameters in a callable like
+    /// `Concatenate[Prefix, P]`. Any argument matched to a later parameter belongs to `P`. The
+    /// first item is the matched-argument index; the second is the source argument index, or `None`
+    /// for synthetic arguments such as bound `self` or `cls`.
+    ///
+    /// ```py
+    /// def wrapper[**P, R](func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R: ...
+    /// wrapper(f, 1, y="x")  # returns the indices for `1` and `y="x"`
+    /// ```
+    fn paramspec_argument_indices(&self, prefix_len: usize) -> Vec<(usize, Option<usize>)> {
+        self.enumerate_argument_types()
+            .filter_map(|(argument_index, adjusted_argument_index, _, _)| {
+                self.argument_matches[argument_index]
+                    .parameters
+                    .iter()
+                    .any(|parameter_index| *parameter_index >= prefix_len)
+                    .then_some((argument_index, adjusted_argument_index))
+            })
+            .collect()
+    }
+
     fn infer_specialization(&mut self, constraints: &ConstraintSetBuilder<'db>) {
         let Some(generic_context) = self.signature.generic_context else {
             return;
@@ -4930,17 +4953,35 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
     fn check_argument_types(&mut self, constraints: &ConstraintSetBuilder<'db>) {
         let paramspec = self.signature.parameters().as_paramspec_with_prefix();
+        let mut paramspec_evaluated = false;
 
         for (argument_index, adjusted_argument_index, argument, argument_types) in
             self.enumerate_argument_types()
         {
-            if let Some((_, paramspec)) = paramspec {
-                if self.try_paramspec_evaluation_at(constraints, argument_index, paramspec) {
-                    // Once we find an argument that matches the `ParamSpec`, we can stop checking
-                    // the remaining arguments since `ParamSpec` should always be the last
-                    // parameter.
-                    return;
+            let paramspec_component_start = if let Some((prefix, paramspec)) = paramspec {
+                if !paramspec_evaluated
+                    && self.try_paramspec_evaluation_at(constraints, argument_index, paramspec)
+                {
+                    paramspec_evaluated = true;
                 }
+
+                paramspec_evaluated.then_some(prefix.len())
+            } else {
+                None
+            };
+
+            let is_paramspec_component_parameter = |parameter_index: usize| {
+                paramspec_component_start.is_some_and(|start| parameter_index >= start)
+            };
+
+            let matched_parameters = &self.argument_matches[argument_index].parameters;
+            if paramspec_component_start.is_some()
+                && !matched_parameters.is_empty()
+                && matched_parameters
+                    .iter()
+                    .all(|parameter_index| is_paramspec_component_parameter(*parameter_index))
+            {
+                continue;
             }
 
             match argument {
@@ -4949,6 +4990,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     argument_index,
                     adjusted_argument_index,
                     argument,
+                    paramspec_component_start,
                 ),
                 Argument::Keywords => self.check_keyword_variadic_argument_type(
                     constraints,
@@ -4957,10 +4999,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     argument,
                     // Splatted arguments are inferred without type context.
                     argument_types.get_default().unwrap_or(Type::unknown()),
+                    paramspec_component_start,
                 ),
                 _ => {
                     // If the argument isn't splatted, just check its type directly.
                     for parameter_index in &self.argument_matches[argument_index].parameters {
+                        if is_paramspec_component_parameter(*parameter_index) {
+                            continue;
+                        }
+
                         let declared_type =
                             self.signature.parameters()[*parameter_index].annotated_type();
                         let argument_type = argument_types.get_for_declared_type(declared_type);
@@ -4978,7 +5025,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        if let Some((_, paramspec)) = paramspec {
+        if let Some((_, paramspec)) = paramspec
+            && !paramspec_evaluated
+        {
             // If we reach here, none of the arguments matched the `ParamSpec` parameter, but the
             // `ParamSpec` could specialize to a parameter list containing some parameters. For
             // example,
@@ -5050,10 +5099,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.evaluate_paramspec_sub_call(constraints, Some(argument_index), paramspec)
     }
 
-    /// Invoke a sub-call for the given `ParamSpec` type variable, using the remaining arguments.
+    /// Invoke a sub-call for the given `ParamSpec` type variable, using the forwarded arguments.
     ///
-    /// The remaining arguments start from `argument_index` if provided, otherwise no arguments
-    /// are passed.
+    /// The forwarded arguments are those matched to the `ParamSpec` components if
+    /// `argument_index` is provided, otherwise no arguments are passed.
     ///
     /// This method returns `false` if the specialization does not contain a mapping for the given
     /// `paramspec` or contains an invalid mapping (i.e., not a `Callable` of kind `ParamSpecValue`).
@@ -5081,20 +5130,29 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return false;
         }
 
-        let (sub_arguments, error_offset) = if let Some(argument_index) = argument_index {
-            let num_synthetic_args = self
-                .arguments
+        let (sub_arguments, error_argument_indices) = if let Some(argument_index) = argument_index {
+            let Some((prefix, _)) = self.signature.parameters().as_paramspec_with_prefix() else {
+                return false;
+            };
+            let paramspec_arguments = self.paramspec_argument_indices(prefix.len());
+            if !paramspec_arguments
                 .iter()
-                .filter(|(arg, _)| matches!(arg, Argument::Synthetic))
-                .count();
+                .any(|(paramspec_argument_index, _)| *paramspec_argument_index == argument_index)
+            {
+                return false;
+            }
+
+            let (paramspec_argument_indices, error_argument_indices): (Vec<_>, Vec<_>) =
+                paramspec_arguments.into_iter().unzip();
 
             (
-                self.arguments.start_from(argument_index),
-                Some(argument_index - num_synthetic_args),
+                self.arguments.select(&paramspec_argument_indices),
+                Some(error_argument_indices),
             )
         } else {
             (CallArguments::none(), None)
         };
+        let error_argument_indices = error_argument_indices.as_deref();
 
         // Create Bindings with all overloads and perform full overload resolution
         let callable_binding =
@@ -5117,18 +5175,21 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .single_element()
             .expect("ParamSpec sub-call should only contain a single CallableBinding");
 
+        let mut extend_errors = |errors: &[BindingError<'db>]| {
+            self.errors.extend(
+                errors
+                    .iter()
+                    .cloned()
+                    .map(|err| err.maybe_remap_argument_indices(error_argument_indices)),
+            );
+        };
+
         match callable_binding.matching_overload_index() {
             MatchingOverloadIndex::None => {
                 if let [binding] = callable_binding.overloads() {
                     // This is not an overloaded function, so we can propagate its errors to the
                     // outer bindings.
-                    self.errors.extend(
-                        binding
-                            .errors
-                            .iter()
-                            .cloned()
-                            .map(|err| err.maybe_apply_argument_index_offset(error_offset)),
-                    );
+                    extend_errors(&binding.errors);
                 } else {
                     let index = callable_binding
                         .best_failing_overload_index(
@@ -5137,41 +5198,20 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         .unwrap_or(0);
                     // TODO: We should also update the specialization for the `ParamSpec` to reflect
                     // the matching overload here.
-                    self.errors.extend(
-                        callable_binding.overloads()[index]
-                            .errors
-                            .iter()
-                            .cloned()
-                            .map(|err| err.maybe_apply_argument_index_offset(error_offset)),
-                    );
+                    extend_errors(&callable_binding.overloads()[index].errors);
                 }
             }
             MatchingOverloadIndex::Single(index) => {
                 // TODO: We should also update the specialization for the `ParamSpec` to reflect the
                 // matching overload here.
-                self.errors.extend(
-                    callable_binding.overloads()[index]
-                        .errors
-                        .iter()
-                        .cloned()
-                        .map(|err| err.maybe_apply_argument_index_offset(error_offset)),
-                );
+                extend_errors(&callable_binding.overloads()[index].errors);
             }
             MatchingOverloadIndex::Multiple(_) => {
                 if !matches!(
                     callable_binding.overload_call_return_type,
                     Some(OverloadCallReturnType::ArgumentTypeExpansion(_))
                 ) {
-                    self.errors.extend(
-                        callable_binding
-                            .overloads()
-                            .first()
-                            .unwrap()
-                            .errors
-                            .iter()
-                            .cloned()
-                            .map(|err| err.maybe_apply_argument_index_offset(error_offset)),
-                    );
+                    extend_errors(&callable_binding.overloads().first().unwrap().errors);
                 }
             }
         }
@@ -5185,10 +5225,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         argument_index: usize,
         adjusted_argument_index: Option<usize>,
         argument: Argument<'a>,
+        paramspec_component_start: Option<usize>,
     ) {
         for (parameter_index, variadic_argument_type) in
             self.argument_matches[argument_index].iter()
         {
+            if paramspec_component_start.is_some_and(|start| parameter_index >= start) {
+                continue;
+            }
+
             self.check_argument_type(
                 constraints,
                 argument_index,
@@ -5207,6 +5252,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         adjusted_argument_index: Option<usize>,
         argument: Argument<'a>,
         argument_type: Type<'db>,
+        paramspec_component_start: Option<usize>,
     ) {
         if let Some(unpacked_keys) =
             extract_unpacked_typed_dict_keys_from_value_type(self.db, argument_type)
@@ -5216,6 +5262,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 .map(|unpacked_key| unpacked_key.value_ty)
                 .zip(&self.argument_matches[argument_index].parameters)
             {
+                if paramspec_component_start.is_some_and(|start| *parameter_index >= start) {
+                    continue;
+                }
+
                 self.check_argument_type(
                     constraints,
                     argument_index,
@@ -5253,6 +5303,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             };
 
         for parameter_index in &self.argument_matches[argument_index].parameters {
+            if paramspec_component_start.is_some_and(|start| *parameter_index >= start) {
+                continue;
+            }
+
             let value_type = if let Some(value_type) = value_type_paramspec {
                 value_type
             } else {
@@ -5338,9 +5392,66 @@ impl<'db> MatchedArgument<'db> {
     }
 }
 
+/// The declared type context to use when inferring a call-site argument.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ArgumentTypeContext<'db> {
+    /// The lookup key for the inferred argument type.
+    pub(crate) declared_type: Type<'db>,
+    /// The unspecialized parameter annotation that later type checking may still request.
+    original_declared_type: Type<'db>,
+    /// The concrete type context to use while inferring the argument expression.
+    pub(crate) type_context: TypeContext<'db>,
+}
+
+impl<'db> ArgumentTypeContext<'db> {
+    /// Creates an argument type context.
+    ///
+    /// `declared_type` is the lookup key for the inferred argument type. `original_declared_type`
+    /// is the unspecialized parameter annotation that later type checking may still request.
+    fn new(
+        declared_type: Type<'db>,
+        original_declared_type: Type<'db>,
+        type_context: Type<'db>,
+    ) -> Self {
+        Self {
+            declared_type,
+            original_declared_type,
+            type_context: TypeContext::new(Some(type_context)),
+        }
+    }
+
+    /// Stores an inferred argument type under every declared-type key that can later request it.
+    ///
+    /// For a forwarded `ParamSpec` argument, the expression is inferred against the specialized
+    /// wrapped parameter but may still be looked up through the original `P.args` or `P.kwargs`
+    /// annotation during the outer wrapper call check.
+    pub(crate) fn insert_inferred_type(
+        self,
+        arguments_types: &mut CallArguments<'_, 'db>,
+        argument_index: usize,
+        inferred_ty: Type<'db>,
+    ) {
+        arguments_types.insert_type(argument_index, self.declared_type, inferred_ty);
+        if self.declared_type != self.original_declared_type {
+            arguments_types.insert_type(argument_index, self.original_declared_type, inferred_ty);
+        }
+    }
+}
+
 /// Indicates that a parameter of the given name was not found.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct UnknownParameterNameError;
+
+#[derive(Clone, Copy)]
+struct ParamSpecArgumentContext<'a, 'call, 'db> {
+    db: &'db dyn Db,
+    constraints: &'a ConstraintSetBuilder<'db>,
+    binding: &'a CallableBinding<'db>,
+    callable: CallableType<'db>,
+    arguments_types: &'a CallArguments<'call, 'db>,
+    argument_index: usize,
+    call_expression_tcx: TypeContext<'db>,
+}
 
 /// Binding information for one of the overloads of a callable.
 #[derive(Debug, Clone)]
@@ -5399,6 +5510,346 @@ impl<'db> Binding<'db> {
             parameter_tys: Box::from([]),
             errors: vec![],
         }
+    }
+
+    /// Returns the matched-argument entry for a source call argument.
+    ///
+    /// [`CallableBinding`] prepends a synthetic bound receiver before matching bound methods, while
+    /// inference still iterates over source call arguments. This method centralizes that offset.
+    fn matched_argument_for_call_argument(
+        &self,
+        binding: &CallableBinding<'db>,
+        argument_index: usize,
+    ) -> Option<&MatchedArgument<'db>> {
+        self.argument_matches
+            .get(argument_index + usize::from(binding.bound_type.is_some()))
+    }
+
+    /// Returns source argument indices whose matched parameters satisfy `matches_parameter`.
+    ///
+    /// The returned indices are relative to the original call site, excluding any synthetic bound
+    /// receiver. For example, this can select all arguments forwarded through `P.args` and
+    /// `P.kwargs` after the wrapper's prefix parameters.
+    ///
+    /// ```py
+    /// def wrapper[**P, R](func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R: ...
+    /// wrapper(f, 1, y="x")  # can select `1` and `y="x"` without including `func`
+    /// ```
+    fn call_argument_indices_matching_parameters(
+        &self,
+        binding: &CallableBinding<'db>,
+        mut matches_parameter: impl FnMut(usize) -> bool,
+    ) -> Vec<usize> {
+        let bound_argument_offset = usize::from(binding.bound_type.is_some());
+
+        self.argument_matches
+            .iter()
+            .enumerate()
+            .filter_map(|(matched_argument_index, argument_matches)| {
+                if matched_argument_index < bound_argument_offset {
+                    return None;
+                }
+
+                argument_matches
+                    .parameters
+                    .iter()
+                    .any(|parameter_index| matches_parameter(*parameter_index))
+                    .then_some(matched_argument_index - bound_argument_offset)
+            })
+            .collect()
+    }
+
+    /// Infers the callable value that a `ParamSpec` maps to for this overload.
+    ///
+    /// The wrapper's current arguments are rechecked against this single overload so that a binder
+    /// argument such as `func: Callable[P, R]` can specialize `P` before forwarded arguments are
+    /// inferred.
+    ///
+    /// ```py
+    /// def put_tags(tags: list[Tag], /) -> None: ...
+    /// def wrapper[**P, R](func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R: ...
+    /// wrapper(put_tags, [{"Key": "k", "Value": "v"}])  # infers `P` from `put_tags`
+    /// ```
+    fn inferred_paramspec_callable(
+        &self,
+        db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
+        binding: &CallableBinding<'db>,
+        paramspec: BoundTypeVarInstance<'db>,
+        arguments_types: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> Option<CallableType<'db>> {
+        let mut specialized_binding =
+            CallableBinding::from_overloads(self.signature_type, [self.signature.clone()]);
+        if let Some(bound_type) = binding.bound_type {
+            specialized_binding = specialized_binding.with_bound_type(bound_type);
+        }
+
+        // Reuse the normal binding checker to infer `P` from the arguments that have already
+        // been inferred. This avoids duplicating specialization logic here; the current
+        // `P.args`/`P.kwargs` argument is still uninferred, so it only contributes `Unknown`.
+        let mut specialized_bindings =
+            Bindings::from(specialized_binding).match_parameters(db, arguments_types);
+        let _ = specialized_bindings.check_types_impl(
+            db,
+            constraints,
+            arguments_types,
+            call_expression_tcx,
+            &[],
+        );
+
+        let Type::Callable(callable) = specialized_bindings
+            .single_element()
+            .and_then(|binding| binding.matching_overloads().exactly_one().ok())
+            .and_then(|(_, overload)| overload.specialization())
+            .and_then(|specialization| specialization.get(db, paramspec))?
+        else {
+            return None;
+        };
+
+        (callable.kind(db) == CallableTypeKind::ParamSpecValue).then_some(callable)
+    }
+
+    /// Returns the specialized wrapped-call parameter type for a forwarded argument.
+    ///
+    /// The forwarded outer arguments are first projected into a sub-call against the callable stored
+    /// in `P`. The parameter matched by `argument_index` in that sub-call becomes the context for
+    /// bidirectional inference.
+    ///
+    /// ```py
+    /// def put_object(*, TagSet: list[Tag]) -> None: ...
+    /// def wrapper[**P, R](func: Callable[P, R], /, **kwargs: P.kwargs) -> R: ...
+    /// wrapper(put_object, TagSet=[{"Key": "k", "Value": "v"}])  # context is `list[Tag]`
+    /// ```
+    fn paramspec_argument_context(
+        &self,
+        context: ParamSpecArgumentContext<'_, '_, 'db>,
+    ) -> Option<Type<'db>> {
+        let ParamSpecArgumentContext {
+            db,
+            constraints,
+            binding,
+            callable,
+            arguments_types,
+            argument_index,
+            call_expression_tcx,
+        } = context;
+        let (prefix, _) = self.signature.parameters().as_paramspec_with_prefix()?;
+        let paramspec_argument_indices = self
+            .call_argument_indices_matching_parameters(binding, |parameter_index| {
+                parameter_index >= prefix.len()
+            });
+        let sub_argument_index = paramspec_argument_indices
+            .iter()
+            .position(|paramspec_argument_index| *paramspec_argument_index == argument_index)?;
+
+        let specialized_binding = CallableBinding::from_overloads(
+            self.signature_type,
+            callable.signatures(db).iter().cloned(),
+        );
+        let sub_arguments = arguments_types.select(&paramspec_argument_indices);
+        let mut specialized_bindings =
+            Bindings::from(specialized_binding).match_parameters(db, &sub_arguments);
+        let _ = specialized_bindings.check_types_impl(
+            db,
+            constraints,
+            &sub_arguments,
+            call_expression_tcx,
+            &[],
+        );
+
+        let specialized_binding = specialized_bindings.single_element()?;
+        let (_, specialized_overload) = specialized_binding
+            .matching_overloads()
+            .exactly_one()
+            .ok()?;
+        let [specialized_parameter_index] = specialized_overload
+            .argument_matches()
+            .get(sub_argument_index)?
+            .parameters
+            .as_slice()
+        else {
+            return None;
+        };
+
+        let parameter_type = specialized_overload.signature.parameters()
+            [*specialized_parameter_index]
+            .annotated_type();
+        // A context like `list[Unknown]` or `list[T@g]` is worse than no context here:
+        // it can erase the concrete literal type that should later specialize the wrapped
+        // callable. Check the parameter before applying the sub-call specialization so an
+        // earlier forwarded argument cannot turn `list[T@g]` into apparently-safe `list[int]`.
+        if parameter_type.has_dynamic(db) || parameter_type.has_typevar_or_typevar_instance(db) {
+            return None;
+        }
+
+        let parameter_type = specialized_overload
+            .specialization()
+            .map_or(parameter_type, |specialization| {
+                parameter_type.apply_specialization(db, specialization)
+            });
+
+        (!parameter_type.has_dynamic(db) && !parameter_type.has_typevar_or_typevar_instance(db))
+            .then_some(parameter_type)
+    }
+
+    /// Returns the wrapper parameter type that can bind the `ParamSpec` used by forwarded arguments.
+    ///
+    /// This is used before normal source-order inference so a keyword forwarded through `P.kwargs`
+    /// can still use a later binder argument such as `func=put_object`.
+    ///
+    /// ```py
+    /// def put_object(*, TagSet: list[Tag]) -> None: ...
+    /// def wrapper[**P, R](func: Callable[P, R], **kwargs: P.kwargs) -> R: ...
+    /// wrapper(TagSet=[{"Key": "k", "Value": "v"}], func=put_object)
+    /// ```
+    pub(crate) fn paramspec_binder_parameter_type(
+        &self,
+        db: &'db dyn Db,
+        binding: &CallableBinding<'db>,
+        argument_index: usize,
+    ) -> Option<Type<'db>> {
+        let (prefix, paramspec) = self.signature.parameters().as_paramspec_with_prefix()?;
+        let [parameter_index] = self
+            .matched_argument_for_call_argument(binding, argument_index)?
+            .parameters
+            .as_slice()
+        else {
+            return None;
+        };
+
+        if *parameter_index >= prefix.len() {
+            return None;
+        }
+
+        let parameter_type = self.signature.parameters()[*parameter_index].annotated_type();
+        parameter_type
+            .references_typevar(db, paramspec.typevar(db).identity(db))
+            .then_some(parameter_type)
+    }
+
+    /// Returns the type context to use for bidirectional inference of a source call argument.
+    ///
+    /// This covers the normal parameter annotation path, generic return-context specialization, and
+    /// the `ParamSpec` forwarding path where a wrapper argument receives context from the wrapped
+    /// callable's parameter.
+    ///
+    /// ```py
+    /// def put_tags(tags: list[Tag], /) -> None: ...
+    /// def wrapper[**P, R](func: Callable[P, R], /, *args: P.args) -> R: ...
+    /// wrapper(put_tags, [{"Key": "k", "Value": "v"}])  # forwarded list gets `list[Tag]`
+    /// ```
+    pub(crate) fn argument_type_context(
+        &self,
+        db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
+        binding: &CallableBinding<'db>,
+        arguments_types: &CallArguments<'_, 'db>,
+        argument_index: usize,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> Option<ArgumentTypeContext<'db>> {
+        let argument_matches = self.matched_argument_for_call_argument(binding, argument_index)?;
+        let [parameter_index] = argument_matches.parameters.as_slice() else {
+            return None;
+        };
+
+        let parameter = &self.signature.parameters()[*parameter_index];
+        let mut parameter_type = parameter.annotated_type();
+        let original_parameter_type = parameter_type;
+
+        // If the parameter is a single non-ParamSpec type variable with an upper bound,
+        // e.g., `typing.Self`, use the upper bound as type context. ParamSpec components
+        // need to reach generic call specialization below, where earlier arguments can
+        // specialize the full `ParamSpec`.
+        if let Type::TypeVar(typevar) = parameter_type
+            && !typevar.is_paramspec(db)
+            && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
+                typevar.typevar(db).bound_or_constraints(db)
+        {
+            return Some(ArgumentTypeContext::new(
+                original_parameter_type,
+                original_parameter_type,
+                bound,
+            ));
+        }
+
+        // If this is a generic call, attempt to specialize the parameter type using the
+        // declared type context, propagating the declared types of any type variables.
+        if let Some(generic_context) = self.signature.generic_context {
+            let mut builder =
+                SpecializationBuilder::new(db, constraints, generic_context.inferable_typevars(db));
+
+            if let Some(declared_return_ty) = call_expression_tcx.annotation {
+                let return_ty = self
+                    .normalized_constructor_return(db)
+                    .unwrap_or(self.signature.return_ty);
+
+                let _ = builder.infer(declared_return_ty, return_ty);
+            }
+
+            let paramspec = if let Type::TypeVar(typevar) = original_parameter_type
+                && typevar.is_paramspec(db)
+                && typevar.paramspec_attr(db).is_some()
+            {
+                Some(typevar.without_paramspec_attr(db))
+            } else {
+                None
+            };
+
+            // Default specialize any type variables to a marker type, which will be ignored
+            // during argument inference, allowing the concrete subset of the parameter
+            // type to still affect argument inference.
+            //
+            // TODO: Eventually, we want to "tie together" the typevars of the two calls
+            // so that we can infer their specializations at the same time — or at least, for
+            // the specialization of one to influence the specialization of the other. It's
+            // not yet clear how we're going to do that. (We might have to start inferring
+            // constraint sets for each expression, instead of simple types?)
+            let specialization = builder.build_with(generic_context, |_, bounds| {
+                if bounds.is_none() {
+                    Some(Type::Dynamic(DynamicType::UnspecializedTypeVar))
+                } else {
+                    None
+                }
+            });
+
+            // A `P.args`/`P.kwargs` parameter has a useful context only after another
+            // argument, usually a `Callable[P, R]`, specializes `P`.
+            if let Some(paramspec) = paramspec
+                && let Some(callable) = self.inferred_paramspec_callable(
+                    db,
+                    constraints,
+                    binding,
+                    paramspec,
+                    arguments_types,
+                    call_expression_tcx,
+                )
+                && let Some(specialized_parameter_type) =
+                    self.paramspec_argument_context(ParamSpecArgumentContext {
+                        db,
+                        constraints,
+                        binding,
+                        callable,
+                        arguments_types,
+                        argument_index,
+                        call_expression_tcx,
+                    })
+            {
+                return Some(ArgumentTypeContext::new(
+                    specialized_parameter_type,
+                    original_parameter_type,
+                    specialized_parameter_type,
+                ));
+            }
+
+            parameter_type = parameter_type.apply_specialization(db, specialization);
+        }
+
+        Some(ArgumentTypeContext::new(
+            original_parameter_type,
+            original_parameter_type,
+            parameter_type,
+        ))
     }
 
     fn replace_callable_type(&mut self, before: Type<'db>, after: Type<'db>) {
@@ -6157,13 +6608,36 @@ impl BindingError<'_> {
         self
     }
 
-    /// Applies the given offset to the argument indices in this error, if any.
+    /// Remaps any argument index in this error when a remapping table is available.
     ///
-    /// This is mainly used to adjust error argument indices for errors that were generated in a
-    /// sub-call for a `ParamSpec`, where the argument indices are relative to the sub-call's
-    /// argument list rather than the original call's argument list. The `offset` should be the
-    /// number of arguments in the original call that were matched before the `ParamSpec` component.
-    pub(crate) fn apply_argument_index_offset(&mut self, offset: usize) {
+    /// This is used when propagating errors from a synthetic sub-call back to the original call.
+    /// Each sub-call argument index is looked up in `argument_indices`; `None` means the error
+    /// should be reported on the whole call expression.
+    fn maybe_remap_argument_indices(mut self, argument_indices: Option<&[Option<usize>]>) -> Self {
+        if let Some(argument_indices) = argument_indices {
+            self.map_argument_indices(|argument_index| {
+                argument_index
+                    .and_then(|index| argument_indices.get(index).copied())
+                    .flatten()
+            });
+        }
+        self
+    }
+
+    /// Rewrites every stored argument index with the provided mapping function.
+    ///
+    /// This supports both simple offsets and sparse sub-call remapping. For a forwarded `ParamSpec`
+    /// call, the sub-call only contains the arguments supplied to `P`. An error at sub-call
+    /// argument `0` might therefore refer to outer-call argument `1`:
+    ///
+    /// ```py
+    /// def wrapper[**P, R](func: Callable[P, R], /, *args: P.args) -> R: ...
+    /// wrapper(func, "bad")  # sub-call index 0 maps back to the outer `"bad"` argument
+    /// ```
+    fn map_argument_indices(&mut self, mut map: impl FnMut(Option<usize>) -> Option<usize>) {
+        let mut remap = |argument_index: &mut Option<usize>| {
+            *argument_index = map(*argument_index);
+        };
         match self {
             BindingError::InvalidArgumentType { argument_index, .. }
             | BindingError::InvalidKeyType { argument_index, .. }
@@ -6171,18 +6645,14 @@ impl BindingError<'_> {
             | BindingError::PositionalOnlyParameterAsKwarg { argument_index, .. }
             | BindingError::ParameterAlreadyAssigned { argument_index, .. }
             | BindingError::SpecializationError { argument_index, .. } => {
-                if let Some(argument_index) = argument_index {
-                    *argument_index += offset;
-                }
+                remap(argument_index);
             }
 
             BindingError::TooManyPositionalArguments {
                 first_excess_argument_index,
                 ..
             } => {
-                if let Some(first_excess_argument_index) = first_excess_argument_index {
-                    *first_excess_argument_index += offset;
-                }
+                remap(first_excess_argument_index);
             }
 
             BindingError::CalledTopCallable(..)
@@ -6193,6 +6663,16 @@ impl BindingError<'_> {
             | BindingError::PropertyHasNoSetter(..)
             | BindingError::PropertyHasNoDeleter(..) => {}
         }
+    }
+
+    /// Applies the given offset to the argument indices in this error, if any.
+    ///
+    /// This is mainly used to adjust error argument indices for errors that were generated in a
+    /// sub-call for a `ParamSpec`, where the argument indices are relative to the sub-call's
+    /// argument list rather than the original call's argument list. The `offset` should be the
+    /// number of arguments in the original call that were matched before the `ParamSpec` component.
+    pub(crate) fn apply_argument_index_offset(&mut self, offset: usize) {
+        self.map_argument_indices(|argument_index| argument_index.map(|index| index + offset));
     }
 }
 

@@ -207,6 +207,24 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         self.items.get(index).map(|item| &item.types)
     }
 
+    /// Insert an inferred type for the argument at `index` under the given type context.
+    ///
+    /// This is useful when argument inference is driven from outside the argument iterator, for
+    /// example when a wrapper call first infers a context for an earlier ParamSpec-binding
+    /// argument and then stores that result back on the original call argument.
+    pub(crate) fn insert_type(
+        &mut self,
+        index: usize,
+        tcx: impl Into<TypeContext<'db>>,
+        ty: Type<'db>,
+    ) {
+        self.items
+            .get_mut(index)
+            .expect("argument index should be valid")
+            .types
+            .insert(tcx, ty);
+    }
+
     pub(crate) fn iter_types(&self) -> impl Iterator<Item = &CallArgumentTypes<'db>> + '_ {
         self.items.iter().map(|item| &item.types)
     }
@@ -246,6 +264,24 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     pub(crate) fn start_from(&self, index: usize) -> Self {
         Self {
             items: self.items[index..].to_vec(),
+        }
+    }
+
+    /// Create a new [`CallArguments`] containing only the arguments at the specified indices.
+    ///
+    /// The resulting argument list preserves the order of `indices`. This is used to turn the
+    /// subset of forwarded outer arguments into the argument list for a synthetic sub-call:
+    ///
+    /// ```py
+    /// def wrapper[**P, R](func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R: ...
+    /// wrapper(f, 1, y="x")  # select the `1` and `y="x"` arguments for the call to `f`
+    /// ```
+    pub(crate) fn select(&self, indices: &[usize]) -> Self {
+        Self {
+            items: indices
+                .iter()
+                .map(|index| self.items[*index].clone())
+                .collect(),
         }
     }
 
