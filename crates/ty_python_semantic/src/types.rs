@@ -1330,6 +1330,7 @@ impl<'db> Type<'db> {
         )
     }
 
+    #[cfg_attr(not(test), expect(dead_code))] // Used by type tests and useful for gradual-type fast paths.
     pub(crate) fn has_dynamic(self, db: &'db dyn Db) -> bool {
         any_over_type(db, self, false, |ty| ty.is_dynamic())
     }

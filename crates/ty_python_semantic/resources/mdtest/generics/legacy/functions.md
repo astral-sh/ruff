@@ -955,6 +955,22 @@ reveal_type(flatten_covariant(b"abc"))  # revealed: tuple[int, ...]
 reveal_type(flatten_covariant(b"abc", ("x",)))  # revealed: tuple[int | Literal["x"], ...]
 ```
 
+## Inferring bounded typevars through iterable protocols
+
+```py
+from typing import Iterable, TypeVar
+
+S = TypeVar("S", bound=str | bytes)
+T = TypeVar("T", bound=str | bytes)
+
+def collect(items: Iterable[T]) -> list[T]:
+    return list(items)
+
+def test(items: list[S]) -> None:
+    reveal_type(collect(items))  # revealed: list[S@test]
+    bad: list[str] | list[bytes] = collect(items)  # error: [invalid-assignment]
+```
+
 ## Inferring typevars in intersections (formal type position)
 
 ```py

@@ -23,6 +23,35 @@ from overloaded import f
 f("a")  # error: [invalid-argument-type]
 ```
 
+## Bound method overloads preserve original positions
+
+When binding `Base().f`, the first overload is filtered out because its `self` parameter only
+accepts `Other`. The remaining overloads keep their original source indexes so diagnostics can point
+at the matching declaration and list the original non-matching overloads correctly.
+
+```py
+from typing import overload
+
+class Other:
+    pass
+
+class Base:
+    @overload
+    def f(self: Other, x: bytes) -> bytes: ...
+    @overload
+    def f(self, x: int) -> int: ...
+    @overload
+    def f(self, x: str, y: int) -> str: ...
+    def f(
+        self,
+        x: bytes | int | str,
+        y: int = 0,
+    ) -> bytes | int | str:
+        return x
+
+Base().f("ok", "bad")  # error: [invalid-argument-type]
+```
+
 ## Call to function with too many unmatched overloads
 
 This has an excessive number of overloads to the point that ty will cut off the list in the
