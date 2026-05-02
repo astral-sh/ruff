@@ -153,7 +153,7 @@ pub enum PatternPredicateKind<'db> {
     Or(Vec<PatternPredicateKind<'db>>),
     Class(Expression<'db>, ClassPatternKind),
     Mapping(ClassPatternKind),
-    Sequence(ClassPatternKind),
+    Sequence(ClassPatternKind, Vec<PatternPredicateKind<'db>>),
     As(Option<Box<PatternPredicateKind<'db>>>, Option<Name>),
     Unsupported,
 }

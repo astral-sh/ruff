@@ -34,6 +34,7 @@ use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 use std::collections::hash_map::Entry;
 
+use super::tuple::TupleSpec;
 /// Return the type constraint that `test` (if true) would place on `symbol`, if any.
 ///
 /// For example, if we have this code:
@@ -745,8 +746,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::Mapping(kind) => {
                 self.evaluate_match_pattern_mapping(subject, *kind, is_positive)
             }
-            PatternPredicateKind::Sequence(kind) => {
-                self.evaluate_match_pattern_sequence(subject, *kind, is_positive)
+            PatternPredicateKind::Sequence(kind, element_patterns) => {
+                self.evaluate_match_pattern_sequence(subject, *kind, element_patterns, is_positive)
             }
             PatternPredicateKind::Value(expr) => {
                 self.evaluate_match_pattern_value(subject, *expr, is_positive)
@@ -1767,8 +1768,16 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         subject: Expression<'db>,
         kind: ClassPatternKind,
+        element_patterns: &[PatternPredicateKind<'db>],
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
+        if is_positive
+            && let Some(constraints) =
+                self.evaluate_match_pattern_sequence_elements(subject, element_patterns)
+        {
+            return Some(constraints);
+        }
+
         if !kind.is_irrefutable() && !is_positive {
             return None;
         }
@@ -1865,6 +1874,38 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 merge_constraints(&mut constraints, constraints_);
                 constraints
             })
+    }
+
+    /// Evaluate a sequence pattern like `case (x, y, z):` or `case [a, b]:`.
+    ///
+    /// For each element pattern, we narrow the corresponding element of the tuple subject.
+    fn evaluate_match_pattern_sequence_elements(
+        &mut self,
+        subject: Expression<'db>,
+        element_patterns: &[PatternPredicateKind<'db>],
+    ) -> Option<NarrowingConstraints<'db>> {
+        // Get the subject expression's place.
+        let place_expr = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
+        let place = self.expect_place(&place_expr);
+
+        // Get the subject's type.
+        let subject_ty = infer_same_file_expression_type(self.db, subject, TypeContext::default());
+
+        // If no element pattern provides narrowing constraints (e.g., all wildcards),
+        // don't narrow.
+        if !has_any_narrowing_constraint(element_patterns) {
+            return None;
+        }
+
+        let narrowed_tuple = self.narrow_tuple_by_sequence_pattern(subject_ty, element_patterns)?;
+        if narrowed_tuple == subject_ty {
+            return None;
+        }
+
+        Some(NarrowingConstraints::from_iter([(
+            place,
+            NarrowingConstraint::replacement(narrowed_tuple),
+        )]))
     }
 
     fn evaluate_bool_op(
@@ -2060,6 +2101,253 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         } else {
             None
         }
+    }
+
+    /// Narrow a type by applying a match-pattern predicate directly to the type itself.
+    ///
+    /// Returns `None` when the pattern doesn't constrain the type.
+    fn narrow_type_by_pattern_kind(
+        &mut self,
+        subject_ty: Type<'db>,
+        pattern: &PatternPredicateKind<'db>,
+        is_positive: bool,
+    ) -> Option<Type<'db>> {
+        let narrowed_ty = match pattern {
+            PatternPredicateKind::Singleton(singleton) => {
+                let singleton_ty = match singleton {
+                    ast::Singleton::None => Type::none(self.db),
+                    ast::Singleton::True => Type::bool_literal(true),
+                    ast::Singleton::False => Type::bool_literal(false),
+                };
+                IntersectionBuilder::new(self.db)
+                    .add_positive(subject_ty)
+                    .add_positive(singleton_ty.negate_if(self.db, !is_positive))
+                    .build()
+            }
+            PatternPredicateKind::Class(cls, kind) => {
+                if !kind.is_irrefutable() && !is_positive {
+                    // A non-irrefutable class pattern can't safely exclude class instances.
+                    return None;
+                }
+
+                let class_type =
+                    infer_same_file_expression_type(self.db, *cls, TypeContext::default());
+                let narrowed_class = match class_type {
+                    Type::ClassLiteral(class) => {
+                        Type::instance(self.db, class.top_materialization(self.db))
+                            .negate_if(self.db, !is_positive)
+                    }
+                    dynamic @ Type::Dynamic(_) => dynamic,
+                    _ => return None,
+                };
+
+                IntersectionBuilder::new(self.db)
+                    .add_positive(subject_ty)
+                    .add_positive(narrowed_class)
+                    .build()
+            }
+            PatternPredicateKind::Value(expr) => {
+                let value_ty =
+                    infer_same_file_expression_type(self.db, *expr, TypeContext::default());
+                let constraint_ty = self.evaluate_expr_compare_op(
+                    subject_ty,
+                    value_ty,
+                    ast::CmpOp::Eq,
+                    is_positive,
+                )?;
+                IntersectionBuilder::new(self.db)
+                    .add_positive(subject_ty)
+                    .add_positive(constraint_ty)
+                    .build()
+            }
+            PatternPredicateKind::Or(alternatives) => {
+                if is_positive {
+                    UnionType::from_elements(
+                        self.db,
+                        alternatives.iter().map(|alternative| {
+                            self.narrow_type_by_pattern_kind(subject_ty, alternative, is_positive)
+                                .unwrap_or(subject_ty)
+                        }),
+                    )
+                } else {
+                    let mut narrowed = subject_ty;
+                    for alternative in alternatives {
+                        if let Some(alternative_narrowed) =
+                            self.narrow_type_by_pattern_kind(narrowed, alternative, is_positive)
+                        {
+                            narrowed = alternative_narrowed;
+                        }
+                    }
+                    narrowed
+                }
+            }
+            PatternPredicateKind::As(pattern, _) => {
+                return pattern.as_deref().and_then(|inner| {
+                    self.narrow_type_by_pattern_kind(subject_ty, inner, is_positive)
+                });
+            }
+            PatternPredicateKind::Sequence(_, element_patterns) => {
+                if !is_positive {
+                    // TODO: support negative narrowing for sequences.
+                    return None;
+                }
+                self.narrow_tuple_by_sequence_pattern(subject_ty, element_patterns)?
+            }
+            PatternPredicateKind::Mapping(kind) => {
+                if !kind.is_irrefutable() && !is_positive {
+                    return None;
+                }
+                let mapping_ty = KnownClass::Mapping
+                    .to_instance(self.db)
+                    .negate_if(self.db, !is_positive);
+                IntersectionBuilder::new(self.db)
+                    .add_positive(subject_ty)
+                    .add_positive(mapping_ty)
+                    .build()
+            }
+            PatternPredicateKind::Unsupported => return None,
+        };
+
+        (narrowed_ty != subject_ty).then_some(narrowed_ty)
+    }
+
+    /// Narrow a type by applying a sequence pattern's element-wise constraints.
+    ///
+    /// Returns `None` if the subject type is not a tuple (or union of tuples),
+    /// meaning the pattern cannot narrow it.
+    ///
+    /// Handles union subjects by decomposing, narrowing each element, and
+    /// reconstructing the union.
+    fn narrow_tuple_by_sequence_pattern(
+        &mut self,
+        subject_ty: Type<'db>,
+        element_patterns: &[PatternPredicateKind<'db>],
+    ) -> Option<Type<'db>> {
+        match subject_ty {
+            Type::Union(union) => {
+                let narrowed: Vec<_> = union
+                    .elements(self.db)
+                    .iter()
+                    .map(|element| {
+                        // `None` means "can't narrow this element" — keep it as-is.
+                        // Elements that definitely don't match should return `Never`,
+                        // which will automatically drop out of the union.
+                        self.narrow_tuple_by_sequence_pattern(*element, element_patterns)
+                            .unwrap_or(*element)
+                    })
+                    .collect();
+                Some(UnionType::from_elements(self.db, narrowed))
+            }
+            Type::TypeAlias(alias) => {
+                self.narrow_tuple_by_sequence_pattern(alias.value_type(self.db), element_patterns)
+            }
+            Type::NominalInstance(instance) => {
+                let tuple_spec = instance.tuple_spec(self.db)?;
+                Some(self.narrow_tuple_spec_by_sequence_pattern(&tuple_spec, element_patterns))
+            }
+            _ => None,
+        }
+    }
+
+    /// Narrow a tuple spec by applying element-wise sequence pattern constraints.
+    ///
+    /// Returns `Type::Never` if the tuple can never match the pattern (e.g. wrong length).
+    fn narrow_tuple_spec_by_sequence_pattern(
+        &mut self,
+        tuple_spec: &TupleSpec<'db>,
+        element_patterns: &[PatternPredicateKind<'db>],
+    ) -> Type<'db> {
+        let narrowed_elements: Vec<Type<'db>> = match tuple_spec {
+            TupleSpec::Fixed(fixed) => {
+                // A fixed-length tuple with the wrong length can never match.
+                if fixed.len() != element_patterns.len() {
+                    return Type::Never;
+                }
+
+                let elements = fixed.all_elements();
+
+                // Narrow each element based on its pattern.
+                elements
+                    .iter()
+                    .zip(element_patterns.iter())
+                    .map(|(element_ty, pattern)| {
+                        self.narrow_tuple_element_by_pattern(*element_ty, pattern)
+                    })
+                    .collect()
+            }
+            TupleSpec::Variable(variable) => {
+                // For variable-length tuples like `tuple[int | str, ...]`, a pattern like
+                // `(x, str())` narrows to a fixed-length tuple with the pattern's length.
+                //
+                // The tuple structure is: prefix + variable* + suffix.
+                let pattern_len = element_patterns.len();
+                let prefix_elements = variable.prefix_elements();
+                let suffix_elements = variable.suffix_elements();
+                let prefix_len = prefix_elements.len();
+                let suffix_len = suffix_elements.len();
+
+                // A variable-length tuple can't match if the pattern is shorter than
+                // the fixed prefix + suffix.
+                if pattern_len < prefix_len + suffix_len {
+                    return Type::Never;
+                }
+
+                // Build element types for a fixed-length tuple matching the pattern.
+                element_patterns
+                    .iter()
+                    .enumerate()
+                    .map(|(i, pattern)| {
+                        // Determine which part of the tuple this element comes from.
+                        let element_ty = if i < prefix_len {
+                            prefix_elements[i]
+                        } else if i >= pattern_len - suffix_len {
+                            suffix_elements[i - (pattern_len - suffix_len)]
+                        } else {
+                            variable.variable()
+                        };
+
+                        self.narrow_tuple_element_by_pattern(element_ty, pattern)
+                    })
+                    .collect()
+            }
+        };
+
+        Type::heterogeneous_tuple(self.db, narrowed_elements)
+    }
+
+    /// Narrow a single tuple element type by a pattern.
+    fn narrow_tuple_element_by_pattern(
+        &mut self,
+        element_ty: Type<'db>,
+        pattern: &PatternPredicateKind<'db>,
+    ) -> Type<'db> {
+        self.narrow_type_by_pattern_kind(element_ty, pattern, true)
+            .unwrap_or(element_ty)
+    }
+}
+
+/// Returns `true` if any element pattern provides a narrowing constraint.
+fn has_any_narrowing_constraint(patterns: &[PatternPredicateKind]) -> bool {
+    patterns.iter().any(pattern_has_narrowing_constraint)
+}
+
+/// Returns `true` if a single pattern provides a narrowing constraint.
+fn pattern_has_narrowing_constraint(pattern: &PatternPredicateKind) -> bool {
+    match pattern {
+        PatternPredicateKind::Singleton(_)
+        | PatternPredicateKind::Class(_, _)
+        | PatternPredicateKind::Mapping(_)
+        | PatternPredicateKind::Value(_) => true,
+        PatternPredicateKind::Sequence(_, sub_patterns) => {
+            has_any_narrowing_constraint(sub_patterns)
+        }
+        PatternPredicateKind::Or(alternatives) => alternatives
+            .iter()
+            .any(|p| pattern_has_narrowing_constraint(p)),
+        PatternPredicateKind::As(inner, _) => inner
+            .as_deref()
+            .is_some_and(|p| pattern_has_narrowing_constraint(p)),
+        PatternPredicateKind::Unsupported => false,
     }
 }
 
