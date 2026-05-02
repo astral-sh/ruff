@@ -5950,6 +5950,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             item_types
                 .get(&elt.node_index().load())
                 .copied()
+                .or_else(|| builder.try_expression_type(elt))
                 .unwrap_or_else(|| builder.infer_expression(elt, tcx))
         };
 
@@ -6943,9 +6944,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         arguments: &'a ast::Arguments,
     ) -> CallArguments<'a, 'db> {
-        let call_arguments =
-            CallArguments::from_arguments(arguments, |arg_or_keyword, splatted_value| {
-                let ty = self.infer_expression(splatted_value, TypeContext::default());
+        let call_arguments = CallArguments::from_arguments(
+            arguments,
+            |arg_or_keyword, splatted_value| {
+                let ty = if matches!(arg_or_keyword, ast::ArgOrKeyword::Keyword(keyword) if keyword.arg.is_none())
+                    && splatted_value.is_dict_expr()
+                    && self
+                        .try_expression_type(splatted_value)
+                        .is_some_and(|ty| ty.is_unknown())
+                {
+                    self.expressions.remove(&splatted_value.into());
+                    if let Some(expression_cache) = &self.expression_cache {
+                        expression_cache
+                            .borrow_mut()
+                            .remove(&(splatted_value.into(), TypeContext::default()));
+                    }
+                    self.infer_expression(splatted_value, TypeContext::default())
+                } else {
+                    self.get_or_infer_expression(splatted_value, TypeContext::default())
+                };
                 if let ast::ArgOrKeyword::Arg(argument) = arg_or_keyword
                     && argument.is_starred_expr()
                 {
@@ -6955,7 +6972,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 ty
-            });
+            },
+        );
 
         for arg in &arguments.args {
             if let ast::Expr::Starred(ast::ExprStarred { value, .. }) = arg {
@@ -7087,11 +7105,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return self.infer_typeddict_call_expression(call_expression, None);
         }
 
-        // We don't call `Type::try_call`, because we want to perform type inference on the
-        // arguments after matching them to parameters, but before checking that the argument types
-        // are assignable to any parameter annotations.
-        let mut call_arguments = self.prepare_call_arguments(arguments);
-
         if callable_type.is_notimplemented(self.db()) {
             if let Some(builder) = self
                 .context
@@ -7109,6 +7122,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             return Type::unknown();
         }
+
+        let class = match callable_type {
+            Type::ClassLiteral(class) => Some(ClassType::NonGeneric(class)),
+            Type::GenericAlias(generic) => Some(ClassType::Generic(generic)),
+            Type::SubclassOf(subclass) => subclass.subclass_of().into_class(self.db()),
+            _ => None,
+        };
+
+        // Prepare `TypedDict` constructor calls before variadic argument setup so field-directed
+        // value inference becomes canonical before `**kwargs` expressions are inferred.
+        let has_prepared_typed_dict_constructor = class
+            .filter(|class| class.is_typed_dict(self.db()))
+            .map(|class| {
+                let typed_dict = TypedDictType::new(class);
+                let form = TypedDictConstructorForm::from_arguments(arguments);
+                self.prepare_typed_dict_constructor(
+                    typed_dict,
+                    form,
+                    arguments,
+                    func.as_ref().into(),
+                );
+            })
+            .is_some();
+
+        // We don't call `Type::try_call`, because we want to perform type inference on the
+        // arguments after matching them to parameters, but before checking that the argument types
+        // are assignable to any parameter annotations.
+        let mut call_arguments = self.prepare_call_arguments(arguments);
 
         // Special handling for `TypedDict` method calls
         if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
@@ -7228,13 +7269,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => {}
         }
 
-        let class = match callable_type {
-            Type::ClassLiteral(class) => Some(ClassType::NonGeneric(class)),
-            Type::GenericAlias(generic) => Some(ClassType::Generic(generic)),
-            Type::SubclassOf(subclass) => subclass.subclass_of().into_class(self.db()),
-            _ => None,
-        };
-
         if let Some(class) = class {
             // It might look odd here that we emit an error for class-literals and generic aliases but not
             // `type[]` types. But it's deliberate! The typing spec explicitly mandates that `type[]` types
@@ -7310,22 +7344,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             call_expression,
             &bindings,
         );
-
-        // Prepare `TypedDict` constructor calls before general argument inference so the field
-        // type context becomes the canonical inference for constructor values.
-        let has_prepared_typed_dict_constructor = class
-            .filter(|class| class.is_typed_dict(self.db()))
-            .map(|class| {
-                let typed_dict = TypedDictType::new(class);
-                let form = TypedDictConstructorForm::from_arguments(arguments);
-                self.prepare_typed_dict_constructor(
-                    typed_dict,
-                    form,
-                    arguments,
-                    func.as_ref().into(),
-                );
-            })
-            .is_some();
 
         let bindings_result = self.infer_and_check_argument_types(
             ArgumentsIter::from_ast(arguments),
