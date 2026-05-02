@@ -3,8 +3,11 @@ use std::fmt::Write;
 use crate::{
     Db,
     types::{
-        GenericContext, Type, definition_expression_type,
-        display::qualified_name_components_from_scope, generics::Specialization, visitor,
+        ApplyTypeMappingVisitor, GenericContext, Type, TypeContext, TypeMapping,
+        definition_expression_type,
+        display::qualified_name_components_from_scope,
+        generics::{ApplySpecialization, Specialization},
+        visitor,
     },
 };
 use ty_python_core::{
@@ -60,7 +63,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub(super) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
         let module = parsed_module(db, scope.file(db)).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
@@ -74,7 +77,22 @@ impl<'db> PEP695TypeAliasType<'db> {
             let specialization = self
                 .specialization(db)
                 .unwrap_or_else(|| generic_context.default_specialization(db, None));
-            ty.apply_specialization(db, specialization)
+            let type_mapping = match specialization.materialization_kind(db) {
+                None => {
+                    TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(specialization))
+                }
+                Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
+                    specialization: ApplySpecialization::TypeAlias(specialization),
+                    materialization_kind,
+                },
+            };
+
+            ty.apply_type_mapping_impl(
+                db,
+                &type_mapping,
+                TypeContext::default(),
+                &ApplyTypeMappingVisitor::default(),
+            )
         } else {
             ty
         }

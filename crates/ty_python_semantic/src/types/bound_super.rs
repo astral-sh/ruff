@@ -9,8 +9,9 @@ use crate::{
     place::{Place, PlaceAndQualifiers},
     types::{
         BoundTypeVarInstance, ClassBase, ClassType, DivergentType, DynamicType,
-        IntersectionBuilder, KnownClass, MemberLookupPolicy, SpecialFormType, SubclassOfInner,
-        SubclassOfType, Type, TypeVarBoundOrConstraints, UnionBuilder,
+        IntersectionBuilder, KnownClass, MemberLookupPolicy, RecursiveTypeNormalizationVisitor,
+        SpecialFormType, SubclassOfInner, SubclassOfType, Type, TypeVarBoundOrConstraints,
+        UnionBuilder,
         constraints::ConstraintSet,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
@@ -264,14 +265,15 @@ impl<'db> ResolvedSuperOwner<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
         Some(Self {
             owner_type: self
                 .owner_type
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, div, nested, visitor)?,
             lookup_anchor: self
                 .lookup_anchor
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, div, nested, visitor)?,
             receiver: self.receiver,
         })
     }
@@ -299,6 +301,7 @@ impl<'db> SuperOwnerKind<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
         match self {
             SuperOwnerKind::Dynamic(dynamic) => {
@@ -306,7 +309,7 @@ impl<'db> SuperOwnerKind<'db> {
             }
             SuperOwnerKind::Divergent(_) => Some(self.clone()),
             SuperOwnerKind::Resolved(resolved_owner) => Some(SuperOwnerKind::Resolved(
-                resolved_owner.recursive_type_normalized_impl(db, div, nested)?,
+                resolved_owner.recursive_type_normalized_impl(db, div, nested, visitor)?,
             )),
         }
     }
@@ -942,13 +945,14 @@ impl<'db> BoundSuperType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
         Some(Self::new(
             db,
             self.pivot_class(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, div, nested, visitor)?,
             self.owner(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, div, nested, visitor)?,
         ))
     }
 }

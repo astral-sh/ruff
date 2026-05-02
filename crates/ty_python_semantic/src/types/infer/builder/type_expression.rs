@@ -2063,8 +2063,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let argument_type = self.infer_expression(&arguments[0], TypeContext::default());
 
-                let Some(callable_type) =
-                    argument_type.try_upcast_to_callable(db).map(|callables| {
+                let Some(callable_type) = argument_type
+                    .try_upcast_to_callable_with_recursive_fallback(
+                        db,
+                        self.typevar_binding_context,
+                    )
+                    .map(|callables| {
                         if special_form == SpecialFormType::RegularCallableTypeOf {
                             callables
                                 .map(|callable| callable.into_regular(db))
