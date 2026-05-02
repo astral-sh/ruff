@@ -495,6 +495,14 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
 ///
 /// In other words, it returns `true` if [`expand_type`] returns [`Some`] for the given type.
 pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    if ty
+        .enum_complement(db)
+        .and_then(|complement| complement.remaining_literal_types(db))
+        .is_some()
+    {
+        return true;
+    }
+
     match ty {
         Type::NominalInstance(instance) => {
             let class = instance.class(db);
@@ -518,6 +526,13 @@ pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 /// Returns [`None`] if the type cannot be expanded.
 fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
     // NOTE: Update `is_expandable_type` if this logic changes accordingly.
+    if let Some(literals) = ty
+        .enum_complement(db)
+        .and_then(|complement| complement.remaining_literal_types(db))
+    {
+        return Some(literals);
+    }
+
     match ty {
         Type::NominalInstance(instance) => {
             let class = instance.class(db);
@@ -567,7 +582,18 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
 
             None
         }
-        Type::Union(union) => Some(union.elements(db).to_vec()),
+        Type::Union(union) => Some(
+            union
+                .elements(db)
+                .iter()
+                .flat_map(|element| {
+                    element
+                        .enum_complement(db)
+                        .and_then(|complement| complement.remaining_literal_types(db))
+                        .unwrap_or_else(|| vec![*element])
+                })
+                .collect(),
+        ),
         // For type aliases, expand the underlying value type.
         Type::TypeAlias(alias) => expand_type(db, alias.value_type(db)),
         // We don't handle `type[A | B]` here because it's already stored in the expanded form

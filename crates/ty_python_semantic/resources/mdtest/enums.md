@@ -2235,7 +2235,9 @@ def _(answer: Answer):
 
 ```py
 from enum import Enum
-from typing_extensions import assert_never
+from typing import Any
+from typing_extensions import Literal, assert_never, assert_type, overload
+from ty_extensions import Intersection
 
 class Color(Enum):
     RED = 1
@@ -2260,6 +2262,87 @@ def color_name_without_assertion(color: Color) -> str:
         return "Green"
     elif color is Color.BLUE:
         return "Blue"
+
+def color_value_without_red(color: Color) -> Literal[2, 3]:
+    if color is Color.RED:
+        raise ValueError()
+    reveal_type(color.value)  # revealed: Literal[2, 3]
+    return color.value
+
+def color_value_without_red_and_with_any(color: Intersection[Color, Any]) -> Literal[2, 3]:
+    if color is Color.RED:
+        raise ValueError()
+    reveal_type(color)  # revealed: Color & Any & ~Literal[Color.RED]
+    reveal_type(color.value)  # revealed: Literal[2, 3]
+    return color.value
+
+def color_truthy_without_red(color: Color) -> int:
+    if color is Color.RED:
+        raise ValueError()
+    if color:
+        return 1
+
+def color_after_merge(color: Color) -> None:
+    if color is Color.RED:
+        merged = color
+    else:
+        merged = color
+    reveal_type(merged)  # revealed: Color
+    assert_type(merged, Color)
+
+def color_after_different_complement_merge(color: Color, flag: bool) -> None:
+    if flag:
+        if color is Color.RED:
+            return
+        merged = color
+    else:
+        if color is Color.GREEN:
+            return
+        merged = color
+    reveal_type(merged)  # revealed: Color
+    assert_type(merged, Color)
+
+def color_after_dynamic_complement_merge(color: Intersection[Color, Any], flag: bool) -> None:
+    if flag:
+        if color is Color.RED:
+            return
+        merged = color
+    else:
+        if color is Color.GREEN:
+            return
+        merged = color
+    reveal_type(merged)  # revealed: Color & Any
+    assert_type(merged, Intersection[Color, Any])
+
+def color_after_shared_complement_merge(color: Color, flag: bool) -> None:
+    if color is Color.RED:
+        return
+    if flag:
+        merged = color
+    else:
+        if color is Color.GREEN:
+            return
+        merged = color
+    reveal_type(merged)  # revealed: Literal[Color.GREEN, Color.BLUE]
+    assert_type(merged, Literal[Color.GREEN, Color.BLUE])
+
+def color_compare_without_red(color: Color) -> None:
+    if color is Color.RED:
+        return
+    reveal_type(color == Color.RED)  # revealed: Literal[False]
+    reveal_type(color != Color.RED)  # revealed: Literal[True]
+
+@overload
+def color_overload(color: Literal[Color.GREEN]) -> Literal["green"]: ...
+@overload
+def color_overload(color: Literal[Color.BLUE]) -> Literal["blue"]: ...
+def color_overload(color: Color) -> str:
+    return color.name.lower()
+
+def color_overload_without_red(color: Color) -> None:
+    if color is Color.RED:
+        return
+    reveal_type(color_overload(color))  # revealed: Literal["green", "blue"]
 
 def color_name_misses_one_variant(color: Color) -> str:
     if color is Color.RED:
@@ -2287,8 +2370,8 @@ python-version = "3.10"
 ```
 
 ```py
-from enum import Enum
-from typing_extensions import assert_never
+from enum import Enum, IntEnum
+from typing_extensions import Literal, assert_never
 
 class Color(Enum):
     RED = 1
@@ -2333,6 +2416,37 @@ def singleton_check(value: Singleton) -> str:
             return "Singleton value"
         case _:
             assert_never(value)
+
+class ThreadSubset(IntEnum):
+    WARP = 1
+    WARPGROUP = 2
+    BLOCK = 3
+
+def thread_subset_name(value: Literal[ThreadSubset.WARPGROUP, ThreadSubset.WARP]) -> str:
+    match value:
+        case ThreadSubset.WARPGROUP:
+            return "Warpgroup"
+        case ThreadSubset.WARP:
+            return "Warp"
+        case _:
+            assert_never(value)
+
+class CustomEq(Enum):
+    A = 1
+    B = 2
+
+    def __eq__(self, other: object) -> bool:
+        return False
+
+def custom_eq_match(value: Literal[CustomEq.A, CustomEq.B]) -> str:
+    match value:
+        case CustomEq.A:
+            return "A"
+        case CustomEq.B:
+            return "B"
+        case _:
+            reveal_type(value)  # revealed: CustomEq
+            return "default"
 ```
 
 ## `if` statements (function syntax)
