@@ -51,6 +51,9 @@ pub enum KnownClass {
     Set,
     FrozenSet,
     Dict,
+    DictKeys,
+    DictValues,
+    DictItems,
     Slice,
     Property,
     BaseException,
@@ -216,6 +219,9 @@ impl KnownClass {
             | Self::Property
             | Self::SpecialForm
             | Self::Dict
+            | Self::DictKeys
+            | Self::DictValues
+            | Self::DictItems
             | Self::ModuleType
             | Self::ChainMap
             | Self::Complex
@@ -281,6 +287,9 @@ impl KnownClass {
             | KnownClass::Set
             | KnownClass::FrozenSet
             | KnownClass::Dict
+            | KnownClass::DictKeys
+            | KnownClass::DictValues
+            | KnownClass::DictItems
             | KnownClass::Slice
             | KnownClass::Property
             | KnownClass::BaseException
@@ -375,6 +384,9 @@ impl KnownClass {
             | KnownClass::Set
             | KnownClass::FrozenSet
             | KnownClass::Dict
+            | KnownClass::DictKeys
+            | KnownClass::DictValues
+            | KnownClass::DictItems
             | KnownClass::Slice
             | KnownClass::Property
             | KnownClass::BaseException
@@ -469,6 +481,9 @@ impl KnownClass {
             | KnownClass::Set
             | KnownClass::FrozenSet
             | KnownClass::Dict
+            | KnownClass::DictKeys
+            | KnownClass::DictValues
+            | KnownClass::DictItems
             | KnownClass::Slice
             | KnownClass::Property
             | KnownClass::BaseException
@@ -580,6 +595,9 @@ impl KnownClass {
             | Self::Str
             | Self::Set
             | Self::Dict
+            | Self::DictKeys
+            | Self::DictValues
+            | Self::DictItems
             | Self::List
             | Self::Type
             | Self::Slice
@@ -672,6 +690,9 @@ impl KnownClass {
             | KnownClass::Set
             | KnownClass::FrozenSet
             | KnownClass::Dict
+            | KnownClass::DictKeys
+            | KnownClass::DictValues
+            | KnownClass::DictItems
             | KnownClass::Slice
             | KnownClass::Property
             | KnownClass::BaseException
@@ -762,6 +783,9 @@ impl KnownClass {
             Self::Str => "str",
             Self::Set => "set",
             Self::Dict => "dict",
+            Self::DictKeys => "dict_keys",
+            Self::DictValues => "dict_values",
+            Self::DictItems => "dict_items",
             Self::List => "list",
             Self::Type => "type",
             Self::Slice => "slice",
@@ -1240,6 +1264,7 @@ impl KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::OrderedDict => KnownModule::Collections,
+            Self::DictKeys | Self::DictValues | Self::DictItems => KnownModule::CollectionsAbc,
             Self::Field | Self::KwOnly => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
             Self::NamedTupleLike
@@ -1278,6 +1303,9 @@ impl KnownClass {
             | Self::Set
             | Self::FrozenSet
             | Self::Dict
+            | Self::DictKeys
+            | Self::DictValues
+            | Self::DictItems
             | Self::Slice
             | Self::Property
             | Self::BaseException
@@ -1374,6 +1402,9 @@ impl KnownClass {
             | Self::Set
             | Self::FrozenSet
             | Self::Dict
+            | Self::DictKeys
+            | Self::DictValues
+            | Self::DictItems
             | Self::List
             | Self::Type
             | Self::Slice
@@ -1584,6 +1615,9 @@ impl KnownClass {
             | Self::Set
             | Self::FrozenSet
             | Self::Dict
+            | Self::DictKeys
+            | Self::DictValues
+            | Self::DictItems
             | Self::Slice
             | Self::Property
             | Self::GenericAlias

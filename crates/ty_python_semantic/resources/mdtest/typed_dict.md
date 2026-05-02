@@ -2049,8 +2049,8 @@ class Person(TypedDict):
     inner: NotRequired[Inner]
 
 def _(p: Person) -> None:
-    reveal_type(p.keys())  # revealed: dict_keys[str, object]
-    reveal_type(p.values())  # revealed: dict_values[str, object]
+    reveal_type(p.keys())  # revealed: dict_keys[Literal["name", "age", "extra", "inner"], str | int | None | Inner]
+    reveal_type(p.values())  # revealed: dict_values[Literal["name", "age", "extra", "inner"], str | int | None | Inner]
 
     # `get()` returns the field type for required keys (no None union)
     reveal_type(p.get("name"))  # revealed: str
@@ -4914,14 +4914,11 @@ class Closed(TypedDict, closed=True):
     age: int
 
 def _(closed: Closed) -> None:
-    # TODO: should be `dict_keys[Literal["name", "age"], str | int]`
-    reveal_type(closed.keys())  # revealed: dict_keys[str, object]
+    reveal_type(closed.keys())  # revealed: dict_keys[Literal["name", "age"], str | int]
 
-    # TODO: should be `dict_values[Literal["name", "age"], str | int]`
-    reveal_type(closed.values())  # revealed: dict_values[str, object]
+    reveal_type(closed.values())  # revealed: dict_values[Literal["name", "age"], str | int]
 
-    # TODO: should be `dict_items[Literal["name", "age"], str | int]`
-    reveal_type(closed.items())  # revealed: dict_items[str, object]
+    reveal_type(closed.items())  # revealed: dict_items[Literal["name"], str] | dict_items[Literal["age"], int]
 
     # iterating over the keys gives `Literal` types
     for key in closed:
@@ -4929,16 +4926,13 @@ def _(closed: Closed) -> None:
         reveal_type(key)  # revealed: str
 
     for key in closed.keys():
-        # TODO: should be `Literal["name", "age"]`
-        reveal_type(key)  # revealed: str
+        reveal_type(key)  # revealed: Literal["name", "age"]
 
     for value in closed.values():
-        # TODO: should be `str | int
-        reveal_type(value)  # revealed: object
+        reveal_type(value)  # revealed: str | int
 
     for item in closed.items():
-        # TODO: should be `tuple[Literal["name"], str] | tuple[Literal["age"], int]`
-        reveal_type(item)  # revealed: tuple[str, object]
+        reveal_type(item)  # revealed: tuple[Literal["name"], str] | tuple[Literal["age"], int]
 ```
 
 ### Iterating keys, values and items of an extra-items TypedDict
@@ -4954,29 +4948,30 @@ class Extra(TypedDict, extra_items=int):
     name: str
 
 def _(extra: Extra) -> None:
-    # TODO: should be `dict_keys[str, str | int]`
-    reveal_type(extra.keys())  # revealed: dict_keys[str, object]
+    # TODO: should be `dict_keys[str, str | int]` once `extra_items` is supported
+    reveal_type(extra.keys())  # revealed: dict_keys[Literal["name"], str]
 
-    # TODO: should be `dict_values[str, str | int]`
-    reveal_type(extra.values())  # revealed: dict_values[str, object]
+    # TODO: should be `dict_values[str, str | int]` once `extra_items` is supported
+    reveal_type(extra.values())  # revealed: dict_values[Literal["name"], str]
 
-    # TODO: should be `dict_items[str, str | int]`
-    reveal_type(extra.items())  # revealed: dict_items[str, object]
+    # TODO: should be `dict_items[str, str | int]` once `extra_items` is supported
+    reveal_type(extra.items())  # revealed: dict_items[Literal["name"], str]
 
     # iterating over the keys gives `str` types
     for key in extra:
         reveal_type(key)  # revealed: str
 
     for key in extra.keys():
-        reveal_type(key)  # revealed: str
+        # TODO: should be `str` once `extra_items` is supported
+        reveal_type(key)  # revealed: Literal["name"]
 
     for value in extra.values():
-        # TODO: should be `str | int
-        reveal_type(value)  # revealed: object
+        # TODO: should be `str | int` once `extra_items` is supported
+        reveal_type(value)  # revealed: str
 
     for item in extra.items():
-        # TODO: should be `tuple[str, str | int]`
-        reveal_type(item)  # revealed: tuple[str, object]
+        # TODO: should be `tuple[str, str | int]` once `extra_items` is supported
+        reveal_type(item)  # revealed: tuple[Literal["name"], str]
 ```
 
 ### A closed `TypedDict` is equivalent to `extra_items=Never`

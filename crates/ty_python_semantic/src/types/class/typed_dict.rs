@@ -39,6 +39,9 @@ pub(super) fn synthesize_typed_dict_method<'db>(
         "__setitem__" => Some(synthesize_typed_dict_setitem(db, instance_ty, fields())),
         "__delitem__" => Some(synthesize_typed_dict_delitem(db, instance_ty, fields())),
         "get" => Some(synthesize_typed_dict_get(db, instance_ty, fields())),
+        "keys" => Some(synthesize_typed_dict_keys(db, instance_ty, fields())),
+        "values" => Some(synthesize_typed_dict_values(db, instance_ty, fields())),
+        "items" => Some(synthesize_typed_dict_items(db, instance_ty, fields())),
         "update" => Some(synthesize_typed_dict_update(db, instance_ty, fields())),
         "pop" => Some(synthesize_typed_dict_pop(db, instance_ty, fields())),
         "setdefault" => Some(synthesize_typed_dict_setdefault(db, instance_ty, fields())),
@@ -47,6 +50,74 @@ pub(super) fn synthesize_typed_dict_method<'db>(
         }
         _ => None,
     }
+}
+
+fn typed_dict_key_type<'db>(db: &'db dyn Db, fields: TypedDictFields<'db>) -> Type<'db> {
+    UnionType::from_elements(
+        db,
+        fields
+            .iter()
+            .map(|(name, _)| Type::string_literal(db, name)),
+    )
+}
+
+fn typed_dict_value_type<'db>(db: &'db dyn Db, fields: TypedDictFields<'db>) -> Type<'db> {
+    UnionType::from_elements(db, fields.iter().map(|(_, field)| field.declared_ty))
+}
+
+fn synthesize_typed_dict_view_method<'db>(
+    db: &'db dyn Db,
+    instance_ty: Type<'db>,
+    return_ty: Type<'db>,
+) -> Type<'db> {
+    let parameters =
+        [Parameter::positional_only(Some(Name::new_static("self")))
+            .with_annotated_type(instance_ty)];
+    let signature = Signature::new(Parameters::new(db, parameters), return_ty);
+    Type::function_like_callable(db, signature)
+}
+
+fn synthesize_typed_dict_keys<'db>(
+    db: &'db dyn Db,
+    instance_ty: Type<'db>,
+    fields: TypedDictFields<'db>,
+) -> Type<'db> {
+    let key_ty = typed_dict_key_type(db, fields);
+    let value_ty = typed_dict_value_type(db, fields);
+    let return_ty = KnownClass::DictKeys.to_specialized_instance(db, &[key_ty, value_ty]);
+    synthesize_typed_dict_view_method(db, instance_ty, return_ty)
+}
+
+fn synthesize_typed_dict_values<'db>(
+    db: &'db dyn Db,
+    instance_ty: Type<'db>,
+    fields: TypedDictFields<'db>,
+) -> Type<'db> {
+    let key_ty = typed_dict_key_type(db, fields);
+    let value_ty = typed_dict_value_type(db, fields);
+    let return_ty = KnownClass::DictValues.to_specialized_instance(db, &[key_ty, value_ty]);
+    synthesize_typed_dict_view_method(db, instance_ty, return_ty)
+}
+
+fn synthesize_typed_dict_items<'db>(
+    db: &'db dyn Db,
+    instance_ty: Type<'db>,
+    fields: TypedDictFields<'db>,
+) -> Type<'db> {
+    let return_ty = if fields.len() == 0 {
+        KnownClass::DictItems.to_specialized_instance(db, &[Type::Never, Type::Never])
+    } else {
+        UnionType::from_elements(
+            db,
+            fields.iter().map(|(name, field)| {
+                KnownClass::DictItems.to_specialized_instance(
+                    db,
+                    &[Type::string_literal(db, name), field.declared_ty],
+                )
+            }),
+        )
+    };
+    synthesize_typed_dict_view_method(db, instance_ty, return_ty)
 }
 
 /// Enum unifying the field schema for both dynamic and static `TypedDict` representations.
