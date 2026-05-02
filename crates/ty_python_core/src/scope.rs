@@ -156,6 +156,10 @@ impl Scope {
     pub fn is_eager(&self) -> bool {
         self.kind().is_eager()
     }
+
+    pub(crate) fn is_lazy(&self) -> bool {
+        self.kind().is_lazy()
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, get_size2::GetSize)]
@@ -208,6 +212,10 @@ pub enum ScopeKind {
 impl ScopeKind {
     pub(crate) const fn is_eager(self) -> bool {
         self.laziness().is_eager()
+    }
+
+    pub(crate) const fn is_lazy(self) -> bool {
+        self.laziness().is_lazy()
     }
 
     pub(crate) const fn laziness(self) -> ScopeLaziness {

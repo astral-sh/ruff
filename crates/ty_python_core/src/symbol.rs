@@ -113,6 +113,20 @@ impl Symbol {
         !self.is_global() && !self.is_nonlocal() && (self.is_bound() || self.is_declared())
     }
 
+    /// Is the symbol treated as a free variable in this scope?
+    ///
+    /// This is a cheap approximation: it returns true for names that are neither local nor
+    /// explicitly declared `global`/`nonlocal` in the current scope.
+    /// In particular, it can also include unresolved names, builtins, implicit globals, and some
+    /// class-body edge cases where the actual runtime resolution is not determined by symbol flags
+    /// alone.
+    ///
+    /// Use this only for scope-local heuristics that need to distinguish definite locals from
+    /// names that may resolve through an enclosing context.
+    pub fn is_free(&self) -> bool {
+        !self.is_bound() && !self.is_declared() && !self.is_global() && !self.is_nonlocal()
+    }
+
     pub const fn is_reassigned(&self) -> bool {
         self.flags.contains(SymbolFlags::IS_REASSIGNED)
     }

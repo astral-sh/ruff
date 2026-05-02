@@ -633,13 +633,18 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let file = expression.file(self.db);
                 let index = semantic_index(self.db, file);
                 let constraints = self.evaluate_simple_expr(expression_node, is_positive);
+                // For example, suppose we have an alias `is_none = x is None`.
+                // When this alias is used for narrowing, that is, within a block like `if is_none: ...`,
+                // both the constraint `is_none: Literal[True]` and the constraint `x: None` should be imposed.
+                // The former is `constraints` and the latter is `aliased_constraints`.
                 if let Some(alias_predicate) = index.narrowing_alias_predicate(expression_node) {
+                    // Aliases defined in an outer scope are also supported, but we need to check
+                    // that the alias is still valid in this scope (its target / RHS names not reassigned).
+                    if alias_predicate.is_invalidated(self.db, index) {
+                        return constraints;
+                    }
                     let aliased_constraints =
                         self.evaluate_expression_predicate(alias_predicate.expression, is_positive);
-                    // For example, suppose we have an alias `is_none = x is None`.
-                    // When this alias is used for narrowing, that is, within a block like `if is_none: ...`,
-                    // both the constraint `is_none: Literal[True]` and the constraint `x: None` should be imposed.
-                    // The former is `constraints` and the latter is `aliased_constraints`.
                     Self::merge_optional_constraints_and(constraints, aliased_constraints)
                 } else {
                     constraints

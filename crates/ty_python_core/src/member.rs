@@ -149,7 +149,7 @@ impl get_size2::GetSize for MemberFlags {}
 /// - segments: stores where each segment starts and its kind (attribute, int subscript, string subscript)
 ///
 /// The symbol name can be extracted from the path by taking the text up to the first segment's start offset.
-#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) struct MemberExpr {
     /// The entire path as a single Name
     path: Name,
@@ -566,7 +566,7 @@ impl DerefMut for MemberTableBuilder {
 /// Design choices:
 /// - Uses `Box<[SegmentInfo]>` instead of `ThinVec` because even with a `ThinVec`, the size of `Segments` is still 128 bytes.
 /// - Uses u64 for inline storage. That's the largest size without increasing the overall size of `Segments` and allows to encode up to 7 segments.
-#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 enum Segments {
     /// Inline storage for up to 7 segments with 6-bit relative offsets (max 63 bytes per segment)
     Small(SmallSegments),
@@ -740,7 +740,7 @@ const INLINE_MAX_RELATIVE_OFFSET: u32 = (1 << INLINE_PREV_LEN_BITS) - 1; // 63
 /// - Maximum 63-byte relative offset per segment (sufficient for most identifiers)
 /// - Never empty (`segments.len()` >= 1)
 ///
-#[derive(Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 #[repr(transparent)]
 struct SmallSegments(u64);
 

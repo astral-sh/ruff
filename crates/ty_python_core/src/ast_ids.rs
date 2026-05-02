@@ -99,6 +99,16 @@ pub(super) struct AstIdsBuilder {
 }
 
 impl AstIdsBuilder {
+    /// Returns whether `key` already has a recorded use in this scope.
+    pub(super) fn has_use(&self, key: ExpressionNodeKey) -> bool {
+        self.uses_map.contains_key(&key)
+    }
+
+    /// Returns the recorded use ID for `key`, if any.
+    pub(super) fn use_id(&self, key: ExpressionNodeKey) -> Option<ScopedUseId> {
+        self.uses_map.get(&key).copied()
+    }
+
     /// Adds `expr` to the use ids map and returns its id.
     pub(super) fn record_use(&mut self, expr: impl Into<ExpressionNodeKey>) -> ScopedUseId {
         let use_id = self.uses_map.len().into();
