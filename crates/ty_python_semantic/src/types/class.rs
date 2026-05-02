@@ -417,6 +417,20 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    pub(crate) fn class_member_deferred(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        match self {
+            Self::Static(class) => class.class_member_deferred(db, name, policy),
+            Self::Dynamic(class) => class.class_member(db, name, policy),
+            Self::DynamicNamedTuple(namedtuple) => namedtuple.class_member(db, name, policy),
+            Self::DynamicTypedDict(typeddict) => typeddict.class_member(db, name, policy),
+        }
+    }
+
     /// Look up a class-level member using a provided MRO iterator.
     ///
     /// This is used by `super()` to start the MRO lookup after the pivot class.
@@ -1357,6 +1371,23 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(class) => class.class_member(db, name, policy),
             Self::Generic(generic) => generic.origin(db).class_member_inner(
+                db,
+                Some(generic.specialization(db)),
+                name,
+                policy,
+            ),
+        }
+    }
+
+    pub(super) fn class_member_deferred(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        match self {
+            Self::NonGeneric(class) => class.class_member_deferred(db, name, policy),
+            Self::Generic(generic) => generic.origin(db).class_member_inner_deferred(
                 db,
                 Some(generic.specialization(db)),
                 name,
@@ -2334,6 +2365,75 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         })
     }
 
+    /// Look up a class member by iterating through the MRO, while preserving raw types and
+    /// public-type policies until the caller explicitly materializes the result.
+    pub(super) fn class_member_deferred(
+        self,
+        name: &str,
+        policy: MemberLookupPolicy,
+        inherited_generic_context: Option<GenericContext<'db>>,
+        is_self_object: bool,
+    ) -> DeferredClassMemberResult<'db> {
+        let db = self.db;
+        let mut dynamic_type: Option<Type<'db>> = None;
+        let mut member = Place::Undefined.with_qualifiers(TypeQualifiers::empty());
+
+        for superclass in self.mro_iter {
+            match superclass {
+                ClassBase::Generic | ClassBase::Protocol => {
+                    // Skip over these very special class bases that aren't really classes.
+                }
+                ClassBase::Dynamic(_) => {
+                    // Note: calling `Type::from(superclass).member()` would be incorrect here.
+                    // What we'd really want is a `Type::Any.own_class_member()` method,
+                    // but adding such a method wouldn't make much sense -- it would always return `Any`!
+                    dynamic_type.get_or_insert(Type::from(superclass));
+                }
+                ClassBase::Divergent(_) => {
+                    dynamic_type.get_or_insert(Type::from(superclass));
+                }
+                ClassBase::Class(class) => {
+                    let known = class.known(db);
+
+                    // Only exclude `object` members if this is not an `object` class itself
+                    if known == Some(KnownClass::Object)
+                        && policy.mro_no_object_fallback()
+                        && !is_self_object
+                    {
+                        continue;
+                    }
+
+                    if known == Some(KnownClass::Type) && policy.meta_class_no_type_fallback() {
+                        continue;
+                    }
+
+                    if matches!(known, Some(KnownClass::Int | KnownClass::Str))
+                        && policy.mro_no_int_or_str_fallback()
+                    {
+                        continue;
+                    }
+
+                    member = member.or_fall_back_to_deferred(db, || {
+                        class
+                            .own_class_member(db, inherited_generic_context, name)
+                            .inner
+                    });
+                }
+                ClassBase::TypedDict => {
+                    return DeferredClassMemberResult::TypedDict;
+                }
+            }
+            if member.place.is_definitely_bound() {
+                break;
+            }
+        }
+
+        DeferredClassMemberResult::Done(CompletedDeferredMemberLookup {
+            member,
+            dynamic_type,
+        })
+    }
+
     /// Look up an instance member by iterating through the MRO.
     ///
     /// Unlike class member lookup, instance member lookup:
@@ -2450,6 +2550,48 @@ impl<'db> CompletedMemberLookup<'db> {
                 Some(dynamic),
             ) => Place::bound(IntersectionType::from_two_elements(db, ty, dynamic))
                 .with_qualifiers(qualifiers),
+
+            (
+                PlaceAndQualifiers {
+                    place: Place::Undefined,
+                    qualifiers,
+                },
+                Some(dynamic),
+            ) => Place::bound(dynamic).with_qualifiers(qualifiers),
+        }
+    }
+}
+
+/// Result of deferred class member lookup from MRO iteration.
+pub(super) enum DeferredClassMemberResult<'db> {
+    /// Found the member or exhausted the MRO.
+    Done(CompletedDeferredMemberLookup<'db>),
+    /// Encountered a `TypedDict` base.
+    TypedDict,
+}
+
+pub(super) struct CompletedDeferredMemberLookup<'db> {
+    member: PlaceAndQualifiers<'db>,
+    dynamic_type: Option<Type<'db>>,
+}
+
+impl<'db> CompletedDeferredMemberLookup<'db> {
+    /// Finalize the deferred lookup result without materializing the public-type policy.
+    pub(super) fn finalize_deferred(self, db: &'db dyn Db) -> PlaceAndQualifiers<'db> {
+        match (self.member, self.dynamic_type) {
+            (symbol_and_qualifiers, None) => symbol_and_qualifiers,
+
+            (
+                PlaceAndQualifiers {
+                    place: Place::Defined(defined),
+                    qualifiers,
+                },
+                Some(dynamic),
+            ) => Place::Defined(DefinedPlace {
+                ty: IntersectionType::from_two_elements(db, defined.ty, dynamic),
+                ..defined
+            })
+            .with_qualifiers(qualifiers),
 
             (
                 PlaceAndQualifiers {

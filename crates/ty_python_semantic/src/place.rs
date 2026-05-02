@@ -80,6 +80,8 @@ pub(crate) enum PublicTypePolicy {
     Raw,
     /// Public lookup should expose the promoted stored type.
     Promote,
+    /// Ordinary promotion has already been applied; only singleton widening remains.
+    PromoteSingletonsOnly,
 }
 
 impl PublicTypePolicy {
@@ -88,6 +90,7 @@ impl PublicTypePolicy {
         match self {
             Self::Raw => ty,
             Self::Promote => ty.promote(db).promote_singletons(db),
+            Self::PromoteSingletonsOnly => ty.promote_singletons(db),
         }
     }
 }
@@ -124,6 +127,87 @@ impl<'db> DefinedPlace<'db> {
     pub(crate) fn with_public_type_policy(mut self, public_type_policy: PublicTypePolicy) -> Self {
         self.public_type_policy = public_type_policy;
         self
+    }
+
+    pub(crate) fn materialize_public_type(self, db: &'db dyn Db) -> Self {
+        Self {
+            ty: self.public_type_policy.apply_if_needed(db, self.ty),
+            public_type_policy: PublicTypePolicy::Raw,
+            ..self
+        }
+    }
+
+    pub(crate) fn union_for_fallback(
+        self,
+        db: &'db dyn Db,
+        fallback: Self,
+        definedness: Definedness,
+    ) -> Self {
+        let (ty, public_type_policy) = if self.public_type_policy == fallback.public_type_policy {
+            match self.public_type_policy {
+                PublicTypePolicy::Raw => (
+                    UnionType::from_two_elements(db, self.ty, fallback.ty),
+                    PublicTypePolicy::Raw,
+                ),
+                PublicTypePolicy::Promote => (
+                    UnionType::from_two_elements(db, self.ty.promote(db), fallback.ty.promote(db)),
+                    PublicTypePolicy::PromoteSingletonsOnly,
+                ),
+                PublicTypePolicy::PromoteSingletonsOnly => (
+                    UnionType::from_two_elements(db, self.ty, fallback.ty),
+                    PublicTypePolicy::PromoteSingletonsOnly,
+                ),
+            }
+        } else {
+            (
+                UnionType::from_two_elements(
+                    db,
+                    self.materialize_public_type(db).ty,
+                    fallback.materialize_public_type(db).ty,
+                ),
+                PublicTypePolicy::Raw,
+            )
+        };
+
+        Self {
+            ty,
+            origin: self.origin.merge(fallback.origin),
+            definedness,
+            public_type_policy,
+        }
+    }
+
+    pub(crate) fn union_with_lower_precedence_fallback(
+        self,
+        db: &'db dyn Db,
+        fallback: Self,
+        definedness: Definedness,
+    ) -> Self {
+        if matches!(
+            self.public_type_policy,
+            PublicTypePolicy::Promote | PublicTypePolicy::PromoteSingletonsOnly
+        ) {
+            Self {
+                ty: UnionType::from_two_elements(
+                    db,
+                    if self.public_type_policy == PublicTypePolicy::Promote {
+                        self.ty.promote(db)
+                    } else {
+                        self.ty
+                    },
+                    if fallback.public_type_policy == PublicTypePolicy::Promote {
+                        fallback.ty.promote(db)
+                    } else {
+                        fallback.ty
+                    },
+                ),
+                origin: self.origin.merge(fallback.origin),
+                definedness,
+                public_type_policy: PublicTypePolicy::Raw,
+            }
+        } else {
+            self.union_for_fallback(db, fallback, definedness)
+        }
     }
 
     pub(crate) const fn is_definitely_defined(&self) -> bool {
@@ -240,6 +324,14 @@ impl<'db> Place<'db> {
         PlaceAndQualifiers {
             place: self,
             qualifiers,
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn materialize_public_type(self, db: &'db dyn Db) -> Self {
+        match self {
+            Place::Defined(defined) => Place::Defined(defined.materialize_public_type(db)),
+            Place::Undefined => Place::Undefined,
         }
     }
 
@@ -800,6 +892,33 @@ impl<'db> PlaceAndQualifiers<'db> {
         self.into_lookup_result(db)
             .or_else(|lookup_error| lookup_error.or_fall_back_to(db, fallback_fn()))
             .into()
+    }
+
+    /// Like [`Self::or_fall_back_to`], but preserves the raw type and public-type policy of
+    /// participating places instead of materializing them into a public lookup result first.
+    #[must_use]
+    pub(crate) fn or_fall_back_to_deferred(
+        self,
+        db: &'db dyn Db,
+        fallback_fn: impl FnOnce() -> PlaceAndQualifiers<'db>,
+    ) -> Self {
+        match self.place {
+            Place::Defined(defined) if defined.is_definitely_defined() => self,
+            Place::Undefined => fallback_fn(),
+            Place::Defined(defined) => {
+                let fallback = fallback_fn();
+
+                match fallback.place {
+                    Place::Undefined => self,
+                    Place::Defined(fallback_defined) => Place::Defined(defined.union_for_fallback(
+                        db,
+                        fallback_defined,
+                        fallback_defined.definedness,
+                    ))
+                    .with_qualifiers(self.qualifiers.union(fallback.qualifiers)),
+                }
+            }
+        }
     }
 
     pub(crate) fn cycle_normalized(

@@ -26,9 +26,10 @@ use crate::{
         call::{CallError, CallErrorKind},
         callable::CallableTypeKind,
         class::{
-            ClassMemberResult, CodeGeneratorKind, DisjointBase, DynamicTypedDictLiteral, Field,
-            FieldKind, InstanceMemberResult, MetaclassError, MetaclassErrorKind, MethodDecorator,
-            MroLookup, NamedTupleField, SlotsKind, synthesize_namedtuple_class_member,
+            ClassMemberResult, CodeGeneratorKind, DeferredClassMemberResult, DisjointBase,
+            DynamicTypedDictLiteral, Field, FieldKind, InstanceMemberResult, MetaclassError,
+            MetaclassErrorKind, MethodDecorator, MroLookup, NamedTupleField, SlotsKind,
+            synthesize_namedtuple_class_member,
             typed_dict::{TypedDictFields, synthesize_typed_dict_method, typed_dict_class_member},
         },
         context::InferContext,
@@ -981,6 +982,39 @@ impl<'db> StaticClassLiteral<'db> {
         member
     }
 
+    pub(super) fn class_member_deferred(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        fn into_function_like_callable<'d>(db: &'d dyn Db, ty: Type<'d>) -> Type<'d> {
+            match ty {
+                Type::Callable(callable_ty) => Type::Callable(CallableType::new(
+                    db,
+                    callable_ty.signatures(db),
+                    CallableTypeKind::FunctionLike,
+                )),
+                Type::Union(union) => {
+                    union.map(db, |element| into_function_like_callable(db, *element))
+                }
+                Type::Intersection(intersection) => intersection
+                    .map_positive(db, |element| into_function_like_callable(db, *element)),
+                _ => ty,
+            }
+        }
+
+        let mut member = self.class_member_inner_deferred(db, None, name, policy);
+
+        // We generally treat dunder attributes with `Callable` types as function-like callables.
+        // See `callables_as_descriptors.md` for more details.
+        if name.starts_with("__") && name.ends_with("__") {
+            member = member.map_type(|ty| into_function_like_callable(db, ty));
+        }
+
+        member
+    }
+
     pub(super) fn class_member_inner(
         self,
         db: &'db dyn Db,
@@ -989,6 +1023,28 @@ impl<'db> StaticClassLiteral<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         self.class_member_from_mro(db, name, policy, self.iter_mro(db, specialization))
+    }
+
+    pub(super) fn class_member_inner_deferred(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        let result = MroLookup::new(db, self.iter_mro(db, specialization)).class_member_deferred(
+            name,
+            policy,
+            self.inherited_generic_context(db),
+            self.is_known(db, KnownClass::Object),
+        );
+
+        match result {
+            DeferredClassMemberResult::Done(result) => result.finalize_deferred(db),
+            DeferredClassMemberResult::TypedDict => {
+                typed_dict_class_member(db, ClassLiteral::Static(self), policy, name)
+            }
+        }
     }
 
     pub(crate) fn class_member_from_mro(

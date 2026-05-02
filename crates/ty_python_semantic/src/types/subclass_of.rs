@@ -216,6 +216,29 @@ impl<'db> SubclassOfType<'db> {
         class_like.find_name_in_mro_with_policy(db, name, policy)
     }
 
+    pub(crate) fn find_name_in_mro_with_policy_deferred(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> Option<PlaceAndQualifiers<'db>> {
+        let class_like = match self.subclass_of.with_transposed_type_var(db) {
+            SubclassOfInner::Class(class) => Type::from(class),
+            SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic),
+            SubclassOfInner::TypeVar(bound_typevar) => {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
+                    None => unreachable!(),
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound,
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        constraints.as_type(db)
+                    }
+                }
+            }
+        };
+
+        class_like.find_name_in_mro_with_policy_deferred(db, name, policy)
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
