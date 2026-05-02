@@ -3453,12 +3453,11 @@ class Baz:
     def method(self) -> bytes:
         return b"foo"
 
-static_assert(is_assignable_to(type[Baz], type[Foo]))  # error: [static-assert-error]
-static_assert(is_assignable_to(TypeOf[Baz], type[Foo]))  # error: [static-assert-error]
+static_assert(is_assignable_to(type[Baz], type[Foo]))
+static_assert(is_assignable_to(TypeOf[Baz], type[Foo]))
 
-# TODO: these should pass
-static_assert(is_subtype_of(type[Baz], type[Foo]))  # error: [static-assert-error]
-static_assert(is_subtype_of(TypeOf[Baz], type[Foo]))  # error: [static-assert-error]
+static_assert(is_subtype_of(type[Baz], type[Foo]))
+static_assert(is_subtype_of(TypeOf[Baz], type[Foo]))
 ```
 
 ## Regression test for `ClassVar` members in stubs

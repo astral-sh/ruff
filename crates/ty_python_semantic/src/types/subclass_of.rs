@@ -323,7 +323,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // and `type[int]` describes all possible runtime subclasses of the class `int`.
             // The first set is a subset of the second set, because `bool` is itself a subclass of `int`.
             (SubclassOfInner::Class(source), SubclassOfInner::Class(target)) => {
-                self.check_class_pair(db, source, target)
+                if target.is_protocol(db) {
+                    self.check_type_pair(db, Type::instance(db, source), Type::instance(db, target))
+                } else {
+                    self.check_class_pair(db, source, target)
+                }
             }
 
             (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {
