@@ -855,3 +855,13 @@ def f():
     else:
         reveal_type(x)  # revealed: str
 ```
+
+## Interaction of `isinstance()` narrowing and the meta-type of intersections
+
+```py
+def f(x: object):
+    if not isinstance(x, int):
+        reveal_type(x)  # revealed: ~int
+        reveal_type(x.__class__)  # revealed: type & ~type[int]
+        reveal_type(x.__class__.__name__)  # revealed: str
+```
