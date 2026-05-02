@@ -27,6 +27,14 @@ Settings: WorkspaceSettings {
 }
 
 Project at XXX
+Program:
+  python-version: 3.10
+  python-platform: linux
+  search-paths: [
+    <temp_dir>/src,
+    <temp_dir>/,
+    vendored://stdlib,
+  ]
 Settings: Settings {
     rules: <RULES>,
     terminal: TerminalSettings {
@@ -170,7 +178,10 @@ Memory report:
 `Program`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `Project`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `FileRoot`                                         metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+`ModuleResolveModeIngredient`                      metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 =======SALSA QUERIES=======
+`dynamic_resolution_paths -> alloc::vec::Vec<ty_module_resolver::path::SearchPath>`
+    metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 =======SALSA SUMMARY=======
 TOTAL MEMORY USAGE: [X.XXMB]
     struct metadata = [X.XXMB]
