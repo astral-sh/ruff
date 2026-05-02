@@ -99,6 +99,7 @@ pub(crate) struct DefinedPlace<'db> {
     pub(crate) origin: TypeOrigin,
     pub(crate) definedness: Definedness,
     pub(crate) public_type_policy: PublicTypePolicy,
+    pub(crate) definition: Option<Definition<'db>>,
 }
 
 impl<'db> DefinedPlace<'db> {
@@ -108,6 +109,7 @@ impl<'db> DefinedPlace<'db> {
             origin: TypeOrigin::Inferred,
             definedness: Definedness::AlwaysDefined,
             public_type_policy: PublicTypePolicy::Raw,
+            definition: None,
         }
     }
 
@@ -123,6 +125,11 @@ impl<'db> DefinedPlace<'db> {
 
     pub(crate) fn with_public_type_policy(mut self, public_type_policy: PublicTypePolicy) -> Self {
         self.public_type_policy = public_type_policy;
+        self
+    }
+
+    pub(crate) fn with_definition(mut self, definition: Option<Definition<'db>>) -> Self {
+        self.definition = definition;
         self
     }
 
@@ -176,6 +183,15 @@ impl<'db> Place<'db> {
     /// Constructor that creates a [`Place`] with type origin [`TypeOrigin::Declared`] and definedness [`Definedness::AlwaysDefined`].
     pub(crate) fn declared(ty: impl Into<Type<'db>>) -> Self {
         Place::Defined(DefinedPlace::new(ty.into()).with_origin(TypeOrigin::Declared))
+    }
+
+    /// Returns this place with the given definition attached. A no-op for [`Place::Undefined`].
+    #[must_use]
+    pub(crate) fn with_definition(self, definition: Option<Definition<'db>>) -> Self {
+        match self {
+            Place::Defined(defined) => Place::Defined(defined.with_definition(definition)),
+            Place::Undefined => Place::Undefined,
+        }
     }
 
     pub(crate) fn is_undefined(&self) -> bool {
@@ -253,18 +269,24 @@ impl<'db> Place<'db> {
                     ty: Type::Union(union),
                     ..
                 },
-            ) => union.map_with_boundness(db, |elem| {
-                Place::Defined(DefinedPlace { ty: *elem, ..place }).try_call_dunder_get(db, owner)
-            }),
+            ) => union
+                .map_with_boundness(db, |elem| {
+                    Place::Defined(DefinedPlace { ty: *elem, ..place })
+                        .try_call_dunder_get(db, owner)
+                })
+                .with_definition(place.definition),
 
             Place::Defined(
                 place @ DefinedPlace {
                     ty: Type::Intersection(intersection),
                     ..
                 },
-            ) => intersection.map_with_boundness(db, |elem| {
-                Place::Defined(DefinedPlace { ty: *elem, ..place }).try_call_dunder_get(db, owner)
-            }),
+            ) => intersection
+                .map_with_boundness(db, |elem| {
+                    Place::Defined(DefinedPlace { ty: *elem, ..place })
+                        .try_call_dunder_get(db, owner)
+                })
+                .with_definition(place.definition),
 
             Place::Defined(defined) => {
                 if let Some((dunder_get_return_ty, _)) =
@@ -299,14 +321,16 @@ impl<'db> From<LookupResult<'db>> for PlaceAndQualifiers<'db> {
         match value {
             Ok(type_and_qualifiers) => Place::Defined(
                 DefinedPlace::new(type_and_qualifiers.inner_type())
-                    .with_origin(type_and_qualifiers.origin()),
+                    .with_origin(type_and_qualifiers.origin())
+                    .with_definition(type_and_qualifiers.definition()),
             )
             .with_qualifiers(type_and_qualifiers.qualifiers()),
             Err(LookupError::Undefined(qualifiers)) => Place::Undefined.with_qualifiers(qualifiers),
             Err(LookupError::PossiblyUndefined(type_and_qualifiers)) => Place::Defined(
                 DefinedPlace::new(type_and_qualifiers.inner_type())
                     .with_origin(type_and_qualifiers.origin())
-                    .with_definedness(Definedness::PossiblyUndefined),
+                    .with_definedness(Definedness::PossiblyUndefined)
+                    .with_definition(type_and_qualifiers.definition()),
             )
             .with_qualifiers(type_and_qualifiers.qualifiers()),
         }
@@ -335,13 +359,17 @@ impl<'db> LookupError<'db> {
                 UnionType::from_two_elements(db, ty.inner_type(), ty2.inner_type()),
                 ty.origin().merge(ty2.origin()),
                 ty.qualifiers().union(ty2.qualifiers()),
-            )),
+            )
+            .with_definition(ty.definition().or(ty2.definition()))),
             (LookupError::PossiblyUndefined(ty), Err(LookupError::PossiblyUndefined(ty2))) => {
-                Err(LookupError::PossiblyUndefined(TypeAndQualifiers::new(
-                    UnionType::from_two_elements(db, ty.inner_type(), ty2.inner_type()),
-                    ty.origin().merge(ty2.origin()),
-                    ty.qualifiers().union(ty2.qualifiers()),
-                )))
+                Err(LookupError::PossiblyUndefined(
+                    TypeAndQualifiers::new(
+                        UnionType::from_two_elements(db, ty.inner_type(), ty2.inner_type()),
+                        ty.origin().merge(ty2.origin()),
+                        ty.qualifiers().union(ty2.qualifiers()),
+                    )
+                    .with_definition(ty.definition().or(ty2.definition())),
+                ))
             }
         }
     }
@@ -752,7 +780,8 @@ impl<'db> PlaceAndQualifiers<'db> {
                 qualifiers,
             } => {
                 let ty = place.public_type_policy.apply_if_needed(db, place.ty);
-                let type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers);
+                let type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers)
+                    .with_definition(place.definition);
                 match place.definedness {
                     Definedness::AlwaysDefined => Ok(type_and_qualifiers),
                     Definedness::PossiblyUndefined => {
@@ -829,6 +858,7 @@ impl<'db> PlaceAndQualifiers<'db> {
                 } else {
                     Definedness::PossiblyUndefined
                 },
+                definition: prev.definition.or(current.definition),
                 ..current
             }),
             // If a `Place` in the current cycle is `Defined` but `Undefined` in the previous cycle,
@@ -922,6 +952,7 @@ pub(crate) fn place_by_id<'db>(
                     ty: Type::Dynamic(DynamicType::Unknown),
                     origin,
                     definedness,
+                    definition: declared_definition,
                     ..
                 }),
             qualifiers,
@@ -932,12 +963,14 @@ pub(crate) fn place_by_id<'db>(
                     ty: inferred,
                     origin,
                     definedness: boundness,
+                    definition: inferred_definition,
                     ..
                 }) => Place::Defined(DefinedPlace {
                     ty: UnionType::from_two_elements(db, Type::unknown(), inferred),
                     origin,
                     definedness: boundness,
                     public_type_policy: PublicTypePolicy::Raw,
+                    definition: inferred_definition.or(declared_definition),
                 })
                 .with_qualifiers(qualifiers),
                 Place::Undefined => Place::Defined(DefinedPlace {
@@ -945,6 +978,7 @@ pub(crate) fn place_by_id<'db>(
                     origin,
                     definedness,
                     public_type_policy: PublicTypePolicy::Raw,
+                    definition: declared_definition,
                 })
                 .with_qualifiers(qualifiers),
             }
@@ -965,6 +999,7 @@ pub(crate) fn place_by_id<'db>(
                     ty: declared_ty,
                     origin,
                     definedness: Definedness::PossiblyUndefined,
+                    definition: declared_definition,
                     ..
                 }),
             qualifiers,
@@ -984,6 +1019,7 @@ pub(crate) fn place_by_id<'db>(
                         origin,
                         definedness: Definedness::AlwaysDefined,
                         public_type_policy: PublicTypePolicy::Raw,
+                        definition: declared_definition,
                     })
                 }
                 // Place is possibly undeclared and (possibly) bound
@@ -991,6 +1027,7 @@ pub(crate) fn place_by_id<'db>(
                     ty: inferred_ty,
                     origin,
                     definedness: boundness,
+                    definition: inferred_definition,
                     ..
                 }) => Place::Defined(DefinedPlace {
                     ty: UnionType::from_two_elements(db, inferred_ty, declared_ty),
@@ -1001,6 +1038,7 @@ pub(crate) fn place_by_id<'db>(
                         boundness
                     },
                     public_type_policy: PublicTypePolicy::Raw,
+                    definition: inferred_definition.or(declared_definition),
                 }),
             };
 
@@ -1516,12 +1554,16 @@ fn place_from_bindings_impl<'db>(
         };
 
         match deleted_reachability {
-            Truthiness::AlwaysFalse => {
-                Place::Defined(DefinedPlace::new(ty).with_definedness(boundness))
-            }
+            Truthiness::AlwaysFalse => Place::Defined(
+                DefinedPlace::new(ty)
+                    .with_definedness(boundness)
+                    .with_definition(first_definition),
+            ),
             Truthiness::AlwaysTrue => Place::Undefined,
             Truthiness::Ambiguous => Place::Defined(
-                DefinedPlace::new(ty).with_definedness(Definedness::PossiblyUndefined),
+                DefinedPlace::new(ty)
+                    .with_definedness(Definedness::PossiblyUndefined)
+                    .with_definition(first_definition),
             ),
         }
     } else {
@@ -1737,7 +1779,8 @@ fn place_from_declarations_impl<'db>(
         let place_and_quals = Place::Defined(
             DefinedPlace::new(declared.inner_type())
                 .with_origin(TypeOrigin::Declared)
-                .with_definedness(boundness),
+                .with_definedness(boundness)
+                .with_definition(first_declaration),
         )
         .with_qualifiers(declared.qualifiers());
 
@@ -2096,6 +2139,7 @@ mod tests {
                 origin: Inferred,
                 definedness: PossiblyUndefined,
                 public_type_policy: PublicTypePolicy::Raw,
+                definition: None,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -2105,6 +2149,7 @@ mod tests {
                 origin: Inferred,
                 definedness: PossiblyUndefined,
                 public_type_policy: PublicTypePolicy::Raw,
+                definition: None,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -2115,6 +2160,7 @@ mod tests {
                 origin: Inferred,
                 definedness: AlwaysDefined,
                 public_type_policy: PublicTypePolicy::Raw,
+                definition: None,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -2124,6 +2170,7 @@ mod tests {
                 origin: Inferred,
                 definedness: AlwaysDefined,
                 public_type_policy: PublicTypePolicy::Raw,
+                definition: None,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -2147,7 +2194,8 @@ mod tests {
                 ty: UnionType::from_elements(&db, [ty1, ty2]),
                 origin: Inferred,
                 definedness: PossiblyUndefined,
-                public_type_policy: PublicTypePolicy::Raw
+                public_type_policy: PublicTypePolicy::Raw,
+                definition: None,
             })
             .into()
         );
@@ -2157,7 +2205,8 @@ mod tests {
                 ty: UnionType::from_elements(&db, [ty1, ty2]),
                 origin: Inferred,
                 definedness: AlwaysDefined,
-                public_type_policy: PublicTypePolicy::Raw
+                public_type_policy: PublicTypePolicy::Raw,
+                definition: None,
             })
             .into()
         );

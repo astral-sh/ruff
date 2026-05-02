@@ -81,6 +81,73 @@ async def main() -> None:
     await NonCallableAwait()  # error: [invalid-await]
 ```
 
+If `__await__` is inherited from a base class, the diagnostic follows the MRO and points at the base
+class's assignment — including through deeper inheritance chains.
+
+```py
+class BaseWithBadAwait:
+    __await__ = 42
+
+class IntermediateAwait(BaseWithBadAwait): ...
+class DeepInheritedNonCallableAwait(IntermediateAwait): ...
+
+async def main() -> None:
+    await DeepInheritedNonCallableAwait()  # error: [invalid-await]
+```
+
+When the expression type is a union, the binding site cannot be attributed to a single definition,
+so the secondary annotation is omitted.
+
+```py
+class A:
+    __await__ = 42
+
+class B:
+    __await__ = "hello"
+
+x: A | B
+
+async def main() -> None:
+    await x  # error: [invalid-await]
+```
+
+## Non-callable `__await__` declared in class body, bound implicitly in `__init__`
+
+When `__await__` is declared in the class body but bound by an implicit assignment in `__init__`,
+the diagnostic points at the implicit assignment site — that's where the bad value comes from.
+
+```py
+class ImplicitBadAwait:
+    __await__: int
+
+    def __init__(self) -> None:
+        self.__await__ = 42
+
+async def main() -> None:
+    await ImplicitBadAwait()  # error: [invalid-await]
+```
+
+## Non-callable `__await__` on a re-exported class
+
+When `__await__` is defined on a class that is re-exported from another module, the diagnostic
+follows the import to the attribute's binding in the source module.
+
+`other.py`:
+
+```py
+class HasBadAwait:
+    __await__ = 42
+```
+
+`main.py`:
+
+```py
+from other import HasBadAwait
+
+async def main() -> None:
+    await HasBadAwait()  # error: [invalid-await]
+```
+
 ## `__await__` definition with explicit invalid return type
 
 `__await__` must return a valid iterator. This diagnostic also points to the method definition if

@@ -145,20 +145,20 @@ impl<'db> Type<'db> {
                     }
                 }
 
-                Err(CallDunderError::CallError(CallErrorKind::BindingError, bindings)) => {
+                Err(CallDunderError::CallError(CallErrorKind::BindingError, bindings, _)) => {
                     Err(BoolError::IncorrectArguments {
                         truthiness: type_to_truthiness(bindings.return_type(db)),
                         not_boolable_type: *self,
                     })
                 }
 
-                Err(CallDunderError::CallError(CallErrorKind::NotCallable, _)) => {
+                Err(CallDunderError::CallError(CallErrorKind::NotCallable, _, _)) => {
                     Err(BoolError::NotCallable {
                         not_boolable_type: *self,
                     })
                 }
 
-                Err(CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _)) => {
+                Err(CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _, _)) => {
                     Err(BoolError::Other {
                         not_boolable_type: *self,
                     })

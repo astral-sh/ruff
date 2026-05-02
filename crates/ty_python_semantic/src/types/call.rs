@@ -191,7 +191,14 @@ pub(super) enum CallDunderError<'db> {
     /// The dunder attribute exists but it can't be called with the given arguments.
     ///
     /// This includes non-callable dunder attributes that are possibly unbound.
-    CallError(CallErrorKind, Box<Bindings<'db>>),
+    ///
+    /// The binding site of the dunder on the receiver's class, when statically
+    /// resolvable. See <https://github.com/astral-sh/ty/issues/3250>.
+    CallError(
+        CallErrorKind,
+        Box<Bindings<'db>>,
+        Option<ty_python_core::definition::Definition<'db>>,
+    ),
 
     /// The type has the specified dunder method and it is callable
     /// with the specified arguments without any binding errors
@@ -213,20 +220,14 @@ pub(super) enum CallDunderError<'db> {
 impl<'db> CallDunderError<'db> {
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            Self::MethodNotAvailable | Self::CallError(CallErrorKind::NotCallable, _) => None,
-            Self::CallError(_, bindings) => Some(bindings.return_type(db)),
+            Self::MethodNotAvailable | Self::CallError(CallErrorKind::NotCallable, _, _) => None,
+            Self::CallError(_, bindings, _) => Some(bindings.return_type(db)),
             Self::PossiblyUnbound { bindings, .. } => Some(bindings.return_type(db)),
         }
     }
 
     pub(super) fn fallback_return_type(&self, db: &'db dyn Db) -> Type<'db> {
         self.return_type(db).unwrap_or(Type::unknown())
-    }
-}
-
-impl<'db> From<CallError<'db>> for CallDunderError<'db> {
-    fn from(CallError(kind, bindings): CallError<'db>) -> Self {
-        Self::CallError(kind, bindings)
     }
 }
 
@@ -243,7 +244,7 @@ pub(crate) enum CallBinOpError {
 impl From<CallDunderError<'_>> for CallBinOpError {
     fn from(value: CallDunderError<'_>) -> Self {
         match value {
-            CallDunderError::CallError(_, _) => Self::CallError,
+            CallDunderError::CallError(_, _, _) => Self::CallError,
             CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound { .. } => {
                 CallBinOpError::NotSupported
             }
