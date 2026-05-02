@@ -731,7 +731,7 @@ x6: Covariant[int | None] = covariant(1)
 x7: Contravariant[int | None] = contravariant(1)
 x8: Invariant[int | None] = invariant(1)
 
-reveal_type(x5)  # revealed: Bivariant[int | None]
+reveal_type(x5)  # revealed: Bivariant[Literal[1]]
 reveal_type(x6)  # revealed: Covariant[Literal[1]]
 reveal_type(x7)  # revealed: Contravariant[int | None]
 reveal_type(x8)  # revealed: Invariant[int | None]
