@@ -569,6 +569,11 @@ impl SearchPath {
         matches!(&*self.0, SearchPathInner::SitePackages(_))
     }
 
+    /// Is the module in an editable install discovered from site-packages?
+    pub fn is_editable(&self) -> bool {
+        matches!(&*self.0, SearchPathInner::Editable(_))
+    }
+
     fn is_valid_extension(&self, extension: &str) -> bool {
         if self.is_standard_library() {
             extension == "pyi"
