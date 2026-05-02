@@ -31,7 +31,7 @@ use crate::types::generics::{
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
 use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
 use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, Signature, SignatureRelationVisitor,
@@ -1247,16 +1247,28 @@ impl<'db> ClassType<'db> {
                     this_class == other_class
                 }
                 (ClassType::Generic(this_alias), ClassType::Generic(other_alias)) => {
-                    this_alias.origin(db) == other_alias.origin(db)
-                        && !this_alias
-                            .specialization(db)
-                            .is_disjoint_from(
-                                db,
-                                other_alias.specialization(db),
-                                constraints,
-                                InferableTypeVars::None,
-                            )
-                            .is_always_satisfied(db)
+                    if this_alias.origin(db) != other_alias.origin(db) {
+                        return false;
+                    }
+
+                    let this_specialization = this_alias.specialization(db);
+                    let other_specialization = other_alias.specialization(db);
+                    // Tuple element types do not impose runtime class-inheritance constraints:
+                    // `tuple[int]` and `tuple[str]` both have `tuple` as their runtime base.
+                    if this_specialization.tuple(db).is_some()
+                        && other_specialization.tuple(db).is_some()
+                    {
+                        return true;
+                    }
+
+                    !this_specialization
+                        .is_disjoint_from(
+                            db,
+                            other_specialization,
+                            constraints,
+                            InferableTypeVars::None,
+                        )
+                        .is_always_satisfied(db)
                 }
                 (ClassType::NonGeneric(_), ClassType::Generic(_))
                 | (ClassType::Generic(_), ClassType::NonGeneric(_)) => false,
@@ -1274,8 +1286,103 @@ impl<'db> ClassType<'db> {
         other: Self,
         constraints: &ConstraintSetBuilder<'db>,
     ) -> bool {
+        // The ordinary class-MRO query has no surrounding disjointness traversal, so it creates
+        // a checker here. Callers that already have a `DisjointnessChecker` use
+        // `could_coexist_in_mro_with_specialization_check` below to keep their active guard.
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        let checker = DisjointnessChecker::new(
+            constraints,
+            InferableTypeVars::None,
+            &relation_visitor,
+            &disjointness_visitor,
+            &signature_relation_visitor,
+            &materialization_visitor,
+        );
+        self.could_coexist_in_mro_with_specialization_check(
+            db,
+            other,
+            constraints,
+            &|left, right| {
+                checker
+                    .check_specialization_pair_in_mro(db, left, right)
+                    .is_always_satisfied(db)
+            },
+        )
+    }
+
+    /// Like [`ClassType::could_coexist_in_mro_with`], but lets callers provide the
+    /// specialization MRO-incompatibility check so recursive disjointness checks can reuse their
+    /// active cycle guards.
+    pub(super) fn could_coexist_in_mro_with_specialization_check(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        constraints: &ConstraintSetBuilder<'db>,
+        specializations_are_incompatible_in_mro: &impl Fn(
+            Specialization<'db>,
+            Specialization<'db>,
+        ) -> bool,
+    ) -> bool {
         if self == other {
             return true;
+        }
+
+        // If the two types are direct aliases of the same generic class, use ordinary
+        // specialization disjointness for that direct comparison. For example,
+        // `Covariant[FinalA]` and `Covariant[B]` can overlap through `Covariant[Never]`, even
+        // though no concrete subclass can have both `Covariant[FinalA]` and `Covariant[B]` as
+        // separate generic bases in its MRO.
+        if let Some((self_alias, other_alias)) = self
+            .into_generic_alias()
+            .zip(other.into_generic_alias())
+            .filter(|(self_alias, other_alias)| self_alias.origin(db) == other_alias.origin(db))
+        {
+            // As above, tuple element specs do not make two direct aliases incompatible as
+            // runtime classes.
+            if self_alias.specialization(db).tuple(db).is_some()
+                && other_alias.specialization(db).tuple(db).is_some()
+            {
+                return true;
+            }
+
+            return !self_alias
+                .specialization(db)
+                .is_disjoint_from(
+                    db,
+                    other_alias.specialization(db),
+                    constraints,
+                    InferableTypeVars::None,
+                )
+                .is_always_satisfied(db);
+        }
+
+        let other_generic_bases: Vec<_> = other
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .filter_map(ClassType::into_generic_alias)
+            .collect();
+
+        if self
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .filter_map(ClassType::into_generic_alias)
+            .any(|self_alias| {
+                other_generic_bases.iter().any(|other_alias| {
+                    if self_alias.origin(db) != other_alias.origin(db) {
+                        return false;
+                    }
+
+                    specializations_are_incompatible_in_mro(
+                        self_alias.specialization(db),
+                        other_alias.specialization(db),
+                    )
+                })
+            })
+        {
+            return false;
         }
 
         if self.is_final(db) {

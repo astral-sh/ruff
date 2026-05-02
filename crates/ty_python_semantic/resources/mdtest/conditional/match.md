@@ -52,10 +52,7 @@ def sequence_star_pattern_is_not_exhaustive_for_text(paths: Sequence[str]) -> No
 
     # `str`, `bytes`, and `bytearray` are subtypes of `Sequence`, but sequence
     # patterns explicitly do not match them.
-    # TODO: After https://github.com/astral-sh/ty/issues/3314 is fixed, the
-    # `Sequence[str] & bytes` and `Sequence[str] & bytearray` intersections
-    # should simplify to `Never`.
-    reveal_type(paths)  # revealed: str | (Sequence[str] & bytes) | (Sequence[str] & bytearray)
+    reveal_type(paths)  # revealed: str
 
 def sequence_prefix_star_pattern_is_not_catch_all(paths: Sequence[str]) -> None:
     match paths:

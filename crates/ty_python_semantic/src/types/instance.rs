@@ -571,7 +571,26 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         if left.is_object() || right.is_object() {
             return result;
         }
-        if let Some(left_spec) = left.tuple_spec(db) {
+
+        let left_class = left.class(db);
+        let right_class = right.class(db);
+        // Two different final classes cannot share a subclass, so their instances cannot
+        // overlap. For example, if both `A` and `B` are final, no runtime value can be both
+        // an `A` and a `B`.
+        if left_class.class_literal(db) != right_class.class_literal(db)
+            && left_class.is_final(db)
+            && right_class.is_final(db)
+        {
+            return self.always();
+        }
+
+        let compare_tuple_specs = matches!(left.0, NominalInstanceInner::ExactTuple(_))
+            || matches!(right.0, NominalInstanceInner::ExactTuple(_));
+
+        // Exact tuple instances can be disjoint because of their element specs, e.g.
+        // `tuple[int]` versus `tuple[str]`. For tuple subclasses, fall through to the MRO check
+        // below; subclass relationships, not tuple element specs alone, determine overlap.
+        if compare_tuple_specs && let Some(left_spec) = left.tuple_spec(db) {
             if let Some(right_spec) = right.tuple_spec(db) {
                 let compatible = self.check_tuple_spec_pair(db, &left_spec, &right_spec);
                 if result
@@ -586,9 +605,15 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         result.or(db, self.constraints, || {
             ConstraintSet::from_bool(
                 self.constraints,
-                !left
-                    .class(db)
-                    .could_coexist_in_mro_with(db, right.class(db), self.constraints),
+                !left_class.could_coexist_in_mro_with_specialization_check(
+                    db,
+                    right_class,
+                    self.constraints,
+                    &|left, right| {
+                        self.check_specialization_pair_in_mro(db, left, right)
+                            .is_always_satisfied(db)
+                    },
+                ),
             )
         })
     }

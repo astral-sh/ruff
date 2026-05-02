@@ -243,6 +243,27 @@ reveal_type(Foo())  # revealed: Foo
 reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
+## Overloaded `__init__` with method-level type variables
+
+Method-level type variables in an earlier overload should not make the overload filtering logic
+treat later overloads as unreachable when the constructor return specializations are still
+ambiguous.
+
+```py
+from typing import Any, Generic, Sequence, TypeVar, overload
+
+T = TypeVar("T")
+
+class C(Generic[T]):
+    @overload
+    def __init__(self: "C[Any]", x: Sequence[T]) -> None: ...
+    @overload
+    def __init__(self: "C[int]", x: tuple[int]) -> None: ...
+    def __init__(self, x: object) -> None: ...
+
+reveal_type(C((1,)))  # revealed: C[Any | int]
+```
+
 ## `__new__` return type
 
 Python's `__new__` method can return any type, not just an instance of the class. When `__new__`

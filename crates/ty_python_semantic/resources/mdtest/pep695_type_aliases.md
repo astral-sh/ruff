@@ -255,6 +255,20 @@ static_assert(not is_equivalent_to(TypeAliasType1, TypeAliasType2))
 static_assert(is_disjoint_from(TypeAliasType1, TypeAliasType2))
 ```
 
+Inferring a type variable from a type alias should preserve the specific alias object:
+
+```py
+from ty_extensions import TypeOf, is_equivalent_to, static_assert
+
+type Alias = int
+
+def identity[T](x: T) -> T:
+    return x
+
+# The inferred return type should still be the `Alias` object, not the alias value `int`.
+static_assert(is_equivalent_to(TypeOf[identity(Alias)], TypeOf[Alias]))
+```
+
 ## Direct use of `TypeAliasType`
 
 `TypeAliasType` can also be used directly. This is useful for versions of Python prior to 3.12.
@@ -531,6 +545,19 @@ x: JSON_OBJECT = {"hello": 23}
 
 def f() -> JSON_OBJECT:
     return {"hello": 23}
+```
+
+### Assignment through recursive aliases with recursive branches first
+
+```py
+type JsonValue = dict[str, JsonValue] | list[JsonValue] | str
+type JsonObject = dict[str, JsonValue]
+
+def f() -> JsonObject:
+    return {"hello": "world"}
+
+def g() -> JsonValue:
+    return {"hello": "world"}
 ```
 
 ### Recursive dict alias in method return

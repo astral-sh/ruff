@@ -378,8 +378,7 @@ def _():
     static_assert(not is_subtype_of(type[InvSub[bool]], type[InvSub[int]]))
     static_assert(not is_subtype_of(type[InvSub[int]], type[InvSub[bool]]))
     static_assert(is_disjoint_from(type[InvSub[int]], type[InvSub[str]]))
-    # TODO: These are disjoint.
-    static_assert(not is_disjoint_from(type[InvSub[bool]], type[InvSub[int]]))
+    static_assert(is_disjoint_from(type[InvSub[bool]], type[InvSub[int]]))
 
 def _[T]():
     static_assert(is_subtype_of(type[BivSub[T]], type[BivSub[Any]]))
@@ -449,10 +448,8 @@ def _():
 
     static_assert(not is_subtype_of(type[InvSub[bool]], type[Inv[int]]))
     static_assert(not is_subtype_of(type[InvSub[int]], type[Inv[bool]]))
-    # TODO: These are disjoint.
-    static_assert(not is_disjoint_from(type[InvSub[bool]], type[Inv[int]]))
-    # TODO: These are disjoint.
-    static_assert(not is_disjoint_from(type[InvSub[int]], type[Inv[bool]]))
+    static_assert(is_disjoint_from(type[InvSub[bool]], type[Inv[int]]))
+    static_assert(is_disjoint_from(type[InvSub[int]], type[Inv[bool]]))
 
 def _[T]():
     static_assert(is_subtype_of(type[BivSub[T]], type[Biv[Any]]))
