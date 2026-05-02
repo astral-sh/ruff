@@ -20,41 +20,27 @@
 //! avoid this is to prefer always calling `visitor.visit` only in the main recursive method on
 //! `Type`.
 
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::cmp::Eq;
 use std::hash::Hash;
 use std::marker::PhantomData;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
+use crate::Db;
 use crate::FxIndexSet;
 use crate::types::Type;
-
-/// Maximum recursion depth for cycle detection.
-///
-/// This is a safety limit to prevent stack overflow when checking recursive generic protocols
-/// that create infinitely growing type specializations. For example:
-///
-/// ```python
-/// class C[T](Protocol):
-///     a: 'C[set[T]]'
-/// ```
-///
-/// When checking `C[set[int]]` against e.g. `C[Unknown]`, member `a` requires checking
-/// `C[set[set[int]]]`, which in turn requires checking `C[set[set[set[int]]]]`, etc. Each level
-/// creates a unique cache key, so the standard cycle detection doesn't catch it. The depth limit
-/// ensures we bail out before hitting a stack overflow.
-const MAX_RECURSION_DEPTH: u32 = 64;
 
 pub(crate) type TypeTransformer<'db, Tag> = CycleDetector<Tag, Type<'db>, Type<'db>>;
 
 impl<Tag> Default for TypeTransformer<'_, Tag> {
     fn default() -> Self {
-        // TODO: proper recursive type handling
-
-        // This must be Any, not e.g. a todo type, because Any is the normalized form of the
-        // dynamic type (that is, todo types are normalized to Any).
-        CycleDetector::new(Type::any())
+        CycleDetector {
+            seen: RefCell::new(FxIndexSet::default()),
+            cache: RefCell::new(FxHashMap::default()),
+            fallback: None,
+            _tag: PhantomData,
+        }
     }
 }
 
@@ -75,11 +61,7 @@ pub struct CycleDetector<Tag, T, R> {
     /// sort-of defeat the point of a cache if we did!)
     cache: RefCell<FxHashMap<T, R>>,
 
-    /// Current recursion depth. Used to prevent stack overflow if recursive generic types create
-    /// infinitely growing type specializations that don't trigger exact-match cycle detection.
-    depth: Cell<u32>,
-
-    fallback: R,
+    fallback: Option<R>,
 
     _tag: PhantomData<Tag>,
 }
@@ -89,40 +71,90 @@ impl<Tag, T, R> CycleDetector<Tag, T, R> {
         CycleDetector {
             seen: RefCell::new(FxIndexSet::default()),
             cache: RefCell::new(FxHashMap::default()),
-            depth: Cell::new(0),
-            fallback,
+            fallback: Some(fallback),
             _tag: PhantomData,
         }
     }
 }
 
 impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
-    pub fn visit(&self, item: T, func: impl FnOnce() -> R) -> R {
+    /// Some recursive types cannot be evaluated for equality using simple hash values.
+    /// `is_cycle` provides a manual equality check.
+    /// `on_cycle` returns the type to be used as a fallback during the cycle.
+    fn visit_or_else(
+        &self,
+        item: T,
+        is_cycle: impl FnOnce(&FxIndexSet<T>, &T) -> bool,
+        on_cycle: impl FnOnce(T) -> R,
+        func: impl FnOnce() -> R,
+    ) -> R {
         if let Some(val) = self.cache.borrow().get(&item) {
             return val.clone();
         }
 
         // We hit a cycle
-        if !self.seen.borrow_mut().insert(item.clone()) {
-            return self.fallback.clone();
+        if is_cycle(&self.seen.borrow(), &item) || !self.seen.borrow_mut().insert(item.clone()) {
+            return on_cycle(item);
         }
-
-        // Check depth limit to prevent stack overflow from recursive generic types
-        // with growing specializations (e.g., C[set[T]] -> C[set[set[T]]] -> ...)
-        let current_depth = self.depth.get();
-        if current_depth >= MAX_RECURSION_DEPTH {
-            self.seen.borrow_mut().pop();
-            return self.fallback.clone();
-        }
-        self.depth.set(current_depth + 1);
 
         let ret = func();
 
-        self.depth.set(current_depth);
         self.seen.borrow_mut().pop();
         self.cache.borrow_mut().insert(item, ret.clone());
 
         ret
+    }
+
+    /// For `TypeTransformer`, use `visit_type` instead.
+    pub fn visit(&self, item: T, func: impl FnOnce() -> R) -> R {
+        debug_assert!(self.fallback.is_some());
+        self.visit_or_else(
+            item,
+            FxIndexSet::contains,
+            |_| self.fallback.clone().unwrap(),
+            func,
+        )
+    }
+}
+
+impl<'db, Tag> TypeTransformer<'db, Tag> {
+    fn same_type_identity(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
+        if left == right {
+            return true;
+        }
+
+        match (left, right) {
+            // We can create a self-referential function type: e.g. `def f(x: "TypeOf[f]"): reveal_type(x)`
+            // To avoid the difficulty of equality checking for function types containing this, we simply use `literal` for equality checking.
+            (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => {
+                left.literal(db) == right.literal(db)
+            }
+            // Similarly, we can create a self-referential NewType: e.g. `T = NewType("T", list["T"])`
+            (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => {
+                left.definition(db) == right.definition(db)
+            }
+            _ => false,
+        }
+    }
+
+    pub fn visit_type(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        func: impl FnOnce() -> Type<'db>,
+    ) -> Type<'db> {
+        self.visit_or_else(
+            ty,
+            |seen, ty| {
+                seen.contains(ty)
+                    || seen
+                        .iter()
+                        .any(|seen_type| Self::same_type_identity(db, *seen_type, *ty))
+            },
+            // When a cycle is encountered, the type being visited is returned as a fallback (typically a recursive type alias).
+            |item| item,
+            func,
+        )
     }
 }
 
