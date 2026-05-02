@@ -426,11 +426,12 @@ class SubclassOfGenericProtocol[T](GenericProtocol[T]): ...
 reveal_type(SubclassOfGenericProtocol[int]())  # revealed: SubclassOfGenericProtocol[int]
 ```
 
-And as a corollary, `type[MyProtocol]` can also be called:
+And as a corollary, `type[MyProtocol]` can also be called, but we currently model the result
+imprecisely:
 
 ```py
 def f(x: type[MyProtocol]):
-    reveal_type(x())  # revealed: MyProtocol
+    reveal_type(x())  # revealed: @Todo(type[T] for protocols)
 ```
 
 ## Members of a protocol
@@ -3064,7 +3065,7 @@ def _(r: Recursive):
     reveal_type(r.t)  # revealed: tuple[int, tuple[str, Recursive]]
     reveal_type(r.callable1)  # revealed: (int, /) -> Recursive
     reveal_type(r.callable2)  # revealed: (Recursive, /) -> int
-    reveal_type(r.subtype_of)  # revealed: type[Recursive]
+    reveal_type(r.subtype_of)  # revealed: @Todo(type[T] for protocols)
     reveal_type(r.generic)  # revealed: GenericC[Recursive]
     reveal_type(r.method(r))  # revealed: Recursive
     reveal_type(r.nested)  # revealed: Recursive | ((Recursive, tuple[Recursive, Recursive], /) -> Recursive)
@@ -3416,8 +3417,8 @@ Where `P` is a protocol type, a class object `N` can be said to inhabit the type
 - All method members on `P` exist on the class object `N`
 - Instantiating `N` creates an object that would satisfy the protocol `P`
 
-Currently meta-protocols are not fully supported by ty, but we try to keep false positives to a
-minimum in the meantime.
+Currently meta-protocols are not fully supported by ty. We model `type[P]` imprecisely to keep false
+positives to a minimum in the meantime.
 
 ```py
 from typing import Protocol, ClassVar
@@ -3429,23 +3430,19 @@ class Foo(Protocol):
     def method(self) -> bytes: ...
 
 def _(f: type[Foo]):
-    reveal_type(f)  # revealed: type[Foo]
+    reveal_type(f)  # revealed: type[@Todo(type[T] for protocols)]
 
-    # TODO: we should emit `unresolved-attribute` here: although we would accept this for a
-    # nominal class, we would see any class `N` as inhabiting `Foo` if it had an implicit
-    # instance attribute `x`, and implicit instance attributes are rarely bound on the class
-    # object.
-    reveal_type(f.x)  # revealed: int
+    reveal_type(f.x)  # revealed: @Todo(type[T] for protocols)
 
-    reveal_type(f.y)  # revealed: str
+    reveal_type(f.y)  # revealed: @Todo(type[T] for protocols)
     f.y = "foo"  # fine
 
-    reveal_type(f.method)  # revealed: def method(self, /) -> bytes
+    reveal_type(f.method)  # revealed: @Todo(type[T] for protocols)
 
 class Bar: ...
 
-static_assert(not is_assignable_to(type[Bar], type[Foo]))
-static_assert(not is_assignable_to(TypeOf[Bar], type[Foo]))
+static_assert(is_assignable_to(type[Bar], type[Foo]))
+static_assert(is_assignable_to(TypeOf[Bar], type[Foo]))
 
 class Baz:
     x: int
@@ -3456,8 +3453,18 @@ class Baz:
 static_assert(is_assignable_to(type[Baz], type[Foo]))
 static_assert(is_assignable_to(TypeOf[Baz], type[Foo]))
 
-static_assert(is_subtype_of(type[Baz], type[Foo]))
-static_assert(is_subtype_of(TypeOf[Baz], type[Foo]))
+static_assert(not is_subtype_of(type[Baz], type[Foo]))
+static_assert(not is_subtype_of(TypeOf[Baz], type[Foo]))
+
+class RegisterClass(Protocol):
+    _reg_clsid_: str
+
+def use_command_line(*classes: type[RegisterClass]) -> None: ...
+
+class Interpreter:
+    _reg_clsid_ = "clsid"
+
+use_command_line(Interpreter)
 ```
 
 ## Regression test for `ClassVar` members in stubs

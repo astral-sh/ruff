@@ -32,3 +32,20 @@ However, using such a `GenericAlias` instance in a type expression is currently 
 def _(strings: Strings) -> None:
     reveal_type(strings)  # revealed: Unknown
 ```
+
+It is valid to use a known class-object value as the argument to `typing.Type` at runtime:
+
+```py
+from typing import Any, Type
+import typing_extensions as tp
+
+def type_hint_from_value(value: Any) -> Any:
+    if isinstance(value, type):
+        return Type[value]
+    return value
+
+def typing_extensions_type_hint_from_value(value: Any) -> Any:
+    if isinstance(value, type):
+        return tp.Type[value]
+    return value
+```

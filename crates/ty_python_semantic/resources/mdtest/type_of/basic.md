@@ -480,6 +480,21 @@ def _[T]():
     static_assert(not is_disjoint_from(type[InvSub[T]], type[Inv[Any]]))
 ```
 
+## `type[]` with specialized generic type aliases
+
+```py
+from typing import Any, Generic, TypeAlias, TypeVar
+
+T = TypeVar("T")
+
+class Frame(Generic[T]): ...
+
+TFrameAny: TypeAlias = Frame[Any]
+
+def _(constructor: type[TFrameAny]) -> None:
+    reveal_type(constructor)  # revealed: type[Frame[Any]]
+```
+
 ## `type[]` types in unions with `Callable` types and callback protocols
 
 `type[Foo]` is assignable to `Callable[[], Foo]` here:

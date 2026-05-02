@@ -37,21 +37,32 @@ use ty_python_core::definition::Definition;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
 use ty_python_core::scope::FileScopeId;
 
-fn is_valid_type_argument_to_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+pub(super) fn is_valid_type_argument_to_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     let ty = ty.as_type_alias().map(Type::TypeAlias).unwrap_or(ty);
     let ty = ty.resolve_type_alias(db);
 
     match ty {
         Type::NominalInstance(_)
+        | Type::ClassLiteral(_)
         | Type::TypedDict(_)
         | Type::TypeVar(_)
+        | Type::GenericAlias(_)
+        | Type::SubclassOf(_)
         | Type::ProtocolInstance(_) => true,
+        Type::SpecialForm(
+            SpecialFormType::Any | SpecialFormType::Unknown | SpecialFormType::Type,
+        ) => true,
         Type::Dynamic(DynamicType::Any | DynamicType::Unknown) => true,
         Type::Union(union) => union
             .elements(db)
             .iter()
             .copied()
             .all(|element| is_valid_type_argument_to_type(db, element)),
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .copied()
+            .any(|element| is_valid_type_argument_to_type(db, element)),
         _ => false,
     }
 }
@@ -354,7 +365,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 },
                 SpecialFormType::Type => {
                     // Similar to the branch above that handles `type[…]`, handle `typing.Type[…]`
-                    let argument_ty = self.infer_type_expression(slice);
+                    let argument_ty = self.infer_expression(slice, TypeContext::default());
                     let argument_ty = if is_valid_type_argument_to_type(db, argument_ty) {
                         argument_ty
                     } else {
