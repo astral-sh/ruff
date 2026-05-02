@@ -458,6 +458,19 @@ def dict_get(d: dict[str, str | None]):
         return
 
     reveal_type(d["a"])  # revealed: str
+
+from typing_extensions import NotRequired, TypedDict
+
+class TD(TypedDict):
+    required: str | None
+    optional: NotRequired[str | None]
+
+def typed_dict_get(td: TD):
+    if td.get("required") is not None:
+        reveal_type(td["required"])  # revealed: str
+
+    if td.get("optional") is not None:
+        reveal_type(td["optional"])  # revealed: str
 ```
 
 ## Combined attribute and subscript narrowing

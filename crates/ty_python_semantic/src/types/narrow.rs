@@ -2077,8 +2077,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    /// Narrow the matching subscript place for a `dict.get` call proven to return a non-`None`
-    /// value.
+    /// Narrow the matching subscript place for a `dict.get` or `TypedDict.get` call proven to
+    /// return a non-`None` value.
     ///
     /// For example, given `d: dict[str, int | None]`, `d.get("key") is not None` proves that
     /// `d["key"]` exists and has type `int`:
@@ -2107,7 +2107,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             return None;
         };
 
-        if !is_dict_instance(self.db, inference.expression_type(attribute.value.as_ref())) {
+        if !has_known_dict_get_semantics(
+            self.db,
+            inference.expression_type(attribute.value.as_ref()),
+        ) {
             return None;
         }
 
@@ -2120,17 +2123,20 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 }
 
-fn is_dict_instance<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+// We only apply `dict.get`-to-subscript narrowing for types whose `get` and `__getitem__`
+// relationship is known. Arbitrary `Mapping` implementations can override `get` independently.
+fn has_known_dict_get_semantics<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty.resolve_type_alias(db) {
         Type::NominalInstance(instance) => instance.has_known_class(db, KnownClass::Dict),
+        Type::TypedDict(_) => true,
         Type::Intersection(intersection) => intersection
             .positive(db)
             .iter()
-            .any(|element| is_dict_instance(db, *element)),
+            .any(|element| has_known_dict_get_semantics(db, *element)),
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .all(|element| is_dict_instance(db, *element)),
+            .all(|element| has_known_dict_get_semantics(db, *element)),
         _ => false,
     }
 }
