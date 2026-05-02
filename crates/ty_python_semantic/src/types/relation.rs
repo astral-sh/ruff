@@ -1779,19 +1779,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .subclass_of()
                     .into_class(db)
                     .map(|target_cls| {
-                        if target_cls.is_protocol(db) {
-                            self.check_type_pair(
-                                db,
-                                Type::instance(db, source_cls.default_specialization(db)),
-                                Type::instance(db, target_cls),
-                            )
-                        } else {
-                            self.check_class_pair(
-                                db,
-                                source_cls.default_specialization(db),
-                                target_cls,
-                            )
-                        }
+                        self.check_class_pair(db, source_cls.default_specialization(db), target_cls)
                     })
                     .unwrap_or_else(|| {
                         ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
@@ -1822,15 +1810,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .subclass_of()
                     .into_class(db)
                     .map(|target_cls| {
-                        if target_cls.is_protocol(db) {
-                            self.check_type_pair(
-                                db,
-                                Type::instance(db, ClassType::Generic(source_alias)),
-                                Type::instance(db, target_cls),
-                            )
-                        } else {
-                            self.check_class_pair(db, ClassType::Generic(source_alias), target_cls)
-                        }
+                        self.check_class_pair(db, ClassType::Generic(source_alias), target_cls)
                     })
                     .unwrap_or_else(|| {
                         ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())

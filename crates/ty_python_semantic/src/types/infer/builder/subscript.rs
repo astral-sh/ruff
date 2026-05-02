@@ -37,6 +37,24 @@ use ty_python_core::definition::Definition;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
 use ty_python_core::scope::FileScopeId;
 
+/// Return whether `ty` can be used as the argument to `type[...]` or `typing.Type[...]`.
+///
+/// The argument must denote a class-object type or a gradual type that may denote one. Type aliases
+/// are resolved before validation, so aliases to specialized classes are treated like the class
+/// type they name.
+///
+/// ```py
+/// from collections.abc import Callable
+/// from typing import Any, Type
+///
+/// Alias = list[int]
+/// ok: type[Alias]
+/// bad: type[Callable[[int], str]]  # rejected: not a class-object type
+///
+/// def type_hint_from_value(value: Any) -> Any:
+///     if isinstance(value, type):
+///         return Type[value]
+/// ```
 pub(super) fn is_valid_type_argument_to_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     let ty = ty.as_type_alias().map(Type::TypeAlias).unwrap_or(ty);
     let ty = ty.resolve_type_alias(db);

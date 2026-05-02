@@ -9,9 +9,7 @@ use crate::types::diagnostic::{
     note_py_version_too_old_for_pep_604, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_callable, report_invalid_concatenate_last_arg,
 };
-use crate::types::infer::builder::subscript::{
-    AnnotatedExprContext, is_valid_type_argument_to_type,
-};
+use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
@@ -1165,15 +1163,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     builder.db(),
                     todo_type!("type[T] for protocols").expect_dynamic(),
                 );
-            }
-            if let Type::Intersection(intersection) = resolved_slice_ty
-                && intersection
-                    .positive(builder.db())
-                    .iter()
-                    .copied()
-                    .any(|element| is_valid_type_argument_to_type(builder.db(), element))
-            {
-                return SubclassOfType::subclass_of_unknown();
             }
             SubclassOfType::try_from_instance(builder.db(), slice_ty)
                 .unwrap_or_else(|| invalid_type_argument(builder, slice))
