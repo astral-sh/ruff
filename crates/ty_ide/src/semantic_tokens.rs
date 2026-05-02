@@ -47,7 +47,7 @@ use ty_python_semantic::{
         CallArgumentForm, call_argument_forms, definition_for_name,
         static_member_type_for_attribute,
     },
-    types::{MethodDecorator, SpecialFormType, Type, TypeVarKind},
+    types::{KnownInstanceType, MethodDecorator, SpecialFormType, Type, TypeVarKind},
 };
 
 /// Semantic token types supported by the language server.
@@ -310,7 +310,9 @@ impl<'db> SemanticTokenVisitor<'db> {
                 }
             }
             DefinitionKind::Class(_) => Some((SemanticTokenType::Class, modifiers)),
-            DefinitionKind::TypeVar(_) => Some((SemanticTokenType::TypeParameter, modifiers)),
+            DefinitionKind::TypeVar(_) | DefinitionKind::ParamSpec(_) => {
+                Some((SemanticTokenType::TypeParameter, modifiers))
+            }
             DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) => {
                 let parsed = parsed_module(db, definition.file(db));
                 let ty = parameter.node(&parsed.load(db)).inferred_type(&model);
@@ -365,6 +367,13 @@ impl<'db> SemanticTokenVisitor<'db> {
                 if let Some(value) = value
                     && let Some(value_ty) = value.inferred_type(&model)
                 {
+                    if matches!(value_ty, Type::KnownInstance(KnownInstanceType::TypeVar(_))) {
+                        return Some((
+                            SemanticTokenType::TypeParameter,
+                            SemanticTokenModifier::empty(),
+                        ));
+                    }
+
                     if value_ty.is_class_literal()
                         || value_ty.is_subclass_of()
                         || value_ty.is_generic_alias()
@@ -396,6 +405,9 @@ impl<'db> SemanticTokenVisitor<'db> {
         Some(match ty {
             Type::ClassLiteral(_) => (SemanticTokenType::Class, modifiers),
             Type::TypeVar(_) => (SemanticTokenType::TypeParameter, modifiers),
+            Type::KnownInstance(KnownInstanceType::TypeVar(_)) => {
+                (SemanticTokenType::TypeParameter, modifiers)
+            }
             Type::FunctionLiteral(_) => {
                 // Check if this is a method based on current scope
                 if self.in_class_scope {
@@ -1360,6 +1372,68 @@ y = 'hello'
         "42" @ 5..7: Number
         "y" @ 8..9: Variable [definition]
         "'hello'" @ 12..19: String
+        "#);
+    }
+
+    #[test]
+    fn semantic_tokens_legacy_typevar() {
+        let test = SemanticTokenTest::new(
+            r#"
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    value: T
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "typing" @ 6..12: Namespace
+        "Generic" @ 20..27: Variable
+        "TypeVar" @ 29..36: Class
+        "T" @ 38..39: TypeParameter [definition]
+        "TypeVar" @ 42..49: Class
+        "\"T\"" @ 50..53: String
+        "Box" @ 62..65: Class [definition]
+        "Generic" @ 66..73: Variable
+        "T" @ 74..75: TypeParameter
+        "value" @ 83..88: Variable [definition]
+        "T" @ 90..91: TypeParameter
+        "#);
+    }
+
+    #[test]
+    fn semantic_tokens_legacy_paramspec() {
+        let test = SemanticTokenTest::new(
+            r#"
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+
+def decorator(func: Callable[P, int]) -> Callable[P, str]: ...
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "typing" @ 6..12: Namespace
+        "Callable" @ 20..28: Variable
+        "ParamSpec" @ 30..39: Class
+        "P" @ 41..42: TypeParameter [definition]
+        "ParamSpec" @ 45..54: Class
+        "\"P\"" @ 55..58: String
+        "decorator" @ 65..74: Function [definition]
+        "func" @ 75..79: Parameter [definition]
+        "Callable" @ 81..89: Variable
+        "P" @ 90..91: TypeParameter
+        "int" @ 93..96: Class
+        "Callable" @ 102..110: Variable
+        "P" @ 111..112: TypeParameter
+        "str" @ 114..117: Class
         "#);
     }
 
@@ -3592,16 +3666,16 @@ class BoundedContainer[T: int, U = str]:
         "func_paramspec" @ 266..280: Function [definition]
         "P" @ 283..284: TypeParameter [definition]
         "func" @ 286..290: Parameter [definition]
-        "P" @ 301..302: Variable
+        "P" @ 301..302: TypeParameter
         "int" @ 304..307: Class
-        "P" @ 322..323: Variable
+        "P" @ 322..323: TypeParameter
         "str" @ 325..328: Class
         "wrapper" @ 339..346: Function [definition]
         "args" @ 348..352: Parameter [definition]
-        "P" @ 354..355: Variable
+        "P" @ 354..355: TypeParameter
         "args" @ 356..360: Property [readonly]
         "kwargs" @ 364..370: Parameter [definition]
-        "P" @ 372..373: Variable
+        "P" @ 372..373: TypeParameter
         "kwargs" @ 374..380: Property [readonly]
         "str" @ 385..388: Class
         "str" @ 405..408: Class
