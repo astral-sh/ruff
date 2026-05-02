@@ -11,7 +11,6 @@
 mod constructor;
 
 use std::borrow::Cow;
-use std::collections::HashSet;
 use std::fmt;
 
 use itertools::Itertools;
@@ -3271,21 +3270,21 @@ impl<'db> CallableBinding<'db> {
     ///
     /// [1]: https://typing.python.org/en/latest/spec/overload.html#overload-call-evaluation
     fn filter_overloads_containing_variadic(&mut self, matching_overload_indexes: &[usize]) {
-        let variadic_matching_overloads = matching_overload_indexes
+        let variadic_matching_overload_count = matching_overload_indexes
             .iter()
             .filter(|&&overload_index| {
                 self.overloads[overload_index].variadic_argument_matched_to_variadic_parameter
             })
-            .collect::<HashSet<_>>();
+            .count();
 
-        if variadic_matching_overloads.is_empty()
-            || variadic_matching_overloads.len() == matching_overload_indexes.len()
+        if variadic_matching_overload_count == 0
+            || variadic_matching_overload_count == matching_overload_indexes.len()
         {
             return;
         }
 
         for overload_index in matching_overload_indexes {
-            if !variadic_matching_overloads.contains(overload_index) {
+            if !self.overloads[*overload_index].variadic_argument_matched_to_variadic_parameter {
                 self.overloads[*overload_index].mark_as_unmatched_overload();
             }
         }
@@ -3352,7 +3351,7 @@ impl<'db> CallableBinding<'db> {
             .max()
             .unwrap_or(0);
 
-        let mut participating_slot_indices = HashSet::new();
+        let mut participating_slot_indices = vec![false; max_slot_count];
         for slot_index in 0..max_slot_count {
             let mut first_parameter_type: Option<Type<'db>> = None;
             for (_, overload_slots) in &matching_overload_slots {
@@ -3364,11 +3363,11 @@ impl<'db> CallableBinding<'db> {
                             .when_equivalent_to(db, current_parameter_type, constraints)
                             .is_always_satisfied(db)
                         {
-                            participating_slot_indices.insert(slot_index);
+                            participating_slot_indices[slot_index] = true;
                         }
                     }
                     (Some(_), None) => {
-                        participating_slot_indices.insert(slot_index);
+                        participating_slot_indices[slot_index] = true;
                     }
                     (None, Some(current_parameter_type)) => {
                         first_parameter_type = Some(current_parameter_type);
@@ -3396,7 +3395,7 @@ impl<'db> CallableBinding<'db> {
 
             for (_, slots) in &matching_overload_slots {
                 for (slot_index, slot) in slots.iter().enumerate() {
-                    if participating_slot_indices.contains(&slot_index) {
+                    if participating_slot_indices[slot_index] {
                         let argument_type = slot.variadic_argument.unwrap_or_else(|| {
                             current_slots
                                 .get(slot_index)
@@ -3426,7 +3425,7 @@ impl<'db> CallableBinding<'db> {
                 .collect::<Vec<_>>();
             for (_, slots) in &matching_overload_slots[..=upto] {
                 for (slot_index, slot) in slots.iter().enumerate() {
-                    if participating_slot_indices.contains(&slot_index) {
+                    if participating_slot_indices[slot_index] {
                         union_parameter_types[slot_index].add_in_place(slot.parameter);
                     }
                 }
@@ -4883,6 +4882,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // TODO: handle starred annotations, e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...]]`
         if !self.constraint_set_errors[argument_index]
             && !parameter.has_starred_annotation()
+            && argument_type != expected_ty
+            && !expected_ty.is_object()
             && argument_type
                 .when_assignable_to(self.db, expected_ty, constraints, self.inferable_typevars)
                 .is_never_satisfied(self.db)

@@ -51,7 +51,11 @@ impl<'db> UnionType<'db> {
 
         if let Some(first) = iter_elements.next() {
             if let Some(second) = iter_elements.next() {
-                let builder = UnionBuilder::new(db).add(first.into()).add(second.into());
+                let (lower, upper) = iter_elements.size_hint();
+                let capacity = upper.unwrap_or(lower).saturating_add(2);
+                let builder = UnionBuilder::with_capacity(db, capacity)
+                    .add(first.into())
+                    .add(second.into());
                 iter_elements
                     .fold(builder, |builder, element| builder.add(element.into()))
                     .build()
@@ -81,10 +85,11 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
+        let elements = elements.into_iter();
+        let (lower, upper) = elements.size_hint();
         elements
-            .into_iter()
             .fold(
-                UnionBuilder::new(db).unpack_aliases(false),
+                UnionBuilder::with_capacity(db, upper.unwrap_or(lower)).unpack_aliases(false),
                 |builder, element| builder.add(element.into()),
             )
             .build()
@@ -95,10 +100,11 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
+        let elements = elements.into_iter();
+        let (lower, upper) = elements.size_hint();
         elements
-            .into_iter()
             .fold(
-                UnionBuilder::new(db).cycle_recovery(true),
+                UnionBuilder::with_capacity(db, upper.unwrap_or(lower)).cycle_recovery(true),
                 |builder, element| builder.add(element.into()),
             )
             .build()
@@ -114,7 +120,9 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = Option<T>>,
         T: Into<Type<'db>>,
     {
-        let mut builder = UnionBuilder::new(db);
+        let elements = elements.into_iter();
+        let (lower, upper) = elements.size_hint();
+        let mut builder = UnionBuilder::with_capacity(db, upper.unwrap_or(lower));
         for element in elements {
             builder = builder.add(element?.into());
         }
