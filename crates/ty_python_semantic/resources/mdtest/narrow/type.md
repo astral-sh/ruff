@@ -331,6 +331,7 @@ def _(x: Base):
 def _(x: object):
     if (y := type(x)) is bool:
         reveal_type(y)  # revealed: <class 'bool'>
+        reveal_type(x)  # revealed: bool
     if (type(y := x)) is bool:
         reveal_type(y)  # revealed: bool
 ```

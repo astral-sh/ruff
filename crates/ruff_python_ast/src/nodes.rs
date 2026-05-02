@@ -84,6 +84,17 @@ impl Expr {
         }
     }
 
+    /// Return the value expression after peeling off any nested named expressions.
+    ///
+    /// For example, this returns the `x` expression for both `x` and `(y := x)`.
+    pub fn expression_value(&self) -> &Self {
+        let mut expr = self;
+        while let Expr::Named(named) = expr {
+            expr = &named.value;
+        }
+        expr
+    }
+
     /// Return the [`OperatorPrecedence`] of this expression
     pub fn precedence(&self) -> OperatorPrecedence {
         OperatorPrecedence::from(self)
