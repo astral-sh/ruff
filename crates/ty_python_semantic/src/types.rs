@@ -1077,8 +1077,10 @@ impl<'db> Type<'db> {
         };
 
         let mut enum_class = None;
+        let mut rest = smallvec::SmallVec::default();
         for positive in intersection.positive(db) {
             if matches!(positive, Type::Dynamic(_)) {
+                rest.push(*positive);
                 continue;
             }
 
@@ -1109,7 +1111,12 @@ impl<'db> Type<'db> {
             excluded_names.insert(canonical_name.clone());
         }
 
-        Some(EnumComplement::new(enum_class, metadata, excluded_names))
+        Some(EnumComplement::new(
+            enum_class,
+            metadata,
+            excluded_names,
+            rest,
+        ))
     }
 
     /// Return `true` if this type is an enum instance type.

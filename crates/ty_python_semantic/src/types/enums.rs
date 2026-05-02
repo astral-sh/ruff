@@ -9,8 +9,9 @@ use crate::{
     reachability::DeclarationsIteratorExtension,
     types::{
         ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, LiteralValueTypeKind,
-        MemberLookupPolicy, StaticClassLiteral, Type, function::FunctionType,
-        set_theoretic::builder::UnionBuilder,
+        MemberLookupPolicy, StaticClassLiteral, Type,
+        function::FunctionType,
+        set_theoretic::builder::{IntersectionBuilder, UnionBuilder},
     },
 };
 use ty_python_core::{definition::DefinitionKind, place_table, scope::ScopeId, use_def_map};
@@ -146,6 +147,9 @@ pub(crate) struct EnumComplement<'db> {
     enum_class: ClassLiteral<'db>,
     metadata: &'db EnumMetadata<'db>,
     excluded_names: FxHashSet<Name>,
+    /// The rest of the intersection's positive components, such as `Any`, that must be kept when
+    /// expanding the complement.
+    rest: SmallVec<[Type<'db>; 1]>,
 }
 
 impl<'db> EnumComplement<'db> {
@@ -155,11 +159,13 @@ impl<'db> EnumComplement<'db> {
         enum_class: ClassLiteral<'db>,
         metadata: &'db EnumMetadata<'db>,
         excluded_names: FxHashSet<Name>,
+        rest: SmallVec<[Type<'db>; 1]>,
     ) -> Self {
         Self {
             enum_class,
             metadata,
             excluded_names,
+            rest,
         }
     }
 
@@ -218,6 +224,16 @@ impl<'db> EnumComplement<'db> {
         self.excluded_names.contains(name)
     }
 
+    /// Return the rest of the intersection's positive components.
+    pub(crate) fn rest(&self) -> &[Type<'db>] {
+        &self.rest
+    }
+
+    /// Return `true` if this complement carries any additional positive components.
+    pub(crate) fn has_rest(&self) -> bool {
+        !self.rest.is_empty()
+    }
+
     /// Count the canonical enum members still represented by this complement.
     fn remaining_member_count(&self) -> usize {
         self.metadata
@@ -253,11 +269,22 @@ impl<'db> EnumComplement<'db> {
                 .members
                 .keys()
                 .filter(|name| !self.excluded_names.contains(*name))
-                .map(|name| {
-                    Type::enum_literal(EnumLiteralType::new(db, self.enum_class, name.clone()))
-                })
+                .map(|name| self.remaining_literal_type(db, name.clone()))
                 .collect(),
         )
+    }
+
+    fn remaining_literal_type(&self, db: &'db dyn Db, name: Name) -> Type<'db> {
+        let literal = Type::enum_literal(EnumLiteralType::new(db, self.enum_class, name));
+        if !self.has_rest() {
+            return literal;
+        }
+
+        let mut builder = IntersectionBuilder::new(db).add_positive(literal);
+        for rest in self.rest() {
+            builder = builder.add_positive(*rest);
+        }
+        builder.build()
     }
 
     /// Expand this complement for display only if the resulting `Literal[...]` remains concise.
@@ -281,6 +308,10 @@ impl<'db> EnumComplement<'db> {
         db: &'db dyn Db,
         max_literals: usize,
     ) -> Option<Vec<Type<'db>>> {
+        if self.has_rest() {
+            return None;
+        }
+
         let remaining_count = self.remaining_member_count();
         if remaining_count == 0 || remaining_count > max_literals {
             return None;

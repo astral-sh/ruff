@@ -166,10 +166,15 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
             if let Some(other_complement) = ty.enum_complement(db) {
                 if other_complement.enum_class() == enum_class
                     && other_complement.has_excluded_members()
+                    && other_complement.rest() == complement.rest()
                 {
                     shared_excluded_names.retain(|name| other_complement.excludes_member(name));
                     remove_indices.push(index);
                 }
+                continue;
+            }
+
+            if complement.has_rest() {
                 continue;
             }
 
@@ -188,21 +193,23 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
         }
 
         if !remove_indices.is_empty() {
-            types[complement_index] = enum_class.to_non_generic_instance(db);
+            let mut builder =
+                IntersectionBuilder::new(db).add_positive(enum_class.to_non_generic_instance(db));
+            for rest in complement.rest() {
+                builder = builder.add_positive(*rest);
+            }
             for name in metadata
                 .members
                 .keys()
                 .filter(|name| shared_excluded_names.contains(*name))
             {
-                types[complement_index] = IntersectionBuilder::new(db)
-                    .add_positive(types[complement_index])
-                    .add_negative(Type::enum_literal(EnumLiteralType::new(
-                        db,
-                        enum_class,
-                        name.clone(),
-                    )))
-                    .build();
+                builder = builder.add_negative(Type::enum_literal(EnumLiteralType::new(
+                    db,
+                    enum_class,
+                    name.clone(),
+                )));
             }
+            types[complement_index] = builder.build();
 
             remove_indices.sort_unstable();
             for index in remove_indices.into_iter().rev() {

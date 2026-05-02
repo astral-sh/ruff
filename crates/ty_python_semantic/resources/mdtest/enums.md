@@ -2272,6 +2272,7 @@ def color_value_without_red(color: Color) -> Literal[2, 3]:
 def color_value_without_red_and_with_any(color: Intersection[Color, Any]) -> Literal[2, 3]:
     if color is Color.RED:
         raise ValueError()
+    reveal_type(color)  # revealed: Color & Any & ~Literal[Color.RED]
     reveal_type(color.value)  # revealed: Literal[2, 3]
     return color.value
 
@@ -2300,6 +2301,18 @@ def color_after_different_complement_merge(color: Color, flag: bool) -> None:
         merged = color
     reveal_type(merged)  # revealed: Color
     assert_type(merged, Color)
+
+def color_after_dynamic_complement_merge(color: Intersection[Color, Any], flag: bool) -> None:
+    if flag:
+        if color is Color.RED:
+            return
+        merged = color
+    else:
+        if color is Color.GREEN:
+            return
+        merged = color
+    reveal_type(merged)  # revealed: Color & Any
+    assert_type(merged, Intersection[Color, Any])
 
 def color_after_shared_complement_merge(color: Color, flag: bool) -> None:
     if color is Color.RED:
