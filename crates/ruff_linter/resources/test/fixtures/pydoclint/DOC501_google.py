@@ -1,5 +1,7 @@
 import something
+import urllib.error
 from somewhere import AnotherError
+from urllib import error as url_error
 
 
 class FasterThanLightError(Exception):
@@ -317,3 +319,72 @@ def chained_missing(value):
         title="Validation",
         line_errors=[],
     ).with_traceback(None)
+
+
+# OK - exception raised via module attribute call, documented
+def module_exception_documented(value):
+    """Process a value.
+
+    Args:
+        value: the value to process.
+
+    Raises:
+        something.SomeError: if the value is bad.
+    """
+    raise something.SomeError(value)
+
+
+# DOC501 - exception raised via module attribute call, NOT documented
+def module_exception_missing(value):
+    """Process a value.
+
+    Args:
+        value: the value to process.
+    """
+    raise something.SomeError(value)
+
+
+# OK - exception raised via nested module attribute call, documented
+def nested_module_exception_documented(value):
+    """Process a value.
+
+    Args:
+        value: the value to process.
+
+    Raises:
+        URLError: if the connection fails.
+    """
+    raise urllib.error.URLError(value)
+
+
+# DOC501 - exception raised via nested module attribute call, NOT documented
+def nested_module_exception_missing(value):
+    """Process a value.
+
+    Args:
+        value: the value to process.
+    """
+    raise urllib.error.URLError(value)
+
+
+# OK - exception raised via from-imported module, documented
+def from_import_module_documented(value):
+    """Process a value.
+
+    Args:
+        value: the value to process.
+
+    Raises:
+        URLError: if the connection fails.
+    """
+    raise url_error.URLError(value)
+
+
+# DOC501 - exception raised via from-imported module, NOT documented
+def from_import_module_missing(value):
+    """Process a value.
+
+    Args:
+        value: the value to process.
+    """
+    raise url_error.URLError(value)
