@@ -1591,22 +1591,6 @@ fn specialization_variance<'db>(
     }
 }
 
-fn type_or_alias_value_has_typevar<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    any_over_type(db, ty, true, |ty| matches!(ty, Type::TypeVar(_)))
-}
-
-fn type_or_alias_value_has_typevar_or_typevar_instance<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-) -> bool {
-    any_over_type(db, ty, true, |ty| {
-        matches!(
-            ty,
-            Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_)
-        )
-    })
-}
-
 impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     /// Return `true` if a type can safely participate in specialization disjointness shortcuts.
     ///
@@ -1615,7 +1599,14 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     /// type as another type variable, so treating either as definitive evidence of disjointness
     /// would make overload filtering and union simplification too eager.
     fn type_is_static_for_specialization_disjointness(db: &'db dyn Db, ty: Type<'db>) -> bool {
-        if ty.is_dynamic() || type_or_alias_value_has_typevar_or_typevar_instance(db, ty) {
+        if ty.is_dynamic()
+            || any_over_type(db, ty, true, |ty| {
+                matches!(
+                    ty,
+                    Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_)
+                )
+            })
+        {
             return false;
         }
 
@@ -2157,8 +2148,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
         // Pairs with no type variables cannot contribute any mapping. Look through nested alias
         // values here so `list[Alias[T]]` still reaches structural inference.
-        if !type_or_alias_value_has_typevar(self.db, formal)
-            && !type_or_alias_value_has_typevar(self.db, actual)
+        if !any_over_type(self.db, formal, true, |ty| matches!(ty, Type::TypeVar(_)))
+            && !any_over_type(self.db, actual, true, |ty| matches!(ty, Type::TypeVar(_)))
         {
             return Ok(());
         }
