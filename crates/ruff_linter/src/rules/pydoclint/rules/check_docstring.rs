@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::{map_callable, map_subscript};
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Stmt, visitor};
@@ -980,10 +980,33 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
         match stmt {
             Stmt::Raise(ast::StmtRaise { exc, .. }) => {
                 if let Some(exc) = exc.as_ref() {
-                    // First try to resolve the exception directly
-                    if let Some(qualified_name) =
-                        self.semantic.resolve_qualified_name(map_callable(exc))
-                    {
+                    // Unwrap method chain calls to find the exception type:
+                    //   `raise ValueError("bad")` → `ValueError`
+                    //   `raise ValueError.from_exception_data(...)` → `ValueError`
+                    //   `raise Error.create(...).with_traceback(tb)` → `Error`
+                    //   `raise module.SomeError` → `module.SomeError` (bare attr, no unwrap)
+                    let mut current = exc.as_ref();
+                    let qualified_name = loop {
+                        if let ast::Expr::Call(ast::ExprCall { func, .. }) = current {
+                            if let ast::Expr::Attribute(attr) = func.as_ref() {
+                                // `Error.method(...)` — try resolving the object.
+                                if let Some(qn) = self.semantic.resolve_qualified_name(&attr.value)
+                                {
+                                    break Some(qn);
+                                }
+                                // Object is another call — keep peeling.
+                                current = &attr.value;
+                            } else {
+                                // `Error(...)` — resolve the callable directly.
+                                break self.semantic.resolve_qualified_name(func.as_ref());
+                            }
+                        } else {
+                            // Bare `Error` or `module.Error` — resolve as-is.
+                            break self.semantic.resolve_qualified_name(current);
+                        }
+                    };
+
+                    if let Some(qualified_name) = qualified_name {
                         self.raised_exceptions.push(ExceptionEntry {
                             qualified_name,
                             range: exc.range(),

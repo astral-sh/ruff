@@ -226,3 +226,35 @@ DOC501 Raised exception `ValueError` missing from docstring
 244 |           raise TypeError  # DOC501
     |
 help: Add `ValueError` to the docstring
+
+DOC501 Raised exception `ValueError` missing from docstring
+   --> DOC501_google.py:269:5
+    |
+267 |   # DOC501 - exception raised via classmethod, NOT documented
+268 |   def validate_classmethod_missing(value):
+269 | /     """Validate a value.
+270 | |
+271 | |     Args:
+272 | |         value: the value to validate.
+273 | |     """
+    | |_______^
+274 |       raise ValueError.from_exception_data(
+275 |           title="Validation",
+    |
+help: Add `ValueError` to the docstring
+
+DOC501 Raised exception `ValueError` missing from docstring
+   --> DOC501_google.py:311:5
+    |
+309 |   # DOC501 - chained method call, NOT documented
+310 |   def chained_missing(value):
+311 | /     """Validate a value.
+312 | |
+313 | |     Args:
+314 | |         value: the value to validate.
+315 | |     """
+    | |_______^
+316 |       raise ValueError.from_exception_data(
+317 |           title="Validation",
+    |
+help: Add `ValueError` to the docstring
