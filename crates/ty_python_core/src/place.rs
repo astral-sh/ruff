@@ -653,7 +653,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         // For subscript expressions on either side, the subscript base can also be narrowed.
         // (TypedDict and tuple discriminated union narrowing.)
         for expr in std::iter::once(&*expr_compare.left).chain(&expr_compare.comparators) {
-            if let ast::Expr::Subscript(subscript) = expr
+            if let ast::Expr::Subscript(subscript) = expr.expression_value()
                 && let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value)
                 && let Some(place) = self.places.place_id((&place_expr).into())
             {
@@ -710,17 +710,13 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
 
     /// Helper to add a potential narrowing target expression to the set.
     fn add_narrowing_target(&self, expr: &ast::Expr, places: &mut PossiblyNarrowedPlaces) {
-        match expr {
-            ast::Expr::Name(_)
-            | ast::Expr::Attribute(_)
-            | ast::Expr::Subscript(_)
-            | ast::Expr::Named(_) => {
-                if let Some(place_expr) = PlaceExpr::try_from_expr(expr) {
-                    if let Some(place) = self.places.place_id((&place_expr).into()) {
-                        places.insert(place);
-                    }
-                }
+        if let Some(place_expr) = PlaceExpr::try_from_expr(expr) {
+            if let Some(place) = self.places.place_id((&place_expr).into()) {
+                places.insert(place);
             }
+        }
+
+        match expr.expression_value() {
             // type(x) is Y can narrow x
             ast::Expr::Call(call) if call.arguments.args.len() == 1 => {
                 if let Some(first_arg) = call.arguments.args.first() {
