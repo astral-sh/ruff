@@ -4598,7 +4598,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // the expected type passed should be the "raw" type,
                     // i.e. type variables in the return type are non-inferable,
                     // and the return types of async functions are not wrapped in `CoroutineType[...]`.
-                    let return_ty = func.last_definition_raw_signature(self.db()).return_ty;
+                    let return_ty = func
+                        .last_definition_lexical_raw_signature(self.db())
+                        .return_ty;
 
                     // For generator functions, the declared return type is e.g.
                     // `Generator[YieldType, SendType, ReturnType]`. The type context

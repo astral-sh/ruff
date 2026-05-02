@@ -108,8 +108,21 @@ pub(crate) fn bind_typevar<'db>(
         let is_class_scope = ancestor_scope.kind().is_class();
         // If we've already crossed a class boundary, skip class-scoped generic contexts.
         // This prevents inner classes from accessing type parameters of outer classes.
+        let generic_context = match ancestor_scope.node() {
+            NodeWithScopeKind::FunctionTypeParameters(function) => {
+                let definition = index.expect_single_definition(function);
+                infer_definition_types(db, definition)
+                    .function_type(definition)
+                    .and_then(|function_type| {
+                        function_type
+                            .last_definition_lexical_raw_signature(db)
+                            .generic_context
+                    })
+            }
+            node => GenericContext::of_node(db, node, index),
+        };
         if (!is_class_scope || !crossed_class_scope)
-            && let Some(generic_context) = GenericContext::of_node(db, ancestor_scope.node(), index)
+            && let Some(generic_context) = generic_context
             && let Some(bound) = generic_context.binds_typevar(db, typevar)
         {
             return Some(bound);
@@ -312,7 +325,7 @@ impl<'db> GenericContext<'db> {
     /// Creates a generic context from a list of PEP-695 type parameters.
     pub(crate) fn from_type_params(
         db: &'db dyn Db,
-        index: &'db SemanticIndex<'db>,
+        index: &SemanticIndex<'db>,
         binding_context: Definition<'db>,
         type_params_node: &ast::TypeParams,
     ) -> Self {
@@ -492,7 +505,7 @@ impl<'db> GenericContext<'db> {
 
     fn variable_from_type_param(
         db: &'db dyn Db,
-        index: &'db SemanticIndex<'db>,
+        index: &SemanticIndex<'db>,
         binding_context: Definition<'db>,
         type_param_node: &ast::TypeParam,
     ) -> Option<BoundTypeVarInstance<'db>> {

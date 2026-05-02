@@ -243,6 +243,17 @@ reveal_type(generic_context(outside_callable(int_identity)))
 outside_callable(int_identity)("string")
 ```
 
+The function's type parameters are still in scope inside the body, even if they only appear in a
+return-position `Callable` and are scoped to the returned callable:
+
+```py
+from typing import Callable, cast
+
+def body_annotation[**P]() -> Callable[P, None]:
+    local: Callable[P, None] = cast(Callable[P, None], object())
+    return local
+```
+
 ## Overloaded callable as generic `Callable` argument
 
 An overloaded callable should be assignable to a non-overloaded callable type when the overload set
