@@ -118,6 +118,9 @@ pub enum KnownInstanceType<'db> {
     /// A `functools.partial(func, ...)` call result where we could determine
     /// the remaining callable signature after binding some arguments.
     FunctoolsPartial(FunctoolsPartialInstance<'db>),
+
+    /// The bound `__call__` attribute of a precise `functools.partial(...)` result.
+    FunctoolsPartialCall(FunctoolsPartialInstance<'db>),
 }
 
 pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -173,7 +176,8 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
                 visitor.visit_type(db, field.ty);
             }
         }
-        KnownInstanceType::FunctoolsPartial(partial) => {
+        KnownInstanceType::FunctoolsPartial(partial)
+        | KnownInstanceType::FunctoolsPartialCall(partial) => {
             visitor.visit_callable_type(db, partial.partial(db));
         }
     }
@@ -241,6 +245,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::FunctoolsPartial(partial) => partial
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Self::FunctoolsPartial),
+            Self::FunctoolsPartialCall(partial) => partial
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Self::FunctoolsPartialCall),
         }
     }
 
@@ -269,6 +276,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::NewType(_) => KnownClass::NewType,
             Self::NamedTupleSpec(_) => KnownClass::Sequence,
             Self::FunctoolsPartial(_) => KnownClass::FunctoolsPartial,
+            Self::FunctoolsPartialCall(_) => KnownClass::MethodWrapperType,
         }
     }
 
@@ -336,6 +344,11 @@ impl<'db> KnownInstanceType<'db> {
             }
             KnownInstanceType::FunctoolsPartial(partial) => {
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartial(
+                    partial.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
+            }
+            KnownInstanceType::FunctoolsPartialCall(partial) => {
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(
                     partial.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }

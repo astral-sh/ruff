@@ -43,6 +43,7 @@ use crate::types::function::{
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
+    TypeVarInference,
 };
 use crate::types::known_instance::FieldInstance;
 use crate::types::signatures::{
@@ -3332,7 +3333,7 @@ impl<'db> CallableBinding<'db> {
                                 let parameter_type = overload.signature.parameters()
                                     [parameter_index]
                                     .annotated_type()
-                                    .apply_optional_specialization(db, overload.specialization);
+                                    .apply_optional_specialization(db, overload.specialization(db));
                                 OverloadFilterSlot {
                                     parameter: parameter_type,
                                     argument: argument_types.get_for_declared_type(parameter_type),
@@ -4458,7 +4459,7 @@ struct ArgumentTypeChecker<'a, 'db> {
     errors: &'a mut Vec<BindingError<'db>>,
 
     inferable_typevars: InferableTypeVars<'db>,
-    specialization: Option<Specialization<'db>>,
+    inference: Option<TypeVarInference<'db>>,
 
     /// Argument indices for which specialization inference has already produced a sufficiently
     /// precise argument mismatch. We can then silence `check_argument_type` for those arguments to
@@ -4536,7 +4537,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return_ty,
             errors,
             inferable_typevars: InferableTypeVars::None,
-            specialization: None,
+            inference: None,
             constraint_set_errors: vec![false; arguments.len()],
         }
     }
@@ -4567,6 +4568,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 argument_types,
             ))
         })
+    }
+
+    fn specialization(&self) -> Option<Specialization<'db>> {
+        self.inference
+            .map(|inference| inference.specialization(self.db))
     }
 
     fn infer_specialization(&mut self, constraints: &ConstraintSetBuilder<'db>) {
@@ -4736,58 +4742,58 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.errors.extend(specialization_errors);
 
         // Attempt to promote any promotable types assigned to the specialization.
-        // The hook receives (typevar, lower_bound, upper_bound) and returns Some(ty) to
-        // override the default solution, or None to keep it.
-        let maybe_promote = |typevar: BoundTypeVarInstance<'db>,
-                             bounds: Option<(Type<'db>, Type<'db>)>| {
-            let (lower, _upper) = bounds?;
-            let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
+        // The hook receives (typevar, inferred type) and returns Some(ty) to override the default
+        // solution, or None to keep it.
+        let mut maybe_promote =
+            |typevar: BoundTypeVarInstance<'db>, inferred_ty: Type<'db>| -> Option<Type<'db>> {
+                let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
 
-            // For constrained TypeVars, the inferred type is already one of the
-            // constraints. Promoting literals would produce a type that doesn't
-            // match any constraint.
-            if matches!(
-                bound_or_constraints,
-                Some(TypeVarBoundOrConstraints::Constraints(_))
-            ) {
-                return None;
-            }
-
-            let mut variance_in_return = TypeVarVariance::Bivariant;
-
-            // Find all occurrences of the type variable in the return type.
-            self.return_ty
-                .visit_specialization(self.db, |ty, variance| {
-                    if ty != Type::TypeVar(typevar) {
-                        return;
-                    }
-
-                    variance_in_return = variance_in_return.join(variance);
-                });
-
-            // Promotion is only useful if the type variable is in non-covariant position
-            // in the return type.
-            if variance_in_return.is_covariant() {
-                return None;
-            }
-
-            let promoted = lower.promote(self.db);
-
-            // If the TypeVar has an upper bound, only use the promoted type if it
-            // still satisfies the bound.
-            if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
-                if !promoted.is_assignable_to(self.db, bound) {
+                // For constrained TypeVars, the inferred type is already one of the
+                // constraints. Promoting literals would produce a type that doesn't
+                // match any constraint.
+                if matches!(
+                    bound_or_constraints,
+                    Some(TypeVarBoundOrConstraints::Constraints(_))
+                ) {
                     return None;
                 }
-            }
 
-            Some(promoted)
-        };
+                let mut variance_in_return = TypeVarVariance::Bivariant;
 
-        let specialization = builder.build_with(generic_context, maybe_promote);
+                // Find all occurrences of the type variable in the return type.
+                self.return_ty
+                    .visit_specialization(self.db, |ty, variance| {
+                        if ty != Type::TypeVar(typevar) {
+                            return;
+                        }
+
+                        variance_in_return = variance_in_return.join(variance);
+                    });
+
+                // Promotion is only useful if the type variable is in non-covariant position
+                // in the return type.
+                if variance_in_return.is_covariant() {
+                    return None;
+                }
+
+                let promoted = inferred_ty.promote(self.db);
+
+                // If the TypeVar has an upper bound, only use the promoted type if it
+                // still satisfies the bound.
+                if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
+                    if !promoted.is_assignable_to(self.db, bound) {
+                        return None;
+                    }
+                }
+
+                Some(promoted)
+            };
+
+        let inference = builder.build_inference_with(generic_context, &mut maybe_promote);
+        let specialization = inference.specialization(self.db);
 
         self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
-        self.specialization = Some(specialization);
+        self.inference = Some(inference);
     }
 
     fn infer_argument_constraints<'c>(
@@ -4863,7 +4869,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
 
         let mut expected_ty = parameter.annotated_type();
-        if let Some(specialization) = self.specialization {
+        if let Some(specialization) = self.specialization() {
             argument_type = argument_type.apply_specialization(self.db, specialization);
             expected_ty = expected_ty.apply_specialization(self.db, specialization);
         }
@@ -5066,7 +5072,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         paramspec: BoundTypeVarInstance<'db>,
     ) -> bool {
         let Some(Type::Callable(callable)) = self
-            .specialization
+            .specialization()
             .and_then(|specialization| specialization.get(self.db, paramspec))
         else {
             return false;
@@ -5280,7 +5286,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self,
     ) -> (
         InferableTypeVars<'db>,
-        Option<Specialization<'db>>,
+        Option<TypeVarInference<'db>>,
         Type<'db>,
     ) {
         for (parameter_ty, builder) in self
@@ -5293,7 +5299,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        (self.inferable_typevars, self.specialization, self.return_ty)
+        (self.inferable_typevars, self.inference, self.return_ty)
     }
 }
 
@@ -5364,8 +5370,8 @@ pub(crate) struct Binding<'db> {
     /// The inferable typevars in this signature.
     inferable_typevars: InferableTypeVars<'db>,
 
-    /// The specialization that was inferred from the argument types, if the callable is generic.
-    specialization: Option<Specialization<'db>>,
+    /// The type-variable inference result for this binding, if the callable is generic.
+    inference: Option<TypeVarInference<'db>>,
 
     /// Information about which parameter(s) each argument was matched with, in argument source
     /// order.
@@ -5393,7 +5399,7 @@ impl<'db> Binding<'db> {
             return_ty,
             constructor_context: None,
             inferable_typevars: InferableTypeVars::None,
-            specialization: None,
+            inference: None,
             argument_matches: Box::from([]),
             variadic_argument_matched_to_variadic_parameter: false,
             parameter_tys: Box::from([]),
@@ -5495,7 +5501,7 @@ impl<'db> Binding<'db> {
         checker.infer_specialization(constraints);
         checker.check_argument_types(constraints);
 
-        (self.inferable_typevars, self.specialization, self.return_ty) = checker.finish();
+        (self.inferable_typevars, self.inference, self.return_ty) = checker.finish();
     }
 
     fn check_keyword_unpack_key_types(
@@ -5669,7 +5675,7 @@ impl<'db> Binding<'db> {
         PartialSignatureApplication::new(
             self.signature.clone(),
             self.partial_application(arguments),
-            self.specialization,
+            self.inference,
             self.unspecialized_return_type(db),
         )
     }
@@ -5757,7 +5763,7 @@ impl<'db> Binding<'db> {
         BindingSnapshot {
             return_ty: self.return_ty,
             inferable_typevars: self.inferable_typevars,
-            specialization: self.specialization,
+            inference: self.inference,
             argument_matches: self.argument_matches.clone(),
             parameter_tys: self.parameter_tys.clone(),
             errors: self.errors.clone(),
@@ -5768,7 +5774,7 @@ impl<'db> Binding<'db> {
         let BindingSnapshot {
             return_ty,
             inferable_typevars,
-            specialization,
+            inference,
             argument_matches,
             parameter_tys,
             errors,
@@ -5776,7 +5782,7 @@ impl<'db> Binding<'db> {
 
         self.return_ty = return_ty;
         self.inferable_typevars = inferable_typevars;
-        self.specialization = specialization;
+        self.inference = inference;
         self.argument_matches = argument_matches;
         self.parameter_tys = parameter_tys;
         self.errors = errors;
@@ -5788,8 +5794,8 @@ impl<'db> Binding<'db> {
         &self.argument_matches
     }
 
-    pub(crate) fn specialization(&self) -> Option<Specialization<'db>> {
-        self.specialization
+    pub(crate) fn specialization(&self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+        self.inference.map(|inference| inference.specialization(db))
     }
 
     pub(crate) fn errors(&self) -> &[BindingError<'db>] {
@@ -5800,7 +5806,7 @@ impl<'db> Binding<'db> {
     fn reset(&mut self, db: &'db dyn Db) {
         self.return_ty = self.initial_return_type(db);
         self.inferable_typevars = InferableTypeVars::None;
-        self.specialization = None;
+        self.inference = None;
         self.argument_matches = Box::from([]);
         self.parameter_tys = Box::from([]);
         self.errors.clear();
@@ -5811,7 +5817,7 @@ impl<'db> Binding<'db> {
 struct BindingSnapshot<'db> {
     return_ty: Type<'db>,
     inferable_typevars: InferableTypeVars<'db>,
-    specialization: Option<Specialization<'db>>,
+    inference: Option<TypeVarInference<'db>>,
     argument_matches: Box<[MatchedArgument<'db>]>,
     parameter_tys: Box<[Option<Type<'db>>]>,
     errors: Vec<BindingError<'db>>,
@@ -5852,7 +5858,7 @@ impl<'db> CallableBindingSnapshot<'db> {
                 // ... and update the snapshot with the current state of the binding.
                 snapshot.return_ty = binding.return_ty;
                 snapshot.inferable_typevars = binding.inferable_typevars;
-                snapshot.specialization = binding.specialization;
+                snapshot.inference = binding.inference;
                 snapshot
                     .argument_matches
                     .clone_from(&binding.argument_matches);
