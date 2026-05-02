@@ -17,12 +17,12 @@ use ruff_text_size::TextSize;
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct LineLength(
-    #[cfg_attr(feature = "schemars", schemars(range(min = 1, max = 320)))] NonZeroU16,
+    #[cfg_attr(feature = "schemars", schemars(range(min = 1, max = 65536)))] NonZeroU16,
 );
 
 impl LineLength {
     /// Maximum allowed value for a valid [`LineLength`]
-    pub const MAX: u16 = 320;
+    pub const MAX: u16 = 65535;
 
     /// Return the numeric value for this [`LineLength`]
     pub fn value(&self) -> u16 {
