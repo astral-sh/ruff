@@ -390,6 +390,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
+        self.infer_expression_with_promoted_literal_children(expression, tcx)
+            .promote(self.db())
+    }
+
+    fn infer_expression_with_promoted_literal_children(
+        &mut self,
+        expression: &ast::Expr,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         self.with_inference_flag(InferenceFlags::PROMOTE_LITERALS, true, |builder| {
             builder.infer_expression(expression, tcx)
         })
@@ -5163,7 +5172,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let constraints = ConstraintSetBuilder::new();
-        let promote_literals = arguments_types.len() > Self::MAX_PRECISE_LITERAL_INFERENCE_ARITY;
+        let promote_literals = arguments_types.len() > Self::MAX_PRECISE_LITERAL_INFERENCE_ARITY
+            || self
+                .inference_flags()
+                .contains(InferenceFlags::PROMOTE_LITERALS);
         let iter = itertools::izip!(
             0..,
             arguments_types.iter_mut(),
@@ -5174,9 +5186,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut overloads_with_binding: Vec<(&Binding<'db>, &CallableBinding<'db>)> = Vec::new();
         let mut infer_argument = |builder: &mut Self, arg_expr| {
             if promote_literals {
-                builder.with_inference_flag(InferenceFlags::PROMOTE_LITERALS, true, |builder| {
-                    infer_argument_ty(builder, arg_expr)
-                })
+                builder
+                    .with_inference_flag(InferenceFlags::PROMOTE_LITERALS, true, |builder| {
+                        infer_argument_ty(builder, arg_expr)
+                    })
+                    .promote(builder.db())
             } else {
                 infer_argument_ty(builder, arg_expr)
             }
@@ -5508,13 +5522,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ty = Type::LiteralValue(literal.to_unpromotable());
         }
 
-        if self
-            .inference_flags()
-            .contains(InferenceFlags::PROMOTE_LITERALS)
-        {
-            ty = ty.promote(self.db());
-        }
-
         self.store_expression_type(expression, ty);
 
         if let Some(expression_cache) = &self.expression_cache {
@@ -5812,7 +5819,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 TypeContext::default()
             };
-            if tuple.len() > Self::MAX_PRECISE_LITERAL_INFERENCE_ARITY {
+            if tuple.len() > Self::MAX_PRECISE_LITERAL_INFERENCE_ARITY
+                || self
+                    .inference_flags()
+                    .contains(InferenceFlags::PROMOTE_LITERALS)
+            {
                 // Widen nested literals while recursively inferring very large tuples,
                 // to avoid pathological performance issues in subexpressions.
                 self.infer_expression_with_promoted_literals(elt, ctx)
@@ -6052,7 +6063,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
-        let promote_literals = elts.len() > Self::MAX_PRECISE_LITERAL_INFERENCE_ARITY;
+        let promote_literals = elts.len() > Self::MAX_PRECISE_LITERAL_INFERENCE_ARITY
+            || self
+                .inference_flags()
+                .contains(InferenceFlags::PROMOTE_LITERALS);
 
         // Extract the type variable `T` from `list[T]` in typeshed.
         let elt_tys = |collection_class: KnownClass| {

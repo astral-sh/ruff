@@ -1300,11 +1300,12 @@ bitflags::bitflags! {
         /// Whether we're in a context where `Unpack` can be legal.
         const IN_VALID_UNPACK_CONTEXT = 1 << 10;
 
-        /// Whether literal-heavy expressions should be widened during recursive inference.
+        /// Whether child expressions that can accumulate literal-heavy types should be widened.
         ///
-        /// This is enabled for pathological cases such as huge collection literals or very
-        /// high-arity calls, where preserving every nested literal during inference can cause
-        /// severe performance issues.
+        /// This is enabled while recursively inferring subexpressions of pathological cases such
+        /// as huge collection literals or very high-arity calls. The boundary that enables this
+        /// flag is responsible for promoting the immediate result type; the flag propagates that
+        /// behavior to nested collection and call boundaries without promoting every scalar leaf.
         const PROMOTE_LITERALS = 1 << 11;
 
         /// Whether the visitor is currently visiting a type expression.
