@@ -504,91 +504,9 @@ explicitly enable the `D` rule code prefix, since the `D` rules are not enabled 
     convention = "google"
     ```
 
-Enabling a [`convention`](settings.md#lint_pydocstyle_convention) will disable any rules that are not
-included in the specified convention. As such, the intended workflow is to enable a convention and
-then selectively enable or disable any additional rules on top of it:
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ruff.lint]
-    select = [
-        "D",
-        # Augment the convention by requiring an imperative mood for all docstrings.
-        "D401",
-    ]
-
-    ignore = [
-        # Relax the convention by _not_ requiring documentation for every function parameter.
-        "D417",
-    ]
-
-    [tool.ruff.lint.pydocstyle]
-    convention = "google"
-    ```
-
-=== "ruff.toml"
-
-    ```toml
-    [lint]
-    select = [
-        "D",
-        # Augment the convention by requiring an imperative mood for all docstrings.
-        "D401",
-    ]
-
-    ignore = [
-        # Relax the convention by _not_ requiring documentation for every function parameter.
-        "D417",
-    ]
-
-    [lint.pydocstyle]
-    convention = "google"
-    ```
-
-The PEP 257 convention includes all `D` errors apart from:
-[`D203`](rules/incorrect-blank-line-before-class.md),
-[`D212`](rules/multi-line-summary-first-line.md),
-[`D213`](rules/multi-line-summary-second-line.md),
-[`D214`](rules/overindented-section.md),
-[`D215`](rules/overindented-section-underline.md),
-[`D404`](rules/docstring-starts-with-this.md),
-[`D405`](rules/non-capitalized-section-name.md),
-[`D406`](rules/missing-new-line-after-section-name.md),
-[`D407`](rules/missing-dashed-underline-after-section.md),
-[`D408`](rules/missing-section-underline-after-name.md),
-[`D409`](rules/mismatched-section-underline-length.md),
-[`D410`](rules/no-blank-line-after-section.md),
-[`D411`](rules/no-blank-line-before-section.md),
-[`D413`](rules/missing-blank-line-after-last-section.md),
-[`D415`](rules/missing-terminal-punctuation.md),
-[`D416`](rules/missing-section-name-colon.md), and
-[`D417`](rules/undocumented-param.md).
-
-The NumPy convention includes all `D` errors apart from:
-[`D107`](rules/undocumented-public-init.md),
-[`D203`](rules/incorrect-blank-line-before-class.md),
-[`D212`](rules/multi-line-summary-first-line.md),
-[`D213`](rules/multi-line-summary-second-line.md),
-[`D402`](rules/signature-in-docstring.md),
-[`D413`](rules/missing-blank-line-after-last-section.md),
-[`D415`](rules/missing-terminal-punctuation.md),
-[`D416`](rules/missing-section-name-colon.md), and
-[`D417`](rules/undocumented-param.md).
-
-The Google convention includes all `D` errors apart from:
-[`D203`](rules/incorrect-blank-line-before-class.md),
-[`D204`](rules/incorrect-blank-line-after-class.md),
-[`D213`](rules/multi-line-summary-second-line.md),
-[`D215`](rules/overindented-section-underline.md),
-[`D400`](rules/missing-trailing-period.md),
-[`D401`](rules/non-imperative-mood.md),
-[`D404`](rules/docstring-starts-with-this.md),
-[`D406`](rules/missing-new-line-after-section-name.md),
-[`D407`](rules/missing-dashed-underline-after-section.md),
-[`D408`](rules/missing-section-underline-after-name.md),
-[`D409`](rules/mismatched-section-underline-length.md), and
-[`D413`](rules/missing-blank-line-after-last-section.md).
+Enabling a [`convention`](settings.md#lint_pydocstyle_convention) disables any rules that are not
+included in it. For the exact rule sets in the PEP 257, NumPy, and Google conventions, see the
+[`convention`](settings.md#lint_pydocstyle_convention) settings documentation.
 
 By default, no [`convention`](settings.md#lint_pydocstyle_convention) is set, and so the enabled rules
 are determined by the [`select`](settings.md#lint_select) setting alone.
