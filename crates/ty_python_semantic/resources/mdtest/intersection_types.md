@@ -833,6 +833,28 @@ def _(d: Intersection[Single, Not[Single]]) -> None:
 
 def _(e: Intersection[Single | int, Not[Single]]) -> None:
     reveal_type(e)  # revealed: int
+
+class Big(Enum):
+    A00 = 0
+    A01 = 1
+    A02 = 2
+    A03 = 3
+    A04 = 4
+    A05 = 5
+    A06 = 6
+    A07 = 7
+    A08 = 8
+    A09 = 9
+    A10 = 10
+    A11 = 11
+    A12 = 12
+    A13 = 13
+    A14 = 14
+    A15 = 15
+    A16 = 16
+
+def _(big: Intersection[Big, Not[Literal[Big.A00]]]) -> None:
+    reveal_type(big)  # revealed: Big & ~Literal[Big.A00]
 ```
 
 ## Addition of a type to an intersection with many non-disjoint types

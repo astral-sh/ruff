@@ -65,7 +65,6 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::ops::{Deref, DerefMut};
 use ty_project::Db;
-use ty_python_core::definition::DefinitionCategory;
 use ty_python_semantic::types::{Type, TypeDefinition};
 
 /// Information associated with a text range.
@@ -157,124 +156,6 @@ impl From<FileRange> for NavigationTarget {
             focus_range: value.range(),
             full_range: value.range(),
         }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum DefinitionIdentity<'db> {
-    Definition(ty_python_core::definition::Definition<'db>),
-    Module(File),
-    FileWithRange(FileRange),
-}
-
-impl<'db> From<ty_python_semantic::ResolvedDefinition<'db>> for DefinitionIdentity<'db> {
-    fn from(value: ty_python_semantic::ResolvedDefinition<'db>) -> Self {
-        match value {
-            ty_python_semantic::ResolvedDefinition::Definition(definition) => {
-                Self::Definition(definition)
-            }
-            ty_python_semantic::ResolvedDefinition::Module(file) => Self::Module(file),
-            ty_python_semantic::ResolvedDefinition::FileWithRange(file_range) => {
-                Self::FileWithRange(file_range)
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct DefinitionTarget<'db> {
-    identity: DefinitionIdentity<'db>,
-    navigation: NavigationTarget,
-    category: DefinitionCategory,
-}
-
-impl<'db> DefinitionTarget<'db> {
-    pub(crate) fn new(
-        identity: DefinitionIdentity<'db>,
-        navigation: NavigationTarget,
-        category: DefinitionCategory,
-    ) -> Self {
-        Self {
-            identity,
-            navigation,
-            category,
-        }
-    }
-
-    pub(crate) fn identity(&self) -> DefinitionIdentity<'db> {
-        self.identity
-    }
-
-    pub(crate) fn navigation(&self) -> &NavigationTarget {
-        &self.navigation
-    }
-
-    pub(crate) fn category(&self) -> DefinitionCategory {
-        self.category
-    }
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct DefinitionTargets<'db> {
-    origin: FileRange,
-    targets: smallvec::SmallVec<[DefinitionTarget<'db>; 1]>,
-}
-
-impl<'db> DefinitionTargets<'db> {
-    pub(crate) fn unique(
-        origin: FileRange,
-        targets: impl IntoIterator<Item = DefinitionTarget<'db>>,
-    ) -> Self {
-        let unique: FxHashSet<_> = targets.into_iter().collect();
-        let mut targets = unique.into_iter().collect::<Vec<_>>();
-        targets.sort_by_key(|target| {
-            (
-                target.navigation.file,
-                target.navigation.focus_range.start(),
-                target.category,
-            )
-        });
-        Self {
-            origin,
-            targets: targets.into(),
-        }
-    }
-
-    pub(crate) fn origin(&self) -> FileRange {
-        self.origin
-    }
-
-    pub(crate) fn navigation_targets(&self) -> NavigationTargets {
-        NavigationTargets::unique(self.targets.iter().map(|target| target.navigation.clone()))
-    }
-
-    pub(crate) fn iter(&self) -> std::slice::Iter<'_, DefinitionTarget<'db>> {
-        self.targets.iter()
-    }
-
-    pub(crate) fn declarations(&self) -> impl Iterator<Item = &DefinitionTarget<'db>> {
-        let has_semantic_declaration = self
-            .targets
-            .iter()
-            .any(|target| target.category().is_declaration());
-        let first_binding = self
-            .targets
-            .iter()
-            .filter(|target| target.category().is_binding())
-            .min_by_key(|target| {
-                (
-                    target.navigation.file,
-                    target.navigation.focus_range.start(),
-                )
-            });
-
-        self.targets.iter().filter(move |target| {
-            if has_semantic_declaration {
-                target.category().is_declaration()
-            } else {
-                first_binding.is_some_and(|first_binding| first_binding == *target)
-            }
-        })
     }
 }
 

@@ -1284,7 +1284,7 @@ mod resolve_definition {
     /// This enum helps distinguish between cases where an import resolves to:
     /// - A specific definition within a module (e.g., `from os import path` -> definition of `path`)
     /// - A specific range within a file, sometimes an empty range at the top of the file
-    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum ResolvedDefinition<'db> {
         /// The import resolved to a specific definition within a module
         Definition(Definition<'db>),

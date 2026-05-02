@@ -9,10 +9,32 @@
 //! scope or within classes, are visible outside of the module. Finding
 //! all references to these externally-visible symbols therefore requires
 //! an expensive search of all source files in the workspace.
+//!
+//! Reference matching intentionally works on semantic definition keys, not on
+//! the navigation targets that are returned to the LSP client for
+//! goto-definition. Navigation targets are a presentation format: they answer
+//! "where should the editor jump?" and may be affected by focus ranges, full
+//! ranges, stub mapping, or other UI-oriented choices. References need a
+//! different answer: "does this occurrence resolve to the same symbol?".
+//!
+//! The flow is:
+//! 1. Resolve the symbol under the cursor to raw semantic definitions.
+//! 2. Convert those definitions into [`DefinitionMatches`], keeping the
+//!    semantic key plus the source ranges needed by find-references.
+//! 3. Visit candidate occurrences and resolve each occurrence the same way.
+//! 4. Treat the occurrence as a match when the two identity sets intersect.
+//!
+//! This differs from the old approach, which converted definitions to
+//! `DefinitionTargets`/`NavigationTargets` early and compared those navigation
+//! targets. Keeping references on semantic keys avoids using an editor
+//! jump location as a proxy for symbol equality, while still retaining just
+//! enough range/category information for declaration skipping and parameter
+//! keyword-argument handling.
 
 use crate::goto::GotoTarget;
-use crate::{Db, DefinitionTargets, NavigationTarget, ReferenceKind, ReferenceTarget};
+use crate::{Db, ReferenceKind, ReferenceTarget};
 use ruff_db::files::{File, FileRange};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{
@@ -20,7 +42,8 @@ use ruff_python_ast::{
     visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
 use ruff_text_size::Ranged;
-use ty_python_semantic::{ImportAliasResolution, SemanticModel};
+use ty_python_core::definition::DefinitionCategory;
+use ty_python_semantic::{ImportAliasResolution, ResolvedDefinition, SemanticModel};
 
 /// Mode for references search behavior
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,6 +92,176 @@ impl ReferencesMode {
     }
 }
 
+/// One resolved definition that a candidate occurrence can match against,
+/// together with cached metadata used by find-references.
+///
+/// The [`ResolvedDefinition`] is the semantic identity. The remaining fields
+/// are derived from it once so sorting, declaration filtering, declaration
+/// skipping, and parameter-owner checks do not repeatedly load the parsed
+/// module for semantic definitions.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct DefinitionMatch<'db> {
+    /// The resolved definition used to decide whether two occurrences refer to
+    /// the same symbol.
+    resolved_definition: ResolvedDefinition<'db>,
+
+    /// Whether this definition is a declaration, binding, or both.
+    ///
+    /// `ReferencesSkipDeclaration` uses this to decide which occurrence should
+    /// be omitted. When no explicit semantic declaration exists, we fall back to
+    /// the first binding.
+    category: DefinitionCategory,
+
+    /// The narrow source range that identifies the symbol itself.
+    ///
+    /// For [`ResolvedDefinition::Definition`], this is
+    /// [`ty_python_core::definition::Definition::focus_range`]. For modules and
+    /// range-backed definitions, this is the only available range.
+    focus_range: FileRange,
+
+    /// The full source range covered by the definition node.
+    ///
+    /// For [`ResolvedDefinition::Definition`], this is
+    /// [`ty_python_core::definition::Definition::full_range`]. For modules and
+    /// range-backed definitions, this is the same as
+    /// [`DefinitionMatch::focus_range`].
+    full_range: FileRange,
+}
+
+impl<'db> DefinitionMatch<'db> {
+    fn from_resolved_definition(
+        db: &'db dyn ty_python_semantic::Db,
+        resolved_definition: ResolvedDefinition<'db>,
+    ) -> Self {
+        let (category, focus_range, full_range) = match resolved_definition {
+            ResolvedDefinition::Definition(definition) => {
+                let definition_file = definition.file(db);
+                let module = parsed_module(db, definition_file).load(db);
+                let category = definition
+                    .kind(db)
+                    .category(definition_file.is_stub(db), &module);
+                let focus_range = definition.focus_range(db, &module);
+                let full_range = definition.full_range(db, &module);
+
+                (category, focus_range, full_range)
+            }
+            ResolvedDefinition::Module(file) => {
+                let range = FileRange::new(file, Default::default());
+                (DefinitionCategory::DeclarationAndBinding, range, range)
+            }
+            ResolvedDefinition::FileWithRange(file_range) => (
+                DefinitionCategory::DeclarationAndBinding,
+                file_range,
+                file_range,
+            ),
+        };
+
+        Self {
+            resolved_definition,
+            category,
+            focus_range,
+            full_range,
+        }
+    }
+
+    fn resolved_definition(&self) -> ResolvedDefinition<'db> {
+        self.resolved_definition
+    }
+
+    fn category(&self) -> DefinitionCategory {
+        self.category
+    }
+
+    fn focus_range(&self) -> FileRange {
+        self.focus_range
+    }
+
+    fn full_range(&self) -> FileRange {
+        self.full_range
+    }
+
+    /// Returns true if `range` identifies this definition or lies within its
+    /// full definition range.
+    fn contains(&self, range: FileRange) -> bool {
+        let focus = self.focus_range();
+        let full = self.full_range();
+        focus == range
+            || (full.file() == range.file() && full.range().contains_range(range.range()))
+    }
+}
+
+/// The resolved definitions for one candidate occurrence in a reference search.
+///
+/// Most symbols resolve to a single target, but overload groups, properties,
+/// imports, and other compound cases can produce multiple co-definitions. A
+/// candidate matches when this set intersects with the original target's set by
+/// [`ResolvedDefinition`].
+#[derive(Debug, Clone)]
+struct DefinitionMatches<'db> {
+    /// The range of the occurrence that produced these targets.
+    ///
+    /// This is not the declaration range. It is the syntax range currently being
+    /// visited, and is used to decide whether a store occurrence is the
+    /// declaration that should be skipped in `ReferencesSkipDeclaration` mode.
+    origin: FileRange,
+
+    /// The semantic definitions this occurrence resolves to.
+    targets: smallvec::SmallVec<[DefinitionMatch<'db>; 1]>,
+}
+
+impl<'db> DefinitionMatches<'db> {
+    fn from_definitions(
+        db: &'db dyn ty_python_semantic::Db,
+        origin: FileRange,
+        definitions: Vec<ResolvedDefinition<'db>>,
+    ) -> Self {
+        let mut targets = definitions
+            .into_iter()
+            .map(|resolved_definition| {
+                DefinitionMatch::from_resolved_definition(db, resolved_definition)
+            })
+            .collect::<Vec<_>>();
+
+        targets.sort_by_key(|target| {
+            let focus = target.focus_range();
+            (focus.file(), focus.range().start())
+        });
+        targets.dedup();
+
+        Self {
+            origin,
+            targets: targets.into(),
+        }
+    }
+
+    fn iter(&self) -> std::slice::Iter<'_, DefinitionMatch<'db>> {
+        self.targets.iter()
+    }
+
+    fn declarations(&self) -> impl Iterator<Item = &DefinitionMatch<'db>> {
+        let has_semantic_declaration = self
+            .targets
+            .iter()
+            .any(|target| target.category().is_declaration());
+        let first_binding = self
+            .targets
+            .iter()
+            .filter(|target| target.category().is_binding())
+            .min_by_key(|target| {
+                let focus = target.focus_range();
+                (focus.file(), focus.range().start())
+            });
+
+        self.targets.iter().filter(move |target| {
+            if has_semantic_declaration {
+                target.category().is_declaration()
+            } else {
+                first_binding.is_some_and(|first_binding| first_binding == *target)
+            }
+        })
+    }
+}
+
 /// Find all references to a symbol at the given position.
 /// Search for references across all files in the project.
 pub(crate) fn references<'db>(
@@ -80,7 +273,12 @@ pub(crate) fn references<'db>(
     let model = SemanticModel::new(db, file);
     let target_definitions = goto_target
         .get_definition_targets(&model, mode.to_import_alias_resolution())?
-        .declaration_targets_with_roles(&model, goto_target)?;
+        .declaration_definitions(&model, goto_target)?;
+    let target_definitions = DefinitionMatches::from_definitions(
+        db,
+        FileRange::new(file, goto_target.range()),
+        target_definitions.0,
+    );
 
     // Extract the target text from the goto target for fast comparison
     let target_text = goto_target.to_string()?;
@@ -164,7 +362,7 @@ pub(crate) fn references<'db>(
 fn references_for_parameter_keyword_arguments_across_files<'db>(
     db: &'db dyn Db,
     file: File,
-    target_definitions: &DefinitionTargets<'db>,
+    target_definitions: &DefinitionMatches<'db>,
     target_text: &str,
     mode: ReferencesMode,
     references: &mut Vec<ReferenceTarget>,
@@ -193,7 +391,7 @@ fn references_for_parameter_keyword_arguments_across_files<'db>(
 fn references_for_keyword_arguments_in_file<'db>(
     db: &'db dyn Db,
     file: File,
-    target_definitions: &DefinitionTargets<'db>,
+    target_definitions: &DefinitionMatches<'db>,
     target_text: &str,
     mode: ReferencesMode,
     references: &mut Vec<ReferenceTarget>,
@@ -264,19 +462,21 @@ fn source_contains_keyword_argument_candidate(source: &str, name: &str) -> bool 
     false
 }
 
-/// Return true if the declaration-target sets intersect.
+/// Return true if the semantic identity sets intersect.
 ///
-/// A symbol can resolve to multiple declaration targets (for example, overload groups or an
-/// import binding plus its underlying definition). Intersection semantics avoid missing valid
-/// references/renames when target ordering differs.
+/// A symbol can resolve to multiple definitions (for example, overload groups,
+/// property getter/setter co-definitions, or an import binding plus its
+/// underlying definition). Intersection semantics avoid missing valid
+/// references/renames when target ordering differs or when one occurrence
+/// exposes only part of the co-definition set.
 fn definition_identities_intersect(
-    target_definitions: &DefinitionTargets<'_>,
-    current_targets: &DefinitionTargets<'_>,
+    target_definitions: &DefinitionMatches<'_>,
+    current_targets: &DefinitionMatches<'_>,
 ) -> bool {
     target_definitions.iter().any(|target_definition| {
-        current_targets
-            .iter()
-            .any(|current_target| current_target.identity() == target_definition.identity())
+        current_targets.iter().any(|current_target| {
+            current_target.resolved_definition() == target_definition.resolved_definition()
+        })
     })
 }
 
@@ -285,7 +485,7 @@ fn definition_identities_intersect(
 fn references_for_file<'db>(
     db: &'db dyn Db,
     file: File,
-    target_definitions: &DefinitionTargets<'db>,
+    target_definitions: &DefinitionMatches<'db>,
     target_text: &str,
     mode: ReferencesMode,
     references: &mut Vec<ReferenceTarget>,
@@ -331,22 +531,19 @@ fn is_symbol_externally_visible(goto_target: &GotoTarget<'_>) -> bool {
 /// when the owning callable is visible outside of the current module.
 fn parameter_owner_is_externally_visible(
     db: &dyn Db,
-    target_definitions: &DefinitionTargets<'_>,
+    target_definitions: &DefinitionMatches<'_>,
 ) -> bool {
     target_definitions
         .iter()
-        .any(|target| parameter_owner_is_externally_visible_for_target(db, target.navigation()))
+        .any(|target| parameter_owner_is_externally_visible_for_target(db, target.focus_range()))
 }
 
-fn parameter_owner_is_externally_visible_for_target(
-    db: &dyn Db,
-    target: &NavigationTarget,
-) -> bool {
+fn parameter_owner_is_externally_visible_for_target(db: &dyn Db, target: FileRange) -> bool {
     let file = target.file();
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
 
-    let covering = covering_node(module.syntax().into(), target.focus_range());
+    let covering = covering_node(module.syntax().into(), target.range());
     let Ok(parameter_covering) =
         covering.find_last(|node| matches!(node, AnyNodeRef::Parameter(_)))
     else {
@@ -395,7 +592,7 @@ fn parameter_owner_is_externally_visible_for_target(
 struct LocalReferencesFinder<'db, 'ast, 'refs> {
     model: &'ast SemanticModel<'db>,
     tokens: &'ast Tokens,
-    target_definitions: &'refs DefinitionTargets<'db>,
+    target_definitions: &'refs DefinitionMatches<'db>,
     references: &'refs mut Vec<ReferenceTarget>,
     mode: ReferencesMode,
     target_text: &'refs str,
@@ -606,7 +803,7 @@ impl<'db, 'ast, 'refs> LocalReferencesFinder<'db, 'ast, 'refs> {
     fn definitions_for_covering_node(
         &self,
         covering_node: &CoveringNode<'_>,
-    ) -> Option<DefinitionTargets<'db>> {
+    ) -> Option<DefinitionMatches<'db>> {
         // Use the start of the covering node as the offset. Any offset within
         // the node is fine here. Offsets matter only for import statements
         // where the identifier might be a multi-part module name.
@@ -617,11 +814,17 @@ impl<'db, 'ast, 'refs> LocalReferencesFinder<'db, 'ast, 'refs> {
             return None;
         };
 
-        goto_target
+        let definitions = goto_target
             .get_definition_targets(self.model, self.mode.to_import_alias_resolution())
             .and_then(|definitions| {
-                definitions.declaration_targets_with_roles(self.model, &goto_target)
-            })
+                definitions.declaration_definitions(self.model, &goto_target)
+            })?;
+
+        Some(DefinitionMatches::from_definitions(
+            self.model.db(),
+            FileRange::new(self.model.file(), goto_target.range()),
+            definitions.0,
+        ))
     }
 
     /// Resolves `covering_node` and records it if it refers to the target symbol.
@@ -660,20 +863,9 @@ impl<'db, 'ast, 'refs> LocalReferencesFinder<'db, 'ast, 'refs> {
     }
 
     /// Returns true if this store occurrence is the declaration to omit.
-    fn is_declaration_occurrence(&self, current_definitions: &DefinitionTargets<'_>) -> bool {
+    fn is_declaration_occurrence(&self, current_definitions: &DefinitionMatches<'_>) -> bool {
         self.target_definitions
             .declarations()
-            .any(|target_declaration| {
-                navigation_contains_file_range(
-                    target_declaration.navigation(),
-                    current_definitions.origin(),
-                )
-            })
+            .any(|target_declaration| target_declaration.contains(current_definitions.origin))
     }
-}
-
-fn navigation_contains_file_range(navigation: &NavigationTarget, range: FileRange) -> bool {
-    navigation.file() == range.file()
-        && (navigation.focus_range() == range.range()
-            || navigation.full_range().contains_range(range.range()))
 }

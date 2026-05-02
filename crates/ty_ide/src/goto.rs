@@ -5,9 +5,8 @@ pub use crate::goto_type_definition::goto_type_definition;
 
 use std::borrow::Cow;
 
+use crate::NavigationTarget;
 use crate::stub_mapping::StubMapper;
-use crate::{DefinitionIdentity, DefinitionTarget, DefinitionTargets};
-use ruff_db::files::FileRange;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::token::{Token, TokenAt, TokenKind, Tokens};
@@ -275,18 +274,15 @@ impl<'db> Definitions<'db> {
         model: &SemanticModel<'db>,
         goto_target: &GotoTarget<'_>,
     ) -> Option<crate::NavigationTargets> {
-        Some(
-            definitions_to_definition_targets(model, None, goto_target, self.0)?
-                .navigation_targets(),
-        )
+        definitions_to_navigation_targets(model, None, goto_target, self.0)
     }
 
-    pub(crate) fn declaration_targets_with_roles(
+    pub(crate) fn declaration_definitions(
         self,
         model: &SemanticModel<'db>,
         goto_target: &GotoTarget<'_>,
-    ) -> Option<DefinitionTargets<'db>> {
-        definitions_to_definition_targets(model, None, goto_target, self.0)
+    ) -> Option<Self> {
+        Some(Self(prepare_definitions(model, None, goto_target, self.0)?))
     }
 
     /// Get the "goto-definition" interpretation of this definition
@@ -298,14 +294,11 @@ impl<'db> Definitions<'db> {
         model: &SemanticModel<'db>,
         goto_target: &GotoTarget<'_>,
     ) -> Option<crate::NavigationTargets> {
-        Some(
-            definitions_to_definition_targets(
-                model,
-                Some(&StubMapper::new(model.db())),
-                goto_target,
-                self.0,
-            )?
-            .navigation_targets(),
+        definitions_to_navigation_targets(
+            model,
+            Some(&StubMapper::new(model.db())),
+            goto_target,
+            self.0,
         )
     }
 
@@ -1193,16 +1186,15 @@ impl Ranged for GotoTarget<'_> {
     }
 }
 
-/// Converts a collection of `ResolvedDefinition` items into `DefinitionTarget` items.
+/// Converts a collection of `ResolvedDefinition` items into `NavigationTarget` items.
 fn convert_resolved_definitions_to_targets<'db>(
     db: &'db dyn ty_python_semantic::Db,
     definitions: Vec<ty_python_semantic::ResolvedDefinition<'db>>,
-) -> Vec<DefinitionTarget<'db>> {
+) -> Vec<NavigationTarget> {
     definitions
         .into_iter()
         .map(|resolved_definition| match resolved_definition {
             ty_python_semantic::ResolvedDefinition::Definition(definition) => {
-                let identity = DefinitionIdentity::Definition(definition);
                 // Get the parsed module for range calculation
                 let definition_file = definition.file(db);
                 let module = ruff_db::parsed::parsed_module(db, definition_file).load(db);
@@ -1211,36 +1203,19 @@ fn convert_resolved_definitions_to_targets<'db>(
                 let focus_range = definition.focus_range(db, &module);
                 let full_range = definition.full_range(db, &module);
 
-                let navigation = crate::NavigationTarget {
+                NavigationTarget {
                     file: focus_range.file(),
                     focus_range: focus_range.range(),
                     full_range: full_range.range(),
-                };
-                let category = definition
-                    .kind(db)
-                    .category(definition_file.is_stub(db), &module);
-
-                DefinitionTarget::new(identity, navigation, category)
+                }
             }
             ty_python_semantic::ResolvedDefinition::Module(file) => {
-                let identity = DefinitionIdentity::Module(file);
                 // For modules, navigate to the start of the file
-                let navigation = crate::NavigationTarget::new(file, TextRange::default());
-                DefinitionTarget::new(
-                    identity,
-                    navigation,
-                    ty_python_core::definition::DefinitionCategory::DeclarationAndBinding,
-                )
+                NavigationTarget::new(file, TextRange::default())
             }
             ty_python_semantic::ResolvedDefinition::FileWithRange(file_range) => {
-                let identity = DefinitionIdentity::FileWithRange(file_range);
                 // For file ranges, navigate to the specific range within the file
-                let navigation = crate::NavigationTarget::from(file_range);
-                DefinitionTarget::new(
-                    identity,
-                    navigation,
-                    ty_python_core::definition::DefinitionCategory::DeclarationAndBinding,
-                )
+                NavigationTarget::from(file_range)
             }
         })
         .collect()
@@ -1307,12 +1282,23 @@ fn definitions_for_callable<'db>(
 /// requested for. In some cases, this can influence the targets returned. For
 /// example, when the target is a constructor for a class, definitions other
 /// than the class definition are filtered out.
-fn definitions_to_definition_targets<'db>(
+fn definitions_to_navigation_targets<'db>(
     model: &SemanticModel<'db>,
     stub_mapper: Option<&StubMapper<'db>>,
     goto_target: &GotoTarget<'_>,
     mut definitions: Vec<ty_python_semantic::ResolvedDefinition<'db>>,
-) -> Option<DefinitionTargets<'db>> {
+) -> Option<crate::NavigationTargets> {
+    definitions = prepare_definitions(model, stub_mapper, goto_target, definitions)?;
+    let targets = convert_resolved_definitions_to_targets(model.db(), definitions);
+    Some(targets.into_iter().collect())
+}
+
+fn prepare_definitions<'db>(
+    model: &SemanticModel<'db>,
+    stub_mapper: Option<&StubMapper<'db>>,
+    goto_target: &GotoTarget<'_>,
+    mut definitions: Vec<ty_python_semantic::ResolvedDefinition<'db>>,
+) -> Option<Vec<ty_python_semantic::ResolvedDefinition<'db>>> {
     // When our target is a class constructor, we want to exclude
     // navigation targets to its `__init__` or `__new__` methods.
     //
@@ -1355,9 +1341,7 @@ fn definitions_to_definition_targets<'db>(
     if definitions.is_empty() {
         None
     } else {
-        let origin = FileRange::new(model.file(), goto_target.range());
-        let targets = convert_resolved_definitions_to_targets(model.db(), definitions);
-        Some(DefinitionTargets::unique(origin, targets))
+        Some(definitions)
     }
 }
 
