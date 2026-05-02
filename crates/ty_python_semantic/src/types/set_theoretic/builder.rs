@@ -959,7 +959,7 @@ impl<'db> IntersectionBuilder<'db> {
         }
     }
 
-    fn empty(db: &'db dyn Db) -> Self {
+    const fn empty(db: &'db dyn Db) -> Self {
         Self {
             db,
             intersections: vec![],
@@ -968,6 +968,42 @@ impl<'db> IntersectionBuilder<'db> {
 
     pub(crate) fn add_positive(self, ty: Type<'db>) -> Self {
         self.add_positive_impl(ty, &mut vec![])
+    }
+
+    /// Distribute ourself over this union: for each union element, clone ourself and
+    /// intersect with that union element, then create a new union-of-intersections with all
+    /// of those sub-intersections in it. E.g. if `self` is a simple intersection `T1 & T2`
+    /// and we add `T3 | T4` to the intersection, we don't get `T1 & T2 & (T3 | T4)` (that's
+    /// not in DNF), we distribute the union and get `(T1 & T3) | (T2 & T3) | (T1 & T4) |
+    /// (T2 & T4)`. If `self` is already a union-of-intersections `(T1 & T2) | (T3 & T4)`
+    /// and we add `T5 | T6` to it, that flattens all the way out to `(T1 & T2 & T5) | (T1 &
+    /// T2 & T6) | (T3 & T4 & T5) ...` -- you get the idea.
+    fn add_union_impl(
+        &self,
+        elements: impl IntoIterator<Item = &'db Type<'db>>,
+        seen_aliases: &mut Vec<Type<'db>>,
+    ) -> Self {
+        let elements = elements.into_iter();
+
+        let mut intersections = if let Some(upper) = elements.size_hint().1 {
+            Vec::with_capacity(upper * (self.intersections.len() + 1))
+        } else {
+            vec![]
+        };
+
+        for &element in elements {
+            intersections.append(
+                &mut self
+                    .clone()
+                    .add_positive_impl(element, seen_aliases)
+                    .intersections,
+            );
+        }
+
+        Self {
+            db: self.db,
+            intersections,
+        }
     }
 
     pub(crate) fn add_positive_impl(
@@ -988,24 +1024,7 @@ impl<'db> IntersectionBuilder<'db> {
                 let value_type = alias.value_type(self.db);
                 self.add_positive_impl(value_type, seen_aliases)
             }
-            Type::Union(union) => {
-                // Distribute ourself over this union: for each union element, clone ourself and
-                // intersect with that union element, then create a new union-of-intersections with all
-                // of those sub-intersections in it. E.g. if `self` is a simple intersection `T1 & T2`
-                // and we add `T3 | T4` to the intersection, we don't get `T1 & T2 & (T3 | T4)` (that's
-                // not in DNF), we distribute the union and get `(T1 & T3) | (T2 & T3) | (T1 & T4) |
-                // (T2 & T4)`. If `self` is already a union-of-intersections `(T1 & T2) | (T3 & T4)`
-                // and we add `T5 | T6` to it, that flattens all the way out to `(T1 & T2 & T5) | (T1 &
-                // T2 & T6) | (T3 & T4 & T5) ...` -- you get the idea.
-                union
-                    .elements(self.db)
-                    .iter()
-                    .map(|elem| self.clone().add_positive_impl(*elem, seen_aliases))
-                    .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
-                        builder.intersections.extend(sub.intersections);
-                        builder
-                    })
-            }
+            Type::Union(union) => self.add_union_impl(union.elements(self.db), seen_aliases),
             // `(A & B & ~C) & (D & E & ~F)` -> `A & B & D & E & ~C & ~F`
             Type::Intersection(other) => {
                 let db = self.db;
@@ -1036,17 +1055,9 @@ impl<'db> IntersectionBuilder<'db> {
                     // If we have an enum literal of this enum already in the negative side of
                     // the intersection, expand the instance into the union of enum members, and
                     // add that union to the intersection.
-                    // Note: we manually construct a `UnionType` here instead of going through
-                    // `UnionBuilder` because we would simplify the union to just the enum instance
-                    // and end up in this branch again.
-                    let db = self.db;
-                    self.add_positive_impl(
-                        Type::Union(UnionType::new(
-                            db,
-                            enum_member_literals(db, instance.class_literal(db))
-                                .expect("Calling `enum_member_literals` on an enum class"),
-                            RecursivelyDefined::No,
-                        )),
+                    self.add_union_impl(
+                        enum_member_literals(self.db, instance.class_literal(self.db))
+                            .expect("Calling `enum_member_literals` on an enum class"),
                         seen_aliases,
                     )
                 } else {
@@ -1152,20 +1163,19 @@ impl<'db> IntersectionBuilder<'db> {
                     } else {
                         let db = self.db;
                         let this_member = Type::enum_literal(enum_literal);
-                        let remaining_members = UnionType::from_elements(
-                            db,
+
+                        let remaining_members =
                             enum_member_literals(db, enum_literal.enum_class(db))
                                 .expect("Calling `enum_member_literals` on an enum class")
                                 .iter()
-                                .filter(|&member| member != &this_member),
-                        );
+                                .filter(|&member| member != &this_member);
 
                         // For enum-containing intersections, add the remaining members as positive
                         let mut enum_builder = IntersectionBuilder {
                             db,
                             intersections: enum_intersections,
                         }
-                        .add_positive_impl(remaining_members, seen_aliases);
+                        .add_union_impl(remaining_members, seen_aliases);
 
                         // For non-enum intersections, just add the negative normally
                         let mut other_builder = IntersectionBuilder {
