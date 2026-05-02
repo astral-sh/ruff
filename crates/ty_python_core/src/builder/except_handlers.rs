@@ -1,4 +1,4 @@
-use crate::use_def::FlowSnapshot;
+use crate::use_def::{FlowSnapshot, UseDefMapBuilder};
 
 use super::SemanticIndexBuilder;
 
@@ -43,10 +43,13 @@ impl TryNodeContextStackManager {
         self.current_try_context_stack().take_try_suite_snapshots()
     }
 
-    /// Retrieve the stack that is at the top of our stack of stacks.
-    /// For each `try` block on that stack, push the snapshot onto the `try` block
-    pub(super) fn record_definition(&mut self, builder: &SemanticIndexBuilder) {
-        self.current_try_context_stack().record_definition(builder);
+    /// Record a definition in the try-node context at `scope_index`.
+    pub(super) fn record_definition(
+        &mut self,
+        scope_index: usize,
+        use_def_map: &UseDefMapBuilder<'_>,
+    ) {
+        self.0[scope_index].record_definition(use_def_map);
     }
 
     /// Retrieve the stack that is at the top of our stack of stacks.
@@ -94,10 +97,10 @@ impl TryNodeContextStack {
         )
     }
 
-    /// For each `try` block on the stack, push the snapshot onto the `try` block
-    fn record_definition(&mut self, builder: &SemanticIndexBuilder) {
+    /// For each `try` block on the stack, create a snapshot and push it.
+    fn record_definition(&mut self, use_def_map: &UseDefMapBuilder<'_>) {
         for context in &mut self.0 {
-            context.record_definition(builder.flow_snapshot());
+            context.record_definition(use_def_map.snapshot());
         }
     }
 
