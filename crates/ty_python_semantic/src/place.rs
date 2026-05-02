@@ -2,12 +2,13 @@ use itertools::Either;
 use ruff_db::files::File;
 use ruff_index::IndexVec;
 use ruff_python_ast::PythonVersion;
+use rustc_hash::FxHashMap;
 use ty_module_resolver::{
     KnownModule, Module, ModuleName, file_to_module, resolve_module_confident,
 };
 
 use crate::dunder_all::dunder_all_names;
-use crate::reachability::{ReachabilityConstraintsExtension, evaluate_reachability};
+use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
     DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
@@ -18,7 +19,9 @@ use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
 use ty_python_core::place::{PlaceExprRef, ScopedPlaceId};
 use ty_python_core::predicate::{Predicate, ScopedPredicateId};
-use ty_python_core::reachability_constraints::ReachabilityConstraints;
+use ty_python_core::reachability_constraints::{
+    ReachabilityConstraints, ScopedReachabilityConstraintId,
+};
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
     BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
@@ -596,6 +599,18 @@ pub(super) fn place_from_bindings<'db>(
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
 ) -> PlaceWithDefinition<'db> {
     place_from_bindings_impl(db, bindings_with_constraints, RequiresExplicitReExport::No)
+}
+
+fn evaluate_reachability_cached<'db>(
+    db: &'db dyn Db,
+    predicates: &ty_python_core::predicate::Predicates<'db>,
+    reachability_constraints: &ReachabilityConstraints,
+    reachability_constraint: ScopedReachabilityConstraintId,
+    cache: &mut FxHashMap<ScopedReachabilityConstraintId, Truthiness>,
+) -> Truthiness {
+    *cache.entry(reachability_constraint).or_insert_with(|| {
+        reachability_constraints.evaluate(db, predicates, reachability_constraint)
+    })
 }
 
 /// Build a declared type from a [`DeclarationsIterator`].
@@ -1259,12 +1274,22 @@ fn loop_header_reachability_impl<'db>(
 
     let mut deleted_reachability = Truthiness::AlwaysFalse;
     let mut reachable_bindings = FxIndexSet::default();
+    let mut reachability_cache = FxHashMap::default();
+    let live_bindings: Vec<_> = loop_header.bindings_for_place(place).collect();
+    let use_exact_reachability = live_bindings.len() <= 8
+        && use_def.reachability_constraints().used_interiors().len() <= 128;
 
-    for live_binding in loop_header.bindings_for_place(place) {
-        let reachability = if is_cycle_initial {
+    for live_binding in live_bindings {
+        let reachability = if is_cycle_initial || !use_exact_reachability {
             Truthiness::Ambiguous
         } else {
-            evaluate_reachability(db, use_def, live_binding.reachability_constraint())
+            evaluate_reachability_cached(
+                db,
+                use_def.predicates(),
+                use_def.reachability_constraints(),
+                live_binding.reachability_constraint(),
+                &mut reachability_cache,
+            )
         };
         // Skip unreachable bindings.
         if reachability.is_always_false() {
@@ -1351,6 +1376,7 @@ fn place_from_bindings_impl<'db>(
     let reachability_constraints = bindings_with_constraints.reachability_constraints();
     let boundness_analysis = bindings_with_constraints.boundness_analysis();
     let mut bindings_with_constraints = bindings_with_constraints.peekable();
+    let mut reachability_cache = FxHashMap::default();
 
     let is_non_exported = |binding: Definition<'db>| {
         requires_explicit_reexport.is_yes() && !is_reexported(db, binding)
@@ -1369,12 +1395,6 @@ fn place_from_bindings_impl<'db>(
     // Evaluate this lazily because we don't always need it (for example, if there are no visible
     // bindings at all, we don't need it), and it can cause us to evaluate reachability constraint
     // expressions, which is extra work and can lead to cycles.
-    let unbound_visibility = || {
-        unbound_reachability_constraint.map(|reachability_constraint| {
-            reachability_constraints.evaluate(db, predicates, reachability_constraint)
-        })
-    };
-
     let mut first_definition = None;
     let mut only_loop_header_bindings = true;
 
@@ -1390,9 +1410,16 @@ fn place_from_bindings_impl<'db>(
                     return None;
                 }
                 DefinitionState::Deleted => {
-                    deleted_reachability = deleted_reachability.or_else(|| {
-                        reachability_constraints.evaluate(db, predicates, reachability_constraint)
-                    });
+                    if !deleted_reachability.is_always_true() {
+                        let reachability = evaluate_reachability_cached(
+                            db,
+                            predicates,
+                            reachability_constraints,
+                            reachability_constraint,
+                            &mut reachability_cache,
+                        );
+                        deleted_reachability = deleted_reachability.or(reachability);
+                    }
                     return None;
                 }
             };
@@ -1401,8 +1428,13 @@ fn place_from_bindings_impl<'db>(
                 return None;
             }
 
-            let static_reachability =
-                reachability_constraints.evaluate(db, predicates, reachability_constraint);
+            let static_reachability = evaluate_reachability_cached(
+                db,
+                predicates,
+                reachability_constraints,
+                reachability_constraint,
+                &mut reachability_cache,
+            );
 
             if static_reachability.is_always_false() {
                 // If the static reachability evaluates to false, the binding is either not reachable
@@ -1452,7 +1484,18 @@ fn place_from_bindings_impl<'db>(
                 // return `Never` in this case, because we will union the types of all bindings, and
                 // `Never` will be eliminated automatically.
 
-                if unbound_visibility().is_none_or(Truthiness::is_always_false) {
+                let unbound_visibility =
+                    unbound_reachability_constraint.map(|reachability_constraint| {
+                        evaluate_reachability_cached(
+                            db,
+                            predicates,
+                            reachability_constraints,
+                            reachability_constraint,
+                            &mut reachability_cache,
+                        )
+                    });
+
+                if unbound_visibility.is_none_or(Truthiness::is_always_false) {
                     return Some(Type::Never);
                 }
                 return None;
@@ -1487,7 +1530,7 @@ fn place_from_bindings_impl<'db>(
             builder.add(first);
             builder.add(second);
 
-            for ty in types {
+            for ty in types.by_ref() {
                 builder.add(ty);
             }
 
@@ -1495,10 +1538,20 @@ fn place_from_bindings_impl<'db>(
         } else {
             first
         };
+        drop(types);
 
         let boundness = match boundness_analysis {
             BoundnessAnalysis::AssumeBound => Definedness::AlwaysDefined,
-            BoundnessAnalysis::BasedOnUnboundVisibility => match unbound_visibility() {
+            BoundnessAnalysis::BasedOnUnboundVisibility => match unbound_reachability_constraint
+                .map(|reachability_constraint| {
+                    evaluate_reachability_cached(
+                        db,
+                        predicates,
+                        reachability_constraints,
+                        reachability_constraint,
+                        &mut reachability_cache,
+                    )
+                }) {
                 Some(Truthiness::AlwaysTrue) if only_loop_header_bindings => {
                     // Loop header definitions don't shadow prior bindings, so UNBOUND can still be
                     // definitely-visible alongside a loop header binding. See "Use with loop

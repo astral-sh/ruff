@@ -1955,12 +1955,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         loop_header_kind: &LoopHeaderDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
+        const MAX_EXACT_LOOP_HEADER_BINDINGS: usize = 8;
+        const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 512;
+
         let db = self.db();
-        let place = loop_header_kind.place();
+        let loop_header = loop_header_reachability(db, definition);
         let use_def = self
             .index
             .use_def_map(self.scope().file_scope_id(self.db()));
-        let loop_header = loop_header_reachability(db, definition);
+
+        // Loop-header types are an approximation point for loop fixpoint analysis. Inferring the
+        // exact union of every visible loop-back binding can recursively force inference of large
+        // boolean expressions and explode on real-world loops.
+        if loop_header.reachable_bindings.len() > MAX_EXACT_LOOP_HEADER_BINDINGS
+            || use_def.reachability_constraints().used_interiors().len()
+                > MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES
+        {
+            self.bindings.insert(definition, Type::unknown());
+            return;
+        }
+
+        let place = loop_header_kind.place();
 
         let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
 
