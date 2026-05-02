@@ -51,14 +51,19 @@ impl<'db> UnionType<'db> {
 
         if let Some(first) = iter_elements.next() {
             if let Some(second) = iter_elements.next() {
-                let (lower, upper) = iter_elements.size_hint();
-                let capacity = upper.unwrap_or(lower).saturating_add(2);
-                let builder = UnionBuilder::with_capacity(db, capacity)
-                    .add(first.into())
-                    .add(second.into());
-                iter_elements
-                    .fold(builder, |builder, element| builder.add(element.into()))
-                    .build()
+                if let Some(third) = iter_elements.next() {
+                    let (lower, upper) = iter_elements.size_hint();
+                    let capacity = upper.unwrap_or(lower).saturating_add(3);
+                    let builder = UnionBuilder::with_capacity(db, capacity)
+                        .add(first.into())
+                        .add(second.into())
+                        .add(third.into());
+                    iter_elements
+                        .fold(builder, |builder, element| builder.add(element.into()))
+                        .build()
+                } else {
+                    UnionType::from_two_elements(db, first.into(), second.into())
+                }
             } else {
                 first.into()
             }
