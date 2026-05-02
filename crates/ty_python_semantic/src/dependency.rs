@@ -58,6 +58,18 @@ impl DependencyMetadata {
         }
     }
 
+    pub fn projects(&self) -> &[DependencyProject] {
+        &self.projects
+    }
+
+    pub fn module_owners(&self) -> &[ModuleOwner] {
+        &self.module_owners
+    }
+
+    pub fn into_parts(self) -> (Vec<DependencyProject>, Vec<ModuleOwner>) {
+        (self.projects, self.module_owners)
+    }
+
     fn project_for_file(&self, db: &dyn Db, file: File) -> Option<&DependencyProject> {
         let path = file.path(db).as_system_path()?;
 
@@ -115,7 +127,11 @@ impl DependencyProject {
         }
     }
 
-    fn path(&self) -> &SystemPath {
+    pub fn name(&self) -> &DistributionName {
+        &self.name
+    }
+
+    pub fn path(&self) -> &SystemPath {
         &self.path
     }
 
@@ -154,11 +170,11 @@ impl ModuleOwner {
         Some(Self::new(ModuleName::new(module)?, owners))
     }
 
-    fn module(&self) -> &ModuleName {
+    pub fn module(&self) -> &ModuleName {
         &self.module
     }
 
-    fn owners(&self) -> &[DistributionName] {
+    pub fn owners(&self) -> &[DistributionName] {
         &self.owners
     }
 }
@@ -590,7 +606,7 @@ fn search_path_source(search_path: &SearchPath) -> ImportSource {
         ImportSource::StandardLibrary
     } else if search_path.is_first_party() {
         ImportSource::FirstParty
-    } else if search_path.is_site_packages() {
+    } else if search_path.is_site_packages() || search_path.is_editable() {
         ImportSource::ThirdParty
     } else {
         ImportSource::Other

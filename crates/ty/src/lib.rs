@@ -24,7 +24,9 @@ use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use ruff_db::{STACK_SIZE, max_parallelism};
 use ruff_diagnostics::Applicability;
 use salsa::Database;
-use ty_project::dependency_metadata::parse_uv_workspace_metadata;
+use ty_project::dependency_metadata::{
+    enrich_dependency_metadata_with_editables, parse_uv_workspace_metadata,
+};
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
@@ -176,10 +178,13 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     let mut db = ProjectDatabase::fallible(project_metadata, system)?;
     let project = db.project();
+    let dependency_metadata = dependency_metadata.map(Arc::new);
+    let enriched_dependency_metadata =
+        enrich_dependency_metadata(&db, dependency_metadata.as_ref());
 
     project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
     project.set_force_exclude(&mut db, force_exclude);
-    project.set_dependency_metadata(&mut db, dependency_metadata.clone());
+    project.set_dependency_metadata(&mut db, enriched_dependency_metadata);
 
     if !check_paths.is_empty() {
         project.set_included_paths(&mut db, check_paths);
@@ -230,10 +235,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     }
 }
 
-fn load_dependency_metadata(
-    system: &dyn System,
-    path: &SystemPath,
-) -> Result<Arc<DependencyMetadata>> {
+fn load_dependency_metadata(system: &dyn System, path: &SystemPath) -> Result<DependencyMetadata> {
     let source = system
         .read_to_string(path)
         .with_context(|| format!("Failed to read dependency metadata `{path}`"))?;
@@ -241,7 +243,19 @@ fn load_dependency_metadata(
     let metadata = parse_uv_workspace_metadata(&source)
         .with_context(|| format!("Failed to load dependency metadata `{path}`"))?;
 
-    Ok(Arc::new(metadata))
+    Ok(metadata)
+}
+
+fn enrich_dependency_metadata(
+    db: &ProjectDatabase,
+    dependency_metadata: Option<&Arc<DependencyMetadata>>,
+) -> Option<Arc<DependencyMetadata>> {
+    dependency_metadata.map(|metadata| {
+        Arc::new(enrich_dependency_metadata_with_editables(
+            db,
+            (**metadata).clone(),
+        ))
+    })
 }
 
 #[derive(Copy, Clone)]
@@ -490,8 +504,10 @@ impl MainLoop {
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
                     db.apply_changes(&changes, Some(&self.project_options_overrides));
+                    let dependency_metadata =
+                        enrich_dependency_metadata(db, self.dependency_metadata.as_ref());
                     db.project()
-                        .set_dependency_metadata(db, self.dependency_metadata.clone());
+                        .set_dependency_metadata(db, dependency_metadata);
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }
