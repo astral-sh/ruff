@@ -56,6 +56,32 @@ impl PlaceExpr {
         MemberExprBuilder::visit_expr(expr).and_then(Self::try_from_member_expr)
     }
 
+    /// Tries to create the equivalent subscript place for a call like `x.get("key")`.
+    ///
+    /// This is intentionally syntactic. Callers that use the returned place for narrowing must
+    /// still verify that the receiver type has `dict.get` semantics.
+    pub fn try_from_get_method_call(expr_call: &ast::ExprCall) -> Option<Self> {
+        if !expr_call.arguments.keywords.is_empty() {
+            return None;
+        }
+
+        let [key] = &*expr_call.arguments.args else {
+            return None;
+        };
+
+        let ast::Expr::Attribute(attribute) = expr_call.func.as_ref() else {
+            return None;
+        };
+
+        if attribute.attr.id != "get" {
+            return None;
+        }
+
+        let value = MemberExprBuilder::visit_expr(ast::ExprRef::from(attribute.value.as_ref()))?;
+        let subscript = MemberExprBuilder::visit_subscript_expr(value, key)?;
+        Self::try_from_member_expr(subscript)
+    }
+
     /// Tries to create a `PlaceExpr` from a member expression.
     ///
     /// Returns `None` if the expression is not a valid place expression and `Some` otherwise.
@@ -669,6 +695,14 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
     fn expr_call(&self, expr_call: &ast::ExprCall) -> PossiblyNarrowedPlaces {
         let mut places = PossiblyNarrowedPlaces::default();
 
+        // Include the synthetic subscript place that `.get()` may narrow; semantic checks decide
+        // whether the call actually has `dict.get` semantics.
+        if let Some(place_expr) = PlaceExpr::try_from_get_method_call(expr_call)
+            && let Some(place) = self.places.place_id((&place_expr).into())
+        {
+            places.insert(place);
+        }
+
         // Under the current narrowing semantics, we only ever use the first two positional
         // arguments: argument 0 for most narrowing calls, and argument 1 for unbound
         // TypeGuard/TypeIs methods (e.g. `C.f(C(), x)`).
@@ -710,16 +744,31 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
 
     /// Helper to add a potential narrowing target expression to the set.
     fn add_narrowing_target(&self, expr: &ast::Expr, places: &mut PossiblyNarrowedPlaces) {
-        if let Some(place_expr) = PlaceExpr::try_from_expr(expr) {
-            if let Some(place) = self.places.place_id((&place_expr).into()) {
-                places.insert(place);
+        match expr {
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+                if let Some(place_expr) = PlaceExpr::try_from_expr(expr) {
+                    if let Some(place) = self.places.place_id((&place_expr).into()) {
+                        places.insert(place);
+                    }
+                }
             }
-        }
+            ast::Expr::Named(expr_named) => {
+                places.extend(self.simple_expr(&expr_named.target));
+                places.extend(self.expression_node(&expr_named.value));
+            }
+            ast::Expr::Call(call) => {
+                // Include the synthetic subscript place that `.get()` may narrow; semantic checks
+                // decide whether the call actually has `dict.get` semantics.
+                if let Some(place_expr) = PlaceExpr::try_from_get_method_call(call)
+                    && let Some(place) = self.places.place_id((&place_expr).into())
+                {
+                    places.insert(place);
+                }
 
-        match expr.expression_value() {
-            // type(x) is Y can narrow x
-            ast::Expr::Call(call) if call.arguments.args.len() == 1 => {
-                if let Some(first_arg) = call.arguments.args.first() {
+                // type(x) is Y can narrow x
+                if call.arguments.args.len() == 1
+                    && let Some(first_arg) = call.arguments.args.first()
+                {
                     if let Some(place_expr) = PlaceExpr::try_from_expr(first_arg) {
                         if let Some(place) = self.places.place_id((&place_expr).into()) {
                             places.insert(place);

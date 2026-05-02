@@ -1190,6 +1190,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             )
         }
 
+        fn expression_value(expr: &ast::Expr) -> &ast::Expr {
+            let mut expr = expr;
+            while let ast::Expr::Named(named) = expr {
+                expr = &named.value;
+            }
+            expr
+        }
+
         /// Attempt to find an underlying class literal for purposes of `if type(x) is Y` narrowing.
         ///
         /// We deliberately return `None` for generic-alias types, since narrowing based
@@ -1435,6 +1443,35 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
             let lhs_ty = last_rhs_ty.unwrap_or_else(|| inference.expression_type(left));
             let rhs_ty = inference.expression_type(right);
+
+            // Narrowing for:
+            // - `if d.get("key") is not None`
+            // - `if d.get("key") is None`
+            // - `if None is not d.get("key")`
+            // - `if None is d.get("key")`
+            if let ast::Expr::Call(call) = expression_value(left)
+                && let Some((place, constraint)) =
+                    self.narrow_dict_get_call(inference, call, rhs_ty, *op, is_positive)
+            {
+                constraints
+                    .entry(place)
+                    .and_modify(|existing| {
+                        *existing = existing.merge_constraint_and(constraint.clone());
+                    })
+                    .or_insert(constraint);
+            }
+
+            if let ast::Expr::Call(call) = expression_value(right)
+                && let Some((place, constraint)) =
+                    self.narrow_dict_get_call(inference, call, lhs_ty, *op, is_positive)
+            {
+                constraints
+                    .entry(place)
+                    .and_modify(|existing| {
+                        *existing = existing.merge_constraint_and(constraint.clone());
+                    })
+                    .or_insert(constraint);
+            }
 
             // Narrowing for:
             // - `if type(x) is Y`
@@ -2060,6 +2097,70 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         } else {
             None
         }
+    }
+
+    /// Narrow the matching subscript place for a `dict.get` or `TypedDict.get` call compared
+    /// against `None`.
+    ///
+    /// For example, given `d: dict[str, int | None]`, `d.get("key") is not None` proves that
+    /// `d["key"]` exists and has type `int`:
+    /// ```python
+    /// if d.get("key") is not None:
+    ///     reveal_type(d["key"])  # int
+    /// ```
+    ///
+    /// In the inverse branch, a successful `d["key"]` access can only produce `None`; if the key
+    /// is missing, the access raises and produces no value.
+    fn narrow_dict_get_call(
+        &self,
+        inference: &ExpressionInference<'db>,
+        call: &ast::ExprCall,
+        other_type: Type<'db>,
+        op: ast::CmpOp,
+        is_positive: bool,
+    ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
+        let effective_op = if is_positive { op } else { op.negate() };
+        if !other_type.is_none(self.db) {
+            return None;
+        }
+        let constraint_ty = match effective_op {
+            ast::CmpOp::Is => Type::none(self.db),
+            ast::CmpOp::IsNot => Type::none(self.db).negate(self.db),
+            _ => return None,
+        };
+
+        let ast::Expr::Attribute(attribute) = call.func.as_ref() else {
+            return None;
+        };
+
+        if !has_known_dict_get_semantics(
+            self.db,
+            inference.expression_type(attribute.value.as_ref()),
+        ) {
+            return None;
+        }
+
+        let place_expr = PlaceExpr::try_from_get_method_call(call)?;
+        let place = self.places().place_id(&place_expr)?;
+        Some((place, NarrowingConstraint::intersection(constraint_ty)))
+    }
+}
+
+// We only apply `dict.get`-to-subscript narrowing for types whose `get` and `__getitem__`
+// relationship is known. Arbitrary `Mapping` implementations can override `get` independently.
+fn has_known_dict_get_semantics<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty.resolve_type_alias(db) {
+        Type::NominalInstance(instance) => instance.has_known_class(db, KnownClass::Dict),
+        Type::TypedDict(_) => true,
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .any(|element| has_known_dict_get_semantics(db, *element)),
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| has_known_dict_get_semantics(db, *element)),
+        _ => false,
     }
 }
 
