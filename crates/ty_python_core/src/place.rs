@@ -744,13 +744,18 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
 
     /// Helper to add a potential narrowing target expression to the set.
     fn add_narrowing_target(&self, expr: &ast::Expr, places: &mut PossiblyNarrowedPlaces) {
-        if let Some(place_expr) = PlaceExpr::try_from_expr(expr) {
-            if let Some(place) = self.places.place_id((&place_expr).into()) {
-                places.insert(place);
+        match expr {
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+                if let Some(place_expr) = PlaceExpr::try_from_expr(expr) {
+                    if let Some(place) = self.places.place_id((&place_expr).into()) {
+                        places.insert(place);
+                    }
+                }
             }
-        }
-
-        match expr.expression_value() {
+            ast::Expr::Named(expr_named) => {
+                places.extend(self.simple_expr(&expr_named.target));
+                places.extend(self.expression_node(&expr_named.value));
+            }
             ast::Expr::Call(call) => {
                 // Include the synthetic subscript place that `.get()` may narrow; semantic checks
                 // decide whether the call actually has `dict.get` semantics.
