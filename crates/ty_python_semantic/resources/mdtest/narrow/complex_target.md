@@ -220,6 +220,13 @@ def _(t1: tuple[int | None, int | None], t2: tuple[int, int] | tuple[None, None]
     else:
         reveal_type(t2)  # revealed: tuple[int, int]
 
+    if (first := t2[0]) is not None:
+        reveal_type(first)  # revealed: int
+        reveal_type(t2)  # revealed: tuple[int, int]
+    else:
+        reveal_type(first)  # revealed: None
+        reveal_type(t2)  # revealed: tuple[None, None]
+
 def _(t3: tuple[int, str] | tuple[None, None] | tuple[bool, bytes]):
     # Narrow to tuples where first element is not None
     if t3[0] is not None:
@@ -304,6 +311,14 @@ def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B, C]):
         reveal_type(x)  # revealed: tuple[Literal["tag2"], B, C]
     else:
         reveal_type(x)  # revealed: tuple[Literal["tag1"], A]
+
+def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B, C]):
+    if (tag := x[0]) == "tag1":
+        reveal_type(tag)  # revealed: Literal["tag1"]
+        reveal_type(x)  # revealed: tuple[Literal["tag1"], A]
+    else:
+        reveal_type(tag)  # revealed: Literal["tag2"]
+        reveal_type(x)  # revealed: tuple[Literal["tag2"], B, C]
 
 # With int literals
 def _(x: tuple[Literal[1], A] | tuple[Literal[2], B]):

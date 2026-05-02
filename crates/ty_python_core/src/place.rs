@@ -679,7 +679,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         // For subscript expressions on either side, the subscript base can also be narrowed.
         // (TypedDict and tuple discriminated union narrowing.)
         for expr in std::iter::once(&*expr_compare.left).chain(&expr_compare.comparators) {
-            if let ast::Expr::Subscript(subscript) = expr
+            if let ast::Expr::Subscript(subscript) = expr.expression_value()
                 && let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value)
                 && let Some(place) = self.places.place_id((&place_expr).into())
             {
