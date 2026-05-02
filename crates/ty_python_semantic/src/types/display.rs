@@ -2686,12 +2686,6 @@ const LITERAL_POLICY: TruncationPolicy = TruncationPolicy {
 
 impl<'db> FmtDetailed<'db> for DisplayLiteralGroup<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        if let Some(enum_class) = self.full_enum_class() {
-            return enum_class
-                .display_with(self.db, self.settings.clone())
-                .fmt_detailed(f);
-        }
-
         f.with_type(Type::SpecialForm(SpecialFormType::Literal))
             .write_str("Literal")?;
         f.write_char('[')?;
@@ -2721,48 +2715,6 @@ impl<'db> FmtDetailed<'db> for DisplayLiteralGroup<'db> {
 
         join.finish()?;
         f.write_str("]")
-    }
-}
-
-impl<'db> DisplayLiteralGroup<'db> {
-    /// Return the enum class if this literal group contains every canonical member of one enum.
-    ///
-    /// This lets the display collapse a full enum-literal set back to the enum class instead of
-    /// showing a long `Literal[...]` list.
-    ///
-    /// ```python
-    /// from enum import Enum
-    ///
-    /// class Color(Enum):
-    ///     RED = 1
-    ///     BLUE = 2
-    ///
-    /// # Literal[Color.RED, Color.BLUE] displays as Color.
-    /// ```
-    fn full_enum_class(&self) -> Option<ClassLiteral<'db>> {
-        let mut enum_class = None;
-        let mut names = FxHashSet::default();
-
-        for literal in &self.literals {
-            let enum_literal = literal.as_enum_literal()?;
-            let class = enum_literal.enum_class(self.db);
-            if let Some(existing_class) = enum_class {
-                if existing_class != class {
-                    return None;
-                }
-            } else {
-                enum_class = Some(class);
-            }
-
-            let metadata = crate::types::enum_metadata(self.db, class)?;
-            let name = enum_literal.name(self.db);
-            let canonical_name = metadata.resolve_member(name).unwrap_or(name);
-            names.insert(canonical_name.clone());
-        }
-
-        let enum_class = enum_class?;
-        let metadata = crate::types::enum_metadata(self.db, enum_class)?;
-        (names.len() == metadata.members.len()).then_some(enum_class)
     }
 }
 
