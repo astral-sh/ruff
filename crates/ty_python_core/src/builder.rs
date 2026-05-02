@@ -21,8 +21,8 @@ use ruff_text_size::{Ranged, TextRange};
 use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::HasTrackedScope;
-use crate::ast_ids::AstIdsBuilder;
 use crate::ast_ids::node_key::ExpressionNodeKey;
+use crate::ast_ids::{AstIdsBuilder, ScopedUseId};
 use crate::ast_node_ref::AstNodeRef;
 use crate::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
@@ -105,6 +105,45 @@ struct ScopeInfo<'ast> {
     narrowing_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
 }
 
+#[derive(Debug, Default)]
+enum VisitMode {
+    #[default]
+    Create,
+    Replay(ReplayState),
+}
+
+#[derive(Debug, Default)]
+struct ReplayState {
+    definitions_by_node_offsets: FxHashMap<DefinitionNodeKey, usize>,
+    next_definition_ids_by_scope: FxHashMap<FileScopeId, ScopedDefinitionId>,
+}
+
+impl ReplayState {
+    fn new(scope: FileScopeId, next_definition_id: ScopedDefinitionId) -> Self {
+        Self {
+            definitions_by_node_offsets: FxHashMap::default(),
+            next_definition_ids_by_scope: FxHashMap::from_iter([(scope, next_definition_id)]),
+        }
+    }
+
+    fn next_definition(&mut self, key: DefinitionNodeKey) -> usize {
+        let offset = self.definitions_by_node_offsets.entry(key).or_default();
+        let current = *offset;
+        *offset += 1;
+        current
+    }
+
+    fn next_definition_id(&mut self, scope: FileScopeId) -> ScopedDefinitionId {
+        let next_definition_id = self
+            .next_definition_ids_by_scope
+            .entry(scope)
+            .or_insert(ScopedDefinitionId::from_u32(1));
+        let current = *next_definition_id;
+        *next_definition_id = ScopedDefinitionId::from_u32(current.as_u32() + 1);
+        current
+    }
+}
+
 #[derive(Clone)]
 struct BoolOpSnapshots {
     truthy: FlowSnapshot,
@@ -153,6 +192,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 
     /// Per-scope contexts regarding nested `try`/`except` statements
     try_node_context_stack_manager: TryNodeContextStackManager,
+    visit_mode: VisitMode,
 
     /// Flags about the file's global scope
     has_future_annotations: bool,
@@ -210,6 +250,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             current_match_case: None,
             current_first_parameter_name: None,
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
+            visit_mode: VisitMode::default(),
 
             has_future_annotations: false,
             in_type_checking_block: false,
@@ -261,6 +302,95 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn current_scope(&self) -> FileScopeId {
         self.current_scope_info().file_scope_id
+    }
+
+    fn is_replaying(&self) -> bool {
+        matches!(self.visit_mode, VisitMode::Replay(_))
+    }
+
+    #[expect(
+        dead_code,
+        reason = "replay mode is introduced before the finally double-visit that uses it"
+    )]
+    fn enter_replay_mode(&mut self, next_definition_id: ScopedDefinitionId) -> VisitMode {
+        let current_scope = self.current_scope();
+        std::mem::replace(
+            &mut self.visit_mode,
+            VisitMode::Replay(ReplayState::new(current_scope, next_definition_id)),
+        )
+    }
+
+    #[expect(
+        dead_code,
+        reason = "replay mode is introduced before the finally double-visit that uses it"
+    )]
+    fn restore_visit_mode(&mut self, visit_mode: VisitMode) {
+        self.visit_mode = visit_mode;
+    }
+
+    fn next_replay_definition(&mut self, key: DefinitionNodeKey) -> Option<usize> {
+        let VisitMode::Replay(replay_state) = &mut self.visit_mode else {
+            return None;
+        };
+
+        Some(replay_state.next_definition(key))
+    }
+
+    fn next_replay_definition_id_for_scope(
+        &mut self,
+        scope: FileScopeId,
+    ) -> Option<ScopedDefinitionId> {
+        let VisitMode::Replay(replay_state) = &mut self.visit_mode else {
+            return None;
+        };
+
+        Some(replay_state.next_definition_id(scope))
+    }
+
+    fn next_replay_definition_id(&mut self) -> Option<ScopedDefinitionId> {
+        self.next_replay_definition_id_for_scope(self.current_scope())
+    }
+
+    fn record_use_id(&mut self, expr: impl Into<ExpressionNodeKey>) -> ScopedUseId {
+        self.record_use_id_in_scope(self.current_scope(), expr)
+    }
+
+    fn record_use_id_in_scope(
+        &mut self,
+        scope: FileScopeId,
+        expr: impl Into<ExpressionNodeKey>,
+    ) -> ScopedUseId {
+        let is_replaying = self.is_replaying();
+        let ast_ids = &mut self.ast_ids[scope];
+        if is_replaying {
+            ast_ids.expect_use(expr)
+        } else {
+            ast_ids.record_use(expr)
+        }
+    }
+
+    fn record_use(&mut self, place_id: ScopedPlaceId, use_id: ScopedUseId) {
+        let is_replaying = self.is_replaying();
+        let use_def_map = self.current_use_def_map_mut();
+        if is_replaying {
+            use_def_map.replay_use(place_id, use_id);
+        } else {
+            use_def_map.record_use(place_id, use_id);
+        }
+    }
+
+    fn record_multi_use(
+        &mut self,
+        scope: FileScopeId,
+        places: impl Iterator<Item = ScopedPlaceId>,
+        use_id: ScopedUseId,
+    ) {
+        let is_replaying = self.is_replaying();
+        if is_replaying {
+            self.use_def_maps[scope].replay_multi_use(places, use_id);
+        } else {
+            self.use_def_maps[scope].record_multi_use(places, use_id);
+        }
     }
 
     pub(crate) fn expect_single_definition(
@@ -379,6 +509,25 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn push_scope_with_parent(&mut self, node: NodeWithScopeRef, parent: Option<FileScopeId>) {
+        if self.is_replaying() {
+            let file_scope_id = self.scopes_by_node[&node.node_key()];
+            let scope = &self.scopes[file_scope_id];
+            debug_assert_eq!(scope.parent(), parent);
+            debug_assert_eq!(scope.kind(), node.to_kind(self.module).scope_kind());
+
+            self.try_node_context_stack_manager.enter_nested_scope();
+
+            // Save narrowing aliases. They will be restored with `pop_scope` after returning from inspecting the inner scope.
+            // TODO: Cross-scope alias narrowing is not supported yet.
+            let saved_aliases = std::mem::take(&mut self.narrowing_aliases);
+            self.scope_stack.push(ScopeInfo {
+                file_scope_id,
+                current_loop: None,
+                narrowing_aliases: saved_aliases,
+            });
+            return;
+        }
+
         let children_start = self.scopes.next_index() + 1;
 
         // Note `node` is guaranteed to be a child of `self.module`
@@ -720,6 +869,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .expect("Root scope should be present");
         self.narrowing_aliases = narrowing_aliases;
 
+        if self.is_replaying() {
+            return popped_scope_id;
+        }
+
         let children_end = self.scopes.next_index();
 
         let popped_scope = &mut self.scopes[popped_scope_id];
@@ -757,11 +910,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn current_reachability_constraints_mut(&mut self) -> &mut ReachabilityConstraintsBuilder {
         let scope_id = self.current_scope();
         &mut self.use_def_maps[scope_id].reachability_constraints
-    }
-
-    fn current_ast_ids(&mut self) -> &mut AstIdsBuilder {
-        let scope_id = self.current_scope();
-        &mut self.ast_ids[scope_id]
     }
 
     /// Try to register a narrowing alias for a simple name assignment.
@@ -938,6 +1086,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Add a symbol to the place table and the use-def map.
     /// Return the [`ScopedPlaceId`] that uniquely identifies the symbol in both.
     fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {
+        if self.is_replaying() {
+            let symbol_id = self
+                .current_place_table()
+                .symbol_id(name.as_str())
+                .expect("replayed visit should reuse an existing symbol");
+            debug_assert_eq!(self.current_place_table().symbol(symbol_id).name(), &name);
+            return symbol_id;
+        }
+
         let (symbol_id, added) = self.current_place_table_mut().add_symbol(Symbol::new(name));
         if added {
             self.current_use_def_map_mut().add_place(symbol_id.into());
@@ -948,6 +1105,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Add a place to the place table and the use-def map.
     /// Return the [`ScopedPlaceId`] that uniquely identifies the place in both.
     fn add_place(&mut self, place_expr: PlaceExpr) -> ScopedPlaceId {
+        if self.is_replaying() {
+            return self
+                .current_place_table()
+                .place_id((&place_expr).into())
+                .expect("replayed visit should reuse an existing place");
+        }
+
         let (place_id, added) = self.current_place_table_mut().add_place(place_expr);
         if added {
             self.current_use_def_map_mut().add_place(place_id);
@@ -974,8 +1138,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if let ScopedPlaceId::Symbol(symbol_id) = place_id {
             self.mark_symbol_used(symbol_id);
         }
-        let use_id = self.current_ast_ids().record_use(expr);
-        self.current_use_def_map_mut().record_use(place_id, use_id);
+        let use_id = self.record_use_id(expr);
+        self.record_use(place_id, use_id);
     }
 
     fn record_place_definition(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
@@ -1071,6 +1235,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.definitions_by_node.entry(key).or_default()
     }
 
+    fn record_single_definition_for_key(
+        &mut self,
+        key: impl Into<DefinitionNodeKey>,
+        definition: Definition<'db>,
+    ) {
+        let key = key.into();
+        if self.is_replaying() {
+            let definitions = &self.definitions_by_node[&key];
+            debug_assert_eq!(definitions.len(), 1);
+            debug_assert_eq!(definitions[0], definition);
+        } else {
+            let existing_definition = self
+                .definitions_by_node
+                .insert(key, Definitions::single(definition));
+            debug_assert_eq!(existing_definition, None);
+        }
+    }
+
     /// Add a [`Definition`] associated with the `definition_node` AST node.
     ///
     /// ## Panics
@@ -1097,17 +1279,26 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if self.scopes[scope].kind() == ScopeKind::Class && place.is_symbol() {
             return;
         }
-        for associated_place in self.place_tables[scope]
+        let associated_places: Vec<_> = self.place_tables[scope]
             .associated_place_ids(place)
             .iter()
             .copied()
-        {
-            self.use_def_maps[scope].delete_binding(associated_place.into());
+            .collect();
+        for associated_place in associated_places {
+            self.delete_binding_in_scope(scope, associated_place.into());
         }
     }
 
     fn delete_binding(&mut self, place: ScopedPlaceId) {
-        self.current_use_def_map_mut().delete_binding(place);
+        self.delete_binding_in_scope(self.current_scope(), place);
+    }
+
+    fn delete_binding_in_scope(&mut self, scope: FileScopeId, place: ScopedPlaceId) {
+        if let Some(def_id) = self.next_replay_definition_id_for_scope(scope) {
+            self.use_def_maps[scope].delete_binding_with_definition_id(place, def_id);
+        } else {
+            self.use_def_maps[scope].delete_binding(place);
+        }
     }
 
     /// Push a new [`Definition`] onto the list of definitions
@@ -1133,21 +1324,37 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let category = kind.category(self.source_type.is_stub(), self.module);
         let is_reexported = kind.is_reexported();
+        let definition_key = definition_node.key();
+        let current_scope = self.current_scope();
 
-        let definition: Definition<'db> = Definition::new(
-            self.db,
-            self.file,
-            self.current_scope(),
-            place,
-            kind,
-            is_reexported,
-        );
+        let (definition, num_definitions) =
+            if let Some(offset) = self.next_replay_definition(definition_key) {
+                let definitions = &self.definitions_by_node[&definition_key];
+                let definition = *definitions
+                    .get(offset)
+                    .expect("replayed visit should reuse an existing definition");
+                debug_assert_eq!(definition.file(self.db), self.file);
+                debug_assert_eq!(definition.file_scope(self.db), current_scope);
+                debug_assert_eq!(definition.place(self.db), place);
+                debug_assert_eq!(definition.is_reexported(self.db), is_reexported);
+                (definition, definitions.len())
+            } else {
+                let definition: Definition<'db> = Definition::new(
+                    self.db,
+                    self.file,
+                    current_scope,
+                    place,
+                    kind,
+                    is_reexported,
+                );
 
-        let num_definitions = {
-            let definitions = self.add_entry_for_definition_key(definition_node.key());
-            definitions.push(definition);
-            definitions.len()
-        };
+                let num_definitions = {
+                    let definitions = self.add_entry_for_definition_key(definition_key);
+                    definitions.push(definition);
+                    definitions.len()
+                };
+                (definition, num_definitions)
+            };
 
         // We need to avoid marking places as bound as soon as we encounter a loop header
         // definition for them, because that would lead to false-positive semantic syntax errors in
@@ -1165,13 +1372,29 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.mark_place_declared(place);
         }
 
-        let use_def = self.current_use_def_map_mut();
+        let replay_definition_id = self.next_replay_definition_id();
         match category {
             DefinitionCategory::DeclarationAndBinding => {
-                use_def.record_declaration_and_binding(place, definition);
+                if let Some(def_id) = replay_definition_id {
+                    self.current_use_def_map_mut()
+                        .record_declaration_and_binding_with_definition_id(
+                            place, definition, def_id,
+                        );
+                } else {
+                    self.current_use_def_map_mut()
+                        .record_declaration_and_binding(place, definition);
+                }
                 self.delete_associated_bindings(place);
             }
-            DefinitionCategory::Declaration => use_def.record_declaration(place, definition),
+            DefinitionCategory::Declaration => {
+                if let Some(def_id) = replay_definition_id {
+                    self.current_use_def_map_mut()
+                        .record_declaration_with_definition_id(place, definition, def_id);
+                } else {
+                    self.current_use_def_map_mut()
+                        .record_declaration(place, definition);
+                }
+            }
             DefinitionCategory::Binding => {
                 // Loop-header bindings don't shadow prior bindings.
                 let previous_definitions = if is_loop_header {
@@ -1179,7 +1402,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 } else {
                     PreviousDefinitions::AreShadowed
                 };
-                use_def.record_binding(place, definition, previous_definitions);
+                if let Some(def_id) = replay_definition_id {
+                    self.current_use_def_map_mut()
+                        .record_binding_with_definition_id(
+                            place,
+                            definition,
+                            def_id,
+                            previous_definitions,
+                        );
+                } else {
+                    self.current_use_def_map_mut().record_binding(
+                        place,
+                        definition,
+                        previous_definitions,
+                    );
+                }
                 if !is_loop_header {
                     self.delete_associated_bindings(place);
                 }
@@ -1737,6 +1974,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         expression_kind: ExpressionKind,
         assigned_to: Option<&ast::StmtAssign>,
     ) -> Expression<'db> {
+        if self.is_replaying() {
+            let expression = self.expressions_by_node[&expression_node.into()];
+            debug_assert_eq!(expression.file(self.db), self.file);
+            debug_assert_eq!(expression.file_scope(self.db), self.current_scope());
+            debug_assert_eq!(expression.kind(self.db), expression_kind);
+            debug_assert_eq!(
+                expression.assigned_to(self.db).is_some(),
+                assigned_to.is_some()
+            );
+            return expression;
+        }
+
         let expression = Expression::new(
             self.db,
             self.file,
@@ -1751,6 +2000,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn add_standalone_statement(&mut self, statement_node: &ast::Stmt) -> Statement<'db> {
+        if self.is_replaying() {
+            return self.statements_by_node[&statement_node.into()];
+        }
+
         // Avoid allocating a salsa ingredient if the statement represents an existing
         // definition or standalone expression.
         let statement = match statement_node {
@@ -1974,11 +2227,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // Insert a mapping from the inner Parameter node to the same definition. This
         // ensures that calling `HasType::inferred_type` on the inner parameter returns
         // a valid type (and doesn't panic)
-        let existing_definition = self.definitions_by_node.insert(
-            (&parameter.parameter).into(),
-            Definitions::single(definition),
-        );
-        debug_assert_eq!(existing_definition, None);
+        self.record_single_definition_for_key(&parameter.parameter, definition);
     }
 
     fn declare_lambda_parameters(
@@ -2054,11 +2303,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // Insert a mapping from the inner Parameter node to the same definition. This
         // ensures that calling `HasType::inferred_type` on the inner parameter returns
         // a valid type (and doesn't panic)
-        let existing_definition = self.definitions_by_node.insert(
-            (&parameter.parameter).into(),
-            Definitions::single(definition),
-        );
-        debug_assert_eq!(existing_definition, None);
+        self.record_single_definition_for_key(&parameter.parameter, definition);
     }
 
     /// Add an unpackable assignment for the given [`Unpackable`].
@@ -2267,9 +2512,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // used to collect all the overloaded definitions of a function. This needs to be
                 // done on the `Identifier` node as opposed to `ExprName` because that's what the
                 // AST uses.
-                let use_id = self.current_ast_ids().record_use(name);
-                self.current_use_def_map_mut()
-                    .record_use(symbol.into(), use_id);
+                let use_id = self.record_use_id(name);
+                self.record_use(symbol.into(), use_id);
 
                 self.add_definition(symbol.into(), function_def);
                 self.mark_symbol_used(symbol);
@@ -3521,9 +3765,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     .map(|key_member_id| ScopedPlaceId::from(*key_member_id))
             });
 
-        let use_id = self.ast_ids[current_scope].record_use(keyword);
-        self.use_def_maps[current_scope]
-            .record_multi_use(member_places.into_iter().flatten(), use_id);
+        let member_places: Vec<_> = member_places.into_iter().flatten().collect();
+        let use_id = self.record_use_id_in_scope(current_scope, keyword);
+        self.record_multi_use(current_scope, member_places.into_iter(), use_id);
     }
 
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
