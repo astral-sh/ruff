@@ -390,18 +390,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        self.infer_expression_with_promoted_literal_children(expression, tcx)
-            .promote(self.db())
-    }
-
-    fn infer_expression_with_promoted_literal_children(
-        &mut self,
-        expression: &ast::Expr,
-        tcx: TypeContext<'db>,
-    ) -> Type<'db> {
         self.with_inference_flag(InferenceFlags::PROMOTE_LITERALS, true, |builder| {
             builder.infer_expression(expression, tcx)
         })
+        .promote(self.db())
+    }
+
+    fn should_promote_literals(&self, arity: usize) -> bool {
+        arity > Self::MAX_PRECISE_LITERAL_INFERENCE_ARITY
+            || self
+                .inference_flags()
+                .contains(InferenceFlags::PROMOTE_LITERALS)
     }
 
     fn extend_cycle_recovery(&mut self, other: Option<Type<'db>>) {
@@ -5172,10 +5171,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let constraints = ConstraintSetBuilder::new();
-        let promote_literals = arguments_types.len() > Self::MAX_PRECISE_LITERAL_INFERENCE_ARITY
-            || self
-                .inference_flags()
-                .contains(InferenceFlags::PROMOTE_LITERALS);
+        let promote_literals = self.should_promote_literals(arguments_types.len());
         let iter = itertools::izip!(
             0..,
             arguments_types.iter_mut(),
@@ -5819,11 +5815,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 TypeContext::default()
             };
-            if tuple.len() > Self::MAX_PRECISE_LITERAL_INFERENCE_ARITY
-                || self
-                    .inference_flags()
-                    .contains(InferenceFlags::PROMOTE_LITERALS)
-            {
+            if self.should_promote_literals(tuple.len()) {
                 // Widen nested literals while recursively inferring very large tuples,
                 // to avoid pathological performance issues in subexpressions.
                 self.infer_expression_with_promoted_literals(elt, ctx)
@@ -6063,10 +6055,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
-        let promote_literals = elts.len() > Self::MAX_PRECISE_LITERAL_INFERENCE_ARITY
-            || self
-                .inference_flags()
-                .contains(InferenceFlags::PROMOTE_LITERALS);
+        let promote_literals = self.should_promote_literals(elts.len());
 
         // Extract the type variable `T` from `list[T]` in typeshed.
         let elt_tys = |collection_class: KnownClass| {
