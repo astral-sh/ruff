@@ -480,6 +480,63 @@ BadTypeAlias15: TypeAlias = Literal[-3.14]
 BadTypeAlias16: TypeAlias = list["int" | "str"]
 ```
 
+## `typing.Type` aliases
+
+PEP 613 aliases using `typing.Type[...]` should use type-expression semantics for their argument.
+This preserves generic aliases like `Type[T]`, while runtime uses of `Type[value]` can still use
+expression semantics.
+
+```py
+from typing import Any, Type, TypeAlias, TypeVar
+from typing_extensions import assert_type
+
+T = TypeVar("T")
+
+TypeOfAny: TypeAlias = Type[Any]
+TypeOfT: TypeAlias = Type[T]
+
+def takes_type_of_any(cls: TypeOfAny):
+    assert_type(cls, type[Any])
+
+def call_type_of_t(cls: TypeOfT[T]) -> T:
+    return cls()
+
+assert_type(call_type_of_t(int), int)
+```
+
+The typing conformance suite includes aliases to plain and parameterized `Type`, along with a
+generic alias that is specialized later:
+
+```py
+from typing import Any, Type, TypeAlias, TypeVar
+from typing_extensions import assert_type
+
+T = TypeVar("T")
+
+TA1: TypeAlias = Type
+TA2: TypeAlias = Type[Any]
+TA3: TypeAlias = type
+TA4: TypeAlias = type[Any]
+
+def accepts_type_aliases(a: TA1, b: TA2, c: TA3, d: TA4):
+    _ = a
+    assert_type(b, type[Any])
+    _ = c
+    assert_type(d, type[Any])
+
+TA7: TypeAlias = type[T]
+TA8: TypeAlias = Type[T]
+
+def call_builtin_type_alias(t1: TA7[T]) -> T:
+    return t1()
+
+def call_typing_type_alias(t1: TA8[T]) -> T:
+    return t1()
+
+assert_type(call_builtin_type_alias(int), int)
+assert_type(call_typing_type_alias(int), int)
+```
+
 ## No type qualifiers
 
 The right-hand side of a type alias definition is a [type expression], not an annotation expression.

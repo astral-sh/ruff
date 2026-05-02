@@ -356,7 +356,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 SpecialFormType::Union => match **slice {
                     ast::Expr::Tuple(ref tuple) => {
-                        let elements = tuple.iter().map(|elt| self.infer_type_expression(elt));
+                        if self
+                            .inference_flags()
+                            .contains(InferenceFlags::IN_TYPE_ALIAS)
+                            && let [first, second] = &*tuple.elts
+                        {
+                            return UnionTypeInstance::from_value_expression_types(
+                                db,
+                                [
+                                    self.infer_expression(first, TypeContext::default()),
+                                    self.infer_expression(second, TypeContext::default()),
+                                ],
+                                self.scope(),
+                                self.typevar_binding_context,
+                                self.inference_flags(),
+                            );
+                        }
+
+                        let elements = tuple.iter().map(|elt| {
+                            if self
+                                .inference_flags()
+                                .contains(InferenceFlags::IN_TYPE_ALIAS)
+                            {
+                                self.infer_expression(elt, TypeContext::default())
+                            } else {
+                                self.infer_type_expression(elt)
+                            }
+                        });
 
                         let union_type = Type::KnownInstance(KnownInstanceType::UnionType(
                             UnionTypeInstance::new(
@@ -383,7 +409,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 },
                 SpecialFormType::Type => {
                     // Similar to the branch above that handles `type[…]`, handle `typing.Type[…]`
-                    let argument_ty = self.infer_expression(slice, TypeContext::default());
+                    let argument_ty = if self.inference_flags().intersects(
+                        InferenceFlags::IN_TYPE_ALIAS | InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS,
+                    ) {
+                        self.infer_type_expression(slice)
+                    } else {
+                        self.infer_expression(slice, TypeContext::default())
+                    };
+                    let argument_ty = match argument_ty {
+                        Type::SpecialForm(SpecialFormType::Any) => Type::any(),
+                        Type::SpecialForm(SpecialFormType::Unknown) => Type::unknown(),
+                        _ => argument_ty,
+                    };
                     let argument_ty = if is_valid_type_argument_to_type(db, argument_ty) {
                         argument_ty
                     } else {

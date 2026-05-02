@@ -3327,8 +3327,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let previous_typevar_binding_context =
                     self.typevar_binding_context.replace(definition);
 
-                let value_ty = if let Some(standalone_expression) = self.index.try_expression(value)
-                {
+                let value_ty = if self.can_infer_implicit_type_alias(value, tcx) {
+                    let previously_in_type_alias = self
+                        .context
+                        .inference_flags
+                        .replace(InferenceFlags::IN_TYPE_ALIAS, true);
+                    let ty = self.infer_expression(value, tcx);
+                    self.context
+                        .inference_flags
+                        .set(InferenceFlags::IN_TYPE_ALIAS, previously_in_type_alias);
+                    ty
+                } else if let Some(standalone_expression) = self.index.try_expression(value) {
                     self.infer_standalone_expression_impl(value, standalone_expression, tcx)
                 } else if let ast::Expr::Call(call_expr) = value {
                     // If the RHS is not a standalone expression, this is a simple assignment
@@ -5357,6 +5366,63 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ty = self.infer_expression(expression, tcx);
         self.deferred_state = previous_deferred_state;
         ty
+    }
+
+    /// Return whether a simple assignment RHS should be inferred in implicit-alias context.
+    ///
+    /// Simple assignments in module or class scope can define implicit aliases. Most implicit
+    /// aliases already work through normal expression inference, but `typing.Type[...]` needs an
+    /// explicit type-expression path so that `Type[T]` means the same thing as `type[T]`. This also
+    /// applies when `Type[...]` is nested in a `Union[...]` alias. Runtime uses such as
+    /// `return Type[value]` remain ordinary expressions because they do not go through simple
+    /// assignment inference:
+    ///
+    /// ```py
+    /// from typing import Type, TypeVar
+    ///
+    /// T = TypeVar("T")
+    /// Alias = Type[T]
+    /// ```
+    fn can_infer_implicit_type_alias(&self, expression: &ast::Expr, tcx: TypeContext<'db>) -> bool {
+        if tcx.annotation.is_some() {
+            return false;
+        }
+
+        let current_scope_id = self.scope().file_scope_id(self.db());
+        if !matches!(
+            self.index.scope(current_scope_id).kind(),
+            ScopeKind::Module | ScopeKind::Class
+        ) {
+            return false;
+        }
+
+        self.contains_typing_type_subscript(expression)
+    }
+
+    /// Return whether `expression` contains a `typing.Type[...]` subscription.
+    fn contains_typing_type_subscript(&self, expression: &ast::Expr) -> bool {
+        let ast::Expr::Subscript(subscript) = expression else {
+            return match expression {
+                ast::Expr::Tuple(tuple) => tuple
+                    .iter()
+                    .any(|elt| self.contains_typing_type_subscript(elt)),
+                ast::Expr::BinOp(binary) => {
+                    self.contains_typing_type_subscript(&binary.left)
+                        || self.contains_typing_type_subscript(&binary.right)
+                }
+                _ => false,
+            };
+        };
+
+        let mut speculative = self.speculate();
+        if matches!(
+            speculative.infer_expression(&subscript.value, TypeContext::default()),
+            Type::SpecialForm(SpecialFormType::Type)
+        ) {
+            return true;
+        }
+
+        self.contains_typing_type_subscript(&subscript.slice)
     }
 
     fn infer_maybe_standalone_expression(
