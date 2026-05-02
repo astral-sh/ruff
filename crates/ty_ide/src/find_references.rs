@@ -1930,4 +1930,338 @@ func<CURSOR>_alias()
           |
         "#);
     }
+
+    #[test]
+    fn references_without_declaration_excludes_initial_assignment() {
+        let test = cursor_test(
+            "
+x<CURSOR> = 1
+print(x)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 1 references
+         --> main.py:3:7
+          |
+        3 | print(x)
+          |       -
+          |
+        ");
+    }
+
+    #[test]
+    fn references_without_declaration_keeps_assignment_after_annotation() {
+        let test = cursor_test(
+            "
+x<CURSOR>: int
+x = 1
+print(x)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 2 references
+         --> main.py:3:1
+          |
+        3 | x = 1
+          | -
+        4 | print(x)
+          |       -
+          |
+        ");
+    }
+
+    #[test]
+    fn references_without_declaration_excludes_repeated_annotation() {
+        let test = cursor_test(
+            "
+x<CURSOR>: int
+x: str
+print(x)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 1 references
+         --> main.py:4:7
+          |
+        4 | print(x)
+          |       -
+          |
+        ");
+    }
+
+    #[test]
+    fn references_without_declaration_excludes_repeated_annotated_assignment() {
+        let test = cursor_test(
+            "
+x<CURSOR>: int = 10
+x: str = \"test\"
+print(x)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 1 references
+         --> main.py:4:7
+          |
+        4 | print(x)
+          |       -
+          |
+        ");
+    }
+
+    #[test]
+    fn references_without_declaration_excludes_annotated_assignment() {
+        let test = cursor_test(
+            "
+x<CURSOR>: int = 1
+print(x)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 1 references
+         --> main.py:3:7
+          |
+        3 | print(x)
+          |       -
+          |
+        ");
+    }
+
+    #[test]
+    fn references_without_declaration_excludes_named_expression() {
+        let test = cursor_test(
+            "
+if x<CURSOR> := 1:
+    print(x)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 1 references
+         --> main.py:3:11
+          |
+        3 |     print(x)
+          |           -
+          |
+        ");
+    }
+
+    #[test]
+    fn references_without_declaration_keeps_named_expression_after_annotation() {
+        let test = cursor_test(
+            "
+x<CURSOR>: int
+if x := 1:
+    print(x)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 2 references
+         --> main.py:3:4
+          |
+        3 | if x := 1:
+          |    -
+        4 |     print(x)
+          |           -
+          |
+        ");
+    }
+
+    #[test]
+    fn references_without_declaration_excludes_except_handler_binding() {
+        let test = cursor_test(
+            "
+try:
+    raise ValueError()
+except ValueError as e<CURSOR>:
+    print(e)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 1 references
+         --> main.py:5:11
+          |
+        5 |     print(e)
+          |           -
+          |
+        ");
+    }
+
+    #[test]
+    fn references_without_declaration_excludes_except_handler_binding_after_annotation() {
+        let test = cursor_test(
+            "
+e<CURSOR>: Exception
+try:
+    raise ValueError()
+except ValueError as e:
+    print(e)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 2 references
+         --> main.py:5:22
+          |
+        5 | except ValueError as e:
+          |                      -
+        6 |     print(e)
+          |           -
+          |
+        ");
+    }
+
+    #[test]
+    fn references_without_declaration_excludes_pattern_binding() {
+        let test = cursor_test(
+            "
+match value:
+    case [x<CURSOR>]:
+        print(x)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 1 references
+         --> main.py:4:15
+          |
+        4 |         print(x)
+          |               -
+          |
+        ");
+    }
+
+    #[test]
+    fn references_without_declaration_keeps_pattern_binding_after_annotation() {
+        let test = cursor_test(
+            "
+x<CURSOR>: int
+match value:
+    case [x]:
+        print(x)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 2 references
+         --> main.py:4:11
+          |
+        4 |     case [x]:
+          |           -
+        5 |         print(x)
+          |               -
+          |
+        ");
+    }
+
+    #[test]
+    fn references_without_declaration_multiple_conditional_assignments() {
+        let test = cursor_test(
+            "
+if flag:
+    x<CURSOR> = 1
+else:
+    x = 2
+print(x)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 2 references
+         --> main.py:5:5
+          |
+        5 |     x = 2
+          |     -
+        6 | print(x)
+          |       -
+          |
+        ");
+    }
+
+    #[test]
+    fn references_without_declaration_excludes_initial_attribute_assignment() {
+        let test = cursor_test(
+            "
+class C:
+    def __init__(self):
+        self.x<CURSOR> = 1
+
+    def f(self):
+        print(self.x)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 1 references
+         --> main.py:7:20
+          |
+        7 |         print(self.x)
+          |                    -
+          |
+        ");
+    }
+
+    #[test]
+    fn references_without_declaration_multiple_conditional_attribute_assignments() {
+        let test = cursor_test(
+            "
+class C:
+    def __init__(self, flag):
+        if flag:
+            self.x<CURSOR> = 1
+        else:
+            self.x = 2
+
+    def f(self):
+        print(self.x)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 2 references
+          --> main.py:7:18
+           |
+         7 |             self.x = 2
+           |                  -
+         8 |
+         9 |     def f(self):
+        10 |         print(self.x)
+           |                    -
+           |
+        ");
+    }
+
+    #[test]
+    fn references_without_declaration_keeps_attribute_assignment_after_annotation() {
+        let test = cursor_test(
+            "
+class C:
+    def __init__(self):
+        self.x<CURSOR>: int
+        self.x = 1
+
+    def f(self):
+        print(self.x)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 2 references
+         --> main.py:5:14
+          |
+        5 |         self.x = 1
+          |              -
+        6 |
+        7 |     def f(self):
+        8 |         print(self.x)
+          |                    -
+          |
+        ");
+    }
 }

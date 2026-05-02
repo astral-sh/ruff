@@ -798,7 +798,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum DefinitionCategory {
     /// A Definition which binds a value to a name (e.g. `x = 1`).
     Binding,

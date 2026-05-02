@@ -5,6 +5,7 @@ pub use crate::goto_type_definition::goto_type_definition;
 
 use std::borrow::Cow;
 
+use crate::NavigationTarget;
 use crate::stub_mapping::StubMapper;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
@@ -274,6 +275,14 @@ impl<'db> Definitions<'db> {
         goto_target: &GotoTarget<'_>,
     ) -> Option<crate::NavigationTargets> {
         definitions_to_navigation_targets(model, None, goto_target, self.0)
+    }
+
+    pub(crate) fn declaration_definitions(
+        self,
+        model: &SemanticModel<'db>,
+        goto_target: &GotoTarget<'_>,
+    ) -> Option<Self> {
+        Some(Self(prepare_definitions(model, None, goto_target, self.0)?))
     }
 
     /// Get the "goto-definition" interpretation of this definition
@@ -1181,7 +1190,7 @@ impl Ranged for GotoTarget<'_> {
 fn convert_resolved_definitions_to_targets<'db>(
     db: &'db dyn ty_python_semantic::Db,
     definitions: Vec<ty_python_semantic::ResolvedDefinition<'db>>,
-) -> Vec<crate::NavigationTarget> {
+) -> Vec<NavigationTarget> {
     definitions
         .into_iter()
         .map(|resolved_definition| match resolved_definition {
@@ -1194,7 +1203,7 @@ fn convert_resolved_definitions_to_targets<'db>(
                 let focus_range = definition.focus_range(db, &module);
                 let full_range = definition.full_range(db, &module);
 
-                crate::NavigationTarget {
+                NavigationTarget {
                     file: focus_range.file(),
                     focus_range: focus_range.range(),
                     full_range: full_range.range(),
@@ -1202,11 +1211,11 @@ fn convert_resolved_definitions_to_targets<'db>(
             }
             ty_python_semantic::ResolvedDefinition::Module(file) => {
                 // For modules, navigate to the start of the file
-                crate::NavigationTarget::new(file, TextRange::default())
+                NavigationTarget::new(file, TextRange::default())
             }
             ty_python_semantic::ResolvedDefinition::FileWithRange(file_range) => {
                 // For file ranges, navigate to the specific range within the file
-                crate::NavigationTarget::from(file_range)
+                NavigationTarget::from(file_range)
             }
         })
         .collect()
@@ -1279,6 +1288,17 @@ fn definitions_to_navigation_targets<'db>(
     goto_target: &GotoTarget<'_>,
     mut definitions: Vec<ty_python_semantic::ResolvedDefinition<'db>>,
 ) -> Option<crate::NavigationTargets> {
+    definitions = prepare_definitions(model, stub_mapper, goto_target, definitions)?;
+    let targets = convert_resolved_definitions_to_targets(model.db(), definitions);
+    Some(targets.into_iter().collect())
+}
+
+fn prepare_definitions<'db>(
+    model: &SemanticModel<'db>,
+    stub_mapper: Option<&StubMapper<'db>>,
+    goto_target: &GotoTarget<'_>,
+    mut definitions: Vec<ty_python_semantic::ResolvedDefinition<'db>>,
+) -> Option<Vec<ty_python_semantic::ResolvedDefinition<'db>>> {
     // When our target is a class constructor, we want to exclude
     // navigation targets to its `__init__` or `__new__` methods.
     //
@@ -1321,8 +1341,7 @@ fn definitions_to_navigation_targets<'db>(
     if definitions.is_empty() {
         None
     } else {
-        let targets = convert_resolved_definitions_to_targets(model.db(), definitions);
-        Some(crate::NavigationTargets::unique(targets))
+        Some(definitions)
     }
 }
 

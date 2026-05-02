@@ -169,6 +169,61 @@ def process_data(<CURSOR>data):
     }
 
     #[test]
+    fn test_except_handler_highlights() {
+        let test = cursor_test(
+            "
+try:
+    raise ValueError()
+except ValueError as e<CURSOR>:
+    print(e)
+",
+        );
+
+        assert_snapshot!(test.document_highlights(), @"
+        info[document_highlights]: Highlight 1 (Write)
+         --> main.py:4:22
+          |
+        4 | except ValueError as e:
+          |                      ^
+          |
+
+        info[document_highlights]: Highlight 2 (Read)
+         --> main.py:5:11
+          |
+        5 |     print(e)
+          |           ^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_pattern_binding_highlights() {
+        let test = cursor_test(
+            "
+match value:
+    case [x<CURSOR>]:
+        print(x)
+",
+        );
+
+        assert_snapshot!(test.document_highlights(), @"
+        info[document_highlights]: Highlight 1 (Write)
+         --> main.py:3:11
+          |
+        3 |     case [x]:
+          |           ^
+          |
+
+        info[document_highlights]: Highlight 2 (Read)
+         --> main.py:4:15
+          |
+        4 |         print(x)
+          |               ^
+          |
+        ");
+    }
+
+    #[test]
     fn test_class_name_highlights() {
         let test = cursor_test(
             "
