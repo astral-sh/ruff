@@ -1,9 +1,10 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{Context, Result, bail};
-use ruff_db::system::SystemPathBuf;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use serde::Deserialize;
 use serde_json::{Map, Value};
+use ty_module_resolver::{Db as ModuleResolverDb, list_modules};
 use ty_python_semantic::dependency::{DependencyMetadata, DependencyProject, ModuleOwner};
 
 #[derive(Debug, Deserialize)]
@@ -75,6 +76,58 @@ pub fn parse_uv_workspace_metadata(source: &str) -> Result<DependencyMetadata> {
     Ok(DependencyMetadata::new(projects, module_owners))
 }
 
+pub fn enrich_dependency_metadata_with_editables(
+    db: &dyn ModuleResolverDb,
+    metadata: DependencyMetadata,
+) -> DependencyMetadata {
+    let (projects, mut module_owners) = metadata.into_parts();
+    let mut modules_with_owners: BTreeSet<_> = module_owners
+        .iter()
+        .map(|owner| owner.module().clone())
+        .collect();
+
+    for module in list_modules(db) {
+        let Some(search_path) = module.search_path(db) else {
+            continue;
+        };
+
+        if !search_path.is_editable() {
+            continue;
+        }
+
+        let Some(file) = module.file(db) else {
+            continue;
+        };
+
+        let Some(path) = file.path(db).as_system_path() else {
+            continue;
+        };
+
+        let Some(project) = project_for_path(&projects, path) else {
+            continue;
+        };
+
+        let module_name = module.name(db).clone();
+        if !modules_with_owners.insert(module_name.clone()) {
+            continue;
+        }
+
+        module_owners.push(ModuleOwner::new(module_name, [project.name().to_string()]));
+    }
+
+    DependencyMetadata::new(projects, module_owners)
+}
+
+fn project_for_path<'a>(
+    projects: &'a [DependencyProject],
+    path: &SystemPath,
+) -> Option<&'a DependencyProject> {
+    projects
+        .iter()
+        .filter(|project| path.starts_with(project.path()))
+        .max_by_key(|project| project.path().as_str().len())
+}
+
 fn direct_dependencies(package: &Value, resolution: &Map<String, Value>) -> Result<Vec<String>> {
     let Some(dependencies) = package.get("dependencies") else {
         return Ok(Vec::new());
@@ -137,7 +190,67 @@ fn string_field<'a>(object: &'a Map<String, Value>, fields: &[&str]) -> Option<&
 
 #[cfg(test)]
 mod tests {
-    use super::parse_uv_workspace_metadata;
+    use ruff_db::Db as _;
+    use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPathBuf};
+    use ruff_python_ast::PythonVersion;
+    use ruff_python_ast::name::Name;
+    use ty_module_resolver::{ModuleName, SearchPathSettings};
+    use ty_python_core::platform::PythonPlatform;
+    use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+    use ty_python_semantic::PythonVersionWithSource;
+
+    use crate::ProjectMetadata;
+    use crate::db::tests::TestDb;
+
+    use super::{enrich_dependency_metadata_with_editables, parse_uv_workspace_metadata};
+    use ty_python_semantic::dependency::{DependencyMetadata, DependencyProject, ModuleOwner};
+
+    fn setup_db(files: &[(&str, &str)]) -> anyhow::Result<TestDb> {
+        let project =
+            ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/workspace"));
+        let mut db = TestDb::new(project);
+
+        db.memory_file_system()
+            .create_directory_all("/workspace/app")?;
+        db.memory_file_system()
+            .create_directory_all("/site-packages")?;
+
+        for (path, contents) in files {
+            db.write_file(path, contents)?;
+        }
+
+        let search_paths = SearchPathSettings {
+            src_roots: vec![SystemPathBuf::from("/workspace/app")],
+            site_packages_paths: vec![SystemPathBuf::from("/site-packages")],
+            ..SearchPathSettings::empty()
+        }
+        .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)?;
+
+        Program::from_settings(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersionWithSource {
+                    version: PythonVersion::latest_ty(),
+                    source: ty_python_semantic::PythonVersionSource::Default,
+                },
+                python_platform: PythonPlatform::default(),
+                search_paths,
+            },
+        );
+
+        Ok(db)
+    }
+
+    fn owner_names(metadata: &DependencyMetadata, module: &str) -> Vec<String> {
+        let module = ModuleName::new(module).unwrap();
+
+        metadata
+            .module_owners()
+            .iter()
+            .filter(|owner| owner.module() == &module)
+            .flat_map(|owner| owner.owners().iter().map(ToString::to_string))
+            .collect()
+    }
 
     #[test]
     fn parses_uv_workspace_metadata() {
@@ -230,5 +343,106 @@ mod tests {
                 .to_string()
                 .contains("Unsupported dependency metadata schema version")
         );
+    }
+
+    #[test]
+    fn infers_editable_module_owners() -> anyhow::Result<()> {
+        let db = setup_db(&[
+            ("/site-packages/_lib.pth", "/workspace/lib/src"),
+            ("/workspace/lib/src/lib_module/__init__.py", ""),
+        ])?;
+        let metadata = DependencyMetadata::new(
+            vec![
+                DependencyProject::new(
+                    "app",
+                    SystemPathBuf::from("/workspace/app"),
+                    std::iter::empty::<&str>(),
+                ),
+                DependencyProject::new(
+                    "lib-project",
+                    SystemPathBuf::from("/workspace/lib"),
+                    std::iter::empty::<&str>(),
+                ),
+            ],
+            vec![],
+        );
+
+        let metadata = enrich_dependency_metadata_with_editables(&db, metadata);
+
+        assert_eq!(owner_names(&metadata, "lib_module"), ["lib-project"]);
+        Ok(())
+    }
+
+    #[test]
+    fn nested_workspace_member_uses_longest_matching_project_path() -> anyhow::Result<()> {
+        let db = setup_db(&[
+            ("/site-packages/_parent.pth", "/workspace/parent"),
+            ("/workspace/parent/child/__init__.py", ""),
+        ])?;
+        let metadata = DependencyMetadata::new(
+            vec![
+                DependencyProject::new(
+                    "parent-project",
+                    SystemPathBuf::from("/workspace/parent"),
+                    std::iter::empty::<&str>(),
+                ),
+                DependencyProject::new(
+                    "child-project",
+                    SystemPathBuf::from("/workspace/parent/child"),
+                    std::iter::empty::<&str>(),
+                ),
+            ],
+            vec![],
+        );
+
+        let metadata = enrich_dependency_metadata_with_editables(&db, metadata);
+
+        assert_eq!(owner_names(&metadata, "child"), ["child-project"]);
+        Ok(())
+    }
+
+    #[test]
+    fn explicit_module_owners_are_preserved() -> anyhow::Result<()> {
+        let db = setup_db(&[
+            ("/site-packages/_editable.pth", "/workspace/editable/src"),
+            ("/workspace/editable/src/editable/__init__.py", ""),
+        ])?;
+        let metadata = DependencyMetadata::new(
+            vec![DependencyProject::new(
+                "editable-project",
+                SystemPathBuf::from("/workspace/editable"),
+                std::iter::empty::<&str>(),
+            )],
+            vec![ModuleOwner::new(
+                ModuleName::new_static("editable").unwrap(),
+                ["explicit-owner"],
+            )],
+        );
+
+        let metadata = enrich_dependency_metadata_with_editables(&db, metadata);
+
+        assert_eq!(owner_names(&metadata, "editable"), ["explicit-owner"]);
+        Ok(())
+    }
+
+    #[test]
+    fn namespace_editable_modules_are_skipped() -> anyhow::Result<()> {
+        let db = setup_db(&[
+            ("/site-packages/_namespace.pth", "/workspace/namespace/src"),
+            ("/workspace/namespace/src/ns_pkg/submodule.py", ""),
+        ])?;
+        let metadata = DependencyMetadata::new(
+            vec![DependencyProject::new(
+                "namespace-project",
+                SystemPathBuf::from("/workspace/namespace"),
+                std::iter::empty::<&str>(),
+            )],
+            vec![],
+        );
+
+        let metadata = enrich_dependency_metadata_with_editables(&db, metadata);
+
+        assert_eq!(owner_names(&metadata, "ns_pkg"), Vec::<String>::new());
+        Ok(())
     }
 }

@@ -61,6 +61,60 @@ fn dependency_metadata_enables_missing_direct_dependency_lint() -> anyhow::Resul
 }
 
 #[test]
+fn dependency_metadata_infers_editable_module_owners() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("test.py", "import lib_module"),
+        ("libs/lib/src/lib_module/__init__.py", ""),
+    ])?;
+    let root = format!("{:?}", case.root().to_str().unwrap());
+    let lib = format!("{:?}", case.root().join("libs/lib").to_str().unwrap());
+    let editable = case.root().join("libs/lib/src");
+    let editable = editable.to_str().unwrap();
+
+    case.write_file(".venv/lib/python3.13/site-packages/_lib.pth", editable)?;
+    case.write_file(".venv/Lib/site-packages/_lib.pth", editable)?;
+    case.write_file(
+        "metadata.json",
+        &format!(
+            r#"
+            {{
+              "schema": {{"version": "preview"}},
+              "members": [
+                {{"name": "app", "path": {root}, "id": "app"}},
+                {{"name": "lib-project", "path": {lib}, "id": "lib-project"}}
+              ],
+              "resolution": {{
+                "app": {{"name": "app", "dependencies": []}},
+                "lib-project": {{"name": "lib-project", "dependencies": []}}
+              }},
+              "module_owners": {{}}
+            }}
+            "#
+        ),
+    )?;
+
+    assert_cmd_snapshot!(case.command()
+        .arg("--python").arg(".venv")
+        .arg("--dependency-metadata").arg("metadata.json"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning[missing-direct-dependency]: Third-party import `lib_module` is used but no direct dependency on `lib-project` is declared
+     --> test.py:1:8
+      |
+    1 | import lib_module
+      |        ^^^^^^^^^^
+      |
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn declared_dependency_is_not_reported() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("test.py", "import requests"),
