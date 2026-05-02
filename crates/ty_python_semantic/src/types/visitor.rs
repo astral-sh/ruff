@@ -273,17 +273,35 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
                 // If we have already seen this type, we can skip it.
                 return;
             }
+            let prev_depth = recursion_guard.depth.get();
+            if prev_depth >= MAX_TYPE_WALK_DEPTH {
+                // Bail out to prevent stack overflow from recursive generic protocols
+                // that produce infinitely many distinct specializations (e.g.,
+                // `Protocol[T]` whose members reference `Protocol[list[T]]`).
+                return;
+            }
+            recursion_guard.depth.set(prev_depth + 1);
             walk_non_atomic_type(db, non_atomic_type, visitor);
+            recursion_guard.depth.set(prev_depth);
         }
     }
 }
 
+/// Maximum nesting depth for type walking. This prevents stack overflow when
+/// walking recursive generic protocol types that produce infinitely many
+/// distinct specializations (e.g., a protocol whose callable members return
+/// the same protocol with wrapped type parameters).
+const MAX_TYPE_WALK_DEPTH: u32 = 64;
+
 #[derive(Default, Debug)]
-pub(crate) struct TypeCollector<'db>(RefCell<FxHashSet<Type<'db>>>);
+pub(crate) struct TypeCollector<'db> {
+    seen: RefCell<FxHashSet<Type<'db>>>,
+    depth: Cell<u32>,
+}
 
 impl<'db> TypeCollector<'db> {
     pub(crate) fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
-        !self.0.borrow_mut().insert(ty)
+        !self.seen.borrow_mut().insert(ty)
     }
 }
 
