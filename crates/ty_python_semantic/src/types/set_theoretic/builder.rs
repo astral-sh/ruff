@@ -408,9 +408,13 @@ impl<'db> UnionAccumulator<'db> {
 
 impl<'db> UnionBuilder<'db> {
     pub(crate) fn new(db: &'db dyn Db) -> Self {
+        Self::with_capacity(db, 0)
+    }
+
+    pub(crate) fn with_capacity(db: &'db dyn Db, capacity: usize) -> Self {
         Self {
             db,
-            elements: vec![],
+            elements: Vec::with_capacity(capacity),
             unpack_aliases: true,
             cycle_recovery: false,
             recursively_defined: RecursivelyDefined::No,
