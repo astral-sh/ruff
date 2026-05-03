@@ -48,11 +48,16 @@ pub fn parse_uv_workspace_metadata(source: &str) -> Result<DependencyMetadata> {
             .with_context(|| format!("Missing resolution package node `{}`", member.id))?;
         let direct_dependencies = direct_dependencies(package, &snapshot.resolution)
             .with_context(|| format!("Failed to read dependencies for `{}`", member.name))?;
+        let dependency_group_dependencies =
+            dependency_group_dependencies(package, &snapshot.resolution).with_context(|| {
+                format!("Failed to read dependency groups for `{}`", member.name)
+            })?;
 
-        projects.push(DependencyProject::new(
+        projects.push(DependencyProject::new_with_dependency_groups(
             member.name,
             SystemPathBuf::from(member.path),
             direct_dependencies,
+            dependency_group_dependencies,
         ));
     }
 
@@ -143,6 +148,38 @@ fn direct_dependencies(package: &Value, resolution: &Map<String, Value>) -> Resu
         .collect()
 }
 
+fn dependency_group_dependencies(
+    package: &Value,
+    resolution: &Map<String, Value>,
+) -> Result<Vec<String>> {
+    let Some(dependency_groups) = package.get("dependency_groups") else {
+        return Ok(Vec::new());
+    };
+
+    let dependency_groups = dependency_groups
+        .as_array()
+        .context("Expected `dependency_groups` to be an array")?;
+
+    let mut dependencies = Vec::new();
+    for dependency_group in dependency_groups {
+        let dependency_group = dependency_group.as_object().with_context(|| {
+            format!("Expected dependency group entry to be an object, got `{dependency_group}`")
+        })?;
+        let group_id = dependency_group
+            .get("id")
+            .and_then(Value::as_str)
+            .context("Dependency group entry does not contain a group id")?;
+        let group = resolution
+            .get(group_id)
+            .with_context(|| format!("Missing resolution dependency group node `{group_id}`"))?;
+        dependencies.extend(direct_dependencies(group, resolution).with_context(|| {
+            format!("Failed to read dependencies for dependency group `{group_id}`")
+        })?);
+    }
+
+    Ok(dependencies)
+}
+
 fn dependency_name(dependency: &Value, resolution: &Map<String, Value>) -> Result<String> {
     match dependency {
         Value::String(reference) => Ok(resolve_package_reference(reference, resolution)
@@ -203,7 +240,9 @@ mod tests {
     use crate::db::tests::TestDb;
 
     use super::{enrich_dependency_metadata_with_editables, parse_uv_workspace_metadata};
-    use ty_python_semantic::dependency::{DependencyMetadata, DependencyProject, ModuleOwner};
+    use ty_python_semantic::dependency::{
+        DependencyMetadata, DependencyProject, DistributionName, ModuleOwner,
+    };
 
     fn setup_db(files: &[(&str, &str)]) -> anyhow::Result<TestDb> {
         let project =
@@ -252,6 +291,14 @@ mod tests {
             .collect()
     }
 
+    fn dependency_names<'a>(
+        dependencies: impl Iterator<Item = &'a DistributionName>,
+    ) -> Vec<String> {
+        let mut dependencies = dependencies.map(ToString::to_string).collect::<Vec<_>>();
+        dependencies.sort();
+        dependencies
+    }
+
     #[test]
     fn parses_uv_workspace_metadata() {
         let metadata = parse_uv_workspace_metadata(
@@ -291,6 +338,54 @@ mod tests {
         assert!(debug.contains("requests"));
         assert!(debug.contains("rich"));
         assert!(debug.contains("attrs"));
+    }
+
+    #[test]
+    fn parses_dependency_group_dependencies_separately() {
+        let metadata = parse_uv_workspace_metadata(
+            r#"
+{
+  "schema": {"version": "preview"},
+  "members": [
+    {
+      "name": "app",
+      "path": "/workspace/app",
+      "id": "app"
+    }
+  ],
+  "resolution": {
+    "app": {
+      "name": "app",
+      "dependencies": [
+        {"id": "requests==2.32.0@registry+https://pypi.org/simple"}
+      ],
+      "dependency_groups": [
+        {"name": "dev", "id": "app:dev"}
+      ]
+    },
+    "app:dev": {
+      "dependencies": [
+        {"id": "inline-snapshot==0.20.8@registry+https://pypi.org/simple"}
+      ]
+    },
+    "requests==2.32.0@registry+https://pypi.org/simple": {"name": "requests"},
+    "inline-snapshot==0.20.8@registry+https://pypi.org/simple": {"name": "inline-snapshot"}
+  },
+  "module_owners": {}
+}
+"#,
+        )
+        .unwrap();
+
+        let project = metadata.projects().first().unwrap();
+        assert_eq!(
+            dependency_names(project.direct_dependencies()),
+            ["requests"]
+        );
+        assert_eq!(
+            dependency_names(project.dependency_group_dependencies()),
+            ["inline-snapshot"]
+        );
     }
 
     #[test]
