@@ -257,6 +257,17 @@ def _(g: G):
     reveal_type(g)  # revealed: list[int]
 ```
 
+Bare generic aliases used inside another specialized alias are also specialized with their defaults:
+
+```py
+type Defaulted[T = int] = T
+type Outer[U] = Defaulted
+
+def _(x: Outer[str]):
+    reveal_type(x)  # revealed: int
+    y: int = x
+```
+
 Self-referential defaults should not crash type inference:
 
 ```py

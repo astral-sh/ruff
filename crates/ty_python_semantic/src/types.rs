@@ -5839,13 +5839,21 @@ impl<'db> Type<'db> {
                     TypeMapping::ApplySpecialization(specialization)
                     | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
                     if matches!(specialization, ApplySpecialization::Specialization(_) | ApplySpecialization::Partial { .. }) => {
-                        let current_specialization = specialization.as_specialization(db).unwrap();
+                        let mut current_specialization = specialization.as_specialization(db).unwrap();
+                        if let TypeMapping::ApplySpecializationWithMaterialization {
+                            materialization_kind,
+                            ..
+                        } = type_mapping
+                        {
+                            current_specialization = current_specialization
+                                .with_materialization_kind(db, Some(*materialization_kind));
+                        }
                         Type::TypeAlias(alias.apply_specialization(
                             db,
                             |generic_context| {
                                 alias
                                     .specialization(db)
-                                    .unwrap_or_else(|| generic_context.identity_specialization(db))
+                                    .unwrap_or_else(|| generic_context.default_specialization(db, None))
                                     .apply_specialization(db, current_specialization)
                             },
                         ))
