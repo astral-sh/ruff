@@ -784,18 +784,15 @@ fn benchmark_vararg_parameter_type_accumulation(criterion: &mut Criterion) {
     setup_rayon();
 
     let mut code = "\
-class Base: ...
+def accepts_objects(first: int, *args: object) -> None: ...
+
+accepts_objects(
+    0,
 "
     .to_string();
-    for i in 0..NUM_ARGUMENTS {
-        writeln!(&mut code, "class C{i}(Base): ...").ok();
-    }
-
-    code.push_str("\n\ndef accepts_base(first: int, *args: Base) -> None: ...\n\n");
-    code.push_str("accepts_base(\n    0,\n");
 
     for i in 0..NUM_ARGUMENTS {
-        writeln!(&mut code, "    C{i}(),").ok();
+        writeln!(&mut code, r#"    ("field_{i}", {i}),"#).ok();
     }
 
     code.push_str(")\n");
