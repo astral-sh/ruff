@@ -31,11 +31,10 @@ use crate::types::generics::{
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
 use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    HasRelationToVisitor, IsDisjointVisitor, ProtocolMemberDisjointnessVisitor,
+    ProtocolMemberRelationVisitor, TypeRelation, TypeRelationChecker,
 };
-use crate::types::signatures::{
-    CallableSignature, Parameter, Parameters, Signature, SignatureRelationVisitor,
-};
+use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
@@ -829,6 +828,79 @@ pub enum ClassType<'db> {
     Generic(GenericAlias<'db>),
 }
 
+/// The identity of a member on a statement-defined class under a specific specialization.
+///
+/// This lets recursive walkers and relation checks guard recursion at member granularity. For
+/// example, `Proto[list[int]].child` can be recognized as recursive growth from
+/// `Proto[int].child` without stopping unrelated members on the same class.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(super) struct ClassMemberKey<'db> {
+    class: StaticClassLiteral<'db>,
+    specialization: Option<Specialization<'db>>,
+    member_name: Name,
+}
+
+impl<'db> ClassMemberKey<'db> {
+    pub(super) fn new(
+        class: StaticClassLiteral<'db>,
+        specialization: Option<Specialization<'db>>,
+        member_name: &str,
+    ) -> Self {
+        Self {
+            class,
+            specialization,
+            member_name: Name::new(member_name),
+        }
+    }
+
+    /// Create a member key for a type whose members come from a statement-defined class.
+    ///
+    /// This covers class instances such as `Node[int]`, protocol instances such as `Proto[int]`,
+    /// and class objects such as `type[Node[int]]`. Other types return `None` and continue to use
+    /// their exact type-pair recursion guards.
+    pub(super) fn from_type_member(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        member_name: &str,
+    ) -> Option<Self> {
+        let class = ty.nominal_class(db).or_else(|| ty.to_class_type(db))?;
+        let (class, specialization) = class.static_class_literal(db)?;
+        Some(Self::new(class, specialization, member_name))
+    }
+
+    /// Return `true` if this key is recursive specialization growth from `previous`.
+    pub(super) fn is_recursive_expansion_from(&self, db: &'db dyn Db, previous: &Self) -> bool {
+        if self.class != previous.class || self.member_name != previous.member_name {
+            return false;
+        }
+
+        let (Some(previous), Some(current)) = (previous.specialization, self.specialization) else {
+            return false;
+        };
+        current.is_recursive_expansion_of(db, previous)
+    }
+
+    /// Return `true` if this key is the same member as `previous` and is either the same
+    /// specialization or recursive specialization growth from it.
+    pub(super) fn is_same_or_recursive_expansion_from(
+        &self,
+        db: &'db dyn Db,
+        previous: &Self,
+    ) -> bool {
+        if self.class != previous.class || self.member_name != previous.member_name {
+            return false;
+        }
+
+        match (previous.specialization, self.specialization) {
+            (Some(previous), Some(current)) => {
+                current == previous || current.is_recursive_expansion_of(db, previous)
+            }
+            (None, None) => true,
+            _ => false,
+        }
+    }
+}
+
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
     /// Return a `ClassType` representing the class `builtins.object`
@@ -1182,14 +1254,16 @@ impl<'db> ClassType<'db> {
         let constraints = ConstraintSetBuilder::new();
         let relation_visitor = HasRelationToVisitor::default(&constraints);
         let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let protocol_member_relation_visitor = ProtocolMemberRelationVisitor::default();
+        let protocol_member_disjointness_visitor = ProtocolMemberDisjointnessVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::subtyping(
             &constraints,
             InferableTypeVars::None,
             &relation_visitor,
             &disjointness_visitor,
-            &signature_relation_visitor,
+            &protocol_member_relation_visitor,
+            &protocol_member_disjointness_visitor,
             &materialization_visitor,
         );
         checker

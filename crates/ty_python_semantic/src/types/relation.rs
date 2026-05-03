@@ -2,29 +2,28 @@ use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
+use crate::Db;
 use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
     OwnedConstraintSet,
 };
-use crate::types::cyclic::PairVisitor;
+use crate::types::cyclic::{ActiveRecursionDetector, CycleDetector, PairVisitor};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
+use crate::types::protocol_class::ProtocolMember;
 use crate::types::set_theoretic::RecursivelyDefined;
-use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
+use crate::types::signatures::ParametersKind;
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy,
+    PropertyInstanceType, ProtocolInstanceType, SubclassOfInner, SubclassOfType, TypeAliasType,
+    TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
-use crate::{
-    Db,
-    types::{
-        ErrorContext, ErrorContextTree, Type, constraints::ConstraintSet,
-        generics::InferableTypeVars,
-    },
+use crate::types::{
+    ErrorContext, ErrorContextTree, Type, class::ClassMemberKey, constraints::ConstraintSet,
+    generics::InferableTypeVars, visitor::find_over_type,
 };
 
 /// A non-exhaustive enumeration of relations that can exist between types.
@@ -332,7 +331,8 @@ impl<'db> Type<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let protocol_member_relation_visitor = ProtocolMemberRelationVisitor::default();
+        let protocol_member_disjointness_visitor = ProtocolMemberDisjointnessVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker {
             constraints,
@@ -342,7 +342,8 @@ impl<'db> Type<'db> {
             given: assuming,
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
-            signature_relation_visitor: &signature_relation_visitor,
+            protocol_member_relation_visitor: &protocol_member_relation_visitor,
+            protocol_member_disjointness_visitor: &protocol_member_disjointness_visitor,
             materialization_visitor: &materialization_visitor,
         };
         checker.check_type_pair(db, self, target)
@@ -370,16 +371,22 @@ impl<'db> Type<'db> {
         target: Type<'db>,
     ) -> ErrorContextTree<'db> {
         let builder = ConstraintSetBuilder::new();
+        let relation_visitor = HasRelationToVisitor::default(&builder);
+        let disjointness_visitor = IsDisjointVisitor::default(&builder);
+        let protocol_member_relation_visitor = ProtocolMemberRelationVisitor::default();
+        let protocol_member_disjointness_visitor = ProtocolMemberDisjointnessVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker {
             constraints: &builder,
             inferable: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             context_tree: ErrorContextTree::enabled(),
             given: ConstraintSet::from_bool(&builder, false),
-            relation_visitor: &HasRelationToVisitor::default(&builder),
-            disjointness_visitor: &IsDisjointVisitor::default(&builder),
-            signature_relation_visitor: &SignatureRelationVisitor::default(),
-            materialization_visitor: &ApplyTypeMappingVisitor::default(),
+            relation_visitor: &relation_visitor,
+            disjointness_visitor: &disjointness_visitor,
+            protocol_member_relation_visitor: &protocol_member_relation_visitor,
+            protocol_member_disjointness_visitor: &protocol_member_disjointness_visitor,
+            materialization_visitor: &materialization_visitor,
         };
         checker.check_type_pair(db, self, target);
         checker.context_tree
@@ -497,7 +504,8 @@ impl<'db> Type<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let protocol_member_relation_visitor = ProtocolMemberRelationVisitor::default();
+        let protocol_member_disjointness_visitor = ProtocolMemberDisjointnessVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker {
             constraints,
@@ -507,7 +515,8 @@ impl<'db> Type<'db> {
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
-            signature_relation_visitor: &signature_relation_visitor,
+            protocol_member_relation_visitor: &protocol_member_relation_visitor,
+            protocol_member_disjointness_visitor: &protocol_member_disjointness_visitor,
             materialization_visitor: &materialization_visitor,
         };
         checker.check_type_pair(db, self, target)
@@ -569,13 +578,15 @@ impl<'db> Type<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let protocol_member_relation_visitor = ProtocolMemberRelationVisitor::default();
+        let protocol_member_disjointness_visitor = ProtocolMemberDisjointnessVisitor::default();
         let checker = EquivalenceChecker {
             constraints,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
-            signature_relation_visitor: &signature_relation_visitor,
+            protocol_member_relation_visitor: &protocol_member_relation_visitor,
+            protocol_member_disjointness_visitor: &protocol_member_disjointness_visitor,
             materialization_visitor,
         };
         checker.check_type_pair(db, self, other)
@@ -611,7 +622,8 @@ impl<'db> Type<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let protocol_member_relation_visitor = ProtocolMemberRelationVisitor::default();
+        let protocol_member_disjointness_visitor = ProtocolMemberDisjointnessVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = DisjointnessChecker {
             constraints,
@@ -619,14 +631,15 @@ impl<'db> Type<'db> {
             given: ConstraintSet::from_bool(constraints, false),
             disjointness_visitor: &disjointness_visitor,
             relation_visitor: &relation_visitor,
-            signature_relation_visitor: &signature_relation_visitor,
+            protocol_member_relation_visitor: &protocol_member_relation_visitor,
+            protocol_member_disjointness_visitor: &protocol_member_disjointness_visitor,
             materialization_visitor: &materialization_visitor,
         };
         checker.check_type_pair(db, self, other)
     }
 }
 
-/// A [`PairVisitor`] that is used in `has_relation_to` methods.
+/// A [`CycleDetector`] that is used in `has_relation_to` methods.
 pub(crate) type HasRelationToVisitor<'db, 'c> =
     CycleDetector<TypeRelation, (Type<'db>, Type<'db>, TypeRelation), ConstraintSet<'db, 'c>>;
 
@@ -648,6 +661,301 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
     }
 }
 
+/// Identifies the source side of a protocol-member relation.
+///
+/// This key is only used by the protocol-member recursion guard. It identifies the source member
+/// that is being compared to a target protocol member, not an arbitrary type-pair relation. Keeping
+/// the key member-scoped lets recursive members close coinductively while sibling members are still
+/// checked under the nested specialization.
+///
+/// Protocol-member checks usually compare two class-backed members, such as `Node[int].child`
+/// against `Proto[int].child`. Some protocol checks do not have a statement-defined source member:
+/// `__call__` protocol checks compare a callable source directly against the target protocol's
+/// `__call__` member, and a function literal has no class member key in that case.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+enum ProtocolMemberSourceKey<'db> {
+    /// A source member that comes from a statement-defined class under a specific specialization.
+    ClassMember(ClassMemberKey<'db>),
+
+    /// A callable-alias source under a specific specialization.
+    ///
+    /// This variant is only used for `__call__` protocol checks. A recursive alias such as
+    /// `Fn[T] = Callable[[], Fn[list[T]]]` can satisfy a callable protocol without having a
+    /// statement-defined `__call__` member. By the time protocol matching installs the member
+    /// guard, the alias may have expanded to its callable value type. The recursive anchor that
+    /// remains is the alias specialization in the callable's return type, such as `Fn[list[T]]`
+    /// after `Fn[T]`.
+    ///
+    /// General recursive callable aliases need a callable/type-alias fix; this key only keeps
+    /// recursive callable-protocol matching bounded.
+    TypeAlias(TypeAliasType<'db>),
+
+    /// An exact source-type fallback.
+    ///
+    /// This is used when there is no class-member key and no callable-alias key, most importantly
+    /// for function literals checked against callable protocols. The key is intentionally exact:
+    /// recursive protocol expansion may grow the target member specialization, but the source type
+    /// must remain stable because there is no source-side specialization known to be growing.
+    Type(Type<'db>),
+}
+
+impl<'db> ProtocolMemberSourceKey<'db> {
+    /// Derive a protocol-member source key from a source type and member name.
+    fn from_type_member(db: &'db dyn Db, source: Type<'db>, member_name: &str) -> Self {
+        ClassMemberKey::from_type_member(db, source, member_name)
+            .map(Self::ClassMember)
+            .or_else(|| source_type_alias_key(db, source, member_name).map(Self::TypeAlias))
+            .unwrap_or(Self::Type(source))
+    }
+
+    /// Return `true` if both keys identify the same source side of a recursive member relation.
+    ///
+    /// Class-member sources can be reached again under a recursively growing specialization, such
+    /// as `Impl[list[T]].method` after `Impl[T].method`. Type-alias sources can also grow through
+    /// their alias specialization, such as `Fn[list[T]]` after `Fn[T]`. Other source-type keys
+    /// deliberately require exact equality; they are used for callable sources like function
+    /// literals, where there is no statement-defined source member specialization that can grow.
+    fn is_same_or_recursive_expansion_from(&self, db: &'db dyn Db, previous: &Self) -> bool {
+        match (self, previous) {
+            (Self::ClassMember(source), Self::ClassMember(previous_source)) => {
+                source.is_same_or_recursive_expansion_from(db, previous_source)
+            }
+            (Self::TypeAlias(source), Self::TypeAlias(previous_source)) => {
+                type_alias_is_same_or_recursive_expansion_from(db, *source, *previous_source)
+            }
+            (Self::Type(source), Self::Type(previous_source)) => source == previous_source,
+            _ => false,
+        }
+    }
+}
+
+/// Return a callable-alias key for the source side of a `__call__` protocol-member check.
+///
+/// This deliberately returns `None` for ordinary members: class-backed member keys already carry
+/// the source-side recursion identity there, and unrelated aliases in non-callable members should
+/// not affect protocol-member recursion.
+///
+/// Callable protocol matching may see a recursive type alias either directly as `Type::TypeAlias`
+/// or after it has expanded to a `Callable` value. In the expanded form, the stable source-side
+/// identity is the alias specialization that appears in the callable return type. Parameter types
+/// are intentionally ignored so aliases that only occur in callable inputs do not make unrelated
+/// callables look like recursive growth of the same source.
+fn source_type_alias_key<'db>(
+    db: &'db dyn Db,
+    source: Type<'db>,
+    member_name: &str,
+) -> Option<TypeAliasType<'db>> {
+    if member_name != "__call__" {
+        return None;
+    }
+
+    match source {
+        Type::TypeAlias(alias) => Some(alias),
+        Type::Callable(callable) => callable_return_type_alias_key(db, callable),
+        Type::KnownInstance(KnownInstanceType::Callable(callable)) => {
+            callable_return_type_alias_key(db, callable)
+        }
+        _ => None,
+    }
+}
+
+/// Find the first type alias reachable from a callable's return type.
+///
+/// The traversal is structural: it can find aliases nested inside containers such as
+/// `tuple[Fn[list[T]], T]`, but it does not expand alias values or visit deferred attributes. This
+/// keeps the key tied to the alias specialization that already appears in the callable signature
+/// instead of reintroducing a broad signature-level recursion walk.
+fn callable_return_type_alias_key<'db>(
+    db: &'db dyn Db,
+    callable: CallableType<'db>,
+) -> Option<TypeAliasType<'db>> {
+    callable
+        .signatures(db)
+        .overloads
+        .iter()
+        .find_map(|signature| {
+            find_over_type(db, signature.return_ty, false, |ty| match ty {
+                Type::TypeAlias(alias) => Some(alias),
+                _ => None,
+            })
+        })
+}
+
+/// Return `true` if two alias keys identify the same source or recursive growth of that source.
+///
+/// Recursive growth is only recognized for the same alias definition under a specialization that is
+/// a recursive expansion of the previous specialization, such as `Fn[list[T]]` after `Fn[T]`.
+/// Non-generic aliases and aliases without an available specialization only match by exact
+/// equality.
+fn type_alias_is_same_or_recursive_expansion_from<'db>(
+    db: &'db dyn Db,
+    source: TypeAliasType<'db>,
+    previous: TypeAliasType<'db>,
+) -> bool {
+    if source == previous {
+        return true;
+    }
+
+    if source.definition(db) != previous.definition(db) {
+        return false;
+    }
+
+    let (Some(previous), Some(source)) = (previous.specialization(db), source.specialization(db))
+    else {
+        return false;
+    };
+
+    source.is_recursive_expansion_of(db, previous)
+}
+
+/// Identifies a recursive protocol-member type-relation check.
+///
+/// Exact type-pair checks use [`HasRelationToVisitor`] and can use exact caching. Protocol member
+/// checks need a looser active-recursion predicate so recursive generic members can terminate
+/// while other members are still checked under the nested specialization.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct ProtocolMemberRelationKey<'db> {
+    source: ProtocolMemberSourceKey<'db>,
+    target: ClassMemberKey<'db>,
+    relation: TypeRelation,
+}
+
+impl<'db> ProtocolMemberRelationKey<'db> {
+    fn new(
+        source: ProtocolMemberSourceKey<'db>,
+        target: ClassMemberKey<'db>,
+        relation: TypeRelation,
+    ) -> Self {
+        Self {
+            source,
+            target,
+            relation,
+        }
+    }
+
+    /// Return `true` if this key is the same as `previous` or recursive growth from it.
+    ///
+    /// Both sides must be stable or growing recursively. This keeps the guard member-specific
+    /// while avoiding assumptions about unrelated protocol members.
+    fn is_same_or_recursive_expansion_from(&self, db: &'db dyn Db, previous: &Self) -> bool {
+        self.relation == previous.relation
+            && self
+                .source
+                .is_same_or_recursive_expansion_from(db, &previous.source)
+            && self
+                .target
+                .is_same_or_recursive_expansion_from(db, &previous.target)
+    }
+
+    /// Return `true` when this active relation can be closed coinductively.
+    ///
+    /// Exact recursion closes immediately. Recursive specialization growth closes only after one
+    /// unfolded member check: that first expansion can still contain finite evidence in the same
+    /// member, such as `tuple[Proto[list[T]], T]` versus `tuple[Other[tuple[T]], T]`.
+    fn has_matching_recursive_ancestor(&self, db: &'db dyn Db, seen: &FxHashSet<Self>) -> bool {
+        if seen.contains(self) {
+            return true;
+        }
+
+        seen.iter()
+            .filter(|seen_key| self.is_same_or_recursive_expansion_from(db, seen_key))
+            .nth(1)
+            .is_some()
+    }
+}
+
+/// Tracks recursive protocol-member type-relation checks.
+#[derive(Default)]
+pub(crate) struct ProtocolMemberRelationVisitor<'db> {
+    active: ActiveRecursionDetector<ProtocolMemberRelationKey<'db>>,
+}
+
+impl<'db> ProtocolMemberRelationVisitor<'db> {
+    /// Visit a protocol-member relation key with the recursive-growth predicate.
+    ///
+    /// Protocol-member keys are not cached as exact completed checks: the cycle predicate is
+    /// deliberately looser than equality and depends on the active ancestor stack. Exact type-pair
+    /// relations still use [`HasRelationToVisitor`], which can cache completed
+    /// `(source, target, relation)` keys.
+    fn visit<'c>(
+        &self,
+        db: &'db dyn Db,
+        source: ProtocolMemberSourceKey<'db>,
+        target: ClassMemberKey<'db>,
+        relation: TypeRelation,
+        on_cycle: impl FnOnce() -> ConstraintSet<'db, 'c>,
+        work: impl FnOnce() -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.active.visit_or_else(
+            ProtocolMemberRelationKey::new(source, target, relation),
+            |seen, key| key.has_matching_recursive_ancestor(db, seen),
+            |_| on_cycle(),
+            work,
+        )
+    }
+}
+
+/// Identifies a recursive protocol-member disjointness check.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct ProtocolMemberDisjointnessKey<'db> {
+    left: ClassMemberKey<'db>,
+    right: ClassMemberKey<'db>,
+}
+
+impl<'db> ProtocolMemberDisjointnessKey<'db> {
+    fn new(left: ClassMemberKey<'db>, right: ClassMemberKey<'db>) -> Self {
+        Self { left, right }
+    }
+
+    fn is_same_or_recursive_expansion_from(&self, db: &'db dyn Db, previous: &Self) -> bool {
+        self.left
+            .is_same_or_recursive_expansion_from(db, &previous.left)
+            && self
+                .right
+                .is_same_or_recursive_expansion_from(db, &previous.right)
+    }
+
+    /// Return `true` for exact recursion, or after one growing class-member expansion.
+    ///
+    /// The first expansion can still contain finite evidence in the same member, such as
+    /// `tuple[Proto[list[T]], T]` versus `tuple[Nominal[list[T]], int]`.
+    fn has_matching_recursive_ancestor(&self, db: &'db dyn Db, seen: &FxHashSet<Self>) -> bool {
+        if seen.contains(self) {
+            return true;
+        }
+
+        seen.iter()
+            .filter(|seen_key| self.is_same_or_recursive_expansion_from(db, seen_key))
+            .nth(1)
+            .is_some()
+    }
+}
+
+/// Tracks recursive protocol-member disjointness checks.
+#[derive(Default)]
+pub(crate) struct ProtocolMemberDisjointnessVisitor<'db> {
+    active: ActiveRecursionDetector<ProtocolMemberDisjointnessKey<'db>>,
+}
+
+impl<'db> ProtocolMemberDisjointnessVisitor<'db> {
+    /// Visit a class-member disjointness key with the recursive-growth predicate.
+    fn visit<'c>(
+        &self,
+        db: &'db dyn Db,
+        left: ClassMemberKey<'db>,
+        right: ClassMemberKey<'db>,
+        on_cycle: impl FnOnce() -> ConstraintSet<'db, 'c>,
+        work: impl FnOnce() -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.active.visit_or_else(
+            ProtocolMemberDisjointnessKey::new(left, right),
+            |seen, key| key.has_matching_recursive_ancestor(db, seen),
+            |_| on_cycle(),
+            work,
+        )
+    }
+}
+
 #[derive(Clone)]
 pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
@@ -664,7 +972,8 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     // any other more "low-level" method.
     relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
-    pub(super) signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
+    protocol_member_relation_visitor: &'a ProtocolMemberRelationVisitor<'db>,
+    protocol_member_disjointness_visitor: &'a ProtocolMemberDisjointnessVisitor<'db>,
     pub(super) materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
 }
 
@@ -674,7 +983,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         inferable: InferableTypeVars<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
-        signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
+        protocol_member_relation_visitor: &'a ProtocolMemberRelationVisitor<'db>,
+        protocol_member_disjointness_visitor: &'a ProtocolMemberDisjointnessVisitor<'db>,
         materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
@@ -685,7 +995,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
-            signature_relation_visitor,
+            protocol_member_relation_visitor,
+            protocol_member_disjointness_visitor,
             materialization_visitor,
         }
     }
@@ -694,7 +1005,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
-        signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
+        protocol_member_relation_visitor: &'a ProtocolMemberRelationVisitor<'db>,
+        protocol_member_disjointness_visitor: &'a ProtocolMemberDisjointnessVisitor<'db>,
         materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
@@ -705,7 +1017,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
-            signature_relation_visitor,
+            protocol_member_relation_visitor,
+            protocol_member_disjointness_visitor,
             materialization_visitor,
         }
     }
@@ -714,7 +1027,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
-        signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
+        protocol_member_relation_visitor: &'a ProtocolMemberRelationVisitor<'db>,
+        protocol_member_disjointness_visitor: &'a ProtocolMemberDisjointnessVisitor<'db>,
         materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
@@ -725,7 +1039,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
-            signature_relation_visitor,
+            protocol_member_relation_visitor,
+            protocol_member_disjointness_visitor,
             materialization_visitor,
         }
     }
@@ -734,7 +1049,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
-        signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
+        protocol_member_relation_visitor: &'a ProtocolMemberRelationVisitor<'db>,
+        protocol_member_disjointness_visitor: &'a ProtocolMemberDisjointnessVisitor<'db>,
         materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
@@ -745,7 +1061,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
-            signature_relation_visitor,
+            protocol_member_relation_visitor,
+            protocol_member_disjointness_visitor,
             materialization_visitor,
         }
     }
@@ -808,6 +1125,57 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         self.relation_visitor
             .visit((source, target, self.relation), work)
+    }
+
+    /// Check a protocol member relation with a member-level recursive-cycle fallback.
+    ///
+    /// A recursive member may assume its own relation coinductively when the source and target
+    /// specializations are stable or growing recursively. Other members are still checked under
+    /// the nested specialization.
+    ///
+    /// The source side is derived from `source` and `member_name`, and is intentionally narrower
+    /// than a full callable-signature recursion guard:
+    ///
+    /// - Class-backed sources use a statement-defined member key.
+    /// - Recursive callable aliases used in `__call__` protocol checks use the alias specialization
+    ///   that remains in the callable return type after alias expansion.
+    /// - Other sources use the exact source type, which covers function literals checked against
+    ///   callable protocols.
+    ///
+    /// If the target member has no class-member key, this runs `work` without the member-level
+    /// guard.
+    ///
+    /// ```python
+    /// from typing import Protocol
+    ///
+    /// class Source[T](Protocol):
+    ///     child: "Source[list[T]]"
+    ///     payload: T
+    ///
+    /// class Target[T](Protocol):
+    ///     child: "Target[tuple[T]]"
+    ///     payload: T
+    /// ```
+    pub(super) fn with_protocol_member_relation_guard(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        member_name: &str,
+        target: Option<ClassMemberKey<'db>>,
+        work: impl FnOnce() -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        let Some(target) = target else {
+            return work();
+        };
+
+        self.protocol_member_relation_visitor.visit(
+            db,
+            ProtocolMemberSourceKey::from_type_member(db, source, member_name),
+            target,
+            self.relation,
+            || self.always(),
+            work,
+        )
     }
 
     /// Is `target` a metaclass instance (a nominal instance of a subclass of `builtins.type`)?
@@ -2029,7 +2397,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
-            signature_relation_visitor: self.signature_relation_visitor,
+            protocol_member_relation_visitor: self.protocol_member_relation_visitor,
+            protocol_member_disjointness_visitor: self.protocol_member_disjointness_visitor,
             materialization_visitor: self.materialization_visitor,
         }
     }
@@ -2041,7 +2410,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
-            signature_relation_visitor: self.signature_relation_visitor,
+            protocol_member_relation_visitor: self.protocol_member_relation_visitor,
+            protocol_member_disjointness_visitor: self.protocol_member_disjointness_visitor,
             materialization_visitor: self.materialization_visitor,
         }
     }
@@ -2086,7 +2456,8 @@ pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
     // any other more "low-level" method.
     relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
-    signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
+    protocol_member_relation_visitor: &'a ProtocolMemberRelationVisitor<'db>,
+    protocol_member_disjointness_visitor: &'a ProtocolMemberDisjointnessVisitor<'db>,
     materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
 }
 
@@ -2103,7 +2474,8 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             inferable: InferableTypeVars::None,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
-            signature_relation_visitor: self.signature_relation_visitor,
+            protocol_member_relation_visitor: self.protocol_member_relation_visitor,
+            protocol_member_disjointness_visitor: self.protocol_member_disjointness_visitor,
             materialization_visitor,
         }
     }
@@ -2151,7 +2523,8 @@ pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     // any other more "low-level" method.
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
     relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
-    signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
+    protocol_member_relation_visitor: &'a ProtocolMemberRelationVisitor<'db>,
+    protocol_member_disjointness_visitor: &'a ProtocolMemberDisjointnessVisitor<'db>,
     materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
 }
 
@@ -2161,7 +2534,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         inferable: InferableTypeVars<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
-        signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
+        protocol_member_relation_visitor: &'a ProtocolMemberRelationVisitor<'db>,
+        protocol_member_disjointness_visitor: &'a ProtocolMemberDisjointnessVisitor<'db>,
         materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
@@ -2170,7 +2544,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             given: ConstraintSet::from_bool(constraints, false),
             disjointness_visitor,
             relation_visitor,
-            signature_relation_visitor,
+            protocol_member_relation_visitor,
+            protocol_member_disjointness_visitor,
             materialization_visitor,
         }
     }
@@ -2187,7 +2562,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
-            signature_relation_visitor: self.signature_relation_visitor,
+            protocol_member_relation_visitor: self.protocol_member_relation_visitor,
+            protocol_member_disjointness_visitor: self.protocol_member_disjointness_visitor,
             materialization_visitor: self.materialization_visitor,
         }
     }
@@ -2198,7 +2574,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
-            signature_relation_visitor: self.signature_relation_visitor,
+            protocol_member_relation_visitor: self.protocol_member_relation_visitor,
+            protocol_member_disjointness_visitor: self.protocol_member_disjointness_visitor,
             materialization_visitor: self.materialization_visitor,
         }
     }
@@ -2212,6 +2589,43 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         self.disjointness_visitor.visit((source, target), work)
     }
 
+    /// Check a protocol member disjointness relation with a member-level recursive-cycle fallback.
+    ///
+    /// For disjointness, the recursive member itself is not evidence of disjointness. Returning
+    /// `false` for the recursive member lets other protocol members continue to decide whether
+    /// the protocol and the other type are disjoint.
+    fn with_protocol_member_disjointness_guard(
+        &self,
+        db: &'db dyn Db,
+        protocol: ClassMemberKey<'db>,
+        other: ClassMemberKey<'db>,
+        work: impl FnOnce() -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.protocol_member_disjointness_visitor
+            .visit(db, protocol, other, || self.never(), work)
+    }
+
+    /// Check whether a protocol member type is disjoint from another member type.
+    ///
+    /// If both members can be identified by class specialization, this uses the member-level
+    /// disjointness guard so recursive generic member chains can terminate without treating the
+    /// recursive member itself as disjoint.
+    fn protocol_member_has_disjoint_type_from_ty_with_guard(
+        &self,
+        db: &'db dyn Db,
+        protocol_key: Option<ClassMemberKey<'db>>,
+        other_key: Option<ClassMemberKey<'db>>,
+        member: &ProtocolMember<'_, 'db>,
+        ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let check_member = || self.protocol_member_has_disjoint_type_from_ty(db, member, ty);
+        if let (Some(protocol_key), Some(other_key)) = (protocol_key, other_key) {
+            self.with_protocol_member_disjointness_guard(db, protocol_key, other_key, check_member)
+        } else {
+            check_member()
+        }
+    }
+
     fn any_protocol_members_absent_or_disjoint(
         &self,
         db: &'db dyn Db,
@@ -2222,12 +2636,24 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             .interface(db)
             .members(db)
             .when_any(db, self.constraints, |member| {
+                let protocol_key = ClassMemberKey::from_type_member(
+                    db,
+                    Type::ProtocolInstance(protocol),
+                    member.name(),
+                );
+                let other_key = ClassMemberKey::from_type_member(db, other, member.name());
                 other
                     .member(db, member.name())
                     .place
                     .ignore_possibly_undefined()
                     .when_none_or(db, self.constraints, |attribute_type| {
-                        self.protocol_member_has_disjoint_type_from_ty(db, &member, attribute_type)
+                        self.protocol_member_has_disjoint_type_from_ty_with_guard(
+                            db,
+                            protocol_key,
+                            other_key,
+                            &member,
+                            attribute_type,
+                        )
                     })
             })
     }
@@ -2618,11 +3044,20 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                         .interface(db)
                         .members(db)
                         .when_any(db, self.constraints, |member| {
+                            let protocol_key = ClassMemberKey::from_type_member(
+                                db,
+                                Type::ProtocolInstance(protocol),
+                                member.name(),
+                            );
+                            let other_key =
+                                ClassMemberKey::from_type_member(db, other, member.name());
                             match other.member(db, member.name()).place {
                                 Place::Defined(DefinedPlace {
                                     ty: attribute_type, ..
-                                }) => self.protocol_member_has_disjoint_type_from_ty(
+                                }) => self.protocol_member_has_disjoint_type_from_ty_with_guard(
                                     db,
+                                    protocol_key,
+                                    other_key,
                                     &member,
                                     attribute_type,
                                 ),

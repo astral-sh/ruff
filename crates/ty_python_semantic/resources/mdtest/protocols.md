@@ -2823,6 +2823,82 @@ static_assert(not is_assignable_to(TypeOf[doesnt_satisfy_foo], Foo))
 static_assert(not is_subtype_of(TypeOf[doesnt_satisfy_foo], Foo))
 ```
 
+Function literals can satisfy recursive callable protocols. This path does not have a source
+class-member key, so it needs to use the target `__call__` member to guard recursive protocol
+expansion:
+
+```py
+from typing import TypeVar
+
+_T_recursive_callable = TypeVar("_T_recursive_callable")
+
+class RecursiveCallable(Protocol[_T_recursive_callable]):
+    def __call__(self) -> "RecursiveCallable[list[_T_recursive_callable]]": ...
+
+def recursive_callable() -> "TypeOf[recursive_callable]":
+    return recursive_callable
+
+static_assert(is_assignable_to(TypeOf[recursive_callable], RecursiveCallable[int]))
+
+class RecursiveCallableWithPayload(Protocol[_T_recursive_callable]):
+    def __call__(
+        self,
+    ) -> tuple[
+        "RecursiveCallableWithPayload[list[_T_recursive_callable]]",
+        _T_recursive_callable,
+    ]: ...
+
+def recursive_callable_with_payload() -> "tuple[TypeOf[recursive_callable_with_payload], int]":
+    raise NotImplementedError
+
+static_assert(
+    not is_assignable_to(
+        TypeOf[recursive_callable_with_payload],
+        RecursiveCallableWithPayload[int],
+    )
+)
+```
+
+Recursive callable aliases can also satisfy recursive callable protocols. This path reaches the
+protocol-member guard with the alias already expanded to its callable value type, so the source key
+tracks the contained alias specialization:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+from typing import Protocol
+from ty_extensions import is_assignable_to, static_assert
+
+class RecursiveCallableProtocol[T](Protocol):
+    def __call__(self) -> "RecursiveCallableProtocol[list[T]]": ...
+
+type RecursiveCallableAlias[T] = Callable[
+    [],
+    RecursiveCallableAlias[list[T]],
+]
+
+static_assert(is_assignable_to(RecursiveCallableAlias[int], RecursiveCallableProtocol[int]))
+
+class RecursiveCallableProtocolWithPayload[T](Protocol):
+    def __call__(self) -> tuple["RecursiveCallableProtocolWithPayload[list[T]]", T]: ...
+
+type RecursiveCallableAliasWithPayload[T] = Callable[
+    [],
+    tuple[RecursiveCallableAliasWithPayload[list[T]], int],
+]
+
+static_assert(
+    not is_assignable_to(
+        RecursiveCallableAliasWithPayload[int],
+        RecursiveCallableProtocolWithPayload[int],
+    )
+)
+```
+
 Class-literals and generic aliases can also be subtypes of callback protocols:
 
 ```py
@@ -3004,12 +3080,11 @@ static_assert(is_equivalent_to(Foo, Bar))
 T = TypeVar("T", bound="TypeVarRecursive")
 
 class TypeVarRecursive(Protocol):
-    # TODO: commenting this out will cause a stack overflow.
-    # x: T
+    x: T  # error: [unbound-type-variable]
     y: "TypeVarRecursive"
 
 def _(t: TypeVarRecursive):
-    # reveal_type(t.x)  # revealed: T
+    reveal_type(t.x)  # revealed: Unknown
     reveal_type(t.y)  # revealed: TypeVarRecursive
 ```
 
@@ -3102,6 +3177,74 @@ class Nominal:
     x: "Nominal"
 
 static_assert(not is_disjoint_from(Proto, Nominal))
+```
+
+### Disjointness of recursive generic protocol and recursive class
+
+These snippets used to stack overflow because the protocol member disjointness check compared
+successively larger specializations (`Node[list[int]]`, `Node[list[list[int]]]`, and so on) without
+hitting the exact type-pair recursion guard.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+from ty_extensions import is_disjoint_from, static_assert
+
+class Proto[T](Protocol):
+    child: "Proto[list[T]]"
+
+class Nominal[T]:
+    child: "Nominal[list[T]]"
+
+static_assert(not is_disjoint_from(Nominal[int], Proto[int]))
+
+class AsymmetricProto[T](Protocol):
+    child: "AsymmetricProto[tuple[T]]"
+
+class AsymmetricNominal[T]:
+    child: "AsymmetricNominal[list[T]]"
+
+static_assert(not is_disjoint_from(AsymmetricNominal[int], AsymmetricProto[int]))
+
+class OneSidedProto[T](Protocol):
+    child: "OneSidedProto[int]"
+
+class OneSidedNominal[T]:
+    child: "OneSidedNominal[list[T]]"
+
+static_assert(not is_disjoint_from(OneSidedNominal[int], OneSidedProto[int]))
+
+class ProtoWithPayload[T](Protocol):
+    child: "ProtoWithPayload[list[T]]"
+    payload: int
+
+class NominalWithPayload[T]:
+    child: "NominalWithPayload[list[T]]"
+    payload: str
+
+static_assert(is_disjoint_from(NominalWithPayload[int], ProtoWithPayload[int]))
+
+class NestedPayloadProto[T](Protocol):
+    child: "NestedPayloadProto[list[T]]"
+    payload: T
+
+class NestedPayloadNominal[T]:
+    child: "NestedPayloadNominal[tuple[T]]"
+    payload: T
+
+static_assert(is_disjoint_from(NestedPayloadNominal[int], NestedPayloadProto[int]))
+
+class SameMemberEvidenceProto[T](Protocol):
+    child: tuple["SameMemberEvidenceProto[list[T]]", T]
+
+class SameMemberEvidenceNominal[T]:
+    child: tuple["SameMemberEvidenceNominal[list[T]]", int]
+
+static_assert(is_disjoint_from(SameMemberEvidenceNominal[int], SameMemberEvidenceProto[int]))
 ```
 
 ### Regression test: recursive protocol through `dict.items()`
@@ -3314,6 +3457,210 @@ def f(c: C[int]) -> None:
     # The cycle detection assumes compatibility when it detects potential
     # infinite recursion between protocol specializations.
     takes_c(c)
+```
+
+### Recursive generic protocols with direct unions and growing specializations
+
+These snippets used to stack overflow while building protocol interfaces. The union builder tried to
+simplify the member type by checking whether one union element was redundant with the recursive
+protocol instance. That forced the next specialized protocol interface (`C[list[T]]`,
+`C[list[list[T]]]`, and so on) before the current interface could finish.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, TypeVar
+
+from ty_extensions import is_assignable_to, is_equivalent_to, is_subtype_of, static_assert
+
+class C[T](Protocol):
+    a: C[list[T]] | None
+
+class D[T](Protocol):
+    a: D[list[T]] | None
+
+static_assert(is_assignable_to(C[int], D[int]))
+static_assert(is_subtype_of(C[int], D[int]))
+static_assert(is_equivalent_to(C[int], D[int]))
+
+class MethodC[T](Protocol):
+    def a(self) -> MethodC[list[T]] | None: ...
+
+class MethodD[T](Protocol):
+    def a(self) -> MethodD[list[T]] | None: ...
+
+static_assert(is_assignable_to(MethodC[int], MethodD[int]))
+
+T = TypeVar("T")
+
+class LegacyC(Protocol[T]):
+    a: LegacyC[list[T]] | None
+
+def takes_legacy_c(c: LegacyC[list[int]] | None) -> None: ...
+def use_legacy_c(c: LegacyC[int]) -> None:
+    takes_legacy_c(c.a)
+```
+
+### Recursive generic sub-protocol with `cast()` and growing specializations
+
+This snippet used to cause a stack overflow because the redundant-cast check walks protocol
+interfaces to look for dynamic types. The call to the unbound parent protocol method triggers
+constraint solving, and each recursive step produces a distinct specialization: `Proto[list[T]]`,
+`Proto[list[list[T]]]`, and so on.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, cast
+
+class Proto[T](Protocol):
+    def method(self) -> "Proto[list[T]]": ...
+
+class Sub[T](Proto[T], Protocol):
+    def method(self) -> "Sub[list[T]]":
+        return cast(Sub[list[T]], Proto.method(self))
+```
+
+### Recursive generic protocol relation with growing specializations
+
+Recursive protocol member checks should not rely on a hard recursion-depth fallback. The relation
+checker needs to stop the recursive member relation while still checking the rest of the interface
+under the recursively specialized type variables. This also applies when the source and target
+specializations grow with different shapes, or when only one side grows recursively.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert, is_assignable_to, is_equivalent_to, is_subtype_of
+
+class C[T](Protocol):
+    a: "C[list[T]]"
+
+class D[T](Protocol):
+    a: "D[list[T]]"
+
+static_assert(is_assignable_to(C[int], D[int]))
+
+type RecursiveAlias[T] = list[T]
+
+class CAliasWrapped[T](Protocol):
+    a: "CAliasWrapped[RecursiveAlias[T]]"
+
+class DAliasWrapped[T](Protocol):
+    a: "DAliasWrapped[RecursiveAlias[T]]"
+
+static_assert(is_assignable_to(CAliasWrapped[int], DAliasWrapped[int]))
+
+class CWithMember[T](Protocol):
+    a: "CWithMember[list[T]]"
+    x: list[T]
+
+class DWithMember[T](Protocol):
+    a: "DWithMember[list[T]]"
+    x: list[int]
+
+static_assert(not is_assignable_to(CWithMember[int], DWithMember[int]))
+
+class CWithRecursiveMember[T](Protocol):
+    a: tuple[T, "CWithRecursiveMember[int]"]
+
+class DWithRecursiveMember[T](Protocol):
+    a: tuple[T, "DWithRecursiveMember[str]"]
+
+static_assert(not is_assignable_to(CWithRecursiveMember[str], DWithRecursiveMember[str]))
+
+class CWithAsymmetricMember[T](Protocol):
+    a: "CWithAsymmetricMember[list[T]]"
+    x: T
+
+class DWithAsymmetricMember[T](Protocol):
+    a: "DWithAsymmetricMember[tuple[T]]"
+    x: T
+
+static_assert(not is_assignable_to(CWithAsymmetricMember[int], DWithAsymmetricMember[int]))
+static_assert(not is_subtype_of(CWithAsymmetricMember[int], DWithAsymmetricMember[int]))
+static_assert(not is_equivalent_to(CWithAsymmetricMember[int], DWithAsymmetricMember[int]))
+
+class CWithOneSidedMember[T](Protocol):
+    a: "CWithOneSidedMember[list[T]]"
+    x: T
+
+class DWithOneSidedMember[T](Protocol):
+    a: "DWithOneSidedMember[int]"
+    x: T
+
+static_assert(not is_assignable_to(CWithOneSidedMember[int], DWithOneSidedMember[int]))
+static_assert(not is_subtype_of(CWithOneSidedMember[int], DWithOneSidedMember[int]))
+static_assert(not is_equivalent_to(CWithOneSidedMember[int], DWithOneSidedMember[int]))
+
+class CWithAsymmetricMethod[T](Protocol):
+    def a(self) -> tuple["CWithAsymmetricMethod[list[T]]", T]: ...
+
+class DWithAsymmetricMethod[T](Protocol):
+    def a(self) -> tuple["DWithAsymmetricMethod[tuple[T]]", T]: ...
+
+static_assert(not is_assignable_to(CWithAsymmetricMethod[int], DWithAsymmetricMethod[int]))
+static_assert(not is_subtype_of(CWithAsymmetricMethod[int], DWithAsymmetricMethod[int]))
+static_assert(not is_equivalent_to(CWithAsymmetricMethod[int], DWithAsymmetricMethod[int]))
+```
+
+### Recursive generic class satisfying protocol through mutually-recursive members
+
+These snippets used to stack overflow because checking a non-protocol type against a protocol
+compares protocol member types with the actual attribute types. The member types can mutually
+recurse through growing generic specializations without ever repeating the exact type pair.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert, is_assignable_to, is_equivalent_to, is_subtype_of
+
+class MutuallyRecursiveProto[T](Protocol):
+    child: "MutuallyRecursiveNominal[list[T]]"
+
+class MutuallyRecursiveNominal[T]:
+    child: "MutuallyRecursiveProto[list[T]]"
+
+static_assert(not is_assignable_to(MutuallyRecursiveNominal[int], MutuallyRecursiveProto[int]))
+static_assert(not is_subtype_of(MutuallyRecursiveNominal[int], MutuallyRecursiveProto[int]))
+static_assert(not is_equivalent_to(MutuallyRecursiveNominal[int], MutuallyRecursiveProto[int]))
+
+class AsymmetricRecursiveProto[T](Protocol):
+    child: "AsymmetricRecursiveNominal[tuple[T]]"
+
+class AsymmetricRecursiveNominal[T]:
+    child: "AsymmetricRecursiveProto[list[T]]"
+
+static_assert(not is_assignable_to(AsymmetricRecursiveNominal[int], AsymmetricRecursiveProto[int]))
+static_assert(not is_subtype_of(AsymmetricRecursiveNominal[int], AsymmetricRecursiveProto[int]))
+static_assert(not is_equivalent_to(AsymmetricRecursiveNominal[int], AsymmetricRecursiveProto[int]))
+
+class AsymmetricRecursiveMethodProto[T](Protocol):
+    def child(self) -> tuple["AsymmetricRecursiveMethodProto[list[T]]", T]: ...
+
+class AsymmetricRecursiveMethodNominal[T]:
+    def child(self) -> tuple["AsymmetricRecursiveMethodNominal[tuple[T]]", T]:
+        raise NotImplementedError
+
+static_assert(not is_assignable_to(AsymmetricRecursiveMethodNominal[int], AsymmetricRecursiveMethodProto[int]))
+static_assert(not is_subtype_of(AsymmetricRecursiveMethodNominal[int], AsymmetricRecursiveMethodProto[int]))
+static_assert(not is_equivalent_to(AsymmetricRecursiveMethodNominal[int], AsymmetricRecursiveMethodProto[int]))
 ```
 
 ### Recursive legacy generic protocol

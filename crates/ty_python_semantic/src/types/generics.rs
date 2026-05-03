@@ -16,18 +16,20 @@ use crate::types::constraints::{
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor,
+    ProtocolMemberDisjointnessVisitor, ProtocolMemberRelationVisitor, TypeRelation,
+    TypeRelationChecker,
 };
-use crate::types::signatures::{
-    CallableSignature, Parameters, ReturnCallableTypeVarScope, SignatureRelationVisitor,
-};
+use crate::types::signatures::{CallableSignature, Parameters, ReturnCallableTypeVarScope};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
 };
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::visitor::{
+    TypeCollector, TypeVisitor, any_over_type_expanding_aliases, walk_type_with_recursion_guard,
+};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
@@ -1073,6 +1075,35 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> Specialization<'db> {
+    /// Return `true` if `self` recursively wraps the type arguments from `previous`.
+    ///
+    /// For example, `Proto[list[int]]` is a recursive expansion of `Proto[int]` because the
+    /// new type argument contains the previous one:
+    ///
+    /// ```python
+    /// from typing import Protocol
+    ///
+    /// class Proto[T](Protocol):
+    ///     child: "Proto[list[T]]"
+    /// ```
+    pub(super) fn is_recursive_expansion_of(self, db: &'db dyn Db, previous: Self) -> bool {
+        if self == previous || self.generic_context(db) != previous.generic_context(db) {
+            return false;
+        }
+
+        let mut expanded = false;
+        for (current_ty, previous_ty) in self.types(db).iter().zip(previous.types(db)) {
+            if current_ty == previous_ty {
+                continue;
+            }
+            if !any_over_type_expanding_aliases(db, *current_ty, |ty| ty == *previous_ty) {
+                return false;
+            }
+            expanded = true;
+        }
+        expanded
+    }
+
     /// Restricts this specialization to only include the typevars in a generic context. If the
     /// specialization does not include all of those typevars, returns `None`.
     pub(crate) fn restrict(
@@ -1356,14 +1387,16 @@ impl<'db> Specialization<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let protocol_member_relation_visitor = ProtocolMemberRelationVisitor::default();
+        let protocol_member_disjointness_visitor = ProtocolMemberDisjointnessVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = DisjointnessChecker::new(
             constraints,
             inferable,
             &relation_visitor,
             &disjointness_visitor,
-            &signature_relation_visitor,
+            &protocol_member_relation_visitor,
+            &protocol_member_disjointness_visitor,
             &materialization_visitor,
         );
         checker.check_specialization_pair(db, self, other)
