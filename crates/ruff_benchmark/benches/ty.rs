@@ -1000,6 +1000,298 @@ fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
     });
 }
 
+/// Benchmark for repeated reachability and narrowing work inside an exact-type dispatch.
+///
+/// This shape was minimized from `PyTorch`'s `GuardBuilder.get_guard_manager_from_source`:
+/// <https://github.com/pytorch/pytorch/blob/be33b7faf685560bb618561b44b751713a660337/torch/_dynamo/guards.py#L1345-L1754>.
+///
+/// ```python
+/// class ChainedSource:
+///     base: object
+///
+/// def from_source(self, source: object) -> Manager:
+///     source_name = name(source)
+///     if source_name != "" and source_name in self.manager_cache:
+///         return self.manager_cache[source_name]
+///     if isinstance(source, ChainedSource):
+///         base_manager = self.from_source(source.base)
+///         base_value = self.get(name(source.base))
+///
+///     if exact(source, Variant0):
+///         out = root.build(...)
+///     elif exact(source, ReturningVariant0):
+///         return root
+///     # ...
+///     elif exact(source, VariantN):
+///         assert base_manager
+///         out = base_manager.build(...)
+///     elif exact(source, (AttributeVariant, AlternateAttributeVariant)):
+///         assert base_manager
+///         assert isinstance(source, AttributeVariant)
+///         if special(base_value):
+///             out = base_manager.build(...)
+///         else:
+///             out = base_manager.build(...)
+///     elif exact(source, TailVariant):
+///         assert base_manager
+///         out = base_manager.build(...)
+///     # ...
+///     self.manager_cache[name(source)] = out
+///     return out
+/// ```
+///
+/// The cache-guard early return and the terminating dispatch branches become shared reachability
+/// constraints for many later `out` bindings. The nested attribute branch adds another predicate
+/// over the already narrowed `source`, and the following tail branches force the final `out` use to
+/// consider those later bindings too. In the full `PyTorch` shape, this repeatedly revisits the same
+/// reachability nodes and narrowing states while resolving the branch calls and the merged `out`.
+///
+/// This benchmark is intentionally smaller than the real method. It captures the straight-line
+/// dispatch shape that made the reachability cache important, but the full `PyTorch` regression is
+/// specifically fixed by memoizing repeated narrowing states.
+fn benchmark_reachability_cache_guard_updates(criterion: &mut Criterion) {
+    const NUM_PREFIX_VARIANTS: usize = 12;
+    const NUM_INITIAL_VARIANTS: usize = 3;
+    const NUM_TAIL_VARIANTS: usize = 2;
+
+    setup_rayon();
+
+    let mut code = r#"from collections.abc import Iterable
+from typing import Any, TypeVar, overload
+from typing_extensions import TypeIs
+
+T = TypeVar("T")
+@overload
+def exact(obj: object, cls: type[T]) -> TypeIs[T]: ...
+@overload
+def exact(obj: object, cls: Iterable[type]) -> bool: ...
+def exact(obj: object, cls: Any) -> bool: return True
+
+class Manager:
+    def build(self, **kwargs: object) -> "Manager":
+        return self
+
+class ChainedSource:
+    base: object
+
+"#
+    .to_string();
+
+    for i in 0..NUM_PREFIX_VARIANTS {
+        let base = if i >= 5 { "ChainedSource" } else { "object" };
+        writeln!(&mut code, "class Variant{i}({base}):\n    field: object\n").ok();
+    }
+
+    code.push_str(
+        r#"class ReturningVariant0: ...
+class ReturningVariant1: ...
+
+class AttributeVariant(ChainedSource):
+    member: str
+
+class AlternateAttributeVariant(AttributeVariant): ...
+
+"#,
+    );
+
+    for i in 0..NUM_TAIL_VARIANTS {
+        writeln!(
+            &mut code,
+            "class TailVariant{i}(ChainedSource):\n    field: object\n"
+        )
+        .ok();
+    }
+
+    code.push_str(
+        r#"def name(source: object) -> str:
+    return "source"
+
+def special(value: object) -> bool:
+    return False
+
+class Builder:
+    manager_cache: dict[str, Manager] = {}
+    retained_values: dict[int, object] = {}
+
+    def get(self, name: str) -> object:
+        return object()
+
+    def from_source(self, source: object) -> Manager:
+        root = Manager()
+        source_name = name(source)
+        if source_name != "" and source_name in self.manager_cache:
+            return self.manager_cache[source_name]
+        value = self.get(source_name)
+        self.retained_values[id(value)] = value
+        base_value = None
+        base_manager = None
+        if isinstance(source, ChainedSource):
+            base_value = self.get(name(source.base))
+            base_manager = self.from_source(source.base)
+"#,
+    );
+
+    for i in 0..NUM_INITIAL_VARIANTS {
+        let keyword = if i == 0 { "if" } else { "elif" };
+        writeln!(
+            &mut code,
+            "        {keyword} exact(source, Variant{i}):\n            out = root.build(field=source.field, source=source_name, value=value)"
+        )
+        .ok();
+    }
+
+    code.push_str(
+        r#"        elif exact(source, ReturningVariant0):
+            return root
+        elif exact(source, ReturningVariant1):
+            return root
+"#,
+    );
+
+    for i in NUM_INITIAL_VARIANTS..NUM_PREFIX_VARIANTS {
+        writeln!(
+            &mut code,
+            "        elif exact(source, Variant{i}):\n            assert base_manager\n            out = base_manager.build(field=source.field, source=source_name, value=value)"
+        )
+        .ok();
+    }
+
+    code.push_str(
+        r#"        elif exact(source, (AttributeVariant, AlternateAttributeVariant)):
+            assert base_manager
+            assert isinstance(source, AttributeVariant)
+            if special(base_value):
+                out = base_manager.build(member=source.member, source=source_name, value=value)
+            else:
+                out = base_manager.build(member=source.member, source=source_name, value=value)
+"#,
+    );
+
+    for i in 0..NUM_TAIL_VARIANTS {
+        writeln!(
+            &mut code,
+            "        elif exact(source, TailVariant{i}):\n            assert base_manager\n            out = base_manager.build(field=source.field, source=source_name, value=value)"
+        )
+        .ok();
+    }
+
+    code.push_str(
+        r#"        else:
+            raise AssertionError
+        self.manager_cache[name(source)] = out
+        return out
+"#,
+    );
+
+    criterion.bench_function("ty_micro[reachability_cache_guard_updates]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Benchmark for loop headers in large surrounding reachability graphs.
+///
+/// This is modeled after isort's line-processing loops:
+/// - <https://github.com/pycqa/isort/blob/ab9cd3601d92d59416a57f457dcabb27ff622dd3/isort/parse.py#L77-L180>
+/// - <https://github.com/pycqa/isort/blob/ab9cd3601d92d59416a57f457dcabb27ff622dd3/isort/core.py#L37-L180>
+///
+/// ```python
+/// def parse_tokens(
+///     items: list[int],
+///     option_0: bool,
+///     option_1: bool,
+///     # ...
+/// ) -> int:
+///     current = 0
+///     if option_0:
+///         option_value_0 = 0
+///     else:
+///         option_value_0 = 0
+///     if option_1:
+///         option_value_1 = 1
+///     else:
+///         option_value_1 = -1
+///     # ...
+///     for item in items:
+///         if option_0:
+///             current = item
+///         else:
+///             current = current + 0
+///         if current < 0:
+///             continue
+///         if option_1:
+///             current = item
+///         else:
+///             current = current + 1
+///         # ...
+///     return current
+/// ```
+///
+/// This is a different shape from the `PyTorch` dispatch above. The local loop-carried place is
+/// simple, but it lives in a large function whose independent setup, option, and line-processing
+/// branches create a large surrounding reachability graph. Exact loop-header analysis can end up
+/// paying for predicates that are unrelated to the loop-back binding itself.
+///
+/// Caching repeated reachability or narrowing subproblems has little opportunity to help here: the
+/// expensive part is deciding whether to do exact loop-header analysis through the large graph in
+/// the first place. The loop-header limit change instead bounds that exact analysis and falls back
+/// to a conservative approximation for large loops.
+fn benchmark_loop_header_large_surrounding_graph(criterion: &mut Criterion) {
+    const NUM_SURROUNDING_PREDICATES: usize = 700;
+    const NUM_LOOP_UPDATES: usize = 24;
+
+    setup_rayon();
+
+    let mut code = "def parse_tokens(items: list[int],\n".to_string();
+    for i in 0..NUM_SURROUNDING_PREDICATES {
+        let comma = if i + 1 == NUM_SURROUNDING_PREDICATES {
+            ""
+        } else {
+            ","
+        };
+        writeln!(&mut code, "    option_{i}: bool{comma}").ok();
+    }
+    code.push_str(") -> int:\n    current = 0\n");
+
+    for i in 0..NUM_SURROUNDING_PREDICATES {
+        writeln!(
+            &mut code,
+            "    if option_{i}:\n        option_value_{i} = {i}\n    else:\n        option_value_{i} = -{i}"
+        )
+        .ok();
+    }
+
+    code.push_str("    for item in items:\n");
+    for i in 0..NUM_LOOP_UPDATES {
+        let option = i % NUM_SURROUNDING_PREDICATES;
+        writeln!(
+            &mut code,
+            "        if option_{option}:\n            current = item\n        else:\n            current = current + {i}"
+        )
+        .ok();
+    }
+    code.push_str("    return current\n");
+
+    criterion.bench_function("ty_micro[loop_header_large_surrounding_graph]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/3120>.
 ///
 /// Sequential (`TypeIs`) narrowing on a large `Literal` union, combined with
@@ -1224,6 +1516,8 @@ criterion_group!(
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,
     benchmark_large_isinstance_narrowing,
+    benchmark_reachability_cache_guard_updates,
+    benchmark_loop_header_large_surrounding_graph,
     benchmark_typeis_narrowing,
     benchmark_pandas_tdd,
 );
