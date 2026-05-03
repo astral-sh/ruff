@@ -187,6 +187,15 @@ impl ModuleResolveMode {
         if module_name == "types" {
             return true;
         }
+        // Same for `typing`: ty hard-codes recognition of its special forms
+        // (`Any`, `Literal`, `Protocol`, etc.) and assumes they come from
+        // typeshed. If a user-supplied `typing.py` were allowed to shadow
+        // typeshed (as can happen when `--extra-search-path` points at a
+        // CPython runtime stdlib directory), `Any` becomes a regular class
+        // and assignability checks against it stop behaving correctly.
+        if module_name == "typing" {
+            return true;
+        }
 
         // Otherwise, some modules should only be conditionally allowed
         // to be shadowed, depending on the module resolution mode.
