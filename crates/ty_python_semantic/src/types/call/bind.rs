@@ -4898,6 +4898,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
         // We still update the actual type of the parameter in this binding to match the argument,
         // even if the argument type is not assignable to the expected parameter type.
+        //
+        // For a broad variadic sink such as `*args: object` or `**kwargs: object`, preserving a
+        // union of every individual argument type does not improve call checking or special-case
+        // return inference. Keep the already-declared top type instead of repeatedly growing a
+        // large union.
+        if (parameter.is_variadic() || parameter.is_keyword_variadic()) && expected_ty.is_object() {
+            self.parameter_tys[parameter_index].get_or_insert(expected_ty);
+            return;
+        }
+
         if let Some(builder) = self
             .parameter_ty_builders
             .get_mut(parameter_index)

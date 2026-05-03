@@ -23,6 +23,49 @@ accepts_only_gradual(1, "one", keyword=object())
 accepts_only_gradual(**{1: "one"})  # error: [invalid-argument-type]
 ```
 
+## Object variadic parameters
+
+`*args: object` and `**kwargs: object` can receive many unrelated argument types. Call binding
+should not build large unions to remember the exact values that were supplied to these broad sinks.
+
+```py
+class C0: ...
+class C1: ...
+class C2: ...
+class C3: ...
+class C4: ...
+class C5: ...
+class C6: ...
+class C7: ...
+class C8: ...
+class C9: ...
+
+def accepts_objects(*args: object, **kwargs: object) -> None: ...
+
+accepts_objects(
+    C0(),
+    C1(),
+    C2(),
+    C3(),
+    C4(),
+    C5(),
+    C6(),
+    C7(),
+    C8(),
+    C9(),
+    k0=C0(),
+    k1=C1(),
+    k2=C2(),
+    k3=C3(),
+    k4=C4(),
+    k5=C5(),
+    k6=C6(),
+    k7=C7(),
+    k8=C8(),
+    k9=C9(),
+)
+```
+
 ## Async
 
 ```py
