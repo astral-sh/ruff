@@ -2015,8 +2015,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         loop_header_kind: &LoopHeaderDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
-        const MAX_EXACT_LOOP_HEADER_BINDINGS: usize = 16;
-        const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 1024;
+        const MAX_EXACT_LOOP_HEADER_BINDINGS: usize = 32;
+        const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 2048;
 
         let db = self.db();
         let loop_header = loop_header_reachability(db, definition);

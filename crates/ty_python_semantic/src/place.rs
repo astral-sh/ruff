@@ -1250,6 +1250,9 @@ fn loop_header_reachability_impl<'db>(
     definition: Definition<'db>,
     is_cycle_initial: bool,
 ) -> LoopHeaderReachability<'db> {
+    const MAX_EXACT_LOOP_HEADER_REACHABILITY_BINDINGS: usize = 32;
+    const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 2048;
+
     let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
         unreachable!("`loop_header_reachability` called with non-loop-header definition");
     };
@@ -1263,8 +1266,9 @@ fn loop_header_reachability_impl<'db>(
     let mut reachable_bindings = FxIndexSet::default();
     let live_bindings: Vec<_> = loop_header.bindings_for_place(place).collect();
     let live_binding_count = live_bindings.len();
-    let use_exact_reachability = live_binding_count <= 16
-        && use_def.reachability_constraints().used_interiors().len() <= 256;
+    let use_exact_reachability = live_binding_count <= MAX_EXACT_LOOP_HEADER_REACHABILITY_BINDINGS
+        && use_def.reachability_constraints().used_interiors().len()
+            <= MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES;
 
     for live_binding in live_bindings {
         let reachability = if is_cycle_initial {
