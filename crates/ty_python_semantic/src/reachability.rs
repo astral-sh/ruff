@@ -203,6 +203,7 @@ use crate::{
     },
 };
 use ruff_text_size::TextRange;
+use rustc_hash::FxHashMap;
 use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
     SemanticIndex, Truthiness, UseDefMap,
@@ -387,6 +388,15 @@ pub(crate) trait ReachabilityConstraintsExtension<'db> {
         predicates: &Predicates<'db>,
         id: ScopedReachabilityConstraintId,
     ) -> Truthiness;
+
+    /// Analyze reachability for a constraint, memoizing intermediate results.
+    fn evaluate_cached(
+        &self,
+        db: &'db dyn Db,
+        predicates: &Predicates<'db>,
+        id: ScopedReachabilityConstraintId,
+        cache: &mut FxHashMap<ScopedReachabilityConstraintId, Truthiness>,
+    ) -> Truthiness;
 }
 
 impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
@@ -419,7 +429,16 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         base_ty: Type<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
-        narrow_by_constraint_inner(db, self, predicates, id, base_ty, place, None)
+        let mut cache = FxHashMap::default();
+        NarrowingContext {
+            db,
+            constraints: self,
+            predicates,
+            base_ty,
+            place,
+            cache: &mut cache,
+        }
+        .narrow(id, None)
     }
 
     /// Analyze the statically known reachability for a given constraint.
@@ -427,166 +446,158 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         &self,
         db: &'db dyn Db,
         predicates: &Predicates<'db>,
-        mut id: ScopedReachabilityConstraintId,
+        id: ScopedReachabilityConstraintId,
+    ) -> Truthiness {
+        let mut cache = FxHashMap::default();
+        self.evaluate_cached(db, predicates, id, &mut cache)
+    }
+
+    /// Analyze reachability for a constraint, memoizing intermediate results.
+    fn evaluate_cached(
+        &self,
+        db: &'db dyn Db,
+        predicates: &Predicates<'db>,
+        id: ScopedReachabilityConstraintId,
+        cache: &mut FxHashMap<ScopedReachabilityConstraintId, Truthiness>,
     ) -> Truthiness {
         type Id = ScopedReachabilityConstraintId;
 
-        loop {
-            let node = match id {
-                Id::ALWAYS_TRUE => return Truthiness::AlwaysTrue,
-                Id::AMBIGUOUS => return Truthiness::Ambiguous,
-                Id::ALWAYS_FALSE => return Truthiness::AlwaysFalse,
-                _ => {
-                    // `id` gives us the index of this node in the IndexVec that we used when
-                    // constructing this BDD. When finalizing the builder, we threw away any
-                    // interior nodes that weren't marked as used. The `used_indices` bit vector
-                    // lets us verify that this node was marked as used, and the rank of that bit
-                    // in the bit vector tells us where this node lives in the "condensed"
-                    // `used_interiors` vector.
-                    let raw_index = id.as_u32() as usize;
-                    debug_assert!(
-                        self.used_indices().get_bit(raw_index).unwrap_or(false),
-                        "all used reachability constraints should have been marked as used",
-                    );
-                    let index = self.used_indices().rank(raw_index) as usize;
-                    self.used_interiors()[index]
-                }
-            };
-            let predicate = &predicates[node.atom()];
-            match analyze_single(db, predicate) {
-                Truthiness::AlwaysTrue => id = node.if_true(),
-                Truthiness::Ambiguous => id = node.if_ambiguous(),
-                Truthiness::AlwaysFalse => id = node.if_false(),
-            }
+        if let Some(cached) = cache.get(&id) {
+            return *cached;
         }
+
+        let result = match id {
+            Id::ALWAYS_TRUE => Truthiness::AlwaysTrue,
+            Id::AMBIGUOUS => Truthiness::Ambiguous,
+            Id::ALWAYS_FALSE => Truthiness::AlwaysFalse,
+            _ => {
+                let node = self.get_interior_node(id);
+                let predicate = &predicates[node.atom()];
+                let branch = match analyze_single(db, predicate) {
+                    Truthiness::AlwaysTrue => node.if_true(),
+                    Truthiness::Ambiguous => node.if_ambiguous(),
+                    Truthiness::AlwaysFalse => node.if_false(),
+                };
+                self.evaluate_cached(db, predicates, branch, cache)
+            }
+        };
+
+        cache.insert(id, result);
+        result
     }
 }
 
-/// Inner recursive helper that accumulates narrowing constraints along each TDD path.
-fn narrow_by_constraint_inner<'db>(
+type NarrowingCacheKey<'db> = (
+    ScopedReachabilityConstraintId,
+    Option<NarrowingConstraint<'db>>,
+);
+
+const MAX_NARROWING_STATES: usize = 256;
+
+fn apply_accumulated_narrowing<'db>(
     db: &'db dyn Db,
-    constraints: &ReachabilityConstraints,
-    predicates: &Predicates<'db>,
-    id: ScopedReachabilityConstraintId,
     base_ty: Type<'db>,
-    place: ScopedPlaceId,
     accumulated: Option<NarrowingConstraint<'db>>,
 ) -> Type<'db> {
-    type Id = ScopedReachabilityConstraintId;
+    match accumulated {
+        Some(constraint) => NarrowingConstraint::intersection(base_ty)
+            .merge_constraint_and(constraint)
+            .evaluate_constraint_type(db),
+        None => base_ty,
+    }
+}
 
-    match id {
-        Id::ALWAYS_TRUE | Id::AMBIGUOUS => {
-            // Apply all accumulated narrowing constraints to the base type
-            match accumulated {
-                Some(constraint) => NarrowingConstraint::intersection(base_ty)
-                    .merge_constraint_and(constraint)
-                    .evaluate_constraint_type(db),
-                None => base_ty,
-            }
+struct NarrowingContext<'a, 'db> {
+    db: &'db dyn Db,
+    constraints: &'a ReachabilityConstraints,
+    predicates: &'a Predicates<'db>,
+    base_ty: Type<'db>,
+    place: ScopedPlaceId,
+    cache: &'a mut FxHashMap<NarrowingCacheKey<'db>, Type<'db>>,
+}
+
+impl<'db> NarrowingContext<'_, 'db> {
+    /// Inner recursive helper that accumulates narrowing constraints along each TDD path.
+    fn narrow(
+        &mut self,
+        id: ScopedReachabilityConstraintId,
+        accumulated: Option<NarrowingConstraint<'db>>,
+    ) -> Type<'db> {
+        type Id = ScopedReachabilityConstraintId;
+
+        let key = (id, accumulated.clone());
+        if let Some(cached) = self.cache.get(&key) {
+            return *cached;
         }
-        Id::ALWAYS_FALSE => Type::Never,
-        _ => {
-            let node = constraints.get_interior_node(id);
-            let predicate = predicates[node.atom()];
+        if self.cache.len() >= MAX_NARROWING_STATES {
+            return apply_accumulated_narrowing(self.db, self.base_ty, accumulated);
+        }
 
-            // `IsNonTerminalCall` predicates don't narrow any variable; they only
-            // affect reachability. Evaluate the predicate to determine which
-            // path(s) are reachable, rather than walking both branches.
-            // `IsNonTerminalCall` always evaluates to `AlwaysTrue` or `AlwaysFalse`,
-            // never `Ambiguous`.
-            if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
-                return match analyze_single(db, &predicate) {
-                    Truthiness::AlwaysTrue => narrow_by_constraint_inner(
-                        db,
-                        constraints,
-                        predicates,
-                        node.if_true(),
-                        base_ty,
-                        place,
-                        accumulated,
-                    ),
-                    Truthiness::AlwaysFalse => narrow_by_constraint_inner(
-                        db,
-                        constraints,
-                        predicates,
-                        node.if_false(),
-                        base_ty,
-                        place,
-                        accumulated,
-                    ),
-                    Truthiness::Ambiguous => {
-                        unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
+        let result = match id {
+            Id::ALWAYS_TRUE | Id::AMBIGUOUS => {
+                // Apply all accumulated narrowing constraints to the base type
+                apply_accumulated_narrowing(self.db, self.base_ty, accumulated)
+            }
+            Id::ALWAYS_FALSE => Type::Never,
+            _ => {
+                let node = self.constraints.get_interior_node(id);
+                let predicate = self.predicates[node.atom()];
+
+                // `IsNonTerminalCall` predicates don't narrow any variable; they only
+                // affect reachability. Evaluate the predicate to determine which
+                // path(s) are reachable, rather than walking both branches.
+                // `IsNonTerminalCall` always evaluates to `AlwaysTrue` or `AlwaysFalse`,
+                // never `Ambiguous`.
+                if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
+                    match analyze_single(self.db, &predicate) {
+                        Truthiness::AlwaysTrue => self.narrow(node.if_true(), accumulated),
+                        Truthiness::AlwaysFalse => self.narrow(node.if_false(), accumulated),
+                        Truthiness::Ambiguous => {
+                            unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
+                        }
                     }
-                };
+                } else {
+                    // Check if this predicate narrows the variable we're interested in.
+                    let pos_constraint = infer_narrowing_constraint(self.db, predicate, self.place);
+
+                    // If the true branch is statically unreachable, skip it entirely.
+                    if node.if_true() == Id::ALWAYS_FALSE {
+                        let neg_predicate = Predicate {
+                            node: predicate.node,
+                            is_positive: !predicate.is_positive,
+                        };
+                        let neg_constraint =
+                            infer_narrowing_constraint(self.db, neg_predicate, self.place);
+                        let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                        self.narrow(node.if_false(), false_accumulated)
+                    } else if node.if_false() == Id::ALWAYS_FALSE {
+                        // If the false branch is statically unreachable, skip it entirely.
+                        let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
+                        self.narrow(node.if_true(), true_accumulated)
+                    } else {
+                        // True branch: predicate holds, so accumulate positive narrowing.
+                        let true_accumulated =
+                            accumulate_constraint(accumulated.clone(), pos_constraint);
+                        let true_ty = self.narrow(node.if_true(), true_accumulated);
+
+                        // False branch: predicate doesn't hold, so accumulate negative narrowing.
+                        let neg_predicate = Predicate {
+                            node: predicate.node,
+                            is_positive: !predicate.is_positive,
+                        };
+                        let neg_constraint =
+                            infer_narrowing_constraint(self.db, neg_predicate, self.place);
+                        let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                        let false_ty = self.narrow(node.if_false(), false_accumulated);
+
+                        UnionType::from_two_elements(self.db, true_ty, false_ty)
+                    }
+                }
             }
+        };
 
-            // Check if this predicate narrows the variable we're interested in.
-            let pos_constraint = infer_narrowing_constraint(db, predicate, place);
-
-            // If the true branch is statically unreachable, skip it entirely.
-            if node.if_true() == Id::ALWAYS_FALSE {
-                let neg_predicate = Predicate {
-                    node: predicate.node,
-                    is_positive: !predicate.is_positive,
-                };
-                let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
-                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
-                return narrow_by_constraint_inner(
-                    db,
-                    constraints,
-                    predicates,
-                    node.if_false(),
-                    base_ty,
-                    place,
-                    false_accumulated,
-                );
-            }
-
-            // If the false branch is statically unreachable, skip it entirely.
-            if node.if_false() == Id::ALWAYS_FALSE {
-                let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
-                return narrow_by_constraint_inner(
-                    db,
-                    constraints,
-                    predicates,
-                    node.if_true(),
-                    base_ty,
-                    place,
-                    true_accumulated,
-                );
-            }
-
-            // True branch: predicate holds → accumulate positive narrowing
-            let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
-            let true_ty = narrow_by_constraint_inner(
-                db,
-                constraints,
-                predicates,
-                node.if_true(),
-                base_ty,
-                place,
-                true_accumulated,
-            );
-
-            // False branch: predicate doesn't hold → accumulate negative narrowing
-            let neg_predicate = Predicate {
-                node: predicate.node,
-                is_positive: !predicate.is_positive,
-            };
-            let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
-            let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
-            let false_ty = narrow_by_constraint_inner(
-                db,
-                constraints,
-                predicates,
-                node.if_false(),
-                base_ty,
-                place,
-                false_accumulated,
-            );
-
-            UnionType::from_two_elements(db, true_ty, false_ty)
-        }
+        self.cache.insert(key, result);
+        result
     }
 }
 
