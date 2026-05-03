@@ -130,6 +130,19 @@ impl<'a> FoldingRangeVisitor<'a> {
         true
     }
 
+    /// Add the given expression folding range unless it's already covered by a block header fold.
+    fn add_expression_range(&mut self, range: TextRange) {
+        if self
+            .active_block_header_delimiter_ranges
+            .iter()
+            .any(|header_range| header_range.range.intersect(range).is_some())
+        {
+            return;
+        }
+
+        self.add_range(range);
+    }
+
     fn is_multiline(&self, range: TextRange) -> bool {
         self.source[range].contains('\n') || self.source[range].contains('\r')
     }
@@ -524,54 +537,54 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
 
             // Multiline expressions
             AnyNodeRef::ExprList(list) => {
-                self.add_range(list.range());
+                self.add_expression_range(list.range());
             }
             AnyNodeRef::ExprTuple(tuple)
                 // Only fold parenthesized tuples.
                 if tuple.parenthesized => {
-                    self.add_range(tuple.range());
+                    self.add_expression_range(tuple.range());
                 }
             AnyNodeRef::ExprDict(dict) => {
-                self.add_range(dict.range());
+                self.add_expression_range(dict.range());
             }
             AnyNodeRef::ExprSet(set) => {
-                self.add_range(set.range());
+                self.add_expression_range(set.range());
             }
             AnyNodeRef::ExprListComp(listcomp) => {
-                self.add_range(listcomp.range());
+                self.add_expression_range(listcomp.range());
             }
             AnyNodeRef::ExprSetComp(setcomp) => {
-                self.add_range(setcomp.range());
+                self.add_expression_range(setcomp.range());
             }
             AnyNodeRef::ExprDictComp(dictcomp) => {
-                self.add_range(dictcomp.range());
+                self.add_expression_range(dictcomp.range());
             }
             AnyNodeRef::ExprGenerator(generator) => {
-                self.add_range(generator.range());
+                self.add_expression_range(generator.range());
             }
 
             // Function calls with arguments spanning multiple lines
             AnyNodeRef::ExprCall(call) => {
-                self.add_range(call.range());
+                self.add_expression_range(call.range());
             }
 
             // String and bytes literals
             AnyNodeRef::ExprStringLiteral(string) => {
-                self.add_range(string.range());
+                self.add_expression_range(string.range());
             }
             AnyNodeRef::ExprBytesLiteral(bytes) => {
-                self.add_range(bytes.range());
+                self.add_expression_range(bytes.range());
             }
             AnyNodeRef::ExprFString(fstring) => {
-                self.add_range(fstring.range());
+                self.add_expression_range(fstring.range());
             }
             AnyNodeRef::ExprTString(tstring) => {
-                self.add_range(tstring.range());
+                self.add_expression_range(tstring.range());
             }
 
             // Type parameter lists
             AnyNodeRef::TypeParams(params) => {
-                self.add_range(params.range());
+                self.add_expression_range(params.range());
             }
 
             _ => {}
