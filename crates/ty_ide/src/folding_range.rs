@@ -1168,6 +1168,361 @@ finally:
     }
 
     #[test]
+    fn test_folding_range_multiline_block_headers() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def foo(
+    x: int,
+    y: str,
+) -> None:
+    pass
+
+def foo(a = (
+    10 + 10
+)) -> (
+    int | None
+):
+    pass
+
+class Repository[
+    Model,
+    Key,
+](
+    Mapping[Key, Model],
+    Protocol,
+):
+    pass
+
+if (
+    first
+    and second
+):
+    pass
+
+for (
+    key,
+    value,
+) in (
+    items
+):
+    pass
+
+with (
+    open("a") as a,
+    open("b") as b,
+):
+    pass
+
+try:
+    pass
+except (
+    ValueError,
+    TypeError,
+) as error:
+    raise error
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @r#"
+        info[folding-range]: Folding Range
+         --> main.py:2:9
+          |
+        2 |   def foo(
+          |  _________^
+        3 | |     x: int,
+        4 | |     y: str,
+          | |____________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:5:11
+          |
+        5 |   ) -> None:
+          |  ___________^
+        6 | |     pass
+          | |________^
+          |
+
+        info[folding-range]: Folding Range
+          --> main.py:8:9
+           |
+         8 |   def foo(a = (
+           |  _________^
+         9 | |     10 + 10
+        10 | | )) -> (
+           | |_^
+           |
+
+        info[folding-range]: Folding Range
+         --> main.py:8:14
+          |
+        8 |   def foo(a = (
+          |  ______________^
+        9 | |     10 + 10
+          | |____________^
+          |
+
+        info[folding-range]: Folding Range
+          --> main.py:10:8
+           |
+        10 |   )) -> (
+           |  ________^
+        11 | |     int | None
+           | |_______________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:12:3
+           |
+        12 |   ):
+           |  ___^
+        13 | |     pass
+           | |________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:15:18
+           |
+        15 |   class Repository[
+           |  __________________^
+        16 | |     Model,
+        17 | |     Key,
+           | |_________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:18:3
+           |
+        18 |   ](
+           |  ___^
+        19 | |     Mapping[Key, Model],
+        20 | |     Protocol,
+           | |______________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:21:3
+           |
+        21 |   ):
+           |  ___^
+        22 | |     pass
+           | |________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:24:5
+           |
+        24 |   if (
+           |  _____^
+        25 | |     first
+        26 | |     and second
+           | |_______________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:27:3
+           |
+        27 |   ):
+           |  ___^
+        28 | |     pass
+           | |________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:30:6
+           |
+        30 |   for (
+           |  ______^
+        31 | |     key,
+        32 | |     value,
+           | |___________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:33:7
+           |
+        33 |   ) in (
+           |  _______^
+        34 | |     items
+           | |__________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:35:3
+           |
+        35 |   ):
+           |  ___^
+        36 | |     pass
+           | |________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:38:7
+           |
+        38 |   with (
+           |  _______^
+        39 | |     open("a") as a,
+        40 | |     open("b") as b,
+           | |____________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:41:3
+           |
+        41 |   ):
+           |  ___^
+        42 | |     pass
+           | |________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:44:5
+           |
+        44 |   try:
+           |  _____^
+        45 | |     pass
+           | |________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:46:9
+           |
+        46 |   except (
+           |  _________^
+        47 | |     ValueError,
+        48 | |     TypeError,
+           | |_______________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:49:12
+           |
+        49 |   ) as error:
+           |  ____________^
+        50 | |     raise error
+           | |_______________^
+           |
+        "#);
+    }
+
+    #[test]
+    fn test_folding_range_multiline_case_block_headers() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+match value:
+    case [
+        first,
+        second,
+    ]:
+        handle_sequence()
+    case {
+        "kind": kind,
+        "payload": payload,
+    }:
+        handle_mapping()
+    case """
+        alpha
+        beta
+    """:
+        handle_string()
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @r#"
+        info[folding-range]: Folding Range
+          --> main.py:2:13
+           |
+         2 |   match value:
+           |  _____________^
+         3 | |     case [
+         4 | |         first,
+         5 | |         second,
+         6 | |     ]:
+         7 | |         handle_sequence()
+         8 | |     case {
+         9 | |         "kind": kind,
+        10 | |         "payload": payload,
+        11 | |     }:
+        12 | |         handle_mapping()
+        13 | |     case """
+        14 | |         alpha
+        15 | |         beta
+        16 | |     """:
+        17 | |         handle_string()
+           | |_______________________^
+           |
+
+        info[folding-range]: Folding Range
+         --> main.py:3:11
+          |
+        3 |       case [
+          |  ___________^
+        4 | |         first,
+        5 | |         second,
+        6 | |     ]:
+          | |____^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:6:7
+          |
+        6 |       ]:
+          |  _______^
+        7 | |         handle_sequence()
+          | |_________________________^
+          |
+
+        info[folding-range]: Folding Range
+          --> main.py:8:11
+           |
+         8 |       case {
+           |  ___________^
+         9 | |         "kind": kind,
+        10 | |         "payload": payload,
+        11 | |     }:
+           | |____^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:11:7
+           |
+        11 |       }:
+           |  _______^
+        12 | |         handle_mapping()
+           | |________________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:16:9
+           |
+        16 |       """:
+           |  _________^
+        17 | |         handle_string()
+           | |_______________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:13:10
+           |
+        13 |       case """
+           |  __________^
+        14 | |         alpha
+        15 | |         beta
+        16 | |     """:
+           | |_______^
+           |
+        "#);
+    }
+
+    #[test]
     fn test_folding_range_collections() {
         let test = CursorTest::builder()
             .source(
