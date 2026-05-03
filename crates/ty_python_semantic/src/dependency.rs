@@ -8,7 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt;
 use ty_module_resolver::{
-    Module, ModuleName, ModuleNameResolutionError, SearchPath, resolve_module,
+    Module, ModuleName, ModuleNameResolutionError, SearchPath, file_to_module, resolve_module,
 };
 use ty_python_core::scope::{FileScopeId, NodeWithScopeRef};
 use ty_python_core::{SemanticIndex, semantic_index};
@@ -101,6 +101,24 @@ impl DependencyMetadata {
             Some(_) => ModuleOwnership::Ambiguous,
         }
     }
+
+    fn dependency_context_for_file(
+        &self,
+        db: &dyn Db,
+        file: File,
+        project: &DependencyProject,
+    ) -> DependencyContext {
+        let Some(module) = file_to_module(db, file) else {
+            return DependencyContext::NonPackage;
+        };
+
+        match self.ownership_for_module(module.name(db)) {
+            ModuleOwnership::Unique(owner) if owner == project.name() => DependencyContext::Package,
+            ModuleOwnership::Unique(_) | ModuleOwnership::Ambiguous | ModuleOwnership::Unknown => {
+                DependencyContext::NonPackage
+            }
+        }
+    }
 }
 
 /// A workspace member or project whose imports are checked against direct dependencies.
@@ -109,6 +127,7 @@ pub struct DependencyProject {
     name: DistributionName,
     path: SystemPathBuf,
     direct_dependencies: FxHashSet<DistributionName>,
+    dependency_group_dependencies: FxHashSet<DistributionName>,
 }
 
 impl DependencyProject {
@@ -117,13 +136,25 @@ impl DependencyProject {
         path: SystemPathBuf,
         direct_dependencies: impl IntoIterator<Item = impl Into<String>>,
     ) -> Self {
+        Self::new_with_dependency_groups(
+            name,
+            path,
+            direct_dependencies,
+            std::iter::empty::<String>(),
+        )
+    }
+
+    pub fn new_with_dependency_groups(
+        name: impl Into<String>,
+        path: SystemPathBuf,
+        direct_dependencies: impl IntoIterator<Item = impl Into<String>>,
+        dependency_group_dependencies: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
         Self {
             name: DistributionName::new(name),
             path,
-            direct_dependencies: direct_dependencies
-                .into_iter()
-                .map(DistributionName::new)
-                .collect(),
+            direct_dependencies: dependency_set(direct_dependencies),
+            dependency_group_dependencies: dependency_set(dependency_group_dependencies),
         }
     }
 
@@ -135,9 +166,33 @@ impl DependencyProject {
         &self.path
     }
 
-    fn declares_dependency(&self, dependency: &DistributionName) -> bool {
-        self.name == *dependency || self.direct_dependencies.contains(dependency)
+    pub fn direct_dependencies(&self) -> impl Iterator<Item = &DistributionName> {
+        self.direct_dependencies.iter()
     }
+
+    pub fn dependency_group_dependencies(&self) -> impl Iterator<Item = &DistributionName> {
+        self.dependency_group_dependencies.iter()
+    }
+
+    fn declares_dependency(
+        &self,
+        dependency: &DistributionName,
+        context: DependencyContext,
+    ) -> bool {
+        self.name == *dependency
+            || self.direct_dependencies.contains(dependency)
+            || (context == DependencyContext::NonPackage
+                && self.dependency_group_dependencies.contains(dependency))
+    }
+}
+
+fn dependency_set(
+    dependencies: impl IntoIterator<Item = impl Into<String>>,
+) -> FxHashSet<DistributionName> {
+    dependencies
+        .into_iter()
+        .map(DistributionName::new)
+        .collect()
 }
 
 /// A mapping from an importable module prefix to the distributions that provide it.
@@ -232,6 +287,12 @@ enum ModuleOwnership<'a> {
     Unknown,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DependencyContext {
+    Package,
+    NonPackage,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct ImportFact {
     range: TextRange,
@@ -316,6 +377,7 @@ pub(crate) fn check_dependency_lints(db: &dyn Db, file: File) -> TypeCheckDiagno
     let suppressions = suppressions(db, file);
     let index = semantic_index(db, file);
     let mut reported = FxHashSet::default();
+    let dependency_context = metadata.dependency_context_for_file(db, file, project);
 
     for fact in import_facts(db, file) {
         if fact.context == ImportContext::TypeChecking {
@@ -334,7 +396,7 @@ pub(crate) fn check_dependency_lints(db: &dyn Db, file: File) -> TypeCheckDiagno
             continue;
         };
 
-        if project.declares_dependency(owner) {
+        if project.declares_dependency(owner, dependency_context) {
             continue;
         }
 
@@ -636,6 +698,22 @@ mod tests {
         direct_dependencies: &[&str],
         module_owners: Vec<ModuleOwner>,
     ) -> anyhow::Result<(TestDb, File)> {
+        setup_db_with_file(
+            "/src/app.py",
+            source,
+            direct_dependencies,
+            std::iter::empty::<&str>(),
+            module_owners,
+        )
+    }
+
+    fn setup_db_with_file(
+        path: &str,
+        source: &str,
+        direct_dependencies: &[&str],
+        dependency_group_dependencies: impl IntoIterator<Item = impl Into<String>>,
+        module_owners: Vec<ModuleOwner>,
+    ) -> anyhow::Result<(TestDb, File)> {
         let mut db = TestDb::new();
 
         let src_root = SystemPathBuf::from("/src");
@@ -644,7 +722,7 @@ mod tests {
         db.memory_file_system().create_directory_all(&src_root)?;
         db.memory_file_system()
             .create_directory_all(&site_packages)?;
-        db.write_file("/src/app.py", source)?;
+        db.write_file(path, source)?;
 
         Program::from_settings(
             &db,
@@ -665,17 +743,18 @@ mod tests {
 
         db.set_analysis_settings(AnalysisSettings {
             dependency_metadata: Some(Arc::new(DependencyMetadata::new(
-                vec![DependencyProject::new(
+                vec![DependencyProject::new_with_dependency_groups(
                     "app",
                     src_root,
                     direct_dependencies.iter().copied(),
+                    dependency_group_dependencies,
                 )],
                 module_owners,
             ))),
             ..AnalysisSettings::default()
         });
 
-        let file = system_path_to_file(&db, "/src/app.py")?;
+        let file = system_path_to_file(&db, path)?;
         Ok((db, file))
     }
 
@@ -729,6 +808,56 @@ mod tests {
         let diagnostics = check_types(&db, file);
 
         assert_eq!(messages(&diagnostics), Vec::<&str>::new());
+
+        Ok(())
+    }
+
+    #[test]
+    fn dependency_group_dependency_is_allowed_for_non_package_file() -> anyhow::Result<()> {
+        let (mut db, file) = setup_db_with_file(
+            "/src/test_app.py",
+            "import inline_snapshot\n",
+            &[],
+            ["inline-snapshot"],
+            vec![ModuleOwner::new(
+                ModuleName::new_static("inline_snapshot").unwrap(),
+                ["inline-snapshot"],
+            )],
+        )?;
+        db.write_file("/site-packages/inline_snapshot/__init__.py", "")?;
+
+        let diagnostics = check_types(&db, file);
+
+        assert_eq!(messages(&diagnostics), Vec::<&str>::new());
+
+        Ok(())
+    }
+
+    #[test]
+    fn dependency_group_dependency_is_reported_for_package_file() -> anyhow::Result<()> {
+        let (mut db, file) = setup_db_with_file(
+            "/src/app/__init__.py",
+            "import inline_snapshot\n",
+            &[],
+            ["inline-snapshot"],
+            vec![
+                ModuleOwner::new(ModuleName::new_static("app").unwrap(), ["app"]),
+                ModuleOwner::new(
+                    ModuleName::new_static("inline_snapshot").unwrap(),
+                    ["inline-snapshot"],
+                ),
+            ],
+        )?;
+        db.write_file("/site-packages/inline_snapshot/__init__.py", "")?;
+
+        let diagnostics = check_types(&db, file);
+
+        assert_eq!(
+            messages(&diagnostics),
+            [
+                "Third-party import `inline_snapshot` is used but no direct dependency on `inline-snapshot` is declared"
+            ]
+        );
 
         Ok(())
     }

@@ -170,6 +170,7 @@ Settings: Settings {
             regex_set: RegexSet([]),
             globs: [],
         },
+        dependency_metadata: None,
     },
     overrides: [],
 }
