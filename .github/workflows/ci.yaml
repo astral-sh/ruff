@@ -76,6 +76,8 @@ jobs:
           if git diff --quiet "${MERGE_BASE}...HEAD" -- \
             ':Cargo.toml' \
             ':Cargo.lock' \
+            ':rust-toolchain.toml' \
+            ':cargo/config.toml' \
             ':crates/ruff_python_trivia/**' \
             ':crates/ruff_source_file/**' \
             ':crates/ruff_text_size/**' \
@@ -95,6 +97,8 @@ jobs:
         run: |
           if git diff --quiet "${MERGE_BASE}...HEAD" -- ':Cargo.toml' \
             ':Cargo.lock' \
+            ':rust-toolchain.toml' \
+            ':cargo/config.toml' \
             ':crates/**' \
             ':!crates/ty*/**' \
             ':!crates/ruff_python_formatter/**' \
@@ -117,6 +121,8 @@ jobs:
         run: |
           if git diff --quiet "${MERGE_BASE}...HEAD" -- ':Cargo.toml' \
             ':Cargo.lock' \
+            ':rust-toolchain.toml' \
+            ':cargo/config.toml' \
             ':crates/ruff_python_formatter/**' \
             ':crates/ruff_formatter/**' \
             ':crates/ruff_python_trivia/**' \
@@ -142,6 +148,8 @@ jobs:
         run: |
           if git diff --quiet "${MERGE_BASE}...HEAD" -- ':Cargo.toml' \
             ':Cargo.lock' \
+            ':rust-toolchain.toml' \
+            ':cargo/config.toml' \
             ':fuzz/fuzz_targets/**' \
             ':.github/workflows/ci.yaml' \
           ; then
@@ -200,6 +208,8 @@ jobs:
           if git diff --quiet "${MERGE_BASE}...HEAD" -- \
             ':Cargo.toml' \
             ':Cargo.lock' \
+            ':rust-toolchain.toml' \
+            ':cargo/config.toml' \
             ':crates/ty*/**' \
             ':crates/ruff_db/**' \
             ':crates/ruff_annotate_snippets/**' \
@@ -223,6 +233,8 @@ jobs:
           if git diff --quiet "${MERGE_BASE}...HEAD" -- \
             ':Cargo.toml' \
             ':Cargo.lock' \
+            ':rust-toolchain.toml' \
+            ':cargo/config.toml' \
             ':crates/ruff_benchmark/**' \
             ':.github/workflows/ci.yaml' \
           ; then
