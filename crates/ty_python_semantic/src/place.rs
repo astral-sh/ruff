@@ -18,7 +18,9 @@ use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
 use ty_python_core::place::{PlaceExprRef, ScopedPlaceId};
 use ty_python_core::predicate::{Predicate, ScopedPredicateId};
-use ty_python_core::reachability_constraints::ReachabilityConstraints;
+use ty_python_core::reachability_constraints::{
+    ReachabilityConstraints, ScopedReachabilityConstraintId,
+};
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
     BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
@@ -1259,12 +1261,22 @@ fn loop_header_reachability_impl<'db>(
 
     let mut deleted_reachability = Truthiness::AlwaysFalse;
     let mut reachable_bindings = FxIndexSet::default();
+    let live_bindings: Vec<_> = loop_header.bindings_for_place(place).collect();
+    let live_binding_count = live_bindings.len();
+    let use_exact_reachability = live_binding_count <= 16
+        && use_def.reachability_constraints().used_interiors().len() <= 256;
 
-    for live_binding in loop_header.bindings_for_place(place) {
+    for live_binding in live_bindings {
         let reachability = if is_cycle_initial {
             Truthiness::Ambiguous
-        } else {
+        } else if use_exact_reachability {
             evaluate_reachability(db, use_def, live_binding.reachability_constraint())
+        } else if live_binding.reachability_constraint()
+            == ScopedReachabilityConstraintId::ALWAYS_FALSE
+        {
+            Truthiness::AlwaysFalse
+        } else {
+            Truthiness::Ambiguous
         };
         // Skip unreachable bindings.
         if reachability.is_always_false() {
@@ -1374,7 +1386,6 @@ fn place_from_bindings_impl<'db>(
             reachability_constraints.evaluate(db, predicates, reachability_constraint)
         })
     };
-
     let mut first_definition = None;
     let mut only_loop_header_bindings = true;
 
