@@ -1250,8 +1250,8 @@ fn loop_header_reachability_impl<'db>(
     definition: Definition<'db>,
     is_cycle_initial: bool,
 ) -> LoopHeaderReachability<'db> {
-    const MAX_EXACT_LOOP_HEADER_REACHABILITY_BINDINGS: usize = 32;
-    const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 2048;
+    const MAX_EXACT_LOOP_HEADER_REACHABILITY_BINDINGS: usize = 128;
+    const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 2688;
 
     let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
         unreachable!("`loop_header_reachability` called with non-loop-header definition");
