@@ -4511,6 +4511,100 @@ fn validate_keyword_unpack_key_type<'db>(
     }
 }
 
+fn is_recursive_classinfo_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty {
+        Type::TypeAlias(alias) => is_recursive_classinfo_type(db, alias.value_type(db)),
+        Type::Union(union) => {
+            let mut has_type = false;
+            let mut has_union_type = false;
+            let mut has_recursive_tuple = false;
+
+            for element in union.elements(db) {
+                match element {
+                    Type::NominalInstance(instance)
+                        if instance.has_known_class(db, KnownClass::Type) =>
+                    {
+                        has_type = true;
+                    }
+                    Type::NominalInstance(instance)
+                        if instance.has_known_class(db, KnownClass::UnionType) =>
+                    {
+                        has_union_type = true;
+                    }
+                    Type::NominalInstance(instance)
+                        if instance.tuple_spec(db).is_some_and(|tuple| {
+                            tuple
+                                .variable_element()
+                                .is_some_and(|element| matches!(*element, Type::TypeAlias(_)))
+                        }) =>
+                    {
+                        has_recursive_tuple = true;
+                    }
+                    _ => return false,
+                }
+            }
+
+            has_type && has_union_type && has_recursive_tuple
+        }
+        _ => false,
+    }
+}
+
+fn known_classinfo_function<'db>(db: &'db dyn Db, callable_ty: Type<'db>) -> Option<KnownFunction> {
+    callable_ty
+        .as_function_literal()
+        .and_then(|function| function.known(db))
+        .filter(|function| {
+            matches!(
+                function,
+                KnownFunction::IsInstance | KnownFunction::IsSubclass
+            )
+        })
+}
+
+fn is_valid_runtime_classinfo_argument<'db>(
+    db: &'db dyn Db,
+    function: Option<KnownFunction>,
+    ty: Type<'db>,
+) -> bool {
+    if is_recursive_classinfo_type(db, ty) {
+        return true;
+    }
+
+    match ty {
+        Type::ClassLiteral(_) | Type::SubclassOf(_) => true,
+        Type::SpecialForm(special_form)
+            if special_form.is_valid_isinstance_target()
+                || (function == Some(KnownFunction::IsSubclass)
+                    && special_form == SpecialFormType::Any) =>
+        {
+            true
+        }
+        Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
+            instance.value_expression_types(db).is_ok_and(|elements| {
+                elements.into_iter().all(|element| {
+                    element.is_none(db)
+                        || is_valid_runtime_classinfo_argument(db, function, element)
+                })
+            })
+        }
+        Type::NominalInstance(instance) => instance.tuple_spec(db).is_some_and(|tuple| {
+            tuple
+                .iter_all_elements()
+                .all(|element| is_valid_runtime_classinfo_argument(db, function, element))
+        }),
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| is_valid_runtime_classinfo_argument(db, function, *element)),
+        Type::TypeAlias(_) => ty.visit_type_alias_value_or_assume_valid(db, |value_ty| {
+            is_valid_runtime_classinfo_argument(db, function, value_ty)
+        }),
+        Type::Dynamic(_) | Type::Divergent(_) | Type::Never => true,
+        _ => false,
+    }
+}
+
 impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     #[expect(clippy::too_many_arguments)]
     fn new(
@@ -4881,11 +4975,25 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // building them in an earlier separate step.
         //
         // TODO: handle starred annotations, e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...]]`
+        let assignability = argument_type.when_assignable_to(
+            self.db,
+            expected_ty,
+            constraints,
+            self.inferable_typevars,
+        );
+        let known_classinfo_function = known_classinfo_function(self.db, self.signature_type);
+        let invalid_classinfo_argument = known_classinfo_function.is_none()
+            && assignability.is_always_satisfied(self.db)
+            && is_recursive_classinfo_type(self.db, expected_ty)
+            && !is_valid_runtime_classinfo_argument(
+                self.db,
+                known_classinfo_function,
+                argument_type,
+            );
+
         if !self.constraint_set_errors[argument_index]
             && !parameter.has_starred_annotation()
-            && argument_type
-                .when_assignable_to(self.db, expected_ty, constraints, self.inferable_typevars)
-                .is_never_satisfied(self.db)
+            && (assignability.is_never_satisfied(self.db) || invalid_classinfo_argument)
         {
             let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
                 && !parameter.is_variadic();
@@ -6238,6 +6346,34 @@ fn invalid_dataclass_target<'db>(
 }
 
 impl<'db> BindingError<'db> {
+    fn is_valid_classinfo_with_special_form(
+        db: &'db dyn Db,
+        function: KnownFunction,
+        ty: Type<'db>,
+    ) -> Option<bool> {
+        match ty {
+            Type::ClassLiteral(_) => Some(false),
+            Type::SpecialForm(special_form)
+                if special_form.is_valid_isinstance_target()
+                    || (function == KnownFunction::IsSubclass
+                        && special_form == SpecialFormType::Any) =>
+            {
+                Some(true)
+            }
+            Type::KnownInstance(KnownInstanceType::UnionType(_)) => Some(false),
+            Type::NominalInstance(nominal) => {
+                let tuple = nominal.tuple_spec(db)?;
+                tuple
+                    .iter_all_elements()
+                    .try_fold(false, |contains, element| {
+                        Self::is_valid_classinfo_with_special_form(db, function, element)
+                            .map(|element_contains| contains || element_contains)
+                    })
+            }
+            _ => None,
+        }
+    }
+
     /// Returns `true` if this error indicates the overload didn't match the call arguments.
     ///
     /// Returns `false` for semantic errors where the overload matched the types but the
@@ -6300,15 +6436,19 @@ impl<'db> BindingError<'db> {
                 // error-prone, due to the fact that they are annotated with recursive type aliases.
                 if parameter.index == 1
                     && *argument_index == Some(1)
+                    && let Some(function) = callable_ty
+                        .as_function_literal()
+                        .and_then(|function| function.known(context.db()))
                     && matches!(
-                        callable_ty
-                            .as_function_literal()
-                            .and_then(|function| function.known(context.db())),
-                        Some(KnownFunction::IsInstance | KnownFunction::IsSubclass)
+                        function,
+                        KnownFunction::IsInstance | KnownFunction::IsSubclass
                     )
-                    && provided_ty
-                        .as_special_form()
-                        .is_some_and(SpecialFormType::is_valid_isinstance_target)
+                    && Self::is_valid_classinfo_with_special_form(
+                        context.db(),
+                        function,
+                        *provided_ty,
+                    )
+                    .is_some_and(|contains_special_form| contains_special_form)
                 {
                     return;
                 }

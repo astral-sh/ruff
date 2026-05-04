@@ -1378,13 +1378,6 @@ impl<'db> Type<'db> {
         any_over_type(db, self, false, |ty| ty.is_dynamic())
     }
 
-    pub(crate) const fn as_special_form(self) -> Option<SpecialFormType> {
-        match self {
-            Type::SpecialForm(special_form) => Some(special_form),
-            _ => None,
-        }
-    }
-
     pub const fn as_property_instance(self) -> Option<PropertyInstanceType<'db>> {
         match self {
             Type::PropertyInstance(property) => Some(property),
@@ -1421,6 +1414,10 @@ impl<'db> Type<'db> {
     ///
     /// The caller owns the fallback result because different operations need different conservative
     /// answers when a recursive alias points back to itself.
+    ///
+    /// ```python
+    /// type RecursiveList = list[RecursiveList]
+    /// ```
     pub(crate) fn visit_type_alias_value<R>(
         self,
         db: &'db dyn Db,
@@ -1438,6 +1435,10 @@ impl<'db> Type<'db> {
     ///
     /// This variant returns `R::default()` when a recursive alias points back to itself. Use this
     /// for predicate and extraction operations where "not available" is the conservative answer.
+    ///
+    /// ```python
+    /// type RecursiveList = list[RecursiveList]
+    /// ```
     pub(crate) fn visit_type_alias_value_or_default<R: Default>(
         self,
         db: &'db dyn Db,
@@ -1451,6 +1452,10 @@ impl<'db> Type<'db> {
     /// This variant returns `true` when a recursive alias points back to itself. Use this for
     /// validation operations where emitting an error from an unexpanded recursive component would
     /// be less accurate than accepting the operation.
+    ///
+    /// ```python
+    /// type RecursiveList = list[RecursiveList]
+    /// ```
     pub(crate) fn visit_type_alias_value_or_assume_valid(
         self,
         db: &'db dyn Db,
@@ -1473,6 +1478,10 @@ impl<'db> Type<'db> {
     ///
     /// Unlike [`Type::as_union_like`], this keeps active type-alias recursion state alive while
     /// visiting the elements. Use this for recursive walks over alias-backed unions.
+    ///
+    /// ```python
+    /// type Json = None | bool | int | str | list[Json] | dict[str, Json]
+    /// ```
     pub(crate) fn visit_union_like_elements(
         self,
         db: &'db dyn Db,
@@ -3795,6 +3804,18 @@ impl<'db> Type<'db> {
     /// In the second case, the return type of `len()` in `typeshed` (`int`)
     /// is used as a fallback.
     fn len(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        /// Extracts a non-negative integer literal from a type returned by `__len__`.
+        ///
+        /// This also looks through alias-backed return types, such as:
+        ///
+        /// ```python
+        /// from typing import Literal
+        ///
+        /// type Length = Literal[3]
+        ///
+        /// class Sized:
+        ///     def __len__(self) -> Length: ...
+        /// ```
         fn non_negative_int_literal_impl<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
             match ty {
                 // TODO: Emit diagnostic for non-integers and negative integers
@@ -4349,6 +4370,12 @@ impl<'db> Type<'db> {
     }
 
     /// Returns dynamic call bindings used as the conservative fallback for recursive callability.
+    ///
+    /// ```python
+    /// from collections.abc import Callable
+    ///
+    /// type RecursiveCallable = Callable[[RecursiveCallable], int]
+    /// ```
     fn unknown_bindings() -> Bindings<'db> {
         let unknown = Type::unknown();
         Binding::single(unknown, Signature::dynamic(unknown)).into()

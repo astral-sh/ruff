@@ -186,7 +186,7 @@ class G:
     def __call__(self, key: int) -> "RecursiveGetItem":
         return self
 
-type RecursiveGetItem = G | RecursiveGetItem
+type RecursiveGetItem = G | RecursiveGetItem  # error: [cyclic-type-alias-definition]
 
 class C:
     __getitem__: RecursiveGetItem = G()

@@ -402,8 +402,9 @@ def g(x: RecursiveList):
 ### Invalid self-referential
 
 ```py
-# TODO emit a diagnostic on these two lines
+# error: [cyclic-type-alias-definition] "Cyclic definition of `IntOr`"
 type IntOr = int | IntOr
+# error: [cyclic-type-alias-definition] "Cyclic definition of `OrInt`"
 type OrInt = OrInt | int
 
 def f(x: IntOr, y: OrInt):
@@ -447,8 +448,9 @@ type I[T] = H[T]
 # It's not possible to create an element of this type, but it's not an error for now
 type DirectRecursiveList[T] = list[DirectRecursiveList[T]]
 
-# TODO: this should probably be a cyclic-type-alias-definition error
+# error: [cyclic-type-alias-definition] "Cyclic definition of `Foo`"
 type Foo[T] = list[T] | Bar[T]
+# error: [cyclic-type-alias-definition] "Cyclic definition of `Bar`"
 type Bar[T] = int | Foo[T]
 
 def _(x: Bar[int]):
@@ -463,7 +465,7 @@ from ty_extensions import Intersection, Not, all_members, has_member
 
 class RecursiveItem: ...
 
-type RecursiveUnion = RecursiveItem | RecursiveUnion
+type RecursiveUnion = RecursiveItem | RecursiveUnion  # error: [cyclic-type-alias-definition]
 
 def subscript_recursive_alias(x: RecursiveUnion):
     # error: [not-subscriptable] "Cannot subscript object of type `RecursiveItem` with no `__getitem__` method"
@@ -473,7 +475,7 @@ class RecursiveIterableItem:
     def __iter__(self) -> Iterator["RecursiveIterable"]:
         return iter([self])
 
-type RecursiveIterable = RecursiveIterableItem | RecursiveIterable
+type RecursiveIterable = RecursiveIterableItem | RecursiveIterable  # error: [cyclic-type-alias-definition]
 
 def iterate_recursive_alias(x: RecursiveIterable):
     for y in x:
@@ -488,7 +490,7 @@ class RecursiveCallable:
     def __call__(self) -> "DunderRecursive":
         return self
 
-type DunderRecursive = RecursiveCallable | DunderRecursive
+type DunderRecursive = RecursiveCallable | DunderRecursive  # error: [cyclic-type-alias-definition]
 
 class HasRecursiveLen:
     __len__: DunderRecursive = RecursiveCallable()
@@ -500,7 +502,7 @@ def len_recursive_alias(x: HasRecursiveLen):
 class RecursiveMembers:
     attr: int
 
-type RecursiveMembersAlias = RecursiveMembers | RecursiveMembersAlias
+type RecursiveMembersAlias = RecursiveMembers | RecursiveMembersAlias  # error: [cyclic-type-alias-definition]
 
 def list_recursive_alias_members(x: RecursiveMembersAlias):
     all_members(x)
@@ -509,7 +511,7 @@ def list_recursive_alias_members(x: RecursiveMembersAlias):
 class RecursiveAttribute:
     attr: int
 
-type RecursiveAttributeAlias = RecursiveAttribute | RecursiveAttributeAlias
+type RecursiveAttributeAlias = RecursiveAttribute | RecursiveAttributeAlias  # error: [cyclic-type-alias-definition]
 
 def assign_recursive_alias_attribute(x: RecursiveAttributeAlias):
     x.attr = 1
@@ -519,6 +521,7 @@ def delete_recursive_alias_attribute(x: RecursiveAttributeAlias):
 
 class RecursiveMissingAttribute: ...
 
+# error: [cyclic-type-alias-definition]
 type RecursiveMissingAttributeAlias = RecursiveMissingAttribute | RecursiveMissingAttributeAlias
 
 def load_missing_recursive_alias_attribute(x: RecursiveMissingAttributeAlias):
@@ -529,7 +532,7 @@ def delete_missing_recursive_alias_attribute(x: RecursiveMissingAttributeAlias):
     # error: [unresolved-attribute] "Attribute `missing` is not defined on `RecursiveMissingAttribute` in union `RecursiveMissingAttributeAlias`"
     del x.missing
 
-type RecursiveIntAttributeAlias = int | RecursiveIntAttributeAlias
+type RecursiveIntAttributeAlias = int | RecursiveIntAttributeAlias  # error: [cyclic-type-alias-definition]
 
 def load_missing_recursive_int_alias_attribute(x: RecursiveIntAttributeAlias):
     # error: [unresolved-attribute] "Attribute `missing` is not defined on `int` in union `RecursiveIntAttributeAlias`"
@@ -539,7 +542,7 @@ class RecursiveKwargs(TypedDict):
     kind: Literal["a"]
     a: int
 
-type RecursiveKwargsAlias = RecursiveKwargs | RecursiveKwargsAlias
+type RecursiveKwargsAlias = RecursiveKwargs | RecursiveKwargsAlias  # error: [cyclic-type-alias-definition]
 
 def call_with_recursive_kwargs_alias(x: RecursiveKwargsAlias):
     def g(a: int): ...
@@ -550,7 +553,7 @@ def narrow_recursive_typed_dict_alias(x: RecursiveKwargsAlias):
     if x["kind"] == "a":
         reveal_type(x)  # revealed: RecursiveKwargs
 
-type RecursiveDecoratorReturn = Callable[[int], int] | RecursiveDecoratorReturn
+type RecursiveDecoratorReturn = Callable[[int], int] | RecursiveDecoratorReturn  # error: [cyclic-type-alias-definition]
 
 def recursive_decorator_return(fn: Callable[[int], int]) -> RecursiveDecoratorReturn: ...
 @recursive_decorator_return
@@ -639,7 +642,7 @@ class BaseWithMethod:
 
 class RecursiveSuperOwner(BaseWithMethod): ...
 
-type RecursiveSuperOwnerAlias = RecursiveSuperOwner | RecursiveSuperOwnerAlias
+type RecursiveSuperOwnerAlias = RecursiveSuperOwner | RecursiveSuperOwnerAlias  # error: [cyclic-type-alias-definition]
 
 def recursive_super_owner(x: RecursiveSuperOwnerAlias):
     super(RecursiveSuperOwner, x).method()
@@ -668,7 +671,7 @@ def expand_recursive_variadic_tuple_argument(x: RecursiveTuple):
     # error: [invalid-argument-type] "Argument to function `overloaded_recursive_tuple_variadic` is incorrect: Expected `int`, found `RecursiveTuple`"
     reveal_type(overloaded_recursive_tuple_variadic(*x))  # revealed: Unknown
 
-type RecursiveClassInfo = type[int] | RecursiveClassInfo
+type RecursiveClassInfo = type[int] | RecursiveClassInfo  # error: [cyclic-type-alias-definition]
 
 def narrow_recursive_classinfo(x: object, y: RecursiveClassInfo):
     if isinstance(x, y):
@@ -764,6 +767,11 @@ static_assert(is_subtype_of(Top[JsonDict], Top[JsonDict]))
 static_assert(is_subtype_of(Top[JsonDict], Bottom[JsonDict]))
 static_assert(is_subtype_of(Bottom[JsonDict], Bottom[JsonDict]))
 static_assert(is_subtype_of(Bottom[JsonDict], Top[JsonDict]))
+
+type MutuallySpecializingA[T] = list[MutuallySpecializingB[list[T]]]
+type MutuallySpecializingB[T] = tuple[MutuallySpecializingA[T]]
+
+static_assert(is_subtype_of(Bottom[MutuallySpecializingA[int]], Top[MutuallySpecializingA[int]]))
 ```
 
 ### Equivalence of top materializations of mutually recursive invariant aliases
@@ -948,7 +956,7 @@ x: Literal[RecursiveLiteralSpecialization[int]]
 ```py
 from typing import reveal_type
 
-type A = int | A
+type A = int | A  # error: [cyclic-type-alias-definition]
 
 def foo(x: A):
     reveal_type(x + 1)  # revealed: int

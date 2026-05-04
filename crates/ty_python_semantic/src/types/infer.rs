@@ -1300,6 +1300,9 @@ bitflags::bitflags! {
         /// Whether we're in a context where `Unpack` can be legal.
         const IN_VALID_UNPACK_CONTEXT = 1 << 10;
 
+        /// Whether the visitor is currently visiting an assignment-based type alias value.
+        const IN_LEGACY_TYPE_ALIAS_VALUE = 1 << 11;
+
         /// Whether the visitor is currently visiting a type expression.
         const IN_TYPE_EXPRESSION = 1 << 12;
 

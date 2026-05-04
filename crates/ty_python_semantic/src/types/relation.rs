@@ -1,3 +1,5 @@
+use std::cell::{Cell, RefCell};
+
 use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
@@ -14,6 +16,8 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
+use crate::types::type_alias::TypeAliasType;
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -23,8 +27,9 @@ use crate::types::{
 use crate::{
     Db,
     types::{
-        ErrorContext, ErrorContextTree, Type, constraints::ConstraintSet,
-        generics::InferableTypeVars,
+        ErrorContext, ErrorContextTree, Type,
+        constraints::ConstraintSet,
+        generics::{InferableTypeVars, Specialization},
     },
 };
 
@@ -207,6 +212,92 @@ pub(crate) enum TypeRelation {
     /// relationships with a typevar. This will eventually replace `Assignability`, but allows us
     /// to start using the new relation in a controlled manner in some places.
     ConstraintSetAssignability,
+}
+
+struct SpecializingAliasCycleVisitor<'db> {
+    current_definition: Definition<'db>,
+    identity_specialization: Specialization<'db>,
+    active_specializations: RefCell<Vec<Specialization<'db>>>,
+    found: Cell<bool>,
+    recursion_guard: TypeCollector<'db>,
+    seen_aliases: RefCell<FxHashSet<Definition<'db>>>,
+}
+
+impl<'db> SpecializingAliasCycleVisitor<'db> {
+    fn visit_type_alias(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+        let definition = alias.definition(db);
+
+        if definition == self.current_definition {
+            if let Some(specialization) = alias.specialization(db) {
+                let normalized_specialization =
+                    self.active_specializations.borrow().iter().rev().fold(
+                        specialization,
+                        |specialization, active_specialization| {
+                            specialization.apply_specialization(db, *active_specialization)
+                        },
+                    );
+
+                if normalized_specialization != self.identity_specialization {
+                    self.found.set(true);
+                }
+            }
+            return;
+        }
+
+        if !self.seen_aliases.borrow_mut().insert(definition) {
+            return;
+        }
+
+        let specialization_count = self.active_specializations.borrow().len();
+        if let Some(specialization) = alias.specialization(db) {
+            self.active_specializations
+                .borrow_mut()
+                .push(specialization);
+        }
+
+        self.visit_type(db, alias.raw_value_type(db));
+
+        self.active_specializations
+            .borrow_mut()
+            .truncate(specialization_count);
+        self.seen_aliases.borrow_mut().remove(&definition);
+    }
+}
+
+impl<'db> TypeVisitor<'db> for SpecializingAliasCycleVisitor<'db> {
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        if self.found.get() {
+            return;
+        }
+
+        if let Type::TypeAlias(alias) = ty {
+            self.visit_type_alias(db, alias);
+            return;
+        }
+
+        walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+    }
+}
+
+fn has_specializing_alias_cycle<'db>(db: &'db dyn Db, alias: TypeAliasType<'db>) -> bool {
+    let Some(generic_context) = alias.generic_context(db) else {
+        return false;
+    };
+
+    let visitor = SpecializingAliasCycleVisitor {
+        current_definition: alias.definition(db),
+        identity_specialization: generic_context.identity_specialization(db),
+        active_specializations: RefCell::default(),
+        found: Cell::new(false),
+        recursion_guard: TypeCollector::default(),
+        seen_aliases: RefCell::default(),
+    };
+    visitor.visit_type(db, alias.raw_value_type(db));
+    visitor.found.get()
 }
 
 impl TypeRelation {
@@ -672,6 +763,14 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
     }
 }
 
+/// A fully specified invariant relation check used as an active-recursion key.
+///
+/// Materializing both sides of an invariant container can re-enter the same relation through a
+/// recursive alias:
+///
+/// ```python
+/// type RecursiveList = list[RecursiveList]
+/// ```
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub(super) struct InvariantRelationGoal<'db> {
     source_type: Type<'db>,
@@ -682,6 +781,14 @@ pub(super) struct InvariantRelationGoal<'db> {
 }
 
 impl<'db> InvariantRelationGoal<'db> {
+    /// Creates an active-recursion key for one invariant source/target relation.
+    ///
+    /// The materialization kinds are part of the key because the same type pair can be checked in
+    /// distinct top and bottom positions for recursive aliases such as:
+    ///
+    /// ```python
+    /// type RecursiveList = list[RecursiveList]
+    /// ```
     pub(super) const fn new(
         source_type: Type<'db>,
         source_materialization: MaterializationKind,
@@ -1033,6 +1140,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
             }
 
+            (Type::TypeAlias(source_alias), _)
+                if has_specializing_alias_cycle(db, source_alias) =>
+            {
+                source.visit_type_alias_value(
+                    db,
+                    || self.always(),
+                    |source_alias_ty| {
+                        self.with_recursion_guard(source, target, || {
+                            self.check_type_pair(db, source_alias_ty, target)
+                        })
+                    },
+                )
+            }
+
             (Type::TypeAlias(source_alias), _) => self.with_recursion_guard(source, target, || {
                 self.alias_relation_visitor.visit(
                     &AliasRelationGoal::Source {
@@ -1044,6 +1165,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     || self.check_type_pair(db, source_alias.value_type(db), target),
                 )
             }),
+
+            (_, Type::TypeAlias(target_alias))
+                if has_specializing_alias_cycle(db, target_alias) =>
+            {
+                target.visit_type_alias_value(
+                    db,
+                    || self.always(),
+                    |target_alias_ty| {
+                        self.with_recursion_guard(source, target, || {
+                            self.check_type_pair(db, source, target_alias_ty)
+                        })
+                    },
+                )
+            }
 
             (_, Type::TypeAlias(target_alias)) => self.with_recursion_guard(source, target, || {
                 self.alias_relation_visitor.visit(

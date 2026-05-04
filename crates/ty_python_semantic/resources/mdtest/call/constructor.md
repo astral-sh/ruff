@@ -301,7 +301,7 @@ python-version = "3.12"
 ```py
 from __future__ import annotations
 
-type RecursiveNewReturn = RecursiveNew | RecursiveNewReturn
+type RecursiveNewReturn = RecursiveNew | RecursiveNewReturn  # error: [cyclic-type-alias-definition]
 
 class RecursiveNew:
     def __new__(cls, value: int) -> RecursiveNewReturn:
@@ -323,7 +323,7 @@ python-version = "3.12"
 ```py
 from __future__ import annotations
 
-type RecursiveMetaCallReturn = RecursiveMetaCall | RecursiveMetaCallReturn
+type RecursiveMetaCallReturn = RecursiveMetaCall | RecursiveMetaCallReturn  # error: [cyclic-type-alias-definition]
 
 class RecursiveMeta(type):
     def __call__(cls, value: int) -> RecursiveMetaCallReturn:

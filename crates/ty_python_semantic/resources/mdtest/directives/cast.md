@@ -81,7 +81,8 @@ def f(x: Any, y: Unknown, z: Any | str | int):
     e = cast(str | int | Any, z)  # error: [redundant-cast]
 ```
 
-Recursive aliases that fall back to `Divergent` should not trigger `redundant-cast`.
+Recursive aliases preserve their self-references when possible, so equivalent casts are still
+redundant.
 
 ```toml
 [environment]
@@ -94,7 +95,16 @@ from typing import cast
 RecursiveAlias = list["RecursiveAlias | None"]
 
 def f(x: RecursiveAlias):
-    cast(RecursiveAlias, x)
+    cast(RecursiveAlias, x)  # error: [redundant-cast]
+```
+
+Stringified type expressions in non-alias assignments should not preserve self-references as
+recursive aliases.
+
+```py
+from typing import cast
+
+x = cast("str | x", "")  # error: [invalid-type-form]
 ```
 
 ## Diagnostic snapshots

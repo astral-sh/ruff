@@ -20,7 +20,9 @@ use crate::types::relation::{
 };
 use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
-use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
+use crate::types::type_alias::{
+    walk_legacy_type_alias, walk_manual_pep_695_type_alias, walk_pep_695_type_alias,
+};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
 };
@@ -737,6 +739,9 @@ impl<'db> GenericContext<'db> {
                     }
                     TypeAliasType::ManualPEP695(type_alias) => {
                         walk_manual_pep_695_type_alias(db, type_alias, self);
+                    }
+                    TypeAliasType::Legacy(type_alias) => {
+                        walk_legacy_type_alias(db, type_alias, self);
                     }
                 }
             }

@@ -311,22 +311,22 @@ from types import UnionType
 RecursiveTuple: TypeAlias = tuple["int | RecursiveTuple", str]
 
 def _(rec: RecursiveTuple):
-    # TODO should be `tuple[int | RecursiveTuple, str]`
-    reveal_type(rec)  # revealed: tuple[Divergent, str]
+    reveal_type(rec)  # revealed: tuple[int | RecursiveTuple, str]
 
 RecursiveHomogeneousTuple: TypeAlias = tuple["int | RecursiveHomogeneousTuple", ...]
 
 def _(rec: RecursiveHomogeneousTuple):
-    # TODO should be `tuple[int | RecursiveHomogeneousTuple, ...]`
-    reveal_type(rec)  # revealed: tuple[Divergent, ...]
+    reveal_type(rec)  # revealed: tuple[int | RecursiveHomogeneousTuple, ...]
 
 ClassInfo: TypeAlias = type | UnionType | tuple["ClassInfo", ...]
-reveal_type(ClassInfo)  # revealed: <types.UnionType special-form 'type | UnionType | tuple[Divergent, ...]'>
+reveal_type(ClassInfo)  # revealed: <types.UnionType special-form 'type | UnionType | tuple[ClassInfo, ...]'>
 
 def my_isinstance(obj: object, classinfo: ClassInfo) -> bool:
-    # TODO should be `type | UnionType | tuple[ClassInfo, ...]`
-    reveal_type(classinfo)  # revealed: type | UnionType | tuple[Divergent, ...]
+    reveal_type(classinfo)  # revealed: type | UnionType | tuple[ClassInfo, ...]
     return isinstance(obj, classinfo)
+
+Itself: TypeAlias = "Itself"  # error: [cyclic-type-alias-definition]
+RedundantUnion: TypeAlias = "int | RedundantUnion"  # error: [cyclic-type-alias-definition]
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -343,7 +343,7 @@ my_isinstance(1, (int, (str, float)))
 my_isinstance(1, (int, (str | float)))
 # error: [invalid-argument-type]
 my_isinstance(1, 1)
-# TODO should be an invalid-argument-type error
+# error: [invalid-argument-type]
 my_isinstance(1, (int, (str, 1)))
 ```
 
@@ -392,6 +392,7 @@ deferred in a stub file, allowing for forward references:
 from typing import TypeAlias
 
 MyAlias: TypeAlias = A | B
+Recursive: TypeAlias = list[Recursive]
 
 class A: ...
 class B: ...
@@ -406,6 +407,9 @@ def f(x: stub.MyAlias): ...
 
 f(stub.A())
 f(stub.B())
+
+def g(x: stub.Recursive):
+    reveal_type(x)  # revealed: list[Recursive]
 
 class Unrelated: ...
 

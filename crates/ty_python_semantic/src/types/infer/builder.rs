@@ -71,7 +71,9 @@ use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
     FunctionDecorators, FunctionType, KnownFunction, report_revealed_type,
 };
-use crate::types::generics::{InferableTypeVars, SpecializationBuilder, bind_typevar};
+use crate::types::generics::{
+    InferableTypeVars, Specialization, SpecializationBuilder, bind_typevar,
+};
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::builder::typed_dict::TypedDictConstructorForm;
@@ -87,7 +89,9 @@ use crate::types::special_form::TypeQualifier;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
-use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
+use crate::types::type_alias::{
+    LegacyTypeAliasType, ManualPEP695TypeAliasType, PEP695TypeAliasType,
+};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
 use crate::types::{
     CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType, DynamicType,
@@ -96,8 +100,8 @@ use crate::types::{
     ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
     SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
     TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType, UnionAccumulator,
-    UnionBuilder, UnionType, binding_type, infer_complete_scope_types, infer_scope_types,
-    todo_type,
+    UnionBuilder, UnionType, any_over_type, binding_type, infer_complete_scope_types,
+    infer_scope_types, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -1443,35 +1447,184 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             previous_check_unbound_typevars,
         );
 
-        // A type alias where a value type points to itself, i.e. the expanded type is `Divergent` is meaningless
-        // (but a type alias that expands to something like `list[Divergent]` may be a valid recursive type alias)
-        // and would lead to infinite recursion. Therefore, such type aliases should not be exposed.
+        // A type alias where a value type points to itself without passing through a productive
+        // type constructor is meaningless and would lead to infinite recursion. Therefore, such
+        // type aliases should not be exposed.
         // ```python
         // type Itself = Itself  # error: "Cyclic definition of `Itself`"
         // type A = B  # error: "Cyclic definition of `A`"
         // type B = A  # error: "Cyclic definition of `B`"
         // type G[T] = G[T]  # error: "Cyclic definition of `G`"
+        // type IntOr = int | IntOr  # error: "Cyclic definition of `IntOr`"
         // type RecursiveList[T] = list[T | RecursiveList[T]]  # OK
         // type RecursiveList2[T] = list[RecursiveList2[T]]  # It's not possible to create an element of this, but it's not an error for now
-        // type IntOr = int | IntOr  # It's redundant, but OK for now
-        // type IntOrStr = int | StrOrInt  # It's redundant, but OK
-        // type StrOrInt = str | IntOrStr  # It's redundant, but OK
         // ```
-        let expanded = value_ty.expand_eagerly(self.db());
+        let definition = self.index.expect_single_definition(type_alias);
+        let Some(expanded) =
+            self.cyclic_type_alias_expansion(value_ty, definition, &type_alias.value)
+        else {
+            return;
+        };
+
+        if let Some(alias_name) = type_alias.name.as_name_expr() {
+            self.report_cyclic_type_alias_definition(type_alias, &alias_name.id);
+        }
+
+        // Replace pure alias cycles with `Divergent`. For cycles that were erased by union
+        // expansion, keep the simplified type to preserve downstream analysis.
         if expanded.is_divergent() {
-            if let Some(builder) = self
-                .context
-                .report_lint(&CYCLIC_TYPE_ALIAS_DEFINITION, type_alias)
-            {
-                builder.into_diagnostic(format_args!(
-                    "Cyclic definition of `{}`",
-                    &type_alias.name.as_name_expr().unwrap().id,
-                ));
-            }
-            // Replace with `Divergent`.
             self.expressions
                 .insert(type_alias.value.as_ref().into(), expanded);
         }
+    }
+
+    /// Returns the eagerly expanded value when a type alias has a cyclic definition.
+    ///
+    /// Pure alias cycles are reported and replaced with `Divergent`, while productive recursive
+    /// aliases are allowed to keep their alias identity:
+    ///
+    /// ```python
+    /// type A = B
+    /// type B = A
+    /// type RecursiveList = list[RecursiveList]
+    /// ```
+    fn cyclic_type_alias_expansion(
+        &self,
+        value_ty: Type<'db>,
+        definition: Definition<'db>,
+        value: &ast::Expr,
+    ) -> Option<Type<'db>> {
+        let expanded = value_ty.expand_eagerly(self.db());
+        let has_unproductive_cycle = !self.has_parse_error(value)
+            && self.has_unproductive_type_alias_cycle(value_ty, definition);
+
+        (expanded.is_divergent() || has_unproductive_cycle).then_some(expanded)
+    }
+
+    /// Emits the `cyclic-type-alias-definition` diagnostic for a single alias target.
+    ///
+    /// ```python
+    /// type A = A
+    /// ```
+    fn report_cyclic_type_alias_definition(&self, target: impl Ranged, alias_name: &str) {
+        if let Some(builder) = self
+            .context
+            .report_lint(&CYCLIC_TYPE_ALIAS_DEFINITION, target)
+        {
+            builder.into_diagnostic(format_args!("Cyclic definition of `{alias_name}`"));
+        }
+    }
+
+    /// Returns `true` if a type contains an unproductive reference back to the current alias.
+    ///
+    /// This detects alias-only cycles that can be hidden inside unions after eager expansion:
+    ///
+    /// ```python
+    /// type IntOr = int | IntOr
+    /// ```
+    fn has_unproductive_type_alias_cycle(
+        &self,
+        ty: Type<'db>,
+        current_definition: Definition<'db>,
+    ) -> bool {
+        self.has_unproductive_type_alias_cycle_impl(
+            ty,
+            current_definition,
+            &mut FxHashSet::default(),
+            &mut Vec::new(),
+        )
+    }
+
+    fn is_unproductive_self_alias_reference(
+        &self,
+        alias: TypeAliasType<'db>,
+        active_specializations: &[Specialization<'db>],
+    ) -> bool {
+        let Some(generic_context) = alias.generic_context(self.db()) else {
+            return true;
+        };
+
+        let Some(specialization) = alias.specialization(self.db()) else {
+            return true;
+        };
+
+        let normalized_specialization = active_specializations.iter().rev().fold(
+            specialization,
+            |specialization, active_specialization| {
+                specialization.apply_specialization(self.db(), *active_specialization)
+            },
+        );
+
+        normalized_specialization == generic_context.identity_specialization(self.db())
+    }
+
+    /// Recursively searches a type for an unproductive reference to `current_definition`.
+    ///
+    /// `seen_aliases` prevents mutually recursive aliases from causing this structural walk to
+    /// loop while checking definitions such as:
+    ///
+    /// ```python
+    /// type A = B
+    /// type B = A
+    /// ```
+    fn has_unproductive_type_alias_cycle_impl(
+        &self,
+        ty: Type<'db>,
+        current_definition: Definition<'db>,
+        seen_aliases: &mut FxHashSet<Definition<'db>>,
+        active_specializations: &mut Vec<Specialization<'db>>,
+    ) -> bool {
+        match ty {
+            Type::Union(union) => union.elements(self.db()).iter().any(|element| {
+                self.has_unproductive_type_alias_cycle_impl(
+                    *element,
+                    current_definition,
+                    seen_aliases,
+                    active_specializations,
+                )
+            }),
+            Type::TypeAlias(alias) => {
+                let definition = alias.definition(self.db());
+                if definition == current_definition {
+                    return self
+                        .is_unproductive_self_alias_reference(alias, active_specializations);
+                }
+                if !seen_aliases.insert(definition) {
+                    return false;
+                }
+
+                let specialization_count = active_specializations.len();
+                if let Some(specialization) = alias.specialization(self.db()) {
+                    active_specializations.push(specialization);
+                }
+
+                let has_cycle = self.has_unproductive_type_alias_cycle_impl(
+                    alias.raw_value_type(self.db()),
+                    current_definition,
+                    seen_aliases,
+                    active_specializations,
+                );
+                active_specializations.truncate(specialization_count);
+                seen_aliases.remove(&definition);
+                has_cycle
+            }
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if `expression` contains a parse error.
+    ///
+    /// This suppresses secondary cyclic-alias diagnostics when the parser has already reported an
+    /// incomplete value, for example:
+    ///
+    /// ```python
+    /// type Bad = list[
+    /// ```
+    fn has_parse_error(&self, expression: &ast::Expr) -> bool {
+        self.module()
+            .errors()
+            .iter()
+            .any(|error| expression.range().contains_range(error.range()))
     }
 
     /// If the current scope is a method inside an enclosing class,
@@ -3368,6 +3521,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // order to bind `T` to `OptionalList`.
                 let previous_typevar_binding_context =
                     self.typevar_binding_context.replace(definition);
+                let previous_in_legacy_type_alias_value = self.context.inference_flags.replace(
+                    InferenceFlags::IN_LEGACY_TYPE_ALIAS_VALUE,
+                    Self::is_legacy_type_alias_value_candidate(value),
+                );
 
                 let value_ty = if let Some(standalone_expression) = self.index.try_expression(value)
                 {
@@ -3448,6 +3605,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.infer_expression(value, tcx)
                 };
 
+                self.context.inference_flags.set(
+                    InferenceFlags::IN_LEGACY_TYPE_ALIAS_VALUE,
+                    previous_in_legacy_type_alias_value,
+                );
                 self.typevar_binding_context = previous_typevar_binding_context;
 
                 // `TYPE_CHECKING` is a special variable that should only be assigned `False`
@@ -4208,12 +4369,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // the definition of `OptionalList` as the binding context while inferring the
             // RHS (`list[T] | None`), in order to bind `T` to `OptionalList`.
             let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
+            let previous_in_legacy_type_alias_value = self.context.inference_flags.replace(
+                InferenceFlags::IN_LEGACY_TYPE_ALIAS_VALUE,
+                is_pep_613_type_alias,
+            );
 
             let inferred_ty = self.infer_maybe_standalone_expression(
                 value,
                 TypeContext::new(Some(declared.inner_type())),
             );
 
+            self.context.inference_flags.set(
+                InferenceFlags::IN_LEGACY_TYPE_ALIAS_VALUE,
+                previous_in_legacy_type_alias_value,
+            );
             self.typevar_binding_context = previous_typevar_binding_context;
             self.deferred_state = previous_deferred_state;
             self.dataclass_field_specifiers.clear();
@@ -4233,6 +4402,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
 
             if is_pep_613_type_alias {
+                let alias_value_ty = inferred_ty
+                    .default_specialize(self.db())
+                    .in_type_expression(
+                        self.db(),
+                        self.scope(),
+                        Some(definition),
+                        self.inference_flags(),
+                    )
+                    .unwrap_or_else(|_| Type::unknown());
+
+                if self
+                    .cyclic_type_alias_expansion(alias_value_ty, definition, value)
+                    .is_some()
+                    && let Some(target_name) = target.as_name_expr()
+                {
+                    self.report_cyclic_type_alias_definition(target, &target_name.id);
+                }
+
                 let inferred_ty =
                     if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = inferred_ty {
                         let identity = TypeVarIdentity::new(
@@ -7836,6 +8023,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             id: symbol_name,
             ctx: _,
         } = name_node;
+
         let expr = PlaceExpr::from_expr_name(name_node);
         let db = self.db();
 
@@ -7893,6 +8081,221 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             });
 
         ty.inner_type()
+    }
+
+    /// Preserves a direct self-reference inside a deferred assignment-based alias value.
+    ///
+    /// This covers both stub-file aliases and stringized values without inspecting strings
+    /// directly:
+    ///
+    /// ```python
+    /// from typing import TypeAlias
+    ///
+    /// A: TypeAlias = list[A]
+    /// ```
+    fn self_referential_legacy_type_alias(
+        &self,
+        name_node: &ast::ExprName,
+    ) -> Option<TypeAliasType<'db>> {
+        if !self.is_deferred()
+            || !self
+                .inference_flags()
+                .contains(InferenceFlags::IN_LEGACY_TYPE_ALIAS_VALUE)
+        {
+            return None;
+        }
+
+        let (current_definition, target_name) = self.current_legacy_type_alias_definition()?;
+        if target_name.id != name_node.id {
+            return None;
+        }
+
+        Some(TypeAliasType::Legacy(LegacyTypeAliasType::new(
+            self.db(),
+            &name_node.id,
+            current_definition,
+        )))
+    }
+
+    /// Preserves a reference to another legacy alias when normal inference exposes a cycle.
+    ///
+    /// The reference is first inferred normally; only if that result contains `Divergent` do we
+    /// recover the referenced assignment-based alias identity. This handles mutual recursion such
+    /// as:
+    ///
+    /// ```python
+    /// A = list["B"]
+    /// B = list["A"]
+    /// ```
+    fn divergent_legacy_type_alias_reference(
+        &self,
+        name_node: &ast::ExprName,
+        inferred_ty: Type<'db>,
+    ) -> Option<TypeAliasType<'db>> {
+        if !self.is_deferred()
+            || !self
+                .inference_flags()
+                .contains(InferenceFlags::IN_LEGACY_TYPE_ALIAS_VALUE)
+            || !any_over_type(self.db(), inferred_ty, true, |ty| ty.is_divergent())
+        {
+            return None;
+        }
+
+        let (current_definition, target_name) = self.current_legacy_type_alias_definition()?;
+        if target_name.id == name_node.id {
+            return None;
+        }
+
+        let referenced_definition = self.legacy_type_alias_definition_for_name(
+            current_definition.file_scope(self.db()),
+            &name_node.id,
+        )?;
+
+        Some(TypeAliasType::Legacy(LegacyTypeAliasType::new(
+            self.db(),
+            &name_node.id,
+            referenced_definition,
+        )))
+    }
+
+    /// Returns the definition and target name for the legacy alias currently being inferred.
+    ///
+    /// ```python
+    /// A = list["A"]
+    /// ```
+    fn current_legacy_type_alias_definition(
+        &self,
+    ) -> Option<(Definition<'db>, &'ast ast::ExprName)> {
+        let InferenceRegion::Definition(definition) = self.region else {
+            return None;
+        };
+
+        let target = match definition.kind(self.db()) {
+            DefinitionKind::Assignment(assignment) => assignment.target(self.module()),
+            DefinitionKind::AnnotatedAssignment(assignment) => assignment.target(self.module()),
+            _ => return None,
+        };
+
+        Some((definition, target.as_name_expr()?))
+    }
+
+    /// Returns `true` if a definition is an assignment-based type alias we can preserve lazily.
+    ///
+    /// ```python
+    /// A = list["A"]
+    ///
+    /// from typing import TypeAlias
+    /// B: TypeAlias = list[B]
+    /// ```
+    fn is_legacy_type_alias_definition(&self, definition: Definition<'db>) -> bool {
+        if definition.file(self.db()) != self.file() {
+            return false;
+        }
+
+        match definition.kind(self.db()) {
+            DefinitionKind::Assignment(assignment) => {
+                assignment.target(self.module()).is_name_expr()
+                    && Self::is_legacy_type_alias_value_candidate(assignment.value(self.module()))
+            }
+            DefinitionKind::AnnotatedAssignment(assignment) => {
+                assignment.target(self.module()).is_name_expr()
+                    && assignment.value(self.module()).is_some()
+                    && Self::is_pep_613_type_alias_annotation(assignment.annotation(self.module()))
+            }
+            _ => false,
+        }
+    }
+
+    /// Returns `true` for annotations that mark a PEP 613 type alias declaration.
+    ///
+    /// ```python
+    /// from typing import TypeAlias
+    ///
+    /// A: TypeAlias = list[A]
+    /// ```
+    fn is_pep_613_type_alias_annotation(annotation: &ast::Expr) -> bool {
+        match annotation {
+            ast::Expr::Name(name) => name.id == "TypeAlias",
+            ast::Expr::Attribute(attribute) => attribute.attr.as_str() == "TypeAlias",
+            _ => false,
+        }
+    }
+
+    /// Finds the single reachable legacy alias definition for `name` in a file scope.
+    ///
+    /// Ambiguous or non-alias bindings are rejected so recursive alias preservation does not turn a
+    /// runtime variable into a type-level alias:
+    ///
+    /// ```python
+    /// A = list["B"]
+    /// B = list["A"]
+    /// ```
+    fn legacy_type_alias_definition_for_name(
+        &self,
+        file_scope_id: FileScopeId,
+        name: &str,
+    ) -> Option<Definition<'db>> {
+        let place_table = self.index.place_table(file_scope_id);
+        let symbol_id = place_table.symbol_id(name)?;
+        let use_def = self.index.use_def_map(file_scope_id);
+        let bindings = use_def.reachable_symbol_bindings(symbol_id);
+        let reachability_constraints = bindings.reachability_constraints();
+        let predicates = bindings.predicates();
+        let mut result = None;
+
+        for binding in bindings {
+            let static_reachability = reachability_constraints.evaluate(
+                self.db(),
+                predicates,
+                binding.reachability_constraint,
+            );
+            if static_reachability.is_always_false() {
+                continue;
+            }
+
+            let DefinitionState::Defined(definition) = binding.binding else {
+                continue;
+            };
+
+            if !self.is_legacy_type_alias_definition(definition) {
+                return None;
+            }
+
+            if result.replace(definition).is_some() {
+                return None;
+            }
+        }
+
+        result
+    }
+
+    /// Returns `true` if an assignment value can be treated as a legacy type alias expression.
+    ///
+    /// The accepted shape is intentionally syntactic and narrow:
+    ///
+    /// ```python
+    /// A = list["A"]
+    /// B = int | str
+    /// C = None
+    /// ```
+    fn is_legacy_type_alias_value_candidate(value: &ast::Expr) -> bool {
+        match value {
+            ast::Expr::Name(_)
+            | ast::Expr::Attribute(_)
+            | ast::Expr::Subscript(_)
+            | ast::Expr::StringLiteral(_)
+            | ast::Expr::NoneLiteral(_) => true,
+            ast::Expr::BinOp(ast::ExprBinOp {
+                left,
+                op: ast::Operator::BitOr,
+                right,
+                ..
+            }) => {
+                Self::is_legacy_type_alias_value_candidate(left)
+                    && Self::is_legacy_type_alias_value_candidate(right)
+            }
+            _ => false,
+        }
     }
 
     fn infer_local_place_load(

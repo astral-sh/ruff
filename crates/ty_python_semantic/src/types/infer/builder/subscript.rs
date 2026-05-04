@@ -214,9 +214,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
             }
-            Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(
-                _,
-            ))) => {
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(
+                TypeAliasType::ManualPEP695(_) | TypeAliasType::Legacy(_),
+            )) => {
                 let slice_ty = self.infer_expression(slice, TypeContext::default());
                 let mut variables = FxOrderSet::default();
                 slice_ty.bind_and_find_all_legacy_typevars(

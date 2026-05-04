@@ -3,8 +3,8 @@ use std::fmt::Write;
 use crate::{
     Db,
     types::{
-        ApplySpecialization, ApplyTypeMappingVisitor, GenericContext, Type, TypeContext,
-        TypeMapping,
+        ApplySpecialization, ApplyTypeMappingVisitor, GenericContext, InferenceFlags, Type,
+        TypeContext, TypeMapping,
         cyclic::{TypeAliasRecursionVisitor, visit_type_alias},
         definition_expression_type,
         display::qualified_name_components_from_scope,
@@ -74,7 +74,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub(in crate::types) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
         let module = parsed_module(db, scope.file(db)).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
@@ -202,12 +202,99 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     }
 }
 
+/// An assignment-based type alias (`Alias = ...` or `Alias: TypeAlias = ...`) that needs
+/// lazy value-type computation to preserve recursive alias identity.
+///
+/// This is a type-level alias identity, not the runtime value of the assignment.
+///
+/// ```python
+/// A = list["A"]
+/// ```
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct LegacyTypeAliasType<'db> {
+    #[returns(ref)]
+    pub name: Name,
+    pub definition: Definition<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for LegacyTypeAliasType<'_> {}
+
+/// Visits the lazily computed value type of an assignment-based alias.
+///
+/// This keeps visitor traversal consistent with aliases whose value is not known until expansion,
+/// including recursive aliases such as:
+///
+/// ```python
+/// A = list["A"]
+/// ```
+pub(super) fn walk_legacy_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    type_alias: LegacyTypeAliasType<'db>,
+    visitor: &V,
+) {
+    visitor.visit_type(db, type_alias.value_type(db));
+}
+
+#[salsa::tracked]
+impl<'db> LegacyTypeAliasType<'db> {
+    /// The value type of this assignment-based type alias.
+    ///
+    /// Computed lazily from the definition to avoid including the value in the interned
+    /// struct's identity. Returns `Divergent` if the type alias is defined cyclically.
+    ///
+    /// ```python
+    /// from typing import TypeAlias
+    ///
+    /// A: TypeAlias = list[A]
+    /// ```
+    #[salsa::tracked(
+        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
+            value.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+        let definition = self.definition(db);
+        let file = definition.file(db);
+        let module = parsed_module(db, file).load(db);
+
+        let value_node = match definition.kind(db) {
+            DefinitionKind::Assignment(assignment) => assignment.value(&module),
+            DefinitionKind::AnnotatedAssignment(assignment) => {
+                let Some(value) = assignment.value(&module) else {
+                    return Type::unknown();
+                };
+                value
+            }
+            _ => return Type::unknown(),
+        };
+
+        definition_expression_type(db, definition, value_node)
+            .default_specialize(db)
+            .in_type_expression(
+                db,
+                definition.scope(db),
+                Some(definition),
+                InferenceFlags::empty(),
+            )
+            .unwrap_or_else(|_| Type::unknown())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub enum TypeAliasType<'db> {
     /// A type alias defined using the PEP 695 `type` statement.
     PEP695(PEP695TypeAliasType<'db>),
     /// A type alias defined by manually instantiating the PEP 695 `types.TypeAliasType`.
     ManualPEP695(ManualPEP695TypeAliasType<'db>),
+    /// An assignment-based type alias that needs to preserve its alias identity lazily.
+    ///
+    /// ```python
+    /// A = list["A"]
+    /// ```
+    Legacy(LegacyTypeAliasType<'db>),
 }
 
 pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -225,6 +312,9 @@ pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         TypeAliasType::ManualPEP695(type_alias) => {
             walk_manual_pep_695_type_alias(db, type_alias, visitor);
         }
+        TypeAliasType::Legacy(type_alias) => {
+            walk_legacy_type_alias(db, type_alias, visitor);
+        }
     }
 }
 
@@ -233,6 +323,7 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.name(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.name(db),
+            TypeAliasType::Legacy(type_alias) => type_alias.name(db),
         }
     }
 
@@ -240,6 +331,7 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.definition(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.definition(db),
+            TypeAliasType::Legacy(type_alias) => type_alias.definition(db),
         }
     }
 
@@ -252,6 +344,7 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
+            TypeAliasType::Legacy(type_alias) => type_alias.value_type(db),
         }
     }
 
@@ -334,17 +427,18 @@ impl<'db> TypeAliasType<'db> {
     /// Direct accessor for the alias value type before applying specialization.
     ///
     /// Prefer [`TypeAliasType::visit_raw_value`] outside this module for recursive operations.
-    fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub(in crate::types) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.raw_value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
+            TypeAliasType::Legacy(type_alias) => type_alias.value_type(db),
         }
     }
 
     pub(crate) fn as_pep_695_type_alias(self) -> Option<PEP695TypeAliasType<'db>> {
         match self {
             TypeAliasType::PEP695(type_alias) => Some(type_alias),
-            TypeAliasType::ManualPEP695(_) => None,
+            TypeAliasType::ManualPEP695(_) | TypeAliasType::Legacy(_) => None,
         }
     }
 
@@ -352,21 +446,21 @@ impl<'db> TypeAliasType<'db> {
         // TODO: Add support for generic non-PEP695 type aliases.
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.generic_context(db),
-            TypeAliasType::ManualPEP695(_) => None,
+            TypeAliasType::ManualPEP695(_) | TypeAliasType::Legacy(_) => None,
         }
     }
 
     pub(crate) fn specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.specialization(db),
-            TypeAliasType::ManualPEP695(_) => None,
+            TypeAliasType::ManualPEP695(_) | TypeAliasType::Legacy(_) => None,
         }
     }
 
     pub(super) fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.apply_function_specialization(db, ty),
-            TypeAliasType::ManualPEP695(_) => ty,
+            TypeAliasType::ManualPEP695(_) | TypeAliasType::Legacy(_) => ty,
         }
     }
 
@@ -379,7 +473,7 @@ impl<'db> TypeAliasType<'db> {
             TypeAliasType::PEP695(type_alias) => {
                 TypeAliasType::PEP695(type_alias.apply_specialization(db, f))
             }
-            TypeAliasType::ManualPEP695(_) => self,
+            TypeAliasType::ManualPEP695(_) | TypeAliasType::Legacy(_) => self,
         }
     }
 
