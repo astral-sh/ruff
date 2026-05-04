@@ -197,7 +197,7 @@ specifically, we'll want to make note of the minimum supported Python version:
 
 ### Rule Selection
 
-Ruff supports [over 800 lint rules](rules.md) split across over 50 built-in plugins, but
+Ruff supports [over 900 lint rules](rules.md) split across over 50 built-in plugins, but
 determining the right set of rules will depend on your project's needs: some rules may be too
 strict, some are framework-specific, and so on.
 
@@ -369,7 +369,7 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.15.11
+  rev: v0.15.12
   hooks:
     # Run the linter.
     - id: ruff-check

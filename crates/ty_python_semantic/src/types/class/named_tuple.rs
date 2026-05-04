@@ -52,6 +52,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
                 Parameter::positional_or_keyword(field.name)
                     .with_annotated_type(field.ty)
                     .with_optional_default_type(field.default)
+                    .with_definition(field.definition)
             }));
 
             let signature = Signature::new_generic(
@@ -89,6 +90,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
                 Parameter::keyword_only(field.name)
                     .with_annotated_type(field.ty)
                     .with_default_type(field.ty)
+                    .with_definition(field.definition)
             }));
 
             let signature = Signature::new(Parameters::new(db, parameters), self_ty);
@@ -115,6 +117,8 @@ pub struct NamedTupleField<'db> {
     pub(crate) name: Name,
     pub(crate) ty: Type<'db>,
     pub(crate) default: Option<Type<'db>>,
+    /// The field's first declaration for a class based named tuple.
+    pub(crate) definition: Option<Definition<'db>>,
 }
 
 /// A namedtuple created via the functional form `namedtuple(name, fields)` or
@@ -558,6 +562,7 @@ impl<'db> NamedTupleSpec<'db> {
                             .unwrap_or(div)
                     },
                     default: None,
+                    definition: f.definition,
                 })
             })
             .collect::<Option<Box<_>>>()?;

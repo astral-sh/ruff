@@ -8,6 +8,7 @@ use rustc_hash::FxHashMap;
 use crate::Db;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::tuple::Tuple;
+use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
 use crate::types::{KnownClass, Type, TypeContext};
 
 /// Maximum number of expanded types that can be generated from a single tuple's
@@ -43,8 +44,13 @@ pub(crate) enum Argument<'a> {
 /// Arguments for a single call, in source order, along with inferred types for each argument.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct CallArguments<'a, 'db> {
-    arguments: Vec<Argument<'a>>,
-    types: Vec<CallArgumentTypes<'db>>,
+    items: Vec<CallArgument<'a, 'db>>,
+}
+
+#[derive(Clone, Debug)]
+struct CallArgument<'a, 'db> {
+    argument: Argument<'a>,
+    types: CallArgumentTypes<'db>,
 }
 
 /// Inferred types for a given argument.
@@ -73,7 +79,7 @@ impl<'db> CallArgumentTypes<'db> {
             .types
             .values()
             .exactly_one()
-            .or(self.types.values().all_equal_value())
+            .or_else(|_| self.types.values().all_equal_value())
         {
             return Some(*exact_ty);
         }
@@ -86,7 +92,7 @@ impl<'db> CallArgumentTypes<'db> {
         self.types
             .get(&tcx)
             .copied()
-            .or(self.get_default())
+            .or_else(|| self.get_default())
             .unwrap_or(Type::unknown())
     }
 
@@ -109,11 +115,6 @@ impl<'db> CallArgumentTypes<'db> {
 }
 
 impl<'a, 'db> CallArguments<'a, 'db> {
-    fn new(arguments: Vec<Argument<'a>>, types: Vec<CallArgumentTypes<'db>>) -> Self {
-        debug_assert!(arguments.len() == types.len());
-        Self { arguments, types }
-    }
-
     /// Create `CallArguments` from AST arguments. We will use the provided callback to obtain the
     /// type of each splatted argument, so that we can determine its length. All other arguments
     /// will remain uninitialized as `Unknown`.
@@ -121,9 +122,12 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         arguments: &'a ast::Arguments,
         mut infer_argument_type: impl FnMut(&ast::ArgOrKeyword, &ast::Expr) -> Type<'db>,
     ) -> Self {
-        arguments
-            .iter_source_order()
-            .map(|arg_or_keyword| match arg_or_keyword {
+        let mut call_arguments = Self {
+            items: Vec::with_capacity(arguments.len()),
+        };
+
+        for arg_or_keyword in arguments.iter_source_order() {
+            let (argument, ty) = match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
                         let ty = infer_argument_type(&arg_or_keyword, value);
@@ -139,8 +143,14 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                         (Argument::Keywords, Some(ty))
                     }
                 }
-            })
-            .collect()
+            };
+            call_arguments.items.push(CallArgument {
+                argument,
+                types: CallArgumentTypes::new(ty),
+            });
+        }
+
+        call_arguments
     }
 
     /// Like [`Self::from_arguments`] but fills as much typing info in as possible.
@@ -183,21 +193,22 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
     /// Create a [`CallArguments`] from an iterator over non-variadic positional argument types.
     pub(crate) fn positional(positional_tys: impl IntoIterator<Item = Type<'db>>) -> Self {
-        let types: Vec<_> = positional_tys
+        positional_tys
             .into_iter()
-            .map(Some)
-            .map(CallArgumentTypes::new)
-            .collect();
-        let arguments = vec![Argument::Positional; types.len()];
-        Self { arguments, types }
+            .map(|ty| (Argument::Positional, Some(ty)))
+            .collect()
     }
 
     pub(crate) fn len(&self) -> usize {
-        self.arguments.len()
+        self.items.len()
     }
 
-    pub(crate) fn types(&self) -> &[CallArgumentTypes<'db>] {
-        &self.types
+    pub(crate) fn argument_types(&self, index: usize) -> Option<&CallArgumentTypes<'db>> {
+        self.items.get(index).map(|item| &item.types)
+    }
+
+    pub(crate) fn iter_types(&self) -> impl Iterator<Item = &CallArgumentTypes<'db>> + '_ {
+        self.items.iter().map(|item| &item.types)
     }
 
     /// Prepend an optional extra synthetic argument (for a `self` or `cls` parameter) to the front
@@ -205,13 +216,13 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// unmodified.)
     pub(crate) fn with_self(&self, bound_self: Option<Type<'db>>) -> Cow<'_, Self> {
         if bound_self.is_some() {
-            let arguments = std::iter::once(Argument::Synthetic)
-                .chain(self.arguments.iter().copied())
-                .collect();
-            let types = std::iter::once(CallArgumentTypes::new(bound_self))
-                .chain(self.types.iter().cloned())
-                .collect();
-            Cow::Owned(CallArguments { arguments, types })
+            let mut items = Vec::with_capacity(self.items.len() + 1);
+            items.push(CallArgument {
+                argument: Argument::Synthetic,
+                types: CallArgumentTypes::new(bound_self),
+            });
+            items.extend(self.items.iter().cloned());
+            Cow::Owned(CallArguments { items })
         } else {
             Cow::Borrowed(self)
         }
@@ -220,21 +231,54 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     pub(crate) fn iter(
         &self,
     ) -> impl Iterator<Item = (Argument<'a>, &CallArgumentTypes<'db>)> + '_ {
-        (self.arguments.iter().copied()).zip(self.types.iter())
+        self.items.iter().map(|item| (item.argument, &item.types))
     }
 
     pub(crate) fn iter_mut(
         &mut self,
     ) -> impl Iterator<Item = (Argument<'a>, &mut CallArgumentTypes<'db>)> + '_ {
-        (self.arguments.iter().copied()).zip(self.types.iter_mut())
+        self.items
+            .iter_mut()
+            .map(|item| (item.argument, &mut item.types))
     }
 
     /// Create a new [`CallArguments`] starting from the specified index.
-    pub(super) fn start_from(&self, index: usize) -> Self {
+    pub(crate) fn start_from(&self, index: usize) -> Self {
         Self {
-            arguments: self.arguments[index..].to_vec(),
-            types: self.types[index..].to_vec(),
+            items: self.items[index..].to_vec(),
         }
+    }
+
+    /// Returns the `functools.partial(...)` bound-argument slice when argument expansion is
+    /// concrete enough for partial-application analysis.
+    pub(crate) fn functools_partial_bound_arguments(&self, db: &'db dyn Db) -> Option<Self> {
+        let bound_call_arguments = self.start_from(1);
+
+        // We only handle variadics and keyword-maps that can be normalized to concrete argument
+        // positions for overload matching.
+        if bound_call_arguments.iter().any(|(argument, argument_ty)| {
+            let argument_ty = argument_ty.get_default().unwrap_or_else(Type::unknown);
+            match argument {
+                Argument::Variadic => !matches!(
+                    argument_ty
+                        .as_nominal_instance()
+                        .and_then(|nominal| nominal.tuple_spec(db)),
+                    Some(spec) if spec.as_fixed_length().is_some()
+                ),
+                // Optional TypedDict keys may be absent at runtime, so we can only refine
+                // `partial(...)` when every expanded key is guaranteed to be present.
+                Argument::Keywords => {
+                    extract_unpacked_typed_dict_keys_from_value_type(db, argument_ty).is_none_or(
+                        |unpacked_keys| unpacked_keys.values().any(|key| !key.is_required),
+                    )
+                }
+                Argument::Positional | Argument::Synthetic | Argument::Keyword(_) => false,
+            }
+        }) {
+            return None;
+        }
+
+        Some(bound_call_arguments)
     }
 
     /// Returns an iterator on performing [argument type expansion].
@@ -245,36 +289,35 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// [argument type expansion]: https://typing.python.org/en/latest/spec/overload.html#argument-type-expansion
     pub(super) fn expand(&self, db: &'db dyn Db) -> impl Iterator<Item = Expansion<'a, 'db>> + '_ {
         /// Represents the state of the expansion process.
-        enum State<'a, 'b, 'db> {
+        enum State<'a, 'db> {
             LimitReached(usize),
-            Expanding(ExpandingState<'a, 'b, 'db>),
+            Expanding(ExpandingState<'a, 'db>),
         }
 
         /// Represents the expanding state with either the initial types or the expanded types.
         ///
         /// This is useful to avoid cloning the initial types vector if none of the types can be
         /// expanded.
-        enum ExpandingState<'a, 'b, 'db> {
-            Initial(&'b Vec<CallArgumentTypes<'db>>),
+        enum ExpandingState<'a, 'db> {
+            Initial,
             Expanded(Vec<CallArguments<'a, 'db>>),
         }
 
-        impl<'db> ExpandingState<'_, '_, 'db> {
+        impl<'a, 'db> ExpandingState<'a, 'db> {
             fn len(&self) -> usize {
                 match self {
-                    ExpandingState::Initial(_) => 1,
+                    ExpandingState::Initial => 1,
                     ExpandingState::Expanded(expanded) => expanded.len(),
                 }
             }
 
-            fn iter(&self) -> impl Iterator<Item = &[CallArgumentTypes<'db>]> + '_ {
+            fn iter<'s>(
+                &'s self,
+                initial: &'s CallArguments<'a, 'db>,
+            ) -> impl Iterator<Item = &'s CallArguments<'a, 'db>> {
                 match self {
-                    ExpandingState::Initial(types) => {
-                        Either::Left(std::iter::once(types.as_slice()))
-                    }
-                    ExpandingState::Expanded(expanded) => {
-                        Either::Right(expanded.iter().map(CallArguments::types))
-                    }
+                    ExpandingState::Initial => Either::Left(std::iter::once(initial)),
+                    ExpandingState::Expanded(expanded) => Either::Right(expanded.iter()),
                 }
             }
         }
@@ -282,7 +325,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         let mut index = 0;
 
         std::iter::successors(
-            Some(State::Expanding(ExpandingState::Initial(&self.types))),
+            Some(State::Expanding(ExpandingState::Initial)),
             move |previous| {
                 let state = match previous {
                     State::LimitReached(index) => return Some(State::LimitReached(*index)),
@@ -291,7 +334,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
                 // Find the next type that can be expanded.
                 let expanded_types = loop {
-                    let arg_type = self.types.get(index)?;
+                    let arg_type = self.argument_types(index)?;
                     // TODO: For types inferred multiple times with distinct type context, we currently only
                     // expand the default inference. Note that direct expansion of a type inferred against a
                     // given declared type would not likely be assignable to other declared types without
@@ -318,14 +361,12 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
                 let mut expanded_arguments = Vec::with_capacity(expansion_size);
 
-                for pre_expanded_types in state.iter() {
+                for pre_expanded_types in state.iter(self) {
                     for subtype in &expanded_types {
-                        let mut new_expanded_types = pre_expanded_types.to_vec();
-                        new_expanded_types[index] = CallArgumentTypes::new(Some(*subtype));
-                        expanded_arguments.push(CallArguments::new(
-                            self.arguments.clone(),
-                            new_expanded_types,
-                        ));
+                        let mut expanded_argument = pre_expanded_types.clone();
+                        expanded_argument.items[index].types =
+                            CallArgumentTypes::new(Some(*subtype));
+                        expanded_arguments.push(expanded_argument);
                     }
                 }
 
@@ -340,7 +381,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         .skip(1) // Skip the initial state, which has no expanded types.
         .map(|state| match state {
             State::LimitReached(index) => Expansion::LimitReached(index),
-            State::Expanding(ExpandingState::Initial(_)) => {
+            State::Expanding(ExpandingState::Initial) => {
                 unreachable!("initial state should be skipped")
             }
             State::Expanding(ExpandingState::Expanded(expanded)) => Expansion::Expanded(expanded),
@@ -435,11 +476,18 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
     where
         T: IntoIterator<Item = (Argument<'a>, Option<Type<'db>>)>,
     {
-        let (arguments, types) = iter
-            .into_iter()
-            .map(|(arg, ty)| (arg, CallArgumentTypes::new(ty)))
-            .unzip();
-        Self { arguments, types }
+        let iter = iter.into_iter();
+        let (lower, upper) = iter.size_hint();
+        let mut items = Vec::with_capacity(upper.unwrap_or(lower));
+
+        for (argument, ty) in iter {
+            items.push(CallArgument {
+                argument,
+                types: CallArgumentTypes::new(ty),
+            });
+        }
+
+        Self { items }
     }
 }
 

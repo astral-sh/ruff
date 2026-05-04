@@ -32,6 +32,16 @@ pub struct InternedConstraintSet<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for InternedConstraintSet<'_> {}
 
+/// A salsa-interned payload for `functools.partial(...)` instances.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct FunctoolsPartialInstance<'db> {
+    pub wrapped: InternedType<'db>,
+    pub partial: CallableType<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for FunctoolsPartialInstance<'_> {}
+
 /// Singleton types that are heavily special-cased by ty. Despite its name,
 /// quite a different type to [`super::NominalInstanceType`].
 ///
@@ -104,6 +114,10 @@ pub enum KnownInstanceType<'db> {
 
     /// The inferred spec for a functional `NamedTuple` class.
     NamedTupleSpec(NamedTupleSpec<'db>),
+
+    /// A `functools.partial(func, ...)` call result where we could determine
+    /// the remaining callable signature after binding some arguments.
+    FunctoolsPartial(FunctoolsPartialInstance<'db>),
 }
 
 pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -158,6 +172,9 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
             for field in spec.fields(db) {
                 visitor.visit_type(db, field.ty);
             }
+        }
+        KnownInstanceType::FunctoolsPartial(partial) => {
+            visitor.visit_callable_type(db, partial.partial(db));
         }
     }
 }
@@ -221,6 +238,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::NamedTupleSpec(spec) => spec
                 .recursive_type_normalized_impl(db, div, true)
                 .map(Self::NamedTupleSpec),
+            Self::FunctoolsPartial(partial) => partial
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Self::FunctoolsPartial),
         }
     }
 
@@ -248,6 +268,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::LiteralStringAlias(_) => KnownClass::Str,
             Self::NewType(_) => KnownClass::NewType,
             Self::NamedTupleSpec(_) => KnownClass::Sequence,
+            Self::FunctoolsPartial(_) => KnownClass::FunctoolsPartial,
         }
     }
 
@@ -260,7 +281,7 @@ impl<'db> KnownInstanceType<'db> {
     /// For example, an alias created using the `type` statement is an instance of
     /// `typing.TypeAliasType`, so `KnownInstanceType::TypeAliasType(_).instance_fallback(db)`
     /// returns `Type::NominalInstance(NominalInstanceType { class: <typing.TypeAliasType> })`.
-    pub(super) fn instance_fallback(self, db: &dyn Db) -> Type<'_> {
+    pub(super) fn instance_fallback(self, db: &'db dyn Db) -> Type<'db> {
         self.class(db).to_instance(db)
     }
 
@@ -311,6 +332,11 @@ impl<'db> KnownInstanceType<'db> {
             KnownInstanceType::Callable(callable_type) => {
                 Type::KnownInstance(KnownInstanceType::Callable(
                     callable_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
+            }
+            KnownInstanceType::FunctoolsPartial(partial) => {
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(
+                    partial.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
             KnownInstanceType::TypeGenericAlias(ty) => {
@@ -554,6 +580,49 @@ impl<'db> UnionTypeInstance<'db> {
         };
 
         Some(Self::new(db, value_expr_types, union_type))
+    }
+}
+
+impl<'db> FunctoolsPartialInstance<'db> {
+    /// Normalizes both the wrapped callable and the exposed reduced callable recursively.
+    fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        Some(Self::new(
+            db,
+            InternedType::new(
+                db,
+                self.wrapped(db)
+                    .inner(db)
+                    .recursive_type_normalized_impl(db, div, nested)?,
+            ),
+            self.partial(db)
+                .recursive_type_normalized_impl(db, div, nested)?,
+        ))
+    }
+
+    /// Applies a type mapping to both the wrapped callable and the exposed reduced callable.
+    fn apply_type_mapping_impl(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            InternedType::new(
+                db,
+                self.wrapped(db)
+                    .inner(db)
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            ),
+            self.partial(db)
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+        )
     }
 }
 

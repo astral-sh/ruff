@@ -7,9 +7,11 @@ use ruff_db::source::{SourceText, source_text};
 use ruff_diagnostics::Edit;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::name::{Name, UnqualifiedName};
+use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_codegen::Stylist;
+use ruff_python_literal::escape::{Escape, UnicodeEscape};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, Module, ModuleName};
@@ -39,6 +41,25 @@ pub fn completion<'db>(
         return vec![];
     };
     let model = SemanticModel::new(db, file);
+
+    if context.cursor.is_in_string() {
+        let Some(string_expr) = context.cursor.enclosing_string_literal_expr() else {
+            return vec![];
+        };
+
+        let mut completions =
+            Completions::new(db, CollectionContext::none(), UserQuery::fuzzy(None));
+
+        add_string_literal_completions(
+            &model,
+            string_expr,
+            context.cursor.string_quote_style(),
+            &mut completions,
+        );
+
+        return completions.into_completions();
+    }
+
     let query = UserQuery::fuzzy(context.cursor.typed);
     let mut completions = Completions::new(db, context.collection_context(db, &model), query);
     match context.kind {
@@ -746,7 +767,7 @@ impl<'m> ContextCursor<'m> {
 
     /// Whether the last token is in a place where we should not provide completions.
     fn is_in_no_completions_place(&self) -> bool {
-        self.is_in_comment() || self.is_in_string() || self.is_in_definition_place()
+        self.is_in_comment() || self.is_in_definition_place()
     }
 
     /// Whether the last token is within a comment or not.
@@ -767,6 +788,21 @@ impl<'m> ContextCursor<'m> {
                 TokenKind::String | TokenKind::FStringMiddle | TokenKind::TStringMiddle
             )
         })
+    }
+
+    /// Returns the string literal expression that the cursor is positioned within, if any.
+    fn enclosing_string_literal_expr(&self) -> Option<&'m ast::ExprStringLiteral> {
+        match self.covering_node.parent() {
+            Some(ast::AnyNodeRef::ExprStringLiteral(string_expr)) => Some(string_expr),
+            _ => None,
+        }
+    }
+
+    /// Returns the quote style of the string literal that the cursor is positioned within, if any.
+    fn string_quote_style(&self) -> Option<Quote> {
+        self.tokens_before
+            .last()
+            .map(|token| token.string_quote_style())
     }
 
     /// Returns true when the tokens indicate that the definition of a new
@@ -1640,6 +1676,63 @@ fn add_keyword_completions<'db>(db: &'db dyn Db, completions: &mut Completions<'
     ];
     for name in keywords {
         completions.add(CompletionBuilder::keyword(name));
+    }
+}
+
+fn add_string_literal_completions<'db>(
+    model: &SemanticModel<'db>,
+    string_expr: &ast::ExprStringLiteral,
+    quote_style: Option<Quote>,
+    completions: &mut Completions<'db>,
+) {
+    fn force_escape_quote(body: &str, quote: Quote) -> String {
+        let quote_char = quote.as_char();
+        let mut escaped = String::with_capacity(body.len());
+        let mut consecutive_backslashes = 0usize;
+
+        for ch in body.chars() {
+            if ch == '\\' {
+                consecutive_backslashes += 1;
+                escaped.push(ch);
+                continue;
+            }
+
+            if ch == quote_char && consecutive_backslashes.is_multiple_of(2) {
+                escaped.push('\\');
+            }
+            consecutive_backslashes = 0;
+            escaped.push(ch);
+        }
+
+        escaped
+    }
+
+    // When we insert a completion for a string literal, we need to make sure
+    // to properly escape any special characters in the completion value and
+    // to use the appropriate quote style.
+    fn escape_for_quote(value: &str, quote: Quote) -> Option<String> {
+        let escaped = UnicodeEscape::with_preferred_quote(value, quote);
+        let mut out = String::new();
+        escaped.write_body(&mut out).ok()?;
+        Some(force_escape_quote(&out, quote))
+    }
+
+    let candidates = model.expected_string_literal_completions(string_expr);
+    if candidates.is_empty() {
+        return;
+    }
+
+    let quote_style = quote_style.unwrap_or(Quote::Double);
+    for candidate in candidates {
+        let Some(insert) = escape_for_quote(&candidate.value, quote_style) else {
+            continue;
+        };
+        completions.add_skip_query(
+            Completion::builder(candidate.value.as_str())
+                .insert(insert)
+                .ty(candidate.ty)
+                .context_specific(true),
+        );
     }
 }
 
@@ -3954,7 +4047,7 @@ quux.<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r###"
+            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @"
         bar :: int
         baz :: int
         foo :: int
@@ -3981,7 +4074,7 @@ quux.<CURSOR>
         __sizeof__ :: bound method Quux.__sizeof__() -> int
         __str__ :: bound method Quux.__str__() -> str
         __subclasshook__ :: bound method type[Quux].__subclasshook__(subclass: type, /) -> bool
-        "###);
+        ");
     }
 
     #[test]
@@ -4000,13 +4093,13 @@ quux.b<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r###"
+            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @"
         bar :: int
         baz :: int
         __getattribute__ :: bound method Quux.__getattribute__(name: str, /) -> Any
         __init_subclass__ :: bound method type[Quux].__init_subclass__() -> None
         __subclasshook__ :: bound method type[Quux].__subclasshook__(subclass: type, /) -> bool
-        "###);
+        ");
     }
 
     #[test]
@@ -6766,6 +6859,397 @@ print(t'''{Foo} and Foo.zqzq<CURSOR>
         assert_snapshot!(
             test.skip_keywords().skip_builtins().build().snapshot(),
             @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn string_literal_completions_function_argument() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Literal
+
+A = Literal["a", "b", "c"]
+
+def func(a: A): ...
+
+func("<CURSOR>")
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        a :: Literal["a"]
+        b :: Literal["b"]
+        c :: Literal["c"]
+        "#,
+        );
+    }
+
+    #[test]
+    fn string_literal_completions_overloaded_function_argument() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Literal, overload
+
+@overload
+def func(mode: Literal["r"]) -> int: ...
+@overload
+def func(mode: Literal["w"]) -> str: ...
+def func(mode: str) -> int | str: ...
+
+func("<CURSOR>")
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        r :: Literal["r"]
+        w :: Literal["w"]
+        "#,
+        );
+    }
+
+    #[test]
+    fn string_literal_completions_annotated_assignment() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Literal
+
+value: Literal["x", "y"] = "<CURSOR>"
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        x :: Literal["x"]
+        y :: Literal["y"]
+        "#,
+        );
+    }
+
+    #[test]
+    fn string_literal_completions_nested_expected_type() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Literal
+
+type A = Literal["foo", "bar", "baz"]
+xs: list[A] = ["<CURSOR>"]
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        bar :: Literal["bar"]
+        baz :: Literal["baz"]
+        foo :: Literal["foo"]
+        "#,
+        );
+    }
+
+    #[test]
+    fn string_literal_completions_filter_non_string_literals() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Literal
+
+Mixed = Literal["left", 1, "right"]
+
+def consume(value: Mixed): ...
+
+consume("<CURSOR>")
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        left :: Literal["left"]
+        right :: Literal["right"]
+        "#,
+        );
+    }
+
+    #[test]
+    fn string_literal_completions_typed_dict_keys() {
+        let builder = completion_test_builder(
+            r#"
+from typing import TypedDict
+
+class TD(TypedDict):
+    left: int
+    right: str
+
+td: TD = {"left": 1, "right": "x"}
+
+td["<CURSOR>"]
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        left :: Literal["left"]
+        right :: Literal["right"]
+        "#,
+        );
+    }
+
+    #[test]
+    fn string_literal_completions_typed_dict_keys_assignment() {
+        let builder = completion_test_builder(
+            r#"
+from typing import TypedDict
+
+class TD(TypedDict):
+    left: int
+    right: str
+
+td: TD = {"left": 1, "right": "x"}
+
+td["<CURSOR>"] = 1
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        left :: Literal["left"]
+        right :: Literal["right"]
+        "#,
+        );
+    }
+
+    #[test]
+    fn string_literal_completions_typed_dict_keys_deletion() {
+        let builder = completion_test_builder(
+            r#"
+from typing import TypedDict
+
+class TD(TypedDict):
+    left: int
+    right: str
+
+td: TD = {"left": 1, "right": "x"}
+
+del td["<CURSOR>"]
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        left :: Literal["left"]
+        right :: Literal["right"]
+        "#,
+        );
+    }
+
+    #[test]
+    fn string_literal_completions_do_not_offer_typed_dict_keys_for_typed_dict_value_context() {
+        let builder = completion_test_builder(
+            r#"
+from typing import TypedDict
+
+class TD(TypedDict):
+    left: int
+    right: str
+
+x: TD = "<CURSOR>"
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn string_literal_completions_typed_dict_union_keys() {
+        let builder = completion_test_builder(
+            r#"
+from typing import TypedDict
+
+class A(TypedDict):
+    a: int
+    both: int
+
+class B(TypedDict):
+    b: int
+    both: str
+
+x: A | B = {"both": 1}
+x["<CURSOR>"]
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        a :: Literal["a"]
+        b :: Literal["b"]
+        both :: Literal["both"]
+        "#,
+        );
+    }
+
+    #[test]
+    fn string_literal_completions_intersection_positive_union_semantics() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Literal
+from ty_extensions import Intersection
+
+x: Intersection[Literal["a", "b"], Literal["b", "c"]] = "<CURSOR>"
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"b :: Literal["b"]"#,
+        );
+    }
+
+    #[test]
+    fn string_literal_completions_intersection_excludes_negative_elements() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Literal
+from ty_extensions import Intersection, Not
+
+x: Intersection[Literal["a"], Not[Literal["b"]]] = "<CURSOR>"
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"a :: Literal["a"]"#,
+        );
+    }
+
+    #[test]
+    fn string_literal_completions_type_alias_recursion_safe() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Literal
+
+type A = Literal["foo", "bar"]
+type B = A
+x: B = "<CURSOR>"
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        bar :: Literal["bar"]
+        foo :: Literal["foo"]
+        "#,
+        );
+    }
+
+    #[test]
+    fn string_literal_completions_single_quote_escaping() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Literal
+x: Literal["can't", "won't"] = '<CURSOR>'
+"#,
+        );
+        let builder = builder.skip_keywords().skip_builtins().skip_auto_import();
+        let test = builder.build();
+        let inserts = test
+            .completions()
+            .iter()
+            .map(|completion| {
+                completion
+                    .insert
+                    .as_deref()
+                    .unwrap_or(completion.name.as_str())
+                    .to_string()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(inserts, vec![r"can\'t", r"won\'t"]);
+    }
+
+    #[test]
+    fn string_literal_completions_double_quote_escaping() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Literal
+x: Literal['say "hi"', 'say "bye"'] = "<CURSOR>"
+"#,
+        );
+        let builder = builder.skip_keywords().skip_builtins().skip_auto_import();
+        let test = builder.build();
+        let inserts = test
+            .completions()
+            .iter()
+            .map(|completion| {
+                completion
+                    .insert
+                    .as_deref()
+                    .unwrap_or(completion.name.as_str())
+                    .to_string()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(inserts, vec![r#"say \"bye\""#, r#"say \"hi\""#]);
+    }
+
+    #[test]
+    fn string_literal_completions_backslash_escaping() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Literal
+x: Literal["a\\b"] = "<CURSOR>"
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @r"a\\b",
+        );
+    }
+
+    #[test]
+    fn string_literal_completions_in_incomplete_string() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Literal
+x: Literal["a"] = "a<CURSOR>
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @"a",
+        );
+    }
+
+    #[test]
+    fn string_literal_completions_in_standalone_statement() {
+        let builder = completion_test_builder(
+            r#"
+from collections.abc import Callable
+from typing import Literal
+
+def func(callback: Callable[[], Literal["yes", "no"]]) -> None: ...
+
+x = y = func(lambda: "<CURSOR>")
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        no :: Literal["no"]
+        yes :: Literal["yes"]
+        "#,
         );
     }
 

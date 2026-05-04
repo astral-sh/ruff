@@ -196,32 +196,34 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```
 error[invalid-overload]: `@final` decorator should be applied only to the first overload
-  --> src/stub.pyi:27:9
+  --> src/stub.pyi:26:5
    |
-27 |     def bar(self, x: str) -> str: ...
-   |         --- First overload defined here
-28 |     @overload
-29 |     @final
-   |     ------
-30 |     # error: [invalid-overload]
-31 |     def bar(self, x: int) -> int: ...
-   |         ^^^
+26 | /     @overload
+27 | |     def bar(self, x: str) -> str: ...
+   | |_____________________________________- First overload defined here
+28 |       @overload
+29 |       @final
+   |       ------
+30 |       # error: [invalid-overload]
+31 |       def bar(self, x: int) -> int: ...
+   |           ^^^
    |
 
 ```
 
 ```
 error[invalid-overload]: `@final` decorator should be applied only to the first overload
-  --> src/stub.pyi:33:9
+  --> src/stub.pyi:32:5
    |
-33 |     def baz(self, x: str) -> str: ...
-   |         --- First overload defined here
-34 |     @final
-   |     ------
-35 |     @overload
-36 |     # error: [invalid-overload]
-37 |     def baz(self, x: int) -> int: ...
-   |         ^^^
+32 | /     @overload
+33 | |     def baz(self, x: str) -> str: ...
+   | |_____________________________________- First overload defined here
+34 |       @final
+   |       ------
+35 |       @overload
+36 |       # error: [invalid-overload]
+37 |       def baz(self, x: int) -> int: ...
+   |           ^^^
    |
 
 ```
@@ -322,8 +324,10 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```
 error[invalid-overload]: `@final` decorator should be applied only to the overload implementation
-  --> src/main.py:24:5
+  --> src/main.py:23:5
    |
+23 |     @overload
+   |     ---------
 24 |     @final
    |     ------
 25 |     def f(self, x: str) -> str: ...  # error: [invalid-overload]
@@ -343,6 +347,7 @@ error[invalid-overload]: `@final` decorator should be applied only to the overlo
 31 |     @final
    |     ------
 32 |     @overload
+   |     ---------
 33 |     def g(self, x: str) -> str: ...  # error: [invalid-overload]
    |         ^
 34 |     @overload
@@ -355,8 +360,10 @@ error[invalid-overload]: `@final` decorator should be applied only to the overlo
 
 ```
 error[invalid-overload]: `@final` decorator should be applied only to the overload implementation
-  --> src/main.py:42:5
+  --> src/main.py:41:5
    |
+41 |     @overload
+   |     ---------
 42 |     @final
    |     ------
 43 |     def h(self, x: int) -> int: ...  # error: [invalid-overload]
@@ -374,6 +381,7 @@ error[invalid-overload]: `@final` decorator should be applied only to the overlo
 49 |     @final
    |     ------
 50 |     @overload
+   |     ---------
 51 |     def i(self, x: int) -> int: ...  # error: [invalid-overload]
    |         ^
 52 |     def i(self, x: int | str) -> int | str:

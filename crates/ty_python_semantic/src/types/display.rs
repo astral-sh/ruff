@@ -833,7 +833,7 @@ fn fmt_type_guard_like<'db, T: TypeGuardLike<'db>>(
         .write_str(T::FORM_NAME)?;
     f.write_char('[')?;
     guard
-        .return_type(db)
+        .type_argument(db)
         .display_with(db, settings.singleline())
         .fmt_detailed(f)?;
     if let Some(name) = guard.place_name(db) {
@@ -1227,7 +1227,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .enum_class(self.db)
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f)?;
-                    write!(f, ".{}", enum_literal.name(self.db))
+                    f.write_char('.')?;
+                    write!(
+                        f.with_type(Type::enum_literal(enum_literal)),
+                        "{}",
+                        enum_literal.name(self.db)
+                    )
                 }
             },
             Type::TypeVar(bound_typevar) => {
@@ -3105,6 +3110,13 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 f.write_str("'>")
             }
             KnownInstanceType::NamedTupleSpec(_) => f.write_str("NamedTupleSpec"),
+            KnownInstanceType::FunctoolsPartial(partial) => {
+                f.write_str("partial[")?;
+                Type::Callable(partial.partial(self.db))
+                    .display_with(self.db, DisplaySettings::default().singleline())
+                    .fmt_detailed(f)?;
+                f.write_str("]")
+            }
         }
     }
 }

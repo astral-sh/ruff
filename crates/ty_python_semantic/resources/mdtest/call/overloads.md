@@ -956,10 +956,11 @@ error[no-matching-overload]: No overload of function `f` matches arguments
    |
 info: Limit of argument type expansion reached at argument 9
 info: First overload defined here
- --> src/overloaded.pyi:8:5
+ --> src/overloaded.pyi:7:1
   |
-8 | def f() -> None: ...
-  |     ^^^^^^^^^^^
+7 | / @overload
+8 | | def f() -> None: ...
+  | |____________________^ First overload defined here
   |
 info: Possible overloads for function `f`:
 info:   () -> None
@@ -1721,20 +1722,54 @@ def _(args1: list[int], args2: list[Any]):
 
 reveal_type(f2())  # revealed: tuple[Any, ...]
 reveal_type(f2(1, 2))  # revealed: tuple[Literal[1], Literal[2]]
-# TODO: Should be `tuple[Literal[1], Literal[2]]`
-reveal_type(f2(x1=1, x2=2))  # revealed: Unknown
-# TODO: Should be `tuple[Literal[2], Literal[1]]`
-reveal_type(f2(x2=1, x1=2))  # revealed: Unknown
+reveal_type(f2(x1=1, x2=2))  # revealed: tuple[Literal[1], Literal[2]]
+reveal_type(f2(x2=1, x1=2))  # revealed: tuple[Literal[2], Literal[1]]
 reveal_type(f2(1, 2, z=3))  # revealed: tuple[Any, ...]
 
 reveal_type(f3(1, 2))  # revealed: tuple[Literal[1], Literal[2]]
 reveal_type(f3(1, 2, 3))  # revealed: tuple[Any, ...]
-# TODO: Should be `tuple[Literal[1], Literal[2]]`
-reveal_type(f3(x1=1, x2=2))  # revealed: Unknown
+reveal_type(f3(x1=1, x2=2))  # revealed: tuple[Literal[1], Literal[2]]
 reveal_type(f3(z=1))  # revealed: dict[str, Any]
 
 # error: [no-matching-overload]
 reveal_type(f3(1, 2, x=3))  # revealed: Unknown
+```
+
+### Varidic argument with generic iterable
+
+`overloaded.pyi`:
+
+```pyi
+from typing import TypeVar, overload
+from collections.abc import Iterable
+
+T = TypeVar("T")
+T1 = TypeVar("T1")
+T2 = TypeVar("T2")
+T3 = TypeVar("T3")
+
+@overload
+def f(x: Iterable[T1], /) -> tuple[T1]: ...
+@overload
+def f(x: Iterable[T1], y: Iterable[T2], /) -> tuple[T1, T2]: ...
+@overload
+def f(x: Iterable[T1], y: Iterable[T2], z: Iterable[T3], /) -> tuple[T1, T2, T3]: ...
+@overload
+def f(*args: Iterable[T]) -> tuple[T, ...]: ...
+```
+
+```py
+from overloaded import f
+
+class A: ...
+class B: ...
+class C: ...
+
+def _(lista: list[A], listb: list[B], listc: list[C]):
+    reveal_type(f(lista))  # revealed: tuple[A]
+    reveal_type(f(lista, listb))  # revealed: tuple[A, B]
+    reveal_type(f(lista, listb, listc))  # revealed: tuple[A, B, C]
+    reveal_type(f())  # revealed: tuple[Unknown, ...]
 ```
 
 ### Non-participating fully-static parameter

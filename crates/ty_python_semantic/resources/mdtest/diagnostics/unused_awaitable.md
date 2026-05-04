@@ -8,8 +8,12 @@ Calling an `async def` function produces a coroutine that must be awaited.
 async def fetch() -> int:
     return 42
 
+async def fetch_complex(x) -> int:
+    return 42
+
 async def main():
     fetch()  # error: [unused-awaitable]
+    fetch_complex(lambda: None)  # error: [unused-awaitable]
 ```
 
 ## Awaited coroutine is fine

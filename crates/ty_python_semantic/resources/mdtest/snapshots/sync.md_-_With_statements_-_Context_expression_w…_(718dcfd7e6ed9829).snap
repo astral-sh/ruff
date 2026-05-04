@@ -1,0 +1,47 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: sync.md - With statements - Context expression with overlapping possibly-unbound union variants
+mdtest path: crates/ty_python_semantic/resources/mdtest/with/sync.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def _(flag1: bool, flag2: bool):
+ 2 |     class GoodManager:
+ 3 |         def __enter__(self) -> str:
+ 4 |             return "foo"
+ 5 | 
+ 6 |         def __exit__(self, exc_type, exc_value, traceback): ...
+ 7 | 
+ 8 |     class MissingExitManager:
+ 9 |         def __enter__(self) -> str:
+10 |             return "bar"
+11 | 
+12 |     class NotAContextManager: ...
+13 |     context_expr = GoodManager() if flag1 else MissingExitManager() if flag2 else NotAContextManager()
+14 | 
+15 |     # error: [invalid-context-manager] "Object of type `GoodManager | MissingExitManager | NotAContextManager` cannot be used with `with` because the methods `__enter__` and `__exit__` are possibly missing"
+16 |     with context_expr as f:
+17 |         reveal_type(f)  # revealed: str
+```
+
+# Diagnostics
+
+```
+error[invalid-context-manager]: Object of type `GoodManager | MissingExitManager | NotAContextManager` cannot be used with `with` because the methods `__enter__` and `__exit__` are possibly missing
+  --> src/mdtest_snippet.py:16:10
+   |
+16 |     with context_expr as f:
+   |          ^^^^^^^^^^^^
+   |
+info: `NotAContextManager` does not implement `__enter__` or `__exit__`
+info: `MissingExitManager` does not implement `__exit__`
+
+```

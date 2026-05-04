@@ -5,9 +5,10 @@ use std::rc::Rc;
 
 use ruff_python_ast::name::Name;
 
-use crate::Db;
-use crate::types::Type;
+use crate::types::context::LintDiagnosticGuard;
 use crate::types::tuple::TupleLength;
+use crate::types::{Type, TypedDictType};
+use crate::{Db, FxOrderSet};
 
 /// Identifies a parameter, either by name or by position.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -54,7 +55,42 @@ pub(crate) enum ErrorContext<'db> {
     NotAssignableToNOtherUnionElements {
         n: usize,
     },
-    TypedDictNotAssignableToDict,
+    NotAssignableToIntersectionElement {
+        source: Type<'db>,
+        element: Type<'db>,
+        intersection: Type<'db>,
+    },
+    NoIntersectionElementAssignableToTarget {
+        intersection: Type<'db>,
+        target: Type<'db>,
+    },
+    TypedDictFieldMissing {
+        field_name: Name,
+        source: TypedDictType<'db>,
+    },
+    TypedDictFieldNotRequiredInSource {
+        source: TypedDictType<'db>,
+        target: TypedDictType<'db>,
+        field_name: Name,
+    },
+    TypedDictFieldNotRequiredAndMutableInTarget {
+        source: TypedDictType<'db>,
+        target: TypedDictType<'db>,
+        field_name: Name,
+    },
+    TypedDictFieldReadOnlyInSource {
+        field_name: Name,
+        source: TypedDictType<'db>,
+        target: TypedDictType<'db>,
+    },
+    TypedDictFieldIncompatible {
+        field_name: Name,
+        source: TypedDictType<'db>,
+        target: TypedDictType<'db>,
+        source_field: Type<'db>,
+        target_field: Type<'db>,
+    },
+    TypedDictNotAssignableToDict(TypedDictType<'db>),
     IncompatibleReturnTypes {
         source: Type<'db>,
         target: Type<'db>,
@@ -99,7 +135,16 @@ pub(crate) enum ErrorContext<'db> {
 }
 
 impl<'db> ErrorContext<'db> {
-    fn render(&self, db: &'db dyn Db) -> Option<String> {
+    fn render(
+        &self,
+        db: &'db dyn Db,
+        help_messages: &mut FxOrderSet<HelpMessages>,
+    ) -> Option<String> {
+        let typed_dict_name = |typed_dict: &TypedDictType<'db>| match typed_dict {
+            TypedDictType::Class(class) => format!("TypedDict `{}`", class.name(db)),
+            TypedDictType::Synthesized(_) => Type::TypedDict(*typed_dict).display(db).to_string(),
+        };
+
         Some(match self {
             Self::Empty => {
                 return None;
@@ -123,9 +168,85 @@ impl<'db> ErrorContext<'db> {
                 "... omitted {n} union element{} without additional context",
                 if *n == 1 { "" } else { "s" }
             ),
-            Self::TypedDictNotAssignableToDict => {
-                "`TypedDict` types are not assignable to `dict` (consider using `Mapping` instead)"
-                    .to_string()
+            Self::NotAssignableToIntersectionElement {
+                source,
+                element,
+                intersection,
+            } => format!(
+                "type `{}` is not assignable to element `{}` of intersection `{}`",
+                source.display(db),
+                element.display(db),
+                intersection.display(db),
+            ),
+            Self::NoIntersectionElementAssignableToTarget {
+                intersection,
+                target,
+            } => format!(
+                "no element of intersection `{}` is assignable to `{}`",
+                intersection.display(db),
+                target.display(db),
+            ),
+            Self::TypedDictFieldMissing { field_name, source } => {
+                format!(
+                    "required field \"{field_name}\" is not present in source {source}",
+                    source = typed_dict_name(source)
+                )
+            }
+            Self::TypedDictFieldNotRequiredInSource {
+                field_name,
+                source,
+                target,
+            } => {
+                format!(
+                    "field \"{field_name}\" is required in {target} but not required in {source}",
+                    source = typed_dict_name(source),
+                    target = typed_dict_name(target)
+                )
+            }
+            Self::TypedDictFieldNotRequiredAndMutableInTarget {
+                field_name,
+                source,
+                target,
+            } => {
+                help_messages.insert(HelpMessages::RequiredFieldCouldBeRemoved);
+                format!(
+                    "field \"{field_name}\" is required in {source} but not required and mutable in {target}",
+                    source = typed_dict_name(source),
+                    target = typed_dict_name(target)
+                )
+            }
+            Self::TypedDictFieldReadOnlyInSource {
+                field_name,
+                source,
+                target,
+            } => {
+                format!(
+                    "field \"{field_name}\" is read-only in {source} but mutable in {target}",
+                    source = typed_dict_name(source),
+                    target = typed_dict_name(target)
+                )
+            }
+            Self::TypedDictFieldIncompatible {
+                field_name,
+                source,
+                target,
+                source_field,
+                target_field,
+            } => format!(
+                "field \"{field_name}\" on {source} has type `{source_field}` which is not assignable to type `{target_field}` expected by {target}",
+                source = typed_dict_name(source),
+                target = typed_dict_name(target),
+                source_field = source_field.display(db),
+                target_field = target_field.display(db),
+            ),
+            Self::TypedDictNotAssignableToDict(typed_dict) => {
+                help_messages.insert(HelpMessages::TypedDictNotAssignableToDict);
+                help_messages.insert(HelpMessages::ConsiderUsingMappingInsteadOfDict);
+
+                format!(
+                    "{source} is not assignable to `dict`",
+                    source = typed_dict_name(typed_dict)
+                )
             }
             Self::IncompatibleReturnTypes { source, target } => format!(
                 "incompatible return types: `{source}` is not assignable to `{target}`",
@@ -217,6 +338,29 @@ impl<'db> ErrorContext<'db> {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+enum HelpMessages {
+    RequiredFieldCouldBeRemoved,
+    TypedDictNotAssignableToDict,
+    ConsiderUsingMappingInsteadOfDict,
+}
+
+impl std::fmt::Display for HelpMessages {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HelpMessages::RequiredFieldCouldBeRemoved => {
+                f.write_str("The required field could be removed through a destructive operation like `del` on the target.")
+            }
+            HelpMessages::TypedDictNotAssignableToDict => {
+                f.write_str("A TypedDict is not usually assignable to any `dict[..]` type; `dict` types allow destructive operations like `clear()`.")
+            }
+            HelpMessages::ConsiderUsingMappingInsteadOfDict => {
+                f.write_str("Consider using `Mapping[..]` instead of `dict[..]`.")
+            }
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ErrorContextNode<'db> {
     context: ErrorContext<'db>,
@@ -238,15 +382,16 @@ impl<'db> ErrorContextNode<'db> {
         matches!(self.context, ErrorContext::Empty) && self.children.is_empty()
     }
 
-    fn render_messages(
+    fn render_tree(
         &self,
         db: &'db dyn Db,
-        messages: &mut Vec<String>,
+        output_lines: &mut Vec<String>,
+        help_messages: &mut FxOrderSet<HelpMessages>,
         prefix: &str,
         continuation: &str,
     ) {
-        if let Some(message) = self.context.render(db) {
-            messages.push(format!("{prefix}{message}"));
+        if let Some(line) = self.context.render(db, help_messages) {
+            output_lines.push(format!("{prefix}{line}"));
         }
 
         let num_children = self.children.len();
@@ -257,7 +402,13 @@ impl<'db> ErrorContextNode<'db> {
             } else {
                 (format!("{continuation}├── "), format!("{continuation}│   "))
             };
-            child.render_messages(db, messages, &child_prefix, &child_continuation);
+            child.render_tree(
+                db,
+                output_lines,
+                help_messages,
+                &child_prefix,
+                &child_continuation,
+            );
         }
     }
 }
@@ -356,12 +507,22 @@ impl<'db> ErrorContextTree<'db> {
         }
     }
 
-    /// Render the tree as a list of messages, with child nodes rendered as indented sub-messages.
-    pub(crate) fn info_messages(&self, db: &'db dyn Db) -> impl Iterator<Item = String> {
-        let mut messages = Vec::new();
+    /// Render the error context tree as info sub-diagnostics on `diag`.
+    pub(in crate::types) fn attach_to(
+        &self,
+        db: &'db dyn Db,
+        diag: &mut LintDiagnosticGuard<'_, '_>,
+    ) {
+        let mut output_lines = Vec::new();
+        let mut help_messages = FxOrderSet::default();
         self.root
             .borrow()
-            .render_messages(db, &mut messages, "", "");
-        messages.into_iter()
+            .render_tree(db, &mut output_lines, &mut help_messages, "", "");
+        for line in output_lines {
+            diag.info(line);
+        }
+        for help_message in help_messages {
+            diag.help(help_message.to_string());
+        }
     }
 }

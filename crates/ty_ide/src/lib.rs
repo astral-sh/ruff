@@ -14,6 +14,7 @@ mod goto;
 mod goto_declaration;
 mod goto_definition;
 mod goto_type_definition;
+mod hints;
 mod hover;
 mod importer;
 mod inlay_hints;
@@ -36,6 +37,7 @@ pub use document_symbols::document_symbols;
 pub use find_references::find_references;
 pub use folding_range::{FoldingRange, FoldingRangeKind, folding_ranges};
 pub use goto::{goto_declaration, goto_definition, goto_type_definition};
+pub use hints::{Hint, HintKind, hints};
 pub use hover::hover;
 pub use inlay_hints::{
     InlayHintKind, InlayHintLabel, InlayHintSettings, InlayHintTextEdit, inlay_hints,
@@ -429,6 +431,7 @@ mod tests {
 
             let config = DisplayDiagnosticConfig::new("ty")
                 .color(false)
+                .context(0)
                 .format(DiagnosticFormat::Full);
             for diagnostic in diagnostics {
                 let diag = diagnostic.into_diagnostic();

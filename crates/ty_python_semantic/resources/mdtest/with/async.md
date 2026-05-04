@@ -102,6 +102,8 @@ async def main():
 
 ## Context expression with possibly-unbound union variants
 
+<!-- snapshot-diagnostics -->
+
 ```py
 async def _(flag: bool):
     class Manager1:

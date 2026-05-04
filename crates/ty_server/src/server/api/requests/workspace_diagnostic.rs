@@ -16,14 +16,14 @@ use ruff_db::files::File;
 use ruff_db::source::source_text;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
+use ty_ide::{Hint, hints};
 use ty_project::{ProgressReporter, ProjectDatabase};
 
 use crate::PositionEncoding;
 use crate::capabilities::ResolvedClientCapabilities;
 use crate::document::DocumentKey;
 use crate::server::api::diagnostics::{
-    Diagnostics, UnnecessaryHint, collect_hints, to_lsp_diagnostic,
-    unnecessary_hints_to_lsp_diagnostics,
+    Diagnostics, to_lsp_diagnostic, unnecessary_hints_to_lsp_diagnostics,
 };
 use crate::server::api::traits::{
     BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
@@ -238,7 +238,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
     }
 
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
-        let unnecessary_hints = collect_hints(db, file);
+        let unnecessary_hints = hints(db, file);
 
         // Another thread might have panicked at this point because of a salsa cancellation which
         // poisoned the result. If the response is poisoned, just don't report and wait for our thread
@@ -286,7 +286,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         let response = &mut self.state.get_mut().unwrap().response;
 
         for (file, diagnostics) in by_file {
-            let unnecessary_hints = collect_hints(db, file);
+            let unnecessary_hints = hints(db, file);
             response.write_diagnostics_for_file(db, file, &diagnostics, &unnecessary_hints);
         }
         response.maybe_flush();
@@ -375,7 +375,7 @@ impl<'a> ResponseWriter<'a> {
         db: &ProjectDatabase,
         file: File,
         diagnostics: &[Diagnostic],
-        unnecessary_hints: &[UnnecessaryHint],
+        unnecessary_hints: &[Hint],
     ) {
         let Some(url) = file_to_url(db, file) else {
             tracing::debug!("Failed to convert file path to URL at {}", file.path(db));

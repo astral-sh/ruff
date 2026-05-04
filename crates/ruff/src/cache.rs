@@ -162,9 +162,8 @@ impl Cache {
         // Write the cache to a temporary file first and then rename it for an "atomic" write.
         // Protects against data loss if the process is killed during the write and races between different ruff
         // processes, resulting in a corrupted cache file. https://github.com/astral-sh/ruff/issues/8147#issuecomment-1943345964
-        let mut temp_file =
-            NamedTempFile::new_in(self.path.parent().expect("Write path must have a parent"))
-                .context("Failed to create temporary file")?;
+        let mut temp_file = tempfile_in(self.path.parent().expect("Write path must have a parent"))
+            .context("Failed to create temporary file")?;
 
         // Serialize to in-memory buffer because hyperfine benchmark showed that it's faster than
         // using a `BufWriter` and our cache files are small enough that streaming isn't necessary.
@@ -296,6 +295,25 @@ impl Cache {
     pub(crate) fn set_formatted(&self, path: RelativePathBuf, key: &FileCacheKey) {
         self.update(path, key, ChangeData::Formatted);
     }
+}
+
+/// Return a [`NamedTempFile`] in the specified directory.
+///
+/// Sets the permissions of the temporary file to `0o666`, to match the non-temporary file
+/// default. ([`NamedTempFile`] defaults to `0o600`.)
+#[cfg(unix)]
+fn tempfile_in(path: &Path) -> io::Result<NamedTempFile> {
+    use std::os::unix::fs::PermissionsExt;
+
+    tempfile::Builder::new()
+        .permissions(fs::Permissions::from_mode(0o666))
+        .tempfile_in(path)
+}
+
+/// Return a [`NamedTempFile`] in the specified directory.
+#[cfg(not(unix))]
+fn tempfile_in(path: &Path) -> io::Result<NamedTempFile> {
+    tempfile::Builder::new().tempfile_in(path)
 }
 
 /// On disk representation of a cache of a package.
@@ -858,6 +876,40 @@ mod tests {
             cache.package.files.keys().collect_vec(),
             vec![&new_path_key],
             "Only the new file should be present"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cache_file_permissions_match_default_file_permissions() {
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\"])\n";
+
+        let test_cache = TestCache::new("cache_file_permissions_match_default_file_permissions");
+        let cache = test_cache.open();
+        let cache_path = cache.path.clone();
+        test_cache.write_source_file("source.py", source);
+
+        test_cache
+            .lint_file_with_cache("source.py", &cache)
+            .expect("Failed to lint test file");
+        cache.persist().unwrap();
+
+        let control_path = cache_path.with_extension("control");
+        fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o666)
+            .open(&control_path)
+            .unwrap();
+
+        let cache_mode = fs::metadata(&cache_path).unwrap().permissions().mode() & 0o777;
+        let control_mode = fs::metadata(&control_path).unwrap().permissions().mode() & 0o777;
+
+        assert_eq!(
+            cache_mode, control_mode,
+            "Cache files should respect the same default permissions as regular files"
         );
     }
 

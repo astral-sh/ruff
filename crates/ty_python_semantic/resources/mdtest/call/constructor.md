@@ -1128,6 +1128,51 @@ class Box(Generic[T]):
 reveal_type(Box(1))  # revealed: Box[int]
 ```
 
+## Generic constructor inference from overloaded `__init__` self types
+
+```py
+from __future__ import annotations
+
+from typing import Generic, TypeVar, overload
+
+T = TypeVar("T")
+CT = TypeVar("CT")
+
+class ClassSelector(Generic[T]):
+    @overload
+    def __init__(
+        self: ClassSelector[CT],
+        *,
+        default: CT,
+        class_: type[CT],
+    ) -> None: ...
+    @overload
+    def __init__(
+        self: ClassSelector[CT | None],
+        *,
+        default: None = None,
+        class_: type[CT],
+    ) -> None: ...
+    def __init__(self, *, default=None, class_=None): ...
+
+class MyClass:
+    pass
+
+a = ClassSelector(default=MyClass(), class_=MyClass)
+reveal_type(a)  # revealed: ClassSelector[MyClass]
+
+b = ClassSelector(class_=MyClass)
+reveal_type(b)  # revealed: ClassSelector[MyClass | None]
+
+# Explicit constructor specializations still reject incompatible inferred `self` types.
+ClassSelector[int](class_=MyClass)  # error: [invalid-argument-type]
+
+class RequiredClassSelector(Generic[T]):
+    def __init__(self: RequiredClassSelector[CT | None], *, class_: type[CT]) -> None: ...
+
+reveal_type(RequiredClassSelector(class_=MyClass))  # revealed: RequiredClassSelector[MyClass | None]
+```
+
 ## `__init__` can remap constructor generic arguments via `self` annotation
 
 ```py

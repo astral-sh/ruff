@@ -451,6 +451,98 @@ fn different_settings() -> Result<()> {
     Ok(())
 }
 
+/// Test that a file uses the settings from its containing workspace folder, not from a
+/// lexicographically later sibling workspace that merely sorts before the file path.
+///
+/// This exercises the setting lookup through language services: hover stays enabled for
+/// `systemtests`, while `external` keeps its own `disable_language_services = true`.
+#[test]
+fn nested_sibling_workspace_uses_correct_settings() -> Result<()> {
+    let systemtests_file = SystemPath::new("systemtests/foo.py");
+    let external_file = SystemPath::new("external/Y/foo.py");
+    let file_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("."), None)?
+        .with_file(systemtests_file, file_content)?
+        .with_workspace(
+            SystemPath::new("external/Y"),
+            Some(ClientOptions::default().with_disable_language_services(true)),
+        )?
+        .with_file(external_file, file_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(systemtests_file, file_content, 1);
+    let systemtests_hover = server.hover_request(systemtests_file, Position::new(0, 5));
+    assert!(
+        systemtests_hover.is_some(),
+        "expected hover information for {systemtests_file}, got: {systemtests_hover:?}",
+    );
+
+    server.open_text_document(external_file, file_content, 1);
+    let external_hover = server.hover_request(external_file, Position::new(0, 5));
+    assert!(
+        external_hover.is_none(),
+        "expected no hover information for {external_file}, got: {external_hover:?}",
+    );
+
+    Ok(())
+}
+
+/// Test that a document resolves to the correct project in a multi-root workspace, rather than
+/// to a lexicographically later sibling workspace that merely sorts before the file path.
+#[test]
+fn nested_sibling_workspace_uses_correct_project() -> Result<()> {
+    let systemtests_file = SystemPath::new("systemtests/included.py");
+    let external_file = SystemPath::new("external/Y/only_external.py");
+    let file_content = "\
+def foo() -> str:
+    return a
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("."), None)?
+        .with_file(
+            SystemPath::new("pyproject.toml"),
+            r#"
+[tool.ty.src]
+include = ["systemtests/included.py"]
+"#,
+        )?
+        .with_file(systemtests_file, file_content)?
+        .with_workspace(SystemPath::new("external/Y"), None)?
+        .with_file(
+            SystemPath::new("external/Y/pyproject.toml"),
+            r#"
+[tool.ty.src]
+include = ["only_external.py"]
+"#,
+        )?
+        .with_file(external_file, file_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(systemtests_file, file_content, 1);
+    let systemtests_diagnostics = server.document_diagnostic_request(systemtests_file, None);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(systemtests_diagnostics),
+        @"1:11..1:12[ERROR]: Name `a` used when not defined",
+    );
+
+    server.open_text_document(external_file, file_content, 1);
+    let external_diagnostics = server.document_diagnostic_request(external_file, None);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(external_diagnostics),
+        @"1:11..1:12[ERROR]: Name `a` used when not defined",
+    );
+
+    Ok(())
+}
+
 /// Test that workspace folders cannot realistically have different
 /// global settings.
 ///
