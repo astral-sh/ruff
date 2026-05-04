@@ -493,6 +493,136 @@ def foo(x: "TypeOf[foo]"):
     reveal_type(x)  # revealed: def foo(x: def foo(...)) -> Unknown
 ```
 
+## Recursive `TypeOf` in returned callables
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Concatenate, Protocol, TypedDict
+from ty_extensions import TypeOf, generic_context
+
+def self_recursive[**P, T](
+    x: Callable[Concatenate[TypeOf[self_recursive], ...], T],
+) -> Callable[Concatenate[TypeOf[self_recursive], P], T]:
+    return x
+
+reveal_type(generic_context(self_recursive))  # revealed: ty_extensions.GenericContext[T@self_recursive]
+# revealed: def self_recursive[T](x: (def self_recursive(...), /, *args: Any, **kwargs: Any) -> T) -> ((def self_recursive(...), /, *args: P'return.args, **kwargs: P'return.kwargs) -> T)
+reveal_type(self_recursive)
+
+def mutual_first[**P, T](
+    x: Callable[Concatenate[TypeOf[mutual_second], ...], T],
+) -> Callable[Concatenate[TypeOf[mutual_second], P], T]:
+    return x
+
+def mutual_second[**P, T](
+    x: Callable[Concatenate[TypeOf[mutual_first], ...], T],
+) -> Callable[Concatenate[TypeOf[mutual_first], P], T]:
+    return x
+
+reveal_type(generic_context(mutual_first))  # revealed: ty_extensions.GenericContext[T@mutual_first]
+reveal_type(generic_context(mutual_second))  # revealed: ty_extensions.GenericContext[T@mutual_second]
+
+class VarianceClass[T]:
+    x: Callable[[TypeOf[variance_class]], T]
+
+def variance_class[T](x: TypeOf[variance_class]) -> VarianceClass[T]:
+    raise NotImplementedError
+
+reveal_type(variance_class)  # revealed: def variance_class[T](x: def variance_class(...)) -> VarianceClass[T]
+
+class VarianceProtocol[T](Protocol):
+    x: Callable[[TypeOf[variance_protocol]], T]
+
+def variance_protocol[T](x: TypeOf[variance_protocol]) -> VarianceProtocol[T]:
+    raise NotImplementedError
+
+reveal_type(variance_protocol)  # revealed: def variance_protocol[T](x: def variance_protocol(...)) -> VarianceProtocol[T]
+
+class VarianceTypedDict[T](TypedDict):
+    x: Callable[[TypeOf[variance_typed_dict]], T]
+
+def variance_typed_dict[T](x: TypeOf[variance_typed_dict]) -> VarianceTypedDict[T]:
+    raise NotImplementedError
+
+reveal_type(variance_typed_dict)  # revealed: def variance_typed_dict[T](x: def variance_typed_dict(...)) -> VarianceTypedDict[T]
+
+class Box[T]:
+    @staticmethod
+    def method(x: T) -> T:
+        return x
+
+def factory[T]() -> Callable[[TypeOf[Box[T].method]], T]:
+    raise NotImplementedError
+
+factory()(Box[int].method)
+
+class Foo:
+    @staticmethod
+    def method[**P, T](
+        x: Callable[Concatenate[TypeOf[Bar.method], ...], T],
+    ) -> Callable[Concatenate[TypeOf[Bar.method], P], T]:
+        return x
+
+class Bar:
+    @staticmethod
+    def method[**P, T](
+        x: Callable[Concatenate[TypeOf[Foo.method], ...], T],
+    ) -> Callable[Concatenate[TypeOf[Foo.method], P], T]:
+        return x
+
+reveal_type(generic_context(Foo.method))  # revealed: ty_extensions.GenericContext[T@method]
+reveal_type(generic_context(Bar.method))  # revealed: ty_extensions.GenericContext[T@method]
+
+def dunder_get[**P, T](
+    x: Callable[Concatenate[TypeOf[dunder_get.__get__], ...], T],
+) -> Callable[Concatenate[TypeOf[dunder_get.__get__], P], T]:
+    return x
+
+reveal_type(generic_context(dunder_get))  # revealed: ty_extensions.GenericContext[T@dunder_get]
+
+def alias_get[**P, T](
+    x: Callable[Concatenate[AliasGet, ...], T],
+) -> Callable[Concatenate[AliasGet, P], T]:
+    return x
+
+type AliasGet = TypeOf[alias_get.__get__]
+
+reveal_type(generic_context(alias_get))  # revealed: ty_extensions.GenericContext[T@alias_get]
+
+type ReturnedCallableAlias[**P] = Callable[Concatenate[TypeOf[alias_return], P], int]
+
+def alias_return[**P](
+    x: Callable[Concatenate[TypeOf[alias_return], ...], int],
+) -> ReturnedCallableAlias[P]:
+    return x
+
+type ChainedReturnedCallableAlias[**P] = ReturnedCallableAliasTarget[P]
+type ReturnedCallableAliasTarget[**P] = Callable[Concatenate[TypeOf[alias_chain_return], P], int]
+
+def alias_chain_return[**P](
+    x: Callable[Concatenate[TypeOf[alias_chain_return], ...], int],
+) -> ChainedReturnedCallableAlias[P]:
+    return x
+
+def property_getter[**P, T](
+    self: object,
+) -> Callable[Concatenate[PropertyAlias, P], T]:
+    raise NotImplementedError
+
+recursive_property = property(property_getter)
+
+type PropertyAlias = TypeOf[recursive_property]
+
+generic_context(property_getter)
+```
+
 ## Deeply nested `TypeOf` chains
 
 Multiple redefinitions of a function with `TypeOf[foo]` as the return type create a chain of
@@ -623,4 +753,44 @@ def f(x: int, /) -> None: ...
 
 static_assert(not is_assignable_to(Callable[[int], None], CallableTypeOf[f]))
 static_assert(is_assignable_to(Callable[[int], None], RegularCallableTypeOf[f]))
+```
+
+## Self-referential `CallableTypeOf` and `RegularCallableTypeOf`
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from ty_extensions import CallableTypeOf, RegularCallableTypeOf
+
+def callable[T]() -> CallableTypeOf[callable]:
+    raise NotImplementedError
+
+def regular[T]() -> RegularCallableTypeOf[regular]:
+    raise NotImplementedError
+
+def call() -> CallableTypeOf[call.__call__]:
+    raise NotImplementedError
+
+def first() -> CallableTypeOf[second]:
+    raise NotImplementedError
+
+def second() -> CallableTypeOf[first]:
+    raise NotImplementedError
+
+def regular_first() -> RegularCallableTypeOf[regular_second]:
+    raise NotImplementedError
+
+def regular_second() -> RegularCallableTypeOf[regular_first]:
+    raise NotImplementedError
+
+reveal_type(callable)  # revealed: def callable[T]() -> ((*args: object, **kwargs: object) -> Never)
+reveal_type(regular)  # revealed: def regular[T]() -> ((*args: object, **kwargs: object) -> Never)
+reveal_type(call)  # revealed: def call() -> ((*args: object, **kwargs: object) -> Never)
+reveal_type(first)  # revealed: def first() -> (() -> Divergent)
+reveal_type(second)  # revealed: def second() -> (() -> (() -> Divergent))
+reveal_type(regular_first)  # revealed: def regular_first() -> (() -> Divergent)
+reveal_type(regular_second)  # revealed: def regular_second() -> (() -> (() -> Divergent))
 ```

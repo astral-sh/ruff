@@ -38,8 +38,8 @@ use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind,
-    ParameterDescription, SelfBinding, TypeContext, TypeMapping, UnionBuilder, VarianceInferable,
-    infer_complete_scope_types, todo_type,
+    ParameterDescription, RecursiveTypeNormalizationVisitor, SelfBinding, TypeContext, TypeMapping,
+    UnionBuilder, VarianceInferable, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -136,6 +136,24 @@ impl<'db> CallableSignature<'db> {
         Self::single(Signature::bottom())
     }
 
+    pub(crate) fn cycle_initial(db: &'db dyn Db, id: salsa::Id) -> Self {
+        Self::single(Signature::new(
+            Parameters::bottom(),
+            Type::divergent(id).bottom_materialization(db),
+        ))
+    }
+
+    fn is_cycle_initial(&self) -> bool {
+        matches!(
+            self.overloads.as_slice(),
+            [signature]
+                if signature.generic_context.is_none()
+                    && signature.definition.is_none()
+                    && signature.parameters == Parameters::bottom()
+                    && signature.return_ty.is_divergent()
+        )
+    }
+
     /// Creates a new `CallableSignature` from an iterator of [`Signature`]s. Returns a
     /// non-callable signature if the iterator is empty.
     pub(crate) fn from_overloads<I>(overloads: I) -> Self
@@ -212,7 +230,7 @@ impl<'db> CallableSignature<'db> {
                     .collect(),
             }
         } else {
-            debug_assert_eq!(previous, &Self::bottom());
+            debug_assert!(previous.is_cycle_initial());
             self.clone()
         }
     }
@@ -222,12 +240,13 @@ impl<'db> CallableSignature<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
         Some(Self {
             overloads: self
                 .overloads
                 .iter()
-                .map(|signature| signature.recursive_type_normalized_impl(db, div, nested))
+                .map(|signature| signature.recursive_type_normalized_impl(db, div, nested, visitor))
                 .collect::<Option<SmallVec<_>>>()?,
         })
     }
@@ -736,19 +755,20 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
         let return_ty = if nested {
             self.return_ty
-                .recursive_type_normalized_impl(db, div, true)?
+                .recursive_type_normalized_impl(db, div, true, visitor)?
         } else {
             self.return_ty
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, div, true, visitor)
                 .unwrap_or(div)
         };
         let parameters = {
             let mut parameters = Vec::with_capacity(self.parameters.len());
             for param in &self.parameters {
-                parameters.push(param.recursive_type_normalized_impl(db, div, nested)?);
+                parameters.push(param.recursive_type_normalized_impl(db, div, nested, visitor)?);
             }
             Parameters::new(db, parameters)
         };
@@ -3673,6 +3693,7 @@ impl<'db> Parameter<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
         let Parameter {
             annotated_type,
@@ -3684,10 +3705,10 @@ impl<'db> Parameter<'db> {
         } = self;
 
         let annotated_type = if nested {
-            annotated_type.recursive_type_normalized_impl(db, div, true)?
+            annotated_type.recursive_type_normalized_impl(db, div, true, visitor)?
         } else {
             annotated_type
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, div, true, visitor)
                 .unwrap_or(div)
         };
 
@@ -3695,9 +3716,11 @@ impl<'db> Parameter<'db> {
             ParameterKind::PositionalOnly { name, default_type } => ParameterKind::PositionalOnly {
                 name: name.clone(),
                 default_type: match default_type {
-                    Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
+                    Some(ty) if nested => {
+                        Some(ty.recursive_type_normalized_impl(db, div, true, visitor)?)
+                    }
                     Some(ty) => Some(
-                        ty.recursive_type_normalized_impl(db, div, true)
+                        ty.recursive_type_normalized_impl(db, div, true, visitor)
                             .unwrap_or(div),
                     ),
                     None => None,
@@ -3708,10 +3731,10 @@ impl<'db> Parameter<'db> {
                     name: name.clone(),
                     default_type: match default_type {
                         Some(ty) if nested => {
-                            Some(ty.recursive_type_normalized_impl(db, div, true)?)
+                            Some(ty.recursive_type_normalized_impl(db, div, true, visitor)?)
                         }
                         Some(ty) => Some(
-                            ty.recursive_type_normalized_impl(db, div, true)
+                            ty.recursive_type_normalized_impl(db, div, true, visitor)
                                 .unwrap_or(div),
                         ),
                         None => None,
@@ -3721,9 +3744,11 @@ impl<'db> Parameter<'db> {
             ParameterKind::KeywordOnly { name, default_type } => ParameterKind::KeywordOnly {
                 name: name.clone(),
                 default_type: match default_type {
-                    Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
+                    Some(ty) if nested => {
+                        Some(ty.recursive_type_normalized_impl(db, div, true, visitor)?)
+                    }
                     Some(ty) => Some(
-                        ty.recursive_type_normalized_impl(db, div, true)
+                        ty.recursive_type_normalized_impl(db, div, true, visitor)
                             .unwrap_or(div),
                     ),
                     None => None,

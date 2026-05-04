@@ -4,8 +4,9 @@ use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin,
 };
 use crate::types::class::KnownClass;
-use crate::types::{Type, TypeQualifiers};
-use crate::types::{TypeVarBoundOrConstraints, visitor};
+use crate::types::{
+    RecursiveTypeNormalizationVisitor, Type, TypeQualifiers, TypeVarBoundOrConstraints, visitor,
+};
 use crate::{Db, FxOrderSet};
 
 pub(crate) mod builder;
@@ -304,6 +305,7 @@ impl<'db> UnionType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Type<'db>> {
         let mut builder = UnionBuilder::new(db)
             .unpack_aliases(false)
@@ -313,7 +315,7 @@ impl<'db> UnionType<'db> {
         for ty in self.elements(db) {
             if nested {
                 // list[T | Divergent] => list[Divergent]
-                let ty = ty.recursive_type_normalized_impl(db, div, nested)?;
+                let ty = ty.recursive_type_normalized_impl(db, div, nested, visitor)?;
                 if ty.same_divergent_marker(div) {
                     return Some(ty);
                 }
@@ -327,7 +329,7 @@ impl<'db> UnionType<'db> {
                     continue;
                 }
                 builder = builder.add(
-                    ty.recursive_type_normalized_impl(db, div, nested)
+                    ty.recursive_type_normalized_impl(db, div, nested, visitor)
                         .unwrap_or(div),
                 );
                 empty = false;
@@ -680,17 +682,18 @@ impl<'db> IntersectionType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
         let positive = if nested {
             self.positive(db)
                 .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, div, nested))
+                .map(|ty| ty.recursive_type_normalized_impl(db, div, nested, visitor))
                 .collect::<Option<FxOrderSet<Type<'db>>>>()?
         } else {
             self.positive(db)
                 .iter()
                 .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, div, nested)
+                    ty.recursive_type_normalized_impl(db, div, nested, visitor)
                         .unwrap_or(div)
                 })
                 .collect()
@@ -698,10 +701,10 @@ impl<'db> IntersectionType<'db> {
 
         let negative = if nested {
             self.negative(db)
-                .try_map(|ty| ty.recursive_type_normalized_impl(db, div, nested))?
+                .try_map(|ty| ty.recursive_type_normalized_impl(db, div, nested, visitor))?
         } else {
             self.negative(db).map(|ty| {
-                ty.recursive_type_normalized_impl(db, div, nested)
+                ty.recursive_type_normalized_impl(db, div, nested, visitor)
                     .unwrap_or(div)
             })
         };

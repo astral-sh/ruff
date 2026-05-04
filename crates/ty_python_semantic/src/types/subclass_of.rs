@@ -7,8 +7,8 @@ use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, ClassType, DynamicType,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
-    SpecialFormType, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
-    TypedDictType, UnionType, todo_type,
+    RecursiveTypeNormalizationVisitor, SpecialFormType, Type, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarVariance, TypedDictType, UnionType, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::definition::Definition;
@@ -221,11 +221,12 @@ impl<'db> SubclassOfType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
         Some(Self {
             subclass_of: self
                 .subclass_of
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, div, nested, visitor)?,
         })
     }
 
@@ -482,10 +483,11 @@ impl<'db> SubclassOfInner<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
         match self {
             Self::Class(class) => Some(Self::Class(
-                class.recursive_type_normalized_impl(db, div, nested)?,
+                class.recursive_type_normalized_impl(db, div, nested, visitor)?,
             )),
             Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
             Self::TypeVar(_) => Some(self),
