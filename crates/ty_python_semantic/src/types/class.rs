@@ -5,17 +5,20 @@ pub(crate) use self::dynamic_literal::{
 };
 pub(super) use self::enum_literal::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec};
 pub use self::known::KnownClass;
-use self::named_tuple::synthesize_namedtuple_class_member;
 pub(super) use self::named_tuple::{
     DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
+};
+use self::named_tuple::{
+    synthesize_namedtuple_class_member, synthesized_namedtuple_class_member_uses_fields,
 };
 pub(crate) use self::static_literal::{
     ExpandedClassBaseEntry, StaticClassLiteral, expanded_class_base_entries,
 };
+use self::typed_dict::synthesized_typed_dict_method_uses_fields;
 pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use super::{
-    BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType, SubclassOfType, Type,
-    TypeQualifiers, class_base::ClassBase, function::FunctionType,
+    BoundTypeVarInstance, KnownBoundMethodType, MemberLookupPolicy, MroIterator, SpecialFormType,
+    SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, TypeOrigin};
@@ -1765,6 +1768,108 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Return whether this class' callable constructor would use `definition`.
+    ///
+    /// This intentionally follows the same member lookup paths as [`ClassType::into_callable`],
+    /// but only inspects the callable object identities. It must not ask for constructor
+    /// signatures, since this is used to break recursive `CallableTypeOf[C]` cycles while a
+    /// constructor signature is being inferred.
+    pub(super) fn constructor_uses_definition(
+        self,
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+    ) -> bool {
+        self.generated_field_source(db).is_some_and(|source| {
+            source.constructor_uses_fields(db) && source.uses_definition(db, definition)
+        }) || self
+            .metaclass_dunder_call_source(db)
+            .is_some_and(|ty| callable_source_uses_definition(db, ty, definition))
+            || self
+                .dunder_new_source(db)
+                .is_some_and(|ty| callable_source_uses_definition(db, ty, definition))
+            || self
+                .dunder_init_source(db)
+                .is_some_and(|ty| callable_source_uses_definition(db, ty, definition))
+    }
+
+    /// Return whether this class' generated member `name` would use `definition`.
+    ///
+    /// This must not ask for the generated member's type, since it is used to break recursive
+    /// `TypeOf[C.generated_member]` and `CallableTypeOf[C.generated_member]` cycles while a
+    /// field type is being inferred.
+    pub(super) fn generated_member_uses_definition(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        definition: Definition<'db>,
+    ) -> bool {
+        self.generated_field_source(db).is_some_and(|source| {
+            source.member_uses_fields(db, name) && source.uses_definition(db, definition)
+        })
+    }
+
+    /// Return the generated fields source for this class, if field-based synthesis applies.
+    fn generated_field_source(self, db: &'db dyn Db) -> Option<GeneratedFieldSource<'db>> {
+        GeneratedFieldSource::from_class(db, self)
+    }
+
+    /// Return the metaclass `__call__` member as a constructor source.
+    fn metaclass_dunder_call_source(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.metaclass_dunder_call_member(db)
+            .ignore_possibly_undefined()
+    }
+
+    /// Return the class `__new__` member as a constructor source.
+    fn dunder_new_source(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.dunder_new_member(db)
+            .and_then(|place| place.ignore_possibly_undefined())
+    }
+
+    /// Return the class `__init__` member as a constructor source.
+    fn dunder_init_source(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.dunder_init_member(db).ignore_possibly_undefined()
+    }
+
+    /// Look up the metaclass `__call__` member used to convert this class to a callable.
+    fn metaclass_dunder_call_member(self, db: &'db dyn Db) -> Place<'db> {
+        Type::from(self)
+            .member_lookup_with_policy(
+                db,
+                "__call__".into(),
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+            )
+            .place
+    }
+
+    /// Look up the `__new__` member used to convert this class to a callable.
+    fn dunder_new_member(self, db: &'db dyn Db) -> Option<PlaceAndQualifiers<'db>> {
+        Type::from(self).lookup_dunder_new(db)
+    }
+
+    /// Look up the `__init__` member used to convert this class to a callable.
+    fn dunder_init_member(self, db: &'db dyn Db) -> Place<'db> {
+        Type::from(self)
+            .member_lookup_with_policy(
+                db,
+                "__init__".into(),
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+            )
+            .place
+    }
+
+    /// Look up the fallback `object.__new__` member used to convert this class to a callable.
+    fn object_dunder_new_member(self, db: &'db dyn Db) -> Place<'db> {
+        Type::from(self)
+            .member_lookup_with_policy(
+                db,
+                "__new__".into(),
+                MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+            )
+            .place
+    }
+
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
     #[salsa::tracked(cycle_initial=into_callable_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
@@ -1779,14 +1884,7 @@ impl<'db> ClassType<'db> {
             .and_then(|(class_literal, _)| class_literal.generic_context(db));
 
         let self_ty = Type::from(self);
-        let metaclass_dunder_call_function_symbol = self_ty
-            .member_lookup_with_policy(
-                db,
-                "__call__".into(),
-                MemberLookupPolicy::NO_INSTANCE_FALLBACK
-                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-            )
-            .place;
+        let metaclass_dunder_call_function_symbol = self.metaclass_dunder_call_member(db);
 
         if let Place::Defined(DefinedPlace {
             ty: Type::BoundMethod(metaclass_dunder_call_function),
@@ -1809,7 +1907,7 @@ impl<'db> ClassType<'db> {
             }
         }
 
-        let dunder_new_function_symbol = self_ty.lookup_dunder_new(db);
+        let dunder_new_function_symbol = self.dunder_new_member(db);
 
         let dunder_new_signature = dunder_new_function_symbol
             .and_then(|place_and_quals| place_and_quals.ignore_possibly_undefined())
@@ -1846,14 +1944,7 @@ impl<'db> ClassType<'db> {
             None
         };
 
-        let dunder_init_function_symbol = self_ty
-            .member_lookup_with_policy(
-                db,
-                "__init__".into(),
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-            )
-            .place;
+        let dunder_init_function_symbol = self.dunder_init_member(db);
 
         let correct_return_type = self_ty.to_instance(db).unwrap_or_else(Type::unknown);
 
@@ -1927,13 +2018,7 @@ impl<'db> ClassType<'db> {
             (None, None) => {
                 // If no `__new__` or `__init__` method is found, then we fall back to looking for
                 // an `object.__new__` method.
-                let new_function_symbol = self_ty
-                    .member_lookup_with_policy(
-                        db,
-                        "__new__".into(),
-                        MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-                    )
-                    .place;
+                let new_function_symbol = self.object_dunder_new_member(db);
 
                 if let Place::Defined(DefinedPlace {
                     ty: Type::FunctionLiteral(mut new_function),
@@ -1978,12 +2063,100 @@ impl<'db> ClassType<'db> {
     }
 }
 
+#[derive(Clone, Copy)]
+enum GeneratedFieldSource<'db> {
+    Static {
+        class: StaticClassLiteral<'db>,
+        specialization: Option<Specialization<'db>>,
+        field_policy: CodeGeneratorKind<'db>,
+    },
+    DynamicNamedTuple(DynamicNamedTupleLiteral<'db>),
+    DynamicTypedDict(DynamicTypedDictLiteral<'db>),
+}
+
+impl<'db> GeneratedFieldSource<'db> {
+    fn from_class(db: &'db dyn Db, class_type: ClassType<'db>) -> Option<Self> {
+        let (class_literal, specialization) = class_type.class_literal_and_specialization(db);
+        match class_literal {
+            ClassLiteral::Static(class) => Some(Self::Static {
+                class,
+                specialization,
+                field_policy: CodeGeneratorKind::from_static_class(db, class, specialization)?,
+            }),
+            ClassLiteral::DynamicNamedTuple(namedtuple) => {
+                Some(Self::DynamicNamedTuple(namedtuple))
+            }
+            ClassLiteral::DynamicTypedDict(typeddict) => Some(Self::DynamicTypedDict(typeddict)),
+            ClassLiteral::Dynamic(_) | ClassLiteral::DynamicEnum(_) => None,
+        }
+    }
+
+    fn constructor_uses_fields(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::Static {
+                class,
+                field_policy,
+                ..
+            } => class.generated_constructor_uses_fields(db, field_policy),
+            Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => true,
+        }
+    }
+
+    fn member_uses_fields(self, db: &'db dyn Db, name: &str) -> bool {
+        match self {
+            Self::Static {
+                class,
+                field_policy,
+                ..
+            } => class.generated_member_uses_fields(db, name, field_policy),
+            Self::DynamicNamedTuple(_) => synthesized_namedtuple_class_member_uses_fields(db, name),
+            Self::DynamicTypedDict(_) => synthesized_typed_dict_method_uses_fields(name),
+        }
+    }
+
+    fn uses_definition(self, db: &'db dyn Db, definition: Definition<'db>) -> bool {
+        match self {
+            Self::Static {
+                class,
+                specialization,
+                field_policy,
+            } => class.generated_fields_include_definition(
+                db,
+                definition,
+                specialization,
+                field_policy,
+            ),
+            Self::DynamicNamedTuple(namedtuple) => {
+                namedtuple.generated_fields_use_definition(db, definition)
+            }
+            Self::DynamicTypedDict(typeddict) => {
+                typeddict.generated_fields_use_definition(db, definition)
+            }
+        }
+    }
+}
+
+fn callable_source_uses_definition<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    definition: Definition<'db>,
+) -> bool {
+    match ty {
+        Type::FunctionLiteral(function) => function.contains_definition(db, definition),
+        Type::BoundMethod(method) => method.function(db).contains_definition(db, definition),
+        Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)) => {
+            function.contains_definition(db, definition)
+        }
+        _ => false,
+    }
+}
+
 fn into_callable_cycle_initial<'db>(
     db: &'db dyn Db,
     _id: salsa::Id,
     _self: ClassType<'db>,
 ) -> CallableTypes<'db> {
-    CallableTypes::one(CallableType::bottom(db))
+    CallableTypes::bottom(db)
 }
 
 impl<'db> From<GenericAlias<'db>> for ClassType<'db> {

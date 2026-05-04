@@ -794,3 +794,163 @@ reveal_type(second)  # revealed: def second() -> (() -> (() -> Divergent))
 reveal_type(regular_first)  # revealed: def regular_first() -> (() -> Divergent)
 reveal_type(regular_second)  # revealed: def regular_second() -> (() -> (() -> Divergent))
 ```
+
+## Self-referential `CallableTypeOf` and `RegularCallableTypeOf` in constructor signatures
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple, TypedDict, dataclass_transform
+from ty_extensions import CallableTypeOf, RegularCallableTypeOf, TypeOf
+
+class CallableInit:
+    def __init__(self, callback: CallableTypeOf[CallableInit]) -> None:
+        pass
+
+x: CallableTypeOf[CallableInit]
+
+class RegularCallableInit:
+    def __init__(self, callback: RegularCallableTypeOf[RegularCallableInit]) -> None:
+        pass
+
+regular: RegularCallableTypeOf[RegularCallableInit]
+
+class CallableNew:
+    def __new__(cls, callback: CallableTypeOf[CallableNew]) -> CallableNew:
+        raise NotImplementedError
+
+n: CallableTypeOf[CallableNew]
+
+class BaseCallableInit:
+    def __init__(self, callback: "CallableTypeOf[InheritedCallableInit]") -> None:
+        pass
+
+class InheritedCallableInit(BaseCallableInit):
+    pass
+
+inherited: CallableTypeOf[InheritedCallableInit]
+
+@dataclass
+class DataclassCallableInit:
+    callback: CallableTypeOf[DataclassCallableInit]
+
+dataclass_init: CallableTypeOf[DataclassCallableInit]
+
+@dataclass
+class DataclassGeneratedInitCallable:
+    callback: CallableTypeOf[DataclassGeneratedInitCallable.__init__]
+
+dataclass_generated_init: CallableTypeOf[DataclassGeneratedInitCallable]
+
+@dataclass
+class DataclassGeneratedReplaceTypeOf:
+    callback: TypeOf[DataclassGeneratedReplaceTypeOf.__replace__]
+
+dataclass_generated_replace: TypeOf[DataclassGeneratedReplaceTypeOf]
+
+@dataclass
+class BaseDataclassGeneratedInit:
+    callback: CallableTypeOf[InheritedDataclassGeneratedInit.__init__]
+
+@dataclass
+class InheritedDataclassGeneratedInit(BaseDataclassGeneratedInit):
+    pass
+
+inherited_dataclass_generated_init: CallableTypeOf[InheritedDataclassGeneratedInit]
+
+class NamedTupleGeneratedReplaceCallable(NamedTuple):
+    callback: CallableTypeOf[NamedTupleGeneratedReplaceCallable._replace]
+
+named_tuple_generated_replace: CallableTypeOf[NamedTupleGeneratedReplaceCallable]
+
+FunctionalNamedTupleCallableNew = NamedTuple(
+    "FunctionalNamedTupleCallableNew",
+    [("callback", "CallableTypeOf[FunctionalNamedTupleCallableNew]")],
+)
+
+functional_named_tuple_new: CallableTypeOf[FunctionalNamedTupleCallableNew]
+
+FunctionalNamedTupleGeneratedReplace = NamedTuple(
+    "FunctionalNamedTupleGeneratedReplace",
+    [("callback", "CallableTypeOf[FunctionalNamedTupleGeneratedReplace._replace]")],
+)
+
+functional_named_tuple_generated_replace: CallableTypeOf[FunctionalNamedTupleGeneratedReplace]
+
+class TypedDictGeneratedGetCallable(TypedDict):
+    callback: CallableTypeOf[TypedDictGeneratedGetCallable.get]
+
+typed_dict_generated_get: CallableTypeOf[TypedDictGeneratedGetCallable]
+
+FunctionalTypedDictCallableInit = TypedDict(
+    "FunctionalTypedDictCallableInit",
+    {"callback": "CallableTypeOf[FunctionalTypedDictCallableInit]"},
+)
+
+functional_typed_dict_init: CallableTypeOf[FunctionalTypedDictCallableInit]
+
+FunctionalTypedDictGeneratedUpdate = TypedDict(
+    "FunctionalTypedDictGeneratedUpdate",
+    {"callback": "CallableTypeOf[FunctionalTypedDictGeneratedUpdate.update]"},
+)
+
+functional_typed_dict_generated_update: CallableTypeOf[FunctionalTypedDictGeneratedUpdate]
+
+type TypedDictGeneratedUpdateAlias = CallableTypeOf[TypedDictGeneratedUpdateAliasTarget.update]
+
+class TypedDictGeneratedUpdateAliasTarget(TypedDict):
+    callback: TypedDictGeneratedUpdateAlias
+
+typed_dict_generated_update_alias: CallableTypeOf[TypedDictGeneratedUpdateAliasTarget]
+
+type ChainedTypedDictGeneratedOrAlias = ChainedTypedDictGeneratedOrAliasTarget
+type ChainedTypedDictGeneratedOrAliasTarget = RegularCallableTypeOf[ChainedTypedDictGeneratedOrTarget.__or__]
+
+class ChainedTypedDictGeneratedOrTarget(TypedDict):
+    callback: ChainedTypedDictGeneratedOrAlias
+
+chained_typed_dict_generated_or_alias: RegularCallableTypeOf[ChainedTypedDictGeneratedOrTarget]
+
+class TypedDictGeneratedRorForwardAliasTarget(TypedDict):
+    callback: TypedDictGeneratedRorForwardAlias
+
+type TypedDictGeneratedRorForwardAlias = TypeOf[TypedDictGeneratedRorForwardAliasTarget.__ror__]
+
+typed_dict_generated_ror_forward_alias: TypeOf[TypedDictGeneratedRorForwardAliasTarget]
+
+type FunctionalTypedDictGeneratedRorAlias = TypeOf[FunctionalTypedDictGeneratedRorAliasTarget.__ror__]
+
+FunctionalTypedDictGeneratedRorAliasTarget = TypedDict(
+    "FunctionalTypedDictGeneratedRorAliasTarget",
+    {"callback": FunctionalTypedDictGeneratedRorAlias},
+)
+
+functional_typed_dict_generated_ror_alias: TypeOf[FunctionalTypedDictGeneratedRorAliasTarget]
+
+@dataclass_transform()
+class DataclassTransformBase:
+    pass
+
+class DataclassTransformCallableInit(DataclassTransformBase):
+    callback: CallableTypeOf[DataclassTransformCallableInit]
+
+class RegularDataclassTransformCallableInit(DataclassTransformBase):
+    callback: RegularCallableTypeOf[RegularDataclassTransformCallableInit]
+```
+
+```py
+from ty_extensions import CallableTypeOf
+
+class Meta(type):
+    def __call__(cls, callback: "CallableTypeOf[CallableMeta]") -> "CallableMeta":
+        raise NotImplementedError
+
+class CallableMeta(metaclass=Meta):
+    pass
+
+m: CallableTypeOf[CallableMeta]
+```

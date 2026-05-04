@@ -376,10 +376,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition) => {
                 Some(definition)
             }
+            InferenceRegion::Scope(scope, _) => scope
+                .node(self.db())
+                .as_type_alias()
+                .map(|type_alias| self.index.expect_single_definition(type_alias)),
             InferenceRegion::Statement(_)
             | InferenceRegion::Expression(_, _)
-            | InferenceRegion::FunctionDecorators(_)
-            | InferenceRegion::Scope(_, _) => None,
+            | InferenceRegion::FunctionDecorators(_) => None,
         })
     }
 
@@ -8386,6 +8389,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
         {
             value_type = Type::TypeVar(bound_typevar);
+        }
+
+        if (self
+            .inference_flags()
+            .contains(InferenceFlags::IN_TYPE_EXPRESSION)
+            || self.is_deferred())
+            && let Some(definition) = self.recursive_type_expression_definition()
+            && value_type.generated_member_uses_definition(db, &attr.id, definition)
+        {
+            return Type::function_like_callable(db, Signature::bottom());
         }
 
         let mut assigned_type = None;

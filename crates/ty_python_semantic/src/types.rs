@@ -110,6 +110,7 @@ mod constraints;
 mod context;
 mod context_manager;
 mod cyclic;
+mod definition_dependencies;
 mod diagnostic;
 mod display;
 mod enums;
@@ -2383,6 +2384,26 @@ impl<'db> Type<'db> {
     /// [`_PyType_Lookup`]: https://github.com/python/cpython/blob/e285232c76606e3be7bf216efb1be1e742423e4b/Objects/typeobject.c#L5223
     fn find_name_in_mro(&self, db: &'db dyn Db, name: &str) -> Option<PlaceAndQualifiers<'db>> {
         self.find_name_in_mro_with_policy(db, name, MemberLookupPolicy::default())
+    }
+
+    fn generated_member_uses_definition(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        definition: Definition<'db>,
+    ) -> bool {
+        if let Some(fallback) = self.materialized_divergent_fallback() {
+            return fallback.generated_member_uses_definition(db, name, definition);
+        }
+
+        match self {
+            Type::TypeAlias(alias) => alias
+                .value_type(db)
+                .generated_member_uses_definition(db, name, definition),
+            _ => self
+                .to_class_type(db)
+                .is_some_and(|class| class.generated_member_uses_definition(db, name, definition)),
+        }
     }
 
     fn find_name_in_mro_with_policy(

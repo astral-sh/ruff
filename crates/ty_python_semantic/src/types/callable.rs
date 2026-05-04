@@ -96,7 +96,7 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(function_literal)
                 if context.is_recursive_reference(db, function_literal) =>
             {
-                Some(CallableTypes::one(CallableType::bottom(db)))
+                Some(CallableTypes::bottom(db))
             }
             Type::FunctionLiteral(function_literal) => {
                 Some(CallableTypes::one(function_literal.into_callable_type(db)))
@@ -104,7 +104,7 @@ impl<'db> Type<'db> {
             Type::BoundMethod(bound_method)
                 if context.is_recursive_reference(db, bound_method.function(db)) =>
             {
-                Some(CallableTypes::one(CallableType::bottom(db)))
+                Some(CallableTypes::bottom(db))
             }
             Type::BoundMethod(bound_method) => {
                 Some(CallableTypes::one(bound_method.into_callable_type(db)))
@@ -129,10 +129,23 @@ impl<'db> Type<'db> {
                     None
                 }
             }
+            Type::ClassLiteral(class_literal)
+                if context.is_recursive_constructor_reference(
+                    db,
+                    class_literal.identity_specialization(db),
+                ) =>
+            {
+                Some(CallableTypes::bottom(db))
+            }
             Type::ClassLiteral(class_literal) => {
                 Some(class_literal.identity_specialization(db).into_callable(db))
             }
 
+            Type::GenericAlias(alias)
+                if context.is_recursive_constructor_reference(db, ClassType::Generic(alias)) =>
+            {
+                Some(CallableTypes::bottom(db))
+            }
             Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
 
             Type::NewTypeInstance(newtype) => newtype
@@ -223,7 +236,7 @@ impl<'db> Type<'db> {
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function))
                 if context.is_recursive_reference(db, function) =>
             {
-                Some(CallableTypes::one(CallableType::bottom(db)))
+                Some(CallableTypes::bottom(db))
             }
 
             Type::KnownBoundMethod(method) => Some(CallableTypes::one(CallableType::new(
@@ -288,6 +301,11 @@ impl<'db> CallableUpcastContext<'db> {
     fn is_recursive_reference(self, db: &'db dyn Db, function: FunctionType<'db>) -> bool {
         self.recursive_definition
             .is_some_and(|definition| function.contains_definition(db, definition))
+    }
+
+    fn is_recursive_constructor_reference(self, db: &'db dyn Db, class: ClassType<'db>) -> bool {
+        self.recursive_definition
+            .is_some_and(|definition| class.constructor_uses_definition(db, definition))
     }
 }
 
@@ -553,6 +571,10 @@ impl<'db> CallableTypes<'db> {
 
     pub(crate) fn one(callable: CallableType<'db>) -> Self {
         CallableTypes(smallvec_inline![callable])
+    }
+
+    pub(crate) fn bottom(db: &'db dyn Db) -> Self {
+        Self::one(CallableType::bottom(db))
     }
 
     pub(crate) fn from_elements(callables: impl IntoIterator<Item = CallableType<'db>>) -> Self {

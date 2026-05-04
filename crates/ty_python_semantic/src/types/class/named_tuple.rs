@@ -112,6 +112,11 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
     }
 }
 
+pub(super) fn synthesized_namedtuple_class_member_uses_fields(db: &dyn Db, name: &str) -> bool {
+    matches!(name, "__new__" | "_replace")
+        || (name == "__replace__" && Program::get(db).python_version(db) >= PythonVersion::PY313)
+}
+
 #[derive(Debug, salsa::Update, get_size2::GetSize, Clone, PartialEq, Eq, Hash)]
 pub struct NamedTupleField<'db> {
     pub(crate) name: Name,
@@ -451,6 +456,28 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
 
     pub(super) fn has_known_fields(self, db: &'db dyn Db) -> bool {
         self.spec(db).has_known_fields(db)
+    }
+
+    /// Return whether this named tuple's generated fields can depend on `definition`.
+    ///
+    /// For functional `typing.NamedTuple`, the field types are inferred from the assigned call
+    /// expression, so evaluating a recursive field annotation has that assignment as its active
+    /// definition.
+    pub(crate) fn generated_fields_use_definition(
+        self,
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+    ) -> bool {
+        matches!(
+            self.anchor(db),
+            DynamicNamedTupleAnchor::TypingDefinition(namedtuple_definition)
+                if *namedtuple_definition == definition
+                    || crate::types::definition_dependencies::definition_value_uses_definition(
+                        db,
+                        *namedtuple_definition,
+                        definition,
+                    )
+        )
     }
 }
 
