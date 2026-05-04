@@ -636,19 +636,6 @@ pub(super) struct ProtocolMember<'a, 'db> {
     definition: Option<Definition<'db>>,
 }
 
-/// Walk the types contained in a single protocol interface member.
-///
-/// This lets callers guard recursion at member granularity. In a protocol like this, a caller can
-/// stop walking the recursive `child` member while still visiting `payload` under the nested
-/// specialization:
-///
-/// ```python
-/// from typing import Protocol
-///
-/// class Proto[T](Protocol):
-///     child: "Proto[list[T]]"
-///     payload: T
-/// ```
 pub(super) fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     member: &ProtocolMember<'_, 'db>,

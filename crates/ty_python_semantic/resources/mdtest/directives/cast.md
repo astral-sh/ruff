@@ -97,7 +97,7 @@ def f(x: RecursiveAlias):
     cast(RecursiveAlias, x)
 ```
 
-Recursive protocol walks should still inspect non-recursive members under nested specializations.
+Recursive protocol walks should still inspect guarded members.
 
 ```py
 from typing import Protocol, cast
@@ -109,18 +109,11 @@ class Proto[T](Protocol):
 
 def f(x: Proto[int]):
     cast(Proto[int], x)
-```
-
-Recursive protocol walks should still inspect specialization contents on recursive members.
-
-```py
-from typing import Protocol, cast
-from ty_extensions import Unknown
 
 class RecursiveMemberProto[T](Protocol):
     def next(self) -> tuple["RecursiveMemberProto[tuple[T, Unknown]]", T]: ...
 
-def f(x: RecursiveMemberProto[int]):
+def g(x: RecursiveMemberProto[int]):
     cast(RecursiveMemberProto[int], x)
 ```
 

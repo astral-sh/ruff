@@ -332,23 +332,10 @@ where
     where
         U: Copy + Default + PartialEq,
     {
-        /// Return `true` after the query finds a non-default result.
         fn found_matching_type(&self) -> bool {
             self.found_matching_type.get() != U::default()
         }
 
-        /// Walk a protocol interface with per-member recursion guards.
-        ///
-        /// In this example, the walker can stop the recursive `child` expansion while still
-        /// visiting `payload` for each finite specialization it reaches:
-        ///
-        /// ```python
-        /// from typing import Protocol
-        ///
-        /// class Proto[T](Protocol):
-        ///     child: "Proto[list[T]]"
-        ///     payload: T
-        /// ```
         fn walk_lazy_protocol_instance_type(
             &self,
             db: &'db dyn Db,
@@ -412,10 +399,6 @@ where
             walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
         }
 
-        /// Visit protocol instances using member-level guards for lazy interface walks.
-        ///
-        /// Non-lazy walks keep using [`walk_protocol_instance_type`], which visits only the
-        /// already-materialized specialization for class-based protocols.
         fn visit_protocol_instance_type(
             &self,
             db: &'db dyn Db,

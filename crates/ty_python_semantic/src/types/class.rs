@@ -829,10 +829,6 @@ pub enum ClassType<'db> {
 }
 
 /// The identity of a member on a statement-defined class under a specific specialization.
-///
-/// This lets recursive walkers and relation checks guard recursion at member granularity. For
-/// example, `Proto[list[int]].child` can be recognized as recursive growth from
-/// `Proto[int].child` without stopping unrelated members on the same class.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(super) struct ClassMemberKey<'db> {
     class: StaticClassLiteral<'db>,
@@ -854,10 +850,6 @@ impl<'db> ClassMemberKey<'db> {
     }
 
     /// Create a member key for a type whose members come from a statement-defined class.
-    ///
-    /// This covers class instances such as `Node[int]`, protocol instances such as `Proto[int]`,
-    /// and class objects such as `type[Node[int]]`. Other types return `None` and continue to use
-    /// their exact type-pair recursion guards.
     pub(super) fn from_type_member(
         db: &'db dyn Db,
         ty: Type<'db>,

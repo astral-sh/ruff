@@ -1076,16 +1076,6 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
 
 impl<'db> Specialization<'db> {
     /// Return `true` if `self` recursively wraps the type arguments from `previous`.
-    ///
-    /// For example, `Proto[list[int]]` is a recursive expansion of `Proto[int]` because the
-    /// new type argument contains the previous one:
-    ///
-    /// ```python
-    /// from typing import Protocol
-    ///
-    /// class Proto[T](Protocol):
-    ///     child: "Proto[list[T]]"
-    /// ```
     pub(super) fn is_recursive_expansion_of(self, db: &'db dyn Db, previous: Self) -> bool {
         if self == previous || self.generic_context(db) != previous.generic_context(db) {
             return false;

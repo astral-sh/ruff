@@ -579,7 +579,7 @@ def f(
     reveal_type(a)  # revealed: () -> Foo
     reveal_type(b)  # revealed: (int, /) -> Bar
     reveal_type(c)  # revealed: <class 'Bar'> | (() -> Bar)
-    reveal_type(d)  # revealed: <class 'Foo'> | CustomCallback
+    reveal_type(d)  # revealed: CustomCallback
 ```
 
 [syntax in the typing spec]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
