@@ -1211,7 +1211,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     }
                 }
                 Type::TypeVar(tvar) => find_underlying_class(db, tvar.typevar(db).upper_bound(db)?),
-                Type::TypeAlias(alias) => find_underlying_class(db, alias.value_type(db)),
+                Type::TypeAlias(_) => ty.visit_type_alias_value_or_default(db, |value_ty| {
+                    find_underlying_class(db, value_ty)
+                }),
                 _ => None,
             }
         }

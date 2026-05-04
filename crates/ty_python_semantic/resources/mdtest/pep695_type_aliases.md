@@ -443,7 +443,7 @@ def _(x: Bar[int]):
 
 ```py
 from typing import Callable, Iterator, Literal, TypedDict, overload
-from ty_extensions import all_members, has_member
+from ty_extensions import Intersection, Not, all_members, has_member
 
 class RecursiveItem: ...
 
@@ -542,6 +542,81 @@ def decorated(x: int) -> int:
     return x
 
 reveal_type(decorated)  # revealed: ((int, /) -> int) | Unknown
+
+type RecursiveCallableSpecialization[T] = Callable[[], RecursiveCallableSpecialization[list[T]]]
+
+def reveal_recursive_callable_specialization(x: RecursiveCallableSpecialization[int]):
+    reveal_type(x)  # revealed: () -> RecursiveCallableSpecialization[list[int]]
+
+type RecursiveTruthinessSpecialization[T] = int | RecursiveTruthinessSpecialization[list[T]]
+
+def reveal_recursive_truthiness_specialization(x: RecursiveTruthinessSpecialization[int]):
+    reveal_type(x)  # revealed: int
+
+def positive_intersection_recursive_truthiness_specialization(
+    x: Intersection[RecursiveTruthinessSpecialization[int], object],
+):
+    reveal_type(x)  # revealed: int
+
+def negative_recursive_truthiness_specialization(
+    x: Not[RecursiveTruthinessSpecialization[int]],
+):
+    reveal_type(x)  # revealed: ~int & ~RecursiveTruthinessSpecialization[list[int]]
+
+def negative_intersection_recursive_truthiness_specialization(
+    x: Intersection[object, Not[RecursiveTruthinessSpecialization[int]]],
+):
+    reveal_type(x)  # revealed: ~int & ~RecursiveTruthinessSpecialization[list[list[int]]]
+
+def bool_recursive_specialization(x: RecursiveTruthinessSpecialization[int]):
+    if x:
+        pass
+
+def infer_recursive_truthiness_specialization[T](x: RecursiveTruthinessSpecialization[T]) -> T:
+    raise NotImplementedError
+
+def call_infer_recursive_truthiness_specialization(x: RecursiveTruthinessSpecialization[int]):
+    infer_recursive_truthiness_specialization(x)
+
+def accept_negative_recursive_truthiness_specialization[T](x: T) -> None:
+    pass
+
+def call_accept_negative_recursive_truthiness_specialization(
+    x: Not[RecursiveTruthinessSpecialization[int]],
+):
+    accept_negative_recursive_truthiness_specialization(x)
+
+def compare_recursive_specialization(x: RecursiveTruthinessSpecialization[int]):
+    reveal_type(x == 1)  # revealed: bool
+
+def binary_recursive_specialization(x: RecursiveTruthinessSpecialization[int]):
+    reveal_type(x + 1)  # revealed: int
+
+type RecursiveSubscriptSpecialization[T] = list[RecursiveSubscriptSpecialization[list[T]]]
+
+def head_recursive_subscript_specialization[T](x: RecursiveSubscriptSpecialization[T]) -> T:
+    raise NotImplementedError
+
+def call_head_recursive_subscript_specialization(x: RecursiveSubscriptSpecialization[int]):
+    reveal_type(head_recursive_subscript_specialization(x))  # revealed: int
+
+def subscript_recursive_specialization(x: RecursiveSubscriptSpecialization[int]):
+    reveal_type(x[0])  # revealed: list[RecursiveSubscriptSpecialization[list[list[int]]]]
+
+type RecursiveClassInfoSpecialization[T] = type[int] | RecursiveClassInfoSpecialization[list[T]]
+
+def isinstance_recursive_specialization(obj: object, classinfo: RecursiveClassInfoSpecialization[int]):
+    if isinstance(obj, classinfo):
+        reveal_type(obj)  # revealed: object
+
+def issubclass_recursive_specialization(obj: type[object], classinfo: RecursiveClassInfoSpecialization[int]):
+    if issubclass(obj, classinfo):
+        reveal_type(obj)  # revealed: type
+
+def match_recursive_classinfo_specialization(obj: object, classinfo: RecursiveClassInfoSpecialization[int]):
+    match obj:
+        case classinfo():
+            reveal_type(obj)  # revealed: object
 
 class BaseWithMethod:
     def method(self) -> None: ...
@@ -830,6 +905,26 @@ type CallableGuard = TypeGuard[Callable[[], CallableGuard]]
 
 reveal_type(CallableIs)  # revealed: TypeAliasType
 reveal_type(CallableGuard)  # revealed: TypeAliasType
+```
+
+### Recursive generic aliases in special forms don't stack overflow
+
+```py
+from typing import Literal, reveal_type
+from typing_extensions import TypeIs
+
+type RecursiveLiteralSpecialization[T] = Literal[1] | RecursiveLiteralSpecialization[list[T]]
+type RecursiveIsSpecialization[T] = int | RecursiveIsSpecialization[list[T]]
+type RecursiveDuplicateSpecialization[T] = RecursiveIsSpecialization[T] | RecursiveIsSpecialization[T]
+
+def is_recursive(x: object) -> TypeIs[RecursiveIsSpecialization[int]]:
+    return True
+
+reveal_type(RecursiveLiteralSpecialization)  # revealed: TypeAliasType
+reveal_type(RecursiveDuplicateSpecialization)  # revealed: TypeAliasType
+
+# error: [invalid-type-form] "Type arguments for `Literal` must be `None`, a literal value (int, bool, str, or bytes), or an enum member"
+x: Literal[RecursiveLiteralSpecialization[int]]
 ```
 
 ### Recursive alias in binary operators doesn't stack overflow

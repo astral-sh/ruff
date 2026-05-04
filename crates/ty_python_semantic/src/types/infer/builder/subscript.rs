@@ -73,9 +73,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .collect_vec();
                     (!keys.is_empty()).then(|| UnionType::from_elements(db, keys))
                 }
-                Type::TypeAlias(alias) => {
-                    visitor.visit(ty, || imp(db, alias.value_type(db), visitor))
-                }
+                Type::TypeAlias(_) => visitor.visit(ty, || {
+                    ty.visit_type_alias_value_or_default(db, |value_ty| imp(db, value_ty, visitor))
+                }),
                 _ => None,
             }
         }
