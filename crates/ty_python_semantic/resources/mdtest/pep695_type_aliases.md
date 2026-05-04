@@ -661,7 +661,7 @@ def expand_recursive_tuple_argument(x: RecursiveTuple):
 def overloaded_recursive_tuple_variadic(x: int) -> int: ...
 @overload
 def overloaded_recursive_tuple_variadic(x: int, y: int) -> str: ...
-def overloaded_recursive_tuple_variadic(*args: object) -> object:
+def overloaded_recursive_tuple_variadic(*args: object, **kwargs: object) -> object:
     return args
 
 def expand_recursive_variadic_tuple_argument(x: RecursiveTuple):

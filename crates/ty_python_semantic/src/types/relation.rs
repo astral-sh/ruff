@@ -814,6 +814,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
         signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
+        invariant_relation_visitor: &'a InvariantRelationVisitor<'db>,
+        alias_relation_visitor: &'a AliasRelationVisitor<'db>,
         materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
@@ -825,6 +827,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             relation_visitor,
             disjointness_visitor,
             signature_relation_visitor,
+            invariant_relation_visitor,
+            alias_relation_visitor,
             materialization_visitor,
         }
     }
@@ -834,6 +838,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
         signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
+        invariant_relation_visitor: &'a InvariantRelationVisitor<'db>,
+        alias_relation_visitor: &'a AliasRelationVisitor<'db>,
         materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
@@ -845,6 +851,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             relation_visitor,
             disjointness_visitor,
             signature_relation_visitor,
+            invariant_relation_visitor,
+            alias_relation_visitor,
             materialization_visitor,
         }
     }

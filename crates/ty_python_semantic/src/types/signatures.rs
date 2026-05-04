@@ -1152,12 +1152,16 @@ impl<'db> Signature<'db> {
         let relation_visitor = HasRelationToVisitor::default(&constraints);
         let disjointness_visitor = IsDisjointVisitor::default(&constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
+        let invariant_relation_visitor = InvariantRelationVisitor::default();
+        let alias_relation_visitor = AliasRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::constraint_set_assignability_with_context(
             &constraints,
             &relation_visitor,
             &disjointness_visitor,
             &signature_relation_visitor,
+            &invariant_relation_visitor,
+            &alias_relation_visitor,
             &materialization_visitor,
         );
 
@@ -1186,12 +1190,16 @@ impl<'db> Signature<'db> {
         let relation_visitor = HasRelationToVisitor::default(&constraints);
         let disjointness_visitor = IsDisjointVisitor::default(&constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
+        let invariant_relation_visitor = InvariantRelationVisitor::default();
+        let alias_relation_visitor = AliasRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::assignability_with_context(
             &constraints,
             &relation_visitor,
             &disjointness_visitor,
             &signature_relation_visitor,
+            &invariant_relation_visitor,
+            &alias_relation_visitor,
             &materialization_visitor,
         );
 
