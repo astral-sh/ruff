@@ -11,7 +11,6 @@ use crate::{
         Parameter, Parameters, Signature, SubclassOfInner, Type, TypeContext, TypeMapping,
         TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
-        cyclic::ActiveRecursionDetector,
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
@@ -51,22 +50,8 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         policy: UpcastPolicy,
     ) -> Option<CallableTypes<'db>> {
-        let recursion_detector = ActiveRecursionDetector::default();
-        self.try_upcast_to_callable_with_policy_impl(db, policy, &recursion_detector)
-    }
-
-    fn try_upcast_to_callable_with_policy_impl(
-        self,
-        db: &'db dyn Db,
-        policy: UpcastPolicy,
-        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-    ) -> Option<CallableTypes<'db>> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.try_upcast_to_callable_with_policy_impl(
-                db,
-                policy,
-                recursion_detector,
-            );
+            return fallback.try_upcast_to_callable_with_policy(db, policy);
         }
 
         match self {
@@ -100,9 +85,7 @@ impl<'db> Type<'db> {
                 if let Place::Defined(place) = call_symbol
                     && place.is_definitely_defined()
                 {
-                    place
-                        .ty
-                        .try_upcast_to_callable_with_policy_impl(db, policy, recursion_detector)
+                    place.ty.try_upcast_to_callable_with_policy(db, policy)
                 } else {
                     None
                 }
@@ -115,7 +98,7 @@ impl<'db> Type<'db> {
 
             Type::NewTypeInstance(newtype) => newtype
                 .concrete_base_type(db)
-                .try_upcast_to_callable_with_policy_impl(db, policy, recursion_detector),
+                .try_upcast_to_callable_with_policy(db, policy),
 
             Type::SubclassOf(subclass_of_ty) if policy == UpcastPolicy::Sound => {
                 Some(CallableTypes::one(CallableType::function_like(
@@ -131,11 +114,7 @@ impl<'db> Type<'db> {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         let upcast_callables = bound
                             .to_meta_type(db)
-                            .try_upcast_to_callable_with_policy_impl(
-                                db,
-                                policy,
-                                recursion_detector,
-                            )?;
+                            .try_upcast_to_callable_with_policy(db, policy)?;
                         Some(upcast_callables.map(|callable| {
                             let signatures = callable
                                 .signatures(db)
@@ -153,11 +132,7 @@ impl<'db> Type<'db> {
                         for constraint in constraints.elements(db) {
                             let element_upcast = constraint
                                 .to_meta_type(db)
-                                .try_upcast_to_callable_with_policy_impl(
-                                    db,
-                                    policy,
-                                    recursion_detector,
-                                )?;
+                                .try_upcast_to_callable_with_policy(db, policy)?;
                             for callable in element_upcast.into_inner() {
                                 let signatures = callable
                                     .signatures(db)
@@ -186,11 +161,8 @@ impl<'db> Type<'db> {
             Type::Union(union) => {
                 let mut callables = SmallVec::new();
                 for element in union.elements(db) {
-                    let element_callable = element.try_upcast_to_callable_with_policy_impl(
-                        db,
-                        policy,
-                        recursion_detector,
-                    )?;
+                    let element_callable =
+                        element.try_upcast_to_callable_with_policy(db, policy)?;
                     callables.extend(element_callable.into_inner());
                 }
                 Some(CallableTypes::new(callables))
@@ -199,17 +171,14 @@ impl<'db> Type<'db> {
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Enum(enum_literal) => enum_literal
                     .enum_class_instance(db)
-                    .try_upcast_to_callable_with_policy_impl(db, policy, recursion_detector),
+                    .try_upcast_to_callable_with_policy(db, policy),
                 _ => None,
             },
 
             Type::TypeAlias(_) => self.visit_type_alias_value(
                 db,
-                recursion_detector,
                 || Some(CallableTypes::one(CallableType::unknown(db))),
-                |value_ty| {
-                    value_ty.try_upcast_to_callable_with_policy_impl(db, policy, recursion_detector)
-                },
+                |value_ty| value_ty.try_upcast_to_callable_with_policy(db, policy),
             ),
 
             Type::KnownBoundMethod(method) => Some(CallableTypes::one(CallableType::new(

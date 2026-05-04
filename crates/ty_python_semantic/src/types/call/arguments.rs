@@ -6,7 +6,6 @@ use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
 use crate::Db;
-use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::tuple::Tuple;
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
@@ -496,15 +495,6 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
 ///
 /// In other words, it returns `true` if [`expand_type`] returns [`Some`] for the given type.
 pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    let recursion_detector = ActiveRecursionDetector::default();
-    is_expandable_type_impl(db, ty, &recursion_detector)
-}
-
-fn is_expandable_type_impl<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-) -> bool {
     match ty {
         Type::NominalInstance(instance) => {
             let class = instance.class(db);
@@ -512,16 +502,14 @@ fn is_expandable_type_impl<'db>(
                 || instance.tuple_spec(db).is_some_and(|spec| match &*spec {
                     Tuple::Fixed(fixed_length_tuple) => fixed_length_tuple
                         .iter_all_elements()
-                        .any(|element| is_expandable_type_impl(db, element, recursion_detector)),
+                        .any(|element| is_expandable_type(db, element)),
                     Tuple::Variable(_) => false,
                 })
                 || enum_metadata(db, class.class_literal(db)).is_some()
         }
         Type::Union(_) => true,
         Type::TypeAlias(_) => {
-            ty.visit_type_alias_value_or_default(db, recursion_detector, |value_ty| {
-                is_expandable_type_impl(db, value_ty, recursion_detector)
-            })
+            ty.visit_type_alias_value_or_default(db, |value_ty| is_expandable_type(db, value_ty))
         }
         _ => false,
     }
@@ -531,15 +519,6 @@ fn is_expandable_type_impl<'db>(
 ///
 /// Returns [`None`] if the type cannot be expanded.
 fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
-    let recursion_detector = ActiveRecursionDetector::default();
-    expand_type_impl(db, ty, &recursion_detector)
-}
-
-fn expand_type_impl<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-) -> Option<Vec<Type<'db>>> {
     // NOTE: Update `is_expandable_type` if this logic changes accordingly.
     match ty {
         Type::NominalInstance(instance) => {
@@ -560,8 +539,7 @@ fn expand_type_impl<'db>(
                         let per_element: Vec<_> = fixed_length_tuple
                             .iter_all_elements()
                             .map(|element| {
-                                expand_type_impl(db, element, recursion_detector)
-                                    .unwrap_or_else(|| vec![element])
+                                expand_type(db, element).unwrap_or_else(|| vec![element])
                             })
                             .collect();
 
@@ -594,9 +572,7 @@ fn expand_type_impl<'db>(
         Type::Union(union) => Some(union.elements(db).to_vec()),
         // For type aliases, expand the underlying value type.
         Type::TypeAlias(_) => {
-            ty.visit_type_alias_value_or_default(db, recursion_detector, |value_ty| {
-                expand_type_impl(db, value_ty, recursion_detector)
-            })
+            ty.visit_type_alias_value_or_default(db, |value_ty| expand_type(db, value_ty))
         }
         // We don't handle `type[A | B]` here because it's already stored in the expanded form
         // i.e., `type[A] | type[B]` which is handled by the `Type::Union` case.

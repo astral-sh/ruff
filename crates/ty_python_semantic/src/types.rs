@@ -22,9 +22,9 @@ use smallvec::smallvec_inline;
 use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
 pub(crate) use self::callable::UpcastPolicy;
-use self::cyclic::ActiveRecursionDetector;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
+use self::cyclic::visit_type_alias;
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
@@ -1383,24 +1383,11 @@ impl<'db> Type<'db> {
     /// If this type is a `Type::TypeAlias`, recursively resolves it to its
     /// underlying value type. Otherwise, returns `self` unchanged.
     pub(crate) fn resolve_type_alias(self, db: &'db dyn Db) -> Type<'db> {
-        let recursion_detector = ActiveRecursionDetector::default();
-        self.resolve_type_alias_impl(db, &recursion_detector)
-    }
-
-    fn resolve_type_alias_impl(
-        self,
-        db: &'db dyn Db,
-        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-    ) -> Type<'db> {
         match self {
-            Type::TypeAlias(alias) => recursion_detector.visit(
-                &self,
+            Type::TypeAlias(alias) => visit_type_alias(
+                alias,
                 || self,
-                || {
-                    alias
-                        .value_type(db)
-                        .resolve_type_alias_impl(db, recursion_detector)
-                },
+                || alias.value_type(db).resolve_type_alias(db),
             ),
             _ => self,
         }
@@ -1413,12 +1400,11 @@ impl<'db> Type<'db> {
     pub(crate) fn visit_type_alias_value<R>(
         self,
         db: &'db dyn Db,
-        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
         on_cycle: impl FnOnce() -> R,
         visit_value: impl FnOnce(Type<'db>) -> R,
     ) -> R {
         if let Type::TypeAlias(alias) = self {
-            recursion_detector.visit(&self, on_cycle, || visit_value(alias.value_type(db)))
+            visit_type_alias(alias, on_cycle, || visit_value(alias.value_type(db)))
         } else {
             visit_value(self)
         }
@@ -1431,10 +1417,9 @@ impl<'db> Type<'db> {
     pub(crate) fn visit_type_alias_value_or_default<R: Default>(
         self,
         db: &'db dyn Db,
-        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
         visit_value: impl FnOnce(Type<'db>) -> R,
     ) -> R {
-        self.visit_type_alias_value(db, recursion_detector, R::default, visit_value)
+        self.visit_type_alias_value(db, R::default, visit_value)
     }
 
     /// If this type is a type alias, visit its value type with active-recursion tracking.
@@ -1445,10 +1430,9 @@ impl<'db> Type<'db> {
     pub(crate) fn visit_type_alias_value_or_assume_valid(
         self,
         db: &'db dyn Db,
-        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
         visit_value: impl FnOnce(Type<'db>) -> bool,
     ) -> bool {
-        self.visit_type_alias_value(db, recursion_detector, || true, visit_value)
+        self.visit_type_alias_value(db, || true, visit_value)
     }
 
     /// Returns `Some(UnionType)` if this type behaves like a union. Apart from explicit unions,
@@ -1458,6 +1442,34 @@ impl<'db> Type<'db> {
             Type::Union(union) => Some(union),
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).as_union_like(db),
             _ => None,
+        }
+    }
+
+    /// Visits each element if this type behaves like a union.
+    ///
+    /// Unlike [`Type::as_union_like`], this keeps active type-alias recursion state alive while
+    /// visiting the elements. Use this for recursive walks over alias-backed unions.
+    pub(crate) fn visit_union_like_elements(
+        self,
+        db: &'db dyn Db,
+        visit_element: &mut impl FnMut(Type<'db>),
+    ) -> bool {
+        match self {
+            Type::Union(union) => {
+                for element in union.elements(db) {
+                    visit_element(*element);
+                }
+                true
+            }
+            Type::TypeAlias(_) => self.visit_type_alias_value(
+                db,
+                || true,
+                |value_ty| value_ty.visit_union_like_elements(db, visit_element),
+            ),
+            Type::NewTypeInstance(newtype) => newtype
+                .concrete_base_type(db)
+                .visit_union_like_elements(db, visit_element),
+            _ => false,
         }
     }
 
@@ -2245,15 +2257,6 @@ impl<'db> Type<'db> {
     /// Note: This function aims to have no false positives, but might return `false`
     /// for more complicated types that are actually singletons.
     pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
-        let recursion_detector = ActiveRecursionDetector::default();
-        self.is_singleton_impl(db, &recursion_detector)
-    }
-
-    fn is_singleton_impl(
-        self,
-        db: &'db dyn Db,
-        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-    ) -> bool {
         match self {
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => false,
 
@@ -2303,7 +2306,7 @@ impl<'db> Type<'db> {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
                         .elements(db)
                         .iter()
-                        .all(|constraint| constraint.is_singleton_impl(db, recursion_detector)),
+                        .all(|constraint| constraint.is_singleton(db)),
                 }
             }
 
@@ -2371,27 +2374,14 @@ impl<'db> Type<'db> {
             Type::TypeGuard(type_guard) => type_guard.is_bound(db),
             Type::TypedDict(_) => false,
             Type::TypeAlias(_) => {
-                self.visit_type_alias_value_or_default(db, recursion_detector, |value_ty| {
-                    value_ty.is_singleton_impl(db, recursion_detector)
-                })
+                self.visit_type_alias_value_or_default(db, |value_ty| value_ty.is_singleton(db))
             }
-            Type::NewTypeInstance(newtype) => newtype
-                .concrete_base_type(db)
-                .is_singleton_impl(db, recursion_detector),
+            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_singleton(db),
         }
     }
 
     /// Return true if this type is non-empty and all inhabitants of this type compare equal.
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
-        let recursion_detector = ActiveRecursionDetector::default();
-        self.is_single_valued_impl(db, &recursion_detector)
-    }
-
-    pub(crate) fn is_single_valued_impl(
-        self,
-        db: &'db dyn Db,
-        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-    ) -> bool {
         match self {
             // Each `partial()` call creates a distinct object at runtime.
             Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_)) => false,
@@ -2434,7 +2424,7 @@ impl<'db> Type<'db> {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
                         .elements(db)
                         .iter()
-                        .all(|constraint| constraint.is_single_valued_impl(db, recursion_detector)),
+                        .all(|constraint| constraint.is_single_valued(db)),
                 }
             }
 
@@ -2443,12 +2433,8 @@ impl<'db> Type<'db> {
                 false
             }
 
-            Type::NominalInstance(instance) => {
-                instance.is_single_valued_impl(db, recursion_detector)
-            }
-            Type::NewTypeInstance(newtype) => newtype
-                .concrete_base_type(db)
-                .is_single_valued_impl(db, recursion_detector),
+            Type::NominalInstance(instance) => instance.is_single_valued(db),
+            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_single_valued(db),
 
             Type::BoundSuper(_) => {
                 // At runtime two super instances never compare equal, even if their arguments are identical.
@@ -2464,9 +2450,7 @@ impl<'db> Type<'db> {
             Type::TypeGuard(type_guard) => type_guard.is_bound(db),
 
             Type::TypeAlias(_) => {
-                self.visit_type_alias_value_or_default(db, recursion_detector, |value_ty| {
-                    value_ty.is_single_valued_impl(db, recursion_detector)
-                })
+                self.visit_type_alias_value_or_default(db, |value_ty| value_ty.is_single_valued(db))
             }
 
             Type::Dynamic(_)
@@ -3525,9 +3509,11 @@ impl<'db> Type<'db> {
                     .member_lookup_with_policy(db, name, policy)
             }
 
-            Type::TypeAlias(alias) => alias
-                .value_type(db)
-                .member_lookup_with_policy(db, name, policy),
+            Type::TypeAlias(_) => self.visit_type_alias_value(
+                db,
+                || Place::Undefined.into(),
+                |value_ty| value_ty.member_lookup_with_policy(db, name, policy),
+            ),
 
             _ if policy.no_instance_fallback() => self.invoke_descriptor_protocol(
                 db,
@@ -3771,11 +3757,7 @@ impl<'db> Type<'db> {
     /// In the second case, the return type of `len()` in `typeshed` (`int`)
     /// is used as a fallback.
     fn len(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        fn non_negative_int_literal_impl<'db>(
-            db: &'db dyn Db,
-            ty: Type<'db>,
-            recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-        ) -> Option<Type<'db>> {
+        fn non_negative_int_literal_impl<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
             match ty {
                 // TODO: Emit diagnostic for non-integers and negative integers
                 Type::LiteralValue(literal) => match literal.kind() {
@@ -3783,14 +3765,12 @@ impl<'db> Type<'db> {
                     LiteralValueTypeKind::Bool(value) => Some(Type::int_literal(i64::from(value))),
                     _ => None,
                 },
-                Type::Union(union) => union.try_map(db, |element| {
-                    non_negative_int_literal_impl(db, *element, recursion_detector)
-                }),
-                Type::TypeAlias(_) => {
-                    ty.visit_type_alias_value_or_default(db, recursion_detector, |value_ty| {
-                        non_negative_int_literal_impl(db, value_ty, recursion_detector)
-                    })
+                Type::Union(union) => {
+                    union.try_map(db, |element| non_negative_int_literal_impl(db, *element))
                 }
+                Type::TypeAlias(_) => ty.visit_type_alias_value_or_default(db, |value_ty| {
+                    non_negative_int_literal_impl(db, value_ty)
+                }),
                 _ => None,
             }
         }
@@ -3819,8 +3799,7 @@ impl<'db> Type<'db> {
             Err(CallDunderError::CallError(_, bindings)) => bindings.return_type(db),
         };
 
-        let recursion_detector = ActiveRecursionDetector::default();
-        non_negative_int_literal_impl(db, return_ty, &recursion_detector)
+        non_negative_int_literal_impl(db, return_ty)
     }
 
     /// If this type is a `ParamSpec` type variable, returns it. Otherwise, returns `None`.
@@ -3909,23 +3888,8 @@ impl<'db> Type<'db> {
     /// elements. It's usually best to only worry about "callability" relative to a particular
     /// argument list, via [`try_call`][Self::try_call] and [`CallErrorKind::NotCallable`].
     fn bindings(self, db: &'db dyn Db) -> Bindings<'db> {
-        let recursion_detector = ActiveRecursionDetector::default();
-        self.bindings_impl(db, &recursion_detector)
-    }
-
-    /// Returns dynamic call bindings used as the conservative fallback for recursive callability.
-    fn unknown_bindings() -> Bindings<'db> {
-        let unknown = Type::unknown();
-        Binding::single(unknown, Signature::dynamic(unknown)).into()
-    }
-
-    fn bindings_impl(
-        self,
-        db: &'db dyn Db,
-        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-    ) -> Bindings<'db> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.bindings_impl(db, recursion_detector);
+            return fallback.bindings(db);
         }
 
         match self {
@@ -3937,16 +3901,14 @@ impl<'db> Type<'db> {
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => CallableBinding::not_callable(self).into(),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        bound.bindings_impl(db, recursion_detector)
-                    }
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.bindings(db),
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         Bindings::from_union(
                             self,
                             constraints
                                 .elements(db)
                                 .iter()
-                                .map(|constraint| constraint.bindings_impl(db, recursion_detector)),
+                                .map(|constraint| constraint.bindings(db)),
                         )
                     }
                 }
@@ -4190,20 +4152,17 @@ impl<'db> Type<'db> {
                 SubclassOfInner::TypeVar(tvar) => {
                     let constructor_instance_type = Type::TypeVar(tvar);
                     let bindings = match tvar.typevar(db).bound_or_constraints(db) {
-                        None => KnownClass::Type
-                            .to_instance(db)
-                            .bindings_impl(db, recursion_detector),
+                        None => KnownClass::Type.to_instance(db).bindings(db),
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                            bound.to_meta_type(db).bindings_impl(db, recursion_detector)
+                            bound.to_meta_type(db).bindings(db)
                         }
                         Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                             Bindings::from_union(
                                 self,
-                                constraints.elements(db).iter().map(|constraint| {
-                                    constraint
-                                        .to_meta_type(db)
-                                        .bindings_impl(db, recursion_detector)
-                                }),
+                                constraints
+                                    .elements(db)
+                                    .iter()
+                                    .map(|constraint| constraint.to_meta_type(db).bindings(db)),
                             )
                         }
                     };
@@ -4252,7 +4211,7 @@ impl<'db> Type<'db> {
                         definedness: boundness,
                         ..
                     }) => {
-                        let mut bindings = dunder_callable.bindings_impl(db, recursion_detector);
+                        let mut bindings = dunder_callable.bindings(db);
                         bindings.replace_callable_type(dunder_callable, self);
                         if boundness == Definedness::PossiblyUndefined {
                             bindings.set_dunder_call_is_possibly_unbound();
@@ -4275,14 +4234,14 @@ impl<'db> Type<'db> {
                 union
                     .elements(db)
                     .iter()
-                    .map(|element| element.bindings_impl(db, recursion_detector)),
+                    .map(|element| element.bindings(db)),
             ),
 
             Type::Intersection(intersection) => Bindings::from_intersection(
                 self,
                 intersection
                     .positive_elements_or_object(db)
-                    .map(|element| element.bindings_impl(db, recursion_detector)),
+                    .map(|element| element.bindings(db)),
             ),
 
             Type::DataclassDecorator(_) => {
@@ -4307,9 +4266,9 @@ impl<'db> Type<'db> {
             Type::SpecialForm(_) => CallableBinding::not_callable(self).into(),
 
             Type::LiteralValue(literal) => match literal.kind() {
-                LiteralValueTypeKind::Enum(enum_literal) => enum_literal
-                    .enum_class_instance(db)
-                    .bindings_impl(db, recursion_detector),
+                LiteralValueTypeKind::Enum(enum_literal) => {
+                    enum_literal.enum_class_instance(db).bindings(db)
+                }
                 _ => CallableBinding::not_callable(self).into(),
             },
 
@@ -4327,19 +4286,18 @@ impl<'db> Type<'db> {
             .into(),
 
             Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)) => {
-                Type::Callable(partial.partial(db)).bindings_impl(db, recursion_detector)
+                Type::Callable(partial.partial(db)).bindings(db)
             }
 
-            Type::KnownInstance(known_instance) => known_instance
-                .instance_fallback(db)
-                .bindings_impl(db, recursion_detector),
+            Type::KnownInstance(known_instance) => {
+                known_instance.instance_fallback(db).bindings(db)
+            }
 
-            Type::TypeAlias(_) => self.visit_type_alias_value(
-                db,
-                recursion_detector,
-                Self::unknown_bindings,
-                |value_ty| value_ty.bindings_impl(db, recursion_detector),
-            ),
+            Type::TypeAlias(_) => {
+                self.visit_type_alias_value(db, Self::unknown_bindings, |value_ty| {
+                    value_ty.bindings(db)
+                })
+            }
 
             Type::PropertyInstance(_)
             | Type::AlwaysFalsy
@@ -4350,6 +4308,12 @@ impl<'db> Type<'db> {
             | Type::TypeGuard(_)
             | Type::TypedDict(_) => CallableBinding::not_callable(self).into(),
         }
+    }
+
+    /// Returns dynamic call bindings used as the conservative fallback for recursive callability.
+    fn unknown_bindings() -> Bindings<'db> {
+        let unknown = Type::unknown();
+        Binding::single(unknown, Signature::dynamic(unknown)).into()
     }
 
     fn known_class_literal_bindings(
@@ -5664,24 +5628,13 @@ impl<'db> Type<'db> {
     /// See `Self::dunder_class` for more details.
     #[must_use]
     pub(crate) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
-        let recursion_detector = ActiveRecursionDetector::default();
-        self.to_meta_type_impl(db, &recursion_detector)
-    }
-
-    fn to_meta_type_impl(
-        self,
-        db: &'db dyn Db,
-        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-    ) -> Type<'db> {
         match self {
             Type::Never => Type::Never,
             Type::NominalInstance(instance) => instance.to_meta_type(db),
             Type::KnownInstance(known_instance) => known_instance.to_meta_type(db),
             Type::SpecialForm(special_form) => special_form.to_meta_type(db),
             Type::PropertyInstance(_) => KnownClass::Property.to_class_literal(db),
-            Type::Union(union) => union.map(db, |element| {
-                element.to_meta_type_impl(db, recursion_detector)
-            }),
+            Type::Union(union) => union.map(db, |element| element.to_meta_type(db)),
             Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_class_literal(db),
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_class_literal(db),
@@ -5731,20 +5684,17 @@ impl<'db> Type<'db> {
             },
             Type::TypeAlias(_) => self.visit_type_alias_value(
                 db,
-                recursion_detector,
                 || {
                     let expanded = self.expand_eagerly(db);
                     if expanded == self {
                         Type::unknown()
                     } else {
-                        expanded.to_meta_type_impl(db, recursion_detector)
+                        expanded.to_meta_type(db)
                     }
                 },
-                |value_ty| value_ty.to_meta_type_impl(db, recursion_detector),
+                |value_ty| value_ty.to_meta_type(db),
             ),
-            Type::NewTypeInstance(newtype) => newtype
-                .concrete_base_type(db)
-                .to_meta_type_impl(db, recursion_detector),
+            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).to_meta_type(db),
         }
     }
 

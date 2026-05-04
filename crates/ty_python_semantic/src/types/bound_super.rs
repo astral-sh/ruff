@@ -13,7 +13,6 @@ use crate::{
         SubclassOfType, Type, TypeVarBoundOrConstraints, UnionBuilder,
         constraints::ConstraintSet,
         context::InferContext,
-        cyclic::ActiveRecursionDetector,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
         relation::EquivalenceChecker,
         signatures::{Parameter, Parameters, Signature},
@@ -488,24 +487,8 @@ impl<'db> BoundSuperType<'db> {
         pivot_class_type: Type<'db>,
         owner_type: Type<'db>,
     ) -> Result<Type<'db>, BoundSuperError<'db>> {
-        let recursion_detector = ActiveRecursionDetector::default();
-        Self::build_impl(db, pivot_class_type, owner_type, &recursion_detector)
-    }
-
-    fn build_impl(
-        db: &'db dyn Db,
-        pivot_class_type: Type<'db>,
-        owner_type: Type<'db>,
-        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-    ) -> Result<Type<'db>, BoundSuperError<'db>> {
-        let delegate_to = |type_to_delegate_to| {
-            BoundSuperType::build_impl(
-                db,
-                pivot_class_type,
-                type_to_delegate_to,
-                recursion_detector,
-            )
-        };
+        let delegate_to =
+            |type_to_delegate_to| BoundSuperType::build(db, pivot_class_type, type_to_delegate_to);
 
         // Delegate but rewrite errors to preserve TypeVar context.
         let delegate_with_error_mapped =
@@ -756,12 +739,7 @@ impl<'db> BoundSuperType<'db> {
                 return Ok(builder.build());
             }
             Type::TypeAlias(_) => {
-                return owner_type.visit_type_alias_value(
-                    db,
-                    recursion_detector,
-                    || Ok(Type::unknown()),
-                    delegate_to,
-                );
+                return owner_type.visit_type_alias_value(db, || Ok(Type::unknown()), delegate_to);
             }
             Type::TypeVar(bound_typevar) => {
                 let typevar = bound_typevar.typevar(db);

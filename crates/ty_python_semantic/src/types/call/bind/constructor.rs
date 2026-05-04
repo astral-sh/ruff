@@ -2,7 +2,6 @@ use super::{ArgumentForms, Binding, Bindings, CallableBinding, CallableItem};
 use crate::db::Db;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
-use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::Specialization;
 use crate::types::signatures::Parameter;
 use crate::types::{BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext};
@@ -567,28 +566,17 @@ fn constructor_returns_instance<'db>(
     class_literal: ClassLiteral<'db>,
     return_ty: Type<'db>,
 ) -> bool {
-    let recursion_detector = ActiveRecursionDetector::default();
-    constructor_returns_instance_impl(db, class_literal, return_ty, &recursion_detector)
-}
-
-fn constructor_returns_instance_impl<'db>(
-    db: &'db dyn Db,
-    class_literal: ClassLiteral<'db>,
-    return_ty: Type<'db>,
-    recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-) -> bool {
     match return_ty {
-        Type::TypeAlias(_) => {
-            return_ty.visit_type_alias_value_or_assume_valid(db, recursion_detector, |value_ty| {
-                constructor_returns_instance_impl(db, class_literal, value_ty, recursion_detector)
-            })
-        }
-        Type::Union(union) => union.elements(db).iter().all(|element| {
-            constructor_returns_instance_impl(db, class_literal, *element, recursion_detector)
+        Type::TypeAlias(_) => return_ty.visit_type_alias_value_or_assume_valid(db, |value_ty| {
+            constructor_returns_instance(db, class_literal, value_ty)
         }),
-        Type::Intersection(intersection) => intersection.iter_positive(db).any(|element| {
-            constructor_returns_instance_impl(db, class_literal, element, recursion_detector)
-        }),
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| constructor_returns_instance(db, class_literal, *element)),
+        Type::Intersection(intersection) => intersection
+            .iter_positive(db)
+            .any(|element| constructor_returns_instance(db, class_literal, element)),
         // Spec says an explicit `Any` return type should be considered non-instance.
         Type::Dynamic(DynamicType::Any) => false,
         // But a missing return annotation should be considered instance.
