@@ -161,6 +161,22 @@ def f(x: Foo[int]):
     reveal_type(x.foo())  # revealed: int
 ```
 
+## Attribute assignment through generic aliases
+
+```py
+class ConfigEntry[T]:
+    data: dict[str, object]
+    runtime_data: T
+
+class RuntimeData:
+    def __init__(self, value: object): ...
+
+type RuntimeDataConfigEntry = ConfigEntry[RuntimeData]
+
+def f(entry: RuntimeDataConfigEntry):
+    entry.runtime_data = RuntimeData(entry.data["key"])
+```
+
 ## Stringified values
 
 Stringifying the right-hand side of a type alias is redundant, but allowed:
