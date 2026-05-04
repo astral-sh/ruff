@@ -373,6 +373,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.cycle_recovery
     }
 
+    pub(super) fn recursive_type_expression_definition(&self) -> Option<Definition<'db>> {
+        self.typevar_binding_context.or(match self.region {
+            InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition) => {
+                Some(definition)
+            }
+            InferenceRegion::Statement(_)
+            | InferenceRegion::Expression(_, _)
+            | InferenceRegion::FunctionDecorators(_)
+            | InferenceRegion::Scope(_, _) => None,
+        })
+    }
+
     fn extend_cycle_recovery(&mut self, other: Option<Type<'db>>) {
         if let Some(other) = other {
             match self.cycle_recovery {
