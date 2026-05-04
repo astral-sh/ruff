@@ -1667,7 +1667,7 @@ from typing import Union
 Recursive = list[Union["Recursive", None]]
 
 def _(r: Recursive):
-    reveal_type(r)  # revealed: list[Divergent]
+    reveal_type(r)  # revealed: list[Recursive | None]
 ```
 
 ### New union syntax
@@ -1695,12 +1695,27 @@ def _(
     recursive_dict3: RecursiveDict3,
     recursive_dict4: RecursiveDict4,
 ):
-    reveal_type(recursive_list1)  # revealed: list[Divergent]
-    reveal_type(recursive_list2)  # revealed: list[Divergent]
-    reveal_type(recursive_dict1)  # revealed: dict[str, Divergent]
-    reveal_type(recursive_dict2)  # revealed: dict[str, Divergent]
-    reveal_type(recursive_dict3)  # revealed: dict[Divergent, int]
-    reveal_type(recursive_dict4)  # revealed: dict[Divergent, int]
+    reveal_type(recursive_list1)  # revealed: list[RecursiveList1 | None]
+    reveal_type(recursive_list2)  # revealed: list[RecursiveList2 | None]
+    reveal_type(recursive_dict1)  # revealed: dict[str, RecursiveDict1 | None]
+    reveal_type(recursive_dict2)  # revealed: dict[str, RecursiveDict2 | None]
+    reveal_type(recursive_dict3)  # revealed: dict[RecursiveDict3, int]
+    reveal_type(recursive_dict4)  # revealed: dict[RecursiveDict4, int]
+```
+
+### Mutually recursive implicit type aliases
+
+```py
+A = list["B"]
+B = list["A"]
+
+C = list["D"]
+D = int
+
+def _(a: A, b: B, c: C):
+    reveal_type(a)  # revealed: list[B]
+    reveal_type(b)  # revealed: list[A]
+    reveal_type(c)  # revealed: list[int]
 ```
 
 ### Self-referential generic implicit type aliases

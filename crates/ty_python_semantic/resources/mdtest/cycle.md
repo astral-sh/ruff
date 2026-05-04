@@ -45,10 +45,8 @@ from typing import Union, TypeAliasType, Sequence, Mapping
 A = list["A | None"]
 
 def f(x: A):
-    # TODO: should be `list[A | None]`?
-    reveal_type(x)  # revealed: list[Divergent]
-    # TODO: should be `A | None`?
-    reveal_type(x[0])  # revealed: Divergent
+    reveal_type(x)  # revealed: list[A | None]
+    reveal_type(x[0])  # revealed: list[A | None] | None
 
 JSONPrimitive = Union[str, int, float, bool, None]
 JSONValue = TypeAliasType("JSONValue", 'Union[JSONPrimitive, Sequence["JSONValue"], Mapping[str, "JSONValue"]]')
@@ -172,7 +170,7 @@ from typing import reveal_type
 class G:
     pass
 
-type RecursiveAlias = G | RecursiveAlias
+type RecursiveAlias = G | RecursiveAlias  # error: [cyclic-type-alias-definition]
 
 class C:
     x: RecursiveAlias

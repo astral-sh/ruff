@@ -661,6 +661,14 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
     }
 }
 
+/// A fully specified invariant relation check used as an active-recursion key.
+///
+/// Materializing both sides of an invariant container can re-enter the same relation through a
+/// recursive alias:
+///
+/// ```python
+/// type RecursiveList = list[RecursiveList]
+/// ```
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub(super) struct InvariantRelationGoal<'db> {
     source_type: Type<'db>,
@@ -671,6 +679,14 @@ pub(super) struct InvariantRelationGoal<'db> {
 }
 
 impl<'db> InvariantRelationGoal<'db> {
+    /// Creates an active-recursion key for one invariant source/target relation.
+    ///
+    /// The materialization kinds are part of the key because the same type pair can be checked in
+    /// distinct top and bottom positions for recursive aliases such as:
+    ///
+    /// ```python
+    /// type RecursiveList = list[RecursiveList]
+    /// ```
     pub(super) const fn new(
         source_type: Type<'db>,
         source_materialization: MaterializationKind,

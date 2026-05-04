@@ -429,12 +429,11 @@ def flag() -> bool:
 
 t = int if flag() else str
 
-# error: [invalid-argument-type] "Argument to function `issubclass` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["str"]"
+# error: [invalid-argument-type] "Argument to function `issubclass` is incorrect: Expected `type | UnionType | tuple[_ClassInfo, ...]`, found `Literal["str"]"
 if issubclass(t, "str"):
     reveal_type(t)  # revealed: <class 'int'> | <class 'str'>
 
-# TODO: this should cause us to emit a diagnostic during
-# type checking
+# error: [invalid-argument-type] "Argument to function `issubclass` is incorrect: Expected `type | UnionType | tuple[_ClassInfo, ...]`, found `tuple[<class 'bytes'>, Literal["str"]]`"
 if issubclass(t, (bytes, "str")):
     reveal_type(t)  # revealed: <class 'int'> | <class 'str'>
 

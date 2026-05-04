@@ -132,8 +132,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         match expression {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => {
+                    if let Some(type_alias) = self.self_referential_legacy_type_alias(name) {
+                        return Type::TypeAlias(type_alias);
+                    }
+
                     let ty = self.infer_name_expression(name);
-                    self.infer_name_or_attribute_type_expression(ty, expression)
+                    let ty = self.infer_name_or_attribute_type_expression(ty, expression);
+                    if let Some(type_alias) = self.divergent_legacy_type_alias_reference(name, ty) {
+                        return Type::TypeAlias(type_alias);
+                    }
+                    ty
                 }
                 ast::ExprContext::Invalid => Type::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => {
@@ -1535,8 +1543,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         }
                     }
                 }
-                KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(_)) => {
-                    // TODO: support generic "manual" PEP 695 type aliases
+                KnownInstanceType::TypeAliasType(
+                    TypeAliasType::ManualPEP695(_) | TypeAliasType::Legacy(_),
+                ) => {
+                    // TODO: support generic non-PEP695 type aliases.
                     let slice_ty = self.infer_expression(slice, TypeContext::default());
                     let mut variables = FxOrderSet::default();
                     slice_ty.bind_and_find_all_legacy_typevars(

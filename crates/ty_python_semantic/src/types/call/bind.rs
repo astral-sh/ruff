@@ -6238,6 +6238,34 @@ fn invalid_dataclass_target<'db>(
 }
 
 impl<'db> BindingError<'db> {
+    fn is_valid_classinfo_with_special_form(
+        db: &'db dyn Db,
+        function: KnownFunction,
+        ty: Type<'db>,
+    ) -> Option<bool> {
+        match ty {
+            Type::ClassLiteral(_) => Some(false),
+            Type::SpecialForm(special_form)
+                if special_form.is_valid_isinstance_target()
+                    || (function == KnownFunction::IsSubclass
+                        && special_form == SpecialFormType::Any) =>
+            {
+                Some(true)
+            }
+            Type::KnownInstance(KnownInstanceType::UnionType(_)) => Some(false),
+            Type::NominalInstance(nominal) => {
+                let tuple = nominal.tuple_spec(db)?;
+                tuple
+                    .iter_all_elements()
+                    .try_fold(false, |contains, element| {
+                        Self::is_valid_classinfo_with_special_form(db, function, element)
+                            .map(|element_contains| contains || element_contains)
+                    })
+            }
+            _ => None,
+        }
+    }
+
     /// Returns `true` if this error indicates the overload didn't match the call arguments.
     ///
     /// Returns `false` for semantic errors where the overload matched the types but the
@@ -6300,15 +6328,19 @@ impl<'db> BindingError<'db> {
                 // error-prone, due to the fact that they are annotated with recursive type aliases.
                 if parameter.index == 1
                     && *argument_index == Some(1)
+                    && let Some(function) = callable_ty
+                        .as_function_literal()
+                        .and_then(|function| function.known(context.db()))
                     && matches!(
-                        callable_ty
-                            .as_function_literal()
-                            .and_then(|function| function.known(context.db())),
-                        Some(KnownFunction::IsInstance | KnownFunction::IsSubclass)
+                        function,
+                        KnownFunction::IsInstance | KnownFunction::IsSubclass
                     )
-                    && provided_ty
-                        .as_special_form()
-                        .is_some_and(SpecialFormType::is_valid_isinstance_target)
+                    && Self::is_valid_classinfo_with_special_form(
+                        context.db(),
+                        function,
+                        *provided_ty,
+                    )
+                    .is_some_and(|contains_special_form| contains_special_form)
                 {
                     return;
                 }

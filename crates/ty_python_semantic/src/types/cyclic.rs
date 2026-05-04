@@ -52,9 +52,19 @@ pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<Tag, (Type<'db>, Type<'
 enum TypeAliasKey {
     PEP695(salsa::Id),
     ManualPEP695(salsa::Id),
+    Legacy(salsa::Id),
 }
 
 impl TypeAliasKey {
+    /// Converts a type alias into an active-recursion key that preserves the alias kind.
+    ///
+    /// Distinguishing the alias kind keeps unrelated aliases with the same Salsa id space from
+    /// colliding when expanding definitions such as:
+    ///
+    /// ```python
+    /// type PEP695 = list[PEP695]
+    /// Legacy = list["Legacy"]
+    /// ```
     fn from_type_alias(db: &dyn Db, type_alias: TypeAliasType<'_>) -> Self {
         match type_alias {
             TypeAliasType::PEP695(type_alias) => {
@@ -63,6 +73,7 @@ impl TypeAliasKey {
             TypeAliasType::ManualPEP695(type_alias) => {
                 TypeAliasKey::ManualPEP695(type_alias.definition(db).as_id())
             }
+            TypeAliasType::Legacy(type_alias) => TypeAliasKey::Legacy(type_alias.as_id()),
         }
     }
 }
@@ -72,6 +83,15 @@ std::thread_local! {
         ActiveRecursionDetector::default();
 }
 
+/// Runs `func` while recording that a type alias is actively being expanded.
+///
+/// If the same alias is encountered again before `func` returns, `on_cycle` supplies the
+/// conservative result for that recursive edge. This keeps operations over aliases productive for
+/// definitions such as:
+///
+/// ```python
+/// type Json = None | bool | int | str | list[Json] | dict[str, Json]
+/// ```
 pub(crate) fn visit_type_alias<R>(
     db: &dyn Db,
     type_alias: TypeAliasType<'_>,
@@ -249,6 +269,7 @@ struct ActiveRecursionGuard<'a, T: Hash + Eq> {
 }
 
 impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
+    /// Removes the active recursion key when the guarded expansion scope exits.
     fn drop(&mut self) {
         self.seen.borrow_mut().remove(self.item);
     }
