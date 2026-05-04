@@ -57,6 +57,7 @@ use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_text_size::Ranged;
+use salsa::plumbing::AsId;
 use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module};
 
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
@@ -64,7 +65,7 @@ use crate::types::call::{Binding, CallArguments};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
-use crate::types::cyclic::visit_recursive_type_normalization;
+use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::diagnostic::{
     ASSERT_TYPE_UNSPELLABLE_SUBTYPE, INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
     TYPE_ASSERTION_FAILURE, report_bad_argument_to_get_protocol_members,
@@ -95,6 +96,40 @@ use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{FileScopeId, SemanticIndex, semantic_index};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct RecursiveTypeNormalizationKey {
+    function_literal: salsa::Id,
+    nested: bool,
+}
+
+std::thread_local! {
+    static ACTIVE_RECURSIVE_TYPE_NORMALIZATIONS: ActiveRecursionDetector<RecursiveTypeNormalizationKey> =
+        ActiveRecursionDetector::default();
+}
+
+/// Runs recursive type normalization under a scoped guard keyed by function literal identity.
+///
+/// `TypeOf` can make a function signature refer back to the same function through many different
+/// type components. Keeping this guard scoped here lets those components keep their ordinary
+/// `recursive_type_normalized_impl(db, div, nested)` signatures.
+fn visit_recursive_type_normalization<R>(
+    function_literal: FunctionLiteral<'_>,
+    nested: bool,
+    on_cycle: impl FnOnce() -> R,
+    func: impl FnOnce() -> R,
+) -> R {
+    ACTIVE_RECURSIVE_TYPE_NORMALIZATIONS.with(|detector| {
+        detector.visit(
+            &RecursiveTypeNormalizationKey {
+                function_literal: function_literal.last_definition.as_id(),
+                nested,
+            },
+            on_cycle,
+            func,
+        )
+    })
+}
 
 /// A collection of useful spans for annotating functions.
 ///

@@ -10,7 +10,7 @@ use crate::types::diagnostic::{
     report_invalid_arguments_to_callable, report_invalid_concatenate_last_arg,
 };
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
-use crate::types::infer::{InferenceFlags, InferenceRegion, TypeExpressionFlags};
+use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
@@ -2063,17 +2063,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let argument_type = self.infer_expression(&arguments[0], TypeContext::default());
 
-                let recursive_definition = self.typevar_binding_context.or(match self.region {
-                    InferenceRegion::Definition(definition)
-                    | InferenceRegion::Deferred(definition) => Some(definition),
-                    InferenceRegion::Statement(_)
-                    | InferenceRegion::Expression(_, _)
-                    | InferenceRegion::FunctionDecorators(_)
-                    | InferenceRegion::Scope(_, _) => None,
-                });
-
                 let Some(callable_type) = argument_type
-                    .try_upcast_to_callable_with_recursive_fallback(db, recursive_definition)
+                    .try_upcast_to_callable_with_recursive_fallback(
+                        db,
+                        self.recursive_type_expression_definition(),
+                    )
                     .map(|callables| {
                         if special_form == SpecialFormType::RegularCallableTypeOf {
                             callables
