@@ -68,8 +68,34 @@ impl TypeAliasKey {
 }
 
 std::thread_local! {
-    static ACTIVE_TYPE_ALIASES: ActiveRecursionDetector<TypeAliasKey> =
-        ActiveRecursionDetector::default();
+    static ACTIVE_TYPE_ALIASES: TypeAliasRecursionVisitor =
+        TypeAliasRecursionVisitor::default();
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct TypeAliasRecursionVisitor {
+    detector: ActiveRecursionDetector<TypeAliasKey>,
+}
+
+impl TypeAliasRecursionVisitor {
+    /// Visits a type alias with active-recursion tracking scoped to this visitor.
+    ///
+    /// Use this for recursive operations that need to share alias-recursion state across nested
+    /// type traversal, without marking the alias as active for unrelated work performed inside the
+    /// operation.
+    pub(crate) fn visit<R>(
+        &self,
+        db: &dyn Db,
+        type_alias: TypeAliasType<'_>,
+        on_cycle: impl FnOnce() -> R,
+        func: impl FnOnce() -> R,
+    ) -> R {
+        self.detector.visit(
+            &TypeAliasKey::from_type_alias(db, type_alias),
+            on_cycle,
+            func,
+        )
+    }
 }
 
 pub(crate) fn visit_type_alias<R>(
@@ -78,13 +104,7 @@ pub(crate) fn visit_type_alias<R>(
     on_cycle: impl FnOnce() -> R,
     func: impl FnOnce() -> R,
 ) -> R {
-    ACTIVE_TYPE_ALIASES.with(|detector| {
-        detector.visit(
-            &TypeAliasKey::from_type_alias(db, type_alias),
-            on_cycle,
-            func,
-        )
-    })
+    ACTIVE_TYPE_ALIASES.with(|visitor| visitor.visit(db, type_alias, on_cycle, func))
 }
 
 #[derive(Debug)]

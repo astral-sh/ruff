@@ -44,6 +44,7 @@ use crate::types::callable::CallableTypeKind;
 use crate::types::class::{ClassLiteral, CodeGeneratorKind, MethodDecorator};
 use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::context::InferContext;
+use crate::types::cyclic::TypeAliasRecursionVisitor;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_TYPE_ALIAS_DEFINITION,
     GeneratorMismatchKind, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT,
@@ -2237,6 +2238,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
         emit_diagnostics: bool,
     ) -> bool {
+        // Attribute assignment validation can infer the RHS while validating the LHS target type.
+        // For example:
+        //
+        //   type Entry = ConfigEntry[RuntimeData]
+        //   def f(entry: Entry):
+        //       entry.runtime_data = RuntimeData(entry.data["key"])
+        //
+        // While validating `entry.runtime_data`, we expand `Entry`. If that expansion uses the
+        // shared thread-local alias guard, then RHS inference of `entry.data` also sees `Entry` as
+        // active and incorrectly treats the member lookup as a recursive alias cycle. Keep alias
+        // recursion state scoped to this LHS validation traversal so unrelated RHS inference gets
+        // its own alias state.
+        self.validate_attribute_assignment_impl(
+            target,
+            object_ty,
+            attribute,
+            infer_value_ty,
+            emit_diagnostics,
+            &TypeAliasRecursionVisitor::default(),
+        )
+    }
+
+    fn validate_attribute_assignment_impl(
+        &mut self,
+        target: &ast::ExprAttribute,
+        object_ty: Type<'db>,
+        attribute: &str,
+        infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
+        emit_diagnostics: bool,
+        alias_visitor: &TypeAliasRecursionVisitor,
+    ) -> bool {
         let db = self.db();
 
         // This closure should only be called if `value_ty` was inferred with `attr_ty` as type context.
@@ -2279,12 +2311,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let value_ty = infer_value_ty.infer_loud(self, TypeContext::default());
 
                 if union.elements(self.db()).iter().all(|elem| {
-                    self.validate_attribute_assignment(
+                    self.validate_attribute_assignment_impl(
                         target,
                         *elem,
                         attribute,
                         &mut |builder, tcx| infer_value_ty.infer_silent(builder, tcx),
                         false,
+                        alias_visitor,
                     )
                 }) {
                     if emit_diagnostics {
@@ -2314,12 +2347,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // TODO: Handle negative intersection elements
                 if intersection.positive(db).iter().any(|elem| {
-                    self.validate_attribute_assignment(
+                    self.validate_attribute_assignment_impl(
                         target,
                         *elem,
                         attribute,
                         &mut |builder, tcx| infer_value_ty.infer_silent(builder, tcx),
                         false,
+                        alias_visitor,
                     )
                 }) {
                     // Perform loud inference using the narrowed type context.
@@ -2349,17 +2383,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            Type::TypeAlias(_) => {
-                object_ty.visit_type_alias_value_or_assume_valid(self.db(), |value_ty| {
-                    self.validate_attribute_assignment(
+            Type::TypeAlias(alias) => alias.visit_value_with_recursion_visitor(
+                db,
+                alias_visitor,
+                || true,
+                |value_ty| {
+                    self.validate_attribute_assignment_impl(
                         target,
                         value_ty,
                         attribute,
                         infer_value_ty,
                         emit_diagnostics,
+                        alias_visitor,
                     )
-                })
-            }
+                },
+            ),
 
             // Super instances do not allow attribute assignment
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {

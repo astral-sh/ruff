@@ -4,8 +4,12 @@ use crate::{
     Db,
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, GenericContext, Type, TypeContext,
-        TypeMapping, cyclic::visit_type_alias, definition_expression_type,
-        display::qualified_name_components_from_scope, generics::Specialization, visitor,
+        TypeMapping,
+        cyclic::{TypeAliasRecursionVisitor, visit_type_alias},
+        definition_expression_type,
+        display::qualified_name_components_from_scope,
+        generics::Specialization,
+        visitor,
     },
 };
 use ty_python_core::{
@@ -262,6 +266,20 @@ impl<'db> TypeAliasType<'db> {
         visit_value: impl FnOnce(Type<'db>) -> R,
     ) -> R {
         visit_type_alias(db, self, on_cycle, || visit_value(self.value_type(db)))
+    }
+
+    /// Visits the alias value type with caller-owned active-recursion tracking.
+    ///
+    /// Use this when the recursive operation should share alias-recursion state across nested type
+    /// traversal, but that state should not apply to unrelated work inside the same call stack.
+    pub(crate) fn visit_value_with_recursion_visitor<R>(
+        self,
+        db: &'db dyn Db,
+        visitor: &TypeAliasRecursionVisitor,
+        on_cycle: impl FnOnce() -> R,
+        visit_value: impl FnOnce(Type<'db>) -> R,
+    ) -> R {
+        visitor.visit(db, self, on_cycle, || visit_value(self.value_type(db)))
     }
 
     /// Visits the alias value type before applying specialization.
