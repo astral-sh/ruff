@@ -50,6 +50,13 @@ jobs:
       - name: "Build ty playground"
         run: npm run build --workspace ty-playground
         working-directory: playground
+      - name: "Verify Pyodide assets"
+        run: |
+          test -f ty/dist/assets/pyodide.asm.js
+          test -f ty/dist/assets/pyodide.asm.wasm
+          test -f ty/dist/assets/pyodide-lock.json
+          test -f ty/dist/assets/python_stdlib.zip
+        working-directory: playground
       - name: "Deploy to Cloudflare Pages"
         if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
         uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3.15.0
