@@ -83,20 +83,6 @@ fn todo_types() {
 
 #[test]
 fn divergent_type() {
-    fn normalize<'db>(
-        db: &'db dyn crate::Db,
-        ty: Type<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Type<'db>> {
-        ty.recursive_type_normalized_impl(
-            db,
-            div,
-            nested,
-            &RecursiveTypeNormalizationVisitor::default(),
-        )
-    }
-
     let db = setup_db();
     let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
     assert!(div.is_dynamic());
@@ -154,8 +140,11 @@ fn divergent_type() {
             .subscript(&db, Type::int_literal(0), ast::ExprContext::Load)
             .is_err()
     );
-    assert_eq!(normalize(&db, top_div, div, true), None);
-    assert_eq!(normalize(&db, bottom_div, div, true), None);
+    assert_eq!(top_div.recursive_type_normalized_impl(&db, div, true), None);
+    assert_eq!(
+        bottom_div.recursive_type_normalized_impl(&db, div, true),
+        None
+    );
 
     // The `Divergent` type must not be eliminated in union with other dynamic types,
     // as this would prevent detection of divergent type inference using `Divergent`.
@@ -220,7 +209,9 @@ fn divergent_type() {
         nested_rec.display(&db).to_string(),
         "list[list[Divergent] | None]"
     );
-    let normalized = normalize(&db, nested_rec, div, false).unwrap();
+    let normalized = nested_rec
+        .recursive_type_normalized_impl(&db, div, false)
+        .unwrap();
     assert_eq!(normalized.display(&db).to_string(), "list[Divergent]");
 
     let recursive_tuple = Type::heterogeneous_tuple(
@@ -242,7 +233,9 @@ fn divergent_type() {
             KnownClass::Str.to_instance(&db),
         ],
     );
-    let normalized = normalize(&db, recursive_tuple, div, false).unwrap();
+    let normalized = recursive_tuple
+        .recursive_type_normalized_impl(&db, div, false)
+        .unwrap();
     assert_eq!(normalized.display(&db).to_string(), "tuple[Divergent, str]");
 
     let recursive_dict = KnownClass::Dict.to_specialized_instance(
@@ -264,12 +257,16 @@ fn divergent_type() {
             ),
         ],
     );
-    let normalized = normalize(&db, recursive_dict, div, false).unwrap();
+    let normalized = recursive_dict
+        .recursive_type_normalized_impl(&db, div, false)
+        .unwrap();
     assert_eq!(normalized.display(&db).to_string(), "dict[str, Divergent]");
 
     let union = UnionType::from_elements(&db, [div, KnownClass::Int.to_instance(&db)]);
     assert_eq!(union.display(&db).to_string(), "Divergent | int");
-    let normalized = normalize(&db, union, div, false).unwrap();
+    let normalized = union
+        .recursive_type_normalized_impl(&db, div, false)
+        .unwrap();
     assert_eq!(normalized.display(&db).to_string(), "int");
 
     // The same can be said about intersections for the `Never` type.

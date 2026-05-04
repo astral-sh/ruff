@@ -26,10 +26,12 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 
 use rustc_hash::{FxHashMap, FxHashSet};
+use salsa::plumbing::AsId;
 
 use crate::Db;
 use crate::FxIndexSet;
 use crate::types::Type;
+use crate::types::function::FunctionLiteral;
 
 pub(crate) type TypeTransformer<'db, Tag> = CycleDetector<Tag, Type<'db>, Type<'db>>;
 
@@ -45,6 +47,40 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
 }
 
 pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<Tag, (Type<'db>, Type<'db>), C>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct RecursiveTypeNormalizationKey {
+    function_literal: salsa::Id,
+    nested: bool,
+}
+
+std::thread_local! {
+    static ACTIVE_RECURSIVE_TYPE_NORMALIZATIONS: ActiveRecursionDetector<RecursiveTypeNormalizationKey> =
+        ActiveRecursionDetector::default();
+}
+
+/// Runs recursive type normalization under a scoped guard keyed by function literal identity.
+///
+/// `TypeOf` can make a function signature refer back to the same function through many different
+/// type components. Keeping this guard scoped here lets those components keep their ordinary
+/// `recursive_type_normalized_impl(db, div, nested)` signatures.
+pub(crate) fn visit_recursive_type_normalization<R>(
+    function_literal: FunctionLiteral<'_>,
+    nested: bool,
+    on_cycle: impl FnOnce() -> R,
+    func: impl FnOnce() -> R,
+) -> R {
+    ACTIVE_RECURSIVE_TYPE_NORMALIZATIONS.with(|detector| {
+        detector.visit(
+            &RecursiveTypeNormalizationKey {
+                function_literal: function_literal.last_definition.as_id(),
+                nested,
+            },
+            on_cycle,
+            func,
+        )
+    })
+}
 
 #[derive(Debug)]
 pub struct CycleDetector<Tag, T, R> {
@@ -193,10 +229,22 @@ impl<T: Hash + Eq + Clone> ActiveRecursionDetector<T> {
             return on_cycle();
         }
 
-        let ret = func();
+        let _guard = ActiveRecursionGuard {
+            seen: &self.seen,
+            item,
+        };
 
-        self.seen.borrow_mut().remove(item);
+        func()
+    }
+}
 
-        ret
+struct ActiveRecursionGuard<'a, T: Hash + Eq> {
+    seen: &'a RefCell<FxHashSet<T>>,
+    item: &'a T,
+}
+
+impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
+    fn drop(&mut self) {
+        self.seen.borrow_mut().remove(self.item);
     }
 }
