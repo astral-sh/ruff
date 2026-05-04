@@ -221,11 +221,40 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
 
 /// Return `true` if union normalization may ask the relation layer about this pair.
 ///
-/// Relation-based simplification can force a protocol interface to be built. While building the
-/// interface for a recursive protocol, that can recursively request interfaces for ever-growing
-/// specializations before the current interface finishes.
-fn can_use_relation_based_simplification(left: Type, right: Type) -> bool {
-    !matches!(left, Type::ProtocolInstance(_)) && !matches!(right, Type::ProtocolInstance(_))
+/// Relation-based simplification can force a protocol interface to be built. While building a
+/// recursive generic protocol interface, that can recursively request interfaces for ever-growing
+/// specializations before the current interface finishes. Non-generic protocols still use the
+/// relation layer: exact interface cycles are handled by Salsa cycle recovery, and preserving
+/// simplification there keeps large real-world unions from growing unnecessarily.
+fn can_use_relation_based_simplification(db: &dyn Db, left: Type, right: Type) -> bool {
+    if is_protocol_instance(left) && is_class_object_type(right)
+        || is_class_object_type(left) && is_protocol_instance(right)
+    {
+        return false;
+    }
+
+    !is_generic_protocol_instance(db, left) && !is_generic_protocol_instance(db, right)
+}
+
+fn is_protocol_instance(ty: Type) -> bool {
+    matches!(ty, Type::ProtocolInstance(_))
+}
+
+fn is_class_object_type(ty: Type) -> bool {
+    matches!(
+        ty,
+        Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
+    )
+}
+
+fn is_generic_protocol_instance(db: &dyn Db, ty: Type) -> bool {
+    if !is_protocol_instance(ty) {
+        return false;
+    }
+
+    ty.nominal_class(db)
+        .and_then(|class| class.static_class_literal(db))
+        .is_some_and(|(_, specialization)| specialization.is_some())
 }
 
 fn is_redundant_for_union_simplification<'db>(
@@ -233,7 +262,7 @@ fn is_redundant_for_union_simplification<'db>(
     left: Type<'db>,
     right: Type<'db>,
 ) -> bool {
-    can_use_relation_based_simplification(left, right) && left.is_redundant_with(db, right)
+    can_use_relation_based_simplification(db, left, right) && left.is_redundant_with(db, right)
 }
 
 fn is_subtype_for_union_simplification<'db>(
@@ -241,7 +270,7 @@ fn is_subtype_for_union_simplification<'db>(
     left: Type<'db>,
     right: Type<'db>,
 ) -> bool {
-    can_use_relation_based_simplification(left, right) && left.is_subtype_of(db, right)
+    can_use_relation_based_simplification(db, left, right) && left.is_subtype_of(db, right)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
