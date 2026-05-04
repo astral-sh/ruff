@@ -64,6 +64,7 @@ use crate::types::call::{Binding, CallArguments};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
+use crate::types::cyclic::visit_recursive_type_normalization;
 use crate::types::diagnostic::{
     ASSERT_TYPE_UNSPELLABLE_SUBTYPE, INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
     TYPE_ASSERTION_FAILURE, report_bad_argument_to_get_protocol_members,
@@ -85,9 +86,8 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
     ClassLiteral, ClassType, DynamicType, FindLegacyTypeVarsVisitor, IntersectionBuilder,
-    KnownClass, KnownInstanceType, RecursiveTypeNormalizationKey,
-    RecursiveTypeNormalizationVisitor, SpecialFormType, SubclassOfInner, SubclassOfType,
-    Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
+    KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
+    Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
     binding_type, definition_expression_type, infer_definition_types, walk_signature,
 };
 use crate::{Db, FxOrderSet};
@@ -1288,24 +1288,24 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
-        visitor.visit(
-            &RecursiveTypeNormalizationKey::Function(self.literal(db), nested),
+        visit_recursive_type_normalization(
+            self.literal(db),
+            nested,
             || None,
             || {
                 let literal = self.literal(db);
                 let updated_signature = match self.updated_signature(db) {
                     Some(signature) => {
-                        Some(signature.recursive_type_normalized_impl(db, div, nested, visitor)?)
+                        Some(signature.recursive_type_normalized_impl(db, div, nested)?)
                     }
                     None => None,
                 };
                 let updated_last_definition_signature =
                     match self.updated_last_definition_signature(db) {
-                        Some(signature) => Some(
-                            signature.recursive_type_normalized_impl(db, div, nested, visitor)?,
-                        ),
+                        Some(signature) => {
+                            Some(signature.recursive_type_normalized_impl(db, div, nested)?)
+                        }
                         None => None,
                     };
                 Some(Self::new(

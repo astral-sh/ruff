@@ -8,9 +8,8 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
         FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
-        RecursiveTypeNormalizationVisitor, Signature, SubclassOfInner, Type, TypeContext,
-        TypeMapping, TypeVarBoundOrConstraints, UnionType,
+        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
+        SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
@@ -496,12 +495,11 @@ impl<'db> CallableType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
         Some(CallableType::new(
             db,
             self.signatures(db)
-                .recursive_type_normalized_impl(db, div, nested, visitor)?,
+                .recursive_type_normalized_impl(db, div, nested)?,
             self.kind(db),
         ))
     }

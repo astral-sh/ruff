@@ -22,7 +22,6 @@ use smallvec::smallvec_inline;
 use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
 pub(crate) use self::callable::UpcastPolicy;
-pub(crate) use self::cyclic::ActiveRecursionDetector;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
 pub(crate) use self::diagnostic::register_lints;
@@ -61,8 +60,8 @@ use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
 use crate::types::enums::enum_metadata;
 use crate::types::function::{
-    DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionLiteral,
-    FunctionSpans, FunctionType, KnownFunction,
+    DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
+    FunctionType, KnownFunction,
 };
 pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{
@@ -331,19 +330,6 @@ pub(crate) type FindLegacyTypeVarsVisitor<'db> = CycleDetector<FindLegacyTypeVar
 #[derive(Debug)]
 pub(crate) struct FindLegacyTypeVars;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) enum RecursiveTypeNormalizationKey<'db> {
-    // Use the stable function literal identity here: recursive normalization can
-    // otherwise keep revisiting the same function through distinct updated signatures.
-    Function(FunctionLiteral<'db>, bool),
-    // Keep `nested` in the key because top-level and nested normalization use
-    // different fallbacks for recursive references.
-    Type(Type<'db>, bool),
-}
-
-pub(crate) type RecursiveTypeNormalizationVisitor<'db> =
-    ActiveRecursionDetector<RecursiveTypeNormalizationKey<'db>>;
-
 /// A [`CycleDetector`] that is used in `visit_specialization` methods.
 pub(crate) type SpecializationVisitor<'db> = CycleDetector<VisitSpecialization, Type<'db>, ()>;
 pub(crate) struct VisitSpecialization;
@@ -606,28 +592,27 @@ impl<'db> PropertyInstanceType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
         let getter = match self.getter(db) {
-            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true, visitor)?),
+            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
             Some(ty) => Some(
-                ty.recursive_type_normalized_impl(db, div, true, visitor)
+                ty.recursive_type_normalized_impl(db, div, true)
                     .unwrap_or(div),
             ),
             None => None,
         };
         let setter = match self.setter(db) {
-            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true, visitor)?),
+            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
             Some(ty) => Some(
-                ty.recursive_type_normalized_impl(db, div, true, visitor)
+                ty.recursive_type_normalized_impl(db, div, true)
                     .unwrap_or(div),
             ),
             None => None,
         };
         let deleter = match self.deleter(db) {
-            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true, visitor)?),
+            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
             Some(ty) => Some(
-                ty.recursive_type_normalized_impl(db, div, true, visitor)
+                ty.recursive_type_normalized_impl(db, div, true)
                     .unwrap_or(div),
             ),
             None => None,
@@ -867,16 +852,15 @@ fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
     guard: T,
     div: Type<'db>,
     nested: bool,
-    visitor: &RecursiveTypeNormalizationVisitor<'db>,
 ) -> Option<Type<'db>> {
     let ty = if nested {
         guard
             .type_argument(db)
-            .recursive_type_normalized_impl(db, div, true, visitor)?
+            .recursive_type_normalized_impl(db, div, true)?
     } else {
         guard
             .type_argument(db)
-            .recursive_type_normalized_impl(db, div, true, visitor)
+            .recursive_type_normalized_impl(db, div, true)
             .unwrap_or(div)
     };
     Some(guard.with_type(db, ty))
@@ -1997,13 +1981,8 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn recursive_type_normalized(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
         cycle.head_ids().fold(self, |ty, id| {
-            ty.recursive_type_normalized_impl(
-                db,
-                Type::divergent(id),
-                false,
-                &RecursiveTypeNormalizationVisitor::default(),
-            )
-            .unwrap_or(Type::divergent(id))
+            ty.recursive_type_normalized_impl(db, Type::divergent(id), false)
+                .unwrap_or(Type::divergent(id))
         })
     }
 
@@ -2028,85 +2007,78 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
         if nested && self.same_divergent_marker(div) {
             return None;
         }
-        visitor.visit(
-            &RecursiveTypeNormalizationKey::Type(self, nested),
-            || None,
-            || match self {
-                Type::Union(union) => {
-                    union.recursive_type_normalized_impl(db, div, nested, visitor)
-                }
-                Type::Intersection(intersection) => intersection
-                    .recursive_type_normalized_impl(db, div, nested, visitor)
-                    .map(Type::Intersection),
-                Type::Callable(callable) => callable
-                    .recursive_type_normalized_impl(db, div, nested, visitor)
-                    .map(Type::Callable),
-                Type::ProtocolInstance(protocol) => protocol
-                    .recursive_type_normalized_impl(db, div, nested, visitor)
-                    .map(Type::ProtocolInstance),
-                Type::NominalInstance(instance) => instance
-                    .recursive_type_normalized_impl(db, div, nested, visitor)
-                    .map(Type::NominalInstance),
-                Type::FunctionLiteral(function) => function
-                    .recursive_type_normalized_impl(db, div, nested, visitor)
-                    .map(Type::FunctionLiteral),
-                Type::PropertyInstance(property) => property
-                    .recursive_type_normalized_impl(db, div, nested, visitor)
-                    .map(Type::PropertyInstance),
-                Type::KnownBoundMethod(method_kind) => method_kind
-                    .recursive_type_normalized_impl(db, div, nested, visitor)
-                    .map(Type::KnownBoundMethod),
-                Type::BoundMethod(method) => method
-                    .recursive_type_normalized_impl(db, div, nested, visitor)
-                    .map(Type::BoundMethod),
-                Type::BoundSuper(bound_super) => bound_super
-                    .recursive_type_normalized_impl(db, div, nested, visitor)
-                    .map(Type::BoundSuper),
-                Type::GenericAlias(generic) => generic
-                    .recursive_type_normalized_impl(db, div, nested, visitor)
-                    .map(Type::GenericAlias),
-                Type::SubclassOf(subclass_of) => subclass_of
-                    .recursive_type_normalized_impl(db, div, nested, visitor)
-                    .map(Type::SubclassOf),
-                Type::TypeVar(_) => Some(self),
-                Type::KnownInstance(known_instance) => known_instance
-                    .recursive_type_normalized_impl(db, div, nested, visitor)
-                    .map(Type::KnownInstance),
-                Type::TypeIs(type_is) => {
-                    recursive_type_normalize_type_guard_like(db, type_is, div, nested, visitor)
-                }
-                Type::TypeGuard(type_guard) => {
-                    recursive_type_normalize_type_guard_like(db, type_guard, div, nested, visitor)
-                }
-                Type::Divergent(_) => Some(self),
-                Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
-                Type::TypedDict(_) => {
-                    // TODO: Normalize TypedDicts
-                    Some(self)
-                }
-                Type::TypeAlias(_) => Some(self),
-                Type::NewTypeInstance(newtype) => newtype
-                    .try_map_base_class_type(db, |class_type| {
-                        class_type.recursive_type_normalized_impl(db, div, nested, visitor)
-                    })
-                    .map(Type::NewTypeInstance),
-                Type::AlwaysFalsy
-                | Type::AlwaysTruthy
-                | Type::Never
-                | Type::WrapperDescriptor(_)
-                | Type::DataclassDecorator(_)
-                | Type::DataclassTransformer(_)
-                | Type::ModuleLiteral(_)
-                | Type::ClassLiteral(_)
-                | Type::SpecialForm(_)
-                | Type::LiteralValue(_) => Some(self),
-            },
-        )
+        match self {
+            Type::Union(union) => union.recursive_type_normalized_impl(db, div, nested),
+            Type::Intersection(intersection) => intersection
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Type::Intersection),
+            Type::Callable(callable) => callable
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Type::Callable),
+            Type::ProtocolInstance(protocol) => protocol
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Type::ProtocolInstance),
+            Type::NominalInstance(instance) => instance
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Type::NominalInstance),
+            Type::FunctionLiteral(function) => function
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Type::FunctionLiteral),
+            Type::PropertyInstance(property) => property
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Type::PropertyInstance),
+            Type::KnownBoundMethod(method_kind) => method_kind
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Type::KnownBoundMethod),
+            Type::BoundMethod(method) => method
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Type::BoundMethod),
+            Type::BoundSuper(bound_super) => bound_super
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Type::BoundSuper),
+            Type::GenericAlias(generic) => generic
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Type::GenericAlias),
+            Type::SubclassOf(subclass_of) => subclass_of
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Type::SubclassOf),
+            Type::TypeVar(_) => Some(self),
+            Type::KnownInstance(known_instance) => known_instance
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Type::KnownInstance),
+            Type::TypeIs(type_is) => {
+                recursive_type_normalize_type_guard_like(db, type_is, div, nested)
+            }
+            Type::TypeGuard(type_guard) => {
+                recursive_type_normalize_type_guard_like(db, type_guard, div, nested)
+            }
+            Type::Divergent(_) => Some(self),
+            Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
+            Type::TypedDict(_) => {
+                // TODO: Normalize TypedDicts
+                Some(self)
+            }
+            Type::TypeAlias(_) => Some(self),
+            Type::NewTypeInstance(newtype) => newtype
+                .try_map_base_class_type(db, |class_type| {
+                    class_type.recursive_type_normalized_impl(db, div, nested)
+                })
+                .map(Type::NewTypeInstance),
+            Type::AlwaysFalsy
+            | Type::AlwaysTruthy
+            | Type::Never
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::ModuleLiteral(_)
+            | Type::ClassLiteral(_)
+            | Type::SpecialForm(_)
+            | Type::LiteralValue(_) => Some(self),
+        }
     }
 
     /// Recursively visit the specialization of a generic class instance.
@@ -5725,17 +5697,11 @@ impl<'db> Type<'db> {
                 }
             }),
 
-            Type::BoundMethod(method) => visitor.visit(db, self, type_mapping, || {
-                Type::BoundMethod(BoundMethodType::new(
-                    db,
-                    method
-                        .function(db)
-                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                    method
-                        .self_instance(db)
-                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                ))
-            }),
+            Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
+                db,
+                method.function(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                method.self_instance(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            )),
 
             Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)) => {
                 match instance.known_class(db) {
@@ -5775,42 +5741,32 @@ impl<'db> Type<'db> {
             }
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
-                visitor.visit(db, self, type_mapping, || {
-                    Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
-                        function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                    ))
-                })
+                Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
+                    function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
             }
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)) => {
-                visitor.visit(db, self, type_mapping, || {
-                    Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(
-                        function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                    ))
-                })
+                Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(
+                    function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
             }
 
             Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(property)) => {
-                visitor.visit(db, self, type_mapping, || {
-                    Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(
-                        property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                    ))
-                })
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(
+                    property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
             }
 
             Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)) => {
-                visitor.visit(db, self, type_mapping, || {
-                    Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(
-                        property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                    ))
-                })
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(
+                    property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
             }
             Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(property)) => {
-                visitor.visit(db, self, type_mapping, || {
-                    Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(
-                        property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                    ))
-                })
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(
+                    property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
             }
 
             Type::Callable(callable) => visitor.visit(db, self, type_mapping, || {
@@ -5827,14 +5783,9 @@ impl<'db> Type<'db> {
 
             Type::SubclassOf(subclass_of) => subclass_of.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
-            Type::PropertyInstance(property) => visitor.visit(db, self, type_mapping, || {
-                Type::PropertyInstance(property.apply_type_mapping_impl(
-                    db,
-                    type_mapping,
-                    tcx,
-                    visitor,
-                ))
-            }),
+            Type::PropertyInstance(property) => {
+                Type::PropertyInstance(property.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+            }
 
             Type::Union(union) => union.map_leave_aliases(db, |element| {
                 element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
@@ -5926,11 +5877,9 @@ impl<'db> Type<'db> {
                             alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                         });
 
-                        let unchanged_alias = alias.value_type(db) == mapped;
-
-                        // If the type mapping does not result in any change to this type alias,
-                        // keep the alias node instead of eagerly expanding it.
-                        if unchanged_alias {
+                        // If the type mapping does not result in any change to this type alias, keep the
+                        // alias node instead of eagerly expanding it.
+                        if alias.value_type(db) == mapped {
                             self
                         } else {
                             mapped

@@ -9,9 +9,8 @@ use crate::{
     types::{
         BindingContext, BoundTypeVarInstance, ClassBase, ClassLiteral, ClassType, GenericContext,
         KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Parameters,
-        PropertyInstanceType, RecursiveTypeNormalizationVisitor, Signature, SubclassOfType, Type,
-        TypeContext, TypeMapping, definition_expression_type, member::Member, mro::Mro,
-        tuple::TupleType,
+        PropertyInstanceType, Signature, SubclassOfType, Type, TypeContext, TypeMapping,
+        definition_expression_type, member::Member, mro::Mro, tuple::TupleType,
     },
 };
 use ty_python_core::{definition::Definition, scope::ScopeId};
@@ -549,7 +548,6 @@ impl<'db> NamedTupleSpec<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
         let fields = self
             .fields(db)
@@ -558,9 +556,9 @@ impl<'db> NamedTupleSpec<'db> {
                 Some(NamedTupleField {
                     name: f.name.clone(),
                     ty: if nested {
-                        f.ty.recursive_type_normalized_impl(db, div, nested, visitor)?
+                        f.ty.recursive_type_normalized_impl(db, div, nested)?
                     } else {
-                        f.ty.recursive_type_normalized_impl(db, div, nested, visitor)
+                        f.ty.recursive_type_normalized_impl(db, div, nested)
                             .unwrap_or(div)
                     },
                     default: None,
