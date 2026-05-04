@@ -278,6 +278,73 @@ fn divergent_type() {
 }
 
 #[test]
+fn materialized_specialization_cache_distinguishes_callable_variance() {
+    use crate::place::global_symbol;
+
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/a.py",
+        r#"
+type Alias[T] = T
+"#,
+    )
+    .unwrap();
+
+    let module = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
+    let ty = global_symbol(&db, module, "Alias").place.expect_type();
+    let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(type_alias))) =
+        ty
+    else {
+        panic!("Expected `Alias` to be a type alias");
+    };
+
+    let generic_context = type_alias.generic_context(&db).unwrap();
+    let typevar = generic_context.variables(&db).next().unwrap();
+    let specialization = generic_context.specialize_partial(&db, [Some(Type::unknown())]);
+    let type_mapping = TypeMapping::ApplySpecializationWithMaterialization {
+        specialization: ApplySpecialization::Specialization(specialization),
+        materialization_kind: MaterializationKind::Top,
+    };
+
+    let int = KnownClass::Int.to_instance(&db);
+    let intersection = IntersectionBuilder::new(&db)
+        .add_positive(Type::TypeVar(typevar))
+        .add_positive(int)
+        .build();
+    assert!(matches!(intersection, Type::Intersection(_)));
+
+    let callable = Type::single_callable(
+        &db,
+        crate::types::signatures::Signature::new(
+            Parameters::new(
+                &db,
+                [
+                    Parameter::positional_only(Some(ruff_python_ast::name::Name::new_static("x")))
+                        .with_annotated_type(intersection),
+                ],
+            ),
+            intersection,
+        ),
+    );
+
+    let Type::Callable(mapped_callable) = callable.apply_type_mapping_impl(
+        &db,
+        &type_mapping,
+        TypeContext::default(),
+        &ApplyTypeMappingVisitor::default(),
+    ) else {
+        panic!("Expected callable");
+    };
+
+    let mapped_signature = &mapped_callable.signatures(&db).overloads[0];
+    assert_eq!(
+        mapped_signature.parameters()[0].annotated_type(),
+        Type::Never
+    );
+    assert_eq!(mapped_signature.return_ty, int);
+}
+
+#[test]
 fn type_alias_variance() {
     use crate::db::tests::TestDb;
     use crate::place::global_symbol;
