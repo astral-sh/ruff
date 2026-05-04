@@ -39,8 +39,8 @@ use crate::types::signatures::{
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
-    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, UnionBuilder,
-    VarianceInferable,
+    FindLegacyTypeVarsVisitor, IntersectionType, RecursiveTypeNormalizationVisitor, TypeContext,
+    TypeMapping, UnionBuilder, VarianceInferable,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet,
@@ -234,12 +234,13 @@ impl<'db> GenericAlias<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
         Some(Self::new(
             db,
             self.origin(db),
             self.specialization(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, div, nested, visitor)?,
         ))
     }
 
@@ -866,11 +867,12 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
         match self {
             Self::NonGeneric(_) => Some(self),
             Self::Generic(generic) => Some(Self::Generic(
-                generic.recursive_type_normalized_impl(db, div, nested)?,
+                generic.recursive_type_normalized_impl(db, div, nested, visitor)?,
             )),
         }
     }

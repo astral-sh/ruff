@@ -5,10 +5,10 @@ use crate::{
     Db,
     types::{
         CallableType, KnownClass, LiteralValueType, LiteralValueTypeKind, Parameter, Parameters,
-        PropertyInstanceType, Signature, StringLiteralType, Type, UnionType,
-        callable::CallableTypeKind, constraints::ConstraintSet, function::FunctionType,
-        known_instance::InternedConstraintSet, relation::TypeRelationChecker,
-        signatures::CallableSignature, visitor,
+        PropertyInstanceType, RecursiveTypeNormalizationVisitor, Signature, StringLiteralType,
+        Type, UnionType, callable::CallableTypeKind, constraints::ConstraintSet,
+        function::FunctionType, known_instance::InternedConstraintSet,
+        relation::TypeRelationChecker, signatures::CallableSignature, visitor,
     },
 };
 
@@ -90,13 +90,14 @@ impl<'db> BoundMethodType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
         Some(Self::new(
             db,
             self.function(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, div, nested, visitor)?,
             self.self_instance(db)
-                .recursive_type_normalized_impl(db, div, true)?,
+                .recursive_type_normalized_impl(db, div, true, visitor)?,
         ))
     }
 }
@@ -193,31 +194,32 @@ impl<'db> KnownBoundMethodType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        visitor: &RecursiveTypeNormalizationVisitor<'db>,
     ) -> Option<Self> {
         match self {
             KnownBoundMethodType::FunctionTypeDunderGet(function) => {
                 Some(KnownBoundMethodType::FunctionTypeDunderGet(
-                    function.recursive_type_normalized_impl(db, div, nested)?,
+                    function.recursive_type_normalized_impl(db, div, nested, visitor)?,
                 ))
             }
             KnownBoundMethodType::FunctionTypeDunderCall(function) => {
                 Some(KnownBoundMethodType::FunctionTypeDunderCall(
-                    function.recursive_type_normalized_impl(db, div, nested)?,
+                    function.recursive_type_normalized_impl(db, div, nested, visitor)?,
                 ))
             }
             KnownBoundMethodType::PropertyDunderGet(property) => {
                 Some(KnownBoundMethodType::PropertyDunderGet(
-                    property.recursive_type_normalized_impl(db, div, nested)?,
+                    property.recursive_type_normalized_impl(db, div, nested, visitor)?,
                 ))
             }
             KnownBoundMethodType::PropertyDunderSet(property) => {
                 Some(KnownBoundMethodType::PropertyDunderSet(
-                    property.recursive_type_normalized_impl(db, div, nested)?,
+                    property.recursive_type_normalized_impl(db, div, nested, visitor)?,
                 ))
             }
             KnownBoundMethodType::PropertyDunderDelete(property) => {
                 Some(KnownBoundMethodType::PropertyDunderDelete(
-                    property.recursive_type_normalized_impl(db, div, nested)?,
+                    property.recursive_type_normalized_impl(db, div, nested, visitor)?,
                 ))
             }
             KnownBoundMethodType::StrStartswith(_)
