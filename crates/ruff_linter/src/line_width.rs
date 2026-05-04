@@ -17,7 +17,7 @@ use ruff_text_size::TextSize;
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct LineLength(
-    #[cfg_attr(feature = "schemars", schemars(range(min = 1, max = 65536)))] NonZeroU16,
+    #[cfg_attr(feature = "schemars", schemars(range(min = 1, max = 65535)))] NonZeroU16,
 );
 
 impl LineLength {
@@ -115,8 +115,8 @@ impl TryFrom<u16> for LineLength {
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match NonZeroU16::try_from(value) {
-            Ok(value) if value.get() <= Self::MAX => Ok(LineLength(value)),
-            Ok(_) | Err(_) => Err(LineLengthFromIntError(value)),
+            Ok(value) => Ok(LineLength(value)),
+            Err(_) => Err(LineLengthFromIntError(value)),
         }
     }
 }
