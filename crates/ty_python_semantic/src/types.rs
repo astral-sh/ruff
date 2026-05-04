@@ -1385,6 +1385,7 @@ impl<'db> Type<'db> {
     pub(crate) fn resolve_type_alias(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::TypeAlias(alias) => visit_type_alias(
+                db,
                 alias,
                 || self,
                 || alias.value_type(db).resolve_type_alias(db),
@@ -1404,7 +1405,7 @@ impl<'db> Type<'db> {
         visit_value: impl FnOnce(Type<'db>) -> R,
     ) -> R {
         if let Type::TypeAlias(alias) = self {
-            visit_type_alias(alias, on_cycle, || visit_value(alias.value_type(db)))
+            visit_type_alias(db, alias, on_cycle, || visit_value(alias.value_type(db)))
         } else {
             visit_value(self)
         }
@@ -6230,15 +6231,14 @@ impl<'db> Type<'db> {
                 );
             }
 
-            Type::TypeAlias(alias) => {
-                visitor.visit(self, || {
-                    alias.value_type(db).find_legacy_typevars_impl(
-                        db,
-                        binding_context,
-                        typevars,
-                        visitor,
-                    );
-                });
+            Type::TypeAlias(_) => {
+                self.visit_type_alias_value(
+                    db,
+                    || (),
+                    |value_ty| {
+                        value_ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                    },
+                );
             }
 
             Type::KnownInstance(known_instance) => match known_instance {

@@ -543,6 +543,16 @@ def decorated(x: int) -> int:
 
 reveal_type(decorated)  # revealed: ((int, /) -> int) | Unknown
 
+type RecursiveListSpecialization[T] = list[RecursiveListSpecialization[list[T]]]
+
+def reveal_recursive_list_specialization(x: RecursiveListSpecialization[int]):
+    reveal_type(x)  # revealed: list[RecursiveListSpecialization[list[int]]]
+
+type RecursiveCallableSpecialization[T] = Callable[[], RecursiveCallableSpecialization[list[T]]]
+
+def reveal_recursive_callable_specialization(x: RecursiveCallableSpecialization[int]):
+    reveal_type(x)  # revealed: () -> RecursiveCallableSpecialization[list[int]]
+
 class BaseWithMethod:
     def method(self) -> None: ...
 
