@@ -1060,6 +1060,31 @@ pub struct Specialization<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for Specialization<'_> {}
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(super) enum RecursiveSpecializationRelation {
+    Exact,
+    Growing,
+    Unrelated,
+}
+
+impl RecursiveSpecializationRelation {
+    pub(super) const fn combine(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Unrelated, _) | (_, Self::Unrelated) => Self::Unrelated,
+            (Self::Growing, _) | (_, Self::Growing) => Self::Growing,
+            (Self::Exact, Self::Exact) => Self::Exact,
+        }
+    }
+
+    pub(super) const fn is_recursive_match(self) -> bool {
+        matches!(self, Self::Exact | Self::Growing)
+    }
+
+    pub(super) const fn is_growing(self) -> bool {
+        matches!(self, Self::Growing)
+    }
+}
+
 pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     specialization: Specialization<'db>,
@@ -1075,23 +1100,36 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> Specialization<'db> {
-    /// Return `true` if `self` recursively wraps the type arguments from `previous`.
-    pub(super) fn is_recursive_expansion_of(self, db: &'db dyn Db, previous: Self) -> bool {
-        if self == previous || self.generic_context(db) != previous.generic_context(db) {
-            return false;
+    /// Classifies how `self` relates to `previous` for recursive specialization guards.
+    pub(super) fn recursive_relation_from(
+        self,
+        db: &'db dyn Db,
+        previous: Self,
+    ) -> RecursiveSpecializationRelation {
+        if self.generic_context(db) != previous.generic_context(db) {
+            return RecursiveSpecializationRelation::Unrelated;
         }
 
-        let mut expanded = false;
+        if self == previous {
+            return RecursiveSpecializationRelation::Exact;
+        }
+
+        let mut growing = false;
         for (current_ty, previous_ty) in self.types(db).iter().zip(previous.types(db)) {
             if current_ty == previous_ty {
                 continue;
             }
             if !any_over_type_expanding_aliases(db, *current_ty, |ty| ty == *previous_ty) {
-                return false;
+                return RecursiveSpecializationRelation::Unrelated;
             }
-            expanded = true;
+            growing = true;
         }
-        expanded
+
+        if growing {
+            RecursiveSpecializationRelation::Growing
+        } else {
+            RecursiveSpecializationRelation::Unrelated
+        }
     }
 
     /// Restricts this specialization to only include the typevars in a generic context. If the
@@ -1978,7 +2016,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> Result<(), ()> {
         let formal_is_single_paramspec = formal_signature.is_single_paramspec().is_some();
 
-        for actual_callable in actual_callables.as_slice() {
+        for actual_callable in actual_callables.iter() {
             if formal_is_single_paramspec {
                 let when = actual_callable
                     .signatures(self.db)

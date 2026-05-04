@@ -661,7 +661,7 @@ error[invalid-overload]: Implementation does not accept all arguments of this ov
 19 |     def update(self, params=(), /, **kwds) -> None:
    |         ------ Implementation defined here
    |
-info: Implementation signature `(self, params=..., /, **kwds) -> None` is not assignable to overload signature `(self, **kwds: Iterable[str]) -> None`
+info: Implementation signature `(self, params=..., /, **kwds) -> None` is not assignable to overload signature `(self, **kwds: str | Iterable[str]) -> None`
 info: parameter `self` is positional-only but must also accept keyword arguments
 ```
 

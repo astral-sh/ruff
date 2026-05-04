@@ -125,6 +125,7 @@ impl<'db> Type<'db> {
                     place
                         .ty
                         .try_upcast_to_callable_with_policy_and_context(db, policy, context)
+                        .map(CallableTypes::requiring_protocol_self_application)
                 } else {
                     None
                 }
@@ -175,20 +176,24 @@ impl<'db> Type<'db> {
                                 .try_upcast_to_callable_with_policy_and_context(
                                     db, policy, context,
                                 )?;
-                            for callable in element_upcast.into_inner() {
-                                let signatures = callable
-                                    .signatures(db)
-                                    .into_iter()
-                                    .map(|sig| sig.clone().with_return_type(Type::TypeVar(tvar)));
-                                callables.push(CallableType::new(
-                                    db,
-                                    CallableSignature::from_overloads(signatures),
-                                    callable.kind(db),
-                                    callable.provenance(db),
-                                ));
-                            }
+                            callables.extend(
+                                element_upcast
+                                    .map(|callable| {
+                                        let signatures =
+                                            callable.signatures(db).into_iter().map(|sig| {
+                                                sig.clone().with_return_type(Type::TypeVar(tvar))
+                                            });
+                                        CallableType::new(
+                                            db,
+                                            CallableSignature::from_overloads(signatures),
+                                            callable.kind(db),
+                                            callable.provenance(db),
+                                        )
+                                    })
+                                    .into_items(),
+                            );
                         }
-                        Some(CallableTypes::new(callables))
+                        Some(CallableTypes::from_items(callables))
                     }
                     None => Some(CallableTypes::one(CallableType::single(
                         db,
@@ -206,9 +211,9 @@ impl<'db> Type<'db> {
                 for element in union.elements(db) {
                     let element_callable = element
                         .try_upcast_to_callable_with_policy_and_context(db, policy, context)?;
-                    callables.extend(element_callable.into_inner());
+                    callables.extend(element_callable.into_items());
                 }
-                Some(CallableTypes::new(callables))
+                Some(CallableTypes::from_items(callables))
             }
 
             Type::LiteralValue(literal) => match literal.kind() {
@@ -609,6 +614,53 @@ impl<'db> CallableType<'db> {
     }
 }
 
+bitflags::bitflags! {
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, salsa::Update)]
+    struct CallableTypeFlags: u8 {
+        /// The callable signature came from a source receiver's `__call__` member.
+        const PROTOCOL_RECEIVER = 1 << 0;
+    }
+}
+
+impl get_size2::GetSize for CallableTypeFlags {}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
+struct CallableTypeWithMetadata<'db> {
+    callable: CallableType<'db>,
+    flags: CallableTypeFlags,
+}
+
+impl<'db> CallableTypeWithMetadata<'db> {
+    fn new(callable: CallableType<'db>) -> Self {
+        Self {
+            callable,
+            flags: CallableTypeFlags::empty(),
+        }
+    }
+
+    fn requiring_protocol_self_application(self) -> Self {
+        Self {
+            flags: self.flags | CallableTypeFlags::PROTOCOL_RECEIVER,
+            ..self
+        }
+    }
+
+    fn map(self, f: impl FnOnce(CallableType<'db>) -> CallableType<'db>) -> Self {
+        Self {
+            callable: f(self.callable),
+            ..self
+        }
+    }
+
+    fn apply_protocol_self(self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
+        if self.flags.contains(CallableTypeFlags::PROTOCOL_RECEIVER) {
+            Self::new(self.callable.apply_self(db, self_type))
+        } else {
+            self
+        }
+    }
+}
+
 /// Converting a type "into a callable" can possibly return a _union_ of callables. Eventually,
 /// when coercing that result to a single type, you'll get a `UnionType`. But this lets you handle
 /// that result as a list of `CallableType`s before merging them into a `UnionType` should that be
@@ -616,51 +668,86 @@ impl<'db> CallableType<'db> {
 ///
 /// Note that this type is guaranteed to contain at least one callable. If you need to support "no
 /// callables" as a possibility, use `Option<CallableTypes>`.
+///
+/// `CallableTypes` also tracks whether a callable was produced from the source receiver's
+/// `__call__` member. Protocol `__call__` checks use that metadata to decide whether `typing.Self`
+/// in the source callable should be specialized to the source receiver type.
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
-pub(crate) struct CallableTypes<'db>(SmallVec<[CallableType<'db>; 1]>);
+pub(crate) struct CallableTypes<'db>(SmallVec<[CallableTypeWithMetadata<'db>; 1]>);
 
 impl<'db> CallableTypes<'db> {
     pub(super) fn new(callables: SmallVec<[CallableType<'db>; 1]>) -> Self {
         assert!(!callables.is_empty(), "CallableTypes should not be empty");
-        CallableTypes(callables)
+        CallableTypes(
+            callables
+                .into_iter()
+                .map(CallableTypeWithMetadata::new)
+                .collect(),
+        )
     }
 
     pub(crate) fn one(callable: CallableType<'db>) -> Self {
-        CallableTypes(smallvec_inline![callable])
+        CallableTypes(smallvec_inline![CallableTypeWithMetadata::new(callable)])
     }
 
     pub(crate) fn from_elements(callables: impl IntoIterator<Item = CallableType<'db>>) -> Self {
         let callables: SmallVec<_> = callables.into_iter().collect();
         assert!(!callables.is_empty(), "CallableTypes should not be empty");
+        Self::new(callables)
+    }
+
+    fn from_items(callables: SmallVec<[CallableTypeWithMetadata<'db>; 1]>) -> Self {
+        assert!(!callables.is_empty(), "CallableTypes should not be empty");
         CallableTypes(callables)
+    }
+
+    fn requiring_protocol_self_application(self) -> Self {
+        Self::from_items(
+            self.0
+                .into_iter()
+                .map(CallableTypeWithMetadata::requiring_protocol_self_application)
+                .collect(),
+        )
     }
 
     pub(crate) fn exactly_one(self) -> Option<CallableType<'db>> {
         match self.0.as_slice() {
-            [single] => Some(*single),
+            [single] => Some(single.callable),
             _ => None,
         }
     }
 
-    pub(super) fn as_slice(&self) -> &[CallableType<'db>] {
-        &self.0
+    pub(super) fn into_inner(self) -> SmallVec<[CallableType<'db>; 1]> {
+        self.0.into_iter().map(|item| item.callable).collect()
     }
 
-    pub(super) fn into_inner(self) -> SmallVec<[CallableType<'db>; 1]> {
+    fn into_items(self) -> SmallVec<[CallableTypeWithMetadata<'db>; 1]> {
         self.0
     }
 
-    pub(super) fn iter(&self) -> std::slice::Iter<'_, CallableType<'db>> {
-        self.0.iter()
+    pub(super) fn iter(&self) -> impl ExactSizeIterator<Item = CallableType<'db>> + '_ {
+        self.0.iter().map(|item| item.callable)
     }
 
     pub(crate) fn into_type(self, db: &'db dyn Db) -> Type<'db> {
         assert!(!self.0.is_empty(), "CallableTypes should not be empty");
-        UnionType::from_elements(db, self.0.into_iter().map(Type::Callable))
+        UnionType::from_elements(
+            db,
+            self.0.into_iter().map(|item| Type::Callable(item.callable)),
+        )
     }
 
     pub(crate) fn map(self, mut f: impl FnMut(CallableType<'db>) -> CallableType<'db>) -> Self {
-        Self::from_elements(self.0.iter().map(|element| f(*element)))
+        Self::from_items(self.0.into_iter().map(|item| item.map(&mut f)).collect())
+    }
+
+    pub(super) fn apply_protocol_self(self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
+        Self::from_items(
+            self.0
+                .into_iter()
+                .map(|item| item.apply_protocol_self(db, self_type))
+                .collect(),
+        )
     }
 
     /// Merges reduced callables into one precise `functools.partial(...)` instance type.
@@ -672,7 +759,7 @@ impl<'db> CallableTypes<'db> {
         let mut overloads = Vec::new();
         let mut seen_overloads = FxHashSet::default();
 
-        for callable in self.0 {
+        for callable in self.into_inner() {
             for signature in callable.signatures(db) {
                 let signature = signature.clone();
                 let dedup_key = signature.clone().with_definition(None);
@@ -691,15 +778,6 @@ impl<'db> CallableTypes<'db> {
             CallableFunctionProvenance::None,
         )
         .into_precise_functools_partial_instance(db, wrapped)
-    }
-}
-
-impl<'a, 'db> IntoIterator for &'a CallableTypes<'db> {
-    type IntoIter = std::slice::Iter<'a, CallableType<'db>>;
-    type Item = &'a CallableType<'db>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
     }
 }
 
@@ -726,7 +804,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target: CallableType<'db>,
     ) -> ConstraintSet<'db, 'c> {
         source.iter().when_all(db, self.constraints, |element| {
-            self.check_callable_pair(db, *element, target)
+            self.check_callable_pair(db, element, target)
         })
     }
 }

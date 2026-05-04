@@ -674,7 +674,7 @@ pub(super) fn walk_protocol_members_with_guard<'db, V>(
                 key,
                 |seen, key| {
                     seen.iter()
-                        .any(|seen_key| key.is_recursive_expansion_from(db, seen_key))
+                        .any(|seen_key| key.recursive_relation_from(db, seen_key).is_growing())
                 },
                 |_| on_recursive_member(protocol),
                 || walk_protocol_member(db, &member, visitor),
@@ -774,13 +774,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     attribute_type
                         .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(self.relation))
                         .when_some_and(db, self.constraints, |callables| {
-                            // A bare callable source has no bound `self` to substitute. Avoid
-                            // walking into recursive callable aliases here; their return types are
-                            // checked under the protocol-member recursion guard below.
-                            let source_callables = if member.name == "__call__"
-                                && matches!(ty, Type::Callable(_))
-                            {
-                                callables
+                            let source_callables = if member.name == "__call__" {
+                                callables.apply_protocol_self(db, fallback_other)
                             } else {
                                 callables.map(|callable| callable.apply_self(db, fallback_other))
                             };
@@ -1135,7 +1130,7 @@ fn cached_protocol_interface<'db>(
                 continue;
             }
 
-            let ty = ty.apply_optional_specialization(db, specialization);
+            let ty = ty.apply_optional_specialization_for_protocol_interface(db, specialization);
 
             let member = match ty {
                 Type::PropertyInstance(property) => ProtocolMemberKind::Property(property),
@@ -1221,6 +1216,10 @@ pub(super) fn has_all_protocol_members_defined<'db>(
                     .all(|member| source_interface.includes_member(db, member.name()))
         }
         _ => target_interface.members(db).all(|member| {
+            if member.name() == "__call__" {
+                return true;
+            }
+
             matches!(
                 ty.member(db, member.name()).place,
                 Place::Defined(DefinedPlace {

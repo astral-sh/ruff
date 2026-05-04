@@ -22,8 +22,11 @@ use crate::types::{
     TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::types::{
-    ErrorContext, ErrorContextTree, Type, class::ClassMemberKey, constraints::ConstraintSet,
-    generics::InferableTypeVars, visitor::find_over_type,
+    ErrorContext, ErrorContextTree, Type,
+    class::ClassMemberKey,
+    constraints::ConstraintSet,
+    generics::{InferableTypeVars, RecursiveSpecializationRelation},
+    visitor::find_over_type,
 };
 
 /// A non-exhaustive enumeration of relations that can exist between types.
@@ -679,16 +682,26 @@ impl<'db> ProtocolMemberSourceKey<'db> {
             .unwrap_or(Self::Type(source))
     }
 
-    fn is_same_or_recursive_expansion_from(&self, db: &'db dyn Db, previous: &Self) -> bool {
+    fn recursive_relation_from(
+        &self,
+        db: &'db dyn Db,
+        previous: &Self,
+    ) -> RecursiveSpecializationRelation {
         match (self, previous) {
             (Self::ClassMember(source), Self::ClassMember(previous_source)) => {
-                source.is_same_or_recursive_expansion_from(db, previous_source)
+                source.recursive_relation_from(db, previous_source)
             }
             (Self::TypeAlias(source), Self::TypeAlias(previous_source)) => {
-                type_alias_is_same_or_recursive_expansion_from(db, *source, *previous_source)
+                source.recursive_relation_from(db, *previous_source)
             }
-            (Self::Type(source), Self::Type(previous_source)) => source == previous_source,
-            _ => false,
+            (Self::Type(source), Self::Type(previous_source)) => {
+                if source == previous_source {
+                    RecursiveSpecializationRelation::Exact
+                } else {
+                    RecursiveSpecializationRelation::Unrelated
+                }
+            }
+            _ => RecursiveSpecializationRelation::Unrelated,
         }
     }
 }
@@ -730,28 +743,6 @@ fn callable_return_type_alias_key<'db>(
         })
 }
 
-/// Return `true` if two alias keys identify the same alias or recursive growth of it.
-fn type_alias_is_same_or_recursive_expansion_from<'db>(
-    db: &'db dyn Db,
-    source: TypeAliasType<'db>,
-    previous: TypeAliasType<'db>,
-) -> bool {
-    if source == previous {
-        return true;
-    }
-
-    if source.definition(db) != previous.definition(db) {
-        return false;
-    }
-
-    let (Some(previous), Some(source)) = (previous.specialization(db), source.specialization(db))
-    else {
-        return false;
-    };
-
-    source.is_recursive_expansion_of(db, previous)
-}
-
 /// Identifies an active protocol-member type-relation check.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct ProtocolMemberRelationKey<'db> {
@@ -773,14 +764,18 @@ impl<'db> ProtocolMemberRelationKey<'db> {
         }
     }
 
-    fn is_same_or_recursive_expansion_from(&self, db: &'db dyn Db, previous: &Self) -> bool {
-        self.relation == previous.relation
-            && self
-                .source
-                .is_same_or_recursive_expansion_from(db, &previous.source)
-            && self
-                .target
-                .is_same_or_recursive_expansion_from(db, &previous.target)
+    fn recursive_relation_from(
+        &self,
+        db: &'db dyn Db,
+        previous: &Self,
+    ) -> RecursiveSpecializationRelation {
+        if self.relation != previous.relation {
+            return RecursiveSpecializationRelation::Unrelated;
+        }
+
+        self.source
+            .recursive_relation_from(db, &previous.source)
+            .combine(self.target.recursive_relation_from(db, &previous.target))
     }
 
     /// Exact recursion closes immediately; growing specialization closes after one unfolded member.
@@ -790,7 +785,10 @@ impl<'db> ProtocolMemberRelationKey<'db> {
         }
 
         seen.iter()
-            .filter(|seen_key| self.is_same_or_recursive_expansion_from(db, seen_key))
+            .filter(|seen_key| {
+                self.recursive_relation_from(db, seen_key)
+                    .is_recursive_match()
+            })
             .nth(1)
             .is_some()
     }
@@ -834,12 +832,14 @@ impl<'db> ProtocolMemberDisjointnessKey<'db> {
         Self { left, right }
     }
 
-    fn is_same_or_recursive_expansion_from(&self, db: &'db dyn Db, previous: &Self) -> bool {
+    fn recursive_relation_from(
+        &self,
+        db: &'db dyn Db,
+        previous: &Self,
+    ) -> RecursiveSpecializationRelation {
         self.left
-            .is_same_or_recursive_expansion_from(db, &previous.left)
-            && self
-                .right
-                .is_same_or_recursive_expansion_from(db, &previous.right)
+            .recursive_relation_from(db, &previous.left)
+            .combine(self.right.recursive_relation_from(db, &previous.right))
     }
 
     /// Exact recursion closes immediately; growing specialization closes after one unfolded member.
@@ -849,7 +849,10 @@ impl<'db> ProtocolMemberDisjointnessKey<'db> {
         }
 
         seen.iter()
-            .filter(|seen_key| self.is_same_or_recursive_expansion_from(db, seen_key))
+            .filter(|seen_key| {
+                self.recursive_relation_from(db, seen_key)
+                    .is_recursive_match()
+            })
             .nth(1)
             .is_some()
     }

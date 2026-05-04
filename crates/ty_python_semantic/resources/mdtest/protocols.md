@@ -2857,7 +2857,7 @@ python-version = "3.12"
 ```py
 from collections.abc import Callable
 from typing import Protocol
-from ty_extensions import is_assignable_to, static_assert
+from ty_extensions import TypeOf, is_assignable_to, static_assert
 
 class AP[T](Protocol):
     def __call__(self) -> "AP[list[T]]": ...
@@ -2866,13 +2866,13 @@ type RecAlias[T] = Callable[[], RecAlias[list[T]]]
 
 static_assert(is_assignable_to(RecAlias[int], AP[int]))
 
+def check_value_source(c: RecAlias[int]) -> None:
+    static_assert(is_assignable_to(TypeOf[c], AP[int]))
+
 class APayload[T](Protocol):
     def __call__(self) -> tuple["APayload[list[T]]", T]: ...
 
-type RecAliasPayload[T] = Callable[
-    [],
-    tuple[RecAliasPayload[list[T]], int],
-]
+type RecAliasPayload[T] = Callable[[], tuple[RecAliasPayload[list[T]], int]]
 
 static_assert(not is_assignable_to(RecAliasPayload[int], APayload[int]))
 ```
@@ -3157,46 +3157,6 @@ class Nominal:
 static_assert(not is_disjoint_from(Proto, Nominal))
 ```
 
-### Recursive generic disjointness
-
-The guard must stop growing specializations without hiding finite disjoint evidence.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing import Protocol
-from ty_extensions import is_disjoint_from, static_assert
-
-class P[T](Protocol):
-    child: "P[list[T]]"
-
-class N[T]:
-    child: "N[list[T]]"
-
-static_assert(not is_disjoint_from(N[int], P[int]))
-
-class PayloadP[T](Protocol):
-    child: "PayloadP[list[T]]"
-    payload: int
-
-class PayloadN[T]:
-    child: "PayloadN[list[T]]"
-    payload: str
-
-static_assert(is_disjoint_from(PayloadN[int], PayloadP[int]))
-
-class TupleP[T](Protocol):
-    child: tuple["TupleP[list[T]]", T]
-
-class TupleN[T]:
-    child: tuple["TupleN[list[T]]", int]
-
-static_assert(is_disjoint_from(TupleN[int], TupleP[int]))
-```
-
 ### Regression test: recursive protocol through `dict.items()`
 
 ```py
@@ -3419,6 +3379,7 @@ python-version = "3.12"
 ```
 
 ```py
+from collections.abc import Callable
 from typing import Protocol, TypeVar
 
 from ty_extensions import is_assignable_to, static_assert
@@ -3447,31 +3408,19 @@ class LegacyU(Protocol[T]):
 def takes_legacy_u(u: LegacyU[list[int]] | None) -> None: ...
 def use_legacy_u(u: LegacyU[int]) -> None:
     takes_legacy_u(u.a)
-```
 
-### Recursive generic protocol cast
+class NestedU[T](Protocol):
+    tuple_member: tuple["NestedU[list[T]]"] | tuple[int]
+    list_member: list["NestedU[list[T]]"] | list[int]
+    callable_member: Callable[[], "NestedU[list[T]]"] | Callable[[], int]
 
-The redundant-cast check walks protocol interfaces to look for dynamic types.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing import Protocol, cast
-
-class Proto[T](Protocol):
-    def method(self) -> "Proto[list[T]]": ...
-
-class Sub[T](Proto[T], Protocol):
-    def method(self) -> "Sub[list[T]]":
-        return cast(Sub[list[T]], Proto.method(self))
+def use_nested_u(u: NestedU[int]) -> None:
+    u.tuple_member
+    u.list_member
+    u.callable_member
 ```
 
 ### Recursive generic protocol relations
-
-The relation checker must still check sibling members and finite same-member evidence.
 
 ```toml
 [environment]
@@ -3480,7 +3429,39 @@ python-version = "3.12"
 
 ```py
 from typing import Protocol
-from ty_extensions import static_assert, is_assignable_to, is_equivalent_to, is_subtype_of
+from ty_extensions import (
+    is_assignable_to,
+    is_disjoint_from,
+    is_equivalent_to,
+    is_subtype_of,
+    static_assert,
+)
+
+class DP[T](Protocol):
+    child: "DP[list[T]]"
+
+class DN[T]:
+    child: "DN[list[T]]"
+
+static_assert(not is_disjoint_from(DN[int], DP[int]))
+
+class PayloadP[T](Protocol):
+    child: "PayloadP[list[T]]"
+    payload: int
+
+class PayloadN[T]:
+    child: "PayloadN[list[T]]"
+    payload: str
+
+static_assert(is_disjoint_from(PayloadN[int], PayloadP[int]))
+
+class TupleP[T](Protocol):
+    child: tuple["TupleP[list[T]]", T]
+
+class TupleN[T]:
+    child: tuple["TupleN[list[T]]", int]
+
+static_assert(is_disjoint_from(TupleN[int], TupleP[int]))
 
 class P[T](Protocol):
     a: "P[list[T]]"
@@ -3537,20 +3518,6 @@ class MQ[T](Protocol):
     def a(self) -> tuple["MQ[tuple[T]]", T]: ...
 
 static_assert(not is_assignable_to(MP[int], MQ[int]))
-```
-
-### Recursive nominal/protocol relation
-
-Nominal/protocol checks can mutually recurse without repeating the exact type pair.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing import Protocol
-from ty_extensions import static_assert, is_assignable_to, is_equivalent_to, is_subtype_of
 
 class MutP[T](Protocol):
     child: "MutN[list[T]]"

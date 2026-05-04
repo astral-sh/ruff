@@ -117,26 +117,30 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
     }
 }
 
-impl<'db, Tag> TypeTransformer<'db, Tag> {
-    fn same_type_identity(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
-        if left == right {
-            return true;
-        }
-
-        match (left, right) {
-            // We can create a self-referential function type: e.g. `def f(x: "TypeOf[f]"): reveal_type(x)`
-            // To avoid the difficulty of equality checking for function types containing this, we simply use `literal` for equality checking.
-            (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => {
-                left.literal(db) == right.literal(db)
-            }
-            // Similarly, we can create a self-referential NewType: e.g. `T = NewType("T", list["T"])`
-            (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => {
-                left.definition(db) == right.definition(db)
-            }
-            _ => false,
-        }
+fn same_type_identity<'db>(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
+    if left == right {
+        return true;
     }
 
+    match (left, right) {
+        // We can create a self-referential function type: e.g. `def f(x: "TypeOf[f]"): reveal_type(x)`
+        // To avoid the difficulty of equality checking for function types containing this, we simply use `literal` for equality checking.
+        (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => {
+            left.literal(db) == right.literal(db)
+        }
+        // Similarly, we can create a self-referential NewType: e.g. `T = NewType("T", list["T"])`
+        (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => {
+            left.definition(db) == right.definition(db)
+        }
+        (Type::TypeAlias(left), Type::TypeAlias(right)) => {
+            left.recursive_relation_from(db, right).is_recursive_match()
+                || right.recursive_relation_from(db, left).is_recursive_match()
+        }
+        _ => false,
+    }
+}
+
+impl<'db, Tag> TypeTransformer<'db, Tag> {
     pub fn visit_type(
         &self,
         db: &'db dyn Db,
@@ -149,12 +153,28 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
                 seen.contains(ty)
                     || seen
                         .iter()
-                        .any(|seen_type| Self::same_type_identity(db, *seen_type, *ty))
+                        .any(|seen_type| same_type_identity(db, *seen_type, *ty))
             },
             // When a cycle is encountered, the type being visited is returned as a fallback (typically a recursive type alias).
             |item| item,
             func,
         )
+    }
+}
+
+impl<'db, Tag> CycleDetector<Tag, Type<'db>, ()> {
+    pub fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>, func: impl FnOnce()) {
+        self.visit_or_else(
+            ty,
+            |seen, ty| {
+                seen.contains(ty)
+                    || seen
+                        .iter()
+                        .any(|seen_type| same_type_identity(db, *seen_type, *ty))
+            },
+            |_| (),
+            func,
+        );
     }
 }
 

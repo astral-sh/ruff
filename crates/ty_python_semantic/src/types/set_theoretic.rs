@@ -136,6 +136,7 @@ impl<'db> UnionType<'db> {
         mapped
     }
 
+    #[cfg(test)]
     /// A version of [`UnionType::map`] that does not unpack type aliases.
     pub(crate) fn map_leave_aliases(
         self,
@@ -163,7 +164,6 @@ impl<'db> UnionType<'db> {
 
         Type::Union(self)
     }
-
     /// A fallible version of [`UnionType::map`].
     ///
     /// For each element in `self`, `transform_fn` is called on that element.

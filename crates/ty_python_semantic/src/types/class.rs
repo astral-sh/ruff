@@ -26,7 +26,8 @@ use crate::types::constraints::{
 use crate::types::enums::enum_metadata;
 use crate::types::function::{AbstractMethodKind, DataclassTransformerParams};
 use crate::types::generics::{
-    GenericContext, InferableTypeVars, Specialization, walk_specialization,
+    GenericContext, InferableTypeVars, RecursiveSpecializationRelation, Specialization,
+    walk_specialization,
 };
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
@@ -860,35 +861,20 @@ impl<'db> ClassMemberKey<'db> {
         Some(Self::new(class, specialization, member_name))
     }
 
-    /// Return `true` if this key is recursive specialization growth from `previous`.
-    pub(super) fn is_recursive_expansion_from(&self, db: &'db dyn Db, previous: &Self) -> bool {
-        if self.class != previous.class || self.member_name != previous.member_name {
-            return false;
-        }
-
-        let (Some(previous), Some(current)) = (previous.specialization, self.specialization) else {
-            return false;
-        };
-        current.is_recursive_expansion_of(db, previous)
-    }
-
-    /// Return `true` if this key is the same member as `previous` and is either the same
-    /// specialization or recursive specialization growth from it.
-    pub(super) fn is_same_or_recursive_expansion_from(
+    /// Classifies this member key relative to a possible recursive ancestor.
+    pub(super) fn recursive_relation_from(
         &self,
         db: &'db dyn Db,
         previous: &Self,
-    ) -> bool {
+    ) -> RecursiveSpecializationRelation {
         if self.class != previous.class || self.member_name != previous.member_name {
-            return false;
+            return RecursiveSpecializationRelation::Unrelated;
         }
 
         match (previous.specialization, self.specialization) {
-            (Some(previous), Some(current)) => {
-                current == previous || current.is_recursive_expansion_of(db, previous)
-            }
-            (None, None) => true,
-            _ => false,
+            (Some(previous), Some(current)) => current.recursive_relation_from(db, previous),
+            (None, None) => RecursiveSpecializationRelation::Exact,
+            _ => RecursiveSpecializationRelation::Unrelated,
         }
     }
 }
