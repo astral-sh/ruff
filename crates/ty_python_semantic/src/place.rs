@@ -1250,8 +1250,10 @@ fn loop_header_reachability_impl<'db>(
     definition: Definition<'db>,
     is_cycle_initial: bool,
 ) -> LoopHeaderReachability<'db> {
+    // These cutoffs were chosen by benchmarking real isort to keep loop analysis
+    // overhead minimal while preserving diagnostics.
     const MAX_EXACT_LOOP_HEADER_REACHABILITY_BINDINGS: usize = 128;
-    const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 2688;
+    const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 2048;
 
     let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
         unreachable!("`loop_header_reachability` called with non-loop-header definition");
@@ -1390,6 +1392,7 @@ fn place_from_bindings_impl<'db>(
             reachability_constraints.evaluate(db, predicates, reachability_constraint)
         })
     };
+
     let mut first_definition = None;
     let mut only_loop_header_bindings = true;
 
