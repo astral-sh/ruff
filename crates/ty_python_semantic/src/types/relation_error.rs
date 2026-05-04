@@ -55,6 +55,41 @@ pub(crate) enum ErrorContext<'db> {
     NotAssignableToNOtherUnionElements {
         n: usize,
     },
+    NotAssignableToIntersectionElement {
+        source: Type<'db>,
+        element: Type<'db>,
+        intersection: Type<'db>,
+    },
+    NoIntersectionElementAssignableToTarget {
+        intersection: Type<'db>,
+        target: Type<'db>,
+    },
+    TypedDictFieldMissing {
+        field_name: Name,
+        source: TypedDictType<'db>,
+    },
+    TypedDictFieldNotRequiredInSource {
+        source: TypedDictType<'db>,
+        target: TypedDictType<'db>,
+        field_name: Name,
+    },
+    TypedDictFieldNotRequiredAndMutableInTarget {
+        source: TypedDictType<'db>,
+        target: TypedDictType<'db>,
+        field_name: Name,
+    },
+    TypedDictFieldReadOnlyInSource {
+        field_name: Name,
+        source: TypedDictType<'db>,
+        target: TypedDictType<'db>,
+    },
+    TypedDictFieldIncompatible {
+        field_name: Name,
+        source: TypedDictType<'db>,
+        target: TypedDictType<'db>,
+        source_field: Type<'db>,
+        target_field: Type<'db>,
+    },
     TypedDictNotAssignableToDict(TypedDictType<'db>),
     IncompatibleReturnTypes {
         source: Type<'db>,
@@ -105,6 +140,11 @@ impl<'db> ErrorContext<'db> {
         db: &'db dyn Db,
         help_messages: &mut FxOrderSet<HelpMessages>,
     ) -> Option<String> {
+        let typed_dict_name = |typed_dict: &TypedDictType<'db>| match typed_dict {
+            TypedDictType::Class(class) => format!("TypedDict `{}`", class.name(db)),
+            TypedDictType::Synthesized(_) => Type::TypedDict(*typed_dict).display(db).to_string(),
+        };
+
         Some(match self {
             Self::Empty => {
                 return None;
@@ -128,15 +168,85 @@ impl<'db> ErrorContext<'db> {
                 "... omitted {n} union element{} without additional context",
                 if *n == 1 { "" } else { "s" }
             ),
+            Self::NotAssignableToIntersectionElement {
+                source,
+                element,
+                intersection,
+            } => format!(
+                "type `{}` is not assignable to element `{}` of intersection `{}`",
+                source.display(db),
+                element.display(db),
+                intersection.display(db),
+            ),
+            Self::NoIntersectionElementAssignableToTarget {
+                intersection,
+                target,
+            } => format!(
+                "no element of intersection `{}` is assignable to `{}`",
+                intersection.display(db),
+                target.display(db),
+            ),
+            Self::TypedDictFieldMissing { field_name, source } => {
+                format!(
+                    "required field \"{field_name}\" is not present in source {source}",
+                    source = typed_dict_name(source)
+                )
+            }
+            Self::TypedDictFieldNotRequiredInSource {
+                field_name,
+                source,
+                target,
+            } => {
+                format!(
+                    "field \"{field_name}\" is required in {target} but not required in {source}",
+                    source = typed_dict_name(source),
+                    target = typed_dict_name(target)
+                )
+            }
+            Self::TypedDictFieldNotRequiredAndMutableInTarget {
+                field_name,
+                source,
+                target,
+            } => {
+                help_messages.insert(HelpMessages::RequiredFieldCouldBeRemoved);
+                format!(
+                    "field \"{field_name}\" is required in {source} but not required and mutable in {target}",
+                    source = typed_dict_name(source),
+                    target = typed_dict_name(target)
+                )
+            }
+            Self::TypedDictFieldReadOnlyInSource {
+                field_name,
+                source,
+                target,
+            } => {
+                format!(
+                    "field \"{field_name}\" is read-only in {source} but mutable in {target}",
+                    source = typed_dict_name(source),
+                    target = typed_dict_name(target)
+                )
+            }
+            Self::TypedDictFieldIncompatible {
+                field_name,
+                source,
+                target,
+                source_field,
+                target_field,
+            } => format!(
+                "field \"{field_name}\" on {source} has type `{source_field}` which is not assignable to type `{target_field}` expected by {target}",
+                source = typed_dict_name(source),
+                target = typed_dict_name(target),
+                source_field = source_field.display(db),
+                target_field = target_field.display(db),
+            ),
             Self::TypedDictNotAssignableToDict(typed_dict) => {
                 help_messages.insert(HelpMessages::TypedDictNotAssignableToDict);
                 help_messages.insert(HelpMessages::ConsiderUsingMappingInsteadOfDict);
 
-                let name = match typed_dict {
-                    TypedDictType::Class(class) => format!("TypedDict `{}`", class.name(db)),
-                    TypedDictType::Synthesized(_) => "TypedDict".to_string(),
-                };
-                format!("{name} is not assignable to `dict`")
+                format!(
+                    "{source} is not assignable to `dict`",
+                    source = typed_dict_name(typed_dict)
+                )
             }
             Self::IncompatibleReturnTypes { source, target } => format!(
                 "incompatible return types: `{source}` is not assignable to `{target}`",
@@ -230,6 +340,7 @@ impl<'db> ErrorContext<'db> {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum HelpMessages {
+    RequiredFieldCouldBeRemoved,
     TypedDictNotAssignableToDict,
     ConsiderUsingMappingInsteadOfDict,
 }
@@ -237,6 +348,9 @@ enum HelpMessages {
 impl std::fmt::Display for HelpMessages {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            HelpMessages::RequiredFieldCouldBeRemoved => {
+                f.write_str("The required field could be removed through a destructive operation like `del` on the target.")
+            }
             HelpMessages::TypedDictNotAssignableToDict => {
                 f.write_str("A TypedDict is not usually assignable to any `dict[..]` type; `dict` types allow destructive operations like `clear()`.")
             }

@@ -39,6 +39,20 @@ async def main() -> None:
     await PossiblyUnbound()  # error: [invalid-await]
 ```
 
+## Union type where one member lacks `__await__`
+
+```py
+class Awaitable:
+    def __await__(self):
+        yield
+
+class NotAwaitable: ...
+
+async def _(flag: bool) -> None:
+    x = Awaitable() if flag else NotAwaitable()
+    await x  # error: [invalid-await]
+```
+
 ## `__await__` definition with extra arguments
 
 Currently, the signature of `__await__` isn't checked for conformity with the `Awaitable` protocol

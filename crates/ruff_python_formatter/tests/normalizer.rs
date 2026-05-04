@@ -189,9 +189,11 @@ impl Transformer for Normalizer {
             return;
         };
 
-        // Changing the newlines to the configured newline is okay because Python normalizes all newlines to `\n`
-        debug.leading = debug.leading.replace("\r\n", "\n").replace('\r', "\n");
-        debug.trailing = debug.trailing.replace("\r\n", "\n").replace('\r', "\n");
+        // The formatter normalizes newlines in the text around a debug expression.
+        let leading = debug.leading().replace("\r\n", "\n").replace('\r', "\n");
+        let expression = debug.expression().to_string();
+        let trailing = debug.trailing().replace("\r\n", "\n").replace('\r', "\n");
+        *debug = ast::DebugText::new(&leading, &expression, &trailing);
     }
 
     fn visit_string_literal(&self, string_literal: &mut ast::StringLiteral) {

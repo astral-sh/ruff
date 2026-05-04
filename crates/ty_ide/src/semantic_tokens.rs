@@ -14,9 +14,6 @@
 //!
 //! TODO: Need to handle semantic tokens within quoted annotations.
 //!
-//! TODO: Need to properly handle Annotated expressions. All type arguments other
-//! than the first should be treated as value expressions, not as type expressions.
-//!
 //! TODO: Properties (or perhaps more generally, descriptor objects?) should be
 //! classified as property tokens rather than just variables.
 //!
@@ -43,14 +40,14 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
-use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_semantic::{
     HasType, SemanticModel,
     types::ide_support::{
         CallArgumentForm, call_argument_forms, definition_for_name,
         static_member_type_for_attribute,
     },
-    types::{SpecialFormType, Type, TypeVarKind},
+    types::{MethodDecorator, SpecialFormType, Type, TypeVarKind},
 };
 
 /// Semantic token types supported by the language server.
@@ -314,7 +311,7 @@ impl<'db> SemanticTokenVisitor<'db> {
             }
             DefinitionKind::Class(_) => Some((SemanticTokenType::Class, modifiers)),
             DefinitionKind::TypeVar(_) => Some((SemanticTokenType::TypeParameter, modifiers)),
-            DefinitionKind::Parameter(parameter) => {
+            DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) => {
                 let parsed = parsed_module(db, definition.file(db));
                 let ty = parameter.node(&parsed.load(db)).inferred_type(&model);
 
@@ -342,12 +339,7 @@ impl<'db> SemanticTokenVisitor<'db> {
 
                 Some((SemanticTokenType::Parameter, modifiers))
             }
-            DefinitionKind::VariadicPositionalParameter(_) => {
-                Some((SemanticTokenType::Parameter, modifiers))
-            }
-            DefinitionKind::VariadicKeywordParameter(_) => {
-                Some((SemanticTokenType::Parameter, modifiers))
-            }
+            DefinitionKind::Parameter(_) => Some((SemanticTokenType::Parameter, modifiers)),
             DefinitionKind::TypeAlias(_) => Some((SemanticTokenType::TypeParameter, modifiers)),
             DefinitionKind::Import(_)
             | DefinitionKind::ImportFrom(_)
@@ -550,37 +542,18 @@ impl<'db> SemanticTokenVisitor<'db> {
         func: &ast::StmtFunctionDef,
     ) -> SemanticTokenType {
         if is_first && self.in_class_scope {
-            // Check if this is a classmethod (has @classmethod decorator)
-            // TODO - replace with a more robust way to check whether this is a classmethod
-            let is_classmethod =
-                func.decorator_list
-                    .iter()
-                    .any(|decorator| match &decorator.expression {
-                        ast::Expr::Name(name) => name.id.as_str() == "classmethod",
-                        ast::Expr::Attribute(attr) => attr.attr.id.as_str() == "classmethod",
-                        _ => false,
-                    });
+            let method_decorator = func
+                .inferred_type(self.model)
+                .and_then(Type::as_function_literal)
+                .and_then(|function_ty| {
+                    MethodDecorator::try_from_fn_type(self.model.db(), function_ty)
+                })
+                .unwrap_or_default();
 
-            // Check if this is a staticmethod (has @staticmethod decorator)
-            // TODO - replace with a more robust way to check whether this is a staticmethod
-            let is_staticmethod =
-                func.decorator_list
-                    .iter()
-                    .any(|decorator| match &decorator.expression {
-                        ast::Expr::Name(name) => name.id.as_str() == "staticmethod",
-                        ast::Expr::Attribute(attr) => attr.attr.id.as_str() == "staticmethod",
-                        _ => false,
-                    });
-
-            if is_staticmethod {
-                // Static methods don't have self/cls parameters
-                SemanticTokenType::Parameter
-            } else if is_classmethod {
-                // First parameter of a classmethod is cls parameter
-                SemanticTokenType::ClsParameter
-            } else {
-                // First parameter of an instance method is self parameter
-                SemanticTokenType::SelfParameter
+            match method_decorator {
+                MethodDecorator::StaticMethod => SemanticTokenType::Parameter,
+                MethodDecorator::ClassMethod => SemanticTokenType::ClsParameter,
+                MethodDecorator::None => SemanticTokenType::SelfParameter,
             }
         } else {
             SemanticTokenType::Parameter
@@ -647,6 +620,35 @@ impl<'db> SemanticTokenVisitor<'db> {
             if let Some(default) = any_param.default() {
                 self.visit_expr(default);
             }
+        }
+    }
+
+    fn visit_expr_with_type_form(&mut self, expr: &Expr, in_type_form: bool) {
+        let prev_in_type_form = self.in_type_form;
+        self.in_type_form = in_type_form;
+        self.visit_expr(expr);
+        self.in_type_form = prev_in_type_form;
+    }
+
+    fn visit_value_expression(&mut self, expr: &Expr) {
+        self.visit_expr_with_type_form(expr, false);
+    }
+
+    fn visit_annotated_arguments(&mut self, slice: &Expr) {
+        let ast::Expr::Tuple(tuple) = slice else {
+            self.visit_annotation(slice);
+            return;
+        };
+
+        let Some((annotation, metadata)) = tuple.elts.split_first() else {
+            self.visit_annotation(slice);
+            return;
+        };
+
+        self.visit_annotation(annotation);
+
+        for metadata_element in metadata {
+            self.visit_value_expression(metadata_element);
         }
     }
 }
@@ -906,10 +908,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 
     /// Visit an annotation or other expression that should be interpreted as a type form.
     fn visit_annotation(&mut self, expr: &'_ Expr) {
-        let prev_in_type_form = self.in_type_form;
-        self.in_type_form = true;
-        self.visit_expr(expr);
-        self.in_type_form = prev_in_type_form;
+        self.visit_expr_with_type_form(expr, true);
     }
 
     fn visit_expr(&mut self, expr: &Expr) {
@@ -979,12 +978,21 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 // Highlight the sub-AST of a string annotation
                 if let Some((sub_ast, sub_model)) = self.model.enter_string_annotation(string_expr)
                 {
-                    let mut sub_visitor = SemanticTokenVisitor::new(&sub_model, None);
+                    let mut sub_visitor = SemanticTokenVisitor::new(&sub_model, self.range_filter);
                     sub_visitor.visit_expr(sub_ast.expr());
                     self.tokens.extend(sub_visitor.tokens);
                 } else {
                     walk_expr(self, expr);
                 }
+            }
+            ast::Expr::Subscript(subscript)
+                if matches!(
+                    subscript.value.inferred_type(self.model),
+                    Some(Type::SpecialForm(SpecialFormType::Annotated))
+                ) =>
+            {
+                self.visit_expr(subscript.value.as_ref());
+                self.visit_annotated_arguments(subscript.slice.as_ref());
             }
             ast::Expr::Call(call) => {
                 self.visit_expr(call.func.as_ref());
@@ -1251,6 +1259,36 @@ mod tests {
     }
 
     #[test]
+    fn semantic_tokens_annotated_metadata() {
+        let test = SemanticTokenTest::new(
+            "
+from typing import Annotated
+
+class Metadata:
+    field = 1
+
+def f(x: Annotated[int, Metadata.field]): ...
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "typing" @ 6..12: Namespace
+        "Annotated" @ 20..29: Variable
+        "Metadata" @ 37..45: Class [definition]
+        "field" @ 51..56: Variable [definition]
+        "1" @ 59..60: Number
+        "f" @ 66..67: Function [definition]
+        "x" @ 68..69: Parameter [definition]
+        "Annotated" @ 71..80: Variable
+        "int" @ 81..84: Class
+        "Metadata" @ 86..94: Class
+        "field" @ 95..100: Variable
+        "#);
+    }
+
+    #[test]
     fn semantic_tokens_match_class_pattern_keyword_before_positional() {
         // Regression test for https://github.com/astral-sh/ty/issues/2417
         // This used to cause a panic because keyword patterns and positional
@@ -1416,6 +1454,56 @@ class MyClass:
         "method" @ 42..48: Method [definition]
         "x" @ 49..50: Parameter [definition]
         "y" @ 52..53: Parameter [definition]
+        "#);
+    }
+
+    #[test]
+    fn semantic_tokens_aliased_staticmethod_parameter() {
+        let test = SemanticTokenTest::new(
+            "
+sm = staticmethod
+
+class MyClass:
+    @sm
+    def method(x, y): pass
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "sm" @ 1..3: Class [definition]
+        "staticmethod" @ 6..18: Class
+        "MyClass" @ 26..33: Class [definition]
+        "sm" @ 40..42: Decorator
+        "method" @ 51..57: Method [definition]
+        "x" @ 58..59: Parameter [definition]
+        "y" @ 61..62: Parameter [definition]
+        "#);
+    }
+
+    #[test]
+    fn semantic_tokens_aliased_classmethod_parameter() {
+        let test = SemanticTokenTest::new(
+            "
+cm = classmethod
+
+class MyClass:
+    @cm
+    def method(cls, x): pass
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "cm" @ 1..3: Class [definition]
+        "classmethod" @ 6..17: Class
+        "MyClass" @ 25..32: Class [definition]
+        "cm" @ 39..41: Decorator
+        "method" @ 50..56: Method [definition]
+        "cls" @ 57..60: ClsParameter [definition]
+        "x" @ 62..63: Parameter [definition]
         "#);
     }
 

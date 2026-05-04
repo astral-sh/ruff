@@ -617,7 +617,6 @@ def zqzqzq():
           |
         2 | from pandas.io.api import zqzqzq
           |                           ^^^^^^
-        3 | __all__ = ['zqzqzq']
           |
         info: Function zqzqzq
         ");
@@ -759,7 +758,6 @@ def zqzqzq():
           |
         2 | from pandas.io.parsers import zqzqzq
           |                               ^^^^^^
-        3 | __all__ = ['zqzqzq']
           |
         info: Function zqzqzq
 
@@ -768,7 +766,6 @@ def zqzqzq():
           |
         2 | from pandas.io.parsers.readers import zqzqzq
           |                                       ^^^^^^
-        3 | __all__ = ['zqzqzq']
           |
         info: Function zqzqzq
         ");
@@ -822,7 +819,6 @@ __all__ = ['zqzqzq']
           |
         2 | def zqzqzq():
           |     ^^^^^^
-        3 |     pass
           |
         info: Function zqzqzq
         ");
@@ -854,7 +850,6 @@ def zqzqzq():
           |
         2 | def zqzqzq():
           |     ^^^^^^
-        3 |     pass
           |
         info: Function zqzqzq
 
@@ -897,7 +892,6 @@ def zqzqzq():
           |
         2 | def zqzqzq():
           |     ^^^^^^
-        3 |     pass
           |
         info: Function zqzqzq
 
@@ -964,8 +958,6 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
           |
         2 | class Abcdefghijklmnop:
           |       ^^^^^^^^^^^^^^^^
-        3 |     '''A data model class'''
-        4 |     def __init__(self):
           |
         info: Class Abcdefghijklmnop
 
@@ -974,8 +966,6 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
           |
         2 | def abcdefghijklmnop():
           |     ^^^^^^^^^^^^^^^^
-        3 |     '''A helpful utility function'''
-        4 |     pass
           |
         info: Function abcdefghijklmnop
         ");
@@ -1007,8 +997,6 @@ def test_helper_xyzxyzxyz():
           |
         2 | def test_helper_xyzxyzxyz():
           |     ^^^^^^^^^^^^^^^^^^^^^
-        3 |     '''A test helper function'''
-        4 |     pass
           |
         info: Function test_helper_xyzxyzxyz
         ");
@@ -1045,7 +1033,6 @@ def test_helper_xyzxyzxyz():
           |
         1 | def helper_xyzxyzxyz(): pass
           |     ^^^^^^^^^^^^^^^^
-        2 | def test_something_xyzxyzxyz(): pass
           |
         info: Function helper_xyzxyzxyz
 

@@ -859,7 +859,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         // that precede them in the type parameter list.
         if let Some(generic_context) = class
             .pep695_generic_context(db)
-            .or(class.legacy_generic_context(db))
+            .or_else(|| class.legacy_generic_context(db))
         {
             let typevars = generic_context.variables(db).map(|btv| btv.typevar(db));
 

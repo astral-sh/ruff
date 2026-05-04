@@ -577,7 +577,10 @@ impl<'db> TypeVarInstance<'db> {
                 let known_class = func_ty.as_class_literal().and_then(|cls| cls.known(db));
                 let expr = &call_expr.arguments.find_keyword("default")?.value;
                 let default_type = definition_expression_type(db, definition, expr);
-                if known_class == Some(KnownClass::ParamSpec) {
+                if matches!(
+                    known_class,
+                    Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec)
+                ) {
                     convert_type_to_paramspec_value(db, default_type)
                 } else {
                     default_type
@@ -709,7 +712,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             db,
             self.typevar(db).identity(db),
             Some(TypeVarBoundOrConstraintsEvaluation::Eager(upper_bound)),
-            None, // ParamSpecs cannot have explicit variance
+            self.typevar(db).explicit_variance(db),
             None, // `P.args` and `P.kwargs` cannot have defaults even though `P` can
         );
 
@@ -736,7 +739,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 db,
                 self.typevar(db).identity(db),
                 None, // Remove the upper bound set by `with_paramspec_attr`
-                None, // ParamSpecs cannot have explicit variance
+                self.typevar(db).explicit_variance(db),
                 None, // `P.args` and `P.kwargs` cannot have defaults even though `P` can
             ),
             self.binding_context(db),

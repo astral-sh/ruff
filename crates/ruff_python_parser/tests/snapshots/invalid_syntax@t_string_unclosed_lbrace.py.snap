@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/inline/err/t_string_unclosed_lbrace.py
 ---
 ## AST
 
@@ -129,6 +128,7 @@ Module(
                                                     debug_text: Some(
                                                         DebugText {
                                                             leading: "",
+                                                            expression: "foo",
                                                             trailing: "=",
                                                         },
                                                     ),

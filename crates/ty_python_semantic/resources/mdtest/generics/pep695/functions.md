@@ -137,6 +137,31 @@ reveal_type(takes_in_protocol(ExplicitSub()))  # revealed: int
 reveal_type(takes_in_protocol(ExplicitGenericSub[str]()))  # revealed: str
 ```
 
+Protocol inference should also preserve unions of structurally matching arguments:
+
+```py
+from typing import Protocol
+
+class A:
+    def foo(self) -> "A":
+        raise NotImplementedError
+
+class B:
+    def foo(self) -> "B":
+        raise NotImplementedError
+
+class SupportsFoo[T](Protocol):
+    def foo(self) -> T: ...
+
+def takes_in_supports_foo[T](obj: SupportsFoo[T]) -> T:
+    raise NotImplementedError
+
+def _(a: A, b: B, x: A | B):
+    reveal_type(takes_in_supports_foo(a))  # revealed: A
+    reveal_type(takes_in_supports_foo(b))  # revealed: B
+    reveal_type(takes_in_supports_foo(x))  # revealed: A | B
+```
+
 ## Inferring tuple parameter types
 
 ```py

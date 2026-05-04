@@ -257,7 +257,8 @@ impl<'db> Definitions<'db> {
             | ty_python_semantic::types::TypeDefinition::TypeVar(definition)
             | ty_python_semantic::types::TypeDefinition::TypeAlias(definition)
             | ty_python_semantic::types::TypeDefinition::SpecialForm(definition)
-            | ty_python_semantic::types::TypeDefinition::NewType(definition) => {
+            | ty_python_semantic::types::TypeDefinition::NewType(definition)
+            | ty_python_semantic::types::TypeDefinition::EnumMember(definition) => {
                 ResolvedDefinition::Definition(definition)
             }
         };

@@ -500,26 +500,11 @@ pub fn definitions_for_keyword_argument<'db>(
 
         // For each signature, find the parameter with the matching name
         for signature in signatures {
-            if let Some((_param_index, _param)) =
+            if let Some((_param_index, param)) =
                 signature.parameters().keyword_by_name(keyword_name_str)
+                && let Some(definition) = param.definition()
             {
-                if let Some(function_definition) = signature.definition() {
-                    let function_file = function_definition.file(db);
-                    let module = parsed_module(db, function_file).load(db);
-                    let def_kind = function_definition.kind(db);
-
-                    if let DefinitionKind::Function(function_ast_ref) = def_kind {
-                        let function_node = function_ast_ref.node(&module);
-
-                        if let Some(parameter_range) =
-                            find_parameter_range(&function_node.parameters, keyword_name_str)
-                        {
-                            resolved_definitions.push(ResolvedDefinition::FileWithRange(
-                                FileRange::new(function_file, parameter_range),
-                            ));
-                        }
-                    }
-                }
+                resolved_definitions.push(ResolvedDefinition::Definition(definition));
             }
         }
     }
@@ -647,20 +632,6 @@ impl<'db> CallSignatureDetails<'db> {
             argument_to_parameter_mapping,
             argument_to_displayed_parameter_mapping,
         }
-    }
-
-    fn get_definition_parameter_range(&self, db: &dyn Db, name: &str) -> Option<FileRange> {
-        let definition = self.signature.definition()?;
-        let file = definition.file(db);
-        let module_ref = parsed_module(db, file).load(db);
-
-        let parameters = match definition.kind(db) {
-            DefinitionKind::Function(node) => &node.node(&module_ref).parameters,
-            // TODO: lambda functions
-            _ => return None,
-        };
-
-        Some(FileRange::new(file, parameters.find(name)?.name().range))
     }
 }
 
@@ -1258,7 +1229,11 @@ pub fn inlay_hint_call_argument_details<'db>(
             continue;
         };
 
-        let parameter_label_offset = resolved.get_definition_parameter_range(db, param.name()?);
+        let parameter_label_offset = param.definition().map(|definition| {
+            let param_file = definition.file(db);
+            let module = parsed_module(db, param_file).load(db);
+            definition.focus_range(db, &module)
+        });
 
         // Only add hints for parameters that can be specified by name
         if !param.is_positional_only() && !param.is_variadic() && !param.is_keyword_variadic() {
@@ -1270,18 +1245,6 @@ pub fn inlay_hint_call_argument_details<'db>(
     }
 
     Some(InlayHintCallArgumentDetails { argument_names })
-}
-
-/// Find the text range of a specific parameter in function parameters by name.
-/// Only searches for parameters that can be addressed by name in keyword arguments.
-fn find_parameter_range(parameters: &ast::Parameters, parameter_name: &str) -> Option<TextRange> {
-    // Check regular positional and keyword-only parameters
-    parameters
-        .args
-        .iter()
-        .chain(&parameters.kwonlyargs)
-        .find(|param| param.parameter.name.as_str() == parameter_name)
-        .map(|param| param.parameter.name.range())
 }
 
 mod resolve_definition {
@@ -1873,9 +1836,8 @@ mod resolve_definition {
             | DefinitionKind::DictKeyAssignment(_)
             | DefinitionKind::For(_)
             | DefinitionKind::Comprehension(_)
-            | DefinitionKind::VariadicPositionalParameter(_)
-            | DefinitionKind::VariadicKeywordParameter(_)
             | DefinitionKind::Parameter(_)
+            | DefinitionKind::LambdaParameter { .. }
             | DefinitionKind::WithItem(_)
             | DefinitionKind::MatchPattern(_)
             | DefinitionKind::ExceptHandler(_)

@@ -2,11 +2,12 @@ use crate::Db;
 use crate::reachability::is_reachable;
 use crate::types::function::FunctionDecorators;
 use crate::types::infer::function_known_decorator_flags;
+use get_size2::GetSize;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
-use ty_python_core::definition::{DefinitionKind, DefinitionState};
+use ty_python_core::definition::{DefinitionCategory, DefinitionKind, DefinitionState};
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
 use ty_python_core::{SemanticIndex, get_loop_header, semantic_index};
@@ -20,9 +21,8 @@ fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
         | DefinitionKind::AnnotatedAssignment(_)
         | DefinitionKind::For(_)
         | DefinitionKind::Comprehension(_)
-        | DefinitionKind::VariadicPositionalParameter(_)
-        | DefinitionKind::VariadicKeywordParameter(_)
         | DefinitionKind::Parameter(_)
+        | DefinitionKind::LambdaParameter { .. }
         | DefinitionKind::WithItem(_)
         | DefinitionKind::MatchPattern(_)
         | DefinitionKind::ExceptHandler(_) => true,
@@ -57,7 +57,7 @@ fn function_scope_is_overload_declaration(
     function_known_decorator_flags(db, definition).contains(FunctionDecorators::OVERLOAD)
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, GetSize)]
 pub struct UnusedBinding {
     pub range: TextRange,
     pub name: Name,
@@ -68,8 +68,9 @@ pub struct UnusedBinding {
 /// This intentionally reports only function-, lambda-, and comprehension-scope bindings.
 /// Module- and class-scope bindings can still be observed indirectly (for example via
 /// imports or attribute access), so reporting them here would risk false positives
-/// without broader reference analysis.
-#[salsa::tracked(returns(ref))]
+/// without broader reference analysis. Bare local annotations (`x: int`) are also
+/// reported, but only if the symbol is neither bound nor used elsewhere in the scope.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBinding> {
     let parsed = parsed_module(db, file).load(db);
     let is_stub_file = file.is_stub(db);
@@ -160,6 +161,13 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
                 continue;
             }
 
+            let category = kind.category(is_stub_file, &parsed);
+            if matches!(category, DefinitionCategory::Declaration)
+                && (symbol.is_bound() || symbol.is_used())
+            {
+                continue;
+            }
+
             let range = kind.target_range(&parsed);
 
             unused.push(UnusedBinding {
@@ -190,7 +198,7 @@ mod tests {
     ) -> anyhow::Result<Vec<UnusedBinding>> {
         let db = TestDbBuilder::new().with_file(path, source).build()?;
         let file = system_path_to_file(&db, path).unwrap();
-        let mut bindings = unused_bindings(&db, file).clone();
+        let mut bindings = unused_bindings(&db, file).to_vec();
         bindings.sort_unstable_by_key(|binding| (binding.range.start(), binding.range.end()));
         Ok(bindings)
     }
@@ -684,6 +692,62 @@ mod tests {
 
         let names = collect_unused_names(&source)?;
         assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_annotation_only_declaration_before_reassignment() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def fn(value: bool):
+                a: int
+                if value:
+                    a = 1
+                else:
+                    a = 2
+
+                return a
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_annotation_only_declaration_before_unused_binding() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def fn():
+                a: int
+                a = 1
+            ",
+        );
+
+        let bindings = collect_unused_bindings(&source)?;
+        let assignment_start = TextSize::try_from(source.rfind("a = 1").unwrap()).unwrap();
+        assert_eq!(
+            bindings,
+            vec![UnusedBinding {
+                range: TextRange::new(assignment_start, assignment_start + TextSize::new(1)),
+                name: Name::new("a"),
+            }]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn reports_dead_annotation_only_declaration() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def fn():
+                a: int
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, vec!["a"]);
         Ok(())
     }
 

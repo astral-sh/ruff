@@ -483,17 +483,12 @@ fn run_test(
                 .should_expect_panic()
                 .expect("panic_info is only set when `should_expect_panic` is `Ok`");
 
-            let message = panic_info
-                .payload
-                .as_str()
-                .unwrap_or("Box<dyn Any>")
-                .to_string();
-
             if let Some(expected_message) = expected_message {
+                let message = panic_info.payload.to_string();
                 assert!(
                     message.contains(expected_message),
                     "Test `{}` is expected to panic with `{expected_message}`, but panicked with `{message}` instead.",
-                    test.name()
+                    test.name(),
                 );
             }
         }
@@ -740,12 +735,7 @@ impl AttemptTestError<'_> {
             messages.push(Failure::new(clarification));
         }
         messages.push(Failure::new(""));
-        match info.payload.as_str() {
-            Some(message) => messages.push(Failure::new(message)),
-            // Mimic the default panic hook's rendering of the panic payload if it's
-            // not a string.
-            None => messages.push(Failure::new("Box<dyn Any>")),
-        }
+        messages.push(Failure::new(info.payload));
         messages.push(Failure::new(""));
 
         if let Some(backtrace) = info.backtrace {

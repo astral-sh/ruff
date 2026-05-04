@@ -29,6 +29,7 @@ mod code_action;
 mod custom_extension;
 mod hover;
 mod notebook;
+mod workspace;
 
 use std::collections::{BTreeMap, VecDeque};
 use std::num::NonZeroUsize;

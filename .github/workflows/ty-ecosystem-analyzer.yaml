@@ -29,13 +29,19 @@ concurrency:
   group: ty-ecosystem-analyzer-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+defaults:
+  run:
+    shell: bash
+
 env:
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
-  ECOSYSTEM_ANALYZER_COMMIT: bea89c6205aa21eede8f18fa8d5e28c7803c9e2a
+  # Line-tables-only debug info: faster builds, backtraces still work.
+  CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
+  ECOSYSTEM_ANALYZER_COMMIT: 702b757c63622c7ea3cc3a271050eeab15d83aa7
 
 jobs:
   build-ty:
@@ -48,24 +54,25 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          path: ruff
-          fetch-depth: 0
           persist-credentials: false
 
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          workspaces: "ruff"
           lookup-only: false
 
       - name: Install Rust toolchain
         run: rustup show
 
+      - name: "Install mold"
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
+
       - name: Build ty for both commits
         id: build
-        working-directory: ruff
-        shell: bash
         run: |
           echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+          # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
+          git fetch --no-tags --filter=blob:none --unshallow origin
 
           MERGE_BASE="$(git merge-base "${GITHUB_SHA}" "origin/${GITHUB_BASE_REF}")"
           echo "merge-base=${MERGE_BASE}" >> "$GITHUB_OUTPUT"
@@ -74,17 +81,17 @@ jobs:
 
           git checkout "${MERGE_BASE}"
           cargo build --package ty --profile profiling
-          cp target/profiling/ty ../ty-base
+          cp target/profiling/ty ty-base
 
           git checkout "${GITHUB_SHA}"
           cargo build --package ty --profile profiling
-          cp target/profiling/ty ../ty-pr
+          cp target/profiling/ty ty-pr
 
           # Extract project lists and config for the shard jobs
-          git show "${MERGE_BASE}:crates/ty_python_semantic/resources/primer/good.txt" > ../projects_old.txt
-          git show "${GITHUB_SHA}:crates/ty_python_semantic/resources/primer/good.txt" > ../projects_new.txt
-          cp crates/ty_python_semantic/resources/primer/flaky.txt ../projects_flaky.txt
-          cp .github/ty-ecosystem.toml ../ty-ecosystem.toml
+          git show "${MERGE_BASE}:crates/ty_python_semantic/resources/primer/good.txt" > projects_old.txt
+          cp crates/ty_python_semantic/resources/primer/good.txt projects_new.txt
+          cp crates/ty_python_semantic/resources/primer/flaky.txt projects_flaky.txt
+          cp .github/ty-ecosystem.toml ty-ecosystem.toml
 
       - name: Upload ty binaries, project lists, and config
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -103,7 +110,7 @@ jobs:
     needs: [build-ty]
     strategy:
       matrix:
-        shard: [0, 1]
+        shard: [0, 1, 2, 3]
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
@@ -119,7 +126,6 @@ jobs:
           name: ty-builds
 
       - name: Analyze shard ${{ matrix.shard }}
-        shell: bash
         env:
           SHARD: ${{ matrix.shard }}
           EXCLUDE_NEWER: ${{ needs.build-ty.outputs.timestamp }}
@@ -135,7 +141,6 @@ jobs:
             ecosystem-analyzer \
             --flaky-runs 10 \
             diff \
-            --dynamic-flaky \
             --projects-old projects_old.txt \
             --projects-new projects_new.txt \
             --projects-flaky projects_flaky.txt \
@@ -145,7 +150,7 @@ jobs:
             --new "${GITHUB_SHA}" \
             --exclude-newer "${EXCLUDE_NEWER}" \
             --shard "${SHARD}" \
-            --num-shards 2 \
+            --num-shards 4 \
             --output-old "diagnostics-base-${SHARD}.json" \
             --output-new "diagnostics-PR-${SHARD}.json"
 
@@ -169,28 +174,21 @@ jobs:
           enable-cache: true
           version: "0.11.7"
 
-      - name: Download shard 0 diagnostics
+      - name: Download shard diagnostics
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: diagnostics-shard-0
-
-      - name: Download shard 1 diagnostics
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: diagnostics-shard-1
-
-      - name: Merge shard diagnostics
-        shell: bash
-        run: |
-          jq -s '{ outputs: [.[].outputs[]] }' diagnostics-base-0.json diagnostics-base-1.json > diagnostics-base.json
-          jq -s '{ outputs: [.[].outputs[]] }' diagnostics-PR-0.json   diagnostics-PR-1.json   > diagnostics-PR.json
+          pattern: diagnostics-shard-*
+          merge-multiple: true
 
       - name: Generate reports
         id: generate-reports
-        shell: bash
         env:
           REF_NAME: ${{ github.ref_name }}
         run: |
+          # Merge shard diagnostics
+          jq -s '{ outputs: [.[].outputs[]] }' diagnostics-base-*.json > diagnostics-base.json
+          jq -s '{ outputs: [.[].outputs[]] }' diagnostics-PR-*.json   > diagnostics-PR.json
+
           uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@$ECOSYSTEM_ANALYZER_COMMIT"
 
           mkdir dist

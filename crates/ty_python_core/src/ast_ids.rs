@@ -150,6 +150,12 @@ pub(crate) mod node_key {
         }
     }
 
+    impl From<&ast::ExprLambda> for ExpressionNodeKey {
+        fn from(value: &ast::ExprLambda) -> Self {
+            Self(NodeKey::from_node(value))
+        }
+    }
+
     impl From<&ast::Identifier> for ExpressionNodeKey {
         fn from(value: &ast::Identifier) -> Self {
             Self(NodeKey::from_node(value))

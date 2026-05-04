@@ -26,8 +26,7 @@ pub(crate) fn check_function_definition<'db>(
 ) {
     let db = context.db();
 
-    let Some(Type::FunctionLiteral(function_type)) =
-        infer_definition_types(db, definition).undecorated_type()
+    let Some(function_type) = infer_definition_types(db, definition).function_type(definition)
     else {
         return;
     };
