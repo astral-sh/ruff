@@ -553,6 +553,33 @@ type RecursiveCallableSpecialization[T] = Callable[[], RecursiveCallableSpeciali
 def reveal_recursive_callable_specialization(x: RecursiveCallableSpecialization[int]):
     reveal_type(x)  # revealed: () -> RecursiveCallableSpecialization[list[int]]
 
+type RecursiveTruthinessSpecialization[T] = int | RecursiveTruthinessSpecialization[list[T]]
+
+def bool_recursive_specialization(x: RecursiveTruthinessSpecialization[int]):
+    if x:
+        pass
+
+def compare_recursive_specialization(x: RecursiveTruthinessSpecialization[int]):
+    reveal_type(x == 1)  # revealed: bool
+
+def binary_recursive_specialization(x: RecursiveTruthinessSpecialization[int]):
+    reveal_type(x + 1)  # revealed: int
+
+type RecursiveSubscriptSpecialization[T] = list[RecursiveSubscriptSpecialization[list[T]]]
+
+def subscript_recursive_specialization(x: RecursiveSubscriptSpecialization[int]):
+    reveal_type(x[0])  # revealed: list[RecursiveSubscriptSpecialization[list[list[int]]]]
+
+type RecursiveClassInfoSpecialization[T] = type[int] | RecursiveClassInfoSpecialization[list[T]]
+
+def isinstance_recursive_specialization(obj: object, classinfo: RecursiveClassInfoSpecialization[int]):
+    if isinstance(obj, classinfo):
+        reveal_type(obj)  # revealed: object
+
+def issubclass_recursive_specialization(obj: type[object], classinfo: RecursiveClassInfoSpecialization[int]):
+    if issubclass(obj, classinfo):
+        reveal_type(obj)  # revealed: type
+
 class BaseWithMethod:
     def method(self) -> None: ...
 

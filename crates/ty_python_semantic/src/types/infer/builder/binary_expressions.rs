@@ -362,25 +362,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
             }),
 
-            (Type::TypeAlias(alias), rhs, _) => visitor.visit((left_ty, op, right_ty), || {
-                self.infer_binary_expression_type_impl(
-                    node,
-                    emitted_division_by_zero_diagnostic,
-                    alias.value_type(db),
-                    rhs,
-                    op,
-                    visitor,
+            (Type::TypeAlias(_), rhs, _) => visitor.visit((left_ty, op, right_ty), || {
+                left_ty.visit_type_alias_value(
+                    db,
+                    || Some(Type::Never),
+                    |value_ty| {
+                        self.infer_binary_expression_type_impl(
+                            node,
+                            emitted_division_by_zero_diagnostic,
+                            value_ty,
+                            rhs,
+                            op,
+                            visitor,
+                        )
+                    },
                 )
             }),
 
-            (lhs, Type::TypeAlias(alias), _) => visitor.visit((left_ty, op, right_ty), || {
-                self.infer_binary_expression_type_impl(
-                    node,
-                    emitted_division_by_zero_diagnostic,
-                    lhs,
-                    alias.value_type(db),
-                    op,
-                    visitor,
+            (lhs, Type::TypeAlias(_), _) => visitor.visit((left_ty, op, right_ty), || {
+                right_ty.visit_type_alias_value(
+                    db,
+                    || Some(Type::Never),
+                    |value_ty| {
+                        self.infer_binary_expression_type_impl(
+                            node,
+                            emitted_division_by_zero_diagnostic,
+                            lhs,
+                            value_ty,
+                            op,
+                            visitor,
+                        )
+                    },
                 )
             }),
 

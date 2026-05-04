@@ -251,13 +251,17 @@ pub(super) fn infer_binary_type_comparison<'db>(
             )
         }
 
-        (Type::TypeAlias(alias), right) => Some(visitor.visit((left, op, right), || {
-            infer_binary_type_comparison(context, alias.value_type(db), op, right, range, visitor)
-        })),
+        (Type::TypeAlias(_), right) => Some(left.visit_type_alias_value(
+            db,
+            || Ok(KnownClass::Bool.to_instance(db)),
+            |value_ty| infer_binary_type_comparison(context, value_ty, op, right, range, visitor),
+        )),
 
-        (left, Type::TypeAlias(alias)) => Some(visitor.visit((left, op, right), || {
-            infer_binary_type_comparison(context, left, op, alias.value_type(db), range, visitor)
-        })),
+        (left, Type::TypeAlias(_)) => Some(right.visit_type_alias_value(
+            db,
+            || Ok(KnownClass::Bool.to_instance(db)),
+            |value_ty| infer_binary_type_comparison(context, left, op, value_ty, range, visitor),
+        )),
 
         // `try_dunder` works for almost all `NewType`s, but not for `NewType`s of `float` and
         // `complex`, where the concrete base type is a union. In that case it turns out the

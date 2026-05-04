@@ -305,10 +305,12 @@ impl<'db> Type<'db> {
                 LiteralValueTypeKind::Bytes(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
             },
 
-            Type::TypeAlias(alias) => visitor.visit(*self, || {
-                alias
-                    .value_type(db)
-                    .try_bool_impl(db, allow_short_circuit, visitor)
+            Type::TypeAlias(_) => visitor.visit(*self, || {
+                (*self).visit_type_alias_value(
+                    db,
+                    || Ok(Truthiness::Ambiguous),
+                    |value_ty| value_ty.try_bool_impl(db, allow_short_circuit, visitor),
+                )
             })?,
             Type::NewTypeInstance(newtype) => {
                 newtype

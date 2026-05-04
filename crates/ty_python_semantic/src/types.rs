@@ -1257,7 +1257,9 @@ impl<'db> Type<'db> {
         match self {
             Type::NominalInstance(instance) => Some(instance.class(db)),
             Type::ProtocolInstance(instance) => instance.to_nominal_instance().map(|i| i.class(db)),
-            Type::TypeAlias(alias) => alias.value_type(db).nominal_class(db),
+            Type::TypeAlias(_) => {
+                self.visit_type_alias_value_or_default(db, |value_ty| value_ty.nominal_class(db))
+            }
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).nominal_class(db),
             Type::TypeVar(typevar) => {
                 let TypeVarBoundOrConstraints::UpperBound(bound) =
@@ -2219,6 +2221,17 @@ impl<'db> Type<'db> {
         f: &mut dyn FnMut(Type<'db>, TypeVarVariance),
         visitor: &SpecializationVisitor<'db>,
     ) {
+        if let Type::TypeAlias(_) = self {
+            self.visit_type_alias_value(
+                db,
+                || (),
+                |value_ty| {
+                    value_ty.visit_specialization_impl(db, polarity, f, visitor);
+                },
+            );
+            return;
+        }
+
         let Some(specialization) = self.class_specialization(db) else {
             match self {
                 Type::Union(union) => {
@@ -2231,11 +2244,6 @@ impl<'db> Type<'db> {
                         element.visit_specialization_impl(db, polarity, f, visitor);
                     }
                 }
-                Type::TypeAlias(alias) => visitor.visit(self, || {
-                    alias
-                        .value_type(db)
-                        .visit_specialization_impl(db, polarity, f, visitor);
-                }),
                 Type::Callable(callable) => {
                     for signature in callable.signatures(db) {
                         for parameter in signature.parameters() {

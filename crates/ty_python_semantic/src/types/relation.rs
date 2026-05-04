@@ -981,13 +981,25 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
             }
 
-            (Type::TypeAlias(source_alias), _) => self.with_recursion_guard(source, target, || {
-                self.check_type_pair(db, source_alias.value_type(db), target)
-            }),
+            (Type::TypeAlias(_), _) => source.visit_type_alias_value(
+                db,
+                || self.always(),
+                |source_alias_ty| {
+                    self.with_recursion_guard(source, target, || {
+                        self.check_type_pair(db, source_alias_ty, target)
+                    })
+                },
+            ),
 
-            (_, Type::TypeAlias(target_alias)) => self.with_recursion_guard(source, target, || {
-                self.check_type_pair(db, source, target_alias.value_type(db))
-            }),
+            (_, Type::TypeAlias(_)) => target.visit_type_alias_value(
+                db,
+                || self.always(),
+                |target_alias_ty| {
+                    self.with_recursion_guard(source, target, || {
+                        self.check_type_pair(db, source, target_alias_ty)
+                    })
+                },
+            ),
 
             // Field definitions in dataclasses and dataclass-transformers can involve calls to
             // `dataclasses.field` or custom field-specifier functions. The annotated return type
@@ -2222,19 +2234,25 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
 
-            (Type::TypeAlias(alias), _) => {
-                let left_alias_ty = alias.value_type(db);
-                self.with_recursion_guard(left, right, || {
-                    self.check_type_pair(db, left_alias_ty, right)
-                })
-            }
+            (Type::TypeAlias(_), _) => left.visit_type_alias_value(
+                db,
+                || self.never(),
+                |left_alias_ty| {
+                    self.with_recursion_guard(left, right, || {
+                        self.check_type_pair(db, left_alias_ty, right)
+                    })
+                },
+            ),
 
-            (_, Type::TypeAlias(alias)) => {
-                let right_alias_ty = alias.value_type(db);
-                self.with_recursion_guard(left, right, || {
-                    self.check_type_pair(db, left, right_alias_ty)
-                })
-            }
+            (_, Type::TypeAlias(_)) => right.visit_type_alias_value(
+                db,
+                || self.never(),
+                |right_alias_ty| {
+                    self.with_recursion_guard(left, right, || {
+                        self.check_type_pair(db, left, right_alias_ty)
+                    })
+                },
+            ),
 
             // `type[T]` is disjoint from a callable or protocol instance if its upper bound or constraints are.
             (
