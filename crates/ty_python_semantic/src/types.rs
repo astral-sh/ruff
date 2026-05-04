@@ -18,13 +18,13 @@ use ruff_db::files::File;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
+use salsa::plumbing::AsId;
 use smallvec::smallvec_inline;
 use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
 pub(crate) use self::callable::UpcastPolicy;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
-use self::cyclic::visit_type_alias;
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
@@ -244,6 +244,8 @@ struct ApplyPromoteOnTypeMapping;
 struct ApplyPromoteOffTypeMapping;
 struct ApplyTopMaterialization;
 struct ApplyBottomMaterialization;
+struct ApplySpecializationWithTopMaterialization;
+struct ApplySpecializationWithBottomMaterialization;
 struct ApplyMaterializationEquivalence;
 
 type MaterializationEquivalenceVisitor<'db> =
@@ -252,14 +254,18 @@ type MaterializationEquivalenceVisitor<'db> =
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
 /// Promotion and materialization can visit the same type under two different mappings within a
-/// single recursive call chain. Keep separate cycle caches for those modes so invariant checks and
-/// callable promotion can safely reuse one visitor.
+/// single recursive call chain. Keep separate cycle caches for those modes so invariant checks,
+/// materialized specialization, and callable promotion can safely reuse one visitor.
 pub(crate) struct ApplyTypeMappingVisitor<'db> {
     default: OnceCell<TypeTransformer<'db, ApplyDefaultTypeMapping>>,
     promote_on: OnceCell<TypeTransformer<'db, ApplyPromoteOnTypeMapping>>,
     promote_off: OnceCell<TypeTransformer<'db, ApplyPromoteOffTypeMapping>>,
     top_materialization: OnceCell<TypeTransformer<'db, ApplyTopMaterialization>>,
     bottom_materialization: OnceCell<TypeTransformer<'db, ApplyBottomMaterialization>>,
+    specialization_top_materialization:
+        OnceCell<TypeTransformer<'db, ApplySpecializationWithTopMaterialization>>,
+    specialization_bottom_materialization:
+        OnceCell<TypeTransformer<'db, ApplySpecializationWithBottomMaterialization>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
 }
 
@@ -293,6 +299,20 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
                 .bottom_materialization
                 .get_or_init(TypeTransformer::default)
                 .visit_type(db, ty, func),
+            TypeMapping::ApplySpecializationWithMaterialization {
+                materialization_kind: MaterializationKind::Top,
+                ..
+            } => self
+                .specialization_top_materialization
+                .get_or_init(TypeTransformer::default)
+                .visit_type(db, ty, func),
+            TypeMapping::ApplySpecializationWithMaterialization {
+                materialization_kind: MaterializationKind::Bottom,
+                ..
+            } => self
+                .specialization_bottom_materialization
+                .get_or_init(TypeTransformer::default)
+                .visit_type(db, ty, func),
             _ => self
                 .default
                 .get_or_init(TypeTransformer::default)
@@ -323,6 +343,8 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
             promote_off: OnceCell::new(),
             top_materialization: OnceCell::new(),
             bottom_materialization: OnceCell::new(),
+            specialization_top_materialization: OnceCell::new(),
+            specialization_bottom_materialization: OnceCell::new(),
             materialization_equivalence,
         }
     }
@@ -336,6 +358,8 @@ impl Default for ApplyTypeMappingVisitor<'_> {
             promote_off: OnceCell::new(),
             top_materialization: OnceCell::new(),
             bottom_materialization: OnceCell::new(),
+            specialization_top_materialization: OnceCell::new(),
+            specialization_bottom_materialization: OnceCell::new(),
             materialization_equivalence: OnceCell::new(),
         }
     }
@@ -1233,7 +1257,9 @@ impl<'db> Type<'db> {
         match self {
             Type::NominalInstance(instance) => Some(instance.class(db)),
             Type::ProtocolInstance(instance) => instance.to_nominal_instance().map(|i| i.class(db)),
-            Type::TypeAlias(alias) => alias.value_type(db).nominal_class(db),
+            Type::TypeAlias(_) => {
+                self.visit_type_alias_value_or_default(db, |value_ty| value_ty.nominal_class(db))
+            }
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).nominal_class(db),
             Type::TypeVar(typevar) => {
                 let TypeVarBoundOrConstraints::UpperBound(bound) =
@@ -1384,11 +1410,9 @@ impl<'db> Type<'db> {
     /// underlying value type. Otherwise, returns `self` unchanged.
     pub(crate) fn resolve_type_alias(self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            Type::TypeAlias(alias) => visit_type_alias(
-                alias,
-                || self,
-                || alias.value_type(db).resolve_type_alias(db),
-            ),
+            Type::TypeAlias(alias) => {
+                alias.visit_value(db, || self, |value_ty| value_ty.resolve_type_alias(db))
+            }
             _ => self,
         }
     }
@@ -1404,7 +1428,7 @@ impl<'db> Type<'db> {
         visit_value: impl FnOnce(Type<'db>) -> R,
     ) -> R {
         if let Type::TypeAlias(alias) = self {
-            visit_type_alias(alias, on_cycle, || visit_value(alias.value_type(db)))
+            alias.visit_value(db, on_cycle, visit_value)
         } else {
             visit_value(self)
         }
@@ -1828,14 +1852,13 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::Callable(_)
             | Type::WrapperDescriptor(_)
-            | Type::TypeAlias(_)
             | Type::BoundMethod(_) => Type::Intersection(IntersectionType::new(
                 db,
                 FxOrderSet::default(),
                 NegativeIntersectionElements::Single(*self),
             )),
 
-            Type::Union(_) | Type::Intersection(_) => {
+            Type::Union(_) | Type::Intersection(_) | Type::TypeAlias(_) => {
                 IntersectionBuilder::new(db).add_negative(*self).build()
             }
         }
@@ -2194,6 +2217,17 @@ impl<'db> Type<'db> {
         f: &mut dyn FnMut(Type<'db>, TypeVarVariance),
         visitor: &SpecializationVisitor<'db>,
     ) {
+        if let Type::TypeAlias(_) = self {
+            self.visit_type_alias_value(
+                db,
+                || (),
+                |value_ty| {
+                    value_ty.visit_specialization_impl(db, polarity, f, visitor);
+                },
+            );
+            return;
+        }
+
         let Some(specialization) = self.class_specialization(db) else {
             match self {
                 Type::Union(union) => {
@@ -2206,11 +2240,6 @@ impl<'db> Type<'db> {
                         element.visit_specialization_impl(db, polarity, f, visitor);
                     }
                 }
-                Type::TypeAlias(alias) => visitor.visit(self, || {
-                    alias
-                        .value_type(db)
-                        .visit_specialization_impl(db, polarity, f, visitor);
-                }),
                 Type::Callable(callable) => {
                     for signature in callable.signatures(db) {
                         for parameter in signature.parameters() {
@@ -2579,9 +2608,14 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::TypeAlias(alias) => alias
-                .value_type(db)
-                .find_name_in_mro_with_policy(db, name, policy),
+            Type::TypeAlias(alias) => alias.visit_value(
+                db,
+                || {
+                    Type::divergent(alias.definition(db).as_id())
+                        .find_name_in_mro_with_policy(db, name, policy)
+                },
+                |value_ty| value_ty.find_name_in_mro_with_policy(db, name, policy),
+            ),
 
             Type::FunctionLiteral(_)
             | Type::Callable(_)
@@ -2790,7 +2824,11 @@ impl<'db> Type<'db> {
 
             Type::TypedDict(_) => Place::Undefined.into(),
 
-            Type::TypeAlias(alias) => alias.value_type(db).instance_member(db, name),
+            Type::TypeAlias(alias) => alias.visit_value(
+                db,
+                || Type::divergent(alias.definition(db).as_id()).instance_member(db, name),
+                |value_ty| value_ty.instance_member(db, name),
+            ),
         }
     }
 
@@ -5354,7 +5392,9 @@ impl<'db> Type<'db> {
             // has no instance type. Otherwise, synthesize a typevar with bound or constraints
             // mapped through `to_instance`.
             Type::TypeVar(bound_typevar) => Some(Type::TypeVar(bound_typevar.to_instance(db)?)),
-            Type::TypeAlias(alias) => alias.value_type(db).to_instance(db),
+            Type::TypeAlias(_) => {
+                self.visit_type_alias_value(db, || Some(self), |value_ty| value_ty.to_instance(db))
+            }
             Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance")),
             // An instance of class `C` may itself have instances if `C` is a subclass of `type`.
             Type::NominalInstance(instance)
@@ -5600,11 +5640,17 @@ impl<'db> Type<'db> {
 
             Type::Intersection(_) => Ok(todo_type!("Type::Intersection.in_type_expression")),
 
-            Type::TypeAlias(alias) => alias.value_type(db).in_type_expression(
+            Type::TypeAlias(_) => (*self).visit_type_alias_value(
                 db,
-                scope_id,
-                typevar_binding_context,
-                inference_flags,
+                || Ok(*self),
+                |value_ty| {
+                    value_ty.in_type_expression(
+                        db,
+                        scope_id,
+                        typevar_binding_context,
+                        inference_flags,
+                    )
+                },
             ),
 
             Type::NewTypeInstance(_) => Err(InvalidTypeExpressionError {
@@ -5682,18 +5728,12 @@ impl<'db> Type<'db> {
                     todo_type!("TypedDict synthesized meta-type").expect_dynamic(),
                 ),
             },
-            Type::TypeAlias(_) => self.visit_type_alias_value(
-                db,
-                || {
-                    let expanded = self.expand_eagerly(db);
-                    if expanded == self {
-                        Type::unknown()
-                    } else {
-                        expanded.to_meta_type(db)
-                    }
-                },
-                |value_ty| value_ty.to_meta_type(db),
-            ),
+            Type::TypeAlias(alias) => {
+                let divergent = Type::divergent(alias.definition(db).as_id());
+                self.visit_type_alias_value(db, || divergent, |value_ty| value_ty.to_meta_type(db))
+                    .recursive_type_normalized_impl(db, divergent, false)
+                    .unwrap_or(divergent)
+            }
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).to_meta_type(db),
         }
     }
@@ -5915,22 +5955,47 @@ impl<'db> Type<'db> {
             }),
             Type::Intersection(intersection) => {
                 visitor.visit(db, self, type_mapping, || {
-                    let mut builder = IntersectionBuilder::new(db);
-                    for positive in intersection.positive(db) {
-                        builder = builder.add_positive(
-                            positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                        );
+                    let drop_negative =
+                        matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, _));
+                    let positive = intersection.positive(db);
+                    let negative = intersection.negative(db);
+                    let mut mapped_positive = Vec::with_capacity(positive.len());
+                    let mut mapped_negative = Vec::with_capacity(negative.len());
+                    let mut changed = drop_negative && !negative.is_empty();
+
+                    for positive in positive {
+                        let mapped =
+                            positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                        changed |= mapped != *positive;
+                        mapped_positive.push(mapped);
                     }
-                    // Promotion should remove negative contributions from intersections,
-                    // so we don't preserve them here when promotion is enabled.
-                    if !matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, _)) {
-                        for negative in intersection.negative(db) {
-                            builder = builder.add_negative(negative.apply_type_mapping_impl(
+
+                    if !drop_negative {
+                        for negative in negative {
+                            let mapped = negative.apply_type_mapping_impl(
                                 db,
                                 &type_mapping.flip(),
                                 tcx,
                                 visitor,
-                            ));
+                            );
+                            changed |= mapped != *negative;
+                            mapped_negative.push(mapped);
+                        }
+                    }
+
+                    if !changed {
+                        return self;
+                    }
+
+                    let mut builder = IntersectionBuilder::new(db);
+                    for positive in mapped_positive {
+                        builder = builder.add_positive(positive);
+                    }
+                    // Promotion should remove negative contributions from intersections,
+                    // so we don't preserve them here when promotion is enabled.
+                    if !drop_negative {
+                        for negative in mapped_negative {
+                            builder = builder.add_negative(negative);
                         }
                     }
                     builder.build()
@@ -5957,10 +6022,18 @@ impl<'db> Type<'db> {
 
             Type::TypeAlias(alias) => {
                 match type_mapping {
-                    // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
-                    // detection rather than the visitor's cycle detection, because the visitor tracks
-                    // Type values and `RecursiveList` is different from `RecursiveList[T]`.
-                    TypeMapping::EagerExpansion => alias.raw_value_type(db).expand_eagerly(db),
+                    // For EagerExpansion, expand the raw value type. Use active alias tracking in
+                    // addition to Salsa cycle detection because recursive generic aliases can
+                    // change specialization on every expansion.
+                    TypeMapping::EagerExpansion => {
+                        let divergent = Type::divergent(alias.definition(db).as_id());
+                        alias
+                            .visit_raw_value(db, || divergent, |value_ty| {
+                                value_ty.expand_eagerly(db)
+                            })
+                            .recursive_type_normalized_impl(db, divergent, false)
+                            .unwrap_or(divergent)
+                    }
                     // When specializing a generic type alias, instead of specializing the expanded type, the type alias itself is specialized.
                     // Without this special handling, recursive type aliases would result in cycles, returning an unspecialized fallback type.
                     TypeMapping::ApplySpecialization(specialization)
@@ -5986,28 +6059,31 @@ impl<'db> Type<'db> {
                         ))
                     }
                     _ => {
-                        // Do not call `value_type` here. `value_type` does the specialization internally, so `apply_type_mapping` is
-                        // performed without `visitor` inheritance. In the case of recursive type aliases, this leads to infinite recursion.
-                        // Instead, call `raw_value_type` and perform the specialization after the `visitor` cache has been created.
-                        //
-                        // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
-                        // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
-                        // will detect the cycle and return the fallback value.
                         let mapped = visitor.visit(db, self, type_mapping, || {
-                            let value_type = alias.raw_value_type(db).apply_type_mapping_impl(
+                            // Do not call `value_type` here. `value_type` applies specialization
+                            // without this visitor. Keep the raw expansion, specialization, and
+                            // outer mapping in one visitor call, and use active alias tracking for
+                            // generic aliases whose specialization changes at each recursive step.
+                            alias.visit_raw_value(
                                 db,
-                                type_mapping,
-                                tcx,
-                                visitor,
-                            );
-                            alias
-                                .apply_function_specialization(db, value_type)
-                                .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                                || self,
+                                |raw_value_type| {
+                                    let value_type = raw_value_type.apply_type_mapping_impl(
+                                        db,
+                                        type_mapping,
+                                        tcx,
+                                        visitor,
+                                    );
+                                    alias
+                                        .apply_function_specialization(db, value_type)
+                                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                                },
+                            )
                         });
 
                         // If the type mapping does not result in any change to this type alias, do
                         // not expand it.
-                        if alias.value_type(db) == mapped {
+                        if alias.visit_value(db, || false, |value_type| value_type == mapped) {
                             self
                         } else {
                             mapped
@@ -6230,15 +6306,14 @@ impl<'db> Type<'db> {
                 );
             }
 
-            Type::TypeAlias(alias) => {
-                visitor.visit(self, || {
-                    alias.value_type(db).find_legacy_typevars_impl(
-                        db,
-                        binding_context,
-                        typevars,
-                        visitor,
-                    );
-                });
+            Type::TypeAlias(_) => {
+                self.visit_type_alias_value(
+                    db,
+                    || (),
+                    |value_ty| {
+                        value_ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                    },
+                );
             }
 
             Type::KnownInstance(known_instance) => match known_instance {
@@ -6457,7 +6532,9 @@ impl<'db> Type<'db> {
                 )),
             },
 
-            Self::TypeAlias(alias) => alias.value_type(db).definition(db),
+            Self::TypeAlias(alias) => {
+                alias.visit_value(db, || None, |value_ty| value_ty.definition(db))
+            }
             Self::NewTypeInstance(newtype) => Some(TypeDefinition::NewType(newtype.definition(db))),
 
             Self::PropertyInstance(property) => property

@@ -39,10 +39,11 @@
 use super::RecursivelyDefined;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
+use crate::types::type_alias::TypeAliasType;
 use crate::types::{
-    BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
-    LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType, Type,
-    TypeVarBoundOrConstraints, UnionType,
+    ApplyTypeMappingVisitor, BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType,
+    KnownClass, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
+    StringLiteralType, Type, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 use smallvec::SmallVec;
@@ -520,12 +521,20 @@ impl<'db> UnionBuilder<'db> {
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
             Type::TypeAlias(alias) if self.unpack_aliases => {
-                if seen_aliases.contains(&ty) {
+                if seen_type_alias_definition(self.db, seen_aliases, alias) {
                     // Union contains itself recursively via a type alias. This is an error, just
                     // leave out the recursive alias. TODO surface this error.
                 } else {
                     seen_aliases.push(ty);
-                    self.add_in_place_impl(alias.value_type(self.db), seen_aliases);
+                    ty.visit_type_alias_value(
+                        self.db,
+                        || {
+                            // Union contains itself recursively via a type alias. This is an error, just
+                            // leave out the recursive alias. TODO surface this error.
+                        },
+                        |value_ty| self.add_in_place_impl(value_ty, seen_aliases),
+                    );
+                    seen_aliases.pop();
                 }
             }
             Type::LiteralValue(literal) => {
@@ -800,7 +809,15 @@ impl<'db> UnionBuilder<'db> {
         let mut to_remove = SmallVec::<[usize; 2]>::new();
 
         for (i, element) in self.elements.iter_mut().enumerate() {
-            let element_type = match element.try_reduce(self.db, ty) {
+            let reduction = if should_simplify_full {
+                element.try_reduce(self.db, ty)
+            } else {
+                match element {
+                    UnionElement::Type(existing) => ReduceResult::Type(*existing),
+                    _ => ReduceResult::KeepIf(true),
+                }
+            };
+            let element_type = match reduction {
                 ReduceResult::KeepIf(keep) => {
                     if !keep {
                         to_remove.push(i);
@@ -951,6 +968,17 @@ pub(crate) struct IntersectionBuilder<'db> {
     db: &'db dyn Db,
 }
 
+fn seen_type_alias_definition<'db>(
+    db: &'db dyn Db,
+    seen_aliases: &[Type<'db>],
+    alias: TypeAliasType<'db>,
+) -> bool {
+    let definition = alias.definition(db);
+    seen_aliases.iter().any(|seen_alias| {
+        matches!(*seen_alias, Type::TypeAlias(seen_alias) if seen_alias.definition(db) == definition)
+    })
+}
+
 impl<'db> IntersectionBuilder<'db> {
     pub(crate) fn new(db: &'db dyn Db) -> Self {
         Self {
@@ -977,16 +1005,29 @@ impl<'db> IntersectionBuilder<'db> {
     ) -> Self {
         match ty {
             Type::TypeAlias(alias) => {
-                if seen_aliases.contains(&ty) {
+                if seen_type_alias_definition(self.db, seen_aliases, alias) {
                     // Recursive alias, add it without expanding to avoid infinite recursion.
                     for inner in &mut self.intersections {
                         inner.positive.insert(ty);
                     }
                     return self;
                 }
+                let db = self.db;
+                let Some(value_type) = alias.visit_value_with_mapping_visitor(
+                    db,
+                    &ApplyTypeMappingVisitor::default(),
+                    || None,
+                    Some,
+                ) else {
+                    for inner in &mut self.intersections {
+                        inner.positive.insert(ty);
+                    }
+                    return self;
+                };
                 seen_aliases.push(ty);
-                let value_type = alias.value_type(self.db);
-                self.add_positive_impl(value_type, seen_aliases)
+                let result = self.add_positive_impl(value_type, seen_aliases);
+                seen_aliases.pop();
+                result
             }
             Type::Union(union) => {
                 // Distribute ourself over this union: for each union element, clone ourself and
@@ -1080,16 +1121,29 @@ impl<'db> IntersectionBuilder<'db> {
         // See comments above in `add_positive`; this is just the negated version.
         match ty {
             Type::TypeAlias(alias) => {
-                if seen_aliases.contains(&ty) {
+                if seen_type_alias_definition(self.db, seen_aliases, alias) {
                     // Recursive alias, add it without expanding to avoid infinite recursion.
                     for inner in &mut self.intersections {
                         inner.negative.insert(ty);
                     }
                     return self;
                 }
+                let db = self.db;
+                let Some(value_type) = alias.visit_value_with_mapping_visitor(
+                    db,
+                    &ApplyTypeMappingVisitor::default(),
+                    || None,
+                    Some,
+                ) else {
+                    for inner in &mut self.intersections {
+                        inner.negative.insert(ty);
+                    }
+                    return self;
+                };
                 seen_aliases.push(ty);
-                let value_type = alias.value_type(self.db);
-                self.add_negative_impl(value_type, seen_aliases)
+                let result = self.add_negative_impl(value_type, seen_aliases);
+                seen_aliases.pop();
+                result
             }
             Type::Union(union) => {
                 for elem in union.elements(self.db) {

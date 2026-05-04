@@ -31,8 +31,8 @@ use crate::types::generics::{
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
 use crate::types::relation::{
-    HasRelationToVisitor, InvariantRelationVisitor, IsDisjointVisitor, TypeRelation,
-    TypeRelationChecker,
+    AliasRelationVisitor, HasRelationToVisitor, InvariantRelationVisitor, IsDisjointVisitor,
+    TypeRelation, TypeRelationChecker,
 };
 use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, Signature, SignatureRelationVisitor,
@@ -1199,6 +1199,7 @@ impl<'db> ClassType<'db> {
         let disjointness_visitor = IsDisjointVisitor::default(&constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let invariant_relation_visitor = InvariantRelationVisitor::default();
+        let alias_relation_visitor = AliasRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::subtyping(
             &constraints,
@@ -1207,6 +1208,7 @@ impl<'db> ClassType<'db> {
             &disjointness_visitor,
             &signature_relation_visitor,
             &invariant_relation_visitor,
+            &alias_relation_visitor,
             &materialization_visitor,
         );
         checker

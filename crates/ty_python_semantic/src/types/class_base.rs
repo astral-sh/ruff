@@ -8,6 +8,7 @@ use crate::types::{
     TypeMapping, todo_type,
 };
 use crate::{Db, DisplaySettings};
+use salsa::plumbing::AsId;
 
 /// Enumeration of the possible kinds of types we allow in class bases.
 ///
@@ -151,7 +152,11 @@ impl<'db> ClassBase<'db> {
             // in which case we want to treat `Never` in a forgiving way and silence diagnostics
             Type::Never => Some(ClassBase::unknown()),
 
-            Type::TypeAlias(alias) => Self::try_from_type(db, alias.value_type(db), subclass),
+            Type::TypeAlias(alias) => alias.visit_value(
+                db,
+                || Self::try_from_type(db, Type::divergent(alias.definition(db).as_id()), subclass),
+                |value_ty| Self::try_from_type(db, value_ty, subclass),
+            ),
 
             Type::NewTypeInstance(newtype) => {
                 ClassBase::try_from_type(db, newtype.concrete_base_type(db), subclass)

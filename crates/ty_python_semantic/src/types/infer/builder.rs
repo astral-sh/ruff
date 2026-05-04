@@ -8760,7 +8760,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (_, Type::Never) => Type::Never,
 
             (_, Type::TypeAlias(alias)) => {
-                self.infer_unary_expression_type(op, alias.value_type(self.db()), unary)
+                let db = self.db();
+                alias.visit_value(db, Type::unknown, |value_ty| {
+                    self.infer_unary_expression_type(op, value_ty, unary)
+                })
             }
 
             (ast::UnaryOp::UAdd, Type::LiteralValue(literal)) => match literal.kind() {

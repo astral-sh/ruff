@@ -54,12 +54,14 @@ enum TypeAliasKey {
     ManualPEP695(salsa::Id),
 }
 
-impl<'db> From<TypeAliasType<'db>> for TypeAliasKey {
-    fn from(type_alias: TypeAliasType<'db>) -> Self {
+impl TypeAliasKey {
+    fn from_type_alias(db: &dyn Db, type_alias: TypeAliasType<'_>) -> Self {
         match type_alias {
-            TypeAliasType::PEP695(type_alias) => TypeAliasKey::PEP695(type_alias.as_id()),
+            TypeAliasType::PEP695(type_alias) => {
+                TypeAliasKey::PEP695(type_alias.definition(db).as_id())
+            }
             TypeAliasType::ManualPEP695(type_alias) => {
-                TypeAliasKey::ManualPEP695(type_alias.as_id())
+                TypeAliasKey::ManualPEP695(type_alias.definition(db).as_id())
             }
         }
     }
@@ -71,12 +73,18 @@ std::thread_local! {
 }
 
 pub(crate) fn visit_type_alias<R>(
+    db: &dyn Db,
     type_alias: TypeAliasType<'_>,
     on_cycle: impl FnOnce() -> R,
     func: impl FnOnce() -> R,
 ) -> R {
-    ACTIVE_TYPE_ALIASES
-        .with(|detector| detector.visit(&TypeAliasKey::from(type_alias), on_cycle, func))
+    ACTIVE_TYPE_ALIASES.with(|detector| {
+        detector.visit(
+            &TypeAliasKey::from_type_alias(db, type_alias),
+            on_cycle,
+            func,
+        )
+    })
 }
 
 #[derive(Debug)]

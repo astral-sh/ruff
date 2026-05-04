@@ -476,9 +476,9 @@ impl<'db> SemanticModel<'db> {
                     .iter()
                     .flat_map(|element| collect(db, *element, visitor))
                     .collect(),
-                Type::TypeAlias(alias) => {
-                    visitor.visit(ty, || collect(db, alias.value_type(db), visitor))
-                }
+                Type::TypeAlias(alias) => visitor.visit(ty, || {
+                    alias.visit_value(db, Vec::new, |value_ty| collect(db, value_ty, visitor))
+                }),
                 _ => Vec::new(),
             }
         }

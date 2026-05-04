@@ -182,9 +182,11 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
 impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         match self {
-            KnownInstanceType::TypeAliasType(type_alias) => {
-                type_alias.raw_value_type(db).variance_of(db, typevar)
-            }
+            KnownInstanceType::TypeAliasType(type_alias) => type_alias.visit_raw_value(
+                db,
+                || TypeVarVariance::Bivariant,
+                |value_ty| value_ty.variance_of(db, typevar),
+            ),
             _ => TypeVarVariance::Bivariant,
         }
     }

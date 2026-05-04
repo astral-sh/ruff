@@ -1548,7 +1548,11 @@ fn is_instance_truthiness<'db>(
 
         Type::ClassLiteral(..) => always_true_if(is_instance(&KnownClass::Type.to_instance(db))),
 
-        Type::TypeAlias(alias) => is_instance_truthiness(db, alias.value_type(db), class),
+        Type::TypeAlias(alias) => alias.visit_value(
+            db,
+            || Truthiness::Ambiguous,
+            |value_ty| is_instance_truthiness(db, value_ty, class),
+        ),
 
         Type::TypeVar(bound_typevar) => match bound_typevar.typevar(db).bound_or_constraints(db) {
             None => is_instance_truthiness(db, Type::object(), class),

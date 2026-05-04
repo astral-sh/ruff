@@ -2,6 +2,7 @@ use itertools::Either;
 use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::Ranged;
+use salsa::plumbing::AsId;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::diagnostic::{
@@ -1516,19 +1517,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     "Cannot specialize non-generic type alias `{}`",
                                     type_alias.name(self.db())
                                 ));
-                                let secondary = self.context.secondary(&*subscript.value);
-                                let value_type = type_alias.raw_value_type(self.db());
-                                if value_type.is_specialized_generic(self.db()) {
-                                    diagnostic.annotate(secondary.message(format_args!(
-                                        "Alias to `{}`, which is already specialized",
-                                        value_type.display(self.db())
-                                    )));
-                                } else {
-                                    diagnostic.annotate(secondary.message(format_args!(
-                                        "Alias to `{}`, which is not generic",
-                                        value_type.display(self.db())
-                                    )));
-                                }
+                                type_alias.visit_raw_value(
+                                    self.db(),
+                                    || (),
+                                    |value_type| {
+                                        let secondary = self.context.secondary(&*subscript.value);
+                                        if value_type.is_specialized_generic(self.db()) {
+                                            diagnostic.annotate(secondary.message(format_args!(
+                                                "Alias to `{}`, which is already specialized",
+                                                value_type.display(self.db())
+                                            )));
+                                        } else {
+                                            diagnostic.annotate(secondary.message(format_args!(
+                                                "Alias to `{}`, which is not generic",
+                                                value_type.display(self.db())
+                                            )));
+                                        }
+                                    },
+                                );
                             }
 
                             Type::unknown()
@@ -2140,7 +2146,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 _ => {
                     let narrowed = self.infer_type_expression(arguments_slice);
-                    let expanded = narrowed.expand_eagerly(self.db());
+                    let expanded = if let Type::TypeAlias(alias) = narrowed {
+                        alias.visit_value(
+                            self.db(),
+                            || Type::divergent(alias.definition(self.db()).as_id()),
+                            |value_ty| value_ty.expand_eagerly(self.db()),
+                        )
+                    } else {
+                        narrowed.expand_eagerly(self.db())
+                    };
 
                     if expanded.is_divergent() {
                         expanded
@@ -2481,8 +2495,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 match subscript_ty {
                     // type aliases to literal types
                     Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => {
-                        let value_ty = type_alias.value_type(self.db());
-                        if value_ty.is_literal_or_union_of_literals(self.db()) {
+                        let value_ty = type_alias.visit_value(
+                            self.db(),
+                            || None,
+                            |value_ty| {
+                                value_ty
+                                    .is_literal_or_union_of_literals(self.db())
+                                    .then_some(value_ty)
+                            },
+                        );
+                        if let Some(value_ty) = value_ty {
                             return Ok(value_ty);
                         }
                     }

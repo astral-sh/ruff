@@ -3,7 +3,8 @@ use std::fmt::Write;
 use crate::{
     Db,
     types::{
-        GenericContext, Type, definition_expression_type,
+        ApplySpecialization, ApplyTypeMappingVisitor, GenericContext, Type, TypeContext,
+        TypeMapping, cyclic::visit_type_alias, definition_expression_type,
         display::qualified_name_components_from_scope, generics::Specialization, visitor,
     },
 };
@@ -35,7 +36,13 @@ pub(super) fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized
     type_alias: PEP695TypeAliasType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, type_alias.value_type(db));
+    TypeAliasType::PEP695(type_alias).visit_value(
+        db,
+        || (),
+        |value_ty| {
+            visitor.visit_type(db, value_ty);
+        },
+    );
 }
 
 #[salsa::tracked]
@@ -47,7 +54,10 @@ impl<'db> PEP695TypeAliasType<'db> {
     }
 
     /// The RHS type of a PEP-695 style type alias with specialization applied.
-    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+    ///
+    /// This is the direct accessor used by [`TypeAliasType::visit_value`]. Recursive operations
+    /// should use the visitor wrapper so they can provide an operation-specific cycle fallback.
+    fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         self.apply_function_specialization(db, self.raw_value_type(db))
     }
 
@@ -147,7 +157,13 @@ pub(super) fn walk_manual_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> +
     type_alias: ManualPEP695TypeAliasType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, type_alias.value_type(db));
+    TypeAliasType::ManualPEP695(type_alias).visit_value(
+        db,
+        || (),
+        |value_ty| {
+            visitor.visit_type(db, value_ty);
+        },
+    );
 }
 
 #[salsa::tracked]
@@ -163,7 +179,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+    fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let definition = self.definition(db);
         let file = definition.file(db);
         let module = parsed_module(db, file).load(db);
@@ -223,14 +239,84 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+    /// Direct accessor for the alias value type.
+    ///
+    /// Prefer [`TypeAliasType::visit_value`] unless the caller already owns an operation-specific
+    /// recursion guard. This direct accessor only relies on Salsa cycle recovery for the underlying
+    /// value query.
+    pub(in crate::types) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
         }
     }
 
-    pub(crate) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
+    /// Visits the alias value type with active-recursion tracking.
+    ///
+    /// The caller owns the fallback result because different operations need different conservative
+    /// answers when a recursive alias points back to itself.
+    pub fn visit_value<R>(
+        self,
+        db: &'db dyn Db,
+        on_cycle: impl FnOnce() -> R,
+        visit_value: impl FnOnce(Type<'db>) -> R,
+    ) -> R {
+        visit_type_alias(db, self, on_cycle, || visit_value(self.value_type(db)))
+    }
+
+    /// Visits the alias value type before applying specialization.
+    ///
+    /// Use this when the operation needs to inspect the alias definition itself rather than the
+    /// type produced by a concrete or default specialization.
+    pub fn visit_raw_value<R>(
+        self,
+        db: &'db dyn Db,
+        on_cycle: impl FnOnce() -> R,
+        visit_value: impl FnOnce(Type<'db>) -> R,
+    ) -> R {
+        visit_type_alias(db, self, on_cycle, || visit_value(self.raw_value_type(db)))
+    }
+
+    /// The alias value type with specialization applied through an existing type-mapping visitor.
+    fn value_type_with_mapping_visitor(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Type<'db> {
+        let value_type = self.raw_value_type(db);
+        let Some(generic_context) = self.generic_context(db) else {
+            return value_type;
+        };
+
+        let specialization = self
+            .specialization(db)
+            .unwrap_or_else(|| generic_context.default_specialization(db, None));
+        value_type.apply_type_mapping_impl(
+            db,
+            &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(specialization)),
+            TypeContext::default(),
+            visitor,
+        )
+    }
+
+    /// Visits the alias value type with active-recursion tracking and applies specialization
+    /// through an existing type-mapping visitor.
+    pub(crate) fn visit_value_with_mapping_visitor<R>(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+        on_cycle: impl FnOnce() -> R,
+        visit_value: impl FnOnce(Type<'db>) -> R,
+    ) -> R {
+        visit_type_alias(db, self, on_cycle, || {
+            visit_value(self.value_type_with_mapping_visitor(db, visitor))
+        })
+    }
+
+    /// Direct accessor for the alias value type before applying specialization.
+    ///
+    /// Prefer [`TypeAliasType::visit_raw_value`] outside this module for recursive operations.
+    fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.raw_value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),

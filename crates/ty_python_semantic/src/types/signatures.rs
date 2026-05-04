@@ -28,8 +28,8 @@ use crate::types::generics::{
 };
 use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
-    HasRelationToVisitor, InvariantRelationVisitor, IsDisjointVisitor, TypeRelation,
-    TypeRelationChecker,
+    AliasRelationVisitor, HasRelationToVisitor, InvariantRelationVisitor, IsDisjointVisitor,
+    TypeRelation, TypeRelationChecker,
 };
 use crate::types::typed_dict::{
     UnpackedTypedDictKey, extract_unpacked_typed_dict_keys_from_kwargs_annotation,
@@ -432,6 +432,7 @@ impl<'db> CallableSignature<'db> {
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let invariant_relation_visitor = InvariantRelationVisitor::default();
+        let alias_relation_visitor = AliasRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::constraint_set_assignability(
             constraints,
@@ -439,6 +440,7 @@ impl<'db> CallableSignature<'db> {
             &disjointness_visitor,
             &signature_relation_visitor,
             &invariant_relation_visitor,
+            &alias_relation_visitor,
             &materialization_visitor,
         );
         checker.check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
@@ -1136,6 +1138,7 @@ impl<'db> Signature<'db> {
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let invariant_relation_visitor = InvariantRelationVisitor::default();
+        let alias_relation_visitor = AliasRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::constraint_set_assignability(
             constraints,
@@ -1143,6 +1146,7 @@ impl<'db> Signature<'db> {
             &disjointness_visitor,
             &signature_relation_visitor,
             &invariant_relation_visitor,
+            &alias_relation_visitor,
             &materialization_visitor,
         );
         checker.check_signature_pair(db, self, other)

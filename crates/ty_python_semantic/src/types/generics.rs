@@ -15,8 +15,8 @@ use crate::types::constraints::{
     Solutions,
 };
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, InvariantRelationGoal, InvariantRelationVisitor,
-    IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    AliasRelationVisitor, DisjointnessChecker, HasRelationToVisitor, InvariantRelationGoal,
+    InvariantRelationVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
 use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
@@ -1330,6 +1330,7 @@ impl<'db> Specialization<'db> {
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let invariant_relation_visitor = InvariantRelationVisitor::default();
+        let alias_relation_visitor = AliasRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = DisjointnessChecker::new(
             constraints,
@@ -1338,6 +1339,7 @@ impl<'db> Specialization<'db> {
             &disjointness_visitor,
             &signature_relation_visitor,
             &invariant_relation_visitor,
+            &alias_relation_visitor,
             &materialization_visitor,
         );
         checker.check_specialization_pair(db, self, other)
@@ -2059,10 +2061,44 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let formal = formal.filter_disjoint_elements(self.db, actual, self.inferable);
 
         match (formal, actual) {
+            (Type::TypeAlias(formal_alias), Type::TypeAlias(actual_alias))
+                if formal_alias.definition(self.db) == actual_alias.definition(self.db) =>
+            {
+                let Some(generic_context) = formal_alias.generic_context(self.db) else {
+                    return formal.visit_type_alias_value(
+                        self.db,
+                        || Ok(()),
+                        |value_ty| self.infer_map_impl(value_ty, actual, polarity, f, seen),
+                    );
+                };
+
+                let formal_specialization = formal_alias
+                    .specialization(self.db)
+                    .unwrap_or_else(|| generic_context.default_specialization(self.db, None));
+                let actual_specialization = actual_alias
+                    .specialization(self.db)
+                    .unwrap_or_else(|| generic_context.default_specialization(self.db, None));
+
+                for (typevar, formal_ty, actual_ty) in itertools::izip!(
+                    generic_context.variables(self.db),
+                    formal_specialization.types(self.db),
+                    actual_specialization.types(self.db)
+                ) {
+                    let variance = typevar.variance_with_polarity(self.db, polarity);
+                    self.infer_map_impl(*formal_ty, *actual_ty, variance, &mut f, seen)?;
+                }
+
+                return Ok(());
+            }
+
             // Expand PEP 695 type aliases in the formal type.
             // This is necessary for solving generics like `def head[T](my_list: MyList[T]) -> T`.
-            (Type::TypeAlias(alias), _) => {
-                return self.infer_map_impl(alias.value_type(self.db), actual, polarity, f, seen);
+            (Type::TypeAlias(_), _) => {
+                return formal.visit_type_alias_value(
+                    self.db,
+                    || Ok(()),
+                    |value_ty| self.infer_map_impl(value_ty, actual, polarity, f, seen),
+                );
             }
 
             // TODO: We haven't implemented a full unification solver yet. If typevars appear in
@@ -2201,6 +2237,18 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             (Type::TypeVar(bound_typevar), ty) | (ty, Type::TypeVar(bound_typevar))
                 if bound_typevar.is_inferable(self.db, self.inferable) =>
             {
+                if let Type::Intersection(intersection) = ty
+                    && intersection
+                        .negative(self.db)
+                        .iter()
+                        .any(|negative| matches!(negative, Type::TypeAlias(_)))
+                {
+                    // A negative alias that remains in an intersection after set-theoretic
+                    // simplification is recursive. Avoid trying to structurally infer a typevar
+                    // from it; expanding the alias again can produce an unbounded chain of
+                    // increasingly specialized aliases.
+                    return Ok(());
+                }
                 match bound_typevar.typevar(self.db).bound_or_constraints(self.db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         if polarity.is_contravariant() {
@@ -2548,8 +2596,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // This is placed at the end of the match block to avoid expanding the type alias
             // when it can be matched directly against a type variable in the formal type,
             // e.g., `reveal_type(alias)` should reveal the type alias, not its value type.
-            (formal, Type::TypeAlias(alias)) => {
-                return self.infer_map_impl(formal, alias.value_type(self.db), polarity, f, seen);
+            (formal, Type::TypeAlias(_)) => {
+                return actual.visit_type_alias_value(
+                    self.db,
+                    || Ok(()),
+                    |value_ty| self.infer_map_impl(formal, value_ty, polarity, f, seen),
+                );
             }
 
             // TODO: Add more forms that we can structurally induct into: type[C], callables
