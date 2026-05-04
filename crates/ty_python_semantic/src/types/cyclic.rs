@@ -26,10 +26,12 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 
 use rustc_hash::{FxHashMap, FxHashSet};
+use salsa::plumbing::AsId;
 
 use crate::Db;
 use crate::FxIndexSet;
 use crate::types::Type;
+use crate::types::type_alias::TypeAliasType;
 
 pub(crate) type TypeTransformer<'db, Tag> = CycleDetector<Tag, Type<'db>, Type<'db>>;
 
@@ -45,6 +47,37 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
 }
 
 pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<Tag, (Type<'db>, Type<'db>), C>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum TypeAliasKey {
+    PEP695(salsa::Id),
+    ManualPEP695(salsa::Id),
+}
+
+impl<'db> From<TypeAliasType<'db>> for TypeAliasKey {
+    fn from(type_alias: TypeAliasType<'db>) -> Self {
+        match type_alias {
+            TypeAliasType::PEP695(type_alias) => TypeAliasKey::PEP695(type_alias.as_id()),
+            TypeAliasType::ManualPEP695(type_alias) => {
+                TypeAliasKey::ManualPEP695(type_alias.as_id())
+            }
+        }
+    }
+}
+
+std::thread_local! {
+    static ACTIVE_TYPE_ALIASES: ActiveRecursionDetector<TypeAliasKey> =
+        ActiveRecursionDetector::default();
+}
+
+pub(crate) fn visit_type_alias<R>(
+    type_alias: TypeAliasType<'_>,
+    on_cycle: impl FnOnce() -> R,
+    func: impl FnOnce() -> R,
+) -> R {
+    ACTIVE_TYPE_ALIASES
+        .with(|detector| detector.visit(&TypeAliasKey::from(type_alias), on_cycle, func))
+}
 
 #[derive(Debug)]
 pub struct CycleDetector<Tag, T, R> {
@@ -193,10 +226,22 @@ impl<T: Hash + Eq + Clone> ActiveRecursionDetector<T> {
             return on_cycle();
         }
 
-        let ret = func();
+        let _guard = ActiveRecursionGuard {
+            seen: &self.seen,
+            item,
+        };
 
-        self.seen.borrow_mut().remove(item);
+        func()
+    }
+}
 
-        ret
+struct ActiveRecursionGuard<'a, T: Hash + Eq> {
+    seen: &'a RefCell<FxHashSet<T>>,
+    item: &'a T,
+}
+
+impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
+    fn drop(&mut self) {
+        self.seen.borrow_mut().remove(self.item);
     }
 }

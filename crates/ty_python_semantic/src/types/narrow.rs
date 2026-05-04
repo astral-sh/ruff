@@ -1,7 +1,6 @@
 use crate::Db;
 use crate::reachability::{ReachabilityConstraintsExtension, sequence_pattern_type};
 use crate::subscript::PyIndex;
-use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
@@ -147,17 +146,6 @@ impl ClassInfoConstraintFunction {
         classinfo: Type<'db>,
         is_positive: bool,
     ) -> Option<Type<'db>> {
-        let recursion_detector = ActiveRecursionDetector::default();
-        self.generate_constraint_impl(db, classinfo, is_positive, &recursion_detector)
-    }
-
-    fn generate_constraint_impl<'db>(
-        self,
-        db: &'db dyn Db,
-        classinfo: Type<'db>,
-        is_positive: bool,
-        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-    ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
             ClassInfoConstraintFunction::IsInstance => {
                 Type::instance(db, class.top_materialization(db))
@@ -168,11 +156,9 @@ impl ClassInfoConstraintFunction {
         };
 
         match classinfo {
-            Type::TypeAlias(_) => {
-                classinfo.visit_type_alias_value_or_default(db, recursion_detector, |value_ty| {
-                    self.generate_constraint_impl(db, value_ty, is_positive, recursion_detector)
-                })
-            }
+            Type::TypeAlias(_) => classinfo.visit_type_alias_value_or_default(db, |value_ty| {
+                self.generate_constraint(db, value_ty, is_positive)
+            }),
             Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => {
                 // We can't narrow negatively from a `SubclassOf` type. `if !isinstance(x, y)`
@@ -203,11 +189,10 @@ impl ClassInfoConstraintFunction {
                 if intersection.negative(db).is_empty() {
                     let mut builder = IntersectionBuilder::new(db);
                     for element in intersection.positive(db) {
-                        builder = builder.add_positive(self.generate_constraint_impl(
+                        builder = builder.add_positive(self.generate_constraint(
                             db,
                             *element,
                             is_positive,
-                            recursion_detector,
                         )?);
                     }
                     Some(builder.build())
@@ -217,20 +202,16 @@ impl ClassInfoConstraintFunction {
                 }
             }
             Type::Union(union) => union.try_map(db, |element| {
-                self.generate_constraint_impl(db, *element, is_positive, recursion_detector)
+                self.generate_constraint(db, *element, is_positive)
             }),
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        self.generate_constraint_impl(db, bound, is_positive, recursion_detector)
+                        self.generate_constraint(db, bound, is_positive)
                     }
-                    TypeVarBoundOrConstraints::Constraints(constraints) => self
-                        .generate_constraint_impl(
-                            db,
-                            constraints.as_type(db),
-                            is_positive,
-                            recursion_detector,
-                        ),
+                    TypeVarBoundOrConstraints::Constraints(constraints) => {
+                        self.generate_constraint(db, constraints.as_type(db), is_positive)
+                    }
                 }
             }
 
@@ -241,9 +222,9 @@ impl ClassInfoConstraintFunction {
             Type::NominalInstance(nominal) => nominal.tuple_spec(db).and_then(|tuple| {
                 UnionType::try_from_elements(
                     db,
-                    tuple.iter_all_elements().map(|element| {
-                        self.generate_constraint_impl(db, element, is_positive, recursion_detector)
-                    }),
+                    tuple
+                        .iter_all_elements()
+                        .map(|element| self.generate_constraint(db, element, is_positive)),
                 )
             }),
 
@@ -256,43 +237,32 @@ impl ClassInfoConstraintFunction {
                         // which means that `isinstance(x, int | None)` works even though
                         // `None` is not a class literal.
                         if element.is_none(db) {
-                            self.generate_constraint_impl(
+                            self.generate_constraint(
                                 db,
                                 KnownClass::NoneType.to_class_literal(db),
                                 is_positive,
-                                recursion_detector,
                             )
                         } else {
-                            self.generate_constraint_impl(
-                                db,
-                                element,
-                                is_positive,
-                                recursion_detector,
-                            )
+                            self.generate_constraint(db, element, is_positive)
                         }
                     }),
                 )
             }
 
             Type::SpecialForm(form) => match form {
-                SpecialFormType::LegacyStdlibAlias(alias) => self.generate_constraint_impl(
+                SpecialFormType::LegacyStdlibAlias(alias) => self.generate_constraint(
                     db,
                     alias.aliased_class().to_class_literal(db),
                     is_positive,
-                    recursion_detector,
                 ),
-                SpecialFormType::Tuple => self.generate_constraint_impl(
+                SpecialFormType::Tuple => self.generate_constraint(
                     db,
                     KnownClass::Tuple.to_class_literal(db),
                     is_positive,
-                    recursion_detector,
                 ),
-                SpecialFormType::Type => self.generate_constraint_impl(
-                    db,
-                    KnownClass::Type.to_class_literal(db),
-                    is_positive,
-                    recursion_detector,
-                ),
+                SpecialFormType::Type => {
+                    self.generate_constraint(db, KnownClass::Type.to_class_literal(db), is_positive)
+                }
 
                 // We don't have a good meta-type for `Callable`s right now,
                 // so only apply `isinstance()` narrowing, not `issubclass()`
@@ -2096,33 +2066,19 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 // Return true if the given type is a `TypedDict` or a union or intersection that includes at least
 // one `TypedDict` (even if other types are also present), or a type alias to such a type.
 fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    let recursion_detector = ActiveRecursionDetector::default();
-    is_or_contains_typeddict_impl(db, ty, &recursion_detector)
-}
-
-fn is_or_contains_typeddict_impl<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-) -> bool {
     match ty {
         Type::TypedDict(_) => true,
-        Type::Intersection(intersection) => {
-            intersection
-                .positive(db)
-                .iter()
-                .any(|intersection_element_ty| {
-                    is_or_contains_typeddict_impl(db, *intersection_element_ty, recursion_detector)
-                })
-        }
-        Type::Union(union) => union.elements(db).iter().any(|union_member_ty| {
-            is_or_contains_typeddict_impl(db, *union_member_ty, recursion_detector)
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .any(|intersection_element_ty| is_or_contains_typeddict(db, *intersection_element_ty)),
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .any(|union_member_ty| is_or_contains_typeddict(db, *union_member_ty)),
+        Type::TypeAlias(_) => ty.visit_type_alias_value_or_default(db, |value_ty| {
+            is_or_contains_typeddict(db, value_ty)
         }),
-        Type::TypeAlias(_) => {
-            ty.visit_type_alias_value_or_default(db, recursion_detector, |value_ty| {
-                is_or_contains_typeddict_impl(db, value_ty, recursion_detector)
-            })
-        }
 
         Type::Dynamic(_)
         | Type::Divergent(_)
@@ -2176,16 +2132,6 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
     ty: Type<'db>,
     field_name: &str,
 ) -> bool {
-    let recursion_detector = ActiveRecursionDetector::default();
-    all_matching_typeddict_fields_have_literal_types_impl(db, ty, field_name, &recursion_detector)
-}
-
-fn all_matching_typeddict_fields_have_literal_types_impl<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    field_name: &str,
-    recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-) -> bool {
     let matching_field_is_literal = |typeddict: &TypedDictType<'db>| {
         // There's no matching field to check if `.get()` returns `None`.
         typeddict
@@ -2197,35 +2143,26 @@ fn all_matching_typeddict_fields_have_literal_types_impl<'db>(
     match ty {
         Type::TypedDict(td) => matching_field_is_literal(&td),
         Type::Union(union) => union.elements(db).iter().all(|union_member_ty| {
-            !is_or_contains_typeddict_impl(db, *union_member_ty, recursion_detector)
-                || all_matching_typeddict_fields_have_literal_types_impl(
+            !is_or_contains_typeddict(db, *union_member_ty)
+                || all_matching_typeddict_fields_have_literal_types(
                     db,
                     *union_member_ty,
                     field_name,
-                    recursion_detector,
                 )
         }),
-        Type::TypeAlias(_) => {
-            ty.visit_type_alias_value_or_default(db, recursion_detector, |value_ty| {
-                all_matching_typeddict_fields_have_literal_types_impl(
-                    db,
-                    value_ty,
-                    field_name,
-                    recursion_detector,
-                )
-            })
-        }
+        Type::TypeAlias(_) => ty.visit_type_alias_value_or_default(db, |value_ty| {
+            all_matching_typeddict_fields_have_literal_types(db, value_ty, field_name)
+        }),
         Type::Intersection(intersection) => {
             intersection
                 .positive(db)
                 .iter()
                 .all(|intersection_member_ty| {
-                    !is_or_contains_typeddict_impl(db, *intersection_member_ty, recursion_detector)
-                        || all_matching_typeddict_fields_have_literal_types_impl(
+                    !is_or_contains_typeddict(db, *intersection_member_ty)
+                        || all_matching_typeddict_fields_have_literal_types(
                             db,
                             *intersection_member_ty,
                             field_name,
-                            recursion_detector,
                         )
                 })
         }

@@ -44,7 +44,6 @@ use crate::types::callable::CallableTypeKind;
 use crate::types::class::{ClassLiteral, CodeGeneratorKind, MethodDecorator};
 use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::context::InferContext;
-use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_TYPE_ALIAS_DEFINITION,
     GeneratorMismatchKind, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT,
@@ -2238,26 +2237,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
         emit_diagnostics: bool,
     ) -> bool {
-        let recursion_detector = ActiveRecursionDetector::default();
-        self.validate_attribute_assignment_impl(
-            target,
-            object_ty,
-            attribute,
-            infer_value_ty,
-            emit_diagnostics,
-            &recursion_detector,
-        )
-    }
-
-    fn validate_attribute_assignment_impl(
-        &mut self,
-        target: &ast::ExprAttribute,
-        object_ty: Type<'db>,
-        attribute: &str,
-        infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
-        emit_diagnostics: bool,
-        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-    ) -> bool {
         let db = self.db();
 
         // This closure should only be called if `value_ty` was inferred with `attr_ty` as type context.
@@ -2300,13 +2279,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let value_ty = infer_value_ty.infer_loud(self, TypeContext::default());
 
                 if union.elements(self.db()).iter().all(|elem| {
-                    self.validate_attribute_assignment_impl(
+                    self.validate_attribute_assignment(
                         target,
                         *elem,
                         attribute,
                         &mut |builder, tcx| infer_value_ty.infer_silent(builder, tcx),
                         false,
-                        recursion_detector,
                     )
                 }) {
                     if emit_diagnostics {
@@ -2336,13 +2314,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // TODO: Handle negative intersection elements
                 if intersection.positive(db).iter().any(|elem| {
-                    self.validate_attribute_assignment_impl(
+                    self.validate_attribute_assignment(
                         target,
                         *elem,
                         attribute,
                         &mut |builder, tcx| infer_value_ty.infer_silent(builder, tcx),
                         false,
-                        recursion_detector,
                     )
                 }) {
                     // Perform loud inference using the narrowed type context.
@@ -2372,20 +2349,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            Type::TypeAlias(_) => object_ty.visit_type_alias_value_or_assume_valid(
-                self.db(),
-                recursion_detector,
-                |value_ty| {
-                    self.validate_attribute_assignment_impl(
+            Type::TypeAlias(_) => {
+                object_ty.visit_type_alias_value_or_assume_valid(self.db(), |value_ty| {
+                    self.validate_attribute_assignment(
                         target,
                         value_ty,
                         attribute,
                         infer_value_ty,
                         emit_diagnostics,
-                        recursion_detector,
                     )
-                },
-            ),
+                })
+            }
 
             // Super instances do not allow attribute assignment
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
@@ -2980,35 +2954,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         attribute: &str,
         emit_diagnostics: bool,
     ) -> bool {
-        let recursion_detector = ActiveRecursionDetector::default();
-        self.validate_attribute_deletion_impl(
-            target,
-            object_ty,
-            attribute,
-            emit_diagnostics,
-            &recursion_detector,
-        )
-    }
-
-    fn validate_attribute_deletion_impl(
-        &mut self,
-        target: &ast::ExprAttribute,
-        object_ty: Type<'db>,
-        attribute: &str,
-        emit_diagnostics: bool,
-        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-    ) -> bool {
         let db = self.db();
 
         match object_ty {
             Type::Union(union) => {
                 for element_ty in union.elements(db) {
-                    if !self.validate_attribute_deletion_impl(
+                    if !self.validate_attribute_deletion(
                         target,
                         *element_ty,
                         attribute,
                         emit_diagnostics,
-                        recursion_detector,
                     ) {
                         return false;
                     }
@@ -3018,25 +2973,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             Type::Intersection(intersection) => {
                 if intersection.positive(db).iter().any(|element_ty| {
-                    self.validate_attribute_deletion_impl(
-                        target,
-                        *element_ty,
-                        attribute,
-                        false,
-                        recursion_detector,
-                    )
+                    self.validate_attribute_deletion(target, *element_ty, attribute, false)
                 }) {
                     true
                 } else {
                     if emit_diagnostics && let Some(element_ty) = intersection.positive(db).first()
                     {
-                        self.validate_attribute_deletion_impl(
-                            target,
-                            *element_ty,
-                            attribute,
-                            true,
-                            recursion_detector,
-                        );
+                        self.validate_attribute_deletion(target, *element_ty, attribute, true);
                     }
                     false
                 }
@@ -3045,19 +2988,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Type aliases need their own arm so aliased unions and intersections reuse the
             // specialized handling above. `NewType` instances don't: dunder lookup and attribute
             // fallback already delegate through the concrete base type when needed.
-            Type::TypeAlias(_) => object_ty.visit_type_alias_value_or_assume_valid(
-                db,
-                recursion_detector,
-                |value_ty| {
-                    self.validate_attribute_deletion_impl(
-                        target,
-                        value_ty,
-                        attribute,
-                        emit_diagnostics,
-                        recursion_detector,
-                    )
-                },
-            ),
+            Type::TypeAlias(_) => {
+                object_ty.visit_type_alias_value_or_assume_valid(db, |value_ty| {
+                    self.validate_attribute_deletion(target, value_ty, attribute, emit_diagnostics)
+                })
+            }
 
             Type::NominalInstance(..)
             | Type::ProtocolInstance(_)
@@ -4862,7 +4797,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db: &'d dyn Db,
             ty: Type<'d>,
             kind: CallableTypeKind,
-            recursion_detector: &ActiveRecursionDetector<Type<'d>>,
         ) -> Option<Type<'d>> {
             match ty {
                 Type::Callable(callable) => Some(Type::Callable(CallableType::new(
@@ -4870,14 +4804,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     callable.signatures(db),
                     kind,
                 ))),
-                Type::Union(union) => union.try_map(db, |element| {
-                    propagate_callable_kind(db, *element, kind, recursion_detector)
-                }),
+                Type::Union(union) => {
+                    union.try_map(db, |element| propagate_callable_kind(db, *element, kind))
+                }
                 Type::TypeAlias(_) => ty.visit_type_alias_value(
                     db,
-                    recursion_detector,
                     || Some(Type::unknown()),
-                    |value_ty| propagate_callable_kind(db, value_ty, kind, recursion_detector),
+                    |value_ty| propagate_callable_kind(db, value_ty, kind),
                 ),
                 // Intersections are currently not handled here because that would require
                 // the decorator to be explicitly annotated as returning an intersection.
@@ -4953,11 +4886,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // classmethod-like or staticmethod-like). See "Decorating a method with
         // a `Callable`-typed decorator" in `callables_as_descriptors.md` for the
         // extended explanation.
-        let recursion_detector = ActiveRecursionDetector::default();
         propagatable_kind
-            .and_then(|kind| {
-                propagate_callable_kind(self.db(), return_ty, kind, &recursion_detector)
-            })
+            .and_then(|kind| propagate_callable_kind(self.db(), return_ty, kind))
             .unwrap_or(return_ty)
     }
 
@@ -8425,11 +8355,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             attr_name: &str,
             missing_types: &mut FxIndexSet<Type<'db>>,
         ) {
-            if let Some(union) = ty.as_union_like(db) {
-                for element in union.elements(db) {
-                    union_elements_missing_attribute(db, *element, attr_name, missing_types);
-                }
-            } else if ty.member(db, attr_name).place.is_undefined() {
+            if ty.visit_union_like_elements(db, &mut |element| {
+                union_elements_missing_attribute(db, element, attr_name, missing_types);
+            }) {
+                return;
+            }
+
+            if ty.member(db, attr_name).place.is_undefined() {
                 missing_types.insert(ty);
             }
         }
@@ -8659,19 +8591,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     //
                     // On the other hand, we could be looking at a union where some elements have
                     // the attribute but others definitely don't. That's a very different case, and
-                    // we want it to be an error. Use `as_union_like` here to handle type aliases
-                    // of unions and `NewType`s of float/complex in addition to explicit unions.
-                    if let Some(union) = value_type.as_union_like(db) {
-                        let mut elements_missing_the_attribute = FxIndexSet::default();
-                        for element in union.elements(db) {
-                            union_elements_missing_attribute(
-                                db,
-                                *element,
-                                attr_name,
-                                &mut elements_missing_the_attribute,
-                            );
-                        }
-
+                    // we want it to be an error. Use `visit_union_like_elements` here to handle
+                    // type aliases of unions and `NewType`s of float/complex in addition to
+                    // explicit unions.
+                    let mut elements_missing_the_attribute = FxIndexSet::default();
+                    if value_type.visit_union_like_elements(db, &mut |element| {
+                        union_elements_missing_attribute(
+                            db,
+                            element,
+                            attr_name,
+                            &mut elements_missing_the_attribute,
+                        );
+                    }) {
                         if !elements_missing_the_attribute.is_empty() {
                             if let Some(builder) =
                                 self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)

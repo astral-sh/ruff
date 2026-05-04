@@ -25,7 +25,6 @@ use smallvec::{SmallVec, smallvec_inline};
 use crate::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
@@ -258,12 +257,8 @@ impl<'db> TupleType<'db> {
             .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
     }
 
-    pub(crate) fn is_single_valued_impl(
-        self,
-        db: &'db dyn Db,
-        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-    ) -> bool {
-        self.tuple(db).is_single_valued_impl(db, recursion_detector)
+    pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
+        self.tuple(db).is_single_valued(db)
     }
 }
 
@@ -772,14 +767,8 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         }
     }
 
-    fn is_single_valued_impl(
-        &self,
-        db: &'db dyn Db,
-        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-    ) -> bool {
-        self.0
-            .iter()
-            .all(|ty| ty.is_single_valued_impl(db, recursion_detector))
+    fn is_single_valued(&self, db: &'db dyn Db) -> bool {
+        self.0.iter().all(|ty| ty.is_single_valued(db))
     }
 }
 
@@ -1383,13 +1372,9 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    pub(crate) fn is_single_valued_impl(
-        &self,
-        db: &'db dyn Db,
-        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-    ) -> bool {
+    pub(crate) fn is_single_valued(&self, db: &'db dyn Db) -> bool {
         match self {
-            Tuple::Fixed(tuple) => tuple.is_single_valued_impl(db, recursion_detector),
+            Tuple::Fixed(tuple) => tuple.is_single_valued(db),
             Tuple::Variable(_) => false,
         }
     }
