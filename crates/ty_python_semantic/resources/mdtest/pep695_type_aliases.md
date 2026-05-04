@@ -501,6 +501,24 @@ def assign_recursive_alias_attribute(x: RecursiveAttributeAlias):
 def delete_recursive_alias_attribute(x: RecursiveAttributeAlias):
     del x.attr
 
+class RecursiveMissingAttribute: ...
+
+type RecursiveMissingAttributeAlias = RecursiveMissingAttribute | RecursiveMissingAttributeAlias
+
+def load_missing_recursive_alias_attribute(x: RecursiveMissingAttributeAlias):
+    # error: [unresolved-attribute] "Attribute `missing` is not defined on `RecursiveMissingAttribute` in union `RecursiveMissingAttributeAlias`"
+    reveal_type(x.missing)  # revealed: Divergent
+
+def delete_missing_recursive_alias_attribute(x: RecursiveMissingAttributeAlias):
+    # error: [unresolved-attribute] "Attribute `missing` is not defined on `RecursiveMissingAttribute` in union `RecursiveMissingAttributeAlias`"
+    del x.missing
+
+type RecursiveIntAttributeAlias = int | RecursiveIntAttributeAlias
+
+def load_missing_recursive_int_alias_attribute(x: RecursiveIntAttributeAlias):
+    # error: [unresolved-attribute] "Attribute `missing` is not defined on `int` in union `RecursiveIntAttributeAlias`"
+    reveal_type(x.missing)  # revealed: Divergent
+
 class RecursiveKwargs(TypedDict):
     kind: Literal["a"]
     a: int

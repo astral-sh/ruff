@@ -15,10 +15,11 @@ use crate::types::constraints::{
     Solutions,
 };
 use crate::types::relation::{
-    DisjointnessChecker, InvariantRelationGoal, RelationContext, TypeRelation, TypeRelationChecker,
+    DisjointnessChecker, HasRelationToVisitor, InvariantRelationGoal, InvariantRelationVisitor,
+    IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
 use crate::types::signatures::{
-    CallableSignature, Parameters, ReturnCallableTypeVarScope,
+    CallableSignature, Parameters, ReturnCallableTypeVarScope, SignatureRelationVisitor,
 };
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
@@ -1340,8 +1341,20 @@ impl<'db> Specialization<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let context = RelationContext::default(constraints);
-        let checker = DisjointnessChecker::new(constraints, inferable, &context);
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let invariant_relation_visitor = InvariantRelationVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        let checker = DisjointnessChecker::new(
+            constraints,
+            inferable,
+            &relation_visitor,
+            &disjointness_visitor,
+            &signature_relation_visitor,
+            &invariant_relation_visitor,
+            &materialization_visitor,
+        );
         checker.check_specialization_pair(db, self, other)
     }
 
@@ -1521,7 +1534,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target_type: Type<'db>,
         target_materialization: MaterializationKind,
     ) -> ConstraintSet<'db, 'c> {
-        self.context.visitors.invariant.visit(
+        self.invariant_relation_visitor.visit(
             &InvariantRelationGoal::new(
                 source_type,
                 source_materialization,

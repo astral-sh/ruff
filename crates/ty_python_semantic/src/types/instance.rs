@@ -16,13 +16,16 @@ use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
-use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{
     ProtocolClass, has_all_protocol_members_defined, walk_protocol_interface,
 };
-use crate::types::relation::{DisjointnessChecker, RelationContext, TypeRelationChecker};
+use crate::types::relation::{
+    DisjointnessChecker, HasRelationToVisitor, InvariantRelationVisitor, IsDisjointVisitor,
+    TypeRelationChecker,
+};
+use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
@@ -383,25 +386,14 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn is_single_valued_impl(
-        self,
-        db: &'db dyn Db,
-        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-    ) -> bool {
+    pub(super) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self.0 {
-            NominalInstanceInner::ExactTuple(tuple) => {
-                tuple.is_single_valued_impl(db, recursion_detector)
-            }
+            NominalInstanceInner::ExactTuple(tuple) => tuple.is_single_valued(db),
             NominalInstanceInner::Object => false,
             NominalInstanceInner::NonTuple(class) => class
                 .known(db)
                 .and_then(KnownClass::is_single_valued)
-                .or_else(|| {
-                    Some(
-                        self.tuple_spec(db)?
-                            .is_single_valued_impl(db, recursion_detector),
-                    )
-                })
+                .or_else(|| Some(self.tuple_spec(db)?.is_single_valued(db)))
                 .unwrap_or_else(|| is_single_member_enum(db, class.class_literal(db))),
         }
     }
@@ -741,9 +733,20 @@ impl<'db> ProtocolInstanceType<'db> {
             _: (),
         ) -> bool {
             let constraints = ConstraintSetBuilder::new();
-            let context = RelationContext::default(&constraints);
-            let checker =
-                TypeRelationChecker::subtyping(&constraints, InferableTypeVars::None, &context);
+            let relation_visitor = HasRelationToVisitor::default(&constraints);
+            let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+            let signature_relation_visitor = SignatureRelationVisitor::default();
+            let invariant_relation_visitor = InvariantRelationVisitor::default();
+            let materialization_visitor = ApplyTypeMappingVisitor::default();
+            let checker = TypeRelationChecker::subtyping(
+                &constraints,
+                InferableTypeVars::None,
+                &relation_visitor,
+                &disjointness_visitor,
+                &signature_relation_visitor,
+                &invariant_relation_visitor,
+                &materialization_visitor,
+            );
             checker
                 .check_type_satisfies_protocol(db, Type::object(), protocol)
                 .is_always_satisfied(db)

@@ -6,7 +6,6 @@ use crate::{
         TypeVarBoundOrConstraints, UnionType,
         call::CallErrorKind,
         context::InferContext,
-        cyclic::ActiveRecursionDetector,
         diagnostic::NOT_ITERABLE,
         todo_type,
         tuple::{TupleSpec, TupleSpecBuilder},
@@ -95,20 +94,9 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         mode: EvaluationMode,
     ) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
-        let recursion_detector = ActiveRecursionDetector::default();
-        self.try_iterate_with_mode_impl(db, mode, &recursion_detector)
-    }
-
-    fn try_iterate_with_mode_impl(
-        self,
-        db: &'db dyn Db,
-        mode: EvaluationMode,
-        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
-    ) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
         fn non_async_special_case<'db>(
             db: &'db dyn Db,
             ty: Type<'db>,
-            recursion_detector: &ActiveRecursionDetector<Type<'db>>,
         ) -> Option<Cow<'db, TupleSpec<'db>>> {
             // We will not infer precise heterogeneous tuple specs for literals with lengths above this threshold.
             // The threshold here is somewhat arbitrary and conservative; it could be increased if needed.
@@ -119,7 +107,7 @@ impl<'db> Type<'db> {
             match ty {
                 Type::NominalInstance(nominal) => nominal.tuple_spec(db),
                 Type::NewTypeInstance(newtype) => {
-                    non_async_special_case(db, newtype.concrete_base_type(db), recursion_detector)
+                    non_async_special_case(db, newtype.concrete_base_type(db))
                 }
                 Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
                     Some(Cow::Owned(TupleSpec::homogeneous(todo_type!(
@@ -169,16 +157,15 @@ impl<'db> Type<'db> {
                 }
                 Type::TypeAlias(_) => ty.visit_type_alias_value(
                     db,
-                    recursion_detector,
                     || Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown()))),
-                    |value_ty| non_async_special_case(db, value_ty, recursion_detector),
+                    |value_ty| non_async_special_case(db, value_ty),
                 ),
                 Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        non_async_special_case(db, bound, recursion_detector)
+                        non_async_special_case(db, bound)
                     }
                     TypeVarBoundOrConstraints::Constraints(constraints) => {
-                        non_async_special_case(db, constraints.as_type(db), recursion_detector)
+                        non_async_special_case(db, constraints.as_type(db))
                     }
                 },
                 Type::Union(union) => {
@@ -187,23 +174,13 @@ impl<'db> Type<'db> {
                         let mut elements_iter = elements.iter();
                         let first_element_spec = elements_iter
                             .next()?
-                            .try_iterate_with_mode_impl(
-                                db,
-                                EvaluationMode::Sync,
-                                recursion_detector,
-                            )
+                            .try_iterate_with_mode(db, EvaluationMode::Sync)
                             .ok()?;
                         let mut builder = TupleSpecBuilder::from(&*first_element_spec);
                         for element in elements_iter {
                             builder = builder.union(
                                 db,
-                                &*element
-                                    .try_iterate_with_mode_impl(
-                                        db,
-                                        EvaluationMode::Sync,
-                                        recursion_detector,
-                                    )
-                                    .ok()?,
+                                &*element.try_iterate_with_mode(db, EvaluationMode::Sync).ok()?,
                             );
                         }
                         Some(Cow::Owned(builder.build()))
@@ -231,13 +208,7 @@ impl<'db> Type<'db> {
                     if flattened == ty {
                         let mut specs_iter = intersection.positive_elements_or_object(db).filter_map(
                             |element| {
-                                element
-                                    .try_iterate_with_mode_impl(
-                                        db,
-                                        EvaluationMode::Sync,
-                                        recursion_detector,
-                                    )
-                                    .ok()
+                                element.try_iterate_with_mode(db, EvaluationMode::Sync).ok()
                             },
                         );
                         let first_spec = specs_iter.next()?;
@@ -255,7 +226,7 @@ impl<'db> Type<'db> {
                     }
 
                     // Flattening changed the type; recursively iterate the flattened result.
-                    non_async_special_case(db, flattened, recursion_detector)
+                    non_async_special_case(db, flattened)
                 }
                 // N.B. This special case isn't strictly necessary, it's just an obvious optimization
                 Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
@@ -357,7 +328,7 @@ impl<'db> Type<'db> {
             };
         }
 
-        if let Some(special_case) = non_async_special_case(db, self, recursion_detector) {
+        if let Some(special_case) = non_async_special_case(db, self) {
             return Ok(special_case);
         }
 
