@@ -24,7 +24,7 @@ use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
 pub(crate) use self::callable::UpcastPolicy;
 pub use self::cyclic::CycleDetector;
-pub(crate) use self::cyclic::TypeTransformer;
+use self::cyclic::KeyedTypeTransformer;
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
@@ -241,33 +241,45 @@ fn definition_expression_type<'db>(
     }
 }
 
-struct ApplyDefaultTypeMapping;
-struct ApplyPromoteOnTypeMapping;
-struct ApplyPromoteOffTypeMapping;
-struct ApplyTopMaterialization;
-struct ApplyBottomMaterialization;
-struct ApplySpecializationWithTopMaterialization;
-struct ApplySpecializationWithBottomMaterialization;
+struct ApplyTypeMapping;
 struct ApplyMaterializationEquivalence;
 
+type ApplyTypeMappingTransformer<'db> =
+    KeyedTypeTransformer<'db, ApplyTypeMapping, ApplyTypeMappingMode>;
 type MaterializationEquivalenceVisitor<'db> =
     Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool>>;
 
-/// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum ApplyTypeMappingMode {
+    Default,
+    Promote(PromotionMode),
+    Materialize(MaterializationKind),
+    ApplySpecializationWithMaterialization(MaterializationKind),
+}
+
+impl ApplyTypeMappingMode {
+    fn from_type_mapping(type_mapping: &TypeMapping<'_, '_>) -> Self {
+        match type_mapping {
+            TypeMapping::Promote(mode, _) => Self::Promote(*mode),
+            TypeMapping::Materialize(materialization_kind) => {
+                Self::Materialize(*materialization_kind)
+            }
+            TypeMapping::ApplySpecializationWithMaterialization {
+                materialization_kind,
+                ..
+            } => Self::ApplySpecializationWithMaterialization(*materialization_kind),
+            _ => Self::Default,
+        }
+    }
+}
+
+/// A [`KeyedTypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
 /// Promotion and materialization can visit the same type under two different mappings within a
 /// single recursive call chain. Keep separate cycle caches for those modes so invariant checks,
 /// materialized specialization, and callable promotion can safely reuse one visitor.
 pub(crate) struct ApplyTypeMappingVisitor<'db> {
-    default: OnceCell<TypeTransformer<'db, ApplyDefaultTypeMapping>>,
-    promote_on: OnceCell<TypeTransformer<'db, ApplyPromoteOnTypeMapping>>,
-    promote_off: OnceCell<TypeTransformer<'db, ApplyPromoteOffTypeMapping>>,
-    top_materialization: OnceCell<TypeTransformer<'db, ApplyTopMaterialization>>,
-    bottom_materialization: OnceCell<TypeTransformer<'db, ApplyBottomMaterialization>>,
-    specialization_top_materialization:
-        OnceCell<TypeTransformer<'db, ApplySpecializationWithTopMaterialization>>,
-    specialization_bottom_materialization:
-        OnceCell<TypeTransformer<'db, ApplySpecializationWithBottomMaterialization>>,
+    mapping: OnceCell<ApplyTypeMappingTransformer<'db>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
 }
 
@@ -284,42 +296,14 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
         type_mapping: &TypeMapping<'_, 'db>,
         func: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
-        match type_mapping {
-            TypeMapping::Promote(PromotionMode::On, _) => self
-                .promote_on
-                .get_or_init(TypeTransformer::default)
-                .visit_type(db, ty, func),
-            TypeMapping::Promote(PromotionMode::Off, _) => self
-                .promote_off
-                .get_or_init(TypeTransformer::default)
-                .visit_type(db, ty, func),
-            TypeMapping::Materialize(MaterializationKind::Top) => self
-                .top_materialization
-                .get_or_init(TypeTransformer::default)
-                .visit_type(db, ty, func),
-            TypeMapping::Materialize(MaterializationKind::Bottom) => self
-                .bottom_materialization
-                .get_or_init(TypeTransformer::default)
-                .visit_type(db, ty, func),
-            TypeMapping::ApplySpecializationWithMaterialization {
-                materialization_kind: MaterializationKind::Top,
-                ..
-            } => self
-                .specialization_top_materialization
-                .get_or_init(TypeTransformer::default)
-                .visit_type(db, ty, func),
-            TypeMapping::ApplySpecializationWithMaterialization {
-                materialization_kind: MaterializationKind::Bottom,
-                ..
-            } => self
-                .specialization_bottom_materialization
-                .get_or_init(TypeTransformer::default)
-                .visit_type(db, ty, func),
-            _ => self
-                .default
-                .get_or_init(TypeTransformer::default)
-                .visit_type(db, ty, func),
-        }
+        self.mapping
+            .get_or_init(ApplyTypeMappingTransformer::default)
+            .visit_type_with_key(
+                db,
+                ApplyTypeMappingMode::from_type_mapping(type_mapping),
+                ty,
+                func,
+            )
     }
 
     pub(crate) fn is_equivalent_to_materialization(
@@ -340,13 +324,7 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
         debug_assert!(was_empty.is_ok());
 
         Self {
-            default: OnceCell::new(),
-            promote_on: OnceCell::new(),
-            promote_off: OnceCell::new(),
-            top_materialization: OnceCell::new(),
-            bottom_materialization: OnceCell::new(),
-            specialization_top_materialization: OnceCell::new(),
-            specialization_bottom_materialization: OnceCell::new(),
+            mapping: OnceCell::new(),
             materialization_equivalence,
         }
     }
@@ -355,13 +333,7 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
 impl Default for ApplyTypeMappingVisitor<'_> {
     fn default() -> Self {
         Self {
-            default: OnceCell::new(),
-            promote_on: OnceCell::new(),
-            promote_off: OnceCell::new(),
-            top_materialization: OnceCell::new(),
-            bottom_materialization: OnceCell::new(),
-            specialization_top_materialization: OnceCell::new(),
-            specialization_bottom_materialization: OnceCell::new(),
+            mapping: OnceCell::new(),
             materialization_equivalence: OnceCell::new(),
         }
     }

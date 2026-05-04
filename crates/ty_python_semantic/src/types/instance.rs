@@ -21,11 +21,7 @@ use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{
     ProtocolClass, has_all_protocol_members_defined, walk_protocol_interface,
 };
-use crate::types::relation::{
-    AliasRelationVisitor, DisjointnessChecker, HasRelationToVisitor, InvariantRelationVisitor,
-    IsDisjointVisitor, TypeRelationChecker,
-};
-use crate::types::signatures::SignatureRelationVisitor;
+use crate::types::relation::{DisjointnessChecker, RelationVisitors, TypeRelationChecker};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
@@ -733,20 +729,12 @@ impl<'db> ProtocolInstanceType<'db> {
             _: (),
         ) -> bool {
             let constraints = ConstraintSetBuilder::new();
-            let relation_visitor = HasRelationToVisitor::default(&constraints);
-            let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-            let signature_relation_visitor = SignatureRelationVisitor::default();
-            let invariant_relation_visitor = InvariantRelationVisitor::default();
-            let alias_relation_visitor = AliasRelationVisitor::default();
+            let relation_visitors = RelationVisitors::new(&constraints);
             let materialization_visitor = ApplyTypeMappingVisitor::default();
             let checker = TypeRelationChecker::subtyping(
                 &constraints,
                 InferableTypeVars::None,
-                &relation_visitor,
-                &disjointness_visitor,
-                &signature_relation_visitor,
-                &invariant_relation_visitor,
-                &alias_relation_visitor,
+                &relation_visitors,
                 &materialization_visitor,
             );
             checker

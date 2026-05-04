@@ -15,12 +15,9 @@ use crate::types::constraints::{
     Solutions,
 };
 use crate::types::relation::{
-    AliasRelationVisitor, DisjointnessChecker, HasRelationToVisitor, InvariantRelationGoal,
-    InvariantRelationVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    DisjointnessChecker, InvariantRelationGoal, RelationVisitors, TypeRelation, TypeRelationChecker,
 };
-use crate::types::signatures::{
-    CallableSignature, Parameters, ReturnCallableTypeVarScope, SignatureRelationVisitor,
-};
+use crate::types::signatures::{CallableSignature, Parameters, ReturnCallableTypeVarScope};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
 use crate::types::typevar::{
@@ -1341,20 +1338,12 @@ impl<'db> Specialization<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_visitor = HasRelationToVisitor::default(constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
-        let invariant_relation_visitor = InvariantRelationVisitor::default();
-        let alias_relation_visitor = AliasRelationVisitor::default();
+        let relation_visitors = RelationVisitors::new(constraints);
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = DisjointnessChecker::new(
             constraints,
             inferable,
-            &relation_visitor,
-            &disjointness_visitor,
-            &signature_relation_visitor,
-            &invariant_relation_visitor,
-            &alias_relation_visitor,
+            &relation_visitors,
             &materialization_visitor,
         );
         checker.check_specialization_pair(db, self, other)
@@ -1536,14 +1525,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target_type: Type<'db>,
         target_materialization: MaterializationKind,
     ) -> ConstraintSet<'db, 'c> {
-        self.invariant_relation_visitor.visit(
-            &InvariantRelationGoal::new(
+        self.relation_visitors.invariant.visit(
+            &InvariantRelationGoal {
                 source_type,
                 source_materialization,
                 target_type,
                 target_materialization,
-                self.relation,
-            ),
+                relation: self.relation,
+            },
             || self.check_type_pair(db, source_type, target_type),
             || {
                 self.check_subtyping_in_invariant_position_impl(
