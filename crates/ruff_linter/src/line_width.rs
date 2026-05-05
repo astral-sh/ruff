@@ -13,7 +13,7 @@ use ruff_text_size::TextSize;
 
 /// The length of a line of text that is considered too long.
 ///
-/// The allowed range of values is 1..=320
+/// The allowed range of values is 1..=65535
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct LineLength(
