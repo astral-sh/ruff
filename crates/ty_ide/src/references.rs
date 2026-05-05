@@ -20,6 +20,7 @@ use ruff_python_ast::{
     visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
 use ruff_text_size::Ranged;
+use ty_python_core::definition::{Definition, DefinitionState};
 use ty_python_core::scope::ScopeKind;
 use ty_python_semantic::{ImportAliasResolution, ResolvedDefinition, SemanticModel};
 
@@ -394,13 +395,13 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                 let kind = OccurrenceKind::from(attr_expr.ctx);
                 self.check_identifier(&attr_expr.attr, kind);
             }
-            AnyNodeRef::StmtFunctionDef(func) if self.should_include_declaration() => {
+            AnyNodeRef::StmtFunctionDef(func) => {
                 self.check_declaration_identifier(&func.name);
             }
-            AnyNodeRef::StmtClassDef(class) if self.should_include_declaration() => {
+            AnyNodeRef::StmtClassDef(class) => {
                 self.check_declaration_identifier(&class.name);
             }
-            AnyNodeRef::Parameter(parameter) if self.should_include_declaration() => {
+            AnyNodeRef::Parameter(parameter) => {
                 self.check_declaration_identifier(&parameter.name);
             }
             AnyNodeRef::Keyword(keyword) => {
@@ -408,47 +409,43 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                     self.check_reference_identifier(arg);
                 }
             }
-            AnyNodeRef::StmtGlobal(global_stmt) if self.should_include_declaration() => {
+            AnyNodeRef::StmtGlobal(global_stmt) => {
                 for name in &global_stmt.names {
                     self.check_declaration_identifier(name);
                 }
             }
-            AnyNodeRef::StmtNonlocal(nonlocal_stmt) if self.should_include_declaration() => {
+            AnyNodeRef::StmtNonlocal(nonlocal_stmt) => {
                 for name in &nonlocal_stmt.names {
                     self.check_declaration_identifier(name);
                 }
             }
-            AnyNodeRef::ExceptHandlerExceptHandler(handler)
-                if self.should_include_declaration() =>
-            {
+            AnyNodeRef::ExceptHandlerExceptHandler(handler) => {
                 if let Some(name) = &handler.name {
                     self.check_binding_identifier(name);
                 }
             }
-            AnyNodeRef::PatternMatchAs(pattern_as) if self.should_include_declaration() => {
+            AnyNodeRef::PatternMatchAs(pattern_as) => {
                 if let Some(name) = &pattern_as.name {
                     self.check_binding_identifier(name);
                 }
             }
-            AnyNodeRef::PatternMatchStar(pattern_star) if self.should_include_declaration() => {
+            AnyNodeRef::PatternMatchStar(pattern_star) => {
                 if let Some(name) = &pattern_star.name {
                     self.check_binding_identifier(name);
                 }
             }
-            AnyNodeRef::PatternMatchMapping(pattern_mapping)
-                if self.should_include_declaration() =>
-            {
+            AnyNodeRef::PatternMatchMapping(pattern_mapping) => {
                 if let Some(rest_name) = &pattern_mapping.rest {
                     self.check_binding_identifier(rest_name);
                 }
             }
-            AnyNodeRef::TypeParamParamSpec(param_spec) if self.should_include_declaration() => {
+            AnyNodeRef::TypeParamParamSpec(param_spec) => {
                 self.check_declaration_identifier(&param_spec.name);
             }
-            AnyNodeRef::TypeParamTypeVarTuple(param_tuple) if self.should_include_declaration() => {
+            AnyNodeRef::TypeParamTypeVarTuple(param_tuple) => {
                 self.check_declaration_identifier(&param_tuple.name);
             }
-            AnyNodeRef::TypeParamTypeVar(param_var) if self.should_include_declaration() => {
+            AnyNodeRef::TypeParamTypeVar(param_var) => {
                 self.check_declaration_identifier(&param_var.name);
             }
             AnyNodeRef::ExprStringLiteral(string_expr) => {
@@ -467,7 +464,7 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                     sub_finder.visit_expr(sub_ast.expr());
                 }
             }
-            AnyNodeRef::Alias(alias) if self.should_include_declaration() => {
+            AnyNodeRef::Alias(alias) => {
                 // Handle import alias declarations
                 if let Some(asname) = &alias.asname {
                     self.check_declaration_identifier(asname);
@@ -513,18 +510,7 @@ impl<'a> SourceOrderVisitor<'a> for KeywordArgumentReferencesFinder<'a> {
 }
 
 impl<'a> LocalReferencesFinder<'a> {
-    /// Check if we should include declarations based on the current mode
-    fn should_include_declaration(&self) -> bool {
-        matches!(
-            self.mode,
-            ReferencesMode::References
-                | ReferencesMode::DocumentHighlights
-                | ReferencesMode::Rename
-                | ReferencesMode::RenameMultiFile
-        )
-    }
-
-    /// Checks an identifier of a binding (e.g. `x = 10`).
+    /// Checks an identifier of a binding (e.g. `x = 10`)
     fn check_binding_identifier(&mut self, identifier: &ast::Identifier) {
         self.check_identifier(identifier, OccurrenceKind::Binding);
     }
@@ -570,7 +556,6 @@ impl<'a> LocalReferencesFinder<'a> {
         Some(definitions)
     }
 
-    /// Pushes a reference target when the covering node resolves to any target definition.
     fn check_covering_node(&mut self, covering_node: &CoveringNode<'_>, kind: OccurrenceKind) {
         let Some(current_definitions) = self.definitions_for_covering_node(covering_node) else {
             return;
@@ -581,12 +566,68 @@ impl<'a> LocalReferencesFinder<'a> {
             return;
         }
 
+        if matches!(self.mode, ReferencesMode::ReferencesSkipDeclaration) {
+            let is_declaration = match kind {
+                OccurrenceKind::Declaration => true,
+                OccurrenceKind::Reference => false,
+                OccurrenceKind::Binding => self.is_declaration(covering_node),
+            };
+
+            if is_declaration {
+                return;
+            }
+        }
+
         let target = ReferenceTarget::new(
             self.model.file(),
             covering_node.node().range(),
             kind.to_reference_kind(),
         );
         self.references.push(target);
+    }
+
+    fn is_declaration(&self, covering_node: &CoveringNode<'_>) -> bool {
+        let db = self.model.db();
+
+        let Some(local_definition) = self.model.first_local_definition(covering_node) else {
+            return false;
+        };
+
+        let file = local_definition.file(db);
+        let module = ruff_db::parsed::parsed_module(db, file).load(db);
+        let kind = local_definition.kind(db);
+        let category = kind.category(file.is_stub(db), &module);
+
+        if category.is_declaration() {
+            return true;
+        }
+
+        if self.binding_has_reachable_explicit_declaration(local_definition) {
+            return false;
+        }
+
+        self.binding_is_first_assignment_on_some_path(local_definition)
+    }
+
+    fn binding_has_reachable_explicit_declaration(&self, binding: Definition<'a>) -> bool {
+        let db = self.model.db();
+        let use_def = ty_python_core::use_def_map(db, binding.scope(db));
+        use_def
+            .declarations_at_binding(binding)
+            .any(|declaration| declaration.declaration.definition().is_some())
+    }
+
+    fn binding_is_first_assignment_on_some_path(&self, binding: Definition<'a>) -> bool {
+        let db = self.model.db();
+        let use_def = ty_python_core::use_def_map(db, binding.scope(db));
+        use_def
+            .bindings_at_definition(binding)
+            .any(|prior_binding| {
+                matches!(
+                    prior_binding.binding,
+                    DefinitionState::Deleted | DefinitionState::Undefined
+                )
+            })
     }
 }
 
