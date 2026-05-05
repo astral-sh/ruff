@@ -41,8 +41,8 @@ use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
-    LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType, Type,
-    TypeVarBoundOrConstraints, UnionType,
+    LiteralValueType, LiteralValueTypeKind, MaterializationKind, NegativeIntersectionElements,
+    StringLiteralType, Type, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 use smallvec::SmallVec;
@@ -87,6 +87,10 @@ fn split_truthiness_guarded_intersection<'db>(
         core = core.add_negative(*negative);
     }
     Some((core.build(), guard))
+}
+
+fn should_collapse_with_negation(left: Type, right: Type) -> bool {
+    !left.is_top_dynamic_materialization() && !right.is_top_dynamic_materialization()
 }
 
 /// Try to merge a complementary guarded pair into an unguarded core.
@@ -560,7 +564,9 @@ impl<'db> UnionBuilder<'db> {
                                         to_remove = Some(index);
                                         continue;
                                     }
-                                    if ty_negated().is_subtype_of(self.db, *existing) {
+                                    if should_collapse_with_negation(ty, *existing)
+                                        && ty_negated().is_subtype_of(self.db, *existing)
+                                    {
                                         // The type that includes both this new element, and its negation
                                         // (or a supertype of its negation), must be simply `object`.
                                         self.collapse_to_object();
@@ -607,7 +613,9 @@ impl<'db> UnionBuilder<'db> {
                                         to_remove = Some(index);
                                         continue;
                                     }
-                                    if ty_negated().is_subtype_of(self.db, *existing) {
+                                    if should_collapse_with_negation(ty, *existing)
+                                        && ty_negated().is_subtype_of(self.db, *existing)
+                                    {
                                         // The type that includes both this new element, and its negation
                                         // (or a supertype of its negation), must be simply `object`.
                                         self.collapse_to_object();
@@ -656,7 +664,9 @@ impl<'db> UnionBuilder<'db> {
                                         to_remove = Some(index);
                                         continue;
                                     }
-                                    if ty_negated().is_subtype_of(self.db, *existing) {
+                                    if should_collapse_with_negation(ty, *existing)
+                                        && ty_negated().is_subtype_of(self.db, *existing)
+                                    {
                                         // The type that includes both this new element, and its negation
                                         // (or a supertype of its negation), must be simply `object`.
                                         self.collapse_to_object();
@@ -732,7 +742,9 @@ impl<'db> UnionBuilder<'db> {
                                         to_remove = Some(index);
                                         continue;
                                     }
-                                    if ty_negated().is_subtype_of(self.db, *existing) {
+                                    if should_collapse_with_negation(ty, *existing)
+                                        && ty_negated().is_subtype_of(self.db, *existing)
+                                    {
                                         // The type that includes both this new element, and its negation
                                         // (or a supertype of its negation), must be simply `object`.
                                         self.collapse_to_object();
@@ -776,6 +788,11 @@ impl<'db> UnionBuilder<'db> {
                 }
             }
             // Adding `object` to a union results in `object`.
+            Type::DynamicMaterialization(MaterializationKind::Top) => {
+                self.push_type(ty, seen_aliases);
+            }
+            // Adding the bottom materialization of a dynamic type to a union is a no-op.
+            Type::DynamicMaterialization(MaterializationKind::Bottom) => {}
             ty if ty.is_object() => self.collapse_to_object(),
             _ => self.push_type(ty, seen_aliases),
         }
@@ -856,7 +873,9 @@ impl<'db> UnionBuilder<'db> {
                 }
 
                 let negated = ty_negated.get_or_insert_with(|| ty.negate(self.db));
-                if negated.is_subtype_of(self.db, element_type) {
+                if should_collapse_with_negation(ty, element_type)
+                    && negated.is_subtype_of(self.db, element_type)
+                {
                     // We add `ty` to the union. We just checked that `~ty` is a subtype of an
                     // existing `element`. This also means that `~ty | ty` is a subtype of
                     // `element | ty`, because both elements in the first union are subtypes of
@@ -1243,6 +1262,15 @@ impl<'db> InnerIntersectionBuilder<'db> {
             self.positive.insert(Type::Never);
             return;
         }
+        if matches!(
+            new_positive,
+            Type::DynamicMaterialization(MaterializationKind::Bottom)
+        ) {
+            *self = Self::default();
+            self.positive
+                .insert(Type::dynamic_materialization(MaterializationKind::Bottom));
+            return;
+        }
 
         // `T & Divergent` -> `Divergent`. Conceptually, `Divergent` behaves like `Never` here and
         // dominates intersections. However, `Divergent` is actually a dynamic/gradual type, so
@@ -1256,6 +1284,15 @@ impl<'db> InnerIntersectionBuilder<'db> {
         // `Divergent & T` -> `Divergent`
         if self.positive.iter().any(Type::is_divergent) {
             return;
+        }
+
+        if new_positive.is_top_dynamic_materialization() {
+            if !self.positive.is_empty() || !self.negative.is_empty() {
+                return;
+            }
+        } else {
+            self.positive
+                .retain(|positive| !positive.is_top_dynamic_materialization());
         }
 
         match new_positive {

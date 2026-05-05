@@ -749,6 +749,8 @@ pub enum Type<'db> {
     Dynamic(DynamicType<'db>),
     /// A cycle marker used during recursive type inference.
     Divergent(DivergentType),
+    /// A top (`object`) or bottom (`Never`) bound produced by materializing a dynamic type.
+    DynamicMaterialization(MaterializationKind),
     /// The empty set of values
     Never,
     /// A specific function object
@@ -888,8 +890,24 @@ impl<'db> Type<'db> {
         Self::Divergent(DivergentType::new(id))
     }
 
+    pub(crate) const fn dynamic_materialization(kind: MaterializationKind) -> Self {
+        Self::DynamicMaterialization(kind)
+    }
+
+    pub(crate) const fn is_top_dynamic_materialization(&self) -> bool {
+        matches!(self, Self::DynamicMaterialization(MaterializationKind::Top))
+    }
+
     pub(crate) const fn is_divergent(&self) -> bool {
         matches!(self, Type::Divergent(_))
+    }
+
+    fn dynamic_materialization_fallback(self) -> Option<Type<'db>> {
+        match self {
+            Type::DynamicMaterialization(MaterializationKind::Top) => Some(Type::object()),
+            Type::DynamicMaterialization(MaterializationKind::Bottom) => Some(Type::Never),
+            _ => None,
+        }
     }
 
     /// Returns `true` if both `self` and `other` are `Divergent` types originating from the
@@ -941,6 +959,7 @@ impl<'db> Type<'db> {
         matches!(
             self,
             Type::Never
+                | Type::DynamicMaterialization(MaterializationKind::Bottom)
                 | Type::Divergent(DivergentType {
                     materialization: Some(MaterializationKind::Bottom),
                     ..
@@ -1708,6 +1727,10 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) => *self,
 
+            Type::DynamicMaterialization(materialization_kind) => {
+                Type::DynamicMaterialization(materialization_kind.flip())
+            }
+
             Type::Divergent(_) => (*self)
                 .negated_divergent()
                 .expect("matched `Type::Divergent` above"),
@@ -1774,6 +1797,7 @@ impl<'db> Type<'db> {
             // `Unknown` and `@Todo` are nonstandard extensions,
             // but they are both exactly equivalent to `Any`
             | Type::Dynamic(_)
+            | Type::DynamicMaterialization(_)
             | Type::TypeVar(_)
             | Type::TypeAlias(_)
             | Type::SubclassOf(_)=> true,
@@ -1808,6 +1832,12 @@ impl<'db> Type<'db> {
             | Type::NewTypeInstance(_)
             | Type::LiteralValue(_)
             | Type::TypeAlias(_) => true,
+
+            Type::DynamicMaterialization(kind) => {
+                self.dynamic_materialization_fallback()
+                    .is_some_and(|fallback| fallback.is_hintable(db))
+                    && *kind == MaterializationKind::Top
+            }
 
             Type::Intersection(_)
             | Type::Divergent(_)
@@ -2057,6 +2087,7 @@ impl<'db> Type<'db> {
                 recursive_type_normalize_type_guard_like(db, type_guard, div, nested)
             }
             Type::Divergent(_) => Some(self),
+            Type::DynamicMaterialization(_) => Some(self),
             Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
             Type::TypedDict(_) => {
                 // TODO: Normalize TypedDicts
@@ -2168,7 +2199,10 @@ impl<'db> Type<'db> {
     /// for more complicated types that are actually singletons.
     pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
         match self {
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => false,
+            Type::Dynamic(_)
+            | Type::DynamicMaterialization(_)
+            | Type::Divergent(_)
+            | Type::Never => false,
 
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(..)
@@ -2360,6 +2394,7 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => alias.value_type(db).is_single_valued(db),
 
             Type::Dynamic(_)
+            | Type::DynamicMaterialization(_)
             | Type::Divergent(_)
             | Type::Never
             | Type::Union(..)
@@ -2412,7 +2447,10 @@ impl<'db> Type<'db> {
                 }))
             }
 
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(Place::bound(self).into()),
+            Type::Dynamic(_)
+            | Type::DynamicMaterialization(_)
+            | Type::Divergent(_)
+            | Type::Never => Some(Place::bound(self).into()),
 
             Type::ClassLiteral(class) if class.is_typed_dict(db) => {
                 Some(class.typed_dict_member(db, None, name, policy))
@@ -2620,7 +2658,10 @@ impl<'db> Type<'db> {
             Type::Intersection(intersection) => intersection
                 .map_with_boundness_and_qualifiers(db, |elem| elem.instance_member(db, name)),
 
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
+            Type::Dynamic(_)
+            | Type::DynamicMaterialization(_)
+            | Type::Divergent(_)
+            | Type::Never => Place::bound(self).into(),
 
             Type::NominalInstance(instance) => instance.class(db).instance_member(db, name),
             Type::NewTypeInstance(newtype) => {
@@ -3197,7 +3238,10 @@ impl<'db> Type<'db> {
                     elem.member_lookup_with_policy(db, name_str.into(), policy)
                 }),
 
-            Type::Dynamic(..) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
+            Type::Dynamic(..)
+            | Type::DynamicMaterialization(_)
+            | Type::Divergent(_)
+            | Type::Never => Place::bound(self).into(),
 
             Type::FunctionLiteral(function) if name == "__get__" => Place::bound(
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)),
@@ -4122,9 +4166,10 @@ impl<'db> Type<'db> {
 
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
             // `Never` is always callable and returns `Never`.
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => {
-                Binding::single(self, Signature::dynamic(self)).into()
-            }
+            Type::Dynamic(_)
+            | Type::DynamicMaterialization(_)
+            | Type::Divergent(_)
+            | Type::Never => Binding::single(self, Signature::dynamic(self)).into(),
 
             // Note that this correctly returns `None` if none of the union elements are callable.
             Type::Union(union) => Bindings::from_union(
@@ -5062,6 +5107,25 @@ impl<'db> Type<'db> {
 
     /// Resolve the type of an `await …` expression where `self` is the type of the awaitable.
     fn try_await(self, db: &'db dyn Db) -> Result<Type<'db>, AwaitError<'db>> {
+        if let Type::Union(union) = self {
+            let mut builder = UnionBuilder::new(db);
+            let mut all_elements_awaited = true;
+
+            for element in union.elements(db) {
+                let Ok(awaited) = element.try_await(db) else {
+                    // Fall back to the generic dunder-call path so mixed awaitable and
+                    // non-awaitable unions continue to report the existing diagnostics.
+                    all_elements_awaited = false;
+                    break;
+                };
+                builder = builder.add(awaited);
+            }
+
+            if all_elements_awaited {
+                return Ok(builder.build());
+            }
+        }
+
         let await_result = self.try_call_dunder(
             db,
             "__await__",
@@ -5208,7 +5272,10 @@ impl<'db> Type<'db> {
                     return_ty: return_builder.map(IntersectionBuilder::build),
                 })
             }
-            ty @ (Type::Dynamic(_) | Type::Divergent(_) | Type::Never) => Some(GeneratorTypes {
+            ty @ (Type::Dynamic(_)
+            | Type::DynamicMaterialization(_)
+            | Type::Divergent(_)
+            | Type::Never) => Some(GeneratorTypes {
                 yield_ty: Some(ty),
                 send_ty: Some(ty),
                 return_ty: Some(ty),
@@ -5230,7 +5297,10 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(self),
+            Type::Dynamic(_)
+            | Type::DynamicMaterialization(_)
+            | Type::Divergent(_)
+            | Type::Never => Some(self),
             Type::ClassLiteral(class) => Some(Type::instance(db, class.default_specialization(db))),
             Type::GenericAlias(alias) => Some(Type::instance(db, ClassType::from(alias))),
             Type::SubclassOf(subclass_of_ty) => Some(subclass_of_ty.to_instance(db)),
@@ -5470,7 +5540,7 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::Dynamic(_) | Type::Divergent(_) => Ok(*self),
+            Type::Dynamic(_) | Type::DynamicMaterialization(_) | Type::Divergent(_) => Ok(*self),
 
             Type::NominalInstance(instance) => match instance.known_class(db) {
                 Some(KnownClass::NoneType) => Ok(Type::none(db)),
@@ -5552,6 +5622,10 @@ impl<'db> Type<'db> {
             Type::GenericAlias(alias) => ClassType::from(alias).metaclass(db),
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.to_meta_type(db),
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic)),
+            Type::DynamicMaterialization(_) => self
+                .dynamic_materialization_fallback()
+                .expect("matched `Type::DynamicMaterialization`")
+                .to_meta_type(db),
             Type::Divergent(_) => self,
             // TODO intersections
             Type::Intersection(_) => {
@@ -5908,10 +5982,15 @@ impl<'db> Type<'db> {
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
-                    MaterializationKind::Top => Type::object(),
-                    MaterializationKind::Bottom => Type::Never,
+                    MaterializationKind::Top => {
+                        Type::dynamic_materialization(MaterializationKind::Top)
+                    }
+                    MaterializationKind::Bottom => {
+                        Type::dynamic_materialization(MaterializationKind::Bottom)
+                    }
                 }
             }
+            Type::DynamicMaterialization(_) => self,
             // `Divergent` is an internal cycle marker rather than a gradual type like `Any` or
             // `Unknown`. Preserve the marker across materialization, while recording whether this
             // occurrence should behave like the top (`object`) or bottom (`Never`) bound.
@@ -5997,6 +6076,7 @@ impl<'db> Type<'db> {
                 }
             }
             Type::Divergent(_) => {}
+            Type::DynamicMaterialization(_) => {}
 
             Type::FunctionLiteral(function) => {
                 visitor.visit(self, || {
@@ -6363,6 +6443,9 @@ impl<'db> Type<'db> {
 
             Self::SpecialForm(special_form) => special_form.definition(db),
             Self::Never => Type::SpecialForm(SpecialFormType::Never).definition(db),
+            Self::DynamicMaterialization(_) => self
+                .dynamic_materialization_fallback()
+                .and_then(|fallback| fallback.definition(db)),
             Self::Dynamic(DynamicType::Any) => {
                 Type::SpecialForm(SpecialFormType::Any).definition(db)
             }
@@ -6677,6 +6760,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::TypeGuard(type_guard_type) => type_guard_type.variance_of(db, typevar),
             Type::KnownInstance(known_instance) => known_instance.variance_of(db, typevar),
             Type::Dynamic(_)
+            | Type::DynamicMaterialization(_)
             | Type::Divergent(_)
             | Type::Never
             | Type::WrapperDescriptor(_)

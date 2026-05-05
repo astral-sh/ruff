@@ -165,7 +165,7 @@ type C2 = Callable[[int, tuple[int | Any]], tuple[Any]]
 
 def _(top: Top[C2], bottom: Bottom[C2]) -> None:
     reveal_type(top)  # revealed: (int, tuple[int], /) -> tuple[object]
-    reveal_type(bottom)  # revealed: (int, tuple[object], /) -> Never
+    reveal_type(bottom)  # revealed: (int, tuple[int | object], /) -> Never
 ```
 
 But, if the callable itself is in a contravariant position, then the variance is flipped i.e., if
@@ -417,9 +417,9 @@ def _(
     bottom: Bottom[Intersection[list[Any], list[int]]],
 ):
     # Top[list[Any] & list[int]] = Top[list[Any]] & list[int] = list[int]
-    reveal_type(top)  # revealed: list[int]
+    reveal_type(top)  # revealed: Top[list[Any]] & list[int]
     # Bottom[list[Any] & list[int]] = Bottom[list[Any]] & list[int] = Bottom[list[Any]]
-    reveal_type(bottom)  # revealed: Bottom[list[Any]]
+    reveal_type(bottom)  # revealed: Bottom[list[Any]] & list[int]
 ```
 
 ## Negation (via `Not`)

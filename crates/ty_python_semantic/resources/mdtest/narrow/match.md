@@ -86,7 +86,7 @@ class Covariant[T]:
 def f(x: Covariant[int]):
     match x:
         case Covariant():
-            reveal_type(x)  # revealed: Covariant[int]
+            reveal_type(x)  # revealed: Covariant[int] & Covariant[object]
         case _:
             reveal_type(x)  # revealed: Never
             assert_never(x)
@@ -112,7 +112,7 @@ class Covariant[T]:
 def f(x: Covariant[int]):
     match x:
         case Covariant():
-            reveal_type(x)  # revealed: Covariant[int]
+            reveal_type(x)  # revealed: Covariant[int] & Covariant[object]
         case _:
             reveal_type(x)  # revealed: Never
             assert_never(x)
@@ -159,7 +159,7 @@ from collections.abc import Sequence
 def test_match_star(x: Sequence[int] | int) -> None:
     match x:
         case [*rest]:
-            reveal_type(x)  # revealed: (Sequence[int] & ~str & ~bytes & ~bytearray) | (int & Sequence[object])
+            reveal_type(x)  # revealed: (Sequence[int] & Sequence[object] & ~str & ~bytes & ~bytearray) | (int & Sequence[object])
         case _:
             # `str`, `bytes`, and `bytearray` are subtypes of `Sequence`, but
             # sequence patterns explicitly do not match them. `bytes` and
@@ -172,7 +172,7 @@ def test_match_star(x: Sequence[int] | int) -> None:
 def test_match_star_excludes_text_and_bytes(x: str | bytes | bytearray | list[int]) -> None:
     match x:
         case [*rest]:
-            reveal_type(x)  # revealed: list[int]
+            reveal_type(x)  # revealed: list[int] & Sequence[object]
         case _:
             reveal_type(x)  # revealed: str | bytes | bytearray
 ```

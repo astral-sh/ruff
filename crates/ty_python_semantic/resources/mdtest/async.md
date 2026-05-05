@@ -155,6 +155,36 @@ async def test():
         reveal_type(y)  # revealed: Any
 ```
 
+Top materializations introduced by `TypeIs` narrowing preserve their materialization marker through
+awaiting, so the result does not collapse with more precise union arms:
+
+```py
+import inspect
+from typing import Awaitable
+
+class C: ...
+
+async def test(x: C | Awaitable[C]) -> None:
+    if inspect.isawaitable(x):
+        reveal_type(x)  # revealed: (C & Awaitable[object]) | (Awaitable[C] & Awaitable[object])
+        y = await x
+        reveal_type(y)  # revealed: object | C
+```
+
+This avoids a false positive when the non-awaitable arm is an iterable builtin like `list`.
+
+```py
+import inspect
+from typing import Awaitable
+
+async def test(x: list[int] | Awaitable[list[int]]) -> None:
+    int_list = await x if inspect.isawaitable(x) else x
+    reveal_type(int_list)  # revealed: object | list[int]
+
+    for item in int_list:
+        reveal_type(item)  # revealed: object | int
+```
+
 The return type of awaiting an intersection is the intersection of the return types of awaiting each
 element:
 

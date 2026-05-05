@@ -283,7 +283,7 @@ def f[**P](func: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
     reveal_type(args[0])  # revealed: object
 
     reveal_type("key" in kwargs)  # revealed: bool
-    reveal_type(kwargs.get("key"))  # revealed: object
+    reveal_type(kwargs.get("key"))  # revealed: object | None
     reveal_type(kwargs["key"])  # revealed: object
 ```
 

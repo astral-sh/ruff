@@ -298,12 +298,12 @@ def _(x: dict[int, str] | ListStrOrInt):
     # TODO: this should ideally be an error
     if isinstance(x, ListStrOrInt):
         # TODO: this should not be narrowed
-        reveal_type(x)  # revealed: list[str] | int
+        reveal_type(x)  # revealed: (list[str] & Top[list[Unknown]]) | int
 
     # TODO: this should ideally be an error
     if isinstance(x, Union[list[str], int]):
         # TODO: this should not be narrowed
-        reveal_type(x)  # revealed: list[str] | int
+        reveal_type(x)  # revealed: (list[str] & Top[list[Unknown]]) | int
 ```
 
 ## `Optional` as `classinfo`
@@ -328,7 +328,7 @@ import typing as t
 
 def f(x: dict[str, int] | list[str], y: object):
     if isinstance(x, t.Dict):
-        reveal_type(x)  # revealed: dict[str, int]
+        reveal_type(x)  # revealed: dict[str, int] & Top[dict[Unknown, Unknown]]
     else:
         reveal_type(x)  # revealed: list[str]
 
@@ -723,7 +723,7 @@ When more complex types are involved, the `Top[]` type may get simplified away.
 ```py
 def _(x: list[int] | set[str]):
     if isinstance(x, list):
-        reveal_type(x)  # revealed: list[int]
+        reveal_type(x)  # revealed: list[int] & Top[list[Unknown]]
     else:
         reveal_type(x)  # revealed: set[str]
 ```
@@ -733,7 +733,7 @@ Though if the types involved are not disjoint bases, we necessarily keep a more 
 ```py
 def _(x: Invariant[int] | Covariant[str]):
     if isinstance(x, Invariant):
-        reveal_type(x)  # revealed: Invariant[int] | (Covariant[str] & Top[Invariant[Unknown]])
+        reveal_type(x)  # revealed: (Invariant[int] & Top[Invariant[Unknown]]) | (Covariant[str] & Top[Invariant[Unknown]])
     else:
         reveal_type(x)  # revealed: Covariant[str] & ~Top[Invariant[Unknown]]
 ```

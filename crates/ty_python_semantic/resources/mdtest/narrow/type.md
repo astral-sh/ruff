@@ -107,26 +107,26 @@ def _(x: A | B, y: A | C):
 # list is invariant
 def f(x: list[int] | None):
     if type(x) is list:
-        reveal_type(x)  # revealed: list[int]
+        reveal_type(x)  # revealed: list[int] & Top[list[Unknown]]
     else:
         reveal_type(x)  # revealed: list[int] | None
 
     if type(x) is not list:
         reveal_type(x)  # revealed: list[int] | None
     else:
-        reveal_type(x)  # revealed: list[int]
+        reveal_type(x)  # revealed: list[int] & Top[list[Unknown]]
 
 # frozenset is covariant
 def g(x: frozenset[bytes] | None):
     if type(x) is frozenset:
-        reveal_type(x)  # revealed: frozenset[bytes]
+        reveal_type(x)  # revealed: frozenset[bytes] & frozenset[object]
     else:
         reveal_type(x)  # revealed: frozenset[bytes] | None
 
     if type(x) is not frozenset:
         reveal_type(x)  # revealed: frozenset[bytes] | None
     else:
-        reveal_type(x)  # revealed: frozenset[bytes]
+        reveal_type(x)  # revealed: frozenset[bytes] & frozenset[object]
 
 def h(x: object):
     if type(x) is list:

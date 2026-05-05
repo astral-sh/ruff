@@ -170,10 +170,12 @@ impl<'db> AllMembers<'db> {
                     // `Type` guarantees that unions/intersections
                     // are kept in DNF (i.e., they are flattened).
                     ty.is_dynamic()
+                        || ty.is_top_dynamic_materialization()
                         || match ty {
-                            Type::Intersection(intersection) => {
-                                intersection.positive(db).iter().any(Type::is_dynamic)
-                            }
+                            Type::Intersection(intersection) => intersection
+                                .positive(db)
+                                .iter()
+                                .any(|ty| ty.is_dynamic() || ty.is_top_dynamic_materialization()),
                             _ => false,
                         }
                 }
@@ -285,6 +287,7 @@ impl<'db> AllMembers<'db> {
             },
 
             Type::Dynamic(_)
+            | Type::DynamicMaterialization(_)
             | Type::Divergent(_)
             | Type::Never
             | Type::AlwaysTruthy

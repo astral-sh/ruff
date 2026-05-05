@@ -61,6 +61,9 @@ impl<'db> Type<'db> {
                 db,
                 Signature::dynamic(self),
             ))),
+            Type::DynamicMaterialization(_) if self.is_top_dynamic_materialization() => Some(
+                CallableTypes::one(CallableType::function_like(db, Signature::dynamic(self))),
+            ),
             Type::Divergent(_) => Some(CallableTypes::one(CallableType::function_like(
                 db,
                 Signature::dynamic(self),
@@ -208,6 +211,7 @@ impl<'db> Type<'db> {
             }
 
             Type::Never
+            | Type::DynamicMaterialization(_)
             | Type::DataclassTransformer(_)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy

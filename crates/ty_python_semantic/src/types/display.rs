@@ -868,6 +868,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 }
                 write!(f.with_type(self.ty), "{dynamic}")
             }
+            Type::DynamicMaterialization(MaterializationKind::Top) => {
+                f.with_type(self.ty).write_str("object")
+            }
+            Type::DynamicMaterialization(MaterializationKind::Bottom) => {
+                f.with_type(self.ty).write_str("Never")
+            }
             Type::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
             Type::Never => f.with_type(self.ty).write_str("Never"),
             Type::NominalInstance(instance) => {

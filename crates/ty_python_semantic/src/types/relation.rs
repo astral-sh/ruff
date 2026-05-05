@@ -16,8 +16,8 @@ use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    MaterializationKind, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType,
+    SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -246,6 +246,7 @@ impl<'db> Type<'db> {
     const fn subtyping_is_always_reflexive(self) -> bool {
         match self {
             Type::Never
+            | Type::DynamicMaterialization(_)
             | Type::FunctionLiteral(..)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
@@ -852,6 +853,16 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return self.check_type_pair(db, source, target);
         }
 
+        if !matches!(self.relation, TypeRelation::Redundancy { pure: false }) {
+            if let Some(source) = source.dynamic_materialization_fallback() {
+                return self.check_type_pair(db, source, target);
+            }
+
+            if let Some(target) = target.dynamic_materialization_fallback() {
+                return self.check_type_pair(db, source, target);
+            }
+        }
+
         // Subtyping implies assignability, so if subtyping is reflexive and the two types are
         // equal, it is both a subtype and assignable. Assignability is always reflexive.
         //
@@ -910,6 +921,60 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         };
 
         match (source, target) {
+            (
+                Type::DynamicMaterialization(source_materialization),
+                Type::DynamicMaterialization(target_materialization),
+            ) if matches!(self.relation, TypeRelation::Redundancy { pure: false }) => {
+                ConstraintSet::from_bool(
+                    self.constraints,
+                    source_materialization == target_materialization,
+                )
+            }
+            (Type::DynamicMaterialization(MaterializationKind::Bottom), _)
+                if matches!(self.relation, TypeRelation::Redundancy { pure: false }) =>
+            {
+                self.always()
+            }
+            (_, Type::DynamicMaterialization(MaterializationKind::Bottom))
+                if matches!(self.relation, TypeRelation::Redundancy { pure: false }) =>
+            {
+                self.never()
+            }
+            (Type::DynamicMaterialization(MaterializationKind::Top), _)
+                if matches!(self.relation, TypeRelation::Redundancy { pure: false }) =>
+            {
+                ConstraintSet::from_bool(
+                    self.constraints,
+                    match target {
+                        Type::Dynamic(_) => true,
+                        Type::Union(union) => union
+                            .elements(db)
+                            .iter()
+                            .any(|ty| ty.is_dynamic() || ty.is_top_dynamic_materialization()),
+                        _ => false,
+                    },
+                )
+            }
+            (_, Type::DynamicMaterialization(MaterializationKind::Top))
+                if matches!(self.relation, TypeRelation::Redundancy { pure: false }) =>
+            {
+                ConstraintSet::from_bool(self.constraints, matches!(source, Type::Dynamic(_)))
+            }
+            (Type::DynamicMaterialization(_), _) => self.check_type_pair(
+                db,
+                source
+                    .dynamic_materialization_fallback()
+                    .expect("matched `Type::DynamicMaterialization`"),
+                target,
+            ),
+            (_, Type::DynamicMaterialization(_)) => self.check_type_pair(
+                db,
+                source,
+                target
+                    .dynamic_materialization_fallback()
+                    .expect("matched `Type::DynamicMaterialization`"),
+            ),
+
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(target)) if target.is_object() => self.always(),
             (_, Type::ProtocolInstance(target)) if target.is_equivalent_to_object(db) => {
@@ -2159,7 +2224,29 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             return self.check_type_pair(db, left, right);
         }
 
+        if let Some(left) = left.dynamic_materialization_fallback() {
+            return self.check_type_pair(db, left, right);
+        }
+
+        if let Some(right) = right.dynamic_materialization_fallback() {
+            return self.check_type_pair(db, left, right);
+        }
+
         match (left, right) {
+            (Type::DynamicMaterialization(_), _) => self.check_type_pair(
+                db,
+                left.dynamic_materialization_fallback()
+                    .expect("matched `Type::DynamicMaterialization`"),
+                right,
+            ),
+            (_, Type::DynamicMaterialization(_)) => self.check_type_pair(
+                db,
+                left,
+                right
+                    .dynamic_materialization_fallback()
+                    .expect("matched `Type::DynamicMaterialization`"),
+            ),
+
             (Type::Never, _) | (_, Type::Never) => self.always(),
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),

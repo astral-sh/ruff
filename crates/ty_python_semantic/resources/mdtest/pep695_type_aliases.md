@@ -627,7 +627,7 @@ type Y = X | str | dict[str, Y]
 
 def _(y: Y):
     if isinstance(y, dict):
-        reveal_type(y)  # revealed: dict[str, X] | dict[str, Y]
+        reveal_type(y)  # revealed: (dict[str, X] & Top[dict[Unknown, Unknown]]) | (dict[str, Y] & Top[dict[Unknown, Unknown]])
 ```
 
 ### Recursive alias with tuple - stack overflow test (issue 2470)

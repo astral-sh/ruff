@@ -1581,6 +1581,7 @@ fn is_instance_truthiness<'db>(
         | Type::TypeGuard(..)
         | Type::Callable(..)
         | Type::Dynamic(..)
+        | Type::DynamicMaterialization(_)
         | Type::Divergent(_)
         | Type::Never
         | Type::TypedDict(_) => {

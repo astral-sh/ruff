@@ -184,7 +184,9 @@ impl ClassInfoConstraintFunction {
                     },
                 }
             }
-            Type::Dynamic(_) | Type::Divergent(_) => Some(classinfo),
+            Type::Dynamic(_) | Type::DynamicMaterialization(_) | Type::Divergent(_) => {
+                Some(classinfo)
+            }
             Type::Intersection(intersection) => {
                 if intersection.negative(db).is_empty() {
                     let mut builder = IntersectionBuilder::new(db);
@@ -2079,6 +2081,7 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         Type::TypeAlias(alias) => is_or_contains_typeddict(db, alias.value_type(db)),
 
         Type::Dynamic(_)
+        | Type::DynamicMaterialization(_)
         | Type::Divergent(_)
         | Type::Never
         | Type::FunctionLiteral(_)
@@ -2168,6 +2171,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         // Only the four variants above can pass `is_or_contains_typeddict`, and this function is
         // always guarded by that check.
         Type::Dynamic(_)
+        | Type::DynamicMaterialization(_)
         | Type::Divergent(_)
         | Type::Never
         | Type::FunctionLiteral(_)

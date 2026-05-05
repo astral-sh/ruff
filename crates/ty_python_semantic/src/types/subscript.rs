@@ -473,7 +473,7 @@ fn typed_dict_subscript<'db>(
         return typed_dict_subscript(db, typed_dict, fallback);
     }
 
-    if slice_ty.is_dynamic() {
+    if slice_ty.is_dynamic() || slice_ty.is_top_dynamic_materialization() {
         return Ok(Type::unknown());
     }
 
@@ -524,7 +524,15 @@ impl<'db> Type<'db> {
         let value_ty = self;
 
         let inferred = match (value_ty, slice_ty) {
-            (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
+            (
+                Type::Dynamic(_)
+                | Type::DynamicMaterialization(_)
+                | Type::Divergent(_)
+                | Type::Never,
+                _,
+            ) => Some(Ok(value_ty)),
+
+            (_, Type::DynamicMaterialization(_)) => Some(Ok(Type::unknown())),
 
             (Type::TypeAlias(alias), _) => {
                 Some(alias.value_type(db).subscript(db, slice_ty, expr_context))

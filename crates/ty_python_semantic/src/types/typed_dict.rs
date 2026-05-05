@@ -982,6 +982,7 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
         }
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)
+        | Type::DynamicMaterialization(_)
         | Type::Divergent(_)
         | Type::Never
         | Type::FunctionLiteral(_)

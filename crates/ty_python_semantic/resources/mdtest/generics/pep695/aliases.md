@@ -389,7 +389,7 @@ def _(x: RecursiveList[int]):
     if isinstance(x, list):
         reveal_type(x[0])  # revealed: int | list[RecursiveList[int]]
     if isinstance(x, list) and isinstance(x[0], list):
-        reveal_type(x[0])  # revealed: list[RecursiveList[int]]
+        reveal_type(x[0])  # revealed: list[RecursiveList[int]] & Top[list[Unknown]]
 ```
 
 Assignment checks respect structural subtyping, i.e. type aliases with the same structure are

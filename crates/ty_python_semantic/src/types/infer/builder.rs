@@ -2386,7 +2386,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 false
             }
 
-            Type::Dynamic(..) | Type::Divergent(_) | Type::Never => {
+            Type::Dynamic(..)
+            | Type::DynamicMaterialization(_)
+            | Type::Divergent(_)
+            | Type::Never => {
                 infer_value_ty(self, TypeContext::default());
                 true
             }
@@ -3132,6 +3135,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             Type::Dynamic(..)
+            | Type::DynamicMaterialization(_)
             | Type::Divergent(_)
             | Type::Never
             | Type::ModuleLiteral(..)
@@ -3184,6 +3188,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::Intersection(..)
                 | Type::TypeAlias(..)
                 | Type::Dynamic(..)
+                | Type::DynamicMaterialization(_)
                 | Type::Divergent(_)
                 | Type::Never
                 | Type::ModuleLiteral(..)
@@ -4810,6 +4815,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::Intersection(_) => None,
                 // All other types cannot have a callable kind propagated to them.
                 Type::Dynamic(_)
+                | Type::DynamicMaterialization(_)
                 | Type::Divergent(_)
                 | Type::Never
                 | Type::FunctionLiteral(_)
@@ -8748,7 +8754,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         match (op, operand_type) {
-            (_, Type::Dynamic(_) | Type::Divergent(_)) => operand_type,
+            (_, Type::Dynamic(_) | Type::DynamicMaterialization(_) | Type::Divergent(_)) => {
+                operand_type
+            }
             (_, Type::Never) => Type::Never,
 
             (_, Type::TypeAlias(alias)) => {

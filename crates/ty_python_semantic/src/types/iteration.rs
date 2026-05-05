@@ -215,7 +215,9 @@ impl<'db> Type<'db> {
                     non_async_special_case(db, flattened)
                 }
                 // N.B. This special case isn't strictly necessary, it's just an obvious optimization
-                Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
+                Type::Dynamic(_) | Type::DynamicMaterialization(_) => {
+                    Some(Cow::Owned(TupleSpec::homogeneous(ty)))
+                }
                 Type::Divergent(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
 
                 Type::FunctionLiteral(_)

@@ -209,6 +209,7 @@ impl<'db> Type<'db> {
 
         let truthiness = match self {
             Type::Dynamic(_)
+            | Type::DynamicMaterialization(_)
             | Type::Divergent(_)
             | Type::Never
             | Type::Callable(_)

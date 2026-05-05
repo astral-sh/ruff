@@ -400,6 +400,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // the result would then become Any or Unknown, respectively).
             (div @ Type::Divergent(_), _, _) | (_, div @ Type::Divergent(_), _) => Some(div),
 
+            (materialization @ Type::DynamicMaterialization(_), _, _)
+            | (_, materialization @ Type::DynamicMaterialization(_), _) => Some(materialization),
+
             (any @ Type::Dynamic(DynamicType::Any), _, _)
             | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),
 

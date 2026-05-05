@@ -402,6 +402,42 @@ type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
 }
 
 #[test]
+fn dynamic_materialization_type() {
+    let db = setup_db();
+    let visitor = ApplyTypeMappingVisitor::default();
+    let top = Type::any().materialize(&db, MaterializationKind::Top, &visitor);
+    let bottom = Type::any().materialize(&db, MaterializationKind::Bottom, &visitor);
+    let int = KnownClass::Int.to_instance(&db);
+
+    assert!(top.is_top_dynamic_materialization());
+    assert!(!top.is_dynamic());
+    assert!(!top.has_dynamic(&db));
+    assert!(!top.is_never());
+    assert!(!bottom.is_top_dynamic_materialization());
+    assert!(!bottom.is_dynamic());
+    assert!(!bottom.has_dynamic(&db));
+    assert!(bottom.is_never());
+    assert_eq!(top.negate(&db), bottom);
+    assert_eq!(bottom.negate(&db), top);
+    assert_eq!(
+        UnionBuilder::new(&db)
+            .add(top)
+            .add(int)
+            .build()
+            .display(&db)
+            .to_string(),
+        "object | int"
+    );
+    assert_eq!(
+        IntersectionBuilder::new(&db)
+            .add_positive(top)
+            .add_positive(int)
+            .build(),
+        int
+    );
+}
+
+#[test]
 fn eager_expansion() {
     use crate::db::tests::TestDb;
     use crate::place::global_symbol;
