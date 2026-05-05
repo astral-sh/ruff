@@ -16,9 +16,7 @@ use ruff_text_size::TextSize;
 /// The allowed range of values is 1..=65535
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct LineLength(
-    NonZeroU16,
-);
+pub struct LineLength(NonZeroU16);
 
 impl LineLength {
     /// Maximum allowed value for a valid [`LineLength`]
