@@ -19,7 +19,7 @@ use ruff_python_ast::{
     self as ast, AnyNodeRef,
     visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 use ty_python_core::scope::ScopeKind;
 use ty_python_semantic::{ImportAliasResolution, ResolvedDefinition, SemanticModel};
 
@@ -335,6 +335,35 @@ fn parameter_owner_is_externally_visible_for_target(
     matches!(owner, Some(AnyNodeRef::StmtFunctionDef(_)))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OccurrenceKind {
+    /// An identifier that references a symbol.
+    Reference,
+    /// An identifier that declares a new symbol.
+    Declaration,
+    /// An identifier that binds a new value to a symbol.
+    Binding,
+}
+
+impl OccurrenceKind {
+    fn to_reference_kind(self) -> ReferenceKind {
+        match self {
+            Self::Reference => ReferenceKind::Read,
+            Self::Declaration => ReferenceKind::Other,
+            Self::Binding => ReferenceKind::Write,
+        }
+    }
+}
+
+impl From<ast::ExprContext> for OccurrenceKind {
+    fn from(value: ast::ExprContext) -> Self {
+        match value {
+            ast::ExprContext::Load | ast::ExprContext::Invalid => Self::Reference,
+            ast::ExprContext::Store | ast::ExprContext::Del => OccurrenceKind::Binding,
+        }
+    }
+}
+
 /// AST visitor to find all references to a specific symbol by comparing semantic definitions
 struct LocalReferencesFinder<'a> {
     model: &'a SemanticModel<'a>,
@@ -357,68 +386,70 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                     return TraversalSignal::Traverse;
                 }
 
+                let kind = OccurrenceKind::from(name_expr.ctx);
                 let covering_node = CoveringNode::from_ancestors(self.ancestors.clone());
-                self.check_reference_from_covering_node(&covering_node);
+                self.check_covering_node(&covering_node, kind);
             }
             AnyNodeRef::ExprAttribute(attr_expr) => {
-                self.check_identifier_reference(&attr_expr.attr);
+                let kind = OccurrenceKind::from(attr_expr.ctx);
+                self.check_identifier(&attr_expr.attr, kind);
             }
             AnyNodeRef::StmtFunctionDef(func) if self.should_include_declaration() => {
-                self.check_identifier_reference(&func.name);
+                self.check_declaration_identifier(&func.name);
             }
             AnyNodeRef::StmtClassDef(class) if self.should_include_declaration() => {
-                self.check_identifier_reference(&class.name);
+                self.check_declaration_identifier(&class.name);
             }
             AnyNodeRef::Parameter(parameter) if self.should_include_declaration() => {
-                self.check_identifier_reference(&parameter.name);
+                self.check_declaration_identifier(&parameter.name);
             }
             AnyNodeRef::Keyword(keyword) => {
                 if let Some(arg) = &keyword.arg {
-                    self.check_identifier_reference(arg);
+                    self.check_reference_identifier(arg);
                 }
             }
             AnyNodeRef::StmtGlobal(global_stmt) if self.should_include_declaration() => {
                 for name in &global_stmt.names {
-                    self.check_identifier_reference(name);
+                    self.check_declaration_identifier(name);
                 }
             }
             AnyNodeRef::StmtNonlocal(nonlocal_stmt) if self.should_include_declaration() => {
                 for name in &nonlocal_stmt.names {
-                    self.check_identifier_reference(name);
+                    self.check_declaration_identifier(name);
                 }
             }
             AnyNodeRef::ExceptHandlerExceptHandler(handler)
                 if self.should_include_declaration() =>
             {
                 if let Some(name) = &handler.name {
-                    self.check_identifier_reference(name);
+                    self.check_binding_identifier(name);
                 }
             }
             AnyNodeRef::PatternMatchAs(pattern_as) if self.should_include_declaration() => {
                 if let Some(name) = &pattern_as.name {
-                    self.check_identifier_reference(name);
+                    self.check_binding_identifier(name);
                 }
             }
             AnyNodeRef::PatternMatchStar(pattern_star) if self.should_include_declaration() => {
                 if let Some(name) = &pattern_star.name {
-                    self.check_identifier_reference(name);
+                    self.check_binding_identifier(name);
                 }
             }
             AnyNodeRef::PatternMatchMapping(pattern_mapping)
                 if self.should_include_declaration() =>
             {
                 if let Some(rest_name) = &pattern_mapping.rest {
-                    self.check_identifier_reference(rest_name);
+                    self.check_binding_identifier(rest_name);
                 }
             }
             AnyNodeRef::TypeParamParamSpec(param_spec) if self.should_include_declaration() => {
-                self.check_identifier_reference(&param_spec.name);
+                self.check_declaration_identifier(&param_spec.name);
             }
             AnyNodeRef::TypeParamTypeVarTuple(param_tuple) if self.should_include_declaration() => {
-                self.check_identifier_reference(&param_tuple.name);
+                self.check_declaration_identifier(&param_tuple.name);
             }
             AnyNodeRef::TypeParamTypeVar(param_var) if self.should_include_declaration() => {
-                self.check_identifier_reference(&param_var.name);
+                self.check_declaration_identifier(&param_var.name);
             }
             AnyNodeRef::ExprStringLiteral(string_expr) => {
                 // Highlight the sub-AST of a string annotation
@@ -439,12 +470,12 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
             AnyNodeRef::Alias(alias) if self.should_include_declaration() => {
                 // Handle import alias declarations
                 if let Some(asname) = &alias.asname {
-                    self.check_identifier_reference(asname);
+                    self.check_declaration_identifier(asname);
                 }
                 // Only check the original name if it matches our target text
                 // This is for cases where we're renaming the imported symbol name itself
                 if alias.name.id == self.target_text {
-                    self.check_identifier_reference(&alias.name);
+                    self.check_declaration_identifier(&alias.name);
                 }
             }
             _ => {}
@@ -468,7 +499,7 @@ impl<'a> SourceOrderVisitor<'a> for KeywordArgumentReferencesFinder<'a> {
 
         if let AnyNodeRef::Keyword(keyword) = node {
             if let Some(arg) = &keyword.arg {
-                self.0.check_identifier_reference(arg);
+                self.0.check_reference_identifier(arg);
             }
         }
 
@@ -493,8 +524,22 @@ impl<'a> LocalReferencesFinder<'a> {
         )
     }
 
-    /// Helper method to check identifier references.
-    fn check_identifier_reference(&mut self, identifier: &ast::Identifier) {
+    /// Checks an identifier of a binding (e.g. `x = 10`).
+    fn check_binding_identifier(&mut self, identifier: &ast::Identifier) {
+        self.check_identifier(identifier, OccurrenceKind::Binding);
+    }
+
+    /// Checks an identifier that references a variable (a use).
+    fn check_reference_identifier(&mut self, identifier: &ast::Identifier) {
+        self.check_identifier(identifier, OccurrenceKind::Reference);
+    }
+
+    /// Checks an identifier that's part of a declaration, e.g. the name of the class.
+    fn check_declaration_identifier(&mut self, identifier: &ast::Identifier) {
+        self.check_identifier(identifier, OccurrenceKind::Declaration);
+    }
+
+    fn check_identifier(&mut self, identifier: &ast::Identifier, kind: OccurrenceKind) {
         // Quick text-based check first
         if identifier.id != self.target_text {
             return;
@@ -503,7 +548,7 @@ impl<'a> LocalReferencesFinder<'a> {
         let mut ancestors_with_identifier = self.ancestors.clone();
         ancestors_with_identifier.push(AnyNodeRef::from(identifier));
         let covering_node = CoveringNode::from_ancestors(ancestors_with_identifier);
-        self.check_reference_from_covering_node(&covering_node);
+        self.check_covering_node(&covering_node, kind);
     }
 
     /// Returns the covering node's resolved definitions.
@@ -525,8 +570,8 @@ impl<'a> LocalReferencesFinder<'a> {
         Some(definitions)
     }
 
-    /// Pushes a reference target when the covering node resolves to any target definition
-    fn check_reference_from_covering_node(&mut self, covering_node: &CoveringNode<'_>) {
+    /// Pushes a reference target when the covering node resolves to any target definition.
+    fn check_covering_node(&mut self, covering_node: &CoveringNode<'_>, kind: OccurrenceKind) {
         let Some(current_definitions) = self.definitions_for_covering_node(covering_node) else {
             return;
         };
@@ -536,104 +581,12 @@ impl<'a> LocalReferencesFinder<'a> {
             return;
         }
 
-        let kind = self.determine_reference_kind(covering_node);
-        let target = ReferenceTarget::new(self.model.file(), covering_node.node().range(), kind);
+        let target = ReferenceTarget::new(
+            self.model.file(),
+            covering_node.node().range(),
+            kind.to_reference_kind(),
+        );
         self.references.push(target);
-    }
-
-    /// Determine whether a reference is a read or write operation based on its context
-    fn determine_reference_kind(&self, covering_node: &CoveringNode<'_>) -> ReferenceKind {
-        // Reference kind is only meaningful for DocumentHighlights mode
-        if !matches!(self.mode, ReferencesMode::DocumentHighlights) {
-            return ReferenceKind::Other;
-        }
-
-        // Walk up the ancestors to find the context
-        for ancestor in self.ancestors.iter().rev() {
-            match ancestor {
-                // Assignment targets are writes
-                AnyNodeRef::StmtAssign(assign) => {
-                    // Check if our node is in the targets (left side) of assignment
-                    for target in &assign.targets {
-                        if Self::expr_contains_range(target, covering_node.node().range()) {
-                            return ReferenceKind::Write;
-                        }
-                    }
-                }
-                AnyNodeRef::StmtAnnAssign(ann_assign)
-                    // Check if our node is the target (left side) of annotated assignment
-                    if Self::expr_contains_range(&ann_assign.target, covering_node.node().range()) => {
-                        return ReferenceKind::Write;
-                    }
-                AnyNodeRef::StmtAugAssign(aug_assign)
-                    // Check if our node is the target (left side) of augmented assignment
-                    if Self::expr_contains_range(&aug_assign.target, covering_node.node().range()) => {
-                        return ReferenceKind::Write;
-                    }
-                // For loop targets are writes
-                AnyNodeRef::StmtFor(for_stmt)
-                    if Self::expr_contains_range(&for_stmt.target, covering_node.node().range()) => {
-                        return ReferenceKind::Write;
-                    }
-                // With statement targets are writes
-                AnyNodeRef::WithItem(with_item) => {
-                    if let Some(optional_vars) = &with_item.optional_vars {
-                        if Self::expr_contains_range(optional_vars, covering_node.node().range()) {
-                            return ReferenceKind::Write;
-                        }
-                    }
-                }
-                // Exception handler names are writes
-                AnyNodeRef::ExceptHandlerExceptHandler(handler) => {
-                    if let Some(name) = &handler.name {
-                        if Self::node_contains_range(
-                            AnyNodeRef::from(name),
-                            covering_node.node().range(),
-                        ) {
-                            return ReferenceKind::Write;
-                        }
-                    }
-                }
-                AnyNodeRef::StmtFunctionDef(func)
-                    if Self::node_contains_range(
-                        AnyNodeRef::from(&func.name),
-                        covering_node.node().range(),
-                    ) => {
-                        return ReferenceKind::Other;
-                    }
-                AnyNodeRef::StmtClassDef(class)
-                    if Self::node_contains_range(
-                        AnyNodeRef::from(&class.name),
-                        covering_node.node().range(),
-                    ) => {
-                        return ReferenceKind::Other;
-                    }
-                AnyNodeRef::Parameter(param)
-                    if Self::node_contains_range(
-                        AnyNodeRef::from(&param.name),
-                        covering_node.node().range(),
-                    ) => {
-                        return ReferenceKind::Other;
-                    }
-                AnyNodeRef::StmtGlobal(_) | AnyNodeRef::StmtNonlocal(_) => {
-                    return ReferenceKind::Other;
-                }
-                _ => {}
-            }
-        }
-
-        // Default to read
-        ReferenceKind::Read
-    }
-
-    /// Helper to check if a node contains a given range
-    fn node_contains_range(node: AnyNodeRef<'_>, range: TextRange) -> bool {
-        node.range().contains_range(range)
-    }
-
-    /// Helper to check if an expression contains a given range
-    fn expr_contains_range(expr: &ast::Expr, range: TextRange) -> bool {
-        expr.range().contains_range(range)
     }
 }
 
