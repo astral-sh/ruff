@@ -17,7 +17,7 @@ use ruff_text_size::TextSize;
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct LineLength(
-    #[cfg_attr(feature = "schemars", schemars(range(min = 1, max = 65535)))] NonZeroU16,
+    NonZeroU16,
 );
 
 impl LineLength {
