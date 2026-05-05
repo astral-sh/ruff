@@ -49,6 +49,22 @@ pub(super) fn synthesize_typed_dict_method<'db>(
     }
 }
 
+pub(super) fn synthesized_typed_dict_method_uses_fields(name: &str) -> bool {
+    matches!(
+        name,
+        "__init__"
+            | "__getitem__"
+            | "__setitem__"
+            | "__delitem__"
+            | "get"
+            | "update"
+            | "pop"
+            | "setdefault"
+            | "__or__"
+            | "__ror__"
+    )
+}
+
 /// Enum unifying the field schema for both dynamic and static `TypedDict` representations.
 #[derive(Debug, Copy, Clone)]
 pub(super) enum TypedDictFields<'db> {
@@ -705,6 +721,27 @@ impl<'db> DynamicTypedDictLiteral<'db> {
             }
             DynamicTypedDictAnchor::ScopeOffset { schema, .. } => schema,
         }
+    }
+
+    /// Return whether this `TypedDict`'s generated fields can depend on `definition`.
+    ///
+    /// For functional `TypedDict`, the field types are inferred from the assigned call expression,
+    /// so evaluating a recursive field annotation has that assignment as its active definition.
+    pub(crate) fn generated_fields_use_definition(
+        self,
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+    ) -> bool {
+        matches!(
+            self.anchor(db),
+            DynamicTypedDictAnchor::Definition(typeddict_definition)
+                if *typeddict_definition == definition
+                    || crate::types::definition_dependencies::definition_value_uses_definition(
+                        db,
+                        *typeddict_definition,
+                        definition,
+                    )
+        )
     }
 
     /// Get the MRO for this `TypedDict`.

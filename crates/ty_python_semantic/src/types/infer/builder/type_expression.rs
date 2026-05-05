@@ -75,6 +75,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         ty
     }
 
+    fn infer_expression_in_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        let previously_in_type_expression = self
+            .context
+            .inference_flags
+            .replace(InferenceFlags::IN_TYPE_EXPRESSION, true);
+        let ty = self.infer_expression(expression, TypeContext::default());
+        self.context.inference_flags.set(
+            InferenceFlags::IN_TYPE_EXPRESSION,
+            previously_in_type_expression,
+        );
+        ty
+    }
+
     /// Similar to [`infer_type_expression`], but accepts a [`DeferredExpressionState`].
     ///
     /// [`infer_type_expression`]: TypeInferenceBuilder::infer_type_expression
@@ -2012,7 +2025,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let num_arguments = arguments.len();
                 let type_of_type = if num_arguments == 1 {
                     // N.B. This uses `infer_expression` rather than `infer_type_expression`
-                    self.infer_expression(&arguments[0], TypeContext::default())
+                    self.infer_expression_in_type_expression(&arguments[0])
                 } else {
                     if !self.in_string_annotation() {
                         for argument in arguments {
@@ -2061,7 +2074,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return Type::unknown();
                 }
 
-                let argument_type = self.infer_expression(&arguments[0], TypeContext::default());
+                let argument_type = self.infer_expression_in_type_expression(&arguments[0]);
 
                 let Some(callable_type) = argument_type
                     .try_upcast_to_callable_with_recursive_fallback(

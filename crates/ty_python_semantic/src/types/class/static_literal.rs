@@ -29,7 +29,11 @@ use crate::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, DynamicTypedDictLiteral, Field,
             FieldKind, InstanceMemberResult, MetaclassError, MetaclassErrorKind, MethodDecorator,
             MroLookup, NamedTupleField, SlotsKind, synthesize_namedtuple_class_member,
-            typed_dict::{TypedDictFields, synthesize_typed_dict_method, typed_dict_class_member},
+            synthesized_namedtuple_class_member_uses_fields,
+            typed_dict::{
+                TypedDictFields, synthesize_typed_dict_method,
+                synthesized_typed_dict_method_uses_fields, typed_dict_class_member,
+            },
         },
         context::InferContext,
         declaration_type, definition_expression_type, determine_upper_bound,
@@ -92,6 +96,40 @@ pub struct StaticClassLiteral<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for StaticClassLiteral<'_> {}
+
+impl<'db> CodeGeneratorKind<'db> {
+    pub(super) fn constructor_uses_generated_fields(
+        self,
+        db: &'db dyn Db,
+        class: StaticClassLiteral<'db>,
+    ) -> bool {
+        match self {
+            CodeGeneratorKind::DataclassLike(_) => {
+                class.has_dataclass_param(db, self, DataclassFlags::INIT)
+            }
+            CodeGeneratorKind::NamedTuple | CodeGeneratorKind::TypedDict => true,
+        }
+    }
+
+    pub(super) fn synthesized_member_uses_generated_fields(
+        self,
+        db: &'db dyn Db,
+        class: StaticClassLiteral<'db>,
+        name: &str,
+    ) -> bool {
+        match self {
+            CodeGeneratorKind::DataclassLike(_) => match name {
+                "__init__" => class.has_dataclass_param(db, self, DataclassFlags::INIT),
+                "__replace__" => Program::get(db).python_version(db) >= PythonVersion::PY313,
+                _ => false,
+            },
+            CodeGeneratorKind::NamedTuple => {
+                synthesized_namedtuple_class_member_uses_fields(db, name)
+            }
+            CodeGeneratorKind::TypedDict => synthesized_typed_dict_method_uses_fields(name),
+        }
+    }
+}
 
 fn generic_context_cycle_initial<'db>(
     _db: &'db dyn Db,
@@ -750,6 +788,94 @@ impl<'db> StaticClassLiteral<'db> {
         let (dataclass_params, transformer_params) = self.merged_dataclass_params(db, field_policy);
         dataclass_params.is_some_and(|params| params.flags(db).contains(param))
             || transformer_params.is_some_and(|params| params.flags(db).contains(param))
+    }
+
+    fn generated_own_fields_include_definition(
+        self,
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+    ) -> bool {
+        let class_body_scope = self.body_scope(db);
+        let module = parsed_module(db, class_body_scope.file(db)).load(db);
+        let use_def = use_def_map(db, class_body_scope);
+
+        use_def
+            .all_end_of_scope_symbol_declarations()
+            .any(|(_, declarations)| {
+                declarations.into_iter().any(|declaration| {
+                    let Some(declaration) = declaration.declaration.definition() else {
+                        return false;
+                    };
+
+                    if declaration == definition {
+                        return true;
+                    }
+
+                    let DefinitionKind::AnnotatedAssignment(assignment) = declaration.kind(db)
+                    else {
+                        return false;
+                    };
+
+                    crate::types::definition_dependencies::expression_uses_definition(
+                        db,
+                        class_body_scope,
+                        assignment.annotation(&module),
+                        definition,
+                    )
+                })
+            })
+    }
+
+    pub(super) fn generated_fields_include_definition(
+        self,
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+        specialization: Option<Specialization<'db>>,
+        field_policy: CodeGeneratorKind<'db>,
+    ) -> bool {
+        if field_policy == CodeGeneratorKind::NamedTuple {
+            return self.generated_own_fields_include_definition(db, definition);
+        }
+
+        self.iter_mro(db, specialization).any(|base| {
+            let Some(class) = base.into_class() else {
+                return false;
+            };
+
+            if let Some((class_literal, specialization)) = class.static_class_literal(db) {
+                return field_policy.matches(db, class_literal.into(), specialization)
+                    && class_literal.generated_own_fields_include_definition(db, definition);
+            }
+
+            if field_policy == CodeGeneratorKind::TypedDict
+                && let ClassLiteral::DynamicTypedDict(typeddict) = class.class_literal(db)
+            {
+                return typeddict.generated_fields_use_definition(db, definition);
+            }
+
+            false
+        })
+    }
+
+    pub(super) fn generated_constructor_uses_fields(
+        self,
+        db: &'db dyn Db,
+        field_policy: CodeGeneratorKind<'db>,
+    ) -> bool {
+        field_policy.constructor_uses_generated_fields(db, self)
+    }
+
+    pub(super) fn generated_member_uses_fields(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        field_policy: CodeGeneratorKind<'db>,
+    ) -> bool {
+        if !class_member(db, self.body_scope(db), name).is_undefined() {
+            return false;
+        }
+
+        field_policy.synthesized_member_uses_generated_fields(db, self, name)
     }
 
     /// Returns the nearest `@dataclass_transform` parameters for this class or its MRO.
