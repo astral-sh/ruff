@@ -727,6 +727,14 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                     }
                 }
             }
+            // x.__class__ is Y can narrow x
+            ast::Expr::Attribute(attribute) if attribute.attr.as_str() == "__class__" => {
+                if let Some(place_expr) = PlaceExpr::try_from_expr(&attribute.value) {
+                    if let Some(place) = self.places.place_id((&place_expr).into()) {
+                        places.insert(place);
+                    }
+                }
+            }
             _ => {}
         }
     }
