@@ -1200,12 +1200,13 @@ match value:
            |
 
         info[folding-range]: Folding Range
-         --> main.py:7:9
+         --> main.py:7:10
           |
-        7 | /         [
+        7 |           [
+          |  __________^
         8 | |             value,
         9 | |         ]
-          | |_________^
+          | |________^
           |
 
         info[folding-range]: Folding Range
@@ -1605,6 +1606,19 @@ my_dict = {
     "a": 1,
     "b": 2,
 }
+
+my_list_with_trailing_element_comment = [
+    1,
+    2,
+    3,  # reason
+]
+
+my_list_with_trailing_own_line_comment = [
+    1,
+    2,
+    3,
+    # comment
+]
 <CURSOR>
 "#,
             )
@@ -1612,28 +1626,307 @@ my_dict = {
 
         assert_snapshot!(test.folding_ranges(), @r#"
         info[folding-range]: Folding Range
-         --> main.py:2:11
+         --> main.py:2:12
           |
         2 |   my_list = [
-          |  ___________^
+          |  ____________^
         3 | |     1,
         4 | |     2,
         5 | |     3,
-        6 | | ]
-          | |_^
+          | |_______^
           |
 
         info[folding-range]: Folding Range
-          --> main.py:8:11
+          --> main.py:8:12
            |
          8 |   my_dict = {
-           |  ___________^
+           |  ____________^
          9 | |     "a": 1,
         10 | |     "b": 2,
-        11 | | }
-           | |_^
+           | |____________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:13:42
+           |
+        13 |   my_list_with_trailing_element_comment = [
+           |  __________________________________________^
+        14 | |     1,
+        15 | |     2,
+        16 | |     3,  # reason
+           | |_________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:19:43
+           |
+        19 |   my_list_with_trailing_own_line_comment = [
+           |  ___________________________________________^
+        20 | |     1,
+        21 | |     2,
+        22 | |     3,
+        23 | |     # comment
+           | |______________^
            |
         "#);
+    }
+
+    #[test]
+    fn test_folding_range_expression_delimiters() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+result = call(
+    first,
+    second,
+)
+
+my_set = {
+    "a",
+    "b",
+}
+
+my_tuple = (
+    first,
+    second,
+)
+
+my_generator = (
+    item
+    for item in items
+)
+
+my_list_comp = [
+    item
+    for item in items
+]
+
+my_set_comp = {
+    item
+    for item in items
+}
+
+my_dict_comp = {
+    key: value
+    for key, value in items
+}
+
+type Alias[
+    T,
+    U,
+] = tuple[T, U]
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @r#"
+        info[folding-range]: Folding Range
+         --> main.py:2:15
+          |
+        2 |   result = call(
+          |  _______________^
+        3 | |     first,
+        4 | |     second,
+          | |____________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:7:11
+          |
+        7 |   my_set = {
+          |  ___________^
+        8 | |     "a",
+        9 | |     "b",
+          | |_________^
+          |
+
+        info[folding-range]: Folding Range
+          --> main.py:12:13
+           |
+        12 |   my_tuple = (
+           |  _____________^
+        13 | |     first,
+        14 | |     second,
+           | |____________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:17:17
+           |
+        17 |   my_generator = (
+           |  _________________^
+        18 | |     item
+        19 | |     for item in items
+           | |______________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:22:17
+           |
+        22 |   my_list_comp = [
+           |  _________________^
+        23 | |     item
+        24 | |     for item in items
+           | |______________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:27:16
+           |
+        27 |   my_set_comp = {
+           |  ________________^
+        28 | |     item
+        29 | |     for item in items
+           | |______________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:32:17
+           |
+        32 |   my_dict_comp = {
+           |  _________________^
+        33 | |     key: value
+        34 | |     for key, value in items
+           | |____________________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:37:12
+           |
+        37 |   type Alias[
+           |  ____________^
+        38 | |     T,
+        39 | |     U,
+           | |_______^
+           |
+        "#);
+    }
+
+    #[test]
+    fn test_folding_range_multiline_call_callables() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+callable_and_arguments = (
+    factory
+)(
+    arg,
+)
+
+parenthesized_method_callable = (
+    factory
+).method(arg)
+
+chained_call = (
+    factory
+)(
+    first,
+)(
+    second,
+)
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:27
+          |
+        2 |   callable_and_arguments = (
+          |  ___________________________^
+        3 | |     factory
+          | |____________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:4:3
+          |
+        4 |   )(
+          |  ___^
+        5 | |     arg,
+          | |_________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:8:34
+          |
+        8 |   parenthesized_method_callable = (
+          |  __________________________________^
+        9 | |     factory
+          | |____________^
+          |
+
+        info[folding-range]: Folding Range
+          --> main.py:16:3
+           |
+        16 |   )(
+           |  ___^
+        17 | |     second,
+           | |____________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:12:17
+           |
+        12 |   chained_call = (
+           |  _________________^
+        13 | |     factory
+           | |____________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:14:3
+           |
+        14 |   )(
+           |  ___^
+        15 | |     first,
+           | |___________^
+           |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_multiline_subscripts() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+grouped_subscript = (data)[
+    key
+]
+
+parenthesized_subscript_value = (
+    data
+)[key]
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:28
+          |
+        2 |   grouped_subscript = (data)[
+          |  ____________________________^
+        3 | |     key
+          | |________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:6:34
+          |
+        6 |   parenthesized_subscript_value = (
+          |  __________________________________^
+        7 | |     data
+          | |_________^
+          |
+
+        ");
     }
 
     #[test]
