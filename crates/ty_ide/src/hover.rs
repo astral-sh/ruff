@@ -41,7 +41,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
                 // `Foo()`, where the resolved definition is `__init__` and
                 // usually carries no docstring of its own.
                 goto_target
-                    .get_definition_targets(
+                    .definitions(
                         &model,
                         ty_python_semantic::ImportAliasResolution::ResolveAliases,
                     )
@@ -50,7 +50,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
             .map(HoverContent::Docstring)
     } else {
         goto_target
-            .get_definition_targets(
+            .definitions(
                 &model,
                 ty_python_semantic::ImportAliasResolution::ResolveAliases,
             )

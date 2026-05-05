@@ -20,8 +20,9 @@ pub fn goto_definition(
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &module, offset)?;
     let definition_targets = goto_target
-        .get_definition_targets(&model, ImportAliasResolution::ResolveAliases)?
-        .definition_targets(&model, &goto_target)?;
+        .definitions(&model, ImportAliasResolution::ResolveAliases)?
+        .goto_definition(&model, &goto_target)?
+        .into_navigation_targets(model.db());
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
