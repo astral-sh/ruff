@@ -22,7 +22,7 @@ pub struct LineLength(
 
 impl LineLength {
     /// Maximum allowed value for a valid [`LineLength`]
-    pub const MAX: u16 = 65535;
+    pub const MAX: u16 = u16::MAX;
 
     /// Return the numeric value for this [`LineLength`]
     pub fn value(&self) -> u16 {
