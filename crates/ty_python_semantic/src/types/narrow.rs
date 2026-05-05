@@ -290,6 +290,17 @@ impl ClassInfoConstraintFunction {
             }
         };
 
+        let constraint_from_class_type = |class: ClassType<'db>| match class {
+            ClassType::NonGeneric(class) => constraint_from_class_literal(class),
+            ClassType::Generic(generic) => {
+                // A generic `ClassType` here is the type of a runtime class object, e.g.
+                // `cls: type[list[int]]`, not the generic alias expression `list[int]`
+                // itself. Direct generic aliases are rejected by the `Type::GenericAlias`
+                // case below.
+                constraint_from_class_literal(ClassLiteral::Static(generic.origin(db)))
+            }
+        };
+
         match classinfo {
             Type::TypeAlias(alias) => {
                 self.generate_constraint(db, alias.value_type(db), is_positive)
@@ -304,12 +315,7 @@ impl ClassInfoConstraintFunction {
                 }
 
                 match subclass_of_ty.subclass_of() {
-                    SubclassOfInner::Class(ClassType::NonGeneric(class_literal)) => {
-                        Some(constraint_from_class_literal(class_literal))
-                    }
-                    // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
-                    // e.g. `isinstance(x, list[int])` fails at runtime.
-                    SubclassOfInner::Class(ClassType::Generic(_)) => None,
+                    SubclassOfInner::Class(class) => Some(constraint_from_class_type(class)),
                     SubclassOfInner::Dynamic(dynamic) => Some(Type::Dynamic(dynamic)),
                     SubclassOfInner::TypeVar(bound_typevar) => match self {
                         ClassInfoConstraintFunction::IsSubclass => Some(classinfo),

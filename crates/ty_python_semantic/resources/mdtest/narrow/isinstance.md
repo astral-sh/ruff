@@ -444,6 +444,30 @@ def _(x: object, y: type[int]):
         reveal_type(x)  # revealed: int
 ```
 
+Generic `type[]` types are narrowed using the top materialization of the instance type. This also
+applies to the result of `type(y)`, which is a runtime class object rather than a generic alias:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Invariant[T]:
+    def push(self, x: T) -> None: ...
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object, cls: type[Invariant[int]], y: Invariant[str]):
+    if isinstance(x, cls):
+        reveal_type(x)  # revealed: Top[Invariant[Unknown]]
+        reveal_type(x.get())  # revealed: object
+
+    if isinstance(x, type(y)):
+        reveal_type(x)  # revealed: Top[Invariant[Unknown]]
+        reveal_type(x.get())  # revealed: object
+```
+
 Negative narrowing is not sound in this case, because `type[A]` includes subclasses of `A`:
 
 ```py
