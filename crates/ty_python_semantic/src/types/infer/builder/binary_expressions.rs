@@ -8,6 +8,7 @@ use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
     DIVISION_BY_ZERO, report_unsupported_augmented_assignment, report_unsupported_binary_operation,
 };
+use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
     DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -439,12 +440,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             left_ty,
                             constraints,
                             |constraint| {
-                                self.infer_binary_expression_type(
+                                self.infer_binary_expression_type_impl(
                                     node,
                                     emitted_division_by_zero_diagnostic,
                                     constraint,
                                     constraint,
                                     op,
+                                    visitor,
                                 )
                             },
                         )
@@ -772,21 +774,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         LiteralValueTypeKind::Bool(b1),
                         LiteralValueTypeKind::Bool(_) | LiteralValueTypeKind::Int(_),
                         op,
-                    ) => self.infer_binary_expression_type(
+                    ) => self.infer_binary_expression_type_impl(
                         node,
                         emitted_division_by_zero_diagnostic,
                         Type::int_literal(i64::from(b1)),
                         right_ty,
                         op,
+                        visitor,
                     ),
 
                     (LiteralValueTypeKind::Int(_), LiteralValueTypeKind::Bool(b2), op) => self
-                        .infer_binary_expression_type(
+                        .infer_binary_expression_type_impl(
                             node,
                             emitted_division_by_zero_diagnostic,
                             left_ty,
                             Type::int_literal(i64::from(b2)),
                             op,
+                            visitor,
                         ),
 
                     (
@@ -970,6 +974,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             )
             .ok()
             .map(|binding| binding.return_type(db)),
+
+            (lhs, rhs, ast::Operator::Add) => {
+                if let Some(lhs_tuple) = lhs.exact_tuple_instance_spec(db)
+                    && let Some(rhs_tuple) = rhs.exact_tuple_instance_spec(db)
+                {
+                    let concatenated = TupleSpecBuilder::from(lhs_tuple.as_ref())
+                        .concat(db, rhs_tuple.as_ref())
+                        .build();
+
+                    Some(Type::tuple(TupleType::new(db, &concatenated)))
+                } else {
+                    Type::try_call_bin_op_return_type(db, lhs, ast::Operator::Add, rhs)
+                }
+            }
 
             // We've handled all of the special cases that we support for literals, so we need to
             // fall back on looking for dunder methods on one of the operand types.

@@ -1491,7 +1491,7 @@ fn place_from_bindings_impl<'db>(
                 builder.add(ty);
             }
 
-            builder.build()
+            builder.build().promote_tuple_size_in_large_union(db)
         } else {
             first
         };

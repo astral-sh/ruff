@@ -1010,7 +1010,7 @@ impl<'db> Type<'db> {
         // So we avoid unioning in the first couple iterations, and just use the later iteration's
         // result directly. We still ensure monotonicity after the first couple iterations, which
         // still ensures convergence in cases that are prone to oscillation.
-        if cycle.iteration() <= 1 {
+        let ty = if cycle.iteration() <= 1 {
             self
         } else {
             // The current type is unioned to the previous type. Unioning in the reverse order can
@@ -1019,8 +1019,17 @@ impl<'db> Type<'db> {
             // We should use the previous union type as the base and only add new element types in
             // this cycle, if any.
             UnionType::from_elements_cycle_recovery(db, [previous, self])
-        }
-        .recursive_type_normalized(db, cycle)
+        };
+
+        // Tuple-size promotion is another widening step. Only apply it when cycle recovery
+        // actually added a new type, or stable tuple unions would be collapsed to variadic tuples.
+        let ty = if cycle.iteration() > 1 && ty != previous {
+            ty.promote_tuple_size_in_cycle_recovery(db)
+        } else {
+            ty
+        };
+
+        ty.recursive_type_normalized(db, cycle)
     }
 
     pub fn is_none(&self, db: &'db dyn Db) -> bool {

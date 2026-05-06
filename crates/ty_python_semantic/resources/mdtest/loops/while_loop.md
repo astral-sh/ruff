@@ -449,6 +449,18 @@ while random():
     reveal_type(x)  # revealed: int
 ```
 
+### Stable tuple unions are not promoted during cycle recovery
+
+```py
+def flag() -> bool:
+    return True
+
+def _(k: tuple[int] | tuple[int, int]):
+    while flag():
+        k = k
+    reveal_type(k)  # revealed: tuple[int] | tuple[int, int]
+```
+
 ### Avoid oscillations
 
 We need to avoid oscillating cycles in cases like the following, where the type of one of these loop

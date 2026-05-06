@@ -1321,11 +1321,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let mut check_positive_elements = |emit_diagnostic_and_short_circuit| {
                     let mut valid = false;
-                    for element_ty in intersection.positive(db) {
+                    for element_ty in intersection.positive_elements_or_object(db) {
                         valid |= self.validate_subscript_assignment_impl(
                             target,
                             full_object_ty.or(Some(object_ty)),
-                            *element_ty,
+                            element_ty,
                             &mut |builder, tcx| infer_slice_ty.infer_silent(builder, tcx),
                             rhs_value_node,
                             &mut |builder, tcx| infer_rhs_value.infer_silent(builder, tcx),
