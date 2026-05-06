@@ -228,12 +228,14 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 );
             }
         }
-        Expr::Name(ast::ExprName {
-            id,
-            ctx,
-            range,
-            node_index: _,
-        }) => {
+        Expr::Name(
+            expr_name @ ast::ExprName {
+                id,
+                ctx,
+                range,
+                node_index: _,
+            },
+        ) => {
             match ctx {
                 ExprContext::Load => {
                     if checker.is_rule_enabled(Rule::TypingTextStrAlias) {
@@ -268,6 +270,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     }
                     if checker.is_rule_enabled(Rule::Airflow3SuggestedToMoveToProvider) {
                         airflow::rules::suggested_to_move_to_provider_in_3(checker, expr);
+                    }
+                    if checker.is_rule_enabled(Rule::LazyImportImmediatelyResolved) {
+                        flake8_tidy_imports::rules::lazy_import_immediately_resolved(
+                            checker, expr_name,
+                        );
                     }
                     if checker.any_rule_enabled(&[
                         Rule::SuspiciousPickleUsage,

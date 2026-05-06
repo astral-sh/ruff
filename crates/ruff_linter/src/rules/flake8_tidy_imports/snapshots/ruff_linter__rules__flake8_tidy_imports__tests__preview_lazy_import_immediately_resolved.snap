@@ -1,0 +1,90 @@
+---
+source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
+---
+TID255 Lazy import `foo` is resolved immediately
+ --> TID255.py:7:8
+  |
+5 | lazy from library import Other as Renamed
+6 |
+7 | base = foo.Base
+  |        ^^^
+8 | component = Component
+9 | aliased = alias.Member
+  |
+
+TID255 Lazy import `Component` is resolved immediately
+  --> TID255.py:8:13
+   |
+ 7 | base = foo.Base
+ 8 | component = Component
+   |             ^^^^^^^^^
+ 9 | aliased = alias.Member
+10 | submodule = package.submodule.Member
+   |
+
+TID255 Lazy import `alias` is resolved immediately
+  --> TID255.py:9:11
+   |
+ 7 | base = foo.Base
+ 8 | component = Component
+ 9 | aliased = alias.Member
+   |           ^^^^^
+10 | submodule = package.submodule.Member
+   |
+
+TID255 Lazy import `package` is resolved immediately
+  --> TID255.py:10:13
+   |
+ 8 | component = Component
+ 9 | aliased = alias.Member
+10 | submodule = package.submodule.Member
+   |             ^^^^^^^
+11 |
+12 | if foo.ENABLED:
+   |
+
+TID255 Lazy import `foo` is resolved immediately
+  --> TID255.py:12:4
+   |
+10 | submodule = package.submodule.Member
+11 |
+12 | if foo.ENABLED:
+   |    ^^^
+13 |     pass
+   |
+
+TID255 Lazy import `Component` is resolved immediately
+  --> TID255.py:19:16
+   |
+18 | try:
+19 |     try_body = Component
+   |                ^^^^^^^^^
+20 | except Exception:
+21 |     handler = foo.Error
+   |
+
+TID255 Lazy import `foo` is resolved immediately
+  --> TID255.py:24:15
+   |
+24 | class Derived(foo.Base):
+   |               ^^^
+25 |     component = Component
+   |
+
+TID255 Lazy import `Component` is resolved immediately
+  --> TID255.py:25:17
+   |
+24 | class Derived(foo.Base):
+25 |     component = Component
+   |                 ^^^^^^^^^
+26 |
+27 |     if condition:
+   |
+
+TID255 Lazy import `Renamed` is resolved immediately
+  --> TID255.py:34:22
+   |
+34 | def function(default=Renamed):
+   |                      ^^^^^^^
+35 |     return foo.Value
+   |
