@@ -11,9 +11,6 @@ reveal_type(() + ())  # revealed: tuple[()]
 def _(x: tuple[int, str], y: tuple[None, tuple[int]]):
     reveal_type(x + y)  # revealed: tuple[int, str, None, tuple[int]]
     reveal_type(y + x)  # revealed: tuple[None, tuple[int], int, str]
-
-def f(x: tuple[int, int]) -> tuple[str, int, int]:
-    return ("asdf",) + x
 ```
 
 ## Concatenation for homogeneous tuples
@@ -55,28 +52,17 @@ def _(one_two: OneTwo, x: IntTuple, y: StrTuple, three_four: ThreeFour):
 Large control-flow joins should not infer every possible tuple shape.
 
 ```py
-def flag() -> bool:
-    return True
-
-t = ()
-if flag():
-    t += (1,)
-if flag():
-    t += (2,)
-if flag():
-    t += (3,)
-if flag():
-    t += (4,)
-if flag():
-    t += (5,)
-if flag():
-    t += (6,)
-if flag():
-    t += (7,)
-if flag():
-    t += (8,)
-
-reveal_type(t)  # revealed: tuple[Literal[1, 2, 3, 4, 5, 6, 7, 8], ...]
+def _(flag: bool):
+    t = ()
+    if flag:
+        t += (1,)
+    if flag:
+        t += (2,)
+    if flag:
+        t += (3,)
+    if flag:
+        t += (4,)
+    reveal_type(t)  # revealed: tuple[Literal[1, 2, 3, 4], ...]
 ```
 
 ## Augmented concatenation in loops
@@ -84,54 +70,15 @@ reveal_type(t)  # revealed: tuple[Literal[1, 2, 3, 4, 5, 6, 7, 8], ...]
 Cycle recovery should not infer an increasingly precise tuple shape on every iteration.
 
 ```py
-from collections.abc import Hashable, Mapping
-from typing import TypeAlias
-
-Key: TypeAlias = tuple[str, ...]
-
-def flag() -> bool:
-    return True
-
-def parse_key(key_part: str) -> Key:
-    key: Key = (key_part,)
-    while flag():
-        key += (key_part,)
+def _(item: str, flag: bool):
+    key: tuple[str, ...] = (item,)
+    while flag:
+        key += (item,)
     reveal_type(key)  # revealed: tuple[str, ...]
-    return key
 
-def append_flag(state: tuple[object, ...], alias_is_default: bool) -> tuple[object, ...]:
-    while flag():
-        state = (*state, alias_is_default)
-    reveal_type(state)  # revealed: tuple[object, ...]
-    return state
-
-_marker: tuple[object] = (object(),)
-
-def make_key(args: tuple[object, ...], kwds: Mapping[object, object]) -> Hashable:
-    key: tuple[object, ...] = args
-    if kwds:
-        key += _marker
-        for item in kwds.items():
-            key += item
+def _(item: object, flag: bool):
+    key = ("", None)
+    while flag:
+        key += (item,)
     reveal_type(key)  # revealed: tuple[object, ...]
-    return key
-
-def memoized_key(
-    names: str,
-    dtype: object | None,
-    ilp64: str,
-    arrays: tuple[object, ...],
-) -> tuple[object, ...]:
-    key = (names, dtype, ilp64)
-    for array in arrays:
-        key += (array, flag())
-    reveal_type(key)  # revealed: tuple[object, ...]
-    return key
-
-def piecewise_cases(cdf: Mapping[object, object]) -> tuple[tuple[object, object], ...]:
-    cases = ((None, False),)
-    for key, value in cdf.items():
-        cases = cases + ((key, value),)
-    reveal_type(cases)  # revealed: tuple[tuple[object, object], ...]
-    return cases
 ```

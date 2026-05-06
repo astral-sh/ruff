@@ -452,11 +452,8 @@ while random():
 ### Stable tuple unions are not promoted during cycle recovery
 
 ```py
-def flag() -> bool:
-    return True
-
-def _(k: tuple[int] | tuple[int, int]):
-    while flag():
+def _(k: tuple[int] | tuple[int, int], flag: bool):
+    while flag:
         k = k
     reveal_type(k)  # revealed: tuple[int] | tuple[int, int]
 ```

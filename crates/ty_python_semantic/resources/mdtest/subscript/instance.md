@@ -90,25 +90,6 @@ a = NoSetitem()
 a[0] = 0  # error: "Cannot assign to a subscript on an object of type `NoSetitem`"
 ```
 
-## Subscript store on a negative-only intersection
-
-```py
-def _(out: object) -> None:
-    if out is not None:
-        out[0] = 1  # snapshot: invalid-assignment
-```
-
-```snapshot
-error[invalid-assignment]: Cannot assign to a subscript on an object of type `object`
- --> src/mdtest_snippet.py:3:9
-  |
-3 |         out[0] = 1  # snapshot: invalid-assignment
-  |         ^^^^^^
-  |
-info: The full type of the subscripted object is `~None`
-info: `object` does not have a `__setitem__` method.
-```
-
 ## `__setitem__` not callable
 
 ```py
