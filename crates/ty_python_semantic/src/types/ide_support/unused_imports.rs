@@ -204,16 +204,16 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
                 continue;
             }
 
-            if is_used && multipart_import_name.is_none() {
-                continue;
-            }
-
             let ScopedPlaceId::Symbol(symbol_id) = definition.place(db) else {
                 continue;
             };
 
             let symbol = place_table.symbol(symbol_id);
             let name = symbol.name();
+
+            if multipart_import_name.is_none() && (is_used || symbol.is_used()) {
+                continue;
+            }
 
             if is_intentionally_unused_name(name)
                 || (multipart_import_name.is_none()
@@ -837,6 +837,38 @@ mod tests {
         )?;
 
         assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_imports_used_in_type_aliases() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            from typing import Literal
+            import typing
+
+            type Style = Literal["italic", "bold", "underline"]
+            type Other = typing.Literal["italic", "bold", "underline"]
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn reports_import_shadowed_in_class_type_alias() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            from typing import Literal
+
+            class C:
+                Literal = str
+                type Style = Literal["italic", "bold", "underline"]
+            "#,
+        )?;
+
+        assert_eq!(names, vec!["Literal"]);
         Ok(())
     }
 }

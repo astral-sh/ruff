@@ -714,6 +714,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     // Records snapshots of the place states visible from the current lazy scope.
     fn record_lazy_snapshots(&mut self, popped_scope_id: FileScopeId) {
+        let popped_scope = &self.scopes[popped_scope_id];
+
         for enclosing_scope_info in self.scope_stack.iter().rev() {
             let enclosing_scope_id = enclosing_scope_info.file_scope_id;
             let enclosing_scope_kind = self.scopes[enclosing_scope_id].kind();
@@ -727,7 +729,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // be modified from elsewhere, the snapshot will not be recorded.
                 // (In the case of class scopes, class variables can be modified from elsewhere, but this has no effect in nested scopes,
                 // as class variables are not visible to them)
-                if self.scopes[enclosing_scope_id].kind().is_module() {
+                if enclosing_scope_kind.is_module() {
+                    // Keep module scopes out of binding snapshots because they can be modified
+                    // externally. PEP 695 type-alias scopes still need use tracking, so record
+                    // a usage-only edge without changing type-inference snapshots.
+                    if popped_scope.kind() == ScopeKind::TypeAlias
+                        && nested_symbol.is_used()
+                        && self.resolve_nested_reference_scope(
+                            popped_scope_id,
+                            nested_symbol.name().as_str(),
+                        ) == Some(enclosing_scope_id)
+                        && let Some(enclosed_symbol_id) =
+                            enclosing_place_table.symbol_id(nested_symbol.name())
+                    {
+                        self.use_def_maps[enclosing_scope_id]
+                            .mark_current_bindings_used(enclosed_symbol_id.into());
+                    }
                     continue;
                 }
 
