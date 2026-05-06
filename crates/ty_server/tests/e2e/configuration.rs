@@ -173,6 +173,7 @@ import foo
 import sys
 from typing_extensions import reveal_type
 
+_ = foo
 reveal_type(sys.version_info[:2])
 ";
 
