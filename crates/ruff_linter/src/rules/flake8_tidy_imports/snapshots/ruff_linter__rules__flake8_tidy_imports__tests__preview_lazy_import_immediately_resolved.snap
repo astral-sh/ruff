@@ -1,90 +1,179 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
 ---
-TID255 Lazy import `foo` is resolved immediately
- --> TID255.py:7:8
-  |
-5 | lazy from library import Other as Renamed
-6 |
-7 | base = foo.Base
-  |        ^^^
-8 | component = Component
-9 | aliased = alias.Member
-  |
-
-TID255 Lazy import `Component` is resolved immediately
-  --> TID255.py:8:13
+TID255 [*] Lazy import `foo` is resolved immediately
+  --> TID255.py:8:8
    |
- 7 | base = foo.Base
- 8 | component = Component
+ 6 | lazy import multi_one, multi_two
+ 7 |
+ 8 | base = foo.Base
+   |        ^^^
+ 9 | component = Component
+10 | aliased = alias.Member
+   |
+help: Convert to an eager import
+  - lazy import foo
+1 + import foo
+2 | lazy import package.submodule
+3 | lazy import aliased as alias
+4 | lazy from library import Component
+note: This is an unsafe fix and may change runtime behavior
+
+TID255 [*] Lazy import `Component` is resolved immediately
+  --> TID255.py:9:13
+   |
+ 8 | base = foo.Base
+ 9 | component = Component
    |             ^^^^^^^^^
- 9 | aliased = alias.Member
-10 | submodule = package.submodule.Member
+10 | aliased = alias.Member
+11 | submodule = package.submodule.Member
    |
+help: Convert to an eager import
+1 | lazy import foo
+2 | lazy import package.submodule
+3 | lazy import aliased as alias
+  - lazy from library import Component
+4 + from library import Component
+5 | lazy from library import Other as Renamed
+6 | lazy import multi_one, multi_two
+7 |
+note: This is an unsafe fix and may change runtime behavior
 
-TID255 Lazy import `alias` is resolved immediately
-  --> TID255.py:9:11
+TID255 [*] Lazy import `alias` is resolved immediately
+  --> TID255.py:10:11
    |
- 7 | base = foo.Base
- 8 | component = Component
- 9 | aliased = alias.Member
+ 8 | base = foo.Base
+ 9 | component = Component
+10 | aliased = alias.Member
    |           ^^^^^
-10 | submodule = package.submodule.Member
+11 | submodule = package.submodule.Member
+12 | multi_value = multi_one.Value
    |
+help: Convert to an eager import
+1 | lazy import foo
+2 | lazy import package.submodule
+  - lazy import aliased as alias
+3 + import aliased as alias
+4 | lazy from library import Component
+5 | lazy from library import Other as Renamed
+6 | lazy import multi_one, multi_two
+note: This is an unsafe fix and may change runtime behavior
 
-TID255 Lazy import `package` is resolved immediately
-  --> TID255.py:10:13
+TID255 [*] Lazy import `package` is resolved immediately
+  --> TID255.py:11:13
    |
- 8 | component = Component
- 9 | aliased = alias.Member
-10 | submodule = package.submodule.Member
+ 9 | component = Component
+10 | aliased = alias.Member
+11 | submodule = package.submodule.Member
    |             ^^^^^^^
-11 |
-12 | if foo.ENABLED:
+12 | multi_value = multi_one.Value
+   |
+help: Convert to an eager import
+1 | lazy import foo
+  - lazy import package.submodule
+2 + import package.submodule
+3 | lazy import aliased as alias
+4 | lazy from library import Component
+5 | lazy from library import Other as Renamed
+note: This is an unsafe fix and may change runtime behavior
+
+TID255 Lazy import `multi_one` is resolved immediately
+  --> TID255.py:12:15
+   |
+10 | aliased = alias.Member
+11 | submodule = package.submodule.Member
+12 | multi_value = multi_one.Value
+   |               ^^^^^^^^^
+13 |
+14 | if foo.ENABLED:
    |
 
-TID255 Lazy import `foo` is resolved immediately
-  --> TID255.py:12:4
+TID255 [*] Lazy import `foo` is resolved immediately
+  --> TID255.py:14:4
    |
-10 | submodule = package.submodule.Member
-11 |
-12 | if foo.ENABLED:
+12 | multi_value = multi_one.Value
+13 |
+14 | if foo.ENABLED:
    |    ^^^
-13 |     pass
+15 |     pass
    |
+help: Convert to an eager import
+  - lazy import foo
+1 + import foo
+2 | lazy import package.submodule
+3 | lazy import aliased as alias
+4 | lazy from library import Component
+note: This is an unsafe fix and may change runtime behavior
 
-TID255 Lazy import `Component` is resolved immediately
-  --> TID255.py:19:16
+TID255 [*] Lazy import `Component` is resolved immediately
+  --> TID255.py:21:16
    |
-18 | try:
-19 |     try_body = Component
+20 | try:
+21 |     try_body = Component
    |                ^^^^^^^^^
-20 | except Exception:
-21 |     handler = foo.Error
+22 | except Exception:
+23 |     handler = foo.Error
    |
+help: Convert to an eager import
+1 | lazy import foo
+2 | lazy import package.submodule
+3 | lazy import aliased as alias
+  - lazy from library import Component
+4 + from library import Component
+5 | lazy from library import Other as Renamed
+6 | lazy import multi_one, multi_two
+7 |
+note: This is an unsafe fix and may change runtime behavior
 
-TID255 Lazy import `foo` is resolved immediately
-  --> TID255.py:24:15
+TID255 [*] Lazy import `foo` is resolved immediately
+  --> TID255.py:26:15
    |
-24 | class Derived(foo.Base):
+26 | class Derived(foo.Base):
    |               ^^^
-25 |     component = Component
+27 |     component = Component
    |
+help: Convert to an eager import
+  - lazy import foo
+1 + import foo
+2 | lazy import package.submodule
+3 | lazy import aliased as alias
+4 | lazy from library import Component
+note: This is an unsafe fix and may change runtime behavior
 
-TID255 Lazy import `Component` is resolved immediately
-  --> TID255.py:25:17
+TID255 [*] Lazy import `Component` is resolved immediately
+  --> TID255.py:27:17
    |
-24 | class Derived(foo.Base):
-25 |     component = Component
+26 | class Derived(foo.Base):
+27 |     component = Component
    |                 ^^^^^^^^^
-26 |
-27 |     if condition:
+28 |
+29 |     if condition:
    |
+help: Convert to an eager import
+1 | lazy import foo
+2 | lazy import package.submodule
+3 | lazy import aliased as alias
+  - lazy from library import Component
+4 + from library import Component
+5 | lazy from library import Other as Renamed
+6 | lazy import multi_one, multi_two
+7 |
+note: This is an unsafe fix and may change runtime behavior
 
-TID255 Lazy import `Renamed` is resolved immediately
-  --> TID255.py:34:22
+TID255 [*] Lazy import `Renamed` is resolved immediately
+  --> TID255.py:36:22
    |
-34 | def function(default=Renamed):
+36 | def function(default=Renamed):
    |                      ^^^^^^^
-35 |     return foo.Value
+37 |     return foo.Value
    |
+help: Convert to an eager import
+2 | lazy import package.submodule
+3 | lazy import aliased as alias
+4 | lazy from library import Component
+  - lazy from library import Other as Renamed
+5 + from library import Other as Renamed
+6 | lazy import multi_one, multi_two
+7 |
+8 | base = foo.Base
+note: This is an unsafe fix and may change runtime behavior

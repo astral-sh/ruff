@@ -1,10 +1,10 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{ExprName, PythonVersion, Stmt, StmtImport, StmtImportFrom};
 use ruff_python_semantic::{Binding, BindingKind, ScopeKind};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for lazy imports that are resolved immediately at module load time.
@@ -33,17 +33,34 @@ use crate::checkers::ast::Checker;
 ///
 /// class Bar(foo.Foo): ...
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe because converting a lazy import to an
+/// eager import changes when the imported module is executed, which can change
+/// runtime behavior if the module has import-time side effects.
+///
+/// The fix is only available when the lazy import statement imports a single
+/// member, since removing `lazy` from a multi-member import would make every
+/// imported member eager, including names that may not be resolved immediately.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.12")]
+#[violation_metadata(preview_since = "0.15.13")]
 pub(crate) struct LazyImportImmediatelyResolved {
     name: String,
+    fixable: bool,
 }
 
 impl Violation for LazyImportImmediatelyResolved {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let LazyImportImmediatelyResolved { name } = self;
+        let LazyImportImmediatelyResolved { name, fixable: _ } = self;
         format!("Lazy import `{name}` is resolved immediately")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        self.fixable
+            .then(|| "Convert to an eager import".to_string())
     }
 }
 
@@ -63,34 +80,53 @@ pub(crate) fn lazy_import_immediately_resolved(checker: &Checker, name: &ExprNam
     };
 
     let binding = checker.semantic().binding(binding_id);
-    if !is_lazy_import(binding, checker) {
+    let Some(import) = lazy_import_statement(binding, checker) else {
         return;
-    }
+    };
 
-    checker.report_diagnostic(
+    let fixable = is_single_member_import(import);
+
+    let mut diagnostic = checker.report_diagnostic(
         LazyImportImmediatelyResolved {
             name: name.id.to_string(),
+            fixable,
         },
         name.range(),
     );
+    if fixable {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(TextRange::at(
+            import.start(),
+            TextSize::from(5),
+        ))));
+    }
 }
 
-/// Return `true` if the binding was created by a `lazy import` statement.
-fn is_lazy_import(binding: &Binding, checker: &Checker) -> bool {
+/// Return the import statement if the binding was created by a `lazy import`.
+fn lazy_import_statement<'a>(binding: &Binding, checker: &Checker<'a>) -> Option<&'a Stmt> {
     if !matches!(
         binding.kind,
         BindingKind::Import(_) | BindingKind::SubmoduleImport(_) | BindingKind::FromImport(_)
     ) {
-        return false;
+        return None;
     }
 
+    let stmt = binding.statement(checker.semantic())?;
     matches!(
-        binding.statement(checker.semantic()),
-        Some(
-            Stmt::Import(StmtImport { is_lazy: true, .. })
-                | Stmt::ImportFrom(StmtImportFrom { is_lazy: true, .. })
-        )
+        stmt,
+        Stmt::Import(StmtImport { is_lazy: true, .. })
+            | Stmt::ImportFrom(StmtImportFrom { is_lazy: true, .. })
     )
+    .then_some(stmt)
+}
+
+/// Return `true` if removing `lazy` only makes the resolved import eager.
+fn is_single_member_import(stmt: &Stmt) -> bool {
+    match stmt {
+        Stmt::Import(StmtImport { names, .. }) | Stmt::ImportFrom(StmtImportFrom { names, .. }) => {
+            names.len() == 1
+        }
+        _ => false,
+    }
 }
 
 /// Return `true` if the current expression is evaluated during module import execution.

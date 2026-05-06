@@ -3,11 +3,13 @@ lazy import package.submodule
 lazy import aliased as alias
 lazy from library import Component
 lazy from library import Other as Renamed
+lazy import multi_one, multi_two
 
 base = foo.Base
 component = Component
 aliased = alias.Member
 submodule = package.submodule.Member
+multi_value = multi_one.Value
 
 if foo.ENABLED:
     pass
