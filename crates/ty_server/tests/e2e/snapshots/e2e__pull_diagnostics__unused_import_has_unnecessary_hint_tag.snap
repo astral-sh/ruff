@@ -1,0 +1,28 @@
+---
+source: crates/ty_server/tests/e2e/pull_diagnostics.rs
+expression: diagnostics
+---
+{
+  "kind": "full",
+  "resultId": "[RESULT_ID]",
+  "items": [
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 7
+        },
+        "end": {
+          "line": 0,
+          "character": 9
+        }
+      },
+      "severity": 4,
+      "source": "ty",
+      "message": "`os` is an unused import",
+      "tags": [
+        1
+      ]
+    }
+  ]
+}

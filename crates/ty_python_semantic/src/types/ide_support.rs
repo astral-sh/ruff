@@ -27,11 +27,14 @@ use ty_python_core::{attribute_scopes, global_scope, semantic_index, use_def_map
 mod unreachable_code;
 #[path = "ide_support/unused_bindings.rs"]
 mod unused_binding_support;
+#[path = "ide_support/unused_imports.rs"]
+mod unused_import_support;
 
 pub use resolve_definition::{ImportAliasResolution, ResolvedDefinition, map_stub_definition};
 use resolve_definition::{find_symbol_in_scope, resolve_definition};
 pub use unreachable_code::{UnreachableKind, UnreachableRange, unreachable_ranges};
 pub use unused_binding_support::{UnusedBinding, unused_bindings};
+pub use unused_import_support::{UnusedImport, unused_imports};
 
 /// Get the primary definition kind for a name expression within a specific file.
 /// Returns the first definition kind that is reachable for this name in its scope.
