@@ -244,11 +244,11 @@ reveal_type(sys.version_info[:2])
         {
           "range": {
             "start": {
-              "line": 4,
+              "line": 5,
               "character": 12
             },
             "end": {
-              "line": 4,
+              "line": 5,
               "character": 32
             }
           },
