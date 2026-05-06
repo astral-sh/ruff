@@ -245,51 +245,54 @@ mod tests {
     use ruff_db::files::system_path_to_file;
     use ruff_python_trivia::textwrap::dedent;
 
-    fn collect_unused_entries_in_file(
-        path: &str,
-        source: &str,
-    ) -> anyhow::Result<Vec<(String, String)>> {
-        let source = dedent(source);
-        let db = TestDbBuilder::new().with_file(path, &source).build()?;
-        let file = system_path_to_file(&db, path)?;
-        let mut entries = unused_imports(&db, file)
-            .iter()
-            .map(|import| {
-                (
-                    import.name.to_string(),
-                    source[usize::from(import.range.start())..usize::from(import.range.end())]
-                        .to_string(),
-                )
-            })
-            .collect::<Vec<_>>();
-        entries.sort();
-        Ok(entries)
+    struct UnusedImportTest<'a> {
+        path: &'a str,
     }
 
-    fn collect_unused_entries(source: &str) -> anyhow::Result<Vec<(String, String)>> {
-        collect_unused_entries_in_file("/src/main.py", source)
-    }
+    impl<'a> UnusedImportTest<'a> {
+        fn new() -> Self {
+            Self {
+                path: "/src/main.py",
+            }
+        }
 
-    fn collect_unused_names_in_file(path: &str, source: &str) -> anyhow::Result<Vec<String>> {
-        let db = TestDbBuilder::new()
-            .with_file(path, &dedent(source))
-            .build()?;
-        let file = system_path_to_file(&db, path)?;
-        let mut names = unused_imports(&db, file)
-            .iter()
-            .map(|import| import.name.to_string())
-            .collect::<Vec<_>>();
-        names.sort();
-        Ok(names)
-    }
+        fn with_path(mut self, path: &'a str) -> Self {
+            self.path = path;
+            self
+        }
 
-    fn collect_unused_names(source: &str) -> anyhow::Result<Vec<String>> {
-        collect_unused_names_in_file("/src/main.py", source)
+        fn entries(&self, source: &str) -> anyhow::Result<Vec<(String, String)>> {
+            let source = dedent(source);
+            let db = TestDbBuilder::new().with_file(self.path, &source).build()?;
+            let file = system_path_to_file(&db, self.path)?;
+            let mut entries = unused_imports(&db, file)
+                .iter()
+                .map(|import| {
+                    (
+                        import.name.to_string(),
+                        source[usize::from(import.range.start())..usize::from(import.range.end())]
+                            .to_string(),
+                    )
+                })
+                .collect::<Vec<_>>();
+            entries.sort();
+            Ok(entries)
+        }
+
+        fn names(&self, source: &str) -> anyhow::Result<Vec<String>> {
+            let mut names = self
+                .entries(source)?
+                .into_iter()
+                .map(|(name, _)| name)
+                .collect::<Vec<_>>();
+            names.sort();
+            Ok(names)
+        }
     }
 
     #[test]
     fn reports_basic_unused_imports() -> anyhow::Result<()> {
-        let names = collect_unused_names(
+        let names = UnusedImportTest::new().names(
             r#"
             import os
             import sys
@@ -304,7 +307,7 @@ mod tests {
 
     #[test]
     fn reports_import_forms_and_alias_ranges() -> anyhow::Result<()> {
-        let entries = collect_unused_entries(
+        let entries = UnusedImportTest::new().entries(
             r#"
             import os.path
             import json.decoder as decoder
@@ -327,7 +330,7 @@ mod tests {
 
     #[test]
     fn reports_alias_ranges_in_multi_import_statements() -> anyhow::Result<()> {
-        let entries = collect_unused_entries(
+        let entries = UnusedImportTest::new().entries(
             r#"
             import os as operating_system, sys as system
             from os import path as os_path, sep as separator
@@ -352,7 +355,7 @@ mod tests {
 
     #[test]
     fn reports_alias_ranges_in_parenthesized_from_imports() -> anyhow::Result<()> {
-        let entries = collect_unused_entries(
+        let entries = UnusedImportTest::new().entries(
             r#"
             from os import (
                 path as os_path,
@@ -372,7 +375,7 @@ mod tests {
 
     #[test]
     fn skips_used_import_forms() -> anyhow::Result<()> {
-        let names = collect_unused_names(
+        let names = UnusedImportTest::new().names(
             r#"
             import os.path
             import json.decoder as decoder
@@ -392,7 +395,7 @@ mod tests {
 
     #[test]
     fn skips_used_aliased_multipart_imports() -> anyhow::Result<()> {
-        let names = collect_unused_names(
+        let names = UnusedImportTest::new().names(
             r#"
             import os.path as path
 
@@ -406,7 +409,7 @@ mod tests {
 
     #[test]
     fn reports_unused_aliased_multipart_imports() -> anyhow::Result<()> {
-        let entries = collect_unused_entries(
+        let entries = UnusedImportTest::new().entries(
             r#"
             import os.path as path
 
@@ -420,7 +423,7 @@ mod tests {
 
     #[test]
     fn reports_partially_used_import_lists() -> anyhow::Result<()> {
-        let entries = collect_unused_entries(
+        let entries = UnusedImportTest::new().entries(
             r#"
             import os, sys
             from os import path, sep
@@ -442,7 +445,7 @@ mod tests {
 
     #[test]
     fn reports_partially_used_multipart_import_lists() -> anyhow::Result<()> {
-        let entries = collect_unused_entries(
+        let entries = UnusedImportTest::new().entries(
             r#"
             import os.path, os.pathsep
 
@@ -459,7 +462,7 @@ mod tests {
 
     #[test]
     fn skips_multipart_import_used_as_exact_dotted_name() -> anyhow::Result<()> {
-        let names = collect_unused_names(
+        let names = UnusedImportTest::new().names(
             r#"
             import os.path
 
@@ -473,7 +476,7 @@ mod tests {
 
     #[test]
     fn skips_multipart_import_used_as_dotted_prefix() -> anyhow::Result<()> {
-        let names = collect_unused_names(
+        let names = UnusedImportTest::new().names(
             r#"
             import xml.etree.ElementTree
 
@@ -487,7 +490,7 @@ mod tests {
 
     #[test]
     fn skips_module_scope_multipart_import_used_from_function_scope() -> anyhow::Result<()> {
-        let names = collect_unused_names(
+        let names = UnusedImportTest::new().names(
             r#"
             import os.path
 
@@ -502,7 +505,7 @@ mod tests {
 
     #[test]
     fn skips_function_scope_multipart_import_used_from_nested_scope() -> anyhow::Result<()> {
-        let names = collect_unused_names(
+        let names = UnusedImportTest::new().names(
             r#"
             def f():
                 import os.path
@@ -521,7 +524,7 @@ mod tests {
     #[test]
     fn reports_function_scope_multipart_import_used_only_from_sibling_scope() -> anyhow::Result<()>
     {
-        let entries = collect_unused_entries(
+        let entries = UnusedImportTest::new().entries(
             r#"
             def f():
                 import os.path
@@ -540,7 +543,7 @@ mod tests {
 
     #[test]
     fn reports_multipart_import_when_only_parent_package_is_used() -> anyhow::Result<()> {
-        let entries = collect_unused_entries(
+        let entries = UnusedImportTest::new().entries(
             r#"
             import xml.etree.ElementTree
 
@@ -560,7 +563,7 @@ mod tests {
 
     #[test]
     fn reports_multipart_import_when_only_root_is_used() -> anyhow::Result<()> {
-        let entries = collect_unused_entries(
+        let entries = UnusedImportTest::new().entries(
             r#"
             import os.path
 
@@ -577,7 +580,7 @@ mod tests {
 
     #[test]
     fn reports_multipart_import_when_only_similar_dotted_name_is_used() -> anyhow::Result<()> {
-        let entries = collect_unused_entries(
+        let entries = UnusedImportTest::new().entries(
             r#"
             import os.path
 
@@ -594,7 +597,7 @@ mod tests {
 
     #[test]
     fn reports_multipart_import_when_only_assigned() -> anyhow::Result<()> {
-        let entries = collect_unused_entries(
+        let entries = UnusedImportTest::new().entries(
             r#"
             import os.path
 
@@ -611,7 +614,7 @@ mod tests {
 
     #[test]
     fn skips_multipart_import_when_member_is_assigned() -> anyhow::Result<()> {
-        let names = collect_unused_names(
+        let names = UnusedImportTest::new().names(
             r#"
             import os.path
 
@@ -625,7 +628,7 @@ mod tests {
 
     #[test]
     fn dunder_all_does_not_suppress_multipart_imports() -> anyhow::Result<()> {
-        let entries = collect_unused_entries(
+        let entries = UnusedImportTest::new().entries(
             r#"
             import os.path
 
@@ -642,13 +645,14 @@ mod tests {
 
     #[test]
     fn reports_relative_imports_and_alias_ranges() -> anyhow::Result<()> {
-        let entries = collect_unused_entries_in_file(
-            "/src/pkg/module.py",
-            r#"
+        let entries = UnusedImportTest::new()
+            .with_path("/src/pkg/module.py")
+            .entries(
+                r#"
             from . import sibling
             from .subpackage import helper as local_helper
             "#,
-        )?;
+            )?;
 
         assert_eq!(
             entries,
@@ -662,7 +666,7 @@ mod tests {
 
     #[test]
     fn reports_function_scope_unused_imports() -> anyhow::Result<()> {
-        let names = collect_unused_names(
+        let names = UnusedImportTest::new().names(
             r#"
             def f():
                 import os
@@ -677,7 +681,7 @@ mod tests {
 
     #[test]
     fn reports_class_scope_unused_imports() -> anyhow::Result<()> {
-        let names = collect_unused_names(
+        let names = UnusedImportTest::new().names(
             r#"
             class C:
                 import os
@@ -690,7 +694,7 @@ mod tests {
 
     #[test]
     fn reports_class_scope_multipart_import_used_only_from_method_scope() -> anyhow::Result<()> {
-        let entries = collect_unused_entries(
+        let entries = UnusedImportTest::new().entries(
             r#"
             class C:
                 import os.path
@@ -709,7 +713,7 @@ mod tests {
 
     #[test]
     fn skips_reexports_and_dunder_all() -> anyhow::Result<()> {
-        let names = collect_unused_names(
+        let names = UnusedImportTest::new().names(
             r#"
             import os as os
             from json import decoder as decoder
@@ -725,7 +729,7 @@ mod tests {
 
     #[test]
     fn dunder_all_only_suppresses_listed_module_scope_imports() -> anyhow::Result<()> {
-        let names = collect_unused_names(
+        let names = UnusedImportTest::new().names(
             r#"
             import json
             import sys
@@ -740,7 +744,7 @@ mod tests {
 
     #[test]
     fn skips_star_imports() -> anyhow::Result<()> {
-        let names = collect_unused_names(
+        let names = UnusedImportTest::new().names(
             r#"
             from os import *
             "#,
@@ -752,7 +756,7 @@ mod tests {
 
     #[test]
     fn dunder_all_only_applies_to_module_scope_imports() -> anyhow::Result<()> {
-        let names = collect_unused_names(
+        let names = UnusedImportTest::new().names(
             r#"
             __all__ = ["sys"]
 
@@ -767,7 +771,7 @@ mod tests {
 
     #[test]
     fn reports_private_import_aliases() -> anyhow::Result<()> {
-        let names = collect_unused_names(
+        let names = UnusedImportTest::new().names(
             r#"
             import os as _os
             from sys import version as _version
@@ -780,7 +784,7 @@ mod tests {
 
     #[test]
     fn skips_intentionally_unused_import_aliases() -> anyhow::Result<()> {
-        let names = collect_unused_names(
+        let names = UnusedImportTest::new().names(
             r#"
             import os as _
             import sys as __sys__
@@ -793,7 +797,7 @@ mod tests {
 
     #[test]
     fn skips_future_imports() -> anyhow::Result<()> {
-        let names = collect_unused_names(
+        let names = UnusedImportTest::new().names(
             r#"
             from __future__ import annotations
             import __future__
@@ -806,8 +810,7 @@ mod tests {
 
     #[test]
     fn reports_stub_file_unused_imports() -> anyhow::Result<()> {
-        let entries = collect_unused_entries_in_file(
-            "/src/main.pyi",
+        let entries = UnusedImportTest::new().with_path("/src/main.pyi").entries(
             r#"
             import os
             import sys as sys
@@ -823,7 +826,7 @@ mod tests {
 
     #[test]
     fn skips_imports_used_only_in_annotations() -> anyhow::Result<()> {
-        let names = collect_unused_names(
+        let names = UnusedImportTest::new().names(
             r#"
             from __future__ import annotations
             from os import PathLike
