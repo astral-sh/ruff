@@ -572,6 +572,14 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
     }
 }
 
+/// Return `true` for types that we can model as a known value-domain for equality narrowing.
+fn is_single_valued_equality_domain<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    ty.is_single_valued(db)
+        || ty.is_subtype_of(db, Type::literal_string())
+        || ty.is_bool(db)
+        || (ty.is_enum(db) && !ty.overrides_equality(db))
+}
+
 struct NarrowingConstraintsBuilder<'db, 'ast> {
     db: &'db dyn Db,
     module: &'ast ParsedModuleRef,
@@ -929,9 +937,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 
     fn evaluate_expr_eq(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+        let lhs_ty = lhs_ty.resolve_type_alias(self.db);
         let rhs_ty = rhs_ty.resolve_type_alias(self.db);
 
-        // We can only narrow on equality checks against single-valued types.
+        // Equality narrowing is most precise when comparing against single-valued types.
         if rhs_ty.is_single_valued(self.db) || rhs_ty.is_union_of_single_valued(self.db) {
             // The fully-general (and more efficient) approach here would be to introduce a
             // `NeverEqualTo` type that can wrap a single-valued type, and then simply return
@@ -1011,6 +1020,31 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             } else {
                 filter_to_cannot_be_equal(self.db, lhs_ty, rhs_ty).negate(self.db)
             })
+        } else if let Type::Union(union) = lhs_ty {
+            // Match `in` narrowing for unions that mix known value-domains with broader
+            // arms: the RHS can rule out the value-domain arms, but broader arms stay
+            // if custom equality could make them compare equal.
+            if !union
+                .elements(self.db)
+                .iter()
+                .any(|element| is_single_valued_equality_domain(self.db, *element))
+            {
+                return None;
+            }
+
+            let mut builder = UnionBuilder::new(self.db).add(rhs_ty);
+
+            for element in union.elements(self.db) {
+                if is_single_valued_equality_domain(self.db, *element) {
+                    continue;
+                }
+
+                if could_compare_equal(self.db, *element, rhs_ty) {
+                    builder = builder.add(*element);
+                }
+            }
+
+            Some(builder.build())
         } else {
             None
         }
@@ -1061,15 +1095,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
             if let Some(lhs_union) = lhs_ty.as_union() {
                 for element in lhs_union.elements(self.db) {
-                    // Skip single-valued types (handled via RHS matching).
-                    if element.is_single_valued(self.db) {
-                        continue;
-                    }
-                    // Skip types that are handled specially (LiteralString, bool, enum).
-                    if element.is_subtype_of(self.db, Type::literal_string())
-                        || element.is_bool(self.db)
-                        || (element.is_enum(self.db) && !element.overrides_equality(self.db))
-                    {
+                    // Skip single-valued equality domains (handled via RHS matching).
+                    if is_single_valued_equality_domain(self.db, *element) {
                         continue;
                     }
                     // Skip types that cannot compare equal to any RHS value.
@@ -1108,11 +1135,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
             if let Some(lhs_union) = lhs_ty.as_union() {
                 for element in lhs_union.elements(self.db) {
-                    if element.is_single_valued(self.db)
-                        || element.is_subtype_of(self.db, Type::literal_string())
-                        || element.is_bool(self.db)
-                        || (element.is_enum(self.db) && !element.overrides_equality(self.db))
-                    {
+                    if is_single_valued_equality_domain(self.db, *element) {
                         single_builder = single_builder.add(*element);
                     } else {
                         rest_builder = rest_builder.add(*element);
