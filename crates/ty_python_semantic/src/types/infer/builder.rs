@@ -2,7 +2,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use itertools::Itertools;
-use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
@@ -31,9 +30,10 @@ use super::{
 use crate::diagnostic::format_enumeration;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
-    TypeOrigin, builtins_module_scope, builtins_symbol, class_body_implicit_symbol,
-    explicit_global_symbol, loop_header_reachability, module_type_implicit_global_declaration,
-    module_type_implicit_global_symbol, place, place_from_bindings, place_from_declarations,
+    RequiresExplicitReExport, TypeOrigin, builtins_module_scope, builtins_symbol,
+    class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol,
+    nested_binding_scopes_ty, place_by_id, place_from_bindings, place_from_declarations,
     typing_extensions_symbol,
 };
 use crate::reachability::ReachabilityConstraintsExtension;
@@ -107,7 +107,8 @@ use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
     Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
     ForStmtDefinitionKind, LambdaParameterDefinitionNodeKind, LoopHeaderDefinitionKind,
-    ParameterDefinitionNodeKind, TargetKind, WithItemDefinitionKind,
+    NestedScopeBindingDefinitionKind, ParameterDefinitionNodeKind, TargetKind,
+    WithItemDefinitionKind,
 };
 use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
@@ -1045,6 +1046,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DefinitionKind::LoopHeader(loop_header) => {
                 self.infer_loop_header_definition(loop_header, definition);
             }
+            DefinitionKind::NestedScopeBinding(nested_binding) => {
+                self.infer_nested_scope_binding_definition(nested_binding, definition);
+            }
         }
     }
 
@@ -1160,8 +1164,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .symbol_is_nonlocal_in_scope(symbol_id, file_scope_id)
             {
                 // If we run out of ancestor scopes without finding a definition, we'll fall back to
-                // the local scope. This will also be a syntax error in `infer_nonlocal_statement` (no
-                // binding for `nonlocal` found), but ignore that here.
+                // the local scope. This will also be a syntax error reported by the semantic index
+                // (no binding for `nonlocal` found), but ignore that here.
                 let mut declarations = use_def.declarations_at_binding(binding);
                 let mut is_local = true;
                 // Walk up parent scopes looking for the enclosing scope that has definition of this
@@ -1187,9 +1191,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                     if enclosing_symbol.is_global() {
                         // The variable is `global` in this ancestor scope. This breaks the `nonlocal`
-                        // chain, and it's a syntax error in `infer_nonlocal_statement`. Ignore that
-                        // here and just bail out of this loop.
+                        // chain, and it's a syntax error reported by the semantic index. Ignore
+                        // that here and just bail out of this loop.
                         break;
+                    }
+                    if !enclosing_symbol.is_local() {
+                        continue;
                     }
                     // We found the closest definition. Note that (as in `infer_place_load`) this does
                     // *not* need to be a binding. It could be just a declaration, e.g. `x: int`.
@@ -1648,9 +1655,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Stmt::Raise(raise) => self.infer_raise_statement(raise),
             ast::Stmt::Return(ret) => self.infer_return_statement(ret),
             ast::Stmt::Delete(delete) => self.infer_delete_statement(delete),
-            ast::Stmt::Nonlocal(nonlocal) => self.infer_nonlocal_statement(nonlocal),
             ast::Stmt::Global(global) => self.infer_global_statement(global),
-            ast::Stmt::Break(_)
+            ast::Stmt::Nonlocal(_)
+            | ast::Stmt::Break(_)
             | ast::Stmt::Continue(_)
             | ast::Stmt::Pass(_)
             | ast::Stmt::IpyEscapeCommand(_) => {
@@ -2078,6 +2085,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         self.bindings.insert(definition, union.build());
+    }
+
+    fn infer_nested_scope_binding_definition(
+        &mut self,
+        nested_binding_kind: &NestedScopeBindingDefinitionKind,
+        definition: Definition<'db>,
+    ) {
+        let db = self.db();
+        let Some(symbol_id) = definition.place(db).as_symbol() else {
+            self.bindings.insert(definition, Type::Never);
+            return;
+        };
+
+        let scope = definition.scope(db);
+        let symbol_name = self
+            .index
+            .place_table(scope.file_scope_id(db))
+            .symbol(symbol_id)
+            .name();
+
+        let ty = nested_binding_scopes_ty(
+            db,
+            scope,
+            symbol_name.as_str(),
+            nested_binding_kind.binding_scopes(),
+            RequiresExplicitReExport::No,
+        )
+        .unwrap_or(Type::Never);
+
+        self.bindings.insert(definition, ty);
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
@@ -4918,75 +4955,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             diag.info(format_args!(
                 "Consider adding a declaration to the global scope, e.g. `{name}: int`"
             ));
-        }
-    }
-
-    fn infer_nonlocal_statement(&mut self, nonlocal: &ast::StmtNonlocal) {
-        let ast::StmtNonlocal {
-            node_index: _,
-            range,
-            names,
-        } = nonlocal;
-        let db = self.db();
-        let scope = self.scope();
-        let file_scope_id = scope.file_scope_id(db);
-
-        'names: for name in names {
-            // Walk up parent scopes looking for a possible enclosing scope that may have a
-            // definition of this name visible to us. Note that we skip the scope containing the
-            // use that we are resolving, since we already looked for the place there up above.
-            for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
-                // Class scopes are not visible to nested scopes, and `nonlocal` cannot refer to
-                // globals, so check only function-like scopes.
-                let enclosing_scope = self.index.scope(enclosing_scope_file_id);
-                if !enclosing_scope.kind().is_function_like() {
-                    continue;
-                }
-                let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
-                let Some(enclosing_symbol_id) = enclosing_place_table.symbol_id(name) else {
-                    // This scope doesn't define this name. Keep going.
-                    continue;
-                };
-                let enclosing_symbol = enclosing_place_table.symbol(enclosing_symbol_id);
-                // We've found a definition for this name in an enclosing function-like scope.
-                // Either this definition is the valid place this name refers to, or else we'll
-                // emit a syntax error. Either way, we won't walk any more enclosing scopes. Note
-                // that there are differences here compared to `infer_place_load`: A regular load
-                // (e.g. `print(x)`) is allowed to refer to a global variable (e.g. `x = 1` in the
-                // global scope), and similarly it's allowed to refer to a local variable in an
-                // enclosing function that's declared `global` (e.g. `global x`). However, the
-                // `nonlocal` keyword can't refer to global variables (that's a `SyntaxError`), and
-                // it also can't refer to local variables in enclosing functions that are declared
-                // `global` (also a `SyntaxError`).
-                if enclosing_symbol.is_global() {
-                    // A "chain" of `nonlocal` statements is "broken" by a `global` statement. Stop
-                    // looping and report that this `nonlocal` statement is invalid.
-                    break;
-                }
-                if !enclosing_symbol.is_bound()
-                    && !enclosing_symbol.is_declared()
-                    && !enclosing_symbol.is_nonlocal()
-                {
-                    debug_assert!(enclosing_symbol.is_used());
-                    // The name is only referenced here, not defined. Keep going.
-                    continue;
-                }
-                // We found a definition. We've checked that the name isn't `global` in this scope,
-                // but it's ok if it's `nonlocal`. If a "chain" of `nonlocal` statements fails to
-                // lead to a valid binding, the outermost one will be an error; we don't need to
-                // walk the whole chain for each one.
-                continue 'names;
-            }
-            // There's no matching binding in an enclosing scope. This `nonlocal` statement is
-            // invalid.
-            if let Some(builder) = self
-                .context
-                .report_diagnostic(DiagnosticId::InvalidSyntax, Severity::Error)
-            {
-                builder
-                    .into_diagnostic(format_args!("no binding for nonlocal `{name}` found"))
-                    .annotate(Annotation::primary(self.context.span(*range)));
-            }
         }
     }
 
@@ -8622,12 +8590,50 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // Walk up parent scopes looking for a possible enclosing scope that may have a
-            // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
-            // Note that we skip the scope containing the use that we are resolving, since we
-            // already looked for the place there up above.
-            let mut nonlocal_union_builder = UnionBuilder::new(db);
-            let mut found_some_definition = false;
+            // Walk enclosing scopes to resolve a free-variable load (`LOAD_DEREF` at runtime).
+            // There are two main ways we try to model these loads:
+            //
+            // 1. "Snapshots" record the bindings/constraints in the enclosing scope at the point
+            //    just before a nested scope begins. For variables that aren't modified after that
+            //    point, that's the only value that the nested scope can see. If a variable is
+            //    reassigned later, lazy snapshots for that variable can be updated; if `nonlocal`
+            //    synthetic definitions take over, they can be swept.
+            //
+            // 2. Otherwise, we keep walking until we get to the variable's original defining
+            //    scope, and we use its "public type" there, which respects all reachable bindings,
+            //    not just end-of-scope bindings. That includes the synthetic `NestedScopeBinding`
+            //    definitions that we install after each nested scope is closed, so it has
+            //    a complete view of the nested `global` and `nonlocal` writes beneath it.
+            //
+            // This walk only resolves free variables. A symbol that is local to the current scope
+            // never falls back to an enclosing scope, even if it's only possibly bound at the
+            // current use: Python would raise `UnboundLocalError` instead.
+            //
+            // We also only get to this walk via `or_fall_back_to` above. In other words, for
+            // definitely-locally-bound variables, we defer to the current scope's bindings instead
+            // of looking at enclosing scopes. Concretely:
+            //
+            // def f():
+            //     x = None
+            //
+            //     def g():
+            //         nonlocal x
+            //         if flag:
+            //             x = 42
+            //
+            //         # `x` is possibly unbound here, so we walk enclosing scopes and see the
+            //         # public type in `f`.
+            //         reveal_type(x)  # revealed: None | Literal[42, 99]
+            //
+            //         x = 99
+            //         # But now `x` is definitely bound, so we don't do the walk.
+            //         reveal_type(x)  # revealed: Literal[99]
+            //
+            // Importantly, this approach isn't generally sound. The public type could include
+            // nested bindings from sibling scopes, which really could run at any time, and in some
+            // cases we're being too deferential to local bindings. Unfortunately the fully sound
+            // treatment would reveal `None | Literal[42, 99]` even immediately after `x = 99`,
+            // which is too frustrating for users in practice.
             for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
                 // If the current enclosing scope is global, no place lookup is performed here,
                 // instead falling back to the module's explicit global lookup below.
@@ -8729,25 +8735,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // see a `global` declaration, stop walking scopes and proceed to the global
                 // handling below. (If we're walking from a prior/inner scope where this variable
                 // is `nonlocal`, then this is a semantic syntax error, but we don't enforce that
-                // here. See `infer_nonlocal_statement`.)
+                // here. See `SemanticIndexBuilder::pop_scope`.)
                 if enclosing_place.as_symbol().is_some_and(Symbol::is_global) {
                     break;
                 }
 
-                let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, self.file());
+                // Nested bindings from a `nonlocal` scope are also installed in the defining scope,
+                // so keep walking until we reach that defining scope.
+                if enclosing_place.as_symbol().is_some_and(Symbol::is_nonlocal) {
+                    continue;
+                }
 
                 // If the name is declared or bound in this scope, figure out its type. This might
-                // resolve the name and end the walk. But if the name is declared `nonlocal` in
-                // this scope, we'll keep walking enclosing scopes and union this type with the
-                // other types we find. (It's a semantic syntax error to declare a type for a
-                // `nonlocal` variable, but we don't enforce that here. See the
-                // `ast::Stmt::AnnAssign` handling in `SemanticIndexBuilder::visit_stmt`.)
+                // resolve the name and end the walk.
                 if enclosing_place.is_bound() || enclosing_place.is_declared() {
+                    let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, self.file());
                     let local_place_and_qualifiers = eagerly_resolved_place.unwrap_or_else(|| {
-                        place(
+                        place_by_id(
                             db,
                             enclosing_scope_id,
-                            place_expr,
+                            enclosing_place_id,
+                            RequiresExplicitReExport::No,
                             ConsideredDefinitions::AllReachable,
                         )
                         .map_type(|ty| {
@@ -8758,30 +8766,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             )
                         })
                     });
-                    // We could have `Place::Undefined` here, despite the checks above, for example if
-                    // this scope contains a `del` statement but no binding or declaration.
-                    if let Place::Defined(DefinedPlace {
-                        ty: type_,
-                        definedness: boundness,
-                        ..
-                    }) = local_place_and_qualifiers.place
-                    {
-                        nonlocal_union_builder.add_in_place(type_);
-                        // `ConsideredDefinitions::AllReachable` never returns PossiblyUnbound
-                        debug_assert_eq!(boundness, Definedness::AlwaysDefined);
-                        found_some_definition = true;
-                    }
-
-                    if !enclosing_place.as_symbol().is_some_and(Symbol::is_nonlocal) {
-                        // We've reached a function-like scope that marks this name bound or
-                        // declared but doesn't mark it `nonlocal`. The name is therefore resolved,
-                        // and we won't consider any scopes outside of this one.
-                        return if found_some_definition {
-                            Place::bound(nonlocal_union_builder.build()).into()
-                        } else {
-                            Place::Undefined.into()
-                        };
-                    }
+                    return local_place_and_qualifiers;
                 }
             }
 

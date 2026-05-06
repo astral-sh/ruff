@@ -578,9 +578,9 @@ impl<'db> UnionBuilder<'db> {
         let cycle_recovery = self.cycle_recovery;
         let should_widen = |literals, recursively_defined: RecursivelyDefined| {
             if recursively_defined.is_yes() && cycle_recovery {
-                literals >= MAX_RECURSIVE_UNION_LITERALS
+                literals > MAX_RECURSIVE_UNION_LITERALS
             } else {
-                literals >= MAX_NON_RECURSIVE_UNION_LITERALS
+                literals > MAX_NON_RECURSIVE_UNION_LITERALS
             }
         };
 
@@ -635,11 +635,6 @@ impl<'db> UnionBuilder<'db> {
                         for (index, element) in self.elements.iter_mut().enumerate() {
                             match element {
                                 UnionElement::StringLiterals(literals) => {
-                                    if should_widen(literals.len(), self.recursively_defined) {
-                                        let replace_with = KnownClass::Str.to_instance(self.db);
-                                        self.add_in_place_impl(replace_with, seen_aliases);
-                                        return;
-                                    }
                                     found = Some(literals);
                                     continue;
                                 }
@@ -666,6 +661,12 @@ impl<'db> UnionBuilder<'db> {
                         if let Some(found) = found {
                             let is_promotable = literal.is_promotable();
                             *found.entry(string_literal).or_insert(is_promotable) &= is_promotable;
+
+                            if should_widen(found.len(), self.recursively_defined) {
+                                let replace_with = KnownClass::Str.to_instance(self.db);
+                                self.add_in_place_impl(replace_with, seen_aliases);
+                                return;
+                            }
                         } else {
                             self.elements.push(UnionElement::StringLiterals(
                                 FxOrderMap::from_iter([(string_literal, literal.is_promotable())]),
@@ -682,11 +683,6 @@ impl<'db> UnionBuilder<'db> {
                         for (index, element) in self.elements.iter_mut().enumerate() {
                             match element {
                                 UnionElement::BytesLiterals(literals) => {
-                                    if should_widen(literals.len(), self.recursively_defined) {
-                                        let replace_with = KnownClass::Bytes.to_instance(self.db);
-                                        self.add_in_place_impl(replace_with, seen_aliases);
-                                        return;
-                                    }
                                     found = Some(literals);
                                     continue;
                                 }
@@ -713,6 +709,12 @@ impl<'db> UnionBuilder<'db> {
                         if let Some(found) = found {
                             let is_promotable = literal.is_promotable();
                             *found.entry(bytes_literal).or_insert(is_promotable) &= is_promotable;
+
+                            if should_widen(found.len(), self.recursively_defined) {
+                                let replace_with = KnownClass::Bytes.to_instance(self.db);
+                                self.add_in_place_impl(replace_with, seen_aliases);
+                                return;
+                            }
                         } else {
                             self.elements
                                 .push(UnionElement::BytesLiterals(FxOrderMap::from_iter([(
@@ -731,11 +733,6 @@ impl<'db> UnionBuilder<'db> {
                         for (index, element) in self.elements.iter_mut().enumerate() {
                             match element {
                                 UnionElement::IntLiterals(literals) => {
-                                    if should_widen(literals.len(), self.recursively_defined) {
-                                        let replace_with = KnownClass::Int.to_instance(self.db);
-                                        self.add_in_place_impl(replace_with, seen_aliases);
-                                        return;
-                                    }
                                     found = Some(literals);
                                     continue;
                                 }
@@ -763,6 +760,12 @@ impl<'db> UnionBuilder<'db> {
                             let is_promotable = literal.is_promotable();
                             *found.entry(int_literal.as_i64()).or_insert(is_promotable) &=
                                 is_promotable;
+
+                            if should_widen(found.len(), self.recursively_defined) {
+                                let replace_with = KnownClass::Int.to_instance(self.db);
+                                self.add_in_place_impl(replace_with, seen_aliases);
+                                return;
+                            }
                         } else {
                             self.elements
                                 .push(UnionElement::IntLiterals(FxOrderMap::from_iter([(
@@ -805,20 +808,6 @@ impl<'db> UnionBuilder<'db> {
                                     if *existing_enum_class != enum_class {
                                         continue;
                                     }
-                                    // See the doc-comment above `MAX_NON_RECURSIVE_UNION_ENUM_LITERALS`
-                                    // for why we avoid using the `should_widen` closure here.
-                                    let enum_literals_limit =
-                                        if self.recursively_defined.is_yes() && cycle_recovery {
-                                            MAX_RECURSIVE_UNION_LITERALS
-                                        } else {
-                                            MAX_NON_RECURSIVE_UNION_ENUM_LITERALS
-                                        };
-                                    if literals.len() >= enum_literals_limit {
-                                        let (literal, _) = literals.first().unwrap();
-                                        let replace_with = literal.enum_class_instance(self.db);
-                                        self.add_in_place_impl(replace_with, seen_aliases);
-                                        return;
-                                    }
                                     found = Some(literals);
                                     continue;
                                 }
@@ -860,6 +849,20 @@ impl<'db> UnionBuilder<'db> {
                                 ordermap::map::Entry::Occupied(mut entry) => {
                                     *entry.get_mut() &= literal.is_promotable();
                                 }
+                            }
+
+                            // See the doc-comment above `MAX_NON_RECURSIVE_UNION_ENUM_LITERALS`
+                            // for why enum literals use a separate limit from `should_widen`.
+                            let enum_literals_limit =
+                                if self.recursively_defined.is_yes() && cycle_recovery {
+                                    MAX_RECURSIVE_UNION_LITERALS
+                                } else {
+                                    MAX_NON_RECURSIVE_UNION_ENUM_LITERALS
+                                };
+                            if found.len() > enum_literals_limit {
+                                let replace_with = enum_member_to_add.enum_class_instance(self.db);
+                                self.add_in_place_impl(replace_with, seen_aliases);
+                                return;
                             }
                         } else {
                             self.elements.push(UnionElement::EnumLiterals {

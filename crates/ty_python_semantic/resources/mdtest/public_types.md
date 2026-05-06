@@ -345,7 +345,7 @@ def f(x: A):
 
 ### Assignments to nonlocal variables
 
-Writes to the outer-scope variable are currently not detected:
+Writes to the outer-scope variable are included in the inferred type:
 
 ```py
 def outer() -> None:
@@ -357,8 +357,7 @@ def outer() -> None:
     set_x()
 
     def inner() -> None:
-        # TODO: this should ideally be `None | Literal[1]`. Mypy and pyright support this.
-        reveal_type(x)  # revealed: None
+        reveal_type(x)  # revealed: None | Literal[1]
     inner()
 ```
 

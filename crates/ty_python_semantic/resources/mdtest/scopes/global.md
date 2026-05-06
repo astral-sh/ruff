@@ -36,9 +36,18 @@ def f():
     x = ""
 
     global z
-    # error: [invalid-assignment] "Object of type `Literal[""]` is not assignable to `int`"
+    # This binding is currently allowed, because the invalid declaration of `z` below acts like
+    # `z: Unknown`. The end result is similar to what we get in the local case:
+    #
+    #     x = 42  # ok
+    #     x: str  # error
+    #
+    # It would also be fine if we emit an error here in the future. The important thing is that at
+    # least one of these lines should fail.
     z = ""
 
+# This declaration sees the synthetic definition for `z` that we add to this scope after the end of `f`.
+# error: [invalid-declaration] "Cannot declare type `int` for inferred type `Literal[""]`"
 z: int
 ```
 
@@ -55,6 +64,19 @@ def outer():
     def inner():
         global x
         reveal_type(x)  # revealed: int
+```
+
+Nested `global` writes also shouldn't affect the inferred types of local symbols:
+
+```py
+def outer():
+    x = 2
+
+    def inner():
+        global x
+        x = 3
+
+    reveal_type(x)  # revealed: Literal[2]
 ```
 
 ## Narrowing
@@ -87,8 +109,8 @@ def f():
 ## Nested function after conditional rebinding
 
 A nested function should resolve a `global` name through the enclosing scope, even if that scope
-conditionally rebinds it. Here, the early return means `inner` only sees the original module
-binding:
+conditionally rebinds it. We use all reachable bindings from the nested function scope, so the
+rebound value is included even though that branch returns before `inner` is defined:
 
 ```py
 x = 1
@@ -101,7 +123,7 @@ def outer(flag: bool) -> None:
         return
 
     def inner() -> None:
-        reveal_type(x)  # revealed: Literal[1]
+        reveal_type(x)  # revealed: Literal[1, 2]
 ```
 
 Without the early return, the nested function should see both possible bindings. This is a known
@@ -233,14 +255,14 @@ x = None
 global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
 ```
 
-## Local bindings override preceding `global` bindings
+## Global bindings include later local writes
 
 ```py
 x = 42
 
 def f():
     global x
-    reveal_type(x)  # revealed: Literal[42]
+    reveal_type(x)  # revealed: Literal[42, "56"]
     x = "56"
     reveal_type(x)  # revealed: Literal["56"]
 ```
@@ -376,4 +398,244 @@ B = 1
 class B:
     reveal_type(B)  # revealed: Literal[1]
     B = B
+```
+
+## Visibility of `global` bindings from nested and sibling scopes
+
+(`nonlocal` bindings behave similarly and have a similarly named test case in `nonlocal.md`.)
+
+A `global` write from an inner scope can affect the target variable's inferred type in the global
+scope defining scope. For the same reason, reads in a nested function can also see later bindings in
+their own scope:
+
+`global1.py`:
+
+```py
+x = 1
+
+def f():
+    global x
+    # The following assignment of 2 could be visible if this function has been called before.
+    reveal_type(x)  # revealed: Literal[1, 2]
+    x = 2
+    # Once a binding is made in this scope, it shadows bindings from outer scopes.
+    reveal_type(x)  # revealed: Literal[2]
+
+# From now on we assume `f` could be called at any time.
+reveal_type(x)  # revealed: Literal[1, 2]
+```
+
+The example above (hopefully) feels natural, but if we look at it closely, the reveals there are
+making some beefy assumptions. For one, we assume `f` might be called before the final reveal, even
+though in this case we can actually see that it's never called. A "sufficiently smart compiler"
+could've narrowed that to `Literal[1]`, but we don't/can't track what functions are caled when
+(anywhere really, but especially not in the global scope), so we're being conservative. On the other
+hand, the reveal of `Literal[2]` after the binding in `g` is the opposite, an aggressive assumption
+that's not generally sound. Consider this counterexample where `f` and `g` are siblings that both
+assign to `x`:
+
+`global2.py`:
+
+```py
+x = 1
+
+def f():
+    global x
+    x = 2
+    reveal_type(x)  # revealed: Literal[2]
+
+def g():
+    global x
+    x = 3
+    f()
+    # The logic that gives us `Literal[2]` above also gives us `Literal[3]` here, even though
+    # the call to `f()` means that `x` is in fact 2 at runtime. We can only reason locally about
+    # these things; we can't do whole-program control flow analysis or solve the halting
+    # problem. A fully sound typechecker would generally need to infer `Literal[2, 3]` both here
+    # and above. That would be great here -- wrong answers are bad! -- but it would break too
+    # much real-world code that expects `Literal[2]` in simple cases like `f` above.
+    reveal_type(x)  # revealed: Literal[3]
+
+reveal_type(x)  # revealed: Literal[1, 2, 3]
+```
+
+So we're ok with making unsound assumptions to make simple, common cases do what users expect. Fine.
+But then what about the reveal of `Literal[1, 2, 3]` at the end there? We aggressively shadow
+bindings from outer or sibling scopes, but we conservatively include bindings from scopes nested
+within the current one, once we've encountered them (i.e. in a top-to-bottom reading of the code).
+This second behavior is _also_ unsound, because nested functions can "escape" the scope where
+they're defined and affect reads on lines above their definition. But again these are the behaviors
+that users expect. Here's a more involved example of these rules interacting at different levels of
+nesting:
+
+`global3.py`:
+
+```py
+x = 1
+# We just defined `x`, and we haven't encountered any nested bindings of it yet.
+reveal_type(x)  # revealed: Literal[1]
+
+def bar():
+    global x
+    # We haven't encountered any local bindings for `x` yet. Its public type is visible to `bar`
+    # here, including `bar`s own assignments of 3 below.
+    reveal_type(x)  # revealed: Literal[1, 2, 3]
+
+    x = 2
+    # Local bindings shadow the whole public type.
+    reveal_type(x)  # revealed: Literal[2]
+
+# We've encountered the nested assignment of 3, so we keep it visible alongside local bindings
+# in this scope.
+reveal_type(x)  # revealed: Literal[1, 2]
+
+x = 3
+# This assignment shadows the previous local bindings, but again nested bindings remain visible.
+reveal_type(x)  # revealed: Literal[2, 3]
+```
+
+## Global `+=` widening works like it does in loops
+
+Using `+=` in a loop usually triggers fixpoint analysis, where after the list of `Literal` values
+reaches an upper limit we widen the type to `int`. The same applies to `global` augmented
+assignments, since the inner function body could run any number of times:
+
+```py
+x = 1
+
+def f():
+    global x
+    x += 1
+
+reveal_type(x)  # revealed: int
+```
+
+## Nested `global` bindings are visible in intervening scopes
+
+```py
+def _():
+    def _():
+        global x
+        x = 1
+    global x
+    x = 2
+    # The binding in the innermost function is visible here because it's nested under this scope,
+    # even though this isn't the defining scope of `x`, and even though this scope doesn't declare `x`
+    # as `global` (instead it uses it as a "free variable").
+    reveal_type(x)  # revealed: Literal[1, 2]
+
+x = 3
+reveal_type(x)  # revealed: Literal[1, 2, 3]
+```
+
+## Conditional narrowing can filter out nested bindings
+
+```py
+x = 42
+
+def hello():
+    global x
+    x = "hello"
+
+reveal_type(x)  # revealed: Literal[42, "hello"]
+
+if isinstance(x, int):
+    reveal_type(x)  # revealed: Literal[42]
+```
+
+## Conditional `global` bindings leave parent scope bindings visible
+
+Normal branching and merging rules apply to the shadowing behavior described in the previous
+section:
+
+```py
+def flag(): ...
+
+x = 1
+
+def foo():
+    global x
+
+    x = 2
+
+    def bar():
+        global x
+
+        if flag():
+            x = 3
+            # The public type of `x` is shadowed here...
+            reveal_type(x)  # revealed: Literal[3]
+
+        # ...but still visible here.
+        reveal_type(x)  # revealed: Literal[3, 1, 2]
+```
+
+## Parameter defaults are evaluated before a function's body
+
+We don't need to think about this ordering in normal execution, since the body of a function doesn't
+get to cause any side effects until the function is called. But we do need to think about it in
+inference, because of the (generally unsound) rule mentioned above about considering nested bindings
+visible after we encounter them. That can matter in unusual sitautions like this one:
+
+```py
+x = 1
+
+# This use of `x` doesn't see `x = 2` below.
+def f(y=reveal_type(x)):  # revealed: Literal[1]
+    global x
+    x = 2
+```
+
+## `global` writes in class scopes are applied eagerly
+
+Class bodies are evaluated immediately, so global bindings in a class scope behave more like normal
+assignments. (We still synthesize definitions for them in the containing scope, but they don't have
+special-case shadowing behavior.)
+
+```py
+x = 1
+
+class C:
+    global x
+    x = 2
+
+reveal_type(x)  # revealed: Literal[2]
+x = 3
+reveal_type(x)  # revealed: Literal[3]
+```
+
+This can include multiple layers of nesting. However, any regular function scopes nested within
+classes still behave like other nested function scopes, with the assumption that they could be
+called at any time, and the special-case shadowing behavior that comes with that. Class scopes
+nested within functions also "become lazy" from the perspective of scopes outside the function:
+
+```py
+class C:
+    global x
+    class D:
+        global x
+        def f():
+            global x
+            class E:
+                global x
+                x = 1
+                reveal_type(x)  # revealed: Literal[1]
+
+            x = 2
+            # `x = 1` is within an eager scope, so it gets shadowed.
+            reveal_type(x)  # revealed: Literal[2]
+        x = 3
+        # `x = 1` is within an eager scope, but that eager scope is within a lazy scope, so from our
+        # perspective here both `x = 1` and `x = 2` are lazy. (`x = 2` shadows `x = 1` within its
+        # own scope, but from the outside we consider all reachable bindings, not only those that
+        # reach the end of their scope.)
+        reveal_type(x)  # revealed: Literal[1, 2, 3]
+
+    x = 4
+    # `x = 4` shadows `x = 3`, which is eager, but the lazy bindings are still visible.
+    reveal_type(x)  # revealed: Literal[1, 2, 4]
+
+x = 5
+# `x = 5` shadows `x = 4`, which is eager, but the lazy bindings are still visible.
+reveal_type(x)  # revealed: Literal[1, 2, 5]
 ```

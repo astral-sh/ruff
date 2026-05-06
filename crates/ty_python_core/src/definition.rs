@@ -865,6 +865,7 @@ pub enum DefinitionKind<'db> {
     ParamSpec(AstNodeRef<ast::TypeParamParamSpec>),
     TypeVarTuple(AstNodeRef<ast::TypeParamTypeVarTuple>),
     LoopHeader(LoopHeaderDefinitionKind<'db>),
+    NestedScopeBinding(NestedScopeBindingDefinitionKind),
 }
 
 impl<'db> DefinitionKind<'db> {
@@ -927,7 +928,10 @@ impl<'db> DefinitionKind<'db> {
     /// Returns `true` if this definition is user-visible (i.e., not an internal
     /// control-flow construct like a loop header definition).
     pub const fn is_user_visible(&self) -> bool {
-        !self.is_loop_header()
+        !matches!(
+            self,
+            DefinitionKind::LoopHeader(_) | DefinitionKind::NestedScopeBinding(_)
+        )
     }
 
     /// Returns the [`TextRange`] of the definition target.
@@ -974,6 +978,7 @@ impl<'db> DefinitionKind<'db> {
                 type_var_tuple.node(module).name.range()
             }
             DefinitionKind::LoopHeader(loop_header) => loop_header.range(module),
+            DefinitionKind::NestedScopeBinding(nested_binding) => nested_binding.range(),
         }
     }
 
@@ -1023,6 +1028,7 @@ impl<'db> DefinitionKind<'db> {
             DefinitionKind::ParamSpec(param_spec) => param_spec.node(module).range(),
             DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.node(module).range(),
             DefinitionKind::LoopHeader(loop_header) => loop_header.range(module),
+            DefinitionKind::NestedScopeBinding(nested_binding) => nested_binding.range(),
         }
     }
 
@@ -1063,7 +1069,8 @@ impl<'db> DefinitionKind<'db> {
             | DefinitionKind::MatchPattern(_)
             | DefinitionKind::ImportFromSubmodule(_)
             | DefinitionKind::ExceptHandler(_)
-            | DefinitionKind::LoopHeader(_) => DefinitionCategory::Binding,
+            | DefinitionKind::LoopHeader(_)
+            | DefinitionKind::NestedScopeBinding(_) => DefinitionCategory::Binding,
         }
     }
 
@@ -1470,6 +1477,29 @@ pub struct LoopHeaderDefinitionKind<'db> {
     loop_token: LoopToken<'db>,
     loop_stmt: LoopStmtKind,
     place: ScopedPlaceId,
+}
+
+#[derive(Clone, Debug, get_size2::GetSize)]
+pub struct NestedScopeBindingDefinitionKind {
+    binding_scopes: smallvec::SmallVec<[FileScopeId; 1]>,
+    range: TextRange,
+}
+
+impl NestedScopeBindingDefinitionKind {
+    pub fn new(binding_scopes: smallvec::SmallVec<[FileScopeId; 1]>, range: TextRange) -> Self {
+        Self {
+            binding_scopes,
+            range,
+        }
+    }
+
+    pub fn binding_scopes(&self) -> &[FileScopeId] {
+        &self.binding_scopes
+    }
+
+    pub fn range(&self) -> TextRange {
+        self.range
+    }
 }
 
 #[derive(Clone, Debug, get_size2::GetSize)]

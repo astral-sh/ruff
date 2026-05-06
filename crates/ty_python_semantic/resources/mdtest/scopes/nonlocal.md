@@ -21,14 +21,38 @@ def f():
 
 ## Skips class scope
 
+Class-scoped symbols aren't visible to nested function-scoped reads, whether they're explicitly
+`nonlocal` or not.
+
 ```py
 def f():
     x = 1
 
     class C:
         x = 2
+
         def g():
             reveal_type(x)  # revealed: Literal[1]
+
+        def h():
+            nonlocal x
+            reveal_type(x)  # revealed: Literal[1]
+```
+
+A `nonlocal` write also doesn't affect the inferred type of a class-scoped symbol:
+
+```py
+def f():
+    x = 1
+
+    class C:
+        x = 2
+
+        def g():
+            nonlocal x
+            x = 3
+
+        reveal_type(x)  # revealed: Literal[2]
 ```
 
 ## Reads respect annotation-only declarations
@@ -145,30 +169,16 @@ def a():
 
             def d():
                 nonlocal x
-                reveal_type(x)  # revealed: Literal[3, 2]
+                # Note that `d` could be called more than once, so the assignment of 4 below is
+                # already potentially visible. The rules for this are subtle and in fact
+                # intentionally unsound. See "Visibility of `global` and `nonlocal` bindings from
+                # nested and sibling scopes" below for the details.
+                reveal_type(x)  # revealed: Literal[2, 3, 4]
                 x = 4
                 reveal_type(x)  # revealed: Literal[4]
 
                 def e():
-                    reveal_type(x)  # revealed: Literal[4, 3, 2]
-```
-
-However, currently the union of types that we build is incomplete. We walk parent scopes, but not
-sibling scopes, child scopes, second-cousin-once-removed scopes, etc:
-
-```py
-def a():
-    x = 1
-    def b():
-        nonlocal x
-        x = 2
-
-    def c():
-        def d():
-            nonlocal x
-            x = 3
-        # TODO: This should include 2 and 3.
-        reveal_type(x)  # revealed: Literal[1]
+                    reveal_type(x)  # revealed: Literal[2, 3, 4]
 ```
 
 ## Local variable bindings "look ahead" to any assignment in the current scope
@@ -385,46 +395,6 @@ def f1():
                     y = "string"  # allowed, because `f3`'s `y` is untyped
 ```
 
-## TODO: `nonlocal` affects the inferred type in the outer scope
-
-Without `nonlocal`, `g` can't write to `x`, and the inferred type of `x` in `f`'s scope isn't
-affected by `g`:
-
-```py
-def f():
-    x = 1
-    def g():
-        reveal_type(x)  # revealed: Literal[1]
-    reveal_type(x)  # revealed: Literal[1]
-```
-
-But with `nonlocal`, `g` could write to `x`, and that affects its inferred type in `f`. That's true
-regardless of whether `g` actually writes to `x`. With a write:
-
-```py
-def f():
-    x = 1
-    def g():
-        nonlocal x
-        reveal_type(x)  # revealed: Literal[1]
-        x += 1
-        reveal_type(x)  # revealed: Literal[2]
-    # TODO: should be `Unknown | Literal[1]`
-    reveal_type(x)  # revealed: Literal[1]
-```
-
-Without a write:
-
-```py
-def f():
-    x = 1
-    def g():
-        nonlocal x
-        reveal_type(x)  # revealed: Literal[1]
-    # TODO: should be `Unknown | Literal[1]`
-    reveal_type(x)  # revealed: Literal[1]
-```
-
 ## Annotating a `nonlocal` binding is a syntax error
 
 ```py
@@ -506,4 +476,231 @@ def _(maybe_float: float | None, certain_int: int, flag: bool) -> None:
         assert x is not None
         reveal_type(x)  # revealed: int | float
         +x
+```
+
+## Visibility of `nonlocal` bindings from nested and sibling scopes
+
+(`global` bindings behave similarly and have a similarly named test case in `global.md`.)
+
+A `nonlocal` write from an inner scope can affect the target variable's inferred type in it's
+defining scope. For the same reason, reads in a nested function can also see later bindings in their
+own scope:
+
+```py
+def f():
+    x = 1
+    def g():
+        nonlocal x
+        # The following assignment of 2 could be visible if this function has been called before.
+        reveal_type(x)  # revealed: Literal[1, 2]
+        x = 2
+        # Once a binding is made in this scope, it shadows bindings from outer scopes.
+        reveal_type(x)  # revealed: Literal[2]
+    # From now on we assume `g` could be called at any time.
+    reveal_type(x)  # revealed: Literal[1, 2]
+```
+
+The example above (hopefully) feels natural, but if we look at it closely, the reveals there are
+making some beefy assumptions. For one, we assume `g` might be called before the final reveal, even
+though in this case we can actually see that it's never called. A "sufficiently smart compiler"
+could've narrowed that to `Literal[1]`, but we don't/can't track what functions are caled when, so
+we're being conservative. On the other hand, the reveal of `Literal[2]` after the binding in `g` is
+the opposite, an aggressive assumption that's not generally sound. Consider this counterexample
+where `g` and `h` are siblings that both assign to `x`:
+
+```py
+def f():
+    x = 1
+    def g():
+        nonlocal x
+        x = 2
+        reveal_type(x)  # revealed: Literal[2]
+    def h():
+        nonlocal x
+        x = 3
+        g()
+        # The logic that gives us `Literal[2]` above also gives us `Literal[3]` here, even though
+        # the call to `g()` means that `x` is in fact 2 at runtime. We can only reason locally about
+        # these things; we can't do whole-program control flow analysis or solve the halting
+        # problem. A fully sound typechecker would generally need to infer `Literal[2, 3]` both here
+        # and above. That would be great here -- wrong answers are bad! -- but it would break too
+        # much real-world code that expects `Literal[2]` in simple cases like `g` above.
+        reveal_type(x)  # revealed: Literal[3]
+    reveal_type(x)  # revealed: Literal[1, 2, 3]
+```
+
+So we're ok with making unsound assumptions to make simple, common cases do what users expect. Fine.
+But then what about the reveal of `Literal[1, 2, 3]` at the end there? We aggressively shadow
+bindings from outer or sibling scopes, but we conservatively include bindings from scopes nested
+within the current one, once we've encountered them (i.e. in a top-to-bottom reading of the code).
+This second behavior is _also_ unsound, because nested functions can "escape" the scope where
+they're defined and affect reads on lines above their definition. But again these are the behaviors
+that users expect. Here's a more involved example of these rules interacting at different levels of
+nesting:
+
+```py
+def foo():
+    x = 2
+    # We just defined `x`, and we haven't encountered any nested bindings of it yet.
+    reveal_type(x)  # revealed: Literal[2]
+
+    def bar():
+        nonlocal x
+        # We haven't encountered any local bindings for `x` yet. Its public type is visible to `bar`
+        # here, including `bar`s own assignments of 3 below.
+        reveal_type(x)  # revealed: Literal[2, 3, 4]
+
+        x = 3
+        # Local bindings shadow the whole public type.
+        reveal_type(x)  # revealed: Literal[3]
+
+    # We've encountered the nested assignment of 3, so we keep it visible alongside local bindings
+    # in this scope.
+    reveal_type(x)  # revealed: Literal[2, 3]
+
+    x = 4
+    # This assignment shadows the previous local bindings, but again nested bindings remain visible.
+    reveal_type(x)  # revealed: Literal[3, 4]
+```
+
+## Nonlocal `+=` widening works like it does in loops
+
+Using `+=` in a loop usually triggers fixpoint analysis, where after the list of `Literal` values
+reaches an upper limit we widen the type to `int`. The same applies to `nonlocal` augmented
+assignments, since the inner function body could run any number of times:
+
+```py
+def f():
+    x = 1
+    def g():
+        nonlocal x
+        x += 1
+    reveal_type(x)  # revealed: int
+```
+
+## Nested `nonlocal` bindings are visible in intervening scopes
+
+```py
+def _():
+    def _():
+        def _():
+            nonlocal x
+            x = 1
+        nonlocal x
+        x = 2
+        # The binding in `h` is visible here because it's nested under this scope, even though this
+        # isn't the defining scope of `x`, and even though this scope doesn't declare `x` as
+        # `nonlocal` (instead it uses it as a "free variable").
+        reveal_type(x)  # revealed: Literal[1, 2]
+    x = 3
+    reveal_type(x)  # revealed: Literal[1, 2, 3]
+```
+
+## Conditional narrowing can filter out nested bindings
+
+```py
+def _():
+    x = 42
+
+    def hello():
+        nonlocal x
+        x = "hello"
+
+    reveal_type(x)  # revealed: Literal[42, "hello"]
+
+    if isinstance(x, int):
+        reveal_type(x)  # revealed: Literal[42]
+```
+
+## Conditional `nonlocal` bindings leave parent scope bindings visible
+
+Normal branching and merging rules apply to the shadowing behavior described in the previous
+section:
+
+```py
+def flag(): ...
+def foo():
+    x = 2
+
+    def bar():
+        nonlocal x
+
+        if flag():
+            x = 3
+            # The public types of `x` is shadowed here...
+            reveal_type(x)  # revealed: Literal[3]
+
+        # ...but still visible here.
+        reveal_type(x)  # revealed: Literal[3, 2]
+```
+
+## Parameter defaults are evaluated before a function's body
+
+We don't need to think about this ordering in normal execution, since the body of a function doesn't
+get to cause any side effects until the function is called. But we do need to think about it in
+inference, because of the (generally unsound) rule mentioned above about considering nested bindings
+visible after we encounter them. That can matter in unusual sitautions like this one:
+
+```py
+def f():
+    x = 1
+    # This use of `x` doesn't see `x = 2` below.
+    def g(y=reveal_type(x)):  # revealed: Literal[1]
+        nonlocal x
+        x = 2
+```
+
+## `nonlocal` writes in class scopes are applied eagerly
+
+Class bodies are evaluated immediately, so nonlocal bindings in a nested class scope behave more
+like normal assignments. (We still synthesize definitions for them in the containing scope, but they
+don't have special-case shadowing behavior.)
+
+```py
+def f():
+    x = 1
+    class C:
+        nonlocal x
+        x = 2
+
+    reveal_type(x)  # revealed: Literal[2]
+    x = 3
+    reveal_type(x)  # revealed: Literal[3]
+```
+
+This can include multiple layers of nesting. However, any regular function scopes nested within
+classes still behave like other nested function scopes, with the assumption that they could be
+called at any time, and the special-case shadowing behavior that comes with that. Class scopes
+nested within functions also "become lazy" from the perspective of scopes outside the function:
+
+```py
+def f():
+    class C:
+        nonlocal x
+        class D:
+            nonlocal x
+            def g():
+                nonlocal x
+                class E:
+                    nonlocal x
+                    x = 1
+                    reveal_type(x)  # revealed: Literal[1]
+
+                x = 2
+                # `x = 1` is within an eager scope, so it gets shadowed.
+                reveal_type(x)  # revealed: Literal[2]
+            x = 3
+            # `x = 1` is within an eager scope, but that eager scope is within a lazy scope, so from
+            # our perspective here both `x = 1` and `x = 2` are lazy. (`x = 2` shadows `x = 1`
+            # within its own scope, but from the outside we consider all reachable bindings, not
+            # only those that reach the end of their scope.)
+            reveal_type(x)  # revealed: Literal[1, 2, 3]
+
+        x = 4
+        # `x = 4` shadows `x = 3`, which is eager, but the lazy bindings are still visible.
+        reveal_type(x)  # revealed: Literal[1, 2, 4]
+
+    x = 5
+    # `x = 5` shadows `x = 4`, which is eager, but the lazy bindings are still visible.
+    reveal_type(x)  # revealed: Literal[1, 2, 5]
 ```
