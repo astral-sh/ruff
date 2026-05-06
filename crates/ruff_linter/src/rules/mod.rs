@@ -47,6 +47,7 @@ pub mod numpy;
 pub mod pandas_vet;
 pub mod pep8_naming;
 pub mod perflint;
+pub mod polars_vet;
 pub mod pycodestyle;
 pub mod pydoclint;
 pub mod pydocstyle;

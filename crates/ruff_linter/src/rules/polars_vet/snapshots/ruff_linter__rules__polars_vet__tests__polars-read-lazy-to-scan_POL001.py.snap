@@ -1,0 +1,92 @@
+---
+source: crates/ruff_linter/src/rules/polars_vet/mod.rs
+---
+POL001 [*] Replace `read_*().lazy()` with `scan_csv()`
+ --> POL001.py:3:1
+  |
+1 | import polars as pl
+2 |
+3 | pl.read_csv("data.csv").lazy()
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+4 | pl.read_parquet("data.parquet").lazy()
+5 | pl.read_ndjson("data.ndjson").lazy()
+  |
+help: Replace with a `scan_*()` call
+1 | import polars as pl
+2 |
+  - pl.read_csv("data.csv").lazy()
+3 + pl.scan_csv("data.csv")
+4 | pl.read_parquet("data.parquet").lazy()
+5 | pl.read_ndjson("data.ndjson").lazy()
+6 | pl.read_ipc("data.ipc").lazy()
+note: This is an unsafe fix and may change runtime behavior
+
+POL001 [*] Replace `read_*().lazy()` with `scan_parquet()`
+ --> POL001.py:4:1
+  |
+3 | pl.read_csv("data.csv").lazy()
+4 | pl.read_parquet("data.parquet").lazy()
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+5 | pl.read_ndjson("data.ndjson").lazy()
+6 | pl.read_ipc("data.ipc").lazy()
+  |
+help: Replace with a `scan_*()` call
+1 | import polars as pl
+2 |
+3 | pl.read_csv("data.csv").lazy()
+  - pl.read_parquet("data.parquet").lazy()
+4 + pl.scan_parquet("data.parquet")
+5 | pl.read_ndjson("data.ndjson").lazy()
+6 | pl.read_ipc("data.ipc").lazy()
+7 |
+note: This is an unsafe fix and may change runtime behavior
+
+POL001 [*] Replace `read_*().lazy()` with `scan_ndjson()`
+ --> POL001.py:5:1
+  |
+3 | pl.read_csv("data.csv").lazy()
+4 | pl.read_parquet("data.parquet").lazy()
+5 | pl.read_ndjson("data.ndjson").lazy()
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+6 | pl.read_ipc("data.ipc").lazy()
+  |
+help: Replace with a `scan_*()` call
+2 |
+3 | pl.read_csv("data.csv").lazy()
+4 | pl.read_parquet("data.parquet").lazy()
+  - pl.read_ndjson("data.ndjson").lazy()
+5 + pl.scan_ndjson("data.ndjson")
+6 | pl.read_ipc("data.ipc").lazy()
+7 |
+8 | # No equivalent scan function.
+note: This is an unsafe fix and may change runtime behavior
+
+POL001 [*] Replace `read_*().lazy()` with `scan_ipc()`
+ --> POL001.py:6:1
+  |
+4 | pl.read_parquet("data.parquet").lazy()
+5 | pl.read_ndjson("data.ndjson").lazy()
+6 | pl.read_ipc("data.ipc").lazy()
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+7 |
+8 | # No equivalent scan function.
+  |
+help: Replace with a `scan_*()` call
+3 | pl.read_csv("data.csv").lazy()
+4 | pl.read_parquet("data.parquet").lazy()
+5 | pl.read_ndjson("data.ndjson").lazy()
+  - pl.read_ipc("data.ipc").lazy()
+6 + pl.scan_ipc("data.ipc")
+7 |
+8 | # No equivalent scan function.
+9 | pl.read_excel("data.xlsx").lazy()
+note: This is an unsafe fix and may change runtime behavior
+
+POL001 Replace `read_*().lazy()` with `scan_csv()`
+  --> POL001.py:18:1
+   |
+17 | # Still flag even if lazy receives arguments.
+18 | pl.read_csv("data.csv").lazy(streaming=True)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Replace with a `scan_*()` call

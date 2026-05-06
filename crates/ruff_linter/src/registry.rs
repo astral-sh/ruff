@@ -175,6 +175,9 @@ pub enum Linter {
     /// [pandas-vet](https://pypi.org/project/pandas-vet/)
     #[prefix = "PD"]
     PandasVet,
+    /// [polars](https://pola.rs/)
+    #[prefix = "POL"]
+    PolarsVet,
     /// [pep8-naming](https://pypi.org/project/pep8-naming/)
     #[prefix = "N"]
     PEP8Naming,

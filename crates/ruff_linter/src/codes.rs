@@ -786,6 +786,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (PandasVet, "101") => rules::pandas_vet::rules::PandasNuniqueConstantSeriesCheck,
         (PandasVet, "901") => rules::pandas_vet::rules::PandasDfVariableName,
 
+        // polars-vet
+        (PolarsVet, "001") => rules::polars_vet::rules::PolarsReadLazyToScan,
+
         // flake8-errmsg
         (Flake8ErrMsg, "101") => rules::flake8_errmsg::rules::RawStringInException,
         (Flake8ErrMsg, "102") => rules::flake8_errmsg::rules::FStringInException,

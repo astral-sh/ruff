@@ -1502,6 +1502,7 @@ impl<'a> SemanticModel<'a> {
             "numpy" => self.seen.insert(Modules::NUMPY),
             "os" => self.seen.insert(Modules::OS),
             "pandas" => self.seen.insert(Modules::PANDAS),
+            "polars" => self.seen.insert(Modules::POLARS),
             "pytest" => self.seen.insert(Modules::PYTEST),
             "re" => self.seen.insert(Modules::RE),
             "regex" => self.seen.insert(Modules::REGEX),
@@ -2293,6 +2294,7 @@ bitflags! {
         const AIRFLOW = 1 << 27;
         const HASHLIB = 1 << 28;
         const CRYPT = 1 << 29;
+        const POLARS = 1 << 30;
     }
 }
 
