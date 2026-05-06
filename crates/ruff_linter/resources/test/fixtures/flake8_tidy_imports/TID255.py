@@ -38,3 +38,15 @@ def function(default=Renamed):
 
 
 type Alias = foo.Type
+
+list_values = [foo.Value for _ in range(1)]
+set_values = {Component for _ in range(1)}
+dict_values = {foo.Key: Component for _ in range(1)}
+generator_values = (foo.Value for _ in range(1))
+
+# TODO(charlie): Avoid flagging references behind expression-level control flow.
+short_circuit = False and foo.Value
+conditional_expression = foo.Value if enabled else None
+
+if TYPE_CHECKING:
+    type_checking_only = foo.Value

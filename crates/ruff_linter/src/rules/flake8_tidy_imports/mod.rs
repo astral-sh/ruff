@@ -227,8 +227,8 @@ mod tests {
     fn preview_lazy_import_immediately_resolved_fix() {
         let source = dedent(
             r#"
-            lazy import foo
-            lazy from library import Component
+            lazy  import foo
+            lazy  from library import Component
 
             base = foo.Base
             component = Component

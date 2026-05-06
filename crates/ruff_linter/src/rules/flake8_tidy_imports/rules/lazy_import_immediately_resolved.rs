@@ -1,7 +1,10 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{ExprName, PythonVersion, Stmt, StmtImport, StmtImportFrom};
-use ruff_python_semantic::{Binding, BindingKind, ScopeKind};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_python_ast::{
+    ExprName, PySourceType, PythonVersion, Stmt, StmtImport, StmtImportFrom, helpers,
+    token::{TokenKind, Tokens},
+};
+use ruff_python_semantic::{Binding, BindingKind, GeneratorKind, ScopeKind, SemanticModel};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -71,38 +74,41 @@ pub(crate) fn lazy_import_immediately_resolved(checker: &Checker, name: &ExprNam
         return;
     }
 
-    if !is_immediate_resolution_context(checker) {
+    let semantic = checker.semantic();
+
+    if !is_immediate_resolution_context(semantic, checker.source_type) {
         return;
     }
 
-    let Some(binding_id) = checker.semantic().resolve_name(name) else {
+    let Some(binding_id) = semantic.resolve_name(name) else {
         return;
     };
 
-    let binding = checker.semantic().binding(binding_id);
-    let Some(import) = lazy_import_statement(binding, checker) else {
+    let binding = semantic.binding(binding_id);
+    let Some(import) = lazy_import_statement(binding, semantic) else {
         return;
     };
 
-    let fixable = is_single_member_import(import);
+    let fix_range = if is_single_member_import(import) {
+        lazy_import_prefix_range(import, checker.source_tokens())
+    } else {
+        None
+    };
 
     let mut diagnostic = checker.report_diagnostic(
         LazyImportImmediatelyResolved {
             name: name.id.to_string(),
-            fixable,
+            fixable: fix_range.is_some(),
         },
         name.range(),
     );
-    if fixable {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(TextRange::at(
-            import.start(),
-            TextSize::from(5),
-        ))));
+    if let Some(fix_range) = fix_range {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(fix_range)));
     }
 }
 
 /// Return the import statement if the binding was created by a `lazy import`.
-fn lazy_import_statement<'a>(binding: &Binding, checker: &Checker<'a>) -> Option<&'a Stmt> {
+fn lazy_import_statement<'a>(binding: &Binding, semantic: &SemanticModel<'a>) -> Option<&'a Stmt> {
     if !matches!(
         binding.kind,
         BindingKind::Import(_) | BindingKind::SubmoduleImport(_) | BindingKind::FromImport(_)
@@ -110,7 +116,7 @@ fn lazy_import_statement<'a>(binding: &Binding, checker: &Checker<'a>) -> Option
         return None;
     }
 
-    let stmt = binding.statement(checker.semantic())?;
+    let stmt = binding.statement(semantic)?;
     matches!(
         stmt,
         Stmt::Import(StmtImport { is_lazy: true, .. })
@@ -129,11 +135,22 @@ fn is_single_member_import(stmt: &Stmt) -> bool {
     }
 }
 
-/// Return `true` if the current expression is evaluated during module import execution.
-fn is_immediate_resolution_context(checker: &Checker) -> bool {
-    let semantic = checker.semantic();
+/// Return the range from `lazy` through the whitespace before `import` or `from`.
+fn lazy_import_prefix_range(stmt: &Stmt, source_tokens: &Tokens) -> Option<TextRange> {
+    let mut tokens = source_tokens.after(stmt.start()).iter();
+    let lazy = tokens.find(|token| !token.kind().is_trivia())?;
+    if lazy.kind() != TokenKind::Lazy {
+        return None;
+    }
 
-    if checker.source_type.is_stub()
+    let import = tokens.find(|token| !token.kind().is_trivia())?;
+    matches!(import.kind(), TokenKind::Import | TokenKind::From)
+        .then(|| TextRange::new(lazy.start(), import.start()))
+}
+
+/// Return `true` if the current expression is evaluated during module import execution.
+fn is_immediate_resolution_context(semantic: &SemanticModel, source_type: PySourceType) -> bool {
+    if source_type.is_stub()
         || !semantic.execution_context().is_runtime()
         || semantic.in_deferred_type_definition()
         || semantic.in_deferred_type_alias_value()
@@ -141,7 +158,8 @@ fn is_immediate_resolution_context(checker: &Checker) -> bool {
         return false;
     }
 
-    if semantic.in_exception_handler() || in_conditional_block(checker) {
+    let mut parent_statements = semantic.current_statements().skip(1);
+    if semantic.in_exception_handler() || helpers::on_conditional_branch(&mut parent_statements) {
         return false;
     }
 
@@ -150,18 +168,48 @@ fn is_immediate_resolution_context(checker: &Checker) -> bool {
         ScopeKind::Class(_) | ScopeKind::Type => semantic
             .first_non_type_parent_scope(semantic.current_scope())
             .is_some_and(|scope| scope.kind.is_module()),
+        ScopeKind::Generator {
+            kind:
+                GeneratorKind::ListComprehension
+                | GeneratorKind::DictComprehension
+                | GeneratorKind::SetComprehension,
+            ..
+        } => in_immediate_eager_comprehension_context(semantic),
         ScopeKind::Function(_)
         | ScopeKind::Lambda(_)
-        | ScopeKind::Generator { .. }
+        | ScopeKind::Generator {
+            kind: GeneratorKind::Generator,
+            ..
+        }
         | ScopeKind::DunderClassCell => false,
     }
 }
 
-/// Return `true` if the current expression is inside a conditional block.
-fn in_conditional_block(checker: &Checker) -> bool {
-    checker
-        .semantic()
-        .current_statements()
-        .skip(1)
-        .any(|parent| matches!(parent, Stmt::If(_) | Stmt::While(_) | Stmt::Match(_)))
+fn in_immediate_eager_comprehension_context(semantic: &SemanticModel) -> bool {
+    for scope in semantic.current_scopes().skip(1) {
+        match scope.kind {
+            ScopeKind::Type | ScopeKind::DunderClassCell => {}
+            ScopeKind::Generator {
+                kind:
+                    GeneratorKind::ListComprehension
+                    | GeneratorKind::DictComprehension
+                    | GeneratorKind::SetComprehension,
+                ..
+            } => {}
+            ScopeKind::Module => return true,
+            ScopeKind::Class(_) => {
+                return semantic
+                    .first_non_type_parent_scope(scope)
+                    .is_some_and(|scope| scope.kind.is_module());
+            }
+            ScopeKind::Function(_)
+            | ScopeKind::Lambda(_)
+            | ScopeKind::Generator {
+                kind: GeneratorKind::Generator,
+                ..
+            } => return false,
+        }
+    }
+
+    false
 }

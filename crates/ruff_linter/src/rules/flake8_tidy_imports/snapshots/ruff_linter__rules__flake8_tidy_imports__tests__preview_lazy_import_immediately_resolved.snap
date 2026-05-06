@@ -177,3 +177,112 @@ help: Convert to an eager import
 7 |
 8 | base = foo.Base
 note: This is an unsafe fix and may change runtime behavior
+
+TID255 [*] Lazy import `foo` is resolved immediately
+  --> TID255.py:42:16
+   |
+40 | type Alias = foo.Type
+41 |
+42 | list_values = [foo.Value for _ in range(1)]
+   |                ^^^
+43 | set_values = {Component for _ in range(1)}
+44 | dict_values = {foo.Key: Component for _ in range(1)}
+   |
+help: Convert to an eager import
+  - lazy import foo
+1 + import foo
+2 | lazy import package.submodule
+3 | lazy import aliased as alias
+4 | lazy from library import Component
+note: This is an unsafe fix and may change runtime behavior
+
+TID255 [*] Lazy import `Component` is resolved immediately
+  --> TID255.py:43:15
+   |
+42 | list_values = [foo.Value for _ in range(1)]
+43 | set_values = {Component for _ in range(1)}
+   |               ^^^^^^^^^
+44 | dict_values = {foo.Key: Component for _ in range(1)}
+45 | generator_values = (foo.Value for _ in range(1))
+   |
+help: Convert to an eager import
+1 | lazy import foo
+2 | lazy import package.submodule
+3 | lazy import aliased as alias
+  - lazy from library import Component
+4 + from library import Component
+5 | lazy from library import Other as Renamed
+6 | lazy import multi_one, multi_two
+7 |
+note: This is an unsafe fix and may change runtime behavior
+
+TID255 [*] Lazy import `foo` is resolved immediately
+  --> TID255.py:44:16
+   |
+42 | list_values = [foo.Value for _ in range(1)]
+43 | set_values = {Component for _ in range(1)}
+44 | dict_values = {foo.Key: Component for _ in range(1)}
+   |                ^^^
+45 | generator_values = (foo.Value for _ in range(1))
+   |
+help: Convert to an eager import
+  - lazy import foo
+1 + import foo
+2 | lazy import package.submodule
+3 | lazy import aliased as alias
+4 | lazy from library import Component
+note: This is an unsafe fix and may change runtime behavior
+
+TID255 [*] Lazy import `Component` is resolved immediately
+  --> TID255.py:44:25
+   |
+42 | list_values = [foo.Value for _ in range(1)]
+43 | set_values = {Component for _ in range(1)}
+44 | dict_values = {foo.Key: Component for _ in range(1)}
+   |                         ^^^^^^^^^
+45 | generator_values = (foo.Value for _ in range(1))
+   |
+help: Convert to an eager import
+1 | lazy import foo
+2 | lazy import package.submodule
+3 | lazy import aliased as alias
+  - lazy from library import Component
+4 + from library import Component
+5 | lazy from library import Other as Renamed
+6 | lazy import multi_one, multi_two
+7 |
+note: This is an unsafe fix and may change runtime behavior
+
+TID255 [*] Lazy import `foo` is resolved immediately
+  --> TID255.py:48:27
+   |
+47 | # TODO(charlie): Avoid flagging references behind expression-level control flow.
+48 | short_circuit = False and foo.Value
+   |                           ^^^
+49 | conditional_expression = foo.Value if enabled else None
+   |
+help: Convert to an eager import
+  - lazy import foo
+1 + import foo
+2 | lazy import package.submodule
+3 | lazy import aliased as alias
+4 | lazy from library import Component
+note: This is an unsafe fix and may change runtime behavior
+
+TID255 [*] Lazy import `foo` is resolved immediately
+  --> TID255.py:49:26
+   |
+47 | # TODO(charlie): Avoid flagging references behind expression-level control flow.
+48 | short_circuit = False and foo.Value
+49 | conditional_expression = foo.Value if enabled else None
+   |                          ^^^
+50 |
+51 | if TYPE_CHECKING:
+   |
+help: Convert to an eager import
+  - lazy import foo
+1 + import foo
+2 | lazy import package.submodule
+3 | lazy import aliased as alias
+4 | lazy from library import Component
+note: This is an unsafe fix and may change runtime behavior
