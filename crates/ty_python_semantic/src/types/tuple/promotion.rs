@@ -10,6 +10,49 @@ use crate::types::{Type, UnionBuilder, UnionType};
 
 const MIN_TUPLE_UNION_SIZE_FOR_WIDENING: usize = 16;
 
+/// Controls how aggressively tuple-size promotion identifies and combines candidate tuple types.
+///
+/// Collection literal inference uses [`TupleSizePromotionMode::Strict`] because it should only
+/// promote genuinely homogeneous tuple literals. Cycle recovery and large control-flow joins use
+/// [`TupleSizePromotionMode::Widening`] because their goal is to collapse growing tuple shapes
+/// into a stable variadic tuple.
+#[derive(Copy, Clone)]
+enum TupleSizePromotionMode {
+    Strict,
+    Widening,
+}
+
+impl TupleSizePromotionMode {
+    /// Returns `true` when this mode may widen beyond genuinely homogeneous tuple types.
+    fn is_widening(self) -> bool {
+        matches!(self, Self::Widening)
+    }
+
+    /// Returns whether tuples with these element types may be promoted into the same group.
+    fn can_merge_element_types<'db>(
+        self,
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> bool {
+        left.is_equivalent_to(db, right)
+            || (self.is_widening() && !left.is_disjoint_from(db, right))
+    }
+
+    /// Returns the element type to use after combining two tuple-promotion candidates.
+    fn merge_element_types<'db>(
+        self,
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> Type<'db> {
+        match self {
+            Self::Strict => left,
+            Self::Widening => UnionType::from_elements_leave_aliases(db, [left, right]),
+        }
+    }
+}
+
 /// Tracks the typevars of a collection to which tuple size promotion should **not** apply.
 #[derive(Default)]
 pub(crate) struct TupleSizePromotionConstraints<'db> {
@@ -62,10 +105,10 @@ impl<'db> TupleSizePromotionConstraints<'db> {
     }
 }
 
-/// Represents a single tuple literal whose type in the inferred collection type might be widened.
+/// Represents a tuple type whose length might be widened.
 enum TupleSizePromotionCandidate<'db> {
     Empty,
-    Homogeneous {
+    NonEmpty {
         element_type: Type<'db>,
         length: TupleLength,
     },
@@ -75,10 +118,15 @@ impl<'db> TupleSizePromotionCandidate<'db> {
     /// Returns an eligible candidate if the given type represents one (i.e., it is a
     /// fixed-length homogeneous tuple or the empty tuple).
     fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
-        Self::from_type_impl(db, ty, false)
+        Self::from_type_in_mode(db, ty, TupleSizePromotionMode::Strict)
     }
 
-    fn from_type_impl(db: &'db dyn Db, ty: Type<'db>, cycle_recovery: bool) -> Option<Self> {
+    /// Returns a promotion candidate using the tuple shapes accepted by the given mode.
+    fn from_type_in_mode(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        mode: TupleSizePromotionMode,
+    ) -> Option<Self> {
         let tuple_spec = ty.exact_tuple_instance_spec(db)?;
         match tuple_spec.as_ref() {
             TupleSpec::Fixed(tuple) => {
@@ -87,8 +135,8 @@ impl<'db> TupleSizePromotionCandidate<'db> {
                     return Some(Self::Empty);
                 };
 
-                if cycle_recovery {
-                    return Some(Self::Homogeneous {
+                if mode.is_widening() {
+                    return Some(Self::NonEmpty {
                         element_type: tuple_spec.as_ref().homogeneous_element_type(db),
                         length: TupleLength::Fixed(tuple.len()),
                     });
@@ -96,12 +144,12 @@ impl<'db> TupleSizePromotionCandidate<'db> {
 
                 elements
                     .all(|element| element.is_equivalent_to(db, element_type))
-                    .then_some(Self::Homogeneous {
+                    .then_some(Self::NonEmpty {
                         element_type,
                         length: TupleLength::Fixed(tuple.len()),
                     })
             }
-            TupleSpec::Variable(tuple) if cycle_recovery => Some(Self::Homogeneous {
+            TupleSpec::Variable(tuple) if mode.is_widening() => Some(Self::NonEmpty {
                 element_type: tuple_spec.as_ref().homogeneous_element_type(db),
                 length: tuple.len(),
             }),
@@ -110,16 +158,15 @@ impl<'db> TupleSizePromotionCandidate<'db> {
     }
 }
 
-/// Represents a group of tuple types extracted from a larger union. The types in this group may
-/// be widened in the final inferred type for the collection literal.
-struct HomogeneousTupleUnionGroup<'db> {
+/// Represents a group of tuple types extracted from a larger union that can be widened together.
+struct TuplePromotionGroup<'db> {
     element_type: Type<'db>,
     original_tuple_types: Vec<Type<'db>>,
     first_length: TupleLength,
     has_multiple_lengths: bool,
 }
 
-impl<'db> HomogeneousTupleUnionGroup<'db> {
+impl<'db> TuplePromotionGroup<'db> {
     fn new(element_type: Type<'db>, original_tuple_type: Type<'db>, length: TupleLength) -> Self {
         Self {
             element_type,
@@ -129,56 +176,54 @@ impl<'db> HomogeneousTupleUnionGroup<'db> {
         }
     }
 
-    fn can_merge(&self, db: &'db dyn Db, element_type: Type<'db>, cycle_recovery: bool) -> bool {
-        self.element_type.is_equivalent_to(db, element_type)
-            || (cycle_recovery && !self.element_type.is_disjoint_from(db, element_type))
+    fn can_merge(
+        &self,
+        db: &'db dyn Db,
+        element_type: Type<'db>,
+        mode: TupleSizePromotionMode,
+    ) -> bool {
+        mode.can_merge_element_types(db, self.element_type, element_type)
     }
 
-    /// Adds a tuple to this homogeneous union group.
+    /// Adds a tuple to this promotion group.
     fn add(
         &mut self,
         db: &'db dyn Db,
         original_tuple_type: Type<'db>,
         element_type: Type<'db>,
         length: TupleLength,
-        cycle_recovery: bool,
+        mode: TupleSizePromotionMode,
     ) {
         self.has_multiple_lengths |= length != self.first_length;
-        if cycle_recovery {
-            self.element_type =
-                UnionType::from_elements_leave_aliases(db, [self.element_type, element_type]);
-        }
+        self.element_type = mode.merge_element_types(db, self.element_type, element_type);
         self.original_tuple_types.push(original_tuple_type);
     }
 }
 
 /// Partitions a union into two sets prior to rebuilding it: one for elements that are not
-/// candidates for tuple size promotion, and another for groups of homogeneous tuple elements that are.
+/// candidates for tuple size promotion, and another for groups of tuple elements that can be
+/// promoted together.
 fn partition_tuple_union_elements<'db>(
     db: &'db dyn Db,
     elements: impl IntoIterator<Item = Type<'db>>,
-    cycle_recovery: bool,
-) -> (Vec<Type<'db>>, Vec<HomogeneousTupleUnionGroup<'db>>) {
+    mode: TupleSizePromotionMode,
+) -> (Vec<Type<'db>>, Vec<TuplePromotionGroup<'db>>) {
     let mut other_union_elements = Vec::new();
-    let mut tuple_groups: Vec<HomogeneousTupleUnionGroup<'db>> = Vec::new();
+    let mut tuple_groups: Vec<TuplePromotionGroup<'db>> = Vec::new();
 
     for element in elements {
-        match TupleSizePromotionCandidate::from_type_impl(db, element, cycle_recovery) {
-            Some(TupleSizePromotionCandidate::Homogeneous {
+        match TupleSizePromotionCandidate::from_type_in_mode(db, element, mode) {
+            Some(TupleSizePromotionCandidate::NonEmpty {
                 element_type,
                 length,
             }) => {
                 if let Some(group) = tuple_groups
                     .iter_mut()
-                    .find(|group| group.can_merge(db, element_type, cycle_recovery))
+                    .find(|group| group.can_merge(db, element_type, mode))
                 {
-                    group.add(db, element, element_type, length, cycle_recovery);
+                    group.add(db, element, element_type, length, mode);
                 } else {
-                    tuple_groups.push(HomogeneousTupleUnionGroup::new(
-                        element_type,
-                        element,
-                        length,
-                    ));
+                    tuple_groups.push(TuplePromotionGroup::new(element_type, element, length));
                 }
             }
             Some(TupleSizePromotionCandidate::Empty) | None => other_union_elements.push(element),
@@ -211,7 +256,7 @@ impl<'db> Type<'db> {
     /// ```
     ///
     pub(crate) fn promote_tuple_size_in_union(self, db: &'db dyn Db) -> Type<'db> {
-        self.promote_tuple_size_impl(db, false)
+        self.promote_tuple_size_impl(db, TupleSizePromotionMode::Strict)
     }
 
     /// Promotes recursive tuple-size growth during Salsa cycle recovery.
@@ -220,7 +265,7 @@ impl<'db> Type<'db> {
     /// whose fixed prefix or suffix keeps growing across iterations (for example, repeated `+=`
     /// on a `tuple[T, ...]`).
     pub(crate) fn promote_tuple_size_in_cycle_recovery(self, db: &'db dyn Db) -> Type<'db> {
-        self.promote_tuple_size_impl(db, true)
+        self.promote_tuple_size_impl(db, TupleSizePromotionMode::Widening)
     }
 
     /// Promotes large unions of tuple shapes to avoid exponential growth at control-flow joins.
@@ -233,16 +278,16 @@ impl<'db> Type<'db> {
             return self;
         }
 
-        self.promote_tuple_size_impl(db, true)
+        self.promote_tuple_size_impl(db, TupleSizePromotionMode::Widening)
     }
 
-    fn promote_tuple_size_impl(self, db: &'db dyn Db, cycle_recovery: bool) -> Type<'db> {
+    fn promote_tuple_size_impl(self, db: &'db dyn Db, mode: TupleSizePromotionMode) -> Type<'db> {
         let Type::Union(union) = self else {
             return self;
         };
 
         let (other_union_elements, tuple_groups) =
-            partition_tuple_union_elements(db, union.elements(db).iter().copied(), cycle_recovery);
+            partition_tuple_union_elements(db, union.elements(db).iter().copied(), mode);
 
         if !tuple_groups.iter().any(|group| group.has_multiple_lengths) {
             return self;
