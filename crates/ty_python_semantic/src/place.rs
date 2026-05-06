@@ -1526,7 +1526,7 @@ fn place_from_bindings_impl<'db>(
             builder.add(first);
             builder.add(second);
 
-            for ty in types.by_ref() {
+            for ty in types {
                 builder.add(ty);
             }
 
@@ -1534,8 +1534,6 @@ fn place_from_bindings_impl<'db>(
         } else {
             first
         };
-        drop(types);
-
         let boundness = match boundness_analysis {
             BoundnessAnalysis::AssumeBound => Definedness::AlwaysDefined,
             BoundnessAnalysis::BasedOnUnboundVisibility => match unbound_reachability_constraint

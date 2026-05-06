@@ -525,6 +525,10 @@ impl<'db> NarrowingContext<'_, 'db> {
     ) -> Type<'db> {
         type Id = ScopedReachabilityConstraintId;
 
+        if id == Id::ALWAYS_FALSE {
+            return Type::Never;
+        }
+
         let key = (id, accumulated.clone());
         if let Some(cached) = self.cache.get(&key) {
             return *cached;
