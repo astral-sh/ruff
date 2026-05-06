@@ -4318,6 +4318,66 @@ Source with applied edits:
     }
 
     #[test]
+    fn test_named_tuple_constructor_call() {
+        let mut test = inlay_hint_test(
+            "
+            from typing import NamedTuple
+
+            class Foo(NamedTuple):
+                x: int
+                y: str
+
+            Foo(1, 'a')",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        from typing import NamedTuple
+
+        class Foo(NamedTuple):
+            x: int
+            y: str
+
+        Foo([x=]1, [y=]'a')
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:5:5
+          |
+        5 |     x: int
+          |     ^
+          |
+        info: Source
+         --> main2.py:8:6
+          |
+        8 | Foo([x=]1, [y=]'a')
+          |      ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:6:5
+          |
+        6 |     y: str
+          |     ^
+          |
+        info: Source
+         --> main2.py:8:13
+          |
+        8 | Foo([x=]1, [y=]'a')
+          |             ^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        5 |     x: int
+        6 |     y: str
+        7 |
+          - Foo(1, 'a')
+        8 + Foo(1, y='a')
+        ");
+    }
+
+    #[test]
     fn test_class_constructor_call_new() {
         let mut test = inlay_hint_test(
             "
@@ -7570,6 +7630,19 @@ Source with applied edits:
            |
         11 | b[: B[A]] = B([x=]foo.A())
            |       ^
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:9:5
+          |
+        9 |     x: T
+          |     ^
+          |
+        info: Source
+          --> main2.py:11:16
+           |
+        11 | b[: B[A]] = B([x=]foo.A())
+           |                ^
            |
 
         ---------------------------------------------

@@ -1254,7 +1254,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         //         if t[0] is not None:
         //             reveal_type(t)  # tuple[int, int]
         if matches!(&**ops, [ast::CmpOp::Is | ast::CmpOp::IsNot])
-            && let ast::Expr::Subscript(subscript) = &**left
+            && let ast::Expr::Subscript(subscript) = left.expression_value()
             && let Type::Union(union) = inference
                 .expression_type(&*subscript.value)
                 .resolve_type_alias(self.db)
@@ -1337,11 +1337,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 }
             };
 
-            if let ast::Expr::Subscript(subscript) = &**left {
+            if let ast::Expr::Subscript(subscript) = left.expression_value() {
                 narrow_subscript(subscript, inference.expression_type(&comparators[0]));
             }
 
-            if let ast::Expr::Subscript(subscript) = &comparators[0] {
+            if let ast::Expr::Subscript(subscript) = comparators[0].expression_value() {
                 narrow_subscript(subscript, inference.expression_type(&**left));
             }
         }
@@ -1359,7 +1359,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         //         reveal_type(u)  # revealed: Bar
         if matches!(&**ops, [ast::CmpOp::In | ast::CmpOp::NotIn])
             && let Some(key) = inference.expression_type(&**left).as_string_literal()
-            && let Some(rhs_place_expr) = PlaceExpr::try_from_expr(&comparators[0])
+            && let rhs_expr = comparators[0].expression_value()
             && let rhs_type = inference.expression_type(&comparators[0])
             && is_or_contains_typeddict(self.db, rhs_type)
         {
@@ -1411,8 +1411,21 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 };
 
                 if narrowed != resolved_rhs_type {
-                    let place = self.expect_place(&rhs_place_expr);
-                    constraints.insert(place, NarrowingConstraint::replacement(narrowed));
+                    let constraint = NarrowingConstraint::replacement(narrowed);
+
+                    let comparator_place = PlaceExpr::try_from_expr(&comparators[0])
+                        .and_then(|place_expr| self.places().place_id(&place_expr));
+                    if let Some(place) = comparator_place {
+                        constraints.insert(place, constraint.clone());
+                    }
+
+                    let value_place = PlaceExpr::try_from_expr(rhs_expr)
+                        .and_then(|place_expr| self.places().place_id(&place_expr));
+                    if value_place != comparator_place
+                        && let Some(place) = value_place
+                    {
+                        constraints.insert(place, constraint);
+                    }
                 }
             }
         }
@@ -1428,9 +1441,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // - `if type(x) is not Y`
             // - `if Y is type(x)`
             // - `if Y is not type(x)`
-            if let (ast::Expr::Call(call), _, _, other) | (_, other, ast::Expr::Call(call), _) =
-                (left, lhs_ty, right, rhs_ty)
-            {
+            if let (ast::Expr::Call(call), _, _, other) | (_, other, ast::Expr::Call(call), _) = (
+                left.expression_value(),
+                lhs_ty,
+                right.expression_value(),
+                rhs_ty,
+            ) {
                 let ast::ExprCall {
                     range: _,
                     node_index: _,
@@ -1472,8 +1488,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                                 .negate_if(self.db, !is_positive),
                         ),
                     );
-                    last_rhs_ty = Some(rhs_ty);
-                    continue;
                 }
             }
 

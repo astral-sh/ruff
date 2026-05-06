@@ -233,8 +233,9 @@ fn resolve_module_query<'db>(
 /// aggressively cached. Including the `importing_file` as part of that query would
 /// trash the caching of import resolution between files.
 ///
-/// TODO: should (some) of this also be cached? If an entire directory of python files
-/// is misunderstood we'll end up in here a lot.
+/// Cache desperate resolution because repeated unresolved imports in a project can otherwise
+/// re-walk the same importing-file-relative search paths many times.
+#[salsa::tracked]
 fn desperately_resolve_module<'db>(
     db: &'db dyn Db,
     importing_file: File,

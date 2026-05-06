@@ -132,6 +132,12 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
                     }
                 }
             } else {
+                // A binding in a class body creates a class attribute; it doesn't rebind names
+                // in an enclosing module or function scope.
+                if scope.kind.is_class() {
+                    continue;
+                }
+
                 // Only enforce cross-scope shadowing for imports.
                 if !matches!(
                     shadowed.kind,

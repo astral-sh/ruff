@@ -11,8 +11,6 @@ int
 info[hover]: Hovered content is
  --> main.py:5:15
   |
-3 | def get_index() -> int: ...
-4 | idx = get_index()
 5 | print(values[-idx])
   |               -^^
   |               |

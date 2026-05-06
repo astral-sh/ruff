@@ -480,7 +480,7 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
             AnyNodeRef::TypeParamTypeVar(param_var) if self.should_include_declaration() => {
                 self.check_identifier_reference(&param_var.name);
             }
-            AnyNodeRef::ExprStringLiteral(string_expr) if self.should_include_declaration() => {
+            AnyNodeRef::ExprStringLiteral(string_expr) => {
                 // Highlight the sub-AST of a string annotation
                 if let Some((sub_ast, sub_model)) = self.model.enter_string_annotation(string_expr)
                 {

@@ -698,6 +698,8 @@ pub(crate) struct ScopeInference<'db> {
 struct ScopeInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
+    /// Expected types for expression nodes tracked for IDE completion.
+    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
     /// Metadata for type expressions in this region.
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
@@ -751,6 +753,15 @@ impl<'db> ScopeInference<'db> {
             .get(&expression.into())
             .copied()
             .or_else(|| self.fallback_type())
+    }
+
+    pub(crate) fn try_expected_type(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Type<'db>> {
+        self.extra
+            .as_deref()
+            .and_then(|extra| extra.expected_types.get(&expression.into()).copied())
     }
 
     fn fallback_type(&self) -> Option<Type<'db>> {
@@ -810,6 +821,8 @@ pub(crate) struct DefinitionInference<'db> {
 struct DefinitionInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
+    /// Expected types for expression nodes tracked for IDE completion.
+    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
     /// Functions called while inferring this definition.
     called_functions: Box<[FunctionType<'db>]>,
@@ -1005,6 +1018,8 @@ pub(crate) struct ExpressionInference<'db> {
 struct ExpressionInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
+    /// Expected types for expression nodes tracked for IDE completion.
+    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
     /// Metadata for type expressions in this region.
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
@@ -1129,6 +1144,9 @@ pub(crate) struct StatementInferenceInner<'db> {
 struct StatementInferenceInnerExtra<'db> {
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
+
+    /// Expected types for expression nodes tracked for IDE completion.
+    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
     /// Functions called while inferring this statement.
     called_functions: Box<[FunctionType<'db>]>,
@@ -1278,6 +1296,18 @@ bitflags::bitflags! {
 
         /// Whether the visitor is currently visiting a `**kwargs` annotation.
         const IN_KWARG_ANNOTATION = 1 << 9;
+
+        /// Whether we're in a context where `Unpack` can be legal.
+        const IN_VALID_UNPACK_CONTEXT = 1 << 10;
+
+        /// Whether the visitor is currently visiting a type expression.
+        const IN_TYPE_EXPRESSION = 1 << 12;
+
+        /// Whether the visitor is currently visiting a nested position in a type expression.
+        const IN_NESTED_TYPE_EXPRESSION = 1 << 13;
+
+        /// Whether the visitor is currently visiting the argument to `Unpack[...]`.
+        const IN_UNPACK_TYPE_ARGUMENT = 1 << 14;
     }
 }
 

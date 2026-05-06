@@ -350,6 +350,62 @@ pub(crate) struct UnionBuilder<'db> {
     recursively_defined: RecursivelyDefined,
 }
 
+/// Accumulates types into a union.
+///
+/// Most real-world type variables only accumulate one or two constraints. We keep those cases as
+/// plain `Type`s and only allocate a `UnionBuilder` once we know the accumulation is larger.
+pub(crate) enum UnionAccumulator<'db> {
+    One(Type<'db>),
+    Two(Type<'db>, Type<'db>),
+    Deferred(UnionBuilder<'db>),
+}
+
+impl<'db> UnionAccumulator<'db> {
+    pub(crate) fn new(ty: Type<'db>) -> Self {
+        UnionAccumulator::One(ty)
+    }
+
+    pub(crate) fn add(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+        match self {
+            UnionAccumulator::One(existing) => {
+                *self = UnionAccumulator::Two(*existing, ty);
+            }
+            UnionAccumulator::Two(first, second) => {
+                let mut builder = UnionBuilder::new(db);
+                builder.add_in_place(*first);
+                builder.add_in_place(*second);
+                builder.add_in_place(ty);
+                *self = UnionAccumulator::Deferred(builder);
+            }
+            UnionAccumulator::Deferred(builder) => builder.add_in_place(ty),
+        }
+    }
+
+    pub(crate) fn get_or_build(&mut self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            UnionAccumulator::One(ty) => *ty,
+            UnionAccumulator::Two(first, second) => {
+                let ty = UnionType::from_two_elements(db, *first, *second);
+                *self = UnionAccumulator::One(ty);
+                ty
+            }
+            UnionAccumulator::Deferred(_) => {
+                let ty = std::mem::replace(self, UnionAccumulator::new(Type::Never)).into_type(db);
+                *self = UnionAccumulator::new(ty);
+                ty
+            }
+        }
+    }
+
+    pub(crate) fn into_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            UnionAccumulator::One(ty) => ty,
+            UnionAccumulator::Two(first, second) => UnionType::from_two_elements(db, first, second),
+            UnionAccumulator::Deferred(builder) => builder.build(),
+        }
+    }
+}
+
 impl<'db> UnionBuilder<'db> {
     pub(crate) fn new(db: &'db dyn Db) -> Self {
         Self {

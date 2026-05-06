@@ -402,7 +402,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Named keywords are inferred against the declared type of the matching `TypedDict` field.
     /// Unpacked `**kwargs` and unknown keys fall back to default inference because they do not
     /// map to a single field declaration at this stage.
-    fn infer_typed_dict_constructor_keyword_values(
+    pub(super) fn infer_typed_dict_constructor_keyword_values(
         &mut self,
         typed_dict: TypedDictType<'db>,
         arguments: &ast::Arguments,

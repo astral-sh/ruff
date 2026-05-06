@@ -4,8 +4,6 @@
 
 ### Python 3.10
 
-<!-- snapshot-diagnostics -->
-
 Before Python 3.11, `async` comprehensions could not be used within outer sync comprehensions, even
 within an `async` function ([CPython issue](https://github.com/python/cpython/issues/77527)):
 
@@ -19,16 +17,35 @@ async def elements(n):
     yield n
 
 async def f():
-    # error: 19 [invalid-syntax] "cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)"
+    # snapshot: invalid-syntax
     return {n: [x async for x in elements(n)] for n in range(3)}
+```
+
+```snapshot
+error[invalid-syntax]: cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)
+ --> src/mdtest_snippet.py:6:19
+  |
+6 |     return {n: [x async for x in elements(n)] for n in range(3)}
+  |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 ```
 
 If all of the comprehensions are `async`, on the other hand, the code was still valid:
 
 ```py
 async def test():
-    # error: [not-iterable] "Object of type `range` is not async-iterable"
+    # snapshot: not-iterable
     return [[x async for x in elements(n)] async for n in range(3)]
+```
+
+```snapshot
+error[not-iterable]: Object of type `range` is not async-iterable
+ --> src/mdtest_snippet.py:9:59
+  |
+9 |     return [[x async for x in elements(n)] async for n in range(3)]
+  |                                                           ^^^^^^^^
+  |
+info: It has no `__aiter__` method
 ```
 
 These are a couple of tricky but valid cases to check that nested scope handling is wired up
@@ -375,39 +392,84 @@ def f():
 
 ## `break` and `continue` outside a loop
 
-<!-- snapshot-diagnostics -->
-
 ```py
-break  # error: [invalid-syntax]
-continue  # error: [invalid-syntax]
+break  # snapshot: invalid-syntax
+continue  # snapshot: invalid-syntax
 
 for x in range(42):
     break  # fine
     continue  # fine
 
     def _():
-        break  # error: [invalid-syntax]
-        continue  # error: [invalid-syntax]
+        break  # snapshot: invalid-syntax
+        continue  # snapshot: invalid-syntax
 
     class Fine:
         # this is invalid syntax despite it being in an eager-nested scope!
-        break  # error: [invalid-syntax]
-        continue  # error: [invalid-syntax]
+        break  # snapshot: invalid-syntax
+        continue  # snapshot: invalid-syntax
 ```
 
-## name is parameter and global
+```snapshot
+error[invalid-syntax]: `break` outside loop
+ --> src/mdtest_snippet.py:1:1
+  |
+1 | break  # snapshot: invalid-syntax
+  | ^^^^^
+  |
 
-<!-- snapshot-diagnostics -->
+
+error[invalid-syntax]: `continue` outside loop
+ --> src/mdtest_snippet.py:2:1
+  |
+2 | continue  # snapshot: invalid-syntax
+  | ^^^^^^^^
+  |
+
+
+error[invalid-syntax]: `break` outside loop
+ --> src/mdtest_snippet.py:9:9
+  |
+9 |         break  # snapshot: invalid-syntax
+  |         ^^^^^
+  |
+
+
+error[invalid-syntax]: `continue` outside loop
+  --> src/mdtest_snippet.py:10:9
+   |
+10 |         continue  # snapshot: invalid-syntax
+   |         ^^^^^^^^
+   |
+
+
+error[invalid-syntax]: `break` outside loop
+  --> src/mdtest_snippet.py:14:9
+   |
+14 |         break  # snapshot: invalid-syntax
+   |         ^^^^^
+   |
+
+
+error[invalid-syntax]: `continue` outside loop
+  --> src/mdtest_snippet.py:15:9
+   |
+15 |         continue  # snapshot: invalid-syntax
+   |         ^^^^^^^^
+   |
+```
+
+## name cannot refer to a parameter and a global variable
 
 ```py
 a = None
 
 def f(a):
-    global a  # error: [invalid-syntax]
+    global a  # snapshot: invalid-syntax
 
 def g(a):
     if True:
-        global a  # error: [invalid-syntax]
+        global a  # snapshot: invalid-syntax
 
 def h(a):
     def inner():
@@ -415,20 +477,61 @@ def h(a):
 
 def i(a):
     try:
-        global a  # error: [invalid-syntax]
+        global a  # snapshot: invalid-syntax
     except Exception:
         pass
 
 def f(a):
     a = 1
-    global a  # error: [invalid-syntax]
+    global a  # snapshot: invalid-syntax
 
 def f(a):
     a = 1
     a = 2
-    global a  # error: [invalid-syntax]
+    global a  # snapshot: invalid-syntax
 
 def f(a):
     class Inner:
         global a  # ok
+```
+
+```snapshot
+error[invalid-syntax]: name `a` cannot refer to a parameter and a global variable
+ --> src/mdtest_snippet.py:4:12
+  |
+4 |     global a  # snapshot: invalid-syntax
+  |            ^
+  |
+
+
+error[invalid-syntax]: name `a` cannot refer to a parameter and a global variable
+ --> src/mdtest_snippet.py:8:16
+  |
+8 |         global a  # snapshot: invalid-syntax
+  |                ^
+  |
+
+
+error[invalid-syntax]: name `a` cannot refer to a parameter and a global variable
+  --> src/mdtest_snippet.py:16:16
+   |
+16 |         global a  # snapshot: invalid-syntax
+   |                ^
+   |
+
+
+error[invalid-syntax]: name `a` cannot refer to a parameter and a global variable
+  --> src/mdtest_snippet.py:22:12
+   |
+22 |     global a  # snapshot: invalid-syntax
+   |            ^
+   |
+
+
+error[invalid-syntax]: name `a` cannot refer to a parameter and a global variable
+  --> src/mdtest_snippet.py:27:12
+   |
+27 |     global a  # snapshot: invalid-syntax
+   |            ^
+   |
 ```
