@@ -69,11 +69,7 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
                     }
                     _ => false,
                 });
-            if multipart_import_is_used {
-                continue;
-            }
-
-            if multipart_import_name.is_none() && is_used {
+            if multipart_import_is_used || (multipart_import_name.is_none() && is_used) {
                 continue;
             }
 
