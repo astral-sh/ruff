@@ -1073,14 +1073,8 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn is_non_generic(&self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_non_generic(&self) -> bool {
         self.generic_context.is_none()
-            && self.parameters().iter().all(|parameter| {
-                !parameter
-                    .annotated_type()
-                    .has_typevar_or_typevar_instance(db)
-            })
-            && !self.return_ty.has_typevar_or_typevar_instance(db)
     }
 
     /// Return whether this non-generic implementation accepts the arguments of a non-generic
@@ -1094,8 +1088,8 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         overload: &Self,
     ) -> bool {
-        debug_assert!(self.is_non_generic(db));
-        debug_assert!(overload.is_non_generic(db));
+        debug_assert!(self.is_non_generic());
+        debug_assert!(overload.is_non_generic());
 
         let implementation = self.clone().with_return_type(Type::unknown());
         let overload = overload.clone().with_return_type(Type::unknown());

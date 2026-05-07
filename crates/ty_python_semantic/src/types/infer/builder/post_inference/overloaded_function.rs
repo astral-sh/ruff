@@ -281,7 +281,7 @@ fn check_non_generic_overload_implementation_consistency<'db>(
 
     // TODO: Remove this temporary non-generic restriction once overload implementation consistency
     // handles type-variable domains.
-    if !implementation_signature.is_non_generic(db) {
+    if !implementation_signature.is_non_generic() {
         return;
     }
 
@@ -291,7 +291,7 @@ fn check_non_generic_overload_implementation_consistency<'db>(
 
     if overload_signatures
         .clone()
-        .any(|(_, signature)| !signature.is_non_generic(db))
+        .any(|(_, signature)| !signature.is_non_generic())
     {
         return;
     }
