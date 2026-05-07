@@ -135,13 +135,10 @@ pub(crate) fn references(
                 );
             }
         }
-
         // Parameters are local by scope, but they can have cross-file references via keyword
         // argument labels (e.g. `f(param=...)`). Handle this case with a narrow scan that only
         // considers keyword arguments.
-        if matches!(goto_target, GotoTarget::Parameter(_))
-            && parameter_owner_is_externally_visible(db, &target_definitions)
-        {
+        else if parameter_owner_is_externally_visible(db, &target_definitions) {
             references_for_parameter_keyword_arguments_across_files(
                 db,
                 file,
