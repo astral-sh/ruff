@@ -331,6 +331,18 @@ impl std::fmt::Debug for IntLiteralType {
     }
 }
 
+impl std::cmp::Ord for IntLiteralType {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.as_i64().cmp(&other.as_i64())
+    }
+}
+
+impl std::cmp::PartialOrd for IntLiteralType {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct StringLiteralType<'db> {
     #[returns(deref)]

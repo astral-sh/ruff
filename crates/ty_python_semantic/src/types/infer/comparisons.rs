@@ -379,8 +379,6 @@ pub(super) fn infer_binary_type_comparison<'db>(
         (Type::LiteralValue(left_literal), Type::LiteralValue(right_literal)) => {
             match (left_literal.kind(), right_literal.kind()) {
                 (LiteralValueTypeKind::Int(n), LiteralValueTypeKind::Int(m)) => {
-                    let n = n.as_i64();
-                    let m = m.as_i64();
                     Some(match op {
                         ast::CmpOp::Eq => Ok(Type::bool_literal(n == m)),
                         ast::CmpOp::NotEq => Ok(Type::bool_literal(n != m)),
