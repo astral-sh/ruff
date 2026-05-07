@@ -586,28 +586,6 @@ fn is_equality_domain<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     ty.is_single_valued(db) || ty.is_union_of_single_valued(db)
 }
 
-/// Return the broad portion of `ty` that is not modeled as a known equality domain.
-fn broad_equality_domain_part<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-    match ty {
-        Type::Union(union) => UnionType::from_elements(
-            db,
-            union
-                .elements(db)
-                .iter()
-                .copied()
-                .filter(|element| !is_single_valued_equality_domain(db, *element)),
-        ),
-        _ if is_single_valued_equality_domain(db, ty) => Type::Never,
-        _ => ty,
-    }
-}
-
-/// Return `true` if every possible RHS value is already covered by a broad LHS arm.
-fn rhs_is_covered_by_broad_lhs<'db>(db: &'db dyn Db, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> bool {
-    let broad_lhs = broad_equality_domain_part(db, lhs_ty);
-    !broad_lhs.is_never() && rhs_ty.is_subtype_of(db, broad_lhs)
-}
-
 struct NarrowingConstraintsBuilder<'db, 'ast> {
     db: &'db dyn Db,
     module: &'ast ParsedModuleRef,
@@ -968,7 +946,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let lhs_ty = lhs_ty.resolve_type_alias(self.db);
         let rhs_ty = rhs_ty.resolve_type_alias(self.db);
 
-        // Equality narrowing is most precise when comparing against known equality domains.
+        // A broad RHS can make arbitrary LHS values compare equal through reflected `__eq__`, so
+        // equality only gives us useful information when the RHS is a known equality domain.
         if is_equality_domain(self.db, rhs_ty) {
             // The fully-general (and more efficient) approach here would be to introduce a
             // `NeverEqualTo` type that can wrap a single-valued type, and then simply return
@@ -1048,28 +1027,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             } else {
                 filter_to_cannot_be_equal(self.db, lhs_ty, rhs_ty).negate(self.db)
             })
-        } else if let Type::Union(union) = lhs_ty {
-            // Preserve the ergonomic mixed-union narrowing used for cases like
-            // `str | None == str`, but only when the broad RHS is already covered by one of the
-            // broad LHS arms. An unrelated broad RHS can only erase known value-domain arms via
-            // reflected `__eq__`, as in `str | None == Mock`, so we leave those cases unchanged.
-            if !rhs_is_covered_by_broad_lhs(self.db, lhs_ty, rhs_ty) {
-                return None;
-            }
-
-            let mut builder = UnionBuilder::new(self.db).add(rhs_ty);
-
-            for element in union.elements(self.db) {
-                if is_single_valued_equality_domain(self.db, *element) {
-                    continue;
-                }
-
-                if could_compare_equal(self.db, *element, rhs_ty) {
-                    builder = builder.add(*element);
-                }
-            }
-
-            Some(builder.build())
         } else {
             None
         }
@@ -1106,19 +1063,16 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             .ok()?
             .homogeneous_element_type(self.db);
 
-        if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
-            is_equality_domain(self.db, rhs_values).then_some(rhs_values)
-        } else if lhs_ty.is_union_with_single_valued(self.db) {
-            // Match the `==` policy: broad RHS values are only useful when they are already
-            // covered by retained broad LHS arms. This keeps `str | None in list[str]`
-            // narrowing, without letting unrelated element types erase `None` via reflected
-            // equality.
-            if !is_equality_domain(self.db, rhs_values)
-                && !rhs_is_covered_by_broad_lhs(self.db, lhs_ty, rhs_values)
-            {
-                return None;
-            }
+        // Membership compares the LHS against the RHS elements. If those elements are broad,
+        // reflected `__eq__` can make any LHS value compare equal, so a successful membership
+        // check tells us nothing useful about the LHS.
+        if !is_equality_domain(self.db, rhs_values) {
+            return None;
+        }
 
+        if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
+            Some(rhs_values)
+        } else if lhs_ty.is_union_with_single_valued(self.db) {
             let mut builder = UnionBuilder::new(self.db);
 
             // Add the narrowed values from the RHS first, to keep literals before broader types.
