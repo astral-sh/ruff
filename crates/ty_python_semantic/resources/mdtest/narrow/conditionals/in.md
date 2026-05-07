@@ -162,6 +162,31 @@ def test(x: Literal["a", "b", "c"] | None | int = None):
         reveal_type(x)  # revealed: Literal["c"] | None | int
 ```
 
+## No narrowing against non-single-valued elements
+
+```py
+class Mock:
+    def __eq__(self, other) -> bool:
+        return True
+
+def _(x: str | None, y: Mock):
+    if x in [y]:
+        reveal_type(x)  # revealed: str | None
+    else:
+        reveal_type(x)  # revealed: str | None
+
+def _(x: str | None, y: str):
+    if x in [y]:
+        reveal_type(x)  # revealed: str | None
+    else:
+        reveal_type(x)  # revealed: str | None
+
+    if x not in [y]:
+        reveal_type(x)  # revealed: str | None
+    else:
+        reveal_type(x)  # revealed: str | None
+```
+
 ## Direct `not in` conditional
 
 ```py

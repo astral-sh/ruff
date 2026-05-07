@@ -580,6 +580,12 @@ fn is_single_valued_equality_domain<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool
         || (ty.is_enum(db) && !ty.overrides_equality(db))
 }
 
+/// Return `true` if every inhabitant of `ty` comes from a known value-domain for equality
+/// narrowing.
+fn is_equality_domain<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    ty.is_single_valued(db) || ty.is_union_of_single_valued(db)
+}
+
 struct NarrowingConstraintsBuilder<'db, 'ast> {
     db: &'db dyn Db,
     module: &'ast ParsedModuleRef,
@@ -940,8 +946,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let lhs_ty = lhs_ty.resolve_type_alias(self.db);
         let rhs_ty = rhs_ty.resolve_type_alias(self.db);
 
-        // Equality narrowing is most precise when comparing against single-valued types.
-        if rhs_ty.is_single_valued(self.db) || rhs_ty.is_union_of_single_valued(self.db) {
+        // A broad RHS can make arbitrary LHS values compare equal through reflected `__eq__`, so
+        // equality only gives us useful information when the RHS is a known equality domain.
+        if is_equality_domain(self.db, rhs_ty) {
             // The fully-general (and more efficient) approach here would be to introduce a
             // `NeverEqualTo` type that can wrap a single-valued type, and then simply return
             // `~NeverEqualTo(rhs_ty)` here and let union/intersection builder sort it out. This is
@@ -1020,31 +1027,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             } else {
                 filter_to_cannot_be_equal(self.db, lhs_ty, rhs_ty).negate(self.db)
             })
-        } else if let Type::Union(union) = lhs_ty {
-            // Match `in` narrowing for unions that mix known value-domains with broader
-            // arms: the RHS can rule out the value-domain arms, but broader arms stay
-            // if custom equality could make them compare equal.
-            if !union
-                .elements(self.db)
-                .iter()
-                .any(|element| is_single_valued_equality_domain(self.db, *element))
-            {
-                return None;
-            }
-
-            let mut builder = UnionBuilder::new(self.db).add(rhs_ty);
-
-            for element in union.elements(self.db) {
-                if is_single_valued_equality_domain(self.db, *element) {
-                    continue;
-                }
-
-                if could_compare_equal(self.db, *element, rhs_ty) {
-                    builder = builder.add(*element);
-                }
-            }
-
-            Some(builder.build())
         } else {
             None
         }
@@ -1076,18 +1058,21 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     // since `eq` and `ne` are equivalent to `in` and `not in` with only one element in the RHS.
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         let lhs_ty = lhs_ty.resolve_type_alias(self.db);
+        let rhs_values = rhs_ty
+            .try_iterate(self.db)
+            .ok()?
+            .homogeneous_element_type(self.db);
+
+        // Membership compares the LHS against the RHS elements. If those elements are broad,
+        // reflected `__eq__` can make any LHS value compare equal, so a successful membership
+        // check tells us nothing useful about the LHS.
+        if !is_equality_domain(self.db, rhs_values) {
+            return None;
+        }
 
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
-            rhs_ty
-                .try_iterate(self.db)
-                .ok()
-                .map(|iterable| iterable.homogeneous_element_type(self.db))
+            Some(rhs_values)
         } else if lhs_ty.is_union_with_single_valued(self.db) {
-            let rhs_values = rhs_ty
-                .try_iterate(self.db)
-                .ok()?
-                .homogeneous_element_type(self.db);
-
             let mut builder = UnionBuilder::new(self.db);
 
             // Add the narrowed values from the RHS first, to keep literals before broader types.
@@ -1119,6 +1104,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             .try_iterate(self.db)
             .ok()?
             .homogeneous_element_type(self.db);
+
+        // See `evaluate_expr_in`: broad RHS elements can define arbitrary reflected equality, so
+        // failed membership only gives us useful information for known equality domains.
+        if !is_equality_domain(self.db, rhs_values) {
+            return None;
+        }
 
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
             // Exclude the RHS values from the entire (single-valued) LHS domain.
