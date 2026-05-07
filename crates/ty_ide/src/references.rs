@@ -10,7 +10,7 @@
 //! all references to these externally-visible symbols therefore requires
 //! an expensive search of all source files in the workspace.
 
-use crate::goto::GotoTarget;
+use crate::goto::{Definitions, GotoTarget};
 use crate::{Db, NavigationTarget, NavigationTargets, ReferenceKind, ReferenceTarget};
 use ruff_db::files::File;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
@@ -20,7 +20,8 @@ use ruff_python_ast::{
     visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
 use ruff_text_size::{Ranged, TextRange};
-use ty_python_semantic::{ImportAliasResolution, SemanticModel};
+use ty_python_core::scope::ScopeKind;
+use ty_python_semantic::{ImportAliasResolution, ResolvedDefinition, SemanticModel};
 
 /// Mode for references search behavior
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,9 +79,11 @@ pub(crate) fn references(
     mode: ReferencesMode,
 ) -> Option<Vec<ReferenceTarget>> {
     let model = SemanticModel::new(db, file);
-    let target_definitions = goto_target
-        .get_definition_targets(&model, mode.to_import_alias_resolution())?
-        .declaration_targets(&model, goto_target)?;
+    let target_definitions =
+        goto_target.get_definition_targets(&model, mode.to_import_alias_resolution())?;
+    let target_may_have_cross_file_references =
+        definitions_may_have_cross_file_references(db, &target_definitions);
+    let target_definitions = target_definitions.declaration_targets(&model, goto_target)?;
 
     // Extract the target text from the goto target for fast comparison
     let target_text = goto_target.to_string()?;
@@ -107,7 +110,7 @@ pub(crate) fn references(
     if search_across_files {
         // For symbols that are potentially visible outside of the current module, perform a full
         // semantic search across files.
-        if is_symbol_externally_visible(goto_target) {
+        if target_may_have_cross_file_references {
             // Look for references in all other files within the workspace
             for other_file in &db.project().files(db) {
                 // Skip the current file as we already processed it
@@ -308,22 +311,17 @@ fn references_for_file(
     AnyNodeRef::from(module.syntax()).visit_source_order(&mut finder);
 }
 
-/// Determines whether a symbol is potentially visible outside of the current module.
-fn is_symbol_externally_visible(goto_target: &GotoTarget<'_>) -> bool {
-    match goto_target {
-        GotoTarget::Parameter(_)
-        | GotoTarget::ExceptVariable(_)
-        | GotoTarget::TypeParamTypeVarName(_)
-        | GotoTarget::TypeParamParamSpecName(_)
-        | GotoTarget::TypeParamTypeVarTupleName(_) => false,
-
-        // Assume all other goto target types are potentially visible.
-
-        // TODO: For local variables, we should be able to return false
-        // except in cases where the variable is in the global scope
-        // or uses a "global" binding.
-        _ => true,
-    }
+/// Determines whether the resolved definitions can have references outside their file.
+fn definitions_may_have_cross_file_references(db: &dyn Db, definitions: &Definitions<'_>) -> bool {
+    definitions.0.iter().any(|definition| match definition {
+        ResolvedDefinition::Definition(definition) => {
+            matches!(
+                definition.scope(db).scope(db).kind(),
+                ScopeKind::Module | ScopeKind::Class
+            )
+        }
+        ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => true,
+    })
 }
 
 /// Determine whether a parameter's owning callable is externally visible.
@@ -691,5 +689,28 @@ impl LocalReferencesFinder<'_> {
     /// Helper to check if an expression contains a given range
     fn expr_contains_range(expr: &ast::Expr, range: TextRange) -> bool {
         expr.range().contains_range(range)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn source_candidate_prefilters_use_identifier_boundaries() {
+        for (source, name) in [("x = 1", "x"), ("obj.x", "x"), ("x()", "x")] {
+            assert!(source_contains_identifier_candidate(source, name));
+        }
+
+    #[test]
+    fn class_scope_definition_needs_cross_file_search() {
+        let test = cursor_test(
+            "
+class C:
+    x<CURSOR> = 1
+",
+        );
+
+        assert!(cursor_target_may_have_cross_file_references(&test));
     }
 }

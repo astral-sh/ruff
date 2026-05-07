@@ -1165,6 +1165,39 @@ def process_model():
     }
 
     #[test]
+    fn multi_file_function_local_references_stay_in_file() {
+        let test = CursorTest::builder()
+            .source(
+                "utils.py",
+                "
+def func():
+    x<CURSOR> = 1
+    return x
+",
+            )
+            .source(
+                "caller.py",
+                "
+x = 1
+print(x)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> utils.py:3:5
+          |
+        2 | def func():
+        3 |     x = 1
+          |     -
+        4 |     return x
+          |            -
+          |
+        ");
+    }
+
+    #[test]
     fn multi_file_parameter_references_include_keyword_argument_labels() {
         let test = CursorTest::builder()
             .source(
