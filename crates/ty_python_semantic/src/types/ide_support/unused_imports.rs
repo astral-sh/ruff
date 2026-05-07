@@ -5,7 +5,6 @@ use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_python_ast::{self as ast, helpers::is_dunder, name::Name};
 use ruff_text_size::TextRange;
 use ty_python_core::definition::{DefinitionKind, DefinitionState};
-use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::{NodeWithScopeKind, ScopeKind};
 use ty_python_core::semantic_index;
 
@@ -84,6 +83,8 @@ fn expr_matches_dotted_import_prefix<'a>(
                 return false;
             }
 
+            // Once all imported segments are consumed, any further attribute access
+            // is a use of the import.
             segments
                 .next()
                 .is_none_or(|segment| attribute.attr.id == segment)
@@ -175,7 +176,7 @@ fn multipart_import_is_used_in_scope(
 pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
     let parsed = parsed_module(db, file).load(db);
     let index = semantic_index(db, file);
-    let explicit_exports = dunder_all_names(db, file);
+    let mut explicit_exports = None;
     let mut unused = Vec::new();
 
     for scope_id in index.scope_ids() {
@@ -187,7 +188,6 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
             continue;
         }
 
-        let place_table = index.place_table(file_scope_id);
         let use_def_map = index.use_def_map(file_scope_id);
 
         for (_, state, is_used) in use_def_map.all_definitions_with_usage() {
@@ -207,13 +207,7 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
                 continue;
             }
 
-            let ScopedPlaceId::Symbol(symbol_id) = definition.place(db) else {
-                continue;
-            };
-
-            let symbol = place_table.symbol(symbol_id);
-
-            if multipart_import_name.is_none() && (is_used || symbol.is_used()) {
+            if multipart_import_name.is_none() && is_used {
                 continue;
             }
 
@@ -221,13 +215,14 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
                 continue;
             };
 
-            if is_intentionally_unused_name(&display_name)
-                || (multipart_import_name.is_none()
-                    && is_module_scope
-                    && explicit_exports
-                        .as_ref()
-                        .is_some_and(|exports| exports.contains(&display_name)))
-            {
+            let is_explicit_export = multipart_import_name.is_none()
+                && is_module_scope
+                && explicit_exports
+                    .get_or_insert_with(|| dunder_all_names(db, file))
+                    .as_ref()
+                    .is_some_and(|exports| exports.contains(&display_name));
+
+            if is_intentionally_unused_name(&display_name) || is_explicit_export {
                 continue;
             }
 
@@ -445,6 +440,21 @@ mod tests {
                 ("path".to_string(), "path".to_string()),
             ]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn reports_import_shadowed_before_use() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            import os
+
+            os = "not os"
+            print(os)
+            "#,
+        )?;
+
+        assert_eq!(names, vec!["os"]);
         Ok(())
     }
 
