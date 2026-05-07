@@ -19,7 +19,7 @@ expression: diagnostics
       },
       "severity": 4,
       "source": "ty",
-      "message": "`helper` is an unused import",
+      "message": "Import `helper` is not accessed",
       "tags": [
         1
       ]
