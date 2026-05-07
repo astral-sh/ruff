@@ -209,27 +209,29 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
             };
 
             let symbol = place_table.symbol(symbol_id);
-            let name = symbol.name();
 
             if multipart_import_name.is_none() && (is_used || symbol.is_used()) {
                 continue;
             }
 
-            if is_intentionally_unused_name(name)
+            let Some((range, display_name)) = import_target(kind, &parsed) else {
+                continue;
+            };
+
+            if is_intentionally_unused_name(&display_name)
                 || (multipart_import_name.is_none()
                     && is_module_scope
                     && explicit_exports
                         .as_ref()
-                        .is_some_and(|exports| exports.contains(name)))
+                        .is_some_and(|exports| exports.contains(&display_name)))
             {
                 continue;
             }
 
-            let Some((range, name)) = import_target(kind, &parsed) else {
-                continue;
-            };
-
-            unused.push(UnusedImport { range, name });
+            unused.push(UnusedImport {
+                range,
+                name: display_name,
+            });
         }
     }
 
@@ -739,6 +741,19 @@ mod tests {
         )?;
 
         assert_eq!(names, vec!["json"]);
+        Ok(())
+    }
+
+    #[test]
+    fn dunder_all_suppresses_renamed_import_exports() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            __all__ = ["exported_by_all"]
+            from fractions import Fraction as exported_by_all
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
         Ok(())
     }
 
