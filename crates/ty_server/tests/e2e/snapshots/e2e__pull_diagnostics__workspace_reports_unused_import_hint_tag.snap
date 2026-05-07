@@ -23,7 +23,7 @@ expression: diagnostics
           },
           "severity": 4,
           "source": "ty",
-          "message": "Import `os` is not accessed",
+          "message": "Import `os` is not used",
           "tags": [
             1
           ]

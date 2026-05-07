@@ -19,7 +19,7 @@ expression: diagnostics
       },
       "severity": 4,
       "source": "ty",
-      "message": "Import `helper` is not accessed",
+      "message": "Import `helper` is not used",
       "tags": [
         1
       ]
