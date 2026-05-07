@@ -921,7 +921,7 @@ def callable_identity[**P, R](func: Callable[P, R]) -> Callable[P, R]:
 def f(env: dict) -> None:
     pass
 
-# revealed: (env: dict[Unknown, Unknown]) -> None
+# revealed: def f(env: dict[Unknown, Unknown]) -> None
 reveal_type(f)
 ```
 
@@ -1248,7 +1248,7 @@ c = Container()
 # revealed: ty_extensions.GenericContext[T@generic_method]
 reveal_type(generic_context(c.generic_method))
 
-reveal_type(c.generic_method)  # revealed: [T](value: T) -> T
+reveal_type(c.generic_method)  # revealed: bound method Container.generic_method[T](value: T) -> T
 reveal_type(c.generic_method(100))  # revealed: Literal[100]
 reveal_type(c.generic_method([1, 2, 3]))  # revealed: list[int]
 ```
