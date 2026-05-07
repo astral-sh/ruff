@@ -17,6 +17,97 @@ pub struct UnusedImport {
     pub name: Name,
 }
 
+/// Returns unused import aliases for IDE-facing unnecessary hints.
+///
+/// This is intentionally file-local. It reports imports that are unused in their defining file
+/// unless the file explicitly reexports them with `as` aliases or `__all__`. This can report an
+/// implicit package export as unused; make the export explicit to suppress the hint.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
+    let parsed = parsed_module(db, file).load(db);
+    let index = semantic_index(db, file);
+    let mut explicit_exports = None;
+    let mut unused = Vec::new();
+
+    for scope_id in index.scope_ids() {
+        let file_scope_id = scope_id.file_scope_id(db);
+        let scope = index.scope(file_scope_id);
+        let is_module_scope = matches!(scope.kind(), ScopeKind::Module);
+
+        if matches!(scope.kind(), ScopeKind::TypeParams | ScopeKind::TypeAlias) {
+            continue;
+        }
+
+        let use_def_map = index.use_def_map(file_scope_id);
+
+        for (_, state, is_used) in use_def_map.all_definitions_with_usage() {
+            let DefinitionState::Defined(definition) = state else {
+                continue;
+            };
+
+            let kind = definition.kind(db);
+            if !should_report_import(kind) || kind.is_future_import(&parsed) {
+                continue;
+            }
+
+            let multipart_import_name = unaliased_multipart_import_name(kind, &parsed);
+            let multipart_import_is_used =
+                multipart_import_name.is_some_and(|name| match scope.node() {
+                    NodeWithScopeKind::Module => {
+                        multipart_import_is_used_in_body(parsed.suite(), name)
+                    }
+                    NodeWithScopeKind::Class(class) => {
+                        multipart_import_is_used_in_class_body(&class.node(&parsed).body, name)
+                    }
+                    NodeWithScopeKind::Function(function) => {
+                        multipart_import_is_used_in_body(&function.node(&parsed).body, name)
+                    }
+                    NodeWithScopeKind::Lambda(lambda) => {
+                        let mut visitor = MultipartImportUseVisitor::new(name);
+                        visitor.visit_expr(&lambda.node(&parsed).body);
+                        visitor.used
+                    }
+                    _ => false,
+                });
+            if multipart_import_is_used {
+                continue;
+            }
+
+            if multipart_import_name.is_none() && is_used {
+                continue;
+            }
+
+            let Some((range, display_name)) = import_target(kind, &parsed) else {
+                continue;
+            };
+
+            if is_intentionally_unused_name(&display_name) {
+                continue;
+            }
+
+            let is_explicit_export = multipart_import_name.is_none()
+                && is_module_scope
+                && explicit_exports
+                    .get_or_insert_with(|| dunder_all_names(db, file))
+                    .as_ref()
+                    .is_some_and(|exports| exports.contains(&display_name));
+
+            if is_explicit_export {
+                continue;
+            }
+
+            unused.push(UnusedImport {
+                range,
+                name: display_name,
+            });
+        }
+    }
+
+    unused.sort_unstable_by_key(|import| (import.range.start(), import.range.end()));
+    unused.dedup_by_key(|import| import.range);
+    unused
+}
+
 /// Returns `true` for concrete import aliases that can produce unused-import hints.
 ///
 /// Star imports have no precise target, and explicit reexports are intentional public API.
@@ -90,6 +181,15 @@ struct MultipartImportUseVisitor<'a> {
     used: bool,
 }
 
+impl<'a> MultipartImportUseVisitor<'a> {
+    const fn new(imported_name: &'a str) -> Self {
+        Self {
+            imported_name,
+            used: false,
+        }
+    }
+}
+
 impl<'a> SourceOrderVisitor<'a> for MultipartImportUseVisitor<'_> {
     fn visit_expr(&mut self, expr: &'a ast::Expr) {
         if self.used {
@@ -108,124 +208,36 @@ impl<'a> SourceOrderVisitor<'a> for MultipartImportUseVisitor<'_> {
     }
 }
 
-fn multipart_import_is_used_in_scope(
-    parsed: &ruff_db::parsed::ParsedModuleRef,
-    scope_node: &NodeWithScopeKind,
-    imported_name: &str,
-) -> bool {
-    let mut visitor = MultipartImportUseVisitor {
-        imported_name,
-        used: false,
-    };
+fn multipart_import_is_used_in_body(body: &[ast::Stmt], imported_name: &str) -> bool {
+    let mut visitor = MultipartImportUseVisitor::new(imported_name);
 
-    match scope_node {
-        NodeWithScopeKind::Module => {
-            for stmt in parsed.suite() {
-                visitor.visit_stmt(stmt);
-                if visitor.used {
-                    break;
-                }
-            }
-        }
-        NodeWithScopeKind::Class(class) => {
-            for stmt in &class.node(parsed).body {
-                if !matches!(stmt, ast::Stmt::ClassDef(_) | ast::Stmt::FunctionDef(_)) {
-                    visitor.visit_stmt(stmt);
-                }
+    for stmt in body {
+        visitor.visit_stmt(stmt);
 
-                if visitor.used {
-                    break;
-                }
-            }
+        if visitor.used {
+            break;
         }
-        NodeWithScopeKind::Function(function) => {
-            for stmt in &function.node(parsed).body {
-                visitor.visit_stmt(stmt);
-                if visitor.used {
-                    break;
-                }
-            }
-        }
-        NodeWithScopeKind::Lambda(lambda) => visitor.visit_expr(&lambda.node(parsed).body),
-        _ => {}
     }
 
     visitor.used
 }
 
-/// Returns unused import aliases for IDE-facing unnecessary hints.
-///
-/// This is intentionally file-local. It reports imports that are unused in their defining file
-/// unless the file explicitly reexports them with `as` aliases or `__all__`. This can report an
-/// implicit package export as unused; make the export explicit to suppress the hint.
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
-    let parsed = parsed_module(db, file).load(db);
-    let index = semantic_index(db, file);
-    let mut explicit_exports = None;
-    let mut unused = Vec::new();
+fn multipart_import_is_used_in_class_body(body: &[ast::Stmt], imported_name: &str) -> bool {
+    let mut visitor = MultipartImportUseVisitor::new(imported_name);
 
-    for scope_id in index.scope_ids() {
-        let file_scope_id = scope_id.file_scope_id(db);
-        let scope = index.scope(file_scope_id);
-        let is_module_scope = matches!(scope.kind(), ScopeKind::Module);
-
-        if matches!(scope.kind(), ScopeKind::TypeParams | ScopeKind::TypeAlias) {
+    for stmt in body {
+        if matches!(stmt, ast::Stmt::ClassDef(_) | ast::Stmt::FunctionDef(_)) {
             continue;
         }
 
-        let use_def_map = index.use_def_map(file_scope_id);
+        visitor.visit_stmt(stmt);
 
-        for (_, state, is_used) in use_def_map.all_definitions_with_usage() {
-            let DefinitionState::Defined(definition) = state else {
-                continue;
-            };
-
-            let kind = definition.kind(db);
-            if !should_report_import(kind) || kind.is_future_import(&parsed) {
-                continue;
-            }
-
-            let multipart_import_name = unaliased_multipart_import_name(kind, &parsed);
-            if multipart_import_name
-                .is_some_and(|name| multipart_import_is_used_in_scope(&parsed, scope.node(), name))
-            {
-                continue;
-            }
-
-            if multipart_import_name.is_none() && is_used {
-                continue;
-            }
-
-            let Some((range, display_name)) = import_target(kind, &parsed) else {
-                continue;
-            };
-
-            if is_intentionally_unused_name(&display_name) {
-                continue;
-            }
-
-            let is_explicit_export = multipart_import_name.is_none()
-                && is_module_scope
-                && explicit_exports
-                    .get_or_insert_with(|| dunder_all_names(db, file))
-                    .as_ref()
-                    .is_some_and(|exports| exports.contains(&display_name));
-
-            if is_explicit_export {
-                continue;
-            }
-
-            unused.push(UnusedImport {
-                range,
-                name: display_name,
-            });
+        if visitor.used {
+            break;
         }
     }
 
-    unused.sort_unstable_by_key(|import| (import.range.start(), import.range.end()));
-    unused.dedup_by_key(|import| import.range);
-    unused
+    visitor.used
 }
 
 #[cfg(test)]
