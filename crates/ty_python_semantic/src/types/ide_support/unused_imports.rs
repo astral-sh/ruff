@@ -29,13 +29,11 @@ fn should_report_import(kind: &DefinitionKind<'_>) -> bool {
 }
 
 fn is_future_import(kind: &DefinitionKind<'_>, parsed: &ruff_db::parsed::ParsedModuleRef) -> bool {
-    match kind {
-        DefinitionKind::Import(import) => import.alias(parsed).name.id.as_str() == "__future__",
-        DefinitionKind::ImportFrom(import_from) => {
-            import_from.import(parsed).module.as_deref() == Some("__future__")
-        }
-        _ => false,
-    }
+    matches!(
+        kind,
+        DefinitionKind::ImportFrom(import_from)
+            if import_from.import(parsed).module.as_deref() == Some("__future__")
+    )
 }
 
 fn is_intentionally_unused_name(name: &Name) -> bool {
@@ -70,16 +68,27 @@ fn unaliased_multipart_import_name<'a>(
     (alias.asname.is_none() && name.contains('.')).then_some(name)
 }
 
-fn dotted_name(expr: &ast::Expr) -> Option<String> {
+fn expr_uses_dotted_import(expr: &ast::Expr, imported_name: &str) -> bool {
+    let mut segments = imported_name.split('.');
+    expr_matches_dotted_import_prefix(expr, &mut segments) && segments.next().is_none()
+}
+
+fn expr_matches_dotted_import_prefix<'a>(
+    expr: &ast::Expr,
+    segments: &mut std::str::Split<'a, char>,
+) -> bool {
     match expr {
-        ast::Expr::Name(name) => Some(name.id.to_string()),
+        ast::Expr::Name(name) => segments.next().is_some_and(|segment| name.id == segment),
         ast::Expr::Attribute(attribute) => {
-            let mut name = dotted_name(&attribute.value)?;
-            name.push('.');
-            name.push_str(attribute.attr.id.as_str());
-            Some(name)
+            if !expr_matches_dotted_import_prefix(&attribute.value, segments) {
+                return false;
+            }
+
+            segments
+                .next()
+                .is_none_or(|segment| attribute.attr.id == segment)
         }
-        _ => None,
+        _ => false,
     }
 }
 
@@ -96,8 +105,7 @@ impl<'a> SourceOrderVisitor<'a> for MultipartImportUseVisitor<'_> {
 
         if let ast::Expr::Attribute(attribute) = expr
             && matches!(attribute.ctx, ast::ExprContext::Load)
-            && let Some(name) = dotted_name(expr)
-            && multipart_name_matches(&name, self.imported_name)
+            && expr_uses_dotted_import(expr, self.imported_name)
         {
             self.used = true;
             return;
@@ -105,11 +113,6 @@ impl<'a> SourceOrderVisitor<'a> for MultipartImportUseVisitor<'_> {
 
         source_order::walk_expr(self, expr);
     }
-}
-
-fn multipart_name_matches(name: &str, imported_name: &str) -> bool {
-    let imported_member_prefix = format!("{imported_name}.");
-    name == imported_name || name.starts_with(&imported_member_prefix)
 }
 
 fn visit_class_body_stmt_for_multipart_usage(
@@ -598,6 +601,23 @@ mod tests {
     }
 
     #[test]
+    fn reports_multipart_import_when_only_same_leaf_different_path_is_used() -> anyhow::Result<()> {
+        let entries = UnusedImportTest::new().entries(
+            r#"
+            import pkg.mod
+
+            print(pkg.other.mod)
+            "#,
+        )?;
+
+        assert_eq!(
+            entries,
+            vec![("pkg.mod".to_string(), "pkg.mod".to_string())]
+        );
+        Ok(())
+    }
+
+    #[test]
     fn reports_multipart_import_when_only_assigned() -> anyhow::Result<()> {
         let entries = UnusedImportTest::new().entries(
             r#"
@@ -815,11 +835,23 @@ mod tests {
         let names = UnusedImportTest::new().names(
             r#"
             from __future__ import annotations
-            import __future__
+            import os
             "#,
         )?;
 
-        assert_eq!(names, Vec::<String>::new());
+        assert_eq!(names, vec!["os"]);
+        Ok(())
+    }
+
+    #[test]
+    fn reports_aliased_plain_dunder_future_import() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            import __future__ as future
+            "#,
+        )?;
+
+        assert_eq!(names, vec!["future"]);
         Ok(())
     }
 
