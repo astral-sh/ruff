@@ -177,14 +177,14 @@ def _(x: str | None, y: Mock):
 
 def _(x: str | None, y: str):
     if x in [y]:
-        reveal_type(x)  # revealed: str | None
+        reveal_type(x)  # revealed: str
     else:
         reveal_type(x)  # revealed: str | None
 
     if x not in [y]:
         reveal_type(x)  # revealed: str | None
     else:
-        reveal_type(x)  # revealed: str | None
+        reveal_type(x)  # revealed: str
 ```
 
 ## Direct `not in` conditional

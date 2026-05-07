@@ -219,9 +219,9 @@ def _(x: Literal["foo", "bar", 42, b"foo"] | bool | complex):
         case 42:
             reveal_type(x)  # revealed: int | float | complex
         case 6.0:
-            reveal_type(x)  # revealed: Literal["bar", b"foo"] | (int & ~Literal[42]) | float | complex
+            reveal_type(x)  # revealed: float | (int & ~Literal[42]) | complex
         case 1j:
-            reveal_type(x)  # revealed: Literal["bar", b"foo"] | (int & ~Literal[42]) | float | complex
+            reveal_type(x)  # revealed: complex | (int & ~Literal[42]) | float
         case b"foo":
             reveal_type(x)  # revealed: (int & ~Literal[42]) | Literal[b"foo"] | float | complex
         case _:

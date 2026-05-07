@@ -228,17 +228,23 @@ def _(x: str | None, y: Mock) -> None:
 
 def _(p: str | None, q: str) -> None:
     if p == q:
-        reveal_type(p)  # revealed: str | None
+        reveal_type(p)  # revealed: str
     else:
         reveal_type(p)  # revealed: str | None
 
     if q == p:
-        reveal_type(p)  # revealed: str | None
+        reveal_type(p)  # revealed: str
 
     if p != q:
         reveal_type(p)  # revealed: str | None
     else:
-        reveal_type(p)  # revealed: str | None
+        reveal_type(p)  # revealed: str
+
+def _(x: str | int | None, y: str) -> None:
+    if x == y:
+        # `int` is not eliminated here because there could be subclasses of `int`
+        # with custom `__eq__`/`__ne__` methods
+        reveal_type(x)  # revealed: str | int
 ```
 
 ## `==` / `!=` with two narrowable operands
