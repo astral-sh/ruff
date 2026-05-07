@@ -279,17 +279,18 @@ fn check_non_generic_overload_implementation_consistency<'db>(
     let db = context.db();
     let implementation_signature = implementation.signature(db);
 
+    // TODO: Remove this temporary non-generic restriction once overload implementation consistency
+    // handles type-variable domains.
     if !implementation_signature.is_non_generic(db) {
         return;
     }
 
     let overload_signatures = overloads
         .iter()
-        .map(|overload| (overload, overload.signature(db)))
-        .collect::<Vec<_>>();
+        .map(|overload| (overload, overload.signature(db)));
 
     if overload_signatures
-        .iter()
+        .clone()
         .any(|(_, signature)| !signature.is_non_generic(db))
     {
         return;
@@ -316,7 +317,7 @@ fn check_non_generic_overload_implementation_consistency<'db>(
             (false, false) => "Overload signature is not consistent with implementation",
             (true, true) => continue,
         };
-        let mut diagnostic = builder.into_diagnostic(format_args!("{message}"));
+        let mut diagnostic = builder.into_diagnostic(message);
         if !parameters_are_consistent {
             diagnostic.info("Implementation does not accept all arguments of this overload");
         }
