@@ -208,40 +208,40 @@ impl Index {
     ) -> Option<DocumentQuery> {
         let uri = self.uri_for_key(&key)?.clone();
 
-        let document_settings = self
-            .settings_for_uri(&uri)
-            .map(|settings| {
-                if let Ok(file_path) = uri.to_file_path() {
-                    settings.ruff_settings.get(&file_path)
+        let document_settings = if let Some(settings) = self.settings_for_uri(&uri) {
+            if let Ok(file_path) = uri.to_file_path() {
+                settings.ruff_settings.get(&file_path)
+            } else {
+                // For a new unsaved and untitled document, use the ruff settings from the top of the workspace
+                // but only IF:
+                // * It is the only workspace
+                // * The ruff setting is at the top of the workspace (in the root folder)
+                // Otherwise, use the fallback settings.
+                if self.settings.len() == 1 {
+                    let workspace_path = self.settings.keys().next().unwrap();
+                    settings.ruff_settings.get(&workspace_path.join("untitled"))
                 } else {
-                    // For a new unsaved and untitled document, use the ruff settings from the top of the workspace
-                    // but only IF:
-                    // * It is the only workspace
-                    // * The ruff setting is at the top of the workspace (in the root folder)
-                    // Otherwise, use the fallback settings.
-                    if self.settings.len() == 1 {
-                        let workspace_path = self.settings.keys().next().unwrap();
-                        settings.ruff_settings.get(&workspace_path.join("untitled"))
-                    } else {
-                        tracing::debug!("Use the fallback settings for the new document '{uri}'.");
-                        settings.ruff_settings.fallback()
-                    }
+                    tracing::debug!("Use the fallback settings for the new document '{uri}'.");
+                    settings.ruff_settings.fallback()
                 }
-            })
-            .unwrap_or_else(|| {
-                tracing::warn!(
-                    "No settings available for {} - falling back to default settings",
-                    uri
-                );
-                // The path here is only for completeness, it's okay to use a non-existing path
-                // in case this is an unsaved (untitled) document.
-                let path = Path::new(uri.path());
-                let root = path.parent().unwrap_or(path);
-                Arc::new(RuffSettings::fallback(
-                    global.to_settings().editor_settings(),
-                    root,
-                ))
-            });
+            }
+        } else {
+            tracing::warn!(
+                "No settings available for {} - falling back to default settings",
+                uri
+            );
+            // The path here is only for completeness, it's okay to use a non-existing path
+            // in case this is an unsaved (untitled) document.
+            let path = Path::new(uri.path());
+            let root = path.parent().unwrap_or(path);
+            match RuffSettings::fallback(global.to_settings().editor_settings(), root) {
+                Ok(settings) => Arc::new(settings),
+                Err(err) => {
+                    tracing::error!("Failed to resolve fallback settings for {uri}: {err:#}");
+                    return None;
+                }
+            }
+        };
 
         let controller = self.documents.get(&uri)?;
         let cell_uri = match key {
@@ -287,12 +287,26 @@ impl Index {
                 }
                 indexed.insert(root.clone());
 
-                settings.ruff_settings = ruff_settings::RuffSettingsIndex::new(
+                match ruff_settings::RuffSettingsIndex::new(
                     client,
                     root,
                     settings.client_settings.editor_settings(),
                     false,
-                );
+                ) {
+                    Ok(ruff_settings) => {
+                        settings.ruff_settings = ruff_settings;
+                    }
+                    Err(err) => {
+                        tracing::error!(
+                            "Failed to reload settings for workspace {}: {err:#}",
+                            root.display()
+                        );
+                        client.show_error_message(format_args!(
+                            "The settings for the workspace {} are invalid. Refer to the logs for more information.",
+                            root.display()
+                        ));
+                    }
+                }
             }
         }
     }
@@ -453,7 +467,7 @@ impl WorkspaceSettingsIndex {
             &workspace_path,
             client_settings.editor_settings(),
             workspace.is_default(),
-        );
+        )?;
 
         tracing::info!("Registering workspace: {}", workspace_path.display());
         self.insert(

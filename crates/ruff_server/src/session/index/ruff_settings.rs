@@ -64,7 +64,10 @@ impl RuffSettings {
     ///
     /// In the absence of a valid configuration file, it gracefully falls back to
     /// editor-only settings.
-    pub(crate) fn fallback(editor_settings: &EditorSettings, root: &Path) -> RuffSettings {
+    pub(crate) fn fallback(
+        editor_settings: &EditorSettings,
+        root: &Path,
+    ) -> anyhow::Result<RuffSettings> {
         struct FallbackTransformer<'a> {
             inner: EditorConfigurationTransformer<'a>,
         }
@@ -83,48 +86,45 @@ impl RuffSettings {
             }
         }
 
-        find_user_settings_toml()
-            .and_then(|user_settings| {
-                tracing::debug!(
-                    "Loading settings from user configuration file: `{}`",
-                    user_settings.display()
-                );
-                ruff_workspace::resolver::resolve_root_settings(
-                    &user_settings,
-                    &FallbackTransformer {
-                        inner: EditorConfigurationTransformer(editor_settings, root),
-                    },
-                    ruff_workspace::resolver::ConfigurationOrigin::UserSettings,
-                )
-                .ok()
-                .map(|settings| RuffSettings {
-                    path: Some(user_settings),
-                    settings,
-                })
+        if let Some(settings) = find_user_settings_toml().and_then(|user_settings| {
+            tracing::debug!(
+                "Loading settings from user configuration file: `{}`",
+                user_settings.display()
+            );
+            ruff_workspace::resolver::resolve_root_settings(
+                &user_settings,
+                &FallbackTransformer {
+                    inner: EditorConfigurationTransformer(editor_settings, root),
+                },
+                ruff_workspace::resolver::ConfigurationOrigin::UserSettings,
+            )
+            .ok()
+            .map(|settings| RuffSettings {
+                path: Some(user_settings),
+                settings,
             })
-            .unwrap_or_else(|| {
-                let fallback = find_fallback_target_version(root);
-                if let Some(fallback) = fallback {
-                    tracing::debug!(
-                        "Derived `target-version` from found `requires-python` for fallback configuration: {fallback:?}"
-                    );
-                }
+        }) {
+            return Ok(settings);
+        }
 
-                let configuration = Configuration {
-                    target_version: fallback.map(Into::into),
-                    ..Configuration::default()
-                };
-                Self::with_editor_settings(editor_settings, root, configuration).expect(
-                    "editor configuration should merge successfully with default configuration",
-                )
-            })
+        let fallback = find_fallback_target_version(root);
+        if let Some(fallback) = fallback {
+            tracing::debug!(
+                "Derived `target-version` from found `requires-python` for fallback configuration: {fallback:?}"
+            );
+        }
+
+        let configuration = Configuration {
+            target_version: fallback.map(Into::into),
+            ..Configuration::default()
+        };
+        Self::with_editor_settings(editor_settings, root, configuration)
     }
 
     /// Constructs [`RuffSettings`] by merging the editor-defined settings with the
     /// default configuration.
-    fn editor_only(editor_settings: &EditorSettings, root: &Path) -> RuffSettings {
+    fn editor_only(editor_settings: &EditorSettings, root: &Path) -> anyhow::Result<RuffSettings> {
         Self::with_editor_settings(editor_settings, root, Configuration::default())
-            .expect("editor configuration should merge successfully with default configuration")
     }
 
     /// Merges the `configuration` with the editor defined settings.
@@ -160,16 +160,16 @@ impl RuffSettingsIndex {
         root: &Path,
         editor_settings: &EditorSettings,
         is_default_workspace: bool,
-    ) -> Self {
+    ) -> crate::Result<Self> {
         if editor_settings.configuration_preference == ConfigurationPreference::EditorOnly {
             tracing::debug!(
                 "Using editor-only settings for workspace: {} (skipped indexing)",
                 root.display()
             );
-            return RuffSettingsIndex {
+            return Ok(RuffSettingsIndex {
                 index: BTreeMap::default(),
-                fallback: Arc::new(RuffSettings::editor_only(editor_settings, root)),
-            };
+                fallback: Arc::new(RuffSettings::editor_only(editor_settings, root)?),
+            });
         }
 
         tracing::debug!("Indexing settings for workspace: {}", root.display());
@@ -232,7 +232,7 @@ impl RuffSettingsIndex {
             }
         }
 
-        let fallback = Arc::new(RuffSettings::fallback(editor_settings, root));
+        let fallback = Arc::new(RuffSettings::fallback(editor_settings, root)?);
 
         // If this is the default workspace, the server is running in single-file mode. What this
         // means is that the user opened a file directly (not the folder) in the editor and the
@@ -250,7 +250,7 @@ impl RuffSettingsIndex {
                 ));
             }
 
-            return RuffSettingsIndex { index, fallback };
+            return Ok(RuffSettingsIndex { index, fallback });
         }
 
         // Add any settings within the workspace itself
@@ -370,10 +370,10 @@ impl RuffSettingsIndex {
             ));
         }
 
-        RuffSettingsIndex {
+        Ok(RuffSettingsIndex {
             index: index.into_inner().unwrap(),
             fallback,
-        }
+        })
     }
 
     pub(super) fn get(&self, document_path: &Path) -> Arc<RuffSettings> {
@@ -513,6 +513,8 @@ impl ConfigurationTransformer for IdentityTransformer {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use ruff_linter::line_width::LineLength;
     use ruff_workspace::options::Options;
 
@@ -552,5 +554,76 @@ mod tests {
             .transform(Configuration::default());
 
         assert_eq!(config.line_length.unwrap().value(), 100);
+    }
+
+    #[test]
+    fn invalid_editor_exclude_patterns_return_error() {
+        let editor_settings = EditorSettings {
+            exclude: Some(vec!["foo[".to_string()]),
+            ..Default::default()
+        };
+
+        let err = RuffSettings::editor_only(&editor_settings, Path::new("/src/project"))
+            .expect_err("invalid editor exclude should fail settings resolution");
+
+        assert!(err.to_string().contains("unclosed character class"));
+    }
+
+    #[test]
+    fn invalid_editor_exclude_patterns_return_error_from_fallback() {
+        let editor_settings = EditorSettings {
+            exclude: Some(vec!["foo[".to_string()]),
+            ..Default::default()
+        };
+
+        let err = RuffSettings::fallback(&editor_settings, Path::new("/src/project"))
+            .expect_err("invalid editor exclude should fail fallback settings resolution");
+
+        assert!(err.to_string().contains("unclosed character class"));
+    }
+
+    #[test]
+    fn invalid_inline_editor_exclude_patterns_return_error() {
+        let editor_settings = EditorSettings {
+            configuration: Some(ResolvedConfiguration::Inline(Box::new(Options {
+                exclude: Some(vec!["foo[".to_string()]),
+                line_length: Some(LineLength::try_from(120).unwrap()),
+                ..Default::default()
+            }))),
+            ..Default::default()
+        };
+
+        let err = RuffSettings::editor_only(&editor_settings, Path::new("/src/project"))
+            .expect_err("invalid inline editor exclude should fail settings resolution");
+
+        assert!(err.to_string().contains("unclosed character class"));
+    }
+
+    #[test]
+    fn editor_rule_selection_errors_when_merged_with_conflicting_filesystem_config() {
+        let root = Path::new("/src/project");
+        let filesystem_options: Options = toml::from_str(
+            r#"
+            [lint.isort]
+            required-imports = ["from collections.abc import Set"]
+            "#,
+        )
+        .unwrap();
+        let filesystem_configuration =
+            Configuration::from_options(filesystem_options, None, root).unwrap();
+        let editor_settings = EditorSettings {
+            select: Some(vec![ruff_linter::RuleSelector::from_str("PYI025").unwrap()]),
+            ..Default::default()
+        };
+
+        let err =
+            RuffSettings::with_editor_settings(&editor_settings, root, filesystem_configuration)
+                .expect_err(
+                    "conflicting editor and filesystem settings should fail settings resolution",
+                );
+
+        let message = err.to_string();
+        assert!(message.contains("lint.isort.required-imports"));
+        assert!(message.contains("PYI025"));
     }
 }
