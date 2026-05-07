@@ -27,14 +27,6 @@ fn should_report_import(kind: &DefinitionKind<'_>) -> bool {
     ) && !kind.is_reexported()
 }
 
-fn is_future_import(kind: &DefinitionKind<'_>, parsed: &ruff_db::parsed::ParsedModuleRef) -> bool {
-    matches!(
-        kind,
-        DefinitionKind::ImportFrom(import_from)
-            if import_from.import(parsed).module.as_deref() == Some("__future__")
-    )
-}
-
 fn is_intentionally_unused_name(name: &Name) -> bool {
     name == "_" || is_dunder(name.as_str())
 }
@@ -72,9 +64,9 @@ fn expr_uses_dotted_import(expr: &ast::Expr, imported_name: &str) -> bool {
     expr_matches_dotted_import_prefix(expr, &mut segments) && segments.next().is_none()
 }
 
-fn expr_matches_dotted_import_prefix<'a>(
+fn expr_matches_dotted_import_prefix(
     expr: &ast::Expr,
-    segments: &mut std::str::Split<'a, char>,
+    segments: &mut std::str::Split<'_, char>,
 ) -> bool {
     match expr {
         ast::Expr::Name(name) => segments.next().is_some_and(|segment| name.id == segment),
@@ -116,15 +108,6 @@ impl<'a> SourceOrderVisitor<'a> for MultipartImportUseVisitor<'_> {
     }
 }
 
-fn visit_class_body_stmt_for_multipart_usage(
-    visitor: &mut MultipartImportUseVisitor<'_>,
-    stmt: &ast::Stmt,
-) {
-    if !matches!(stmt, ast::Stmt::ClassDef(_) | ast::Stmt::FunctionDef(_)) {
-        visitor.visit_stmt(stmt);
-    }
-}
-
 fn multipart_import_is_used_in_scope(
     parsed: &ruff_db::parsed::ParsedModuleRef,
     scope_node: &NodeWithScopeKind,
@@ -146,7 +129,10 @@ fn multipart_import_is_used_in_scope(
         }
         NodeWithScopeKind::Class(class) => {
             for stmt in &class.node(parsed).body {
-                visit_class_body_stmt_for_multipart_usage(&mut visitor, stmt);
+                if !matches!(stmt, ast::Stmt::ClassDef(_) | ast::Stmt::FunctionDef(_)) {
+                    visitor.visit_stmt(stmt);
+                }
+
                 if visitor.used {
                     break;
                 }
@@ -196,7 +182,7 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
             };
 
             let kind = definition.kind(db);
-            if !should_report_import(kind) || is_future_import(kind, &parsed) {
+            if !should_report_import(kind) || kind.is_future_import(&parsed) {
                 continue;
             }
 
@@ -215,6 +201,10 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
                 continue;
             };
 
+            if is_intentionally_unused_name(&display_name) {
+                continue;
+            }
+
             let is_explicit_export = multipart_import_name.is_none()
                 && is_module_scope
                 && explicit_exports
@@ -222,7 +212,7 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
                     .as_ref()
                     .is_some_and(|exports| exports.contains(&display_name));
 
-            if is_intentionally_unused_name(&display_name) || is_explicit_export {
+            if is_explicit_export {
                 continue;
             }
 
@@ -906,6 +896,20 @@ mod tests {
 
             type Style = Literal["italic", "bold", "underline"]
             type Other = typing.Literal["italic", "bold", "underline"]
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_class_scope_import_used_in_type_alias() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            class C:
+                from typing import Literal
+                type Style = Literal["italic"]
             "#,
         )?;
 

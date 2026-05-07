@@ -975,6 +975,14 @@ impl<'db> DefinitionKind<'db> {
         )
     }
 
+    pub fn is_future_import(&self, parsed: &ParsedModuleRef) -> bool {
+        matches!(
+            self,
+            DefinitionKind::ImportFrom(import_from)
+                if import_from.import(parsed).module.as_deref() == Some("__future__")
+        )
+    }
+
     pub const fn is_unannotated_assignment(&self) -> bool {
         matches!(self, DefinitionKind::Assignment(_))
     }
