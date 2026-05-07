@@ -297,7 +297,7 @@ impl<'db> From<LiteralValueType<'db>> for Type<'db> {
 
 // This type has the same alignment as `salsa::Id`, allowing `LiteralValueType` to use a smaller
 // discriminant.
-#[derive(PartialOrd, Ord, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) struct IntLiteralType {
     high: u32,
     low: u32,
