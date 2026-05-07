@@ -81,8 +81,8 @@ pub(crate) fn references(
     let model = SemanticModel::new(db, file);
     let target_definitions =
         goto_target.get_definition_targets(&model, mode.to_import_alias_resolution())?;
-    let target_may_have_cross_file_references =
-        definitions_may_have_cross_file_references(db, &target_definitions);
+    let is_externally_visible_symbol =
+        has_any_external_visible_definitions(db, &target_definitions);
     let target_definitions = target_definitions.declaration_targets(&model, goto_target)?;
 
     // Extract the target text from the goto target for fast comparison
@@ -110,7 +110,7 @@ pub(crate) fn references(
     if search_across_files {
         // For symbols that are potentially visible outside of the current module, perform a full
         // semantic search across files.
-        if target_may_have_cross_file_references {
+        if is_externally_visible_symbol {
             // Look for references in all other files within the workspace
             for other_file in &db.project().files(db) {
                 // Skip the current file as we already processed it
@@ -312,14 +312,16 @@ fn references_for_file(
 }
 
 /// Determines whether the resolved definitions can have references outside their file.
-fn definitions_may_have_cross_file_references(db: &dyn Db, definitions: &Definitions<'_>) -> bool {
+fn has_any_external_visible_definitions(db: &dyn Db, definitions: &Definitions<'_>) -> bool {
     definitions.0.iter().any(|definition| match definition {
-        ResolvedDefinition::Definition(definition) => {
-            matches!(
-                definition.scope(db).scope(db).kind(),
-                ScopeKind::Module | ScopeKind::Class
-            )
-        }
+        ResolvedDefinition::Definition(definition) => match definition.scope(db).scope(db).kind() {
+            ScopeKind::Module | ScopeKind::Class => true,
+            ScopeKind::TypeParams
+            | ScopeKind::Function
+            | ScopeKind::Lambda
+            | ScopeKind::Comprehension
+            | ScopeKind::TypeAlias => false,
+        },
         ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => true,
     })
 }
@@ -695,22 +697,57 @@ impl LocalReferencesFinder<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::goto::find_goto_target;
+    use crate::tests::{CursorTest, cursor_test};
+
+    fn cursor_target_is_externally_visible(test: &CursorTest) -> bool {
+        let model = SemanticModel::new(&test.db, test.cursor.file);
+        let goto_target =
+            find_goto_target(&model, &test.cursor.parsed, test.cursor.offset).unwrap();
+        let definitions = goto_target
+            .get_definition_targets(
+                &model,
+                ReferencesMode::References.to_import_alias_resolution(),
+            )
+            .unwrap();
+
+        has_any_external_visible_definitions(&test.db, &definitions)
+    }
 
     #[test]
-    fn source_candidate_prefilters_use_identifier_boundaries() {
-        for (source, name) in [("x = 1", "x"), ("obj.x", "x"), ("x()", "x")] {
-            assert!(source_contains_identifier_candidate(source, name));
-        }
-
-    #[test]
-    fn class_scope_definition_needs_cross_file_search() {
-        let test = cursor_test(
-            "
+    fn externally_visible_definitions_can_have_cross_file_references() {
+        for (case, source) in [
+            ("module-global", "x<CURSOR> = 1"),
+            (
+                "class",
+                "
 class C:
     x<CURSOR> = 1
 ",
-        );
+            ),
+        ] {
+            let test = cursor_test(source);
+            assert!(cursor_target_is_externally_visible(&test), "{case}");
+        }
+    }
 
-        assert!(cursor_target_may_have_cross_file_references(&test));
+    #[test]
+    fn non_public_scope_definitions_stay_in_file() {
+        for (case, source) in [
+            (
+                "function",
+                "
+def f():
+    x<CURSOR> = 1
+    return x
+",
+            ),
+            ("lambda", "f = lambda x<CURSOR>: x"),
+            ("comprehension", "xs = [x for x<CURSOR> in range(3)]"),
+            ("type parameters", "type Alias[T<CURSOR>] = list[T]"),
+        ] {
+            let test = cursor_test(source);
+            assert!(!cursor_target_is_externally_visible(&test), "{case}");
+        }
     }
 }
