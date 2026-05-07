@@ -925,6 +925,39 @@ def f(env: dict) -> None:
 reveal_type(f)
 ```
 
+### Transparent decorator passthrough
+
+A decorator typed as `Callable[P, R] -> Callable[P, R]` preserves overloaded functions.
+
+```py
+from typing import Callable, overload
+
+def transparent[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+@overload
+def test(x: int) -> int: ...
+@overload
+def test(*, y: str) -> str: ...
+@transparent
+def test(x: int | None = None, *, y: str | None = None) -> int | str:
+    raise NotImplementedError
+
+reveal_type(test)  # revealed: Overload[(x: int) -> int, (*, y: str) -> str]
+reveal_type(test(1))  # revealed: int
+reveal_type(test(y="x"))  # revealed: str
+
+# error: [no-matching-overload]
+reveal_type(test(1, y="x"))  # revealed: Unknown
+
+@transparent
+def increment(value: int) -> int:
+    return value + 1
+
+reveal_type(increment)  # revealed: def increment(value: int) -> int
+reveal_type(increment(1))  # revealed: int
+```
+
 ### Overloads
 
 #### Return type filtering
