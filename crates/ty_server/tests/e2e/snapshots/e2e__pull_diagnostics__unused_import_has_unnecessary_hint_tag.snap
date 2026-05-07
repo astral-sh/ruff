@@ -19,7 +19,7 @@ expression: diagnostics
       },
       "severity": 4,
       "source": "ty",
-      "message": "`os` is an unused import",
+      "message": "Import `os` is not accessed",
       "tags": [
         1
       ]
