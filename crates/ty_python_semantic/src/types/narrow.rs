@@ -1040,20 +1040,26 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     // TODO `expr_in` and `expr_not_in` should perhaps be unified with `expr_eq` and `expr_ne`,
     // since `eq` and `ne` are equivalent to `in` and `not in` with only one element in the RHS.
+    fn rhs_values_for_membership_narrowing(&self, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+        let rhs_values = rhs_ty
+            .try_iterate(self.db)
+            .ok()?
+            .homogeneous_element_type(self.db);
+
+        if rhs_values.is_single_valued(self.db) || rhs_values.is_union_of_single_valued(self.db) {
+            Some(rhs_values)
+        } else {
+            None
+        }
+    }
+
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         let lhs_ty = lhs_ty.resolve_type_alias(self.db);
+        let rhs_values = self.rhs_values_for_membership_narrowing(rhs_ty)?;
 
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
-            rhs_ty
-                .try_iterate(self.db)
-                .ok()
-                .map(|iterable| iterable.homogeneous_element_type(self.db))
+            Some(rhs_values)
         } else if lhs_ty.is_union_with_single_valued(self.db) {
-            let rhs_values = rhs_ty
-                .try_iterate(self.db)
-                .ok()?
-                .homogeneous_element_type(self.db);
-
             let mut builder = UnionBuilder::new(self.db);
 
             // Add the narrowed values from the RHS first, to keep literals before broader types.
@@ -1088,10 +1094,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     fn evaluate_expr_not_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         let lhs_ty = lhs_ty.resolve_type_alias(self.db);
 
-        let rhs_values = rhs_ty
-            .try_iterate(self.db)
-            .ok()?
-            .homogeneous_element_type(self.db);
+        let rhs_values = self.rhs_values_for_membership_narrowing(rhs_ty)?;
 
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
             // Exclude the RHS values from the entire (single-valued) LHS domain.

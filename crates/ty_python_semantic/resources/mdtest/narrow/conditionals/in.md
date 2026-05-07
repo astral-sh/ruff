@@ -176,6 +176,20 @@ def test(x: Literal["a", "b", "c"] | None | int = None):
         reveal_type(x)  # revealed: Literal["a", "c"] | int
 ```
 
+## No narrowing against broad iterable element types
+
+```py
+def test(p: str | None, q: str) -> None:
+    s: str
+
+    if p in [q]:
+        reveal_type(p)  # revealed: str | None
+        s = p  # error: [invalid-assignment]
+
+    if p not in [q]:
+        reveal_type(p)  # revealed: str | None
+```
+
 ## No narrowing for the right-hand side (currently)
 
 No narrowing is done for the right-hand side currently, even if the right-hand side is a valid
