@@ -120,7 +120,7 @@ pub(crate) fn references(
 
                 // First do a simple text search to see if there is a potential match in the file
                 let source = ruff_db::source::source_text(db, other_file);
-                if !source.as_str().contains(target_text.as_ref()) {
+                if !contains_identifier(source.as_str(), target_text.as_ref()) {
                     continue;
                 }
 
@@ -233,35 +233,55 @@ fn source_contains_keyword_argument_candidate(source: &str, name: &str) -> bool 
     }
 
     let bytes = source.as_bytes();
-    let needle = name.as_bytes();
-    let mut start = 0usize;
 
-    while let Some(rel_pos) = source[start..].find(name) {
-        let pos = start + rel_pos;
+    source_identifier_matches(source, name).any(|start| {
+        let mut i = start + name.len();
 
-        // Word boundary check before.
-        if let Some(prev) = pos.checked_sub(1).and_then(|i| bytes.get(i))
-            && (prev.is_ascii_alphanumeric() || *prev == b'_')
-        {
-            start = pos + needle.len();
-            continue;
-        }
-
-        let after = pos + needle.len();
-
-        // Skip whitespace and check for '=' (but not '==').
-        let mut i = after;
         while bytes.get(i).is_some_and(u8::is_ascii_whitespace) {
             i += 1;
         }
-        if bytes.get(i) == Some(&b'=') && bytes.get(i + 1) != Some(&b'=') {
-            return true;
-        }
 
-        start = after;
+        bytes.get(i) == Some(&b'=') && bytes.get(i + 1) != Some(&b'=')
+    })
+}
+
+/// Cheap text prefilter for identifier references before AST/semantic validation.
+///
+/// Heuristically matches an ASCII approximation of `\b{name}\b`.
+fn contains_identifier(source: &str, name: &str) -> bool {
+    if name.is_empty() {
+        return false;
     }
 
-    false
+    source_identifier_matches(source, name).next().is_some()
+}
+
+fn source_identifier_matches<'a>(
+    source: &'a str,
+    name: &'a str,
+) -> impl Iterator<Item = usize> + 'a {
+    debug_assert!(!name.is_empty());
+
+    let bytes = source.as_bytes();
+    let needle = name.as_bytes();
+
+    memchr::memmem::find_iter(bytes, needle).filter(move |&pos| {
+        let after = pos + needle.len();
+
+        // Skip this entry if it is within an identifier. E.g. skip
+        // this entry when searching for `x` and this is a match
+        // within `exclude = 10`
+        let boundary_before = pos == 0 || !is_ascii_identifier_continue(bytes[pos - 1]);
+        let boundary_after = bytes
+            .get(after)
+            .is_none_or(|byte| !is_ascii_identifier_continue(*byte));
+
+        boundary_before && boundary_after
+    })
+}
+
+fn is_ascii_identifier_continue(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || byte == b'_'
 }
 
 /// Return true if the declaration-target sets intersect.
@@ -745,6 +765,30 @@ def f():
         ] {
             let test = cursor_test(source);
             assert!(!cursor_target_is_externally_visible(&test), "{case}");
+        }
+    }
+
+    #[test]
+    fn source_candidate_prefilters_use_identifier_boundaries() {
+        for (source, name) in [("x = 1", "x"), ("obj.x", "x"), ("x()", "x")] {
+            assert!(contains_identifier(source, name));
+        }
+
+        for (source, name) in [
+            ("xylophone = 1", "x"),
+            ("value_x = 1", "x"),
+            ("x_value = 1", "x"),
+            ("grid = 1", "id"),
+        ] {
+            assert!(!contains_identifier(source, name));
+        }
+
+        for source in ["f(id=1)", "f(id = 1)"] {
+            assert!(source_contains_keyword_argument_candidate(source, "id"));
+        }
+
+        for source in ["f(grid=1)", "f(id_value=1)", "id == 1"] {
+            assert!(!source_contains_keyword_argument_candidate(source, "id"));
         }
     }
 }
