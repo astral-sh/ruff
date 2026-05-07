@@ -1912,13 +1912,16 @@ mod tests {
             "#,
         );
 
-        // TODO: This should reveal `int` because the user hovers over the parameter and not the value.
         assert_snapshot!(test.hover(), @"
-        Literal[123]
+        (parameter) ab: int
+        ---------------------------------------------
+        a nice little integer
         ---------------------------------------------
         ```python
-        Literal[123]
+        (parameter) ab: int
         ```
+        ---
+        a nice little integer
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:10:6
@@ -1928,6 +1931,597 @@ mod tests {
            |      ||
            |      |Cursor offset
            |      source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_keyword_argument_value() {
+        let test = hover_test(
+            r#"
+            def test(ab: int):
+                """my cool test
+
+                Args:
+                    ab: a nice little integer
+                """
+                return 0
+
+            test(ab=12<CURSOR>3)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (parameter) ab: int
+        ---------------------------------------------
+        a nice little integer
+        ---------------------------------------------
+        ```python
+        (parameter) ab: int
+        ```
+        ---
+        a nice little integer
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:10:9
+           |
+        10 | test(ab=123)
+           |         ^^-
+           |         | |
+           |         | Cursor offset
+           |         source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_argument_value_without_parameter_documentation() {
+        let test = hover_test(
+            r#"
+            value = 123
+            def test(ab: int):
+                return 0
+
+            test(va<CURSOR>lue)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        Literal[123]
+        ---------------------------------------------
+        ```python
+        Literal[123]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:6:6
+          |
+        6 | test(value)
+          |      ^^-^^
+          |      | |
+          |      | Cursor offset
+          |      source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_keyword_argument_without_parameter_documentation() {
+        let test = hover_test(
+            r#"
+            def test(ab: int):
+                return 0
+
+            test(a<CURSOR>b=123)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (parameter) ab: int
+        ---------------------------------------------
+        ```python
+        (parameter) ab: int
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:5:6
+          |
+        5 | test(ab=123)
+          |      ^-
+          |      ||
+          |      |Cursor offset
+          |      source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_second_positional_argument_value() {
+        let test = hover_test(
+            r#"
+            def test(first: int, second: int):
+                """my cool test
+
+                Args:
+                    first: first integer
+                    second: second integer
+                """
+                return 0
+
+            test(123, 45<CURSOR>6)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (parameter) second: int
+        ---------------------------------------------
+        second integer
+        ---------------------------------------------
+        ```python
+        (parameter) second: int
+        ```
+        ---
+        second integer
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:11:11
+           |
+        11 | test(123, 456)
+           |           ^^-
+           |           | |
+           |           | Cursor offset
+           |           source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_positional_only_argument() {
+        let test = hover_test(
+            r#"
+            def test(item: int, /):
+                """my cool test
+
+                Args:
+                    item: positional-only integer
+                """
+                return 0
+
+            test(12<CURSOR>3)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (positional-only parameter) item: int
+        ---------------------------------------------
+        positional-only integer
+        ---------------------------------------------
+        ```python
+        (positional-only parameter) item: int
+        ```
+        ---
+        positional-only integer
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:10:6
+           |
+        10 | test(123)
+           |      ^^-
+           |      | |
+           |      | Cursor offset
+           |      source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_keyword_only_argument() {
+        let test = hover_test(
+            r#"
+            value = "ab"
+            def test(*, option: str):
+                """my cool test
+
+                Args:
+                    option: keyword-only string
+                """
+                return 0
+
+            test(option=va<CURSOR>lue)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (keyword-only parameter) option: str
+        ---------------------------------------------
+        keyword-only string
+        ---------------------------------------------
+        ```python
+        (keyword-only parameter) option: str
+        ```
+        ---
+        keyword-only string
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:11:13
+           |
+        11 | test(option=value)
+           |             ^^-^^
+           |             | |
+           |             | Cursor offset
+           |             source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_defaulted_argument() {
+        let test = hover_test(
+            r#"
+            def test(count: int = 0):
+                """my cool test
+
+                Args:
+                    count: defaulted count
+                """
+                return 0
+
+            test(12<CURSOR>3)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (parameter) count: int = 0
+        ---------------------------------------------
+        defaulted count
+        ---------------------------------------------
+        ```python
+        (parameter) count: int = 0
+        ```
+        ---
+        defaulted count
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:10:6
+           |
+        10 | test(123)
+           |      ^^-
+           |      | |
+           |      | Cursor offset
+           |      source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_variadic_positional_argument() {
+        let test = hover_test(
+            r#"
+            def test(*items: int):
+                """my cool test
+
+                Args:
+                    items: extra integer items
+                """
+                return 0
+
+            test(12<CURSOR>3)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (variadic positional parameter) *items: int
+        ---------------------------------------------
+        extra integer items
+        ---------------------------------------------
+        ```python
+        (variadic positional parameter) *items: int
+        ```
+        ---
+        extra integer items
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:10:6
+           |
+        10 | test(123)
+           |      ^^-
+           |      | |
+           |      | Cursor offset
+           |      source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_variadic_keyword_argument() {
+        let test = hover_test(
+            r#"
+            value = "yes"
+            def test(**options: str):
+                """my cool test
+
+                Args:
+                    options: extra string options
+                """
+                return 0
+
+            test(debug=va<CURSOR>lue)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (variadic keyword parameter) **options: str
+        ---------------------------------------------
+        extra string options
+        ---------------------------------------------
+        ```python
+        (variadic keyword parameter) **options: str
+        ```
+        ---
+        extra string options
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:11:12
+           |
+        11 | test(debug=value)
+           |            ^^-^^
+           |            | |
+           |            | Cursor offset
+           |            source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_starred_argument_unpack() {
+        let test = hover_test(
+            r#"
+            values: tuple[int, ...] = (1, 2)
+            def test(*items: int):
+                """my cool test
+
+                Args:
+                    items: extra integer items
+                """
+                return 0
+
+            test(*va<CURSOR>lues)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (variadic positional parameter) *items: int
+        ---------------------------------------------
+        extra integer items
+        ---------------------------------------------
+        ```python
+        (variadic positional parameter) *items: int
+        ```
+        ---
+        extra integer items
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:11:7
+           |
+        11 | test(*values)
+           |       ^^-^^^
+           |       | |
+           |       | Cursor offset
+           |       source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_double_starred_argument_unpack() {
+        let test = hover_test(
+            r#"
+            options: dict[str, str] = {"debug": "yes"}
+            def test(**settings: str):
+                """my cool test
+
+                Args:
+                    settings: extra string settings
+                """
+                return 0
+
+            test(**opt<CURSOR>ions)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (variadic keyword parameter) **settings: str
+        ---------------------------------------------
+        extra string settings
+        ---------------------------------------------
+        ```python
+        (variadic keyword parameter) **settings: str
+        ```
+        ---
+        extra string settings
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:11:8
+           |
+        11 | test(**options)
+           |        ^^^-^^^
+           |        |  |
+           |        |  Cursor offset
+           |        source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_starred_argument_unpack_multiple_parameters() {
+        let test = hover_test(
+            r#"
+            values: tuple[int, str] = (1, "two")
+            def test(first: int, second: str):
+                """my cool test
+
+                Args:
+                    first: first argument
+                    second: second argument
+                """
+                return 0
+
+            test(*va<CURSOR>lues)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        tuple[Literal[1], Literal["two"]]
+        ---------------------------------------------
+        ```python
+        tuple[Literal[1], Literal["two"]]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:12:7
+           |
+        12 | test(*values)
+           |       ^^-^^^
+           |       | |
+           |       | Cursor offset
+           |       source
+           |
+        "#);
+    }
+
+    #[test]
+    fn hover_bound_method_argument() {
+        let test = hover_test(
+            r#"
+            class Processor:
+                def run(self, count: int):
+                    """my cool method
+
+                    Args:
+                        count: method count
+                    """
+                    return 0
+
+            processor = Processor()
+            processor.run(12<CURSOR>3)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (parameter) count: int
+        ---------------------------------------------
+        method count
+        ---------------------------------------------
+        ```python
+        (parameter) count: int
+        ```
+        ---
+        method count
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:12:15
+           |
+        12 | processor.run(123)
+           |               ^^-
+           |               | |
+           |               | Cursor offset
+           |               source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_constructor_argument() {
+        let test = hover_test(
+            r#"
+            value = "crate"
+            class Box:
+                def __init__(self, name: str):
+                    """my cool constructor
+
+                    Args:
+                        name: box name
+                    """
+                    self.name = name
+
+            Box(va<CURSOR>lue)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (parameter) name: str
+        ---------------------------------------------
+        box name
+        ---------------------------------------------
+        ```python
+        (parameter) name: str
+        ```
+        ---
+        box name
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:12:5
+           |
+        12 | Box(value)
+           |     ^^-^^
+           |     | |
+           |     | Cursor offset
+           |     source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_overload_argument_disambiguated_by_type() {
+        let test = hover_test(
+            r#"
+            from typing import overload
+
+            @overload
+            def choose(value: int) -> int:
+                """Choose int.
+
+                Args:
+                    value: integer overload argument
+                """
+
+            @overload
+            def choose(value: str) -> str:
+                """Choose str.
+
+                Args:
+                    value: string overload argument
+                """
+
+            def choose(value):
+                return value
+
+            value = "abc"
+            choose(va<CURSOR>lue)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        def choose(value: str) -> str
+        (parameter) value: str
+        ---------------------------------------------
+        string overload argument
+        ---------------------------------------------
+        ```python
+        def choose(value: str) -> str
+        (parameter) value: str
+        ```
+        ---
+        string overload argument
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:24:8
+           |
+        24 | choose(value)
+           |        ^^-^^
+           |        | |
+           |        | Cursor offset
+           |        source
            |
         ");
     }
