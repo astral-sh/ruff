@@ -1019,6 +1019,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
 
                 (None, Some((target_tvar, target_return))) if source_overloads.len() > 1 => {
+                    // TODO: Ideally, the constraint solver should use the return type constraint
+                    // to remove unmatched overloads from the `ParamSpec` specialization instead
+                    // of filtering them here.
                     let lower = Type::Callable(CallableType::new(
                         db,
                         CallableSignature::from_overloads(
