@@ -4965,23 +4965,48 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
     fn check_argument_types(&mut self, constraints: &ConstraintSetBuilder<'db>) {
         let paramspec = self.signature.parameters().as_paramspec_with_prefix();
-        let mut paramspec_evaluated = false;
+        let paramspec_component_start = paramspec.and_then(|(prefix, paramspec)| {
+            let prefix_len = prefix.len();
+            let paramspec_arguments = self.paramspec_argument_indices(prefix_len);
+            if paramspec_arguments.is_empty() {
+                self.evaluate_paramspec_sub_call(constraints, None, paramspec);
+                return None;
+            }
+
+            let has_paramspec_component_argument =
+                paramspec_arguments.iter().any(|(argument_index, _)| {
+                    let [parameter_index] =
+                        self.argument_matches[*argument_index].parameters.as_slice()
+                    else {
+                        return false;
+                    };
+
+                    let Type::TypeVar(typevar) =
+                        self.signature.parameters()[*parameter_index].annotated_type()
+                    else {
+                        return false;
+                    };
+
+                    typevar.is_paramspec(self.db)
+                });
+
+            if has_paramspec_component_argument
+                && self.evaluate_paramspec_sub_call(
+                    constraints,
+                    Some(&paramspec_arguments),
+                    paramspec,
+                )
+            {
+                Some(prefix_len)
+            } else {
+                self.evaluate_paramspec_sub_call(constraints, None, paramspec);
+                None
+            }
+        });
 
         for (argument_index, adjusted_argument_index, argument, argument_types) in
             self.enumerate_argument_types()
         {
-            let paramspec_component_start = if let Some((prefix, paramspec)) = paramspec {
-                if !paramspec_evaluated
-                    && self.try_paramspec_evaluation_at(constraints, argument_index, paramspec)
-                {
-                    paramspec_evaluated = true;
-                }
-
-                paramspec_evaluated.then_some(prefix.len())
-            } else {
-                None
-            };
-
             let is_paramspec_component_parameter = |parameter_index: usize| {
                 paramspec_component_start.is_some_and(|start| parameter_index >= start)
             };
@@ -5036,94 +5061,28 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 }
             }
         }
-
-        if let Some((_, paramspec)) = paramspec
-            && !paramspec_evaluated
-        {
-            // If we reach here, none of the arguments matched the `ParamSpec` parameter, but the
-            // `ParamSpec` could specialize to a parameter list containing some parameters. For
-            // example,
-            //
-            // ```py
-            // from typing import Callable
-            //
-            // def foo[**P](f: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
-            //
-            // def f(x: int) -> None: ...
-            //
-            // foo(f)
-            // ```
-            //
-            // Here, no arguments match the `ParamSpec` parameter, but `P` specializes to `(x: int)`,
-            // so we need to perform a sub-call with no arguments.
-            self.evaluate_paramspec_sub_call(constraints, None, paramspec);
-        }
     }
 
-    /// Try to evaluate a `ParamSpec` sub-call at the given argument index.
+    /// Invoke a sub-call for the given `ParamSpec` type variable, using the forwarded arguments.
     ///
-    /// The `ParamSpec` parameter is always going to be at the end of the parameter list but there
-    /// can be other parameter before it. If one of these prepended positional parameters contains
-    /// a free `ParamSpec`, we consider that variable in scope for the purposes of extracting the
-    /// components of that `ParamSpec`. For example:
+    /// The forwarded arguments are those matched to the `ParamSpec` components if provided,
+    /// otherwise no arguments are passed. No forwarded arguments can still require a sub-call:
     ///
     /// ```py
     /// from typing import Callable
     ///
     /// def foo[**P](f: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+    /// def f(x: int) -> None: ...
     ///
-    /// def f(x: int, y: str) -> None: ...
-    ///
-    /// foo(f, 1, "hello")  # P: (x: int, y: str)
+    /// foo(f)  # P specializes to `(x: int)`, so `f` is checked with no arguments.
     /// ```
-    ///
-    /// Here, `P` specializes to `(x: int, y: str)` when `foo` is called with `f`, which means that
-    /// the parameters of `f` become a part of `foo`'s parameter list replacing the `ParamSpec`
-    /// parameter which is:
-    ///
-    /// ```py
-    /// def foo(f: Callable[[x: int, y: str], None], x: int, y: str) -> None: ...
-    /// ```
-    ///
-    /// This method will check whether the parameter matching the argument at `argument_index` is
-    /// annotated with the components of `ParamSpec`, and if so, will invoke a sub-call considering
-    /// the arguments starting from `argument_index` against the specialized parameter list.
-    ///
-    /// Returns `true` if the sub-call was invoked, `false` otherwise.
-    fn try_paramspec_evaluation_at(
-        &mut self,
-        constraints: &ConstraintSetBuilder<'db>,
-        argument_index: usize,
-        paramspec: BoundTypeVarInstance<'db>,
-    ) -> bool {
-        let [parameter_index] = self.argument_matches[argument_index].parameters.as_slice() else {
-            return false;
-        };
-
-        let Type::TypeVar(typevar) = self.signature.parameters()[*parameter_index].annotated_type()
-        else {
-            return false;
-        };
-        if !typevar.is_paramspec(self.db) {
-            return false;
-        }
-
-        self.evaluate_paramspec_sub_call(constraints, Some(argument_index), paramspec)
-    }
-
-    /// Invoke a sub-call for the given `ParamSpec` type variable, using the forwarded arguments.
-    ///
-    /// The forwarded arguments are those matched to the `ParamSpec` components if
-    /// `argument_index` is provided, otherwise no arguments are passed.
     ///
     /// This method returns `false` if the specialization does not contain a mapping for the given
     /// `paramspec` or contains an invalid mapping (i.e., not a `Callable` of kind `ParamSpecValue`).
-    ///
-    /// For more details, refer to [`Self::try_paramspec_evaluation_at`].
     fn evaluate_paramspec_sub_call(
         &mut self,
         constraints: &ConstraintSetBuilder<'db>,
-        argument_index: Option<usize>,
+        paramspec_arguments: Option<&[(usize, Option<usize>)]>,
         paramspec: BoundTypeVarInstance<'db>,
     ) -> bool {
         let Some(Type::Callable(callable)) = self
@@ -5142,28 +5101,18 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return false;
         }
 
-        let (sub_arguments, error_argument_indices) = if let Some(argument_index) = argument_index {
-            let Some((prefix, _)) = self.signature.parameters().as_paramspec_with_prefix() else {
-                return false;
+        let (sub_arguments, error_argument_indices) =
+            if let Some(paramspec_arguments) = paramspec_arguments {
+                let (paramspec_argument_indices, error_argument_indices): (Vec<_>, Vec<_>) =
+                    paramspec_arguments.iter().copied().unzip();
+
+                (
+                    self.arguments.select(&paramspec_argument_indices),
+                    Some(error_argument_indices),
+                )
+            } else {
+                (CallArguments::none(), None)
             };
-            let paramspec_arguments = self.paramspec_argument_indices(prefix.len());
-            if !paramspec_arguments
-                .iter()
-                .any(|(paramspec_argument_index, _)| *paramspec_argument_index == argument_index)
-            {
-                return false;
-            }
-
-            let (paramspec_argument_indices, error_argument_indices): (Vec<_>, Vec<_>) =
-                paramspec_arguments.into_iter().unzip();
-
-            (
-                self.arguments.select(&paramspec_argument_indices),
-                Some(error_argument_indices),
-            )
-        } else {
-            (CallArguments::none(), None)
-        };
         let error_argument_indices = error_argument_indices.as_deref();
 
         // Create Bindings with all overloads and perform full overload resolution
