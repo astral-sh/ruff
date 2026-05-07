@@ -2235,14 +2235,11 @@ impl<'db> UseDefMapBuilder<'db> {
         self.record_use_bindings(bindings, use_id);
     }
 
-    pub(super) fn mark_current_bindings_used(&mut self, place: ScopedPlaceId) {
-        let bindings = match place {
-            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
-            ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
-        };
-
+    pub(super) fn mark_symbol_bindings_used(&mut self, symbol: ScopedSymbolId) {
+        let bindings = self.symbol_states[symbol].bindings();
         let binding_definition_ids: Vec<ScopedDefinitionId> =
             bindings.iter().map(LiveBinding::binding).collect();
+
         self.mark_definition_ids_used(binding_definition_ids);
     }
 

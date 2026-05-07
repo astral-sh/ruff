@@ -743,7 +743,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             enclosing_place_table.symbol_id(nested_symbol.name())
                     {
                         self.use_def_maps[enclosing_scope_id]
-                            .mark_current_bindings_used(enclosed_symbol_id.into());
+                            .mark_symbol_bindings_used(enclosed_symbol_id);
                     }
                     continue;
                 }
