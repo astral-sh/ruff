@@ -2101,10 +2101,7 @@ impl<'db> Bindings<'db> {
                                 order,
                                 unsafe_hash,
                                 frozen,
-                                match_args,
-                                kw_only,
-                                slots,
-                                weakref_slot,
+                                versioned_parameters @ ..,
                             ] = overload.parameter_types()
                             {
                                 let mut flags = DataclassFlags::empty();
@@ -2127,33 +2124,38 @@ impl<'db> Bindings<'db> {
                                 if to_bool(frozen, false) {
                                     flags |= DataclassFlags::FROZEN;
                                 }
-                                if to_bool(match_args, true) {
-                                    if Program::get(db).python_version(db) >= PythonVersion::PY310 {
-                                        flags |= DataclassFlags::MATCH_ARGS;
-                                    } else {
-                                        // TODO: emit diagnostic
+
+                                match versioned_parameters {
+                                    // Python < 3.10.
+                                    [] => {}
+                                    // Python 3.10.
+                                    [match_args, kw_only, slots] => {
+                                        if to_bool(match_args, true) {
+                                            flags |= DataclassFlags::MATCH_ARGS;
+                                        }
+                                        if to_bool(kw_only, false) {
+                                            flags |= DataclassFlags::KW_ONLY;
+                                        }
+                                        if to_bool(slots, false) {
+                                            flags |= DataclassFlags::SLOTS;
+                                        }
                                     }
-                                }
-                                if to_bool(kw_only, false) {
-                                    if Program::get(db).python_version(db) >= PythonVersion::PY310 {
-                                        flags |= DataclassFlags::KW_ONLY;
-                                    } else {
-                                        // TODO: emit diagnostic
+                                    // Python >= 3.11.
+                                    [match_args, kw_only, slots, weakref_slot] => {
+                                        if to_bool(match_args, true) {
+                                            flags |= DataclassFlags::MATCH_ARGS;
+                                        }
+                                        if to_bool(kw_only, false) {
+                                            flags |= DataclassFlags::KW_ONLY;
+                                        }
+                                        if to_bool(slots, false) {
+                                            flags |= DataclassFlags::SLOTS;
+                                        }
+                                        if to_bool(weakref_slot, false) {
+                                            flags |= DataclassFlags::WEAKREF_SLOT;
+                                        }
                                     }
-                                }
-                                if to_bool(slots, false) {
-                                    if Program::get(db).python_version(db) >= PythonVersion::PY310 {
-                                        flags |= DataclassFlags::SLOTS;
-                                    } else {
-                                        // TODO: emit diagnostic
-                                    }
-                                }
-                                if to_bool(weakref_slot, false) {
-                                    if Program::get(db).python_version(db) >= PythonVersion::PY311 {
-                                        flags |= DataclassFlags::WEAKREF_SLOT;
-                                    } else {
-                                        // TODO: emit diagnostic
-                                    }
+                                    _ => {}
                                 }
 
                                 let params = DataclassParams::from_flags(db, flags);
