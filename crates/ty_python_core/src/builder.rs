@@ -730,9 +730,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // (In the case of class scopes, class variables can be modified from elsewhere, but this has no effect in nested scopes,
                 // as class variables are not visible to them)
                 if enclosing_scope_kind.is_module() {
-                    // Keep module scopes out of binding snapshots because they can be modified
-                    // externally. PEP 695 type-alias scopes still need use tracking, so record
-                    // a usage-only edge without changing type-inference snapshots.
+                    // PEP 695 type-alias scopes still need use tracking for module bindings, so
+                    // record a usage-only edge without changing type-inference snapshots.
                     if popped_scope.kind() == ScopeKind::TypeAlias
                         && nested_symbol.is_used()
                         && self.resolve_nested_reference_scope(
