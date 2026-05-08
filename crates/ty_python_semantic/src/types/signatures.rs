@@ -14,15 +14,18 @@ use std::collections::BTreeMap;
 use std::slice::Iter;
 
 use itertools::{Either, EitherOrBoth, Itertools};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec_inline};
 
-use super::{DynamicType, Type, TypeVarVariance, semantic_index};
+use super::{DynamicType, Type, TypeVarVariance, UnionType, semantic_index};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
-use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
+use crate::types::cyclic::ActiveRecursionDetector;
+use crate::types::generics::{
+    ApplySpecialization, GenericContext, InferableTypeVars, Specialization, walk_generic_context,
+};
 use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
@@ -31,11 +34,12 @@ use crate::types::typed_dict::{
     UnpackedTypedDictKey, extract_unpacked_typed_dict_keys_from_kwargs_annotation,
     extract_unpacked_typed_dict_keys_from_value_type,
 };
+use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
-    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind,
-    ParameterDescription, SelfBinding, TypeContext, TypeMapping, UnionBuilder, VarianceInferable,
-    infer_complete_scope_types, todo_type,
+    ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind,
+    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping, UnionBuilder,
+    VarianceInferable, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -94,6 +98,33 @@ pub struct CallableSignature<'db> {
     pub(crate) overloads: SmallVec<[Signature<'db>; 1]>,
 }
 
+/// The per-overload information needed to synthesize one reduced signature for
+/// `functools.partial(...)`.
+#[derive(Clone, Debug)]
+pub(crate) struct PartialSignatureApplication<'db> {
+    signature: Signature<'db>,
+    partial_application: PartialApplication<'db>,
+    specialization: Option<Specialization<'db>>,
+    unspecialized_return_ty: Type<'db>,
+}
+
+impl<'db> PartialSignatureApplication<'db> {
+    /// Creates a new per-overload partial-application summary.
+    pub(crate) fn new(
+        signature: Signature<'db>,
+        partial_application: PartialApplication<'db>,
+        specialization: Option<Specialization<'db>>,
+        unspecialized_return_ty: Type<'db>,
+    ) -> Self {
+        Self {
+            signature,
+            partial_application,
+            specialization,
+            unspecialized_return_ty,
+        }
+    }
+}
+
 impl<'db> CallableSignature<'db> {
     pub(crate) fn single(signature: Signature<'db>) -> Self {
         Self {
@@ -120,6 +151,15 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
+    /// Returns the union of all overload return types, or `Unknown` if there are no overloads.
+    pub(crate) fn overload_return_type_or_unknown(&self, db: &'db dyn Db) -> Type<'db> {
+        match self.overloads.as_slice() {
+            [] => Type::unknown(),
+            [signature] => signature.return_ty,
+            overloads => UnionType::from_elements(db, overloads.iter().map(|sig| sig.return_ty)),
+        }
+    }
+
     pub(crate) fn with_inherited_generic_context(
         &self,
         db: &'db dyn Db,
@@ -130,6 +170,30 @@ impl<'db> CallableSignature<'db> {
                 .clone()
                 .with_inherited_generic_context(db, inherited_generic_context)
         }))
+    }
+
+    /// Returns the reduced overloaded signature exposed by a `functools.partial(...)` object.
+    pub(crate) fn partially_apply(
+        db: &'db dyn Db,
+        overloads: impl IntoIterator<Item = PartialSignatureApplication<'db>>,
+    ) -> Option<Self> {
+        let mut new_overloads = Vec::new();
+        let mut seen_overloads = FxHashSet::default();
+
+        for overload in overloads {
+            let signature = overload.signature.partially_apply(
+                db,
+                &overload.partial_application,
+                overload.specialization,
+                overload.unspecialized_return_ty,
+            );
+            let dedup_key = signature.clone().with_definition(None);
+            if seen_overloads.insert(dedup_key) {
+                new_overloads.push(signature);
+            }
+        }
+
+        (!new_overloads.is_empty()).then(|| Self::from_overloads(new_overloads))
     }
 
     pub(crate) fn cycle_normalized(
@@ -365,11 +429,13 @@ impl<'db> CallableSignature<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::constraint_set_assignability(
             constraints,
             &relation_visitor,
             &disjointness_visitor,
+            &signature_relation_visitor,
             &materialization_visitor,
         );
         checker.check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
@@ -419,6 +485,49 @@ pub struct Signature<'db> {
     pub(crate) return_ty: Type<'db>,
 }
 
+/// Whether one callable signature's parameters are compatible with another's.
+pub(crate) enum ParameterConsistency<'db> {
+    /// The parameters are compatible.
+    Consistent,
+    /// The parameters are incompatible, with context explaining the incompatibility.
+    Inconsistent(ErrorContextTree<'db>),
+}
+
+/// Whether one callable signature's return type is compatible with another's.
+pub(crate) enum ReturnTypeConsistency<'db> {
+    /// The return types are compatible.
+    Consistent,
+    /// The return types are incompatible, with context explaining the incompatibility.
+    Inconsistent(ErrorContextTree<'db>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct SignatureRelationKey<'db> {
+    // Signature recursion for recursive protocols keeps revisiting the same method declarations
+    // under ever-growing specializations. We key the guard on declaration identity so it can
+    // break that active cycle, while synthetic `Callable[...]` signatures still fall through to
+    // the ordinary relation logic because they do not carry definitions.
+    source_definition: Definition<'db>,
+    target_definition: Definition<'db>,
+    relation: TypeRelation,
+}
+
+impl<'db> SignatureRelationKey<'db> {
+    fn from_signatures(
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+        relation: TypeRelation,
+    ) -> Option<Self> {
+        Some(Self {
+            source_definition: source.definition?,
+            target_definition: target.definition?,
+            relation,
+        })
+    }
+}
+
+pub(crate) type SignatureRelationVisitor<'db> = ActiveRecursionDetector<SignatureRelationKey<'db>>;
+
 pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     signature: &Signature<'db>,
@@ -433,6 +542,59 @@ pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
         visitor.visit_type(db, parameter.annotated_type());
     }
     visitor.visit_type(db, signature.return_ty);
+}
+
+/// Describes how a `functools.partial(...)` call binds one overload's parameters.
+///
+/// `call/bind.rs` computes this from argument matching. Signature rewriting then consumes this
+/// summary to synthesize the reduced callable that a partial object exposes.
+#[derive(Clone, Debug)]
+pub(crate) struct PartialApplication<'db> {
+    positionally_bound: Box<[bool]>,
+    keyword_defaults: Box<[Option<Type<'db>>]>,
+    keyword_bound: Box<[bool]>,
+}
+
+impl<'db> PartialApplication<'db> {
+    /// Creates an empty partial-application summary for a signature with `parameter_count`
+    /// parameters.
+    pub(crate) fn new(parameter_count: usize) -> Self {
+        Self {
+            positionally_bound: vec![false; parameter_count].into_boxed_slice(),
+            keyword_defaults: vec![None; parameter_count].into_boxed_slice(),
+            keyword_bound: vec![false; parameter_count].into_boxed_slice(),
+        }
+    }
+
+    /// Marks the parameter at `parameter_index` as consumed by a positional binding.
+    pub(crate) fn bind_positionally(&mut self, parameter_index: usize) {
+        self.positionally_bound[parameter_index] = true;
+    }
+
+    /// Marks the parameter at `parameter_index` as bound by keyword and records the synthesized
+    /// default type that should appear in the reduced signature, if any.
+    pub(crate) fn bind_by_keyword(
+        &mut self,
+        parameter_index: usize,
+        default_ty: Option<Type<'db>>,
+    ) {
+        self.keyword_bound[parameter_index] = true;
+        self.keyword_defaults[parameter_index] = default_ty;
+    }
+
+    /// Returns `true` if the parameter at `parameter_index` is removed from the reduced signature
+    /// because it was already supplied positionally to `functools.partial(...)`.
+    pub(crate) fn is_positionally_bound(&self, parameter_index: usize) -> bool {
+        self.positionally_bound[parameter_index]
+    }
+
+    fn keyword_default(&self, parameter_index: usize) -> Option<Type<'db>> {
+        self.keyword_defaults[parameter_index]
+    }
+
+    fn is_keyword_bound(&self, parameter_index: usize) -> bool {
+        self.keyword_bound[parameter_index]
+    }
 }
 
 impl<'db> Signature<'db> {
@@ -774,10 +936,234 @@ impl<'db> Signature<'db> {
         }
     }
 
+    /// Returns this signature with the given specialization applied to parameters and return type.
+    pub(crate) fn apply_specialization(
+        &self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        let type_mapping =
+            TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(specialization));
+        self.apply_type_mapping_impl(
+            db,
+            &type_mapping,
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
+    }
+
+    /// Returns the callable signature produced by partially applying this signature.
+    pub(crate) fn partially_apply(
+        &self,
+        db: &'db dyn Db,
+        partial_application: &PartialApplication<'db>,
+        specialization: Option<Specialization<'db>>,
+        unspecialized_return_ty: Type<'db>,
+    ) -> Self {
+        let signature_specialization =
+            self.partial_application_specialization(db, partial_application, specialization);
+        let signature = signature_specialization.map_or_else(
+            || self.clone(),
+            |specialization| self.apply_specialization(db, specialization),
+        );
+
+        let parameters = signature.parameters().as_slice();
+        let return_ty = specialization.map_or_else(
+            || unspecialized_return_ty,
+            |specialization| {
+                unspecialized_return_ty
+                    .apply_specialization(db, signature_specialization.unwrap_or(specialization))
+            },
+        );
+
+        let mut remaining = Vec::with_capacity(parameters.len());
+        let mut first_keyword_bound_positional_or_keyword = None;
+        for (index, parameter) in parameters.iter().enumerate() {
+            if partial_application.is_positionally_bound(index) {
+                continue;
+            }
+
+            let parameter = partial_application.keyword_default(index).map_or_else(
+                || parameter.clone(),
+                |default_ty| parameter.clone().with_default_type(default_ty),
+            );
+
+            if first_keyword_bound_positional_or_keyword.is_none()
+                && partial_application.is_keyword_bound(index)
+                && matches!(parameter.kind(), ParameterKind::PositionalOrKeyword { .. })
+            {
+                first_keyword_bound_positional_or_keyword = Some(remaining.len());
+            }
+
+            remaining.push(parameter);
+        }
+
+        // Expand `P.args`/`P.kwargs` while the pair is still adjacent. The keyword-only reshuffle
+        // below can separate them, which would otherwise prevent expansion.
+        let remaining = Parameters::new(db, remaining).expand_paramspec_variadics(db);
+
+        let mut reordered = Vec::with_capacity(remaining.len());
+        let mut keyword_only = Vec::new();
+        let mut keyword_variadic = Vec::new();
+        for (index, parameter) in remaining.iter().cloned().enumerate() {
+            let parameter = if first_keyword_bound_positional_or_keyword
+                .is_some_and(|first_bound_index| index >= first_bound_index)
+                && matches!(parameter.kind(), ParameterKind::PositionalOrKeyword { .. })
+            {
+                parameter.positional_or_keyword_to_keyword_only()
+            } else {
+                parameter
+            };
+
+            if parameter.is_keyword_variadic() {
+                keyword_variadic.push(parameter);
+            } else if parameter.is_keyword_only() {
+                keyword_only.push(parameter);
+            } else {
+                reordered.push(parameter);
+            }
+        }
+
+        reordered.extend(keyword_only);
+        reordered.extend(keyword_variadic);
+
+        signature
+            .with_parameters(Parameters::new(db, reordered))
+            .with_return_type(return_ty)
+    }
+
+    /// Returns the specialization used for the callable signature exposed by a partial object.
+    ///
+    /// Surviving type variables that still appear in the reduced parameter list may need a more
+    /// specific specialization than the plain return-type view.
+    fn partial_application_specialization(
+        &self,
+        db: &'db dyn Db,
+        partial_application: &PartialApplication<'db>,
+        specialization: Option<Specialization<'db>>,
+    ) -> Option<Specialization<'db>> {
+        let specialization = specialization?;
+        let Some(generic_context) = self.generic_context else {
+            return Some(specialization);
+        };
+
+        let promoted_typevars: FxHashSet<BoundTypeVarIdentity<'db>> = generic_context
+            .variables(db)
+            .filter(|typevar| {
+                self.parameters
+                    .iter()
+                    .enumerate()
+                    .filter(|(index, _)| !partial_application.is_positionally_bound(*index))
+                    .any(|(_, parameter)| {
+                        parameter
+                            .annotated_type()
+                            .references_typevar(db, typevar.typevar(db).identity(db))
+                    })
+            })
+            .map(|typevar| typevar.identity(db))
+            .collect();
+
+        if promoted_typevars.is_empty() {
+            return Some(specialization);
+        }
+
+        Some(generic_context.specialize_recursive(
+            db,
+            generic_context.variables(db).map(|typevar| {
+                let ty = specialization
+                    .get(db, typevar)
+                    .unwrap_or(Type::TypeVar(typevar));
+                Some(if promoted_typevars.contains(&typevar.identity(db)) {
+                    ty.promote(db)
+                } else {
+                    ty
+                })
+            }),
+        ))
+    }
+
     fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {
         match self.generic_context {
             Some(generic_context) => generic_context.inferable_typevars(db),
             None => InferableTypeVars::None,
+        }
+    }
+
+    pub(crate) fn is_non_generic(&self) -> bool {
+        self.generic_context.is_none()
+    }
+
+    /// Return whether this non-generic implementation accepts the arguments of a non-generic
+    /// overload, and the relation error context if it does not.
+    ///
+    /// This is a deliberately narrow first pass for overload implementation consistency. Generic
+    /// signatures need additional type-variable-domain handling and should be left to the full
+    /// implementation.
+    pub(crate) fn non_generic_implementation_parameters_consistency_with(
+        &self,
+        db: &'db dyn Db,
+        overload: &Self,
+    ) -> ParameterConsistency<'db> {
+        debug_assert!(self.is_non_generic());
+        debug_assert!(overload.is_non_generic());
+
+        let implementation = self.clone().with_return_type(Type::unknown());
+        let overload = overload.clone().with_return_type(Type::unknown());
+        let constraints = ConstraintSetBuilder::new();
+        let relation_visitor = HasRelationToVisitor::default(&constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        let checker = TypeRelationChecker::constraint_set_assignability_with_context(
+            &constraints,
+            &relation_visitor,
+            &disjointness_visitor,
+            &signature_relation_visitor,
+            &materialization_visitor,
+        );
+
+        let is_consistent = checker
+            .check_signature_pair(db, &implementation, &overload)
+            .is_always_satisfied(db);
+
+        if is_consistent {
+            ParameterConsistency::Consistent
+        } else {
+            ParameterConsistency::Inconsistent(checker.into_error_context())
+        }
+    }
+
+    /// Return whether a non-generic overload return type is assignable to a non-generic
+    /// implementation return type, and the relation error context if it is not.
+    pub(crate) fn non_generic_implementation_return_type_consistency_with(
+        &self,
+        db: &'db dyn Db,
+        overload: &Self,
+    ) -> ReturnTypeConsistency<'db> {
+        debug_assert!(self.is_non_generic());
+        debug_assert!(overload.is_non_generic());
+
+        let constraints = ConstraintSetBuilder::new();
+        let relation_visitor = HasRelationToVisitor::default(&constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        let checker = TypeRelationChecker::assignability_with_context(
+            &constraints,
+            &relation_visitor,
+            &disjointness_visitor,
+            &signature_relation_visitor,
+            &materialization_visitor,
+        );
+
+        let is_consistent = checker
+            .check_type_pair(db, overload.return_ty, self.return_ty)
+            .is_always_satisfied(db);
+
+        if is_consistent {
+            ReturnTypeConsistency::Consistent
+        } else {
+            ReturnTypeConsistency::Inconsistent(checker.into_error_context())
         }
     }
 
@@ -839,11 +1225,13 @@ impl<'db> Signature<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::constraint_set_assignability(
             constraints,
             &relation_visitor,
             &disjointness_visitor,
+            &signature_relation_visitor,
             &materialization_visitor,
         );
         checker.check_signature_pair(db, self, other)
@@ -852,6 +1240,11 @@ impl<'db> Signature<'db> {
     /// Create a new signature with the given definition.
     pub(crate) fn with_definition(self, definition: Option<Definition<'db>>) -> Self {
         Self { definition, ..self }
+    }
+
+    /// Create a new signature with the given parameters.
+    pub(crate) fn with_parameters(self, parameters: Parameters<'db>) -> Self {
+        Self { parameters, ..self }
     }
 
     /// Create a new signature with the given return type.
@@ -1060,17 +1453,33 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
 
                 (None, Some((target_tvar, target_return))) if source_overloads.len() > 1 => {
+                    // TODO: Ideally, the constraint solver should use the return type constraint
+                    // to remove unmatched overloads from the `ParamSpec` specialization instead
+                    // of filtering them here.
                     let lower = Type::Callable(CallableType::new(
                         db,
-                        CallableSignature::from_overloads(source_overloads.iter().map(
-                            |signature| {
-                                Signature::new_generic(
-                                    signature.generic_context,
-                                    signature.parameters().clone(),
-                                    Type::unknown(),
-                                )
-                            },
-                        )),
+                        CallableSignature::from_overloads(
+                            source_overloads
+                                .iter()
+                                .filter(|signature| {
+                                    !self
+                                        .without_context_collection(|| {
+                                            self.check_type_pair(
+                                                db,
+                                                signature.return_ty,
+                                                target_return,
+                                            )
+                                        })
+                                        .is_never_satisfied(db)
+                                })
+                                .map(|signature| {
+                                    Signature::new_generic(
+                                        signature.generic_context,
+                                        signature.parameters().clone(),
+                                        Type::unknown(),
+                                    )
+                                }),
+                        ),
                         CallableTypeKind::ParamSpecValue,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
@@ -1195,7 +1604,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         // `inner` will create a constraint set that references these newly inferable typevars.
         let checker = self.with_inferable_typevars(inferable);
-        let when = checker.check_signature_pair_inner(db, source, target);
+        let when = checker.with_signature_recursion_guard(source, target, || {
+            checker.check_signature_pair_inner(db, source, target)
+        });
 
         // But the caller does not need to consider those extra typevars. Whatever constraint set
         // we produce, we reduce it back down to the inferable set that the caller asked about.
@@ -1206,6 +1617,26 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.constraints,
             source_inferable.iter(db).chain(target_inferable.iter(db)),
         )
+    }
+
+    fn with_signature_recursion_guard(
+        &self,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+        work: impl FnOnce() -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        let Some(key) = SignatureRelationKey::from_signatures(source, target, self.relation) else {
+            return work();
+        };
+
+        // Signature recursion through recursive protocols is coinductive in the same way as
+        // recursive type-relation checks: if checking this signature pair asks for the same
+        // declaration pair again, the inner obligation is the assumption currently being proved.
+        // Use `always` as the cycle value so valid fixed points can close; any real mismatch in
+        // the finite layer still bubbles out of `work`, because only exact active revisits take
+        // this branch and the result is not memoized.
+        self.signature_relation_visitor
+            .visit(&key, || self.always(), work)
     }
 
     fn check_signature_pair_inner(
@@ -3083,6 +3514,62 @@ impl<'db> Parameters<'db> {
             .enumerate()
             .rfind(|(_, parameter)| parameter.is_keyword_variadic())
     }
+
+    /// Expands adjacent `P.args`/`P.kwargs` placeholders into their mapped parameters.
+    pub(crate) fn expand_paramspec_variadics(&self, db: &'db dyn Db) -> Self {
+        let mut variadic_index = None;
+        let mut paramspec_callable = None;
+
+        for (index, parameter) in self.iter().enumerate() {
+            if !parameter.is_variadic() {
+                continue;
+            }
+
+            let Type::Callable(callable) = parameter.annotated_type() else {
+                continue;
+            };
+            if callable.kind(db) != CallableTypeKind::ParamSpecValue {
+                continue;
+            }
+
+            variadic_index = Some(index);
+            paramspec_callable = Some(callable);
+            break;
+        }
+
+        let Some(variadic_index) = variadic_index else {
+            return self.clone();
+        };
+        let Some(paramspec_callable) = paramspec_callable else {
+            return self.clone();
+        };
+
+        let Some(keyword_variadic) = self.get(variadic_index + 1) else {
+            return self.clone();
+        };
+        if !keyword_variadic.is_keyword_variadic() {
+            return self.clone();
+        }
+
+        let Type::Callable(keyword_callable) = keyword_variadic.annotated_type() else {
+            return self.clone();
+        };
+        if keyword_callable.kind(db) != CallableTypeKind::ParamSpecValue
+            || keyword_callable != paramspec_callable
+        {
+            return self.clone();
+        }
+
+        let [mapped_signature] = paramspec_callable.signatures(db).overloads.as_slice() else {
+            return self.clone();
+        };
+
+        let mut expanded = Vec::with_capacity(self.len());
+        expanded.extend_from_slice(&self.value[..variadic_index]);
+        expanded.extend_from_slice(mapped_signature.parameters().as_slice());
+        expanded.extend_from_slice(&self.value[variadic_index + 2..]);
+        Parameters::new(db, expanded)
+    }
 }
 
 impl<'db, 'a> IntoIterator for &'a Parameters<'db> {
@@ -3532,6 +4019,18 @@ impl<'db> Parameter<'db> {
             | ParameterKind::KeywordOnly { default_type, .. } => default_type,
             ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => None,
         }
+    }
+
+    /// Rewrites a positional-or-keyword parameter as keyword-only while preserving its metadata.
+    pub(crate) fn positional_or_keyword_to_keyword_only(&self) -> Self {
+        let mut result = self.clone();
+        if let ParameterKind::PositionalOrKeyword { name, default_type } = &self.kind {
+            result.kind = ParameterKind::KeywordOnly {
+                name: name.clone(),
+                default_type: *default_type,
+            };
+        }
+        result
     }
 }
 

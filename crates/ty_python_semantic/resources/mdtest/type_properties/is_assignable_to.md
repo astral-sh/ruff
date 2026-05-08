@@ -1451,6 +1451,43 @@ static_assert(not is_assignable_to(TypeGuard[Unknown], str))
 static_assert(not is_assignable_to(TypeIs[Any], str))
 ```
 
+## `TypeIs` with gradual types
+
+`TypeIs` is invariant in its declared type. But gradual types are assignable to and from any type,
+so `TypeIs` annotations that differ only by `Any` are still compatible:
+
+```py
+from collections.abc import Sequence
+from ty_extensions import is_assignable_to, static_assert
+from typing_extensions import Any, TypeIs
+
+static_assert(is_assignable_to(TypeIs[Sequence[int]], TypeIs[Sequence[Any]]))
+static_assert(is_assignable_to(TypeIs[Sequence[Any]], TypeIs[Sequence[int]]))
+static_assert(not is_assignable_to(TypeIs[Sequence[int]], TypeIs[Sequence[object]]))
+```
+
+## `callable` as a `TypeIs` predicate
+
+The runtime predicate type and the declared `TypeIs` type are related but distinct. The builtin
+`callable` predicate can be used where a predicate for `Callable[..., Any]` is expected:
+
+```py
+from collections.abc import Callable
+from typing import Any
+from typing_extensions import TypeIs
+
+Plugin = Callable[..., Any]
+IsPlugin = Callable[[object], TypeIs[Plugin]]
+
+def accepts_plugin_predicate(plugin_type: IsPlugin = callable) -> None:
+    pass
+
+def takes_plugin_predicate(plugin_type: IsPlugin) -> None:
+    pass
+
+takes_plugin_predicate(callable)
+```
+
 ## `ParamSpec`
 
 ```py

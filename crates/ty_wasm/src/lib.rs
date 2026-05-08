@@ -165,12 +165,22 @@ impl Workspace {
         )
         .map_err(into_error)?;
 
-        let program_settings = project
+        let (program_settings, program_settings_diagnostics) = project
             .to_program_settings(&self.system, self.db.vendored(), &FallibleStrategy)
             .map_err(into_error)?;
         Program::get(&self.db).update_from_settings(&mut self.db, program_settings);
 
-        self.db.project().reload(&mut self.db, project);
+        let (settings, settings_diagnostics) = project
+            .to_settings(&self.db, &FallibleStrategy)
+            .map_err(into_error)?;
+
+        self.db.project().reload(
+            &mut self.db,
+            project,
+            Some(settings),
+            settings_diagnostics,
+            program_settings_diagnostics,
+        );
 
         Ok(())
     }

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use lsp_types::{
-    DidOpenTextDocumentParams, FileChangeType, FileEvent, TextDocumentItem, Url,
+    DidOpenTextDocumentParams, FileChangeType, FileEvent, Position, Range, TextDocumentItem, Url,
     notification::{DidOpenTextDocument, PublishDiagnostics},
 };
 use ruff_db::system::SystemPath;
@@ -204,6 +204,80 @@ def foo() -> str:
     }];
 
     server.change_text_document(foo, changes, 2);
+
+    let diagnostics = server.await_notification::<PublishDiagnostics>();
+
+    assert_eq!(diagnostics.version, Some(2));
+
+    insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn on_did_change_invalid_tuple_assignment_target_does_not_panic() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+something, somethingelse = (1, 2)
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let _ = server.await_notification::<PublishDiagnostics>();
+
+    server.change_text_document(
+        foo,
+        vec![lsp_types::TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 11), Position::new(0, 24))),
+            range_length: None,
+            text: "not".to_string(),
+        }],
+        2,
+    );
+
+    let diagnostics = server.await_notification::<PublishDiagnostics>();
+
+    assert_eq!(diagnostics.version, Some(2));
+
+    insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn on_did_change_nested_invalid_tuple_assignment_target_does_not_panic() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+something, somethingelse = (1, 2)
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let _ = server.await_notification::<PublishDiagnostics>();
+
+    server.change_text_document(
+        foo,
+        vec![lsp_types::TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 11), Position::new(0, 24))),
+            range_length: None,
+            text: "not x".to_string(),
+        }],
+        2,
+    );
 
     let diagnostics = server.await_notification::<PublishDiagnostics>();
 

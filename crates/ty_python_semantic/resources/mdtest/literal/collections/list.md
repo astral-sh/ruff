@@ -34,7 +34,7 @@ reveal_type(x[0].__name__)  # revealed: str
 ## Mixed list
 
 ```py
-# revealed: list[int | tuple[int, int] | tuple[int, int, int]]
+# revealed: list[int | tuple[int, ...]]
 reveal_type([1, (1, 2), (1, 2, 3)])
 ```
 

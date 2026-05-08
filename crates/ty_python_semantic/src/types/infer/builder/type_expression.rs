@@ -1618,6 +1618,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
+                KnownInstanceType::FunctoolsPartial(_) => {
+                    self.infer_type_expression(&subscript.slice);
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "`functools.partial` instances cannot be specialized",
+                        ));
+                    }
+                    Type::unknown()
+                }
             },
             Type::Dynamic(DynamicType::UnknownGeneric(_)) => {
                 self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
@@ -1666,14 +1675,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 todo_type!("string literal subscripted in type expression")
             }
             Type::Union(union) => {
-                self.infer_type_expression(slice);
-                union.map(self.db(), |element| {
+                let db = self.db();
+                let mut union_builder =
+                    UnionBuilder::new(db).recursively_defined(union.recursively_defined(db));
+
+                for (index, element) in union.elements(db).iter().enumerate() {
                     let mut speculative_builder = self.speculate();
                     let subscript_ty =
                         speculative_builder.infer_subscript_type_expression(subscript, *element);
-                    self.context.extend(&speculative_builder.context.finish());
-                    subscript_ty
-                })
+                    if index == 0 {
+                        self.extend(speculative_builder);
+                    } else {
+                        self.context.extend(&speculative_builder.context.finish());
+                    }
+                    union_builder = union_builder.add(subscript_ty);
+                }
+
+                union_builder.build()
             }
             _ => {
                 if !self.in_string_annotation() {
@@ -2136,16 +2154,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     if expanded.is_divergent() {
                         expanded
                     } else {
-                        TypeIsType::unbound(
-                            self.db(),
-                            // N.B. Using the top materialization here is a pragmatic decision
-                            // that makes us produce more intuitive results given how
-                            // `TypeIs` is used in the real world (in particular, in typeshed).
-                            // However, there's some debate about whether this is really
-                            // fully correct. See <https://github.com/astral-sh/ruff/pull/20591>
-                            // for more discussion.
-                            narrowed.top_materialization(self.db()),
-                        )
+                        TypeIsType::from_type_expression(self.db(), narrowed)
                     }
                 }
             },

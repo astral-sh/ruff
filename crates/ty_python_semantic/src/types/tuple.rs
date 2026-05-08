@@ -35,6 +35,8 @@ use crate::{Db, FxOrderSet, Program};
 use ty_python_core::Truthiness;
 use ty_python_core::definition::Definition;
 
+pub(crate) mod promotion;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum TupleLength {
     Fixed(usize),

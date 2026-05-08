@@ -854,7 +854,7 @@ python-version = "3.9"
 ```py
 from dataclasses import dataclass
 
-@dataclass(kw_only=True)  # TODO: Emit a diagnostic here
+@dataclass(kw_only=True)  # error: [no-matching-overload]
 class A:
     x: int
     y: int
@@ -1088,8 +1088,7 @@ from dataclasses import dataclass
 
 # fmt: off
 
-# TODO: these nonexistent keyword arguments should cause us to emit diagnostics on Python 3.9
-@dataclass(
+@dataclass(  # error: [no-matching-overload]
     slots=True,
     weakref_slot=True,
     match_args=True

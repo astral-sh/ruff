@@ -266,6 +266,7 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
 
     pub(crate) fn visit(
         &self,
+        db: &'db dyn Db,
         ty: Type<'db>,
         type_mapping: &TypeMapping<'_, 'db>,
         func: impl FnOnce() -> Type<'db>,
@@ -274,15 +275,15 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
             TypeMapping::Materialize(MaterializationKind::Top) => self
                 .top_materialization
                 .get_or_init(TypeTransformer::default)
-                .visit(ty, func),
+                .visit_type(db, ty, func),
             TypeMapping::Materialize(MaterializationKind::Bottom) => self
                 .bottom_materialization
                 .get_or_init(TypeTransformer::default)
-                .visit(ty, func),
+                .visit_type(db, ty, func),
             _ => self
                 .default
                 .get_or_init(TypeTransformer::default)
-                .visit(ty, func),
+                .visit_type(db, ty, func),
         }
     }
 
@@ -854,11 +855,11 @@ fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
 ) -> Option<Type<'db>> {
     let ty = if nested {
         guard
-            .return_type(db)
+            .type_argument(db)
             .recursive_type_normalized_impl(db, div, true)?
     } else {
         guard
-            .return_type(db)
+            .type_argument(db)
             .recursive_type_normalized_impl(db, div, true)
             .unwrap_or(div)
     };
@@ -2290,6 +2291,9 @@ impl<'db> Type<'db> {
     /// Return true if this type is non-empty and all inhabitants of this type compare equal.
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
+            // Each `partial()` call creates a distinct object at runtime.
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_)) => false,
+
             Type::FunctionLiteral(..)
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(_)
@@ -3477,6 +3481,39 @@ impl<'db> Type<'db> {
                     .into()
             }
 
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial))
+                if name_str == "__call__" =>
+            {
+                Place::bound(Type::Callable(partial.partial(db))).into()
+            }
+
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)) => {
+                let wrapped = partial.wrapped(db).inner(db);
+                let nominal_lookup = partial
+                    .partial(db)
+                    .into_functools_partial_instance(db)
+                    .member_lookup_with_policy(db, name.clone(), policy);
+                if name_str == "func" {
+                    match nominal_lookup.place {
+                        Place::Defined(DefinedPlace {
+                            origin,
+                            definedness,
+                            public_type_policy,
+                            ..
+                        }) => Place::Defined(DefinedPlace {
+                            ty: wrapped,
+                            origin,
+                            definedness,
+                            public_type_policy,
+                        })
+                        .into(),
+                        Place::Undefined => Place::bound(wrapped).into(),
+                    }
+                } else {
+                    nominal_lookup
+                }
+            }
+
             Type::NominalInstance(..)
             | Type::ProtocolInstance(..)
             | Type::NewTypeInstance(..)
@@ -3912,6 +3949,33 @@ impl<'db> Type<'db> {
                 .into(),
 
                 Some(KnownFunction::Dataclass) => {
+                    let bool_parameter = |name: &'static str, default: bool| {
+                        Parameter::keyword_only(Name::new_static(name))
+                            .with_annotated_type(KnownClass::Bool.to_instance(db))
+                            .with_default_type(Type::bool_literal(default))
+                    };
+
+                    let mut decorator_factory_parameters = vec![
+                        bool_parameter("init", true),
+                        bool_parameter("repr", true),
+                        bool_parameter("eq", true),
+                        bool_parameter("order", false),
+                        bool_parameter("unsafe_hash", false),
+                        bool_parameter("frozen", false),
+                    ];
+
+                    if Program::get(db).python_version(db) >= ast::PythonVersion::PY310 {
+                        decorator_factory_parameters.extend([
+                            bool_parameter("match_args", true),
+                            bool_parameter("kw_only", false),
+                            bool_parameter("slots", false),
+                        ]);
+                    }
+
+                    if Program::get(db).python_version(db) >= ast::PythonVersion::PY311 {
+                        decorator_factory_parameters.push(bool_parameter("weakref_slot", false));
+                    }
+
                     CallableBinding::from_overloads(
                         self,
                         [
@@ -3933,8 +3997,6 @@ impl<'db> Type<'db> {
                                 ),
                                 Type::unknown(),
                             ),
-                            // TODO: make this overload Python-version-dependent
-
                             // def dataclass(
                             //     *,
                             //     init: bool = True,
@@ -3949,41 +4011,7 @@ impl<'db> Type<'db> {
                             //     weakref_slot: bool = False,
                             // ) -> Callable[[type[_T]], type[_T]]: ...
                             Signature::new(
-                                Parameters::new(
-                                    db,
-                                    [
-                                        Parameter::keyword_only(Name::new_static("init"))
-                                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(true)),
-                                        Parameter::keyword_only(Name::new_static("repr"))
-                                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(true)),
-                                        Parameter::keyword_only(Name::new_static("eq"))
-                                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(true)),
-                                        Parameter::keyword_only(Name::new_static("order"))
-                                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(false)),
-                                        Parameter::keyword_only(Name::new_static("unsafe_hash"))
-                                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(false)),
-                                        Parameter::keyword_only(Name::new_static("frozen"))
-                                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(false)),
-                                        Parameter::keyword_only(Name::new_static("match_args"))
-                                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(true)),
-                                        Parameter::keyword_only(Name::new_static("kw_only"))
-                                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(false)),
-                                        Parameter::keyword_only(Name::new_static("slots"))
-                                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(false)),
-                                        Parameter::keyword_only(Name::new_static("weakref_slot"))
-                                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(false)),
-                                    ],
-                                ),
+                                Parameters::new(db, decorator_factory_parameters),
                                 Type::unknown(),
                             ),
                         ],
@@ -4145,6 +4173,10 @@ impl<'db> Type<'db> {
                 ),
             )
             .into(),
+
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)) => {
+                Type::Callable(partial.partial(db)).bindings(db)
+            }
 
             Type::KnownInstance(known_instance) => {
                 known_instance.instance_fallback(db).bindings(db)
@@ -4402,6 +4434,47 @@ impl<'db> Type<'db> {
                 )
             }
 
+            KnownClass::FunctoolsPartial => {
+                // ```py
+                // class partial(Generic[_T]):
+                //     def __new__(cls, func: Callable[..., _T], /, *args: Any, **kwargs: Any) -> Self: ...
+                // ```
+                let return_ty = BoundTypeVarInstance::synthetic(
+                    db,
+                    Name::new_static("_T"),
+                    TypeVarVariance::Covariant,
+                );
+
+                Some(
+                    Binding::single(
+                        self,
+                        Signature::new_generic(
+                            Some(GenericContext::from_typevar_instances(db, [return_ty])),
+                            Parameters::new(
+                                db,
+                                [
+                                    Parameter::positional_only(Some(Name::new_static("func")))
+                                        .with_annotated_type(Type::single_callable(
+                                            db,
+                                            Signature::new(
+                                                Parameters::gradual_form(),
+                                                Type::TypeVar(return_ty),
+                                            ),
+                                        )),
+                                    Parameter::variadic(Name::new_static("args"))
+                                        .with_annotated_type(Type::any()),
+                                    Parameter::keyword_variadic(Name::new_static("kwargs"))
+                                        .with_annotated_type(Type::any()),
+                                ],
+                            ),
+                            KnownClass::FunctoolsPartial
+                                .to_specialized_instance(db, &[Type::TypeVar(return_ty)]),
+                        ),
+                    )
+                    .into(),
+                )
+            }
+
             KnownClass::Tuple => {
                 let element_ty = BoundTypeVarInstance::synthetic(
                     db,
@@ -4531,6 +4604,7 @@ impl<'db> Type<'db> {
                 KnownClass::Bool
                     | KnownClass::Type
                     | KnownClass::Object
+                    | KnownClass::FunctoolsPartial
                     | KnownClass::Property
                     | KnownClass::Super
                     | KnownClass::TypeAliasType
@@ -5328,6 +5402,12 @@ impl<'db> Type<'db> {
                 }
                 KnownInstanceType::Callable(callable) => Ok(Type::Callable(*callable)),
                 KnownInstanceType::LiteralStringAlias(ty) => Ok(ty.inner(db)),
+                KnownInstanceType::FunctoolsPartial(_) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
+                        *self, scope_id
+                    )],
+                    fallback_type: Type::unknown(),
+                }),
             },
 
             Type::SpecialForm(special_form) => special_form
@@ -5586,7 +5666,7 @@ impl<'db> Type<'db> {
             Type::TypeVar(bound_typevar) => bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor),
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
-            Type::FunctionLiteral(function) => visitor.visit(self, type_mapping, || {
+            Type::FunctionLiteral(function) => visitor.visit(db, self, type_mapping, || {
                 match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
@@ -5634,7 +5714,7 @@ impl<'db> Type<'db> {
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             },
 
-            Type::NewTypeInstance(newtype) => visitor.visit(self, type_mapping, || {
+            Type::NewTypeInstance(newtype) => visitor.visit(db, self, type_mapping, || {
                 Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
                     class_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 }))
@@ -5680,9 +5760,9 @@ impl<'db> Type<'db> {
                 ))
             }
 
-            Type::Callable(callable) => {
+            Type::Callable(callable) => visitor.visit(db, self, type_mapping, || {
                 Type::Callable(callable.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-            }
+            }),
 
             Type::GenericAlias(generic) => {
                 Type::GenericAlias(generic.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
@@ -5719,17 +5799,16 @@ impl<'db> Type<'db> {
                 builder.build()
             }
 
-            // TODO(jelle): Materialize should be handled differently, since TypeIs is invariant
-            Type::TypeIs(type_is) => visitor.visit(self, type_mapping, || {
+            Type::TypeIs(type_is) => visitor.visit(db, self, type_mapping, || {
                 type_is.with_type(
                     db,
                     type_is
-                        .return_type(db)
+                        .type_argument(db)
                         .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 )
             }),
 
-            Type::TypeGuard(type_guard) => visitor.visit(self, type_mapping, || {
+            Type::TypeGuard(type_guard) => visitor.visit(db, self, type_mapping, || {
                 type_guard.with_type(
                     db,
                     type_guard
@@ -5739,42 +5818,58 @@ impl<'db> Type<'db> {
             }),
 
             Type::TypeAlias(alias) => {
-                // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
-                // detection rather than the visitor's cycle detection, because the visitor tracks
-                // Type values and `RecursiveList` is different from `RecursiveList[T]`.
-                if TypeMapping::EagerExpansion == *type_mapping {
-                    return alias.raw_value_type(db).expand_eagerly(db);
-                }
-
-                // Do not call `value_type` here. `value_type` does the specialization internally, so `apply_type_mapping` is
-                // performed without `visitor` inheritance. In the case of recursive type aliases, this leads to infinite recursion.
-                // Instead, call `raw_value_type` and perform the specialization after the `visitor` cache has been created.
-                //
-                // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
-                // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
-                // will detect the cycle and return the fallback value.
-                let mapped = visitor.visit(self, type_mapping, || {
-                    match type_mapping {
-                        TypeMapping::EagerExpansion => unreachable!("handled above"),
-
-                        _ => {
+                match type_mapping {
+                    // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
+                    // detection rather than the visitor's cycle detection, because the visitor tracks
+                    // Type values and `RecursiveList` is different from `RecursiveList[T]`.
+                    TypeMapping::EagerExpansion => {
+                        alias.raw_value_type(db).expand_eagerly(db)
+                    },
+                    // When specializing a generic type alias, instead of specializing the expanded type, the type alias itself is specialized.
+                    // Without this special handling, recursive type aliases would result in cycles, returning an unspecialized fallback type.
+                    TypeMapping::ApplySpecialization(specialization)
+                    | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
+                    if matches!(specialization, ApplySpecialization::Specialization(_) | ApplySpecialization::Partial { .. }) => {
+                        let mut current_specialization = specialization.as_specialization(db).unwrap();
+                        if let TypeMapping::ApplySpecializationWithMaterialization {
+                            materialization_kind,
+                            ..
+                        } = type_mapping
+                        {
+                            current_specialization = current_specialization
+                                .with_materialization_kind(db, Some(*materialization_kind));
+                        }
+                        Type::TypeAlias(alias.apply_specialization(
+                            db,
+                            |generic_context| {
+                                alias
+                                    .specialization(db)
+                                    .unwrap_or_else(|| generic_context.default_specialization(db, None))
+                                    .apply_specialization(db, current_specialization)
+                            },
+                        ))
+                    }
+                    _ => {
+                        // Do not call `value_type` here. `value_type` does the specialization internally, so `apply_type_mapping` is
+                        // performed without `visitor` inheritance. In the case of recursive type aliases, this leads to infinite recursion.
+                        // Instead, call `raw_value_type` and perform the specialization after the `visitor` cache has been created.
+                        //
+                        // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
+                        // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
+                        // will detect the cycle and return the fallback value.
+                        let mapped = visitor.visit(db, self, type_mapping, || {
                             let value_type = alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
                             alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                        });
+
+                        // If the type mapping does not result in any change to this type alias, keep the
+                        // alias node instead of eagerly expanding it.
+                        if alias.value_type(db) == mapped {
+                            self
+                        } else {
+                            mapped
                         }
                     }
-                });
-
-                let is_recursive = any_over_type(db, alias.raw_value_type(db).expand_eagerly(db), false, |ty| ty.is_divergent());
-
-                // If the type mapping does not result in any change to this (non-recursive) type alias, do not expand it.
-                //
-                // TODO: The rule that recursive type aliases must be expanded could potentially be removed, but doing so would
-                // currently cause a stack overflow, as the current recursive type alias specialization/expansion mechanism is
-                // incomplete.
-                if !is_recursive && alias.value_type(db) == mapped {
-                    self
-                } else {
-                    mapped
                 }
             }
 
@@ -5975,7 +6070,7 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeIs(type_is) => {
-                type_is.return_type(db).find_legacy_typevars_impl(
+                type_is.type_argument(db).find_legacy_typevars_impl(
                     db,
                     binding_context,
                     typevars,
@@ -6037,7 +6132,8 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::Literal(_)
                 | KnownInstanceType::LiteralStringAlias(_)
                 | KnownInstanceType::NamedTupleSpec(_)
-                | KnownInstanceType::NewType(_) => {
+                | KnownInstanceType::NewType(_)
+                | KnownInstanceType::FunctoolsPartial(_) => {
                     // TODO: For some of these, we may need to try to find legacy typevars in inner types.
                 }
             },
@@ -6820,7 +6916,7 @@ impl<'db> TypeMapping<'_, 'db> {
                 specialization,
                 materialization_kind,
             } => TypeMapping::ApplySpecializationWithMaterialization {
-                specialization: specialization.clone(),
+                specialization: *specialization,
                 materialization_kind: materialization_kind.flip(),
             },
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
@@ -7644,7 +7740,7 @@ pub(super) struct MetaclassTransformInfo<'db> {
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct TypeIsType<'db> {
-    return_type: Type<'db>,
+    type_argument: Type<'db>,
     /// The ID of the scope to which the place belongs
     /// and the ID of the place itself within that scope.
     place_info: Option<(ScopeId<'db>, ScopedPlaceId)>,
@@ -7655,7 +7751,7 @@ fn walk_typeis_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     typeis_type: TypeIsType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, typeis_type.return_type(db));
+    visitor.visit_type(db, typeis_type.type_argument(db));
 }
 
 // The Salsa heap is tracked separately.
@@ -7669,17 +7765,28 @@ impl<'db> TypeIsType<'db> {
         Some(format!("{}", table.place(place)))
     }
 
-    pub(crate) fn unbound(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    /// Construct an unbound `TypeIs` return type from the user-written type expression.
+    ///
+    /// The user-written type is preserved for `TypeIs` invariance checks, while the return type
+    /// used for narrowing applies the top materialization on demand.
+    ///
+    /// ```python
+    /// from typing import TypeIs
+    ///
+    /// def is_tuple(value: object) -> TypeIs[tuple[int, ...]]:
+    ///     return isinstance(value, tuple)
+    /// ```
+    pub(crate) fn from_type_expression(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         Type::TypeIs(Self::new(db, ty, None))
     }
 
-    pub(crate) fn bound(
-        db: &'db dyn Db,
-        return_type: Type<'db>,
-        scope: ScopeId<'db>,
-        place: ScopedPlaceId,
-    ) -> Type<'db> {
-        Type::TypeIs(Self::new(db, return_type, Some((scope, place))))
+    pub(crate) fn return_type(self, db: &'db dyn Db) -> Type<'db> {
+        // N.B. Using the top materialization here is a pragmatic decision that
+        // makes us produce more intuitive results given how `TypeIs` is used in
+        // the real world (in particular, in typeshed). However, there's some
+        // debate about whether this is really fully correct. See
+        // <https://github.com/astral-sh/ruff/pull/20591> for more discussion.
+        self.type_argument(db).top_materialization(db)
     }
 
     #[must_use]
@@ -7689,7 +7796,7 @@ impl<'db> TypeIsType<'db> {
         scope: ScopeId<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
-        Self::bound(db, self.return_type(db), scope, place)
+        Type::TypeIs(Self::new(db, self.type_argument(db), Some((scope, place))))
     }
 
     #[must_use]
@@ -7706,7 +7813,7 @@ impl<'db> VarianceInferable<'db> for TypeIsType<'db> {
     // See the [typing spec] on why `TypeIs` is invariant in its type.
     // [typing spec]: https://typing.python.org/en/latest/spec/narrowing.html#typeis
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
-        self.return_type(db)
+        self.type_argument(db)
             .with_polarity(TypeVarVariance::Invariant)
             .variance_of(db, typevar)
     }
@@ -7786,13 +7893,13 @@ pub(crate) trait TypeGuardLike<'db>: Copy {
     /// The name of this type guard form (for error messages and display)
     const FORM_NAME: &'static str;
 
-    /// Get the return type that the type guard narrows to
-    fn return_type(self, db: &'db dyn Db) -> Type<'db>;
+    /// Get the annotation argument stored in the type guard form.
+    fn type_argument(self, db: &'db dyn Db) -> Type<'db>;
 
     /// Get the human-readable place name if bound
     fn place_name(self, db: &'db dyn Db) -> Option<String>;
 
-    /// Create a new instance with a different return type, wrapped in Type
+    /// Create a new instance with a different type argument, wrapped in Type.
     fn with_type(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db>;
 
     /// The `SpecialFormType` for display purposes
@@ -7802,8 +7909,8 @@ pub(crate) trait TypeGuardLike<'db>: Copy {
 impl<'db> TypeGuardLike<'db> for TypeIsType<'db> {
     const FORM_NAME: &'static str = "TypeIs";
 
-    fn return_type(self, db: &'db dyn Db) -> Type<'db> {
-        TypeIsType::return_type(self, db)
+    fn type_argument(self, db: &'db dyn Db) -> Type<'db> {
+        TypeIsType::type_argument(self, db)
     }
 
     fn place_name(self, db: &'db dyn Db) -> Option<String> {
@@ -7822,7 +7929,7 @@ impl<'db> TypeGuardLike<'db> for TypeIsType<'db> {
 impl<'db> TypeGuardLike<'db> for TypeGuardType<'db> {
     const FORM_NAME: &'static str = "TypeGuard";
 
-    fn return_type(self, db: &'db dyn Db) -> Type<'db> {
+    fn type_argument(self, db: &'db dyn Db) -> Type<'db> {
         TypeGuardType::return_type(self, db)
     }
 

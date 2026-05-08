@@ -17,7 +17,7 @@ use crate::types::constraints::{
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
-use crate::types::signatures::{CallableSignature, Parameters};
+use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
 use crate::types::typevar::{
@@ -877,46 +877,53 @@ impl<'db> GenericContext<'db> {
         I: IntoIterator<Item = Option<Type<'db>>>,
         I::IntoIter: ExactSizeIterator,
     {
-        fn specialize_recursive_impl<'db>(
-            db: &'db dyn Db,
-            context: GenericContext<'db>,
-            mut types: Box<[Type<'db>]>,
-        ) -> Specialization<'db> {
-            let len = types.len();
-            loop {
-                let mut any_changed = false;
-                for i in 0..len {
-                    let specialization = ApplySpecialization::Partial {
-                        generic_context: context,
-                        types: &types,
-                        // Don't recursively substitute type[i] in itself. Ideally, we could instead
-                        // check if the result is self-referential after we're done applying the
-                        // partial specialization. But when we apply a paramspec, we don't use the
-                        // callable that it maps to directly; we create a new callable that reuses
-                        // parts of it. That means we can't look for the previous type directly.
-                        // Instead we use this to skip specializing the type in itself in the first
-                        // place.
-                        skip: Some(i),
-                    };
-                    let updated = types[i].apply_type_mapping(
-                        db,
-                        &TypeMapping::ApplySpecialization(specialization),
-                        TypeContext::default(),
-                    );
-                    if updated != types[i] {
-                        types[i] = updated;
-                        any_changed = true;
-                    }
+        let types = self.fill_in_defaults(db, types);
+        self.specialize_from_types_recursive(db, types)
+    }
+
+    /// Builds a specialization and recursively resolves references between the chosen types.
+    fn specialize_from_types_recursive(
+        self,
+        db: &'db dyn Db,
+        mut types: Box<[Type<'db>]>,
+    ) -> Specialization<'db> {
+        let len = types.len();
+        let variables = self.variables(db).collect_vec();
+        loop {
+            let mut any_changed = false;
+            for i in 0..len {
+                // Preserve identity mappings for unresolved type variables.
+                if types[i] == Type::TypeVar(variables[i]) {
+                    continue;
                 }
 
-                if !any_changed {
-                    return Specialization::new(db, context, types, None, None);
+                let specialization = ApplySpecialization::Partial {
+                    generic_context: self,
+                    types: &types,
+                    // Don't recursively substitute type[i] in itself. Ideally, we could instead
+                    // check if the result is self-referential after we're done applying the
+                    // partial specialization. But when we apply a paramspec, we don't use the
+                    // callable that it maps to directly; we create a new callable that reuses
+                    // parts of it. That means we can't look for the previous type directly.
+                    // Instead we use this to skip specializing the type in itself in the first
+                    // place.
+                    skip: Some(i),
+                };
+                let updated = types[i].apply_type_mapping(
+                    db,
+                    &TypeMapping::ApplySpecialization(specialization),
+                    TypeContext::default(),
+                );
+                if updated != types[i] {
+                    types[i] = updated;
+                    any_changed = true;
                 }
             }
-        }
 
-        let types = self.fill_in_defaults(db, types);
-        specialize_recursive_impl(db, self, types)
+            if !any_changed {
+                return Specialization::new(db, self, types, None, None);
+            }
+        }
     }
 
     /// Creates a specialization of this generic context for the `tuple` class.
@@ -1107,6 +1114,20 @@ impl<'db> Specialization<'db> {
                 &ApplyTypeMappingVisitor::default(),
             ),
         }
+    }
+
+    pub(crate) fn with_materialization_kind(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: Option<MaterializationKind>,
+    ) -> Self {
+        Specialization::new(
+            db,
+            self.generic_context(db),
+            self.types(db),
+            materialization_kind,
+            self.tuple_inner(db),
+        )
     }
 
     pub(crate) fn apply_type_mapping<'a>(
@@ -1306,12 +1327,14 @@ impl<'db> Specialization<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = DisjointnessChecker::new(
             constraints,
             inferable,
             &relation_visitor,
             &disjointness_visitor,
+            &signature_relation_visitor,
             &materialization_visitor,
         );
         checker.check_specialization_pair(db, self, other)
@@ -1634,7 +1657,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 ///
 /// You will usually use [`Specialization`] instead of this type. This type is used when we need to
 /// substitute types for type variables before we have fully constructed a [`Specialization`].
-#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub enum ApplySpecialization<'a, 'db> {
     Specialization(Specialization<'db>),
     Partial {
@@ -1685,6 +1708,38 @@ impl<'db> ApplySpecialization<'_, 'db> {
                     None
                 }
             }
+        }
+    }
+
+    /// Convert this specialization mapping to a concrete specialization over its own generic
+    /// context, preserving skipped type variables in partial specializations as identity mappings.
+    pub(crate) fn as_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+        match self {
+            ApplySpecialization::Specialization(specialization) => Some(specialization),
+            ApplySpecialization::Partial {
+                generic_context,
+                types,
+                skip,
+            } => Some(
+                generic_context.specialize(
+                    db,
+                    generic_context
+                        .variables(db)
+                        .enumerate()
+                        .map(|(index, bound_typevar)| {
+                            if skip.is_some_and(|skip| skip == index) {
+                                Type::TypeVar(bound_typevar)
+                            } else {
+                                types
+                                    .get(index)
+                                    .copied()
+                                    .unwrap_or(Type::TypeVar(bound_typevar))
+                            }
+                        })
+                        .collect::<Vec<_>>(),
+                ),
+            ),
+            ApplySpecialization::ReturnCallables(_) | ApplySpecialization::Single(_, _) => None,
         }
     }
 }
