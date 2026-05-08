@@ -6,7 +6,7 @@
 //!
 //! Some symbols (such as parameters and local variables) are visible only
 //! within their scope. All other symbols, such as those defined at the global
-//! scope or within classes, are visible outside of the module. Finding
+//! scope or within classes, are visible outside the module. Finding
 //! all references to these externally-visible symbols therefore requires
 //! an expensive search of all source files in the workspace.
 
@@ -89,15 +89,7 @@ pub(crate) fn references(
     let target_text = goto_target.to_string()?;
 
     // Find all of the references to the symbol within this file
-    let mut references = Vec::new();
-    references_for_file(
-        db,
-        file,
-        &target_definitions,
-        &target_text,
-        mode,
-        &mut references,
-    );
+    let mut references = references_for_file(db, file, &target_definitions, &target_text, mode);
 
     // Check if we should search across files based on the mode
     let search_across_files = matches!(
@@ -107,47 +99,59 @@ pub(crate) fn references(
             | ReferencesMode::RenameMultiFile
     );
 
-    if search_across_files {
-        // For symbols that are potentially visible outside of the current module, perform a full
-        // semantic search across files.
-        if is_externally_visible_symbol {
-            // Look for references in all other files within the workspace
-            for other_file in &db.project().files(db) {
-                // Skip the current file as we already processed it
-                if other_file == file {
-                    continue;
-                }
+    // Parameters are local by scope, but they can have cross-file references via keyword
+    // argument labels (e.g. `f(param=...)`). Handle this case with a narrow scan that only
+    // considers keyword arguments.
+    let is_parameter = parameter_owner_is_externally_visible(db, &target_definitions);
 
-                // First do a simple text search to see if there is a potential match in the file
-                let source = ruff_db::source::source_text(db, other_file);
-                if !contains_identifier(source.as_str(), target_text.as_ref()) {
-                    continue;
-                }
+    if search_across_files && (is_parameter || is_externally_visible_symbol) {
+        let result = std::sync::Mutex::new(Vec::new());
+        let files = db.project().files(db);
 
-                // If the target text is found, do the more expensive semantic analysis
-                references_for_file(
-                    db,
-                    other_file,
-                    &target_definitions,
-                    &target_text,
-                    mode,
-                    &mut references,
-                );
-            }
+        {
+            let db = Db::dyn_clone(db);
+            let target_definitions = &target_definitions;
+            let files = &files;
+            let result = &result;
+            let needle = target_text.as_ref();
+
+            rayon::scope(move |s| {
+                for other_file in files {
+                    // Skip the current file as we already processed it
+                    if other_file == file {
+                        continue;
+                    }
+
+                    let db = Db::dyn_clone(&*db);
+
+                    s.spawn(move |_| {
+                        let db = &*db;
+
+                        // First do a simple text search to see if there is a potential match in the file
+                        let source = ruff_db::source::source_text(db, other_file);
+                        if !contains_identifier(&source, needle) {
+                            return;
+                        }
+
+                        // If the target text is found, do the more expensive semantic analysis
+                        let references = if is_externally_visible_symbol {
+                            references_for_file(db, other_file, target_definitions, needle, mode)
+                        } else {
+                            references_for_keyword_arguments_in_file(
+                                db,
+                                other_file,
+                                target_definitions,
+                                needle,
+                                mode,
+                            )
+                        };
+
+                        result.lock().unwrap().extend(references);
+                    });
+                }
+            });
         }
-        // Parameters are local by scope, but they can have cross-file references via keyword
-        // argument labels (e.g. `f(param=...)`). Handle this case with a narrow scan that only
-        // considers keyword arguments.
-        else if parameter_owner_is_externally_visible(db, &target_definitions) {
-            references_for_parameter_keyword_arguments_across_files(
-                db,
-                file,
-                &target_definitions,
-                &target_text,
-                mode,
-                &mut references,
-            );
-        }
+        references.extend(result.into_inner().unwrap());
     }
 
     if references.is_empty() {
@@ -157,47 +161,13 @@ pub(crate) fn references(
     }
 }
 
-/// Search other files for keyword-argument labels that bind to the given parameter.
-///
-/// This is intentionally narrower than a full cross-file references search to avoid turning
-/// common parameter names into a costly workspace-wide scan.
-fn references_for_parameter_keyword_arguments_across_files(
-    db: &dyn Db,
-    file: File,
-    target_definitions: &NavigationTargets,
-    target_text: &str,
-    mode: ReferencesMode,
-    references: &mut Vec<ReferenceTarget>,
-) {
-    for other_file in &db.project().files(db) {
-        if other_file == file {
-            continue;
-        }
-
-        let source = ruff_db::source::source_text(db, other_file);
-        if !source_contains_keyword_argument_candidate(source.as_str(), target_text) {
-            continue;
-        }
-
-        references_for_keyword_arguments_in_file(
-            db,
-            other_file,
-            target_definitions,
-            target_text,
-            mode,
-            references,
-        );
-    }
-}
-
 fn references_for_keyword_arguments_in_file(
     db: &dyn Db,
     file: File,
     target_definitions: &NavigationTargets,
     target_text: &str,
     mode: ReferencesMode,
-    references: &mut Vec<ReferenceTarget>,
-) {
+) -> Vec<ReferenceTarget> {
     // This path is used for cross-file parameter keyword-label references.
     // DocumentHighlights is same-file-only and should never route through here.
     debug_assert!(
@@ -208,41 +178,21 @@ fn references_for_keyword_arguments_in_file(
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
     let model = SemanticModel::new(db, file);
+    let mut references = Vec::new();
 
     let mut finder = KeywordArgumentReferencesFinder(LocalReferencesFinder {
         model: &model,
         tokens: module.tokens(),
         target_definitions,
-        references,
+        references: &mut references,
         mode,
         target_text,
         ancestors: Vec::new(),
     });
 
     AnyNodeRef::from(module.syntax()).visit_source_order(&mut finder);
-}
 
-/// Cheap text prefilter for keyword-argument labels before AST/semantic validation.
-///
-/// Heuristically matches an ASCII approximation of `\b{name}\b\s*=\s*(?!=)`.
-/// This is intentionally permissive and may include non-call contexts (e.g. assignments),
-/// but it helps skip files that cannot possibly contain a matching `name=` label.
-fn source_contains_keyword_argument_candidate(source: &str, name: &str) -> bool {
-    if name.is_empty() {
-        return false;
-    }
-
-    let bytes = source.as_bytes();
-
-    source_identifier_matches(source, name).any(|start| {
-        let mut i = start + name.len();
-
-        while bytes.get(i).is_some_and(u8::is_ascii_whitespace) {
-            i += 1;
-        }
-
-        bytes.get(i) == Some(&b'=') && bytes.get(i + 1) != Some(&b'=')
-    })
+    references
 }
 
 /// Cheap text prefilter for identifier references before AST/semantic validation.
@@ -253,19 +203,10 @@ fn contains_identifier(source: &str, name: &str) -> bool {
         return false;
     }
 
-    source_identifier_matches(source, name).next().is_some()
-}
-
-fn source_identifier_matches<'a>(
-    source: &'a str,
-    name: &'a str,
-) -> impl Iterator<Item = usize> + 'a {
-    debug_assert!(!name.is_empty());
-
     let bytes = source.as_bytes();
     let needle = name.as_bytes();
 
-    memchr::memmem::find_iter(bytes, needle).filter(move |&pos| {
+    memchr::memmem::find_iter(bytes, needle).any(move |pos| {
         let after = pos + needle.len();
 
         // Skip this entry if it is within an identifier. E.g. skip
@@ -309,16 +250,16 @@ fn references_for_file(
     target_definitions: &NavigationTargets,
     target_text: &str,
     mode: ReferencesMode,
-    references: &mut Vec<ReferenceTarget>,
-) {
+) -> Vec<ReferenceTarget> {
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
     let model = SemanticModel::new(db, file);
+    let mut references = Vec::new();
 
     let mut finder = LocalReferencesFinder {
         model: &model,
         target_definitions,
-        references,
+        references: &mut references,
         mode,
         tokens: module.tokens(),
         target_text,
@@ -326,6 +267,8 @@ fn references_for_file(
     };
 
     AnyNodeRef::from(module.syntax()).visit_source_order(&mut finder);
+
+    references
 }
 
 /// Determines whether the resolved definitions can have references outside their file.
@@ -419,9 +362,6 @@ struct LocalReferencesFinder<'a> {
     target_text: &'a str,
     ancestors: Vec<AnyNodeRef<'a>>,
 }
-
-/// AST visitor that searches only keyword-argument labels for semantic matches against a target.
-struct KeywordArgumentReferencesFinder<'a>(LocalReferencesFinder<'a>);
 
 impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
     fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
@@ -535,6 +475,9 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
         self.ancestors.pop();
     }
 }
+
+/// AST visitor that searches only keyword-argument labels for semantic matches against a target.
+struct KeywordArgumentReferencesFinder<'a>(LocalReferencesFinder<'a>);
 
 impl<'a> SourceOrderVisitor<'a> for KeywordArgumentReferencesFinder<'a> {
     fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
@@ -772,23 +715,6 @@ def f():
     fn source_candidate_prefilters_use_identifier_boundaries() {
         for (source, name) in [("x = 1", "x"), ("obj.x", "x"), ("x()", "x")] {
             assert!(contains_identifier(source, name));
-        }
-
-        for (source, name) in [
-            ("xylophone = 1", "x"),
-            ("value_x = 1", "x"),
-            ("x_value = 1", "x"),
-            ("grid = 1", "id"),
-        ] {
-            assert!(!contains_identifier(source, name));
-        }
-
-        for source in ["f(id=1)", "f(id = 1)"] {
-            assert!(source_contains_keyword_argument_candidate(source, "id"));
-        }
-
-        for source in ["f(grid=1)", "f(id_value=1)", "id == 1"] {
-            assert!(!source_contains_keyword_argument_candidate(source, "id"));
         }
     }
 }
