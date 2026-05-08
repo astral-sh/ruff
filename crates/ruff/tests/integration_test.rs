@@ -1741,6 +1741,38 @@ fn unreadable_pyproject_toml() -> Result<()> {
     Ok(())
 }
 
+/// Regression test for #19421: a broken symlink should be reported as a
+/// regular IO error (or warned about), not crash with "Failed to create cache key".
+#[cfg(unix)]
+#[test]
+fn broken_symlink() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let target = tempdir.path().join("does_not_exist.py");
+    let link = tempdir.path().join("blah.py");
+    std::os::unix::fs::symlink(&target, &link)?;
+
+    let mut cmd = RuffCheck::default()
+        .filename(link.to_str().unwrap())
+        .args([])
+        .build();
+    insta::with_settings!({filters => vec![
+        (link.display().to_string().as_str(), "[BLAH_PY]"),
+    ]}, {
+        assert_cmd_snapshot!(cmd, @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        E902 No such file or directory (os error 2)
+         --> [BLAH_PY]:1:1
+
+        Found 1 error.
+
+        ----- stderr -----
+        ");
+    });
+    Ok(())
+}
+
 /// Check the output with an unreadable directory
 #[cfg(unix)]
 #[test]

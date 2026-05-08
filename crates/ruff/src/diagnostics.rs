@@ -7,7 +7,7 @@ use std::io::Write;
 use std::ops::{Add, AddAssign};
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use colored::Colorize;
 use log::{debug, warn};
 use ruff_db::diagnostic::Diagnostic;
@@ -191,17 +191,24 @@ pub(crate) fn lint_path(
                 .relative_path(path)
                 .expect("wrong package cache for file");
 
-            let cache_key = FileCacheKey::from_path(path).context("Failed to create cache key")?;
-            let cached_diagnostics = cache
-                .get(relative_path, &cache_key)
-                .is_some_and(FileCache::linted);
-            if cached_diagnostics {
-                return Ok(Diagnostics::default());
-            }
+            // If the file metadata is unreadable (e.g. broken symlink), skip
+            // caching and fall through; the source-load step below will surface
+            // the underlying IO error as a normal diagnostic.
+            match FileCacheKey::from_path(path) {
+                Ok(cache_key) => {
+                    let cached_diagnostics = cache
+                        .get(relative_path, &cache_key)
+                        .is_some_and(FileCache::linted);
+                    if cached_diagnostics {
+                        return Ok(Diagnostics::default());
+                    }
 
-            // Stash the file metadata for later so when we update the cache it reflects the prerun
-            // information
-            Some((cache, relative_path, cache_key))
+                    // Stash the file metadata for later so when we update the cache it reflects
+                    // the prerun information
+                    Some((cache, relative_path, cache_key))
+                }
+                Err(_) => None,
+            }
         }
         _ => None,
     };
