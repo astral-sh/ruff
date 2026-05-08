@@ -133,29 +133,28 @@ impl<'db> UnionType<'db> {
         // identity-preserving for every element, we can return `self` as-is
         // without performing any redundancy checks.
         let elements = self.elements(db);
-        let mut builder: Option<UnionBuilder<'db>> = None;
-        for (i, ty) in elements.iter().enumerate() {
+        let mut iter = elements.iter().enumerate();
+        while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty);
-            if let Some(b) = builder.as_mut() {
-                b.add_in_place(new_ty);
-            } else if &new_ty != ty {
+            if &new_ty != ty {
                 // First change at index `i`. Initialize the builder and
                 // replay the unchanged prefix (we know `elements[..i]`
                 // mapped to themselves, so we pass the originals directly).
                 let mut b = UnionBuilder::new(db);
                 for prev in &elements[..i] {
-                    b.add_in_place(*prev);
+                    b.push_normalized(*prev);
                 }
                 b.add_in_place(new_ty);
-                builder = Some(b);
+
+                for (_, element) in iter {
+                    b.add_in_place(transform_fn(element));
+                }
+
+                return b.recursively_defined(self.recursively_defined(db)).build();
             }
         }
-        let Some(builder) = builder else {
-            return Type::Union(self);
-        };
-        builder
-            .recursively_defined(self.recursively_defined(db))
-            .build()
+
+        Type::Union(self)
     }
 
     /// A version of [`UnionType::map`] that does not unpack type aliases.
@@ -166,26 +165,25 @@ impl<'db> UnionType<'db> {
     ) -> Type<'db> {
         let elements = self.elements(db);
         // Lazy initialization: see `UnionType::map` for details.
-        let mut builder: Option<UnionBuilder<'db>> = None;
-        for (i, ty) in elements.iter().enumerate() {
+        let mut iter = elements.iter().enumerate();
+        while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty);
-            if let Some(b) = builder.as_mut() {
-                b.add_in_place(new_ty);
-            } else if &new_ty != ty {
+            if &new_ty != ty {
                 let mut b = UnionBuilder::new(db).unpack_aliases(false);
                 for prev in &elements[..i] {
-                    b.add_in_place(*prev);
+                    b.push_normalized(*prev);
                 }
                 b.add_in_place(new_ty);
-                builder = Some(b);
+
+                for (_, element) in iter {
+                    b.add_in_place(transform_fn(element));
+                }
+
+                return b.recursively_defined(self.recursively_defined(db)).build();
             }
         }
-        let Some(builder) = builder else {
-            return Type::Union(self);
-        };
-        builder
-            .recursively_defined(self.recursively_defined(db))
-            .build()
+
+        Type::Union(self)
     }
 
     /// A fallible version of [`UnionType::map`].
@@ -202,28 +200,25 @@ impl<'db> UnionType<'db> {
     ) -> Option<Type<'db>> {
         let elements = self.elements(db);
         // Lazy initialization: see `UnionType::map` for details.
-        let mut builder: Option<UnionBuilder<'db>> = None;
-        for (i, ty) in elements.iter().enumerate() {
+        let mut iter = elements.iter().enumerate();
+        while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty)?;
-            if let Some(b) = builder.as_mut() {
-                b.add_in_place(new_ty);
-            } else if &new_ty != ty {
+            if &new_ty != ty {
                 let mut b = UnionBuilder::new(db);
                 for prev in &elements[..i] {
-                    b.add_in_place(*prev);
+                    b.push_normalized(*prev);
                 }
                 b.add_in_place(new_ty);
-                builder = Some(b);
+
+                for (_, element) in iter {
+                    b.add_in_place(transform_fn(element)?);
+                }
+
+                return Some(b.recursively_defined(self.recursively_defined(db)).build());
             }
         }
-        let Some(builder) = builder else {
-            return Some(Type::Union(self));
-        };
-        Some(
-            builder
-                .recursively_defined(self.recursively_defined(db))
-                .build(),
-        )
+
+        Some(Type::Union(self))
     }
 
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
