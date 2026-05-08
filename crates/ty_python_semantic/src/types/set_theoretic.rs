@@ -1,5 +1,7 @@
 use itertools::Either;
 
+use std::convert::Infallible;
+
 use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin,
 };
@@ -126,33 +128,39 @@ impl<'db> UnionType<'db> {
     pub(crate) fn map(
         self,
         db: &'db dyn Db,
-        transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+        mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        self.elements(db)
-            .iter()
-            .map(transform_fn)
-            .fold(UnionBuilder::new(db), |builder, element| {
-                builder.add(element)
-            })
-            .recursively_defined(self.recursively_defined(db))
-            .build()
+        let Ok(mapped) =
+            self.try_map_impl(db, |element| Ok::<_, Infallible>(transform_fn(element)));
+        mapped
     }
 
     /// A version of [`UnionType::map`] that does not unpack type aliases.
     pub(crate) fn map_leave_aliases(
         self,
         db: &'db dyn Db,
-        transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+        mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        self.elements(db)
-            .iter()
-            .map(transform_fn)
-            .fold(
-                UnionBuilder::new(db).unpack_aliases(false),
-                UnionBuilder::add,
-            )
-            .recursively_defined(self.recursively_defined(db))
-            .build()
+        let elements = self.elements(db);
+        let mut iter = elements.iter().enumerate();
+        while let Some((i, ty)) = iter.next() {
+            let new_ty = transform_fn(ty);
+            if &new_ty != ty {
+                let mut builder = UnionBuilder::new(db).unpack_aliases(false);
+                for prev in &elements[..i] {
+                    builder = builder.add(*prev);
+                }
+                builder = builder.add(new_ty);
+                for (_, element) in iter {
+                    builder = builder.add(transform_fn(element));
+                }
+                return builder
+                    .recursively_defined(self.recursively_defined(db))
+                    .build();
+            }
+        }
+
+        Type::Union(self)
     }
 
     /// A fallible version of [`UnionType::map`].
@@ -165,14 +173,37 @@ impl<'db> UnionType<'db> {
     pub(crate) fn try_map(
         self,
         db: &'db dyn Db,
-        transform_fn: impl FnMut(&Type<'db>) -> Option<Type<'db>>,
+        mut transform_fn: impl FnMut(&Type<'db>) -> Option<Type<'db>>,
     ) -> Option<Type<'db>> {
-        let mut builder = UnionBuilder::new(db);
-        for element in self.elements(db).iter().map(transform_fn) {
-            builder = builder.add(element?);
+        self.try_map_impl(db, |element| transform_fn(element).ok_or(()))
+            .ok()
+    }
+
+    fn try_map_impl<E>(
+        self,
+        db: &'db dyn Db,
+        mut transform_fn: impl FnMut(&Type<'db>) -> Result<Type<'db>, E>,
+    ) -> Result<Type<'db>, E> {
+        let elements = self.elements(db);
+        let mut iter = elements.iter().enumerate();
+        while let Some((i, ty)) = iter.next() {
+            let new_ty = transform_fn(ty)?;
+            if &new_ty != ty || matches!(new_ty, Type::TypeAlias(_)) {
+                let mut builder = elements[..i]
+                    .iter()
+                    .copied()
+                    .fold(UnionBuilder::new(db), UnionBuilder::add);
+                builder = builder.add(new_ty);
+                for (_, element) in iter {
+                    builder = builder.add(transform_fn(element)?);
+                }
+                return Ok(builder
+                    .recursively_defined(self.recursively_defined(db))
+                    .build());
+            }
         }
-        builder = builder.recursively_defined(self.recursively_defined(db));
-        Some(builder.build())
+
+        Ok(Type::Union(self))
     }
 
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
