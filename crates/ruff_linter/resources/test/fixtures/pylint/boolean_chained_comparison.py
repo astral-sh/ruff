@@ -146,3 +146,23 @@ a < ( # sneaky comment
 )
 
 a < (b) and (((b)) < c)
+
+# --------------------------
+# attribute access examples
+# --------------------------
+
+class X:
+    value = 1
+
+
+x = X()
+limit = 2
+if 0 < x.value and x.value <= limit:  # [boolean-chained-comparison]
+    pass
+
+if limit >= x.value and x.value > 0:  # [boolean-chained-comparison]
+    pass
+
+# Not handled by the existing repeated-middle-operand simplification.
+if x.value > 0 and x.value <= limit:
+    pass

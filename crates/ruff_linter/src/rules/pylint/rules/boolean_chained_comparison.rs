@@ -1,7 +1,8 @@
 use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
-    BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare,
+    BoolOp, CmpOp, Expr, ExprAttribute, ExprBoolOp, ExprCompare,
+    comparable::ComparableExpr,
     token::{parentheses_iterator, parenthesized_range},
 };
 use ruff_text_size::{Ranged, TextRange};
@@ -77,15 +78,19 @@ pub(crate) fn boolean_chained_comparison(checker: &Checker, expr_bool_op: &ExprB
                 are_compare_expr_simplifiable(left_compare, right_compare)
             })
     {
-        let Some(Expr::Name(left_compare_right)) = left_compare.comparators.last() else {
+        let Some(left_compare_right) = left_compare.comparators.last() else {
             continue;
         };
 
-        let Expr::Name(right_compare_left) = &*right_compare.left else {
-            continue;
-        };
+        let right_compare_left = right_compare.left.as_ref();
 
-        if left_compare_right.id() != right_compare_left.id() {
+        if !is_safe_repeated_operand(left_compare_right)
+            || !is_safe_repeated_operand(right_compare_left)
+        {
+            continue;
+        }
+
+        if ComparableExpr::from(left_compare_right) != ComparableExpr::from(right_compare_left) {
             continue;
         }
 
@@ -154,4 +159,12 @@ fn are_compare_expr_simplifiable(left: &ExprCompare, right: &ExprCompare) -> boo
                     | (CmpOp::Gt | CmpOp::GtE, CmpOp::Gt | CmpOp::GtE)
             )
         })
+}
+
+fn is_safe_repeated_operand(expr: &Expr) -> bool {
+    match expr {
+        Expr::Name(_) => true,
+        Expr::Attribute(ExprAttribute { value, .. }) => is_safe_repeated_operand(value),
+        _ => false,
+    }
 }

@@ -461,6 +461,8 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
 147 |
 148 | a < (b) and (((b)) < c)
     | ^^^^^^^^^^^^^^^^^^^^^^
+149 |
+150 | # --------------------------
     |
 help: Use a single compare expression
 145 |     and ((c<d))
@@ -468,3 +470,44 @@ help: Use a single compare expression
 147 |
     - a < (b) and (((b)) < c)
 148 + (a < (b) < c)
+149 |
+150 | # --------------------------
+151 | # attribute access examples
+
+PLR1716 [*] Contains chained boolean comparison that can be simplified
+   --> boolean_chained_comparison.py:160:4
+    |
+158 | x = X()
+159 | limit = 2
+160 | if 0 < x.value and x.value <= limit:  # [boolean-chained-comparison]
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+161 |     pass
+    |
+help: Use a single compare expression
+157 |
+158 | x = X()
+159 | limit = 2
+    - if 0 < x.value and x.value <= limit:  # [boolean-chained-comparison]
+160 + if 0 < x.value <= limit:  # [boolean-chained-comparison]
+161 |     pass
+162 |
+163 | if limit >= x.value and x.value > 0:  # [boolean-chained-comparison]
+
+PLR1716 [*] Contains chained boolean comparison that can be simplified
+   --> boolean_chained_comparison.py:163:4
+    |
+161 |     pass
+162 |
+163 | if limit >= x.value and x.value > 0:  # [boolean-chained-comparison]
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+164 |     pass
+    |
+help: Use a single compare expression
+160 | if 0 < x.value and x.value <= limit:  # [boolean-chained-comparison]
+161 |     pass
+162 |
+    - if limit >= x.value and x.value > 0:  # [boolean-chained-comparison]
+163 + if limit >= x.value > 0:  # [boolean-chained-comparison]
+164 |     pass
+165 |
+166 | # Not handled by the existing repeated-middle-operand simplification.
