@@ -59,6 +59,45 @@ use super::{DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, in_nested
 ///     return var
 /// ```
 ///
+/// `bound` and constraint arguments on the original `TypeVar` are preserved
+/// in the new type parameter syntax. For a `TypeVar` with a `bound`:
+///
+/// ```python
+/// from typing import TypeVar
+///
+/// T = TypeVar("T", bound=int)
+///
+///
+/// def generic_function(var: T) -> T:
+///     return var
+/// ```
+///
+/// becomes:
+///
+/// ```python
+/// def generic_function[T: int](var: T) -> T:
+///     return var
+/// ```
+///
+/// And for a `TypeVar` with constraints:
+///
+/// ```python
+/// from typing import TypeVar
+///
+/// T = TypeVar("T", int, str)
+///
+///
+/// def generic_function(var: T) -> T:
+///     return var
+/// ```
+///
+/// becomes:
+///
+/// ```python
+/// def generic_function[T: (int, str)](var: T) -> T:
+///     return var
+/// ```
+///
 /// ## See also
 ///
 /// This rule replaces standalone type variables in function signatures but doesn't remove

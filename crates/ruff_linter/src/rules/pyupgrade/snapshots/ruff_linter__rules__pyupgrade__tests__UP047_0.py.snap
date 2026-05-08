@@ -136,3 +136,37 @@ help: Use type parameters
 58 |     return t[1]
 59 |
 note: This is an unsafe fix and may change runtime behavior
+
+UP047 [*] Generic function `issue_19155` should use type parameters
+  --> UP047_0.py:75:5
+   |
+75 | def issue_19155(arg: SameClassT) -> SameClassT:
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+76 |     return arg
+   |
+help: Use type parameters
+72 | SameClassT = TypeVar("SameClassT", Class1, Class2)
+73 |
+74 |
+   - def issue_19155(arg: SameClassT) -> SameClassT:
+75 + def issue_19155[SameClassT: (Class1, Class2)](arg: SameClassT) -> SameClassT:
+76 |     return arg
+77 |
+78 |
+note: This is an unsafe fix and may change runtime behavior
+
+UP047 [*] Generic function `issue_19155_bound` should use type parameters
+  --> UP047_0.py:84:5
+   |
+84 | def issue_19155_bound(arg: BoundedT) -> BoundedT:
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+85 |     return arg
+   |
+help: Use type parameters
+81 | BoundedT = TypeVar("BoundedT", bound=Class1)
+82 |
+83 |
+   - def issue_19155_bound(arg: BoundedT) -> BoundedT:
+84 + def issue_19155_bound[BoundedT: Class1](arg: BoundedT) -> BoundedT:
+85 |     return arg
+note: This is an unsafe fix and may change runtime behavior

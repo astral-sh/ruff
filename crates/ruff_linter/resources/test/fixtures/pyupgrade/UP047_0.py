@@ -63,3 +63,23 @@ def multi_param(t: list[T], c: Callable[[T], None]) -> T:
 def outer():
     def inner(t: T) -> T:
         return t
+
+
+# https://github.com/astral-sh/ruff/issues/19155
+# constraints on a `TypeVar` should be preserved in the generated type parameter
+class Class1: ...
+class Class2: ...
+SameClassT = TypeVar("SameClassT", Class1, Class2)
+
+
+def issue_19155(arg: SameClassT) -> SameClassT:
+    return arg
+
+
+# https://github.com/astral-sh/ruff/issues/19155
+# `bound` on a `TypeVar` should be preserved in the generated type parameter
+BoundedT = TypeVar("BoundedT", bound=Class1)
+
+
+def issue_19155_bound(arg: BoundedT) -> BoundedT:
+    return arg
