@@ -945,6 +945,10 @@ impl<'db> Signature<'db> {
             return Some(self.bind_self(db, Some(typing_self_type)));
         }
 
+        if first_parameter.inferred_annotation {
+            return Some(self.bind_self(db, Some(typing_self_type)));
+        }
+
         let mut expected_self_ty = first_parameter.annotated_type();
         let accepts_any_or_exact_self =
             |ty: Type<'db>| ty.is_dynamic() || ty.is_object() || ty == self_type;
@@ -976,6 +980,12 @@ impl<'db> Signature<'db> {
         }
 
         let inferable_typevars = self.inferable_typevars(db);
+        if (inferable_typevars == InferableTypeVars::None || !expected_self_ty.has_typevar(db))
+            && let Some(is_assignable) = fast_is_assignable_to(db, self_type, expected_self_ty)
+        {
+            return is_assignable.then(|| self.bind_self(db, Some(typing_self_type)));
+        }
+
         if inferable_typevars == InferableTypeVars::None || !expected_self_ty.has_typevar(db) {
             let when = self_type.when_constraint_set_assignable_to_owned(db, expected_self_ty);
             if when.query(|_, when| when.is_always_satisfied(db)) {
@@ -996,6 +1006,12 @@ impl<'db> Signature<'db> {
                     .bind_self(db, Some(typing_self_type)),
             )
         }
+    }
+
+    pub(crate) fn has_explicit_positional_receiver_annotation(&self) -> bool {
+        self.parameters
+            .get(0)
+            .is_some_and(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
     }
 
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
@@ -1353,6 +1369,140 @@ impl<'db> Signature<'db> {
     /// Create a new signature with the given return type.
     pub(crate) fn with_return_type(self, return_ty: Type<'db>) -> Self {
         Self { return_ty, ..self }
+    }
+}
+
+fn fast_is_assignable_to<'db>(
+    db: &'db dyn Db,
+    source: Type<'db>,
+    target: Type<'db>,
+) -> Option<bool> {
+    // Receiver pruning can be hot for large dependency-stub overload sets. Handle common,
+    // structurally simple cases locally and fall back to the full relation when protocols,
+    // materialized generics, or deeper recursive shapes need the normal checker.
+    fast_is_assignable_to_impl(db, source, target, 0)
+}
+
+fn fast_is_assignable_to_impl<'db>(
+    db: &'db dyn Db,
+    source: Type<'db>,
+    target: Type<'db>,
+    depth: u8,
+) -> Option<bool> {
+    if source == target
+        || source.is_never()
+        || source.is_dynamic()
+        || target.is_dynamic()
+        || target.is_object()
+    {
+        return Some(true);
+    }
+
+    if target.is_never() {
+        return Some(false);
+    }
+
+    if depth >= 8 {
+        return None;
+    }
+
+    let source = source.resolve_type_alias(db);
+    let target = target.resolve_type_alias(db);
+
+    if let Some(source_union) = source.as_union_like(db) {
+        let mut saw_unknown = false;
+        for element in source_union.elements(db) {
+            match fast_is_assignable_to_impl(db, *element, target, depth + 1) {
+                Some(true) => {}
+                Some(false) => return Some(false),
+                None => saw_unknown = true,
+            }
+        }
+        return (!saw_unknown).then_some(true);
+    }
+
+    if let Some(target_union) = target.as_union_like(db) {
+        let mut saw_unknown = false;
+        for element in target_union.elements(db) {
+            match fast_is_assignable_to_impl(db, source, *element, depth + 1) {
+                Some(true) => return Some(true),
+                Some(false) => {}
+                None => saw_unknown = true,
+            }
+        }
+        return (!saw_unknown).then_some(false);
+    }
+
+    let source_class = source.nominal_class(db)?;
+    let target_class = target.nominal_class(db)?;
+
+    if source_class != target_class {
+        if target_class.class_literal(db).is_protocol(db) {
+            return None;
+        }
+
+        return Some(source_class.is_subclass_of(db, target_class));
+    }
+
+    fast_specializations_are_assignable_to(db, source, target, depth + 1)
+}
+
+fn fast_specializations_are_assignable_to<'db>(
+    db: &'db dyn Db,
+    source: Type<'db>,
+    target: Type<'db>,
+    depth: u8,
+) -> Option<bool> {
+    match (
+        source.class_specialization(db),
+        target.class_specialization(db),
+    ) {
+        (None, None) => Some(true),
+        (Some(source_specialization), Some(target_specialization)) => {
+            if source_specialization.materialization_kind(db).is_some()
+                || target_specialization.materialization_kind(db).is_some()
+                || source_specialization.generic_context(db)
+                    != target_specialization.generic_context(db)
+            {
+                return None;
+            }
+
+            for ((source_type, target_type), typevar) in source_specialization
+                .types(db)
+                .iter()
+                .zip(target_specialization.types(db))
+                .zip(source_specialization.generic_context(db).variables(db))
+            {
+                let is_assignable = match typevar.variance(db) {
+                    TypeVarVariance::Bivariant => Some(true),
+                    TypeVarVariance::Covariant => {
+                        fast_is_assignable_to_impl(db, *source_type, *target_type, depth)
+                    }
+                    TypeVarVariance::Contravariant => {
+                        fast_is_assignable_to_impl(db, *target_type, *source_type, depth)
+                    }
+                    TypeVarVariance::Invariant => {
+                        match (
+                            fast_is_assignable_to_impl(db, *source_type, *target_type, depth),
+                            fast_is_assignable_to_impl(db, *target_type, *source_type, depth),
+                        ) {
+                            (Some(true), Some(true)) => Some(true),
+                            (Some(false), _) | (_, Some(false)) => Some(false),
+                            _ => None,
+                        }
+                    }
+                };
+
+                match is_assignable {
+                    Some(true) => {}
+                    Some(false) => return Some(false),
+                    None => return None,
+                }
+            }
+
+            Some(true)
+        }
+        _ => None,
     }
 }
 
