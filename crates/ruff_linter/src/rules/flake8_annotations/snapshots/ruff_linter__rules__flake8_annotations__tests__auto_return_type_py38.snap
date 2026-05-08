@@ -946,4 +946,74 @@ help: Add return type annotation: `NoReturn`
     - def func():
 326 + def func() -> NoReturn:
 327 |     raise ValueError
+328 |
+329 |
+note: This is an unsafe fix and may change runtime behavior
+
+ANN201 [*] Missing return type annotation for public function `method`
+   --> auto_return_type.py:336:9
+    |
+334 |     items_list = []
+335 |
+336 |     def method(self):
+    |         ^^^^^^
+337 |         for item in self.items_list:
+338 |             raise Exception(item)
+    |
+help: Add return type annotation: `None`
+333 | class Test:
+334 |     items_list = []
+335 |
+    -     def method(self):
+336 +     def method(self) -> None:
+337 |         for item in self.items_list:
+338 |             raise Exception(item)
+339 |
+note: This is an unsafe fix and may change runtime behavior
+
+ANN201 [*] Missing return type annotation for public function `while_var`
+   --> auto_return_type.py:341:5
+    |
+341 | def while_var(x):
+    |     ^^^^^^^^^
+342 |     while x:
+343 |         raise ValueError
+    |
+help: Add return type annotation: `None`
+338 |             raise Exception(item)
+339 |
+340 |
+    - def while_var(x):
+341 + def while_var(x) -> None:
+342 |     while x:
+343 |         raise ValueError
+344 |
+note: This is an unsafe fix and may change runtime behavior
+
+ANN201 [*] Missing return type annotation for public function `while_true`
+   --> auto_return_type.py:347:5
+    |
+346 | # `while True:` (always-truthy literal) does run the body, so NoReturn is fine.
+347 | def while_true():
+    |     ^^^^^^^^^^
+348 |     while True:
+349 |         raise ValueError
+    |
+help: Add return type annotation: `NoReturn`
+214 |         return 1
+215 |
+216 |
+    - from typing import overload
+217 + from typing import overload, NoReturn
+218 |
+219 |
+220 | @overload
+--------------------------------------------------------------------------------
+344 |
+345 |
+346 | # `while True:` (always-truthy literal) does run the body, so NoReturn is fine.
+    - def while_true():
+347 + def while_true() -> NoReturn:
+348 |     while True:
+349 |         raise ValueError
 note: This is an unsafe fix and may change runtime behavior

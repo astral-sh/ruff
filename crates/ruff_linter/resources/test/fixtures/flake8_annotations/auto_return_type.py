@@ -325,3 +325,25 @@ class Class:
 # Test case: function that raises other exceptions should still get NoReturn
 def func():
     raise ValueError
+
+
+# https://github.com/astral-sh/ruff/issues/22315
+# A `for`/`while` loop body that always raises is conditional: the iterable may
+# be empty (or the test falsy), so the function may return None implicitly.
+class Test:
+    items_list = []
+
+    def method(self):
+        for item in self.items_list:
+            raise Exception(item)
+
+
+def while_var(x):
+    while x:
+        raise ValueError
+
+
+# `while True:` (always-truthy literal) does run the body, so NoReturn is fine.
+def while_true():
+    while True:
+        raise ValueError

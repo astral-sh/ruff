@@ -1,4 +1,4 @@
-use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::helpers::{is_const_true, map_callable};
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
 use crate::model::SemanticModel;
@@ -51,13 +51,39 @@ impl Terminal {
 
         for stmt in stmts {
             match stmt {
-                Stmt::For(ast::StmtFor { body, orelse, .. })
-                | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
+                Stmt::For(ast::StmtFor { body, orelse, .. }) => {
                     if always_breaks(body) {
                         continue;
                     }
 
-                    terminal = terminal.and_then(Self::from_body(body, semantic));
+                    // The iterable may be empty, so the loop body might not run.
+                    // Branch the body's terminal with `Implicit` to model the
+                    // path where the body doesn't execute at all.
+                    let loop_terminal = Self::from_body(body, semantic).branch(Terminal::Implicit);
+                    terminal = terminal.and_then(loop_terminal);
+
+                    if !sometimes_breaks(body, semantic) {
+                        terminal = terminal.and_then(Self::from_body(orelse, semantic));
+                    }
+                }
+                Stmt::While(ast::StmtWhile {
+                    test, body, orelse, ..
+                }) => {
+                    if always_breaks(body) {
+                        continue;
+                    }
+
+                    let body_terminal = Self::from_body(body, semantic);
+                    // `while True:` (and other always-truthy literal tests)
+                    // executes the body at least once, so the body's terminal
+                    // is also the loop's. Otherwise the test may be falsy on
+                    // entry and the body never runs.
+                    let loop_terminal = if is_const_true(test) {
+                        body_terminal
+                    } else {
+                        body_terminal.branch(Terminal::Implicit)
+                    };
+                    terminal = terminal.and_then(loop_terminal);
 
                     if !sometimes_breaks(body, semantic) {
                         terminal = terminal.and_then(Self::from_body(orelse, semantic));
