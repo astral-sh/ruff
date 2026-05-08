@@ -307,9 +307,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } = dict;
 
         let typed_dict_items = typed_dict.items(self.db());
+        let key_tcx =
+            TypeContext::new(self.typed_dict_key_expected_type(Type::TypedDict(typed_dict)));
 
         for item in items {
-            let key_ty = self.infer_optional_expression(item.key.as_ref(), TypeContext::default());
+            let key_ty = self.infer_optional_expression(item.key.as_ref(), key_tcx);
             if let Some((key, key_ty)) = item.key.as_ref().zip(key_ty) {
                 item_types.insert(key.node_index().load(), key_ty);
             }
