@@ -119,7 +119,7 @@ function Logo({ name, className }: { name: "ruff" | "ty"; className: string }) {
             <text
               x="64"
               y="32"
-              class="mtk8"
+              className="mtk8"
               fill="currentColor"
               font-size="24px"
               font-family="Consolas, 'Courier New', monospace"
