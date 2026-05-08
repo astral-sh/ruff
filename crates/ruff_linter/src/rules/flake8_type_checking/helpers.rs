@@ -4,7 +4,7 @@ use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::transformer::{Transformer, walk_expr};
-use ruff_python_ast::{self as ast, Decorator, Expr, StringLiteralFlags};
+use ruff_python_ast::{self as ast, Decorator, Expr, StringFlags, StringLiteralFlags};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::{
@@ -426,11 +426,22 @@ impl<'a> QuoteAnnotator<'a> {
         // generate the string literal with the preferred quote
         let subgenerator = Generator::new(self.stylist.indentation(), self.stylist.line_ending());
         let annotation = subgenerator.expr(&expr_without_forward_references);
+        // Forward-reference type expressions cannot contain backslash escapes
+        // (PEP 484). Pick the outer quote that minimizes escapes in the wrapped
+        // annotation, falling back to the preferred quote when there's a tie.
+        let preferred = self.flags.quote_style();
+        let preferred_count = annotation.matches(preferred.as_char()).count();
+        let opposite_count = annotation.matches(preferred.opposite().as_char()).count();
+        let flags = if preferred_count > opposite_count {
+            self.flags.with_quote_style(preferred.opposite())
+        } else {
+            self.flags
+        };
         generator.expr(&Expr::from(ast::StringLiteral {
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             value: annotation.into_boxed_str(),
-            flags: self.flags,
+            flags,
         }))
     }
 

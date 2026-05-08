@@ -168,69 +168,87 @@ help: Add quotes
 78 | def f():
 
 TC006 [*] Add quotes to type expression in `typing.cast()`
-  --> TC006.py:82:10
+  --> TC006.py:83:10
    |
-80 |     from typing import cast, Annotated, Literal
-81 |
-82 |     cast(list[Annotated["list['Literal[\"A\"]']", "Foo"]], ['A'])
+81 |     from typing import cast, Literal
+82 |
+83 |     cast(Literal["'"], "'")
+   |          ^^^^^^^^^^^^
+   |
+help: Add quotes
+80 |     # contains the preferred outer quote character.
+81 |     from typing import cast, Literal
+82 |
+   -     cast(Literal["'"], "'")
+83 +     cast('Literal["\'"]', "'")
+84 |
+85 |
+86 | def f():
+
+TC006 [*] Add quotes to type expression in `typing.cast()`
+  --> TC006.py:90:10
+   |
+88 |     from typing import cast, Annotated, Literal
+89 |
+90 |     cast(list[Annotated["list['Literal[\"A\"]']", "Foo"]], ['A'])
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Add quotes
-79 |     # Really complex case with nested forward references
-80 |     from typing import cast, Annotated, Literal
-81 |
+87 |     # Really complex case with nested forward references
+88 |     from typing import cast, Annotated, Literal
+89 |
    -     cast(list[Annotated["list['Literal[\"A\"]']", "Foo"]], ['A'])
-82 +     cast("list[Annotated[list[Literal['A']], 'Foo']]", ['A'])
-83 |
-84 |
-85 | def f():
-
-TC006 [*] Add quotes to type expression in `typing.cast()`
-  --> TC006.py:89:9
-   |
-88 |     cast(
-89 |         int  # TC006
-   |         ^^^
-90 |         , 6.0
-91 |     )
-   |
-help: Add quotes
-86 |     from typing import cast
-87 |
-88 |     cast(
-   -         int  # TC006
-89 +         "int"  # TC006
-90 |         , 6.0
-91 |     )
+90 +     cast("list[Annotated[list[Literal['A']], 'Foo']]", ['A'])
+91 |
 92 |
+93 | def f():
 
 TC006 [*] Add quotes to type expression in `typing.cast()`
-  --> TC006.py:98:14
+  --> TC006.py:97:9
    |
-96 |     from typing import cast
-97 |
-98 |     cast(typ=int, val=3.0)  # TC006
-   |              ^^^
-99 |     cast(val=3.0, typ=int)  # TC006
+96 |     cast(
+97 |         int  # TC006
+   |         ^^^
+98 |         , 6.0
+99 |     )
    |
 help: Add quotes
-95 |     # Keyword arguments
-96 |     from typing import cast
-97 |
-   -     cast(typ=int, val=3.0)  # TC006
-98 +     cast(typ="int", val=3.0)  # TC006
-99 |     cast(val=3.0, typ=int)  # TC006
+94  |     from typing import cast
+95  |
+96  |     cast(
+    -         int  # TC006
+97  +         "int"  # TC006
+98  |         , 6.0
+99  |     )
+100 |
 
 TC006 [*] Add quotes to type expression in `typing.cast()`
-  --> TC006.py:99:23
-   |
-98 |     cast(typ=int, val=3.0)  # TC006
-99 |     cast(val=3.0, typ=int)  # TC006
-   |                       ^^^
-   |
+   --> TC006.py:106:14
+    |
+104 |     from typing import cast
+105 |
+106 |     cast(typ=int, val=3.0)  # TC006
+    |              ^^^
+107 |     cast(val=3.0, typ=int)  # TC006
+    |
 help: Add quotes
-96 |     from typing import cast
-97 |
-98 |     cast(typ=int, val=3.0)  # TC006
-   -     cast(val=3.0, typ=int)  # TC006
-99 +     cast(val=3.0, typ="int")  # TC006
+103 |     # Keyword arguments
+104 |     from typing import cast
+105 |
+    -     cast(typ=int, val=3.0)  # TC006
+106 +     cast(typ="int", val=3.0)  # TC006
+107 |     cast(val=3.0, typ=int)  # TC006
+
+TC006 [*] Add quotes to type expression in `typing.cast()`
+   --> TC006.py:107:23
+    |
+106 |     cast(typ=int, val=3.0)  # TC006
+107 |     cast(val=3.0, typ=int)  # TC006
+    |                       ^^^
+    |
+help: Add quotes
+104 |     from typing import cast
+105 |
+106 |     cast(typ=int, val=3.0)  # TC006
+    -     cast(val=3.0, typ=int)  # TC006
+107 +     cast(val=3.0, typ="int")  # TC006

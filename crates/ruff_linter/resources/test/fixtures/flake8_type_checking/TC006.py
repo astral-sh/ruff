@@ -76,6 +76,14 @@ def f():
 
 
 def f():
+    # Regression test for #22131: avoid nested escapes when content
+    # contains the preferred outer quote character.
+    from typing import cast, Literal
+
+    cast(Literal["'"], "'")
+
+
+def f():
     # Really complex case with nested forward references
     from typing import cast, Annotated, Literal
 
