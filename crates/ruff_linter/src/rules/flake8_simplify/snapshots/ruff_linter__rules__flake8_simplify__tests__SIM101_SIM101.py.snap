@@ -180,6 +180,83 @@ help: Merge `isinstance` calls for `a`
 51 |
 52 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722460483
    - if(isinstance(a, int)) or (isinstance(a, float)):
-53 + if isinstance(a, (int, float)):
+53 + if(isinstance(a, (int, float))):
 54 |     pass
+55 |
+56 | # Regression test for: https://github.com/astral-sh/ruff/issues/19601
+note: This is an unsafe fix and may change runtime behavior
+
+SIM101 [*] Multiple `isinstance` calls for expression, merge into a single call
+  --> SIM101.py:60:1
+   |
+58 | # the AST mangles f-strings whose format spec contains escape sequences or
+59 | # whose interpolations include lambdas.
+60 | isinstance(f"{(lambda: 0)}", int) or isinstance(f"{(lambda: 0)}", str)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+61 | isinstance(f"{0:{(lambda: 0)}}", int) or isinstance(f"{0:{(lambda: 0)}}", str)
+62 | isinstance(f"{0:\x22}", int) or isinstance(f"{0:\x22}", str)
+   |
+help: Merge `isinstance` calls
+57 | # The fix must preserve the target's source verbatim — re-rendering through
+58 | # the AST mangles f-strings whose format spec contains escape sequences or
+59 | # whose interpolations include lambdas.
+   - isinstance(f"{(lambda: 0)}", int) or isinstance(f"{(lambda: 0)}", str)
+60 + isinstance(f"{(lambda: 0)}", (int, str))
+61 | isinstance(f"{0:{(lambda: 0)}}", int) or isinstance(f"{0:{(lambda: 0)}}", str)
+62 | isinstance(f"{0:\x22}", int) or isinstance(f"{0:\x22}", str)
+63 | isinstance(f"{0:\x7b}", int) or isinstance(f"{0:\x7b}", str)
+note: This is an unsafe fix and may change runtime behavior
+
+SIM101 [*] Multiple `isinstance` calls for expression, merge into a single call
+  --> SIM101.py:61:1
+   |
+59 | # whose interpolations include lambdas.
+60 | isinstance(f"{(lambda: 0)}", int) or isinstance(f"{(lambda: 0)}", str)
+61 | isinstance(f"{0:{(lambda: 0)}}", int) or isinstance(f"{0:{(lambda: 0)}}", str)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+62 | isinstance(f"{0:\x22}", int) or isinstance(f"{0:\x22}", str)
+63 | isinstance(f"{0:\x7b}", int) or isinstance(f"{0:\x7b}", str)
+   |
+help: Merge `isinstance` calls
+58 | # the AST mangles f-strings whose format spec contains escape sequences or
+59 | # whose interpolations include lambdas.
+60 | isinstance(f"{(lambda: 0)}", int) or isinstance(f"{(lambda: 0)}", str)
+   - isinstance(f"{0:{(lambda: 0)}}", int) or isinstance(f"{0:{(lambda: 0)}}", str)
+61 + isinstance(f"{0:{(lambda: 0)}}", (int, str))
+62 | isinstance(f"{0:\x22}", int) or isinstance(f"{0:\x22}", str)
+63 | isinstance(f"{0:\x7b}", int) or isinstance(f"{0:\x7b}", str)
+note: This is an unsafe fix and may change runtime behavior
+
+SIM101 [*] Multiple `isinstance` calls for expression, merge into a single call
+  --> SIM101.py:62:1
+   |
+60 | isinstance(f"{(lambda: 0)}", int) or isinstance(f"{(lambda: 0)}", str)
+61 | isinstance(f"{0:{(lambda: 0)}}", int) or isinstance(f"{0:{(lambda: 0)}}", str)
+62 | isinstance(f"{0:\x22}", int) or isinstance(f"{0:\x22}", str)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+63 | isinstance(f"{0:\x7b}", int) or isinstance(f"{0:\x7b}", str)
+   |
+help: Merge `isinstance` calls
+59 | # whose interpolations include lambdas.
+60 | isinstance(f"{(lambda: 0)}", int) or isinstance(f"{(lambda: 0)}", str)
+61 | isinstance(f"{0:{(lambda: 0)}}", int) or isinstance(f"{0:{(lambda: 0)}}", str)
+   - isinstance(f"{0:\x22}", int) or isinstance(f"{0:\x22}", str)
+62 + isinstance(f"{0:\x22}", (int, str))
+63 | isinstance(f"{0:\x7b}", int) or isinstance(f"{0:\x7b}", str)
+note: This is an unsafe fix and may change runtime behavior
+
+SIM101 [*] Multiple `isinstance` calls for expression, merge into a single call
+  --> SIM101.py:63:1
+   |
+61 | isinstance(f"{0:{(lambda: 0)}}", int) or isinstance(f"{0:{(lambda: 0)}}", str)
+62 | isinstance(f"{0:\x22}", int) or isinstance(f"{0:\x22}", str)
+63 | isinstance(f"{0:\x7b}", int) or isinstance(f"{0:\x7b}", str)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Merge `isinstance` calls
+60 | isinstance(f"{(lambda: 0)}", int) or isinstance(f"{(lambda: 0)}", str)
+61 | isinstance(f"{0:{(lambda: 0)}}", int) or isinstance(f"{0:{(lambda: 0)}}", str)
+62 | isinstance(f"{0:\x22}", int) or isinstance(f"{0:\x22}", str)
+   - isinstance(f"{0:\x7b}", int) or isinstance(f"{0:\x7b}", str)
+63 + isinstance(f"{0:\x7b}", (int, str))
 note: This is an unsafe fix and may change runtime behavior

@@ -52,3 +52,12 @@ def f():
 # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722460483
 if(isinstance(a, int)) or (isinstance(a, float)):
     pass
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/19601
+# The fix must preserve the target's source verbatim — re-rendering through
+# the AST mangles f-strings whose format spec contains escape sequences or
+# whose interpolations include lambdas.
+isinstance(f"{(lambda: 0)}", int) or isinstance(f"{(lambda: 0)}", str)
+isinstance(f"{0:{(lambda: 0)}}", int) or isinstance(f"{0:{(lambda: 0)}}", str)
+isinstance(f"{0:\x22}", int) or isinstance(f"{0:\x22}", str)
+isinstance(f"{0:\x7b}", int) or isinstance(f"{0:\x7b}", str)

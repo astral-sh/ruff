@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 use std::iter;
 
-use itertools::Either::{Left, Right};
 use itertools::Itertools;
 use ruff_python_ast::{self as ast, Arguments, BoolOp, CmpOp, Expr, ExprContext, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
@@ -411,69 +410,36 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
                     })
                     .collect();
 
-                // Generate a single `isinstance` call.
-                let tuple = ast::ExprTuple {
-                    // Flatten all the types used across the `isinstance` calls.
-                    elts: types
-                        .iter()
-                        .flat_map(|value| {
-                            if let Expr::Tuple(tuple) = value {
-                                Left(tuple.iter())
-                            } else {
-                                Right(iter::once(*value))
-                            }
-                        })
-                        .map(Clone::clone)
-                        .collect(),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                    parenthesized: true,
-                };
-                let isinstance_call = ast::ExprCall {
-                    func: Box::new(
-                        ast::ExprName {
-                            id: Name::new_static("isinstance"),
-                            ctx: ExprContext::Load,
-                            range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                // Build the replacement by splicing source slices for the target and the
+                // type expressions, rather than letting the generator re-render them.
+                // The generator normalizes escape sequences and otherwise reformats
+                // expressions, which can break f-strings that rely on specific spelling
+                // (e.g. `\x7d` in a format spec) or change observable behavior.
+                let locator = checker.locator();
+                let target_src = locator.slice(target.range());
+                let mut type_srcs: Vec<&str> = Vec::with_capacity(types.len());
+                for value in &types {
+                    if let Expr::Tuple(tuple) = value {
+                        for elt in tuple {
+                            type_srcs.push(locator.slice(elt.range()));
                         }
-                        .into(),
-                    ),
-                    arguments: Arguments {
-                        args: Box::from([target.clone(), tuple.into()]),
-                        keywords: Box::from([]),
-                        range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                    },
-                    range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    } else {
+                        type_srcs.push(locator.slice(value.range()));
+                    }
                 }
-                .into();
+                let combined = format!("isinstance({}, ({}))", target_src, type_srcs.join(", "));
 
-                // Generate the combined `BoolOp`.
+                // Replace just the consecutive duplicate calls (and the `or`s between
+                // them) with the combined call, leaving the rest of the `BoolOp`'s source
+                // verbatim.
                 let [first, .., last] = indices.as_slice() else {
                     unreachable!("Indices should have at least two elements")
                 };
-                let before = values.iter().take(*first).cloned();
-                let after = values.iter().skip(last + 1).cloned();
-                let bool_op = ast::ExprBoolOp {
-                    op: BoolOp::Or,
-                    values: before
-                        .chain(iter::once(isinstance_call))
-                        .chain(after)
-                        .collect(),
-                    range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                }
-                .into();
-                let fixed_source = checker.generator().expr(&bool_op);
-
-                // Populate the `Fix`. Replace the _entire_ `BoolOp`. Note that if we have
-                // multiple duplicates, the fixes will conflict.
+                let replace_range =
+                    TextRange::new(values[*first].range().start(), values[*last].range().end());
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    pad(fixed_source, expr.range(), checker.locator()),
-                    expr.range(),
+                    pad(combined, replace_range, locator),
+                    replace_range,
                 )));
             }
         }
