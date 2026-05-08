@@ -18,8 +18,8 @@ use ruff_text_size::{Ranged, TextSize};
 use ty_python_semantic::SemanticModel;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
-    CallSignatureDetails, CallSignatureParameter, call_signature_details,
-    find_active_signature_from_details,
+    CallSignatureDetails, CallSignatureParameter, CallSignatureParameterKind,
+    call_signature_details, find_active_signature_from_details,
 };
 
 // TODO: We may want to add special-case handling for calls to constructors
@@ -38,12 +38,8 @@ pub struct ParameterDetails<'db> {
     /// Documentation specific to the parameter, typically extracted from the
     /// function's docstring
     pub documentation: Option<String>,
-    /// True if the parameter is positional-only.
-    pub is_positional_only: bool,
-    /// True if the parameter can absorb arbitrarily many positional arguments.
-    pub is_variadic: bool,
-    /// True if the parameter can absorb arbitrarily many keyword arguments.
-    pub is_keyword_variadic: bool,
+    /// The displayed parameter category.
+    pub kind: CallSignatureParameterKind,
 }
 
 /// Information about a function signature
@@ -207,9 +203,11 @@ fn create_signature_details_from_call_signature_details<'db>(
                     // converts the parameter count to the zero-based index of that last entry.
                     if current_arg_index < details.parameters.len() {
                         Some(current_arg_index)
-                    } else if details.parameters.last().is_some_and(|parameter| {
-                        parameter.is_variadic || parameter.is_keyword_variadic
-                    }) {
+                    } else if details
+                        .parameters
+                        .last()
+                        .is_some_and(|parameter| parameter.kind.is_any_variadic())
+                    {
                         Some(details.parameters.len() - 1)
                     } else {
                         None
@@ -246,9 +244,8 @@ fn create_parameters<'db>(
                 label,
                 name,
                 ty,
-                is_positional_only,
-                is_variadic,
-                is_keyword_variadic,
+                kind,
+                ..
             } = parameter;
             // Get the parameter name for documentation lookup.
             let documentation = param_docs.get(name.as_str()).cloned();
@@ -258,9 +255,7 @@ fn create_parameters<'db>(
                 label,
                 ty,
                 documentation,
-                is_positional_only,
-                is_variadic,
-                is_keyword_variadic,
+                kind,
             }
         })
         .collect()

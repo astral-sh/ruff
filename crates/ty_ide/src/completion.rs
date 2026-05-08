@@ -1522,7 +1522,7 @@ fn add_class_arg_completions<'db>(
 ///
 /// Suggestions are only provided if the cursor is currently inside a
 /// function call and the function arguments have not 1) already been
-/// set and 2) been defined as positional-only.
+/// set and 2) correspond to parameters that can be passed by keyword.
 fn add_function_arg_completions<'db>(
     db: &'db dyn Db,
     file: File,
@@ -1546,11 +1546,7 @@ fn add_function_arg_completions<'db>(
 
     for sig in &sig_help.signatures {
         for p in &sig.parameters {
-            if p.is_positional_only
-                || p.is_variadic
-                || p.is_keyword_variadic
-                || !set_function_args.insert(p.name.as_str())
-            {
+            if !p.kind.can_be_passed_by_keyword() || !set_function_args.insert(p.name.as_str()) {
                 continue;
             }
             let mut builder = CompletionBuilder::argument(&p.name).ty(p.ty);
