@@ -352,3 +352,10 @@ pub(crate) const fn is_collapsible_if_fix_safe_enabled(settings: &LinterSettings
 pub(crate) const fn is_ruff_ignore_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/issues/20120
+pub(crate) const fn is_f401_submodule_attribute_side_effect_enabled(
+    settings: &LinterSettings,
+) -> bool {
+    settings.preview.is_enabled()
+}

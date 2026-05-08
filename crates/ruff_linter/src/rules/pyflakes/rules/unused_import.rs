@@ -16,7 +16,8 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::fix;
 use crate::preview::{
-    is_dunder_init_fix_unused_import_enabled, is_refined_submodule_import_match_enabled,
+    is_dunder_init_fix_unused_import_enabled, is_f401_submodule_attribute_side_effect_enabled,
+    is_refined_submodule_import_match_enabled,
 };
 use crate::registry::Rule;
 use crate::rules::{isort, isort::ImportSection, isort::ImportType};
@@ -86,6 +87,20 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 /// execution. To wit, the statement `import a.b` automatically executes
 /// `import a`, so in some sense `import a` is _always_ redundant
 /// in the presence of `import a.b`.
+///
+/// Under [preview], we also avoid flagging a `from a.b import x` whose
+/// observable side effect (binding `b` as an attribute of `a`) is relied
+/// on elsewhere in the scope. For example, given:
+///
+/// ```python
+/// import a.b
+/// from a.b.c import x
+///
+/// a.b.c.foo()
+/// ```
+///
+/// ...the `from a.b.c import x` is preserved under preview, because
+/// removing it would break the `a.b.c.foo()` lookup.
 ///
 ///
 /// ## Fix safety
@@ -681,6 +696,15 @@ fn unused_imports_in_scope<'a, 'b>(
                 vec![bdg]
             }
         })
+        .filter(move |bdg| {
+            // Suppress F401 for `from a.b import x` when removing it would
+            // break observable behavior, because importing `a.b.x` (and
+            // therefore `a.b`) is a side effect that another reference in
+            // the scope relies on. See:
+            // https://github.com/astral-sh/ruff/issues/20120
+            !(is_f401_submodule_attribute_side_effect_enabled(settings)
+                && from_import_provides_used_submodule_attribute(semantic, scope, bdg))
+        })
 }
 
 /// Returns a `Vec` of bindings to unused import statements that
@@ -972,4 +996,93 @@ fn symbol_used_in_dunder_all(semantic: &SemanticModel<'_>, binding: &ImportBindi
                 .references()
                 .any(|refid| semantic.reference(refid).in_dunder_all_definition())
         })
+}
+
+/// Returns `true` if `binding` is a `from a.b.c... import x` whose
+/// observable side effect (binding `b` as an attribute of `a`,
+/// `c` as an attribute of `a.b`, and so on) is relied on by some
+/// attribute access in the scope.
+///
+/// `from a.b.c import x` is equivalent to running `import a.b.c` and then
+/// extracting `x` from `a.b.c`. As a side effect, `b` is set as an
+/// attribute of the `a` module object, `c` as an attribute of `a.b`, and so
+/// on. Removing the import — even if the bound name `x` is unused — can
+/// therefore break code that traverses `a.b.c.<...>` via attribute access,
+/// unless some other import in the scope provides the same side effect
+/// (i.e., another import of `a.b.c` or a submodule of it).
+///
+/// See <https://github.com/astral-sh/ruff/issues/20120>.
+fn from_import_provides_used_submodule_attribute(
+    semantic: &SemanticModel<'_>,
+    scope: &Scope,
+    binding: &Binding,
+) -> bool {
+    let BindingKind::FromImport(from_import) = &binding.kind else {
+        return false;
+    };
+
+    let qualified_name = &from_import.qualified_name;
+    let segments = qualified_name.segments();
+
+    // We need a source module of at least two segments (e.g., `a.b` for
+    // `from a.b import x`); otherwise there's no submodule attribute side
+    // effect to worry about.
+    let source_segments = match segments.split_last() {
+        Some((_, source)) if source.len() >= 2 => source,
+        _ => return false,
+    };
+
+    // Skip relative imports (e.g., `from .pkg import x`), which we can't
+    // reliably reason about at the textual qualified-name level.
+    if source_segments
+        .first()
+        .copied()
+        .is_none_or(|first| first.starts_with('.'))
+    {
+        return false;
+    }
+
+    // If any sibling import in the scope already provides the same side
+    // effect (i.e., its qualified name has `source_segments` as a prefix),
+    // then this `FromImport`'s side effect is redundant.
+    if scope.binding_ids().any(|sibling_id| {
+        let sibling = semantic.binding(sibling_id);
+        if std::ptr::eq(sibling, binding) {
+            return false;
+        }
+        let Some(sibling_import) = sibling.as_any_import() else {
+            return false;
+        };
+        let sibling_segments = sibling_import.qualified_name().segments();
+        // For a `FromImport`, the source-module path is everything but
+        // the last segment; for `Import`/`SubmoduleImport`, the full
+        // qualified name corresponds to the imported (sub)module.
+        let sibling_source: &[&str] = match &sibling.kind {
+            BindingKind::FromImport(_) => match sibling_segments.split_last() {
+                Some((_, prefix)) => prefix,
+                None => return false,
+            },
+            _ => sibling_segments,
+        };
+        sibling_source.starts_with(source_segments)
+    }) {
+        return false;
+    }
+
+    // Otherwise, treat the `FromImport` as used if any reference in the
+    // scope traverses an attribute chain that begins with the source
+    // module path.
+    scope.binding_ids().any(|other_id| {
+        let other = semantic.binding(other_id);
+        other.references().any(|ref_id| {
+            let resolved = semantic.reference(ref_id);
+            let Some(expr_id) = resolved.expression_id() else {
+                return false;
+            };
+            let Some(prototype) = expand_to_qualified_name_attribute(semantic, expr_id) else {
+                return false;
+            };
+            prototype.segments().starts_with(source_segments)
+        })
+    })
 }

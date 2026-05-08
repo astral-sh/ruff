@@ -1,0 +1,96 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F401 [*] `snowflake.connector.pandas_tools.write_pandas` imported but unused
+  --> F401_36.py:14:50
+   |
+12 | def f():
+13 |     import snowflake.connector
+14 |     from snowflake.connector.pandas_tools import write_pandas
+   |                                                  ^^^^^^^^^^^^
+15 |
+16 |     snowflake.connector.pandas_tools.write_pandas
+   |
+help: Remove unused import: `snowflake.connector.pandas_tools.write_pandas`
+11 | # Removing it would break `snowflake.connector.pandas_tools.write_pandas` below.
+12 | def f():
+13 |     import snowflake.connector
+   -     from snowflake.connector.pandas_tools import write_pandas
+14 |
+15 |     snowflake.connector.pandas_tools.write_pandas
+16 |
+
+F401 [*] `snowflake.connector.pandas_tools.write_pandas` imported but unused
+  --> F401_36.py:22:50
+   |
+20 | def f():
+21 |     import snowflake.connector
+22 |     from snowflake.connector.pandas_tools import write_pandas
+   |                                                  ^^^^^^^^^^^^
+23 |
+24 |     snowflake.connector.pandas_tools
+   |
+help: Remove unused import: `snowflake.connector.pandas_tools.write_pandas`
+19 | # OK: traversing the source-module path itself relies on the side effect.
+20 | def f():
+21 |     import snowflake.connector
+   -     from snowflake.connector.pandas_tools import write_pandas
+22 |
+23 |     snowflake.connector.pandas_tools
+24 |
+
+F401 [*] `snowflake.connector.pandas_tools.write_pandas` imported but unused
+  --> F401_36.py:31:50
+   |
+29 | def f():
+30 |     import snowflake.connector.pandas_tools
+31 |     from snowflake.connector.pandas_tools import write_pandas
+   |                                                  ^^^^^^^^^^^^
+32 |
+33 |     snowflake.connector.pandas_tools
+   |
+help: Remove unused import: `snowflake.connector.pandas_tools.write_pandas`
+28 | # which already provides the same side effect.
+29 | def f():
+30 |     import snowflake.connector.pandas_tools
+   -     from snowflake.connector.pandas_tools import write_pandas
+31 |
+32 |     snowflake.connector.pandas_tools
+33 |
+
+F401 [*] `snowflake.connector.pandas_tools.write_pandas` imported but unused
+  --> F401_36.py:39:50
+   |
+37 | def f():
+38 |     import snowflake.connector
+39 |     from snowflake.connector.pandas_tools import write_pandas
+   |                                                  ^^^^^^^^^^^^
+40 |
+41 |     snowflake.connector
+   |
+help: Remove unused import: `snowflake.connector.pandas_tools.write_pandas`
+36 | # Error: bound name is unused and no reference traverses the source-module path.
+37 | def f():
+38 |     import snowflake.connector
+   -     from snowflake.connector.pandas_tools import write_pandas
+39 |
+40 |     snowflake.connector
+41 |
+
+F401 [*] `os.path` imported but unused
+  --> F401_36.py:48:20
+   |
+46 | def f():
+47 |     import os
+48 |     from os import path
+   |                    ^^^^
+49 |
+50 |     os.path
+   |
+help: Remove unused import: `os.path`
+45 | # submodule side effect to preserve.
+46 | def f():
+47 |     import os
+   -     from os import path
+48 |
+49 |     os.path

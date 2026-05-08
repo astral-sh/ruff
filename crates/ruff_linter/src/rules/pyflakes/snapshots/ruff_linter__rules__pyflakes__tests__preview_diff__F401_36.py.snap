@@ -1,0 +1,50 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 2
+Added: 0
+
+--- Removed ---
+F401 [*] `snowflake.connector.pandas_tools.write_pandas` imported but unused
+  --> F401_36.py:14:50
+   |
+12 | def f():
+13 |     import snowflake.connector
+14 |     from snowflake.connector.pandas_tools import write_pandas
+   |                                                  ^^^^^^^^^^^^
+15 |
+16 |     snowflake.connector.pandas_tools.write_pandas
+   |
+help: Remove unused import: `snowflake.connector.pandas_tools.write_pandas`
+11 | # Removing it would break `snowflake.connector.pandas_tools.write_pandas` below.
+12 | def f():
+13 |     import snowflake.connector
+   -     from snowflake.connector.pandas_tools import write_pandas
+14 |
+15 |     snowflake.connector.pandas_tools.write_pandas
+16 |
+
+
+F401 [*] `snowflake.connector.pandas_tools.write_pandas` imported but unused
+  --> F401_36.py:22:50
+   |
+20 | def f():
+21 |     import snowflake.connector
+22 |     from snowflake.connector.pandas_tools import write_pandas
+   |                                                  ^^^^^^^^^^^^
+23 |
+24 |     snowflake.connector.pandas_tools
+   |
+help: Remove unused import: `snowflake.connector.pandas_tools.write_pandas`
+19 | # OK: traversing the source-module path itself relies on the side effect.
+20 | def f():
+21 |     import snowflake.connector
+   -     from snowflake.connector.pandas_tools import write_pandas
+22 |
+23 |     snowflake.connector.pandas_tools
+24 |

@@ -58,6 +58,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_23.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_32.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_34.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_36.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.ipynb"))]
     #[test_case(Rule::UndefinedLocalWithImportStar, Path::new("F403.py"))]
@@ -462,6 +463,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_32.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_34.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_35.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_36.py"))]
     fn f401_preview_refined_submodule_handling_diffs(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("preview_diff__{}", path.to_string_lossy());
         assert_diagnostics_diff!(
