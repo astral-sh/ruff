@@ -205,4 +205,21 @@ help: Replace with `f"{foo}'"`
 29 + nok11 = f"{foo}'"
 30 | nok12 = ''.join([foo, "'", '"'])
 31 | nok13 = "".join([foo, "'", '"'])
+32 |
+note: This is an unsafe fix and may change runtime behavior
+
+FLY002 [*] Consider `r"abcdef"` instead of string join
+  --> FLY002.py:37:9
+   |
+35 | nok15 = "".join((r"", "\\"))
+36 | nok16 = "".join((r"", "\0"))
+37 | nok17 = "".join((r"abc", "def"))
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Replace with `r"abcdef"`
+34 | nok14 = "".join((r"", '"'))
+35 | nok15 = "".join((r"", "\\"))
+36 | nok16 = "".join((r"", "\0"))
+   - nok17 = "".join((r"abc", "def"))
+37 + nok17 = r"abcdef"
 note: This is an unsafe fix and may change runtime behavior

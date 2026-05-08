@@ -69,6 +69,23 @@ fn is_static_length(elts: &[Expr]) -> bool {
     elts.iter().all(|e| !e.is_starred_expr())
 }
 
+/// Return whether `content` can appear inside a raw string literal with the
+/// given `flags` without parser errors. Raw literals cannot contain the chosen
+/// closing quote (or three of it for triple-quoted), cannot end with a single
+/// backslash, and cannot contain NUL bytes (Python source rejects those).
+fn raw_string_can_hold(content: &str, flags: ast::StringLiteralFlags) -> bool {
+    if content.contains('\0') {
+        return false;
+    }
+    if content.ends_with('\\') {
+        return false;
+    }
+    if content.contains(flags.quote_str()) {
+        return false;
+    }
+    true
+}
+
 /// Build an f-string consisting of `joinees` joined by `joiner` with `flags`.
 fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<Expr> {
     // If all elements are string constants, join them into a single string.
@@ -104,6 +121,14 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
                     return None;
                 }
             }
+        }
+
+        // Raw strings can't represent arbitrary content (the chosen quote can't
+        // appear, nor a trailing backslash, nor a NUL byte in the source).
+        // If the merged content can't be expressed with the selected flags,
+        // bail rather than emit a fix that produces a syntax error.
+        if flags.prefix().is_raw() && !raw_string_can_hold(&content, flags) {
+            return None;
         }
 
         let node = ast::StringLiteral {

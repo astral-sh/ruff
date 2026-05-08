@@ -29,3 +29,9 @@ nok10 = "".join((foo, '"'))
 nok11 = ''.join((foo, "'"))
 nok12 = ''.join([foo, "'", '"'])
 nok13 = "".join([foo, "'", '"'])
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/21082
+nok14 = "".join((r"", '"'))
+nok15 = "".join((r"", "\\"))
+nok16 = "".join((r"", "\0"))
+nok17 = "".join((r"abc", "def"))
