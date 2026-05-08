@@ -1802,8 +1802,7 @@ impl NodeId {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
     ) -> Solutions<'db> {
-        let path_bounds = PathBounds::compute(db, builder, self);
-        path_bounds.solve(db, builder)
+        PathBounds::compute_default_solutions(db, builder, self)
     }
 
     /// Returns the negation of this BDD.
@@ -2749,6 +2748,7 @@ struct InteriorNodeData {
 struct Bounds<'db> {
     lower: FxIndexSet<Type<'db>>,
     upper: FxIndexSet<Type<'db>>,
+    has_non_never_lower: bool,
 }
 
 impl<'db> Bounds<'db> {
@@ -2757,7 +2757,27 @@ impl<'db> Bounds<'db> {
         // element is typically cheap (in that it does not involve a combinatorial
         // explosion from distributing the clause through an existing disjunction). So we
         // don't need to be as clever here as in `add_upper`.
+        if !ty.is_never() {
+            self.has_non_never_lower = true;
+        }
         self.lower.insert(ty);
+    }
+
+    fn add_lower_for_default_solve(
+        &mut self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+    ) {
+        self.add_lower(db, ty);
+        if self.has_non_never_lower
+            && matches!(
+                bound_typevar.typevar(db).require_bound_or_constraints(db),
+                TypeVarBoundOrConstraints::UpperBound(_)
+            )
+        {
+            self.upper.clear();
+        }
     }
 
     fn add_upper(&mut self, db: &'db dyn Db, ty: Type<'db>) {
@@ -2781,6 +2801,32 @@ impl<'db> Bounds<'db> {
             .retain(|existing| !ty.is_redundant_with(db, *existing));
         self.upper.insert(ty);
     }
+
+    fn add_upper_for_default_solve(
+        &mut self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+    ) {
+        if self.has_non_never_lower
+            && matches!(
+                bound_typevar.typevar(db).require_bound_or_constraints(db),
+                TypeVarBoundOrConstraints::UpperBound(_)
+            )
+        {
+            return;
+        }
+
+        self.add_upper(db, ty);
+    }
+
+    fn key(&self, bound_typevar: BoundTypeVarInstance<'db>) -> TypeVarBoundsKey<'db> {
+        (
+            bound_typevar,
+            self.lower.iter().copied().collect(),
+            self.upper.iter().copied().collect(),
+        )
+    }
 }
 
 /// Materialized lower and upper bounds for a single typevar on a single BDD path.
@@ -2793,6 +2839,14 @@ pub(crate) struct TypeVarBounds<'db> {
     /// upper bound).
     upper: Type<'db>,
 }
+
+type TypeVarBoundsKey<'db> = (
+    BoundTypeVarInstance<'db>,
+    Box<[Type<'db>]>,
+    Box<[Type<'db>]>,
+);
+type LowerBoundsKey<'db> = Box<[Type<'db>]>;
+type UpperBoundsKey<'db> = Box<[Type<'db>]>;
 
 impl<'db> Type<'db> {
     /// Calculates the [`PathBounds`] that represent the valid solutions for when `self` is
@@ -2834,6 +2888,114 @@ pub(crate) enum PathBounds<'db> {
 }
 
 impl<'db> PathBounds<'db> {
+    /// Computes default solutions directly from the raw path bounds.
+    ///
+    /// This is equivalent to `PathBounds::compute(...).solve(...)`, but skips upper-bound
+    /// accumulation for upper-bounded `TypeVar`s once a non-`Never` lower bound is present. The
+    /// default solver always prefers that lower bound after checking it against the `TypeVar`'s
+    /// declared bound, so those upper bounds cannot affect the selected solution.
+    fn compute_default_solutions(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        node: NodeId,
+    ) -> Solutions<'db> {
+        match node.node() {
+            Node::AlwaysTrue => return Solutions::Unconstrained,
+            Node::AlwaysFalse => return Solutions::Unsatisfiable,
+            Node::Interior(_) => {}
+        }
+
+        // Sort the constraints in each path by their `source_order`s, to ensure that we construct
+        // any unions or intersections in our type mappings in a stable order. Constraints might
+        // come out of `PathAssignment`s with identical `source_order`s, but if they do, those
+        // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
+        // retain that stable per-tie ordering.
+        let mut sorted_paths = Vec::new();
+        node.for_each_path(db, builder, |path| {
+            let mut path: Vec<_> = path.positive_constraints().collect();
+            path.sort_by_key(|(_, source_order)| *source_order);
+            sorted_paths.push(path);
+        });
+        sorted_paths.sort_by(|path1, path2| {
+            let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
+            let source_orders2 = path2.iter().map(|(_, source_order)| *source_order);
+            source_orders1.cmp(source_orders2)
+        });
+
+        let mut solutions = Vec::with_capacity(sorted_paths.len());
+        let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, Bounds<'db>> = FxHashMap::default();
+        let mut solution_cache: FxHashMap<TypeVarBoundsKey<'db>, Result<Option<Type<'db>>, ()>> =
+            FxHashMap::default();
+        let mut materialization_cache: FxHashMap<Type<'db>, Type<'db>> = FxHashMap::default();
+        let mut lower_bound_cache: FxHashMap<LowerBoundsKey<'db>, Type<'db>> = FxHashMap::default();
+        let mut upper_bound_cache: FxHashMap<UpperBoundsKey<'db>, Type<'db>> = FxHashMap::default();
+
+        'paths: for path in sorted_paths {
+            mappings.clear();
+            for (constraint, _) in path {
+                let constraint = builder.constraint_data(constraint);
+                let typevar = constraint.typevar;
+                let lower = constraint.lower;
+                let upper = constraint.upper;
+                let bounds = mappings.entry(typevar).or_default();
+                bounds.add_lower_for_default_solve(db, typevar, lower);
+                bounds.add_upper_for_default_solve(db, typevar, upper);
+
+                if let Type::TypeVar(lower_bound_typevar) = lower {
+                    let bounds = mappings.entry(lower_bound_typevar).or_default();
+                    bounds.add_upper_for_default_solve(
+                        db,
+                        lower_bound_typevar,
+                        Type::TypeVar(typevar),
+                    );
+                }
+
+                if let Type::TypeVar(upper_bound_typevar) = upper {
+                    let bounds = mappings.entry(upper_bound_typevar).or_default();
+                    bounds.add_lower_for_default_solve(
+                        db,
+                        upper_bound_typevar,
+                        Type::TypeVar(typevar),
+                    );
+                }
+            }
+
+            let mut solution = Vec::with_capacity(mappings.len());
+            for (bound_typevar, bounds) in mappings.drain() {
+                let key = bounds.key(bound_typevar);
+                let solved = match solution_cache.get(&key) {
+                    Some(solved) => *solved,
+                    None => {
+                        let solved = Self::default_solve_bounds(
+                            db,
+                            builder,
+                            &key,
+                            &mut materialization_cache,
+                            &mut lower_bound_cache,
+                            &mut upper_bound_cache,
+                        );
+                        solution_cache.insert(key, solved);
+                        solved
+                    }
+                };
+                match solved {
+                    Ok(Some(ty)) => solution.push(TypeVarSolution {
+                        bound_typevar,
+                        solution: ty,
+                    }),
+                    Ok(None) => {}
+                    Err(()) => continue 'paths,
+                }
+            }
+            solutions.push(solution);
+        }
+
+        if solutions.is_empty() {
+            return Solutions::Unsatisfiable;
+        }
+        Solutions::Constrained(solutions)
+    }
+
     /// Computes sorted BDD paths and accumulates per-typevar lower/upper bounds for each path.
     ///
     /// Returns a list of paths, where each path contains the materialized lower/upper bounds for
@@ -2899,16 +3061,6 @@ impl<'db> PathBounds<'db> {
         }
 
         PathBounds::Constrained(result)
-    }
-
-    pub(crate) fn solve(
-        &self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-    ) -> Solutions<'db> {
-        self.solve_with(|bound_typevar, _variance, lower, upper| {
-            PathBounds::default_solve(db, builder, bound_typevar, lower, upper)
-        })
     }
 
     /// Solves each path by applying a per-typevar solver function, collecting valid solutions.
@@ -3003,10 +3155,7 @@ impl<'db> PathBounds<'db> {
                     return Ok(Some(lower));
                 }
 
-                let upper = IntersectionType::from_elements(
-                    db,
-                    std::iter::once(upper).chain(std::iter::once(bound)),
-                );
+                let upper = IntersectionType::from_two_elements(db, upper, bound);
                 if upper != bound {
                     Ok(Some(upper))
                 } else {
@@ -3046,6 +3195,107 @@ impl<'db> PathBounds<'db> {
                 }
             }
         }
+    }
+
+    fn default_solve_bounds(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        bounds: &TypeVarBoundsKey<'db>,
+        materialization_cache: &mut FxHashMap<Type<'db>, Type<'db>>,
+        lower_bound_cache: &mut FxHashMap<LowerBoundsKey<'db>, Type<'db>>,
+        upper_bound_cache: &mut FxHashMap<UpperBoundsKey<'db>, Type<'db>>,
+    ) -> Result<Option<Type<'db>>, ()> {
+        let (bound_typevar, lower_bounds, upper_bounds) = bounds;
+        match bound_typevar.typevar(db).require_bound_or_constraints(db) {
+            TypeVarBoundOrConstraints::UpperBound(bound) => {
+                let bound = *materialization_cache
+                    .entry(bound)
+                    .or_insert_with(|| bound.top_materialization(db));
+
+                let mut has_lower = false;
+                let mut when = ConstraintSet::always(builder);
+                for lower_bound in lower_bounds
+                    .iter()
+                    .copied()
+                    .filter(|lower| !lower.is_never())
+                {
+                    has_lower = true;
+                    let lower_bound_when =
+                        lower_bound.when_constraint_set_assignable_to(db, bound, builder);
+                    when = when.and(db, builder, || lower_bound_when);
+                    if when.is_never_satisfied(db) {
+                        return Err(());
+                    }
+                }
+
+                if has_lower {
+                    let lower = Self::union_bounds(db, lower_bounds, lower_bound_cache);
+                    return Ok(Some(lower));
+                }
+
+                let upper = Self::intersect_bounds(db, upper_bounds, upper_bound_cache);
+                let upper = IntersectionType::from_two_elements(db, upper, bound);
+                if upper != bound {
+                    Ok(Some(upper))
+                } else {
+                    Ok(None)
+                }
+            }
+
+            TypeVarBoundOrConstraints::Constraints(_) => {
+                let lower = Self::union_bounds(db, lower_bounds, lower_bound_cache);
+                let upper = Self::intersect_bounds(db, upper_bounds, upper_bound_cache);
+                Self::default_solve(db, builder, *bound_typevar, lower, upper)
+            }
+        }
+    }
+
+    fn union_bounds(
+        db: &'db dyn Db,
+        lower_bounds: &[Type<'db>],
+        cache: &mut FxHashMap<LowerBoundsKey<'db>, Type<'db>>,
+    ) -> Type<'db> {
+        let key: LowerBoundsKey<'db> = lower_bounds.iter().copied().collect();
+        if let Some(lower) = cache.get(&key) {
+            return *lower;
+        }
+
+        let lower = if let Some((last, prefix)) = lower_bounds.split_last() {
+            if prefix.is_empty() {
+                *last
+            } else {
+                let prefix_lower = Self::union_bounds(db, prefix, cache);
+                UnionType::from_two_elements(db, prefix_lower, *last)
+            }
+        } else {
+            Type::Never
+        };
+        cache.insert(key, lower);
+        lower
+    }
+
+    fn intersect_bounds(
+        db: &'db dyn Db,
+        upper_bounds: &[Type<'db>],
+        cache: &mut FxHashMap<UpperBoundsKey<'db>, Type<'db>>,
+    ) -> Type<'db> {
+        let key: UpperBoundsKey<'db> = upper_bounds.iter().copied().collect();
+        if let Some(upper) = cache.get(&key) {
+            return *upper;
+        }
+
+        let upper = if let Some((last, prefix)) = upper_bounds.split_last() {
+            if prefix.is_empty() {
+                *last
+            } else {
+                let prefix_upper = Self::intersect_bounds(db, prefix, cache);
+                IntersectionType::from_two_elements(db, prefix_upper, *last)
+            }
+        } else {
+            Type::object()
+        };
+        cache.insert(key, upper);
+        upper
     }
 }
 
