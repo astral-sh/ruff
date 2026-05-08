@@ -147,11 +147,13 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
                 AnyNodeRef::StmtClassDef(StmtClassDef {
                     name,
                     decorator_list,
+                    body,
                     ..
                 })
                 | AnyNodeRef::StmtFunctionDef(StmtFunctionDef {
                     name,
                     decorator_list,
+                    body,
                     ..
                 }),
             ) = comment.enclosing
@@ -161,6 +163,29 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
                         if decorator.end() < comment.range.start() {
                             return Err(IgnoredReason::AfterDecorator);
                         }
+                    }
+                }
+
+                // Flag own-line `fmt: off`/`fmt: on` comments that sit between a
+                // class or function header and the first statement of its body.
+                // The formatter treats these as dangling comments of the enclosing
+                // definition, so they cannot toggle suppression at the parent
+                // suite level.
+                if comment.line_position.is_own_line()
+                    && let Some(first_body_stmt) = body.first()
+                    && comment.range.start() >= name.end()
+                    && comment.range.end() <= first_body_stmt.start()
+                {
+                    let body_indentation =
+                        indentation_at_offset(first_body_stmt.start(), self.locator.contents())
+                            .unwrap_or_default()
+                            .text_len();
+                    let comment_indentation =
+                        indentation_at_offset(comment.range.start(), self.locator.contents())
+                            .unwrap_or_default()
+                            .text_len();
+                    if comment_indentation < body_indentation {
+                        return Err(IgnoredReason::BetweenClauseHeaderAndBody);
                     }
                 }
             }
@@ -226,6 +251,7 @@ enum IgnoredReason {
     SkipHasToBeTrailing,
     FmtOnCannotBeTrailing,
     FmtOffAboveBlock,
+    BetweenClauseHeaderAndBody,
 }
 
 impl Display for IgnoredReason {
@@ -246,6 +272,12 @@ impl Display for IgnoredReason {
             }
             Self::FmtOffAboveBlock => {
                 write!(f, "it cannot be directly above an alternate body")
+            }
+            Self::BetweenClauseHeaderAndBody => {
+                write!(
+                    f,
+                    "it cannot be between a class or function header and its body"
+                )
             }
         }
     }

@@ -101,3 +101,38 @@ import pytest
 )  # fmt: skip
 def test_eval(test_input, expected):
     assert eval(test_input) == expected
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/20425
+# `fmt: off`/`fmt: on` between a class header and its body is invalid because
+# the formatter treats the comment as dangling on the class definition.
+# fmt: off
+class FmtOnAfterClassHeader(SomeBase[
+    int,
+    str,
+]):
+# fmt: on
+    pass
+
+
+# fmt: off
+class FmtOnAfterSimpleClassHeader:
+# fmt: on
+    x = 1
+
+
+# fmt: off
+def fmt_on_after_function_header(
+    x: int,
+    y: str,
+):
+# fmt: on
+    pass
+
+
+# Comments aligned with the body (the leading-comment position) remain valid.
+class FmtOffAtBodyIndentation:
+    # fmt: off
+    untouched   =   1
+    # fmt: on
+    formatted = 2

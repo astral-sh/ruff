@@ -215,3 +215,60 @@ help: Remove this comment
 65 |
 66 | # all of these should be fine
 note: This is an unsafe fix and may change runtime behavior
+
+RUF028 [*] This suppression comment is invalid because it cannot be between a class or function header and its body
+   --> RUF028.py:114:1
+    |
+112 |     str,
+113 | ]):
+114 | # fmt: on
+    | ^^^^^^^^^
+115 |     pass
+    |
+help: Remove this comment
+111 |     int,
+112 |     str,
+113 | ]):
+    - # fmt: on
+114 |     pass
+115 |
+116 |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF028 [*] This suppression comment is invalid because it cannot be between a class or function header and its body
+   --> RUF028.py:120:1
+    |
+118 | # fmt: off
+119 | class FmtOnAfterSimpleClassHeader:
+120 | # fmt: on
+    | ^^^^^^^^^
+121 |     x = 1
+    |
+help: Remove this comment
+117 |
+118 | # fmt: off
+119 | class FmtOnAfterSimpleClassHeader:
+    - # fmt: on
+120 |     x = 1
+121 |
+122 |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF028 [*] This suppression comment is invalid because it cannot be between a class or function header and its body
+   --> RUF028.py:129:1
+    |
+127 |     y: str,
+128 | ):
+129 | # fmt: on
+    | ^^^^^^^^^
+130 |     pass
+    |
+help: Remove this comment
+126 |     x: int,
+127 |     y: str,
+128 | ):
+    - # fmt: on
+129 |     pass
+130 |
+131 |
+note: This is an unsafe fix and may change runtime behavior
