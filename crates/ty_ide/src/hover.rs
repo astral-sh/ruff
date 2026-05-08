@@ -3,11 +3,14 @@ use crate::goto::{GotoTarget, docstring_for_call_definition, find_goto_target};
 use crate::{Db, MarkupKind, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast as ast;
+use ruff_python_ast::find_node::covering_node;
+use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
-use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
+use ty_python_semantic::types::ide_support::{
+    resolved_call_signature, resolved_call_signature_with_candidates, typed_dict_key_hover,
+};
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarVariance};
 use ty_python_semantic::{DisplaySettings, SemanticModel, TypeQualifiers};
 
@@ -15,6 +18,13 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     let parsed = parsed_module(db, file).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &parsed, offset)?;
+
+    if let Some(contents) = call_argument_hover_contents(db, &model, &parsed, &goto_target) {
+        return Some(RangedValue {
+            range: FileRange::new(file, goto_target.range()),
+            value: Hover { contents },
+        });
+    }
 
     if let GotoTarget::Expression(expr) = goto_target {
         if expr.is_literal_expr() {
@@ -104,6 +114,185 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     })
 }
 
+fn call_argument_hover_contents<'db>(
+    db: &'db dyn Db,
+    model: &SemanticModel<'db>,
+    parsed: &ruff_db::parsed::ParsedModuleRef,
+    goto_target: &GotoTarget,
+) -> Option<Vec<HoverContent<'db>>> {
+    let (call, argument_index) = call_argument_for_target(parsed, goto_target)?;
+    let resolved = resolved_call_signature_with_candidates(model, call)?;
+    let details = &resolved.details;
+    let argument_mapping = details.argument_to_parameter_mapping.get(argument_index)?;
+    let first_parameter_index = argument_mapping.parameters.first()?;
+    if argument_mapping
+        .parameters
+        .iter()
+        .any(|parameter_index| parameter_index != first_parameter_index)
+    {
+        return None;
+    }
+    let displayed_parameter_index = details
+        .argument_to_displayed_parameter_mapping
+        .get(argument_index)
+        .copied()
+        .flatten()?;
+    let parameter = details.parameters.get(displayed_parameter_index)?;
+
+    let name = parameter.name.clone();
+    let is_keyword_argument_name = matches!(goto_target, GotoTarget::KeywordArgument { .. });
+    let documentation = details
+        .definition
+        .and_then(|definition| docstring_for_call_definition(db, definition))
+        .and_then(|docstring| parameter_documentation(&docstring, &name))
+        .or_else(|| {
+            call_argument_definition_docstring(db, model, call)
+                .and_then(|docstring| parameter_documentation(&docstring, &name))
+        });
+
+    if documentation.is_none() && !is_keyword_argument_name {
+        return None;
+    }
+
+    let label = parameter.label.clone();
+    let kind = parameter.hover_label();
+    let signature = resolved
+        .has_multiple_signatures
+        .then(|| call_argument_signature(call, &details.label));
+
+    let mut contents = vec![HoverContent::Parameter {
+        kind,
+        label,
+        signature,
+    }];
+    if let Some(documentation) = documentation {
+        contents.push(HoverContent::ParameterDocumentation(documentation));
+    }
+
+    Some(contents)
+}
+
+fn call_argument_definition_docstring<'db>(
+    db: &'db dyn Db,
+    model: &SemanticModel<'db>,
+    call: &ast::ExprCall,
+) -> Option<Docstring> {
+    GotoTarget::Call {
+        callable: ast::ExprRef::from(&call.func),
+        call,
+        on_parenthesis: false,
+    }
+    .definitions(
+        model,
+        ty_python_semantic::ImportAliasResolution::ResolveAliases,
+    )
+    .and_then(|definitions| definitions.docstring(db))
+}
+
+fn parameter_documentation(docstring: &Docstring, name: &str) -> Option<String> {
+    let mut parameter_documentation = docstring.parameter_documentation();
+    parameter_documentation
+        .remove(name)
+        .or_else(|| parameter_documentation.remove(name.trim_start_matches('*')))
+}
+
+fn call_argument_signature(call: &ast::ExprCall, signature: &str) -> String {
+    if let Some(name) = call_argument_signature_name(&call.func) {
+        format!("def {name}{signature}")
+    } else {
+        signature.to_string()
+    }
+}
+
+fn call_argument_signature_name(function: &ast::Expr) -> Option<&str> {
+    match function {
+        ast::Expr::Name(name) => Some(name.id.as_str()),
+        ast::Expr::Attribute(attribute) => Some(attribute.attr.as_str()),
+        _ => None,
+    }
+}
+
+fn call_argument_for_target<'a>(
+    parsed: &'a ruff_db::parsed::ParsedModuleRef,
+    goto_target: &GotoTarget<'a>,
+) -> Option<(&'a ast::ExprCall, usize)> {
+    match goto_target {
+        GotoTarget::KeywordArgument {
+            keyword,
+            call_expression,
+        } => {
+            let argument_index = call_expression
+                .arguments
+                .iter_source_order()
+                .position(|argument| matches!(argument, ast::ArgOrKeyword::Keyword(candidate) if candidate.range == keyword.range))?;
+            Some((call_expression, argument_index))
+        }
+        GotoTarget::Expression(expression) => {
+            call_argument_for_expression(parsed, expression.range())
+        }
+        _ => None,
+    }
+}
+
+fn call_argument_for_expression(
+    parsed: &ruff_db::parsed::ParsedModuleRef,
+    expression_range: ruff_text_size::TextRange,
+) -> Option<(&ast::ExprCall, usize)> {
+    let root_node: AnyNodeRef = parsed.syntax().into();
+    let call = covering_node(root_node, expression_range)
+        .find_first(|node| {
+            let AnyNodeRef::ExprCall(call) = node else {
+                return false;
+            };
+            direct_argument_index(call, expression_range).is_some()
+        })
+        .ok()?;
+
+    let AnyNodeRef::ExprCall(call) = call.node() else {
+        return None;
+    };
+    let argument_index = direct_argument_index(call, expression_range)?;
+    Some((call, argument_index))
+}
+
+fn direct_argument_index(
+    call: &ast::ExprCall,
+    expression_range: ruff_text_size::TextRange,
+) -> Option<usize> {
+    call.arguments
+        .iter_source_order()
+        .enumerate()
+        .find_map(|(index, argument)| match argument {
+            ast::ArgOrKeyword::Arg(argument) => {
+                if direct_argument_value_range(argument) == expression_range {
+                    Some(index)
+                } else {
+                    None
+                }
+            }
+            ast::ArgOrKeyword::Keyword(keyword) => {
+                if keyword.value.range() == expression_range
+                    || keyword
+                        .arg
+                        .as_ref()
+                        .is_some_and(|arg| arg.range == expression_range)
+                {
+                    Some(index)
+                } else {
+                    None
+                }
+            }
+        })
+}
+
+fn direct_argument_value_range(argument: &ast::Expr) -> ruff_text_size::TextRange {
+    if let ast::Expr::Starred(starred) = argument {
+        starred.value.range()
+    } else {
+        argument.range()
+    }
+}
+
 pub struct Hover<'db> {
     contents: Vec<HoverContent<'db>>,
 }
@@ -166,6 +355,12 @@ impl fmt::Display for DisplayHover<'_, '_> {
 #[derive(Debug, Clone)]
 pub enum HoverContent<'db> {
     Signature(String),
+    Parameter {
+        kind: &'static str,
+        label: String,
+        signature: Option<String>,
+    },
+    ParameterDocumentation(String),
     Type(Type<'db>, Option<TypeVarVariance>, TypeQualifiers),
     TypedDictKey {
         owner: String,
@@ -212,6 +407,24 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
         match self.content {
             HoverContent::Signature(signature) => {
                 self.kind.fenced_code_block(&signature, "python").fmt(f)
+            }
+            HoverContent::Parameter {
+                kind,
+                label,
+                signature,
+            } => {
+                let label = format!("({kind}) {label}");
+                if let Some(signature) = signature {
+                    self.kind
+                        .fenced_code_block(format!("{signature}\n{label}"), "python")
+                        .fmt(f)
+                } else {
+                    self.kind.fenced_code_block(label, "python").fmt(f)
+                }
+            }
+            HoverContent::ParameterDocumentation(documentation) => {
+                let rendered = Docstring::new(documentation.clone()).render(self.kind);
+                f.write_str(rendered.trim_end())
             }
             HoverContent::Type(ty, variance, qualifiers) => {
                 let variance = match variance {
@@ -2463,6 +2676,48 @@ mod tests {
           --> main.py:12:5
            |
         12 | Box(value)
+           |     ^^-^^
+           |     | |
+           |     | Cursor offset
+           |     source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_constructor_argument_class_docstring() {
+        let test = hover_test(
+            r#"
+            value = "crate"
+            class Box:
+                """my cool class
+
+                Args:
+                    name: box name
+                """
+
+                def __init__(self, name: str):
+                    self.name = name
+
+            Box(va<CURSOR>lue)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (parameter) name: str
+        ---------------------------------------------
+        box name
+        ---------------------------------------------
+        ```python
+        (parameter) name: str
+        ```
+        ---
+        box name
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:13:5
+           |
+        13 | Box(value)
            |     ^^-^^
            |     | |
            |     | Cursor offset

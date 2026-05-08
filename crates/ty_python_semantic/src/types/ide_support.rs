@@ -652,6 +652,16 @@ impl CallSignatureParameterKind {
     pub const fn can_be_passed_by_keyword(self) -> bool {
         matches!(self, Self::PositionalOrKeyword | Self::KeywordOnly)
     }
+
+    pub const fn hover_label(self) -> &'static str {
+        match self {
+            Self::PositionalOnly => "positional-only parameter",
+            Self::PositionalOrKeyword => "parameter",
+            Self::Variadic => "variadic positional parameter",
+            Self::KeywordOnly => "keyword-only parameter",
+            Self::KeywordVariadic => "variadic keyword parameter",
+        }
+    }
 }
 
 impl<'db> CallSignatureDetails<'db> {
@@ -1182,31 +1192,29 @@ pub fn find_active_signature_from_details(
     Some(best_index)
 }
 
+/// The resolved signature for a call expression, plus metadata about the candidate set.
+pub struct ResolvedCallSignature<'db> {
+    /// The signature selected for this call.
+    pub details: CallSignatureDetails<'db>,
+
+    /// Whether the callable had more than one candidate signature before selecting the best match.
+    pub has_multiple_signatures: bool,
+}
+
 /// Resolve a call expression to its matching overload's signature details,
 /// using full type checking (not just arity matching) for overload resolution.
 ///
 /// Falls back to arity-based matching if type-based resolution fails.
-pub fn resolved_call_signature<'db>(
+pub fn resolved_call_signature_with_candidates<'db>(
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
-) -> Option<CallSignatureDetails<'db>> {
+) -> Option<ResolvedCallSignature<'db>> {
     let db = model.db();
     let func_type = call_expr.func.inferred_type(model)?;
     let callable_type = func_type.try_upcast_to_callable(db)?.into_type(db);
+    let bindings = full_type_bindings_for_call(model, callable_type, call_expr);
 
-    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
-        splatted_value
-            .inferred_type(model)
-            .unwrap_or(Type::unknown())
-    });
-
-    // Extract the `Bindings` regardless of whether type checking succeeded or failed.
-    let constraints = ConstraintSetBuilder::new();
-    let bindings = callable_type
-        .bindings(db)
-        .match_parameters(db, &args)
-        .check_types(db, &constraints, &args, TypeContext::default(), &[])
-        .unwrap_or_else(|CallError(_, bindings)| *bindings);
+    let has_multiple_signatures = bindings.iter_flat().flatten().nth(1).is_some();
 
     // First, try to find the matching overload after full type checking.
     let type_checked_details: Vec<_> = bindings
@@ -1217,7 +1225,11 @@ pub fn resolved_call_signature<'db>(
 
     if !type_checked_details.is_empty() {
         let active = find_active_signature_from_details(&type_checked_details)?;
-        return type_checked_details.into_iter().nth(active);
+        let details = type_checked_details.into_iter().nth(active)?;
+        return Some(ResolvedCallSignature {
+            details,
+            has_multiple_signatures,
+        });
     }
 
     // If all overloads have type-checking errors (e.g., `InvalidArgumentType`),
@@ -1234,7 +1246,19 @@ pub fn resolved_call_signature<'db>(
     }
 
     let active = find_active_signature_from_details(&all_details)?;
-    all_details.into_iter().nth(active)
+    let details = all_details.into_iter().nth(active)?;
+    Some(ResolvedCallSignature {
+        details,
+        has_multiple_signatures,
+    })
+}
+
+/// Resolve a call expression to its matching overload's signature details.
+pub fn resolved_call_signature<'db>(
+    model: &SemanticModel<'db>,
+    call_expr: &ast::ExprCall,
+) -> Option<CallSignatureDetails<'db>> {
+    resolved_call_signature_with_candidates(model, call_expr).map(|resolved| resolved.details)
 }
 
 #[derive(Default)]
