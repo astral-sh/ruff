@@ -533,4 +533,45 @@ help: Add `thing_id` to function signature
 370 | @app.get("/things/{thing_id}")
     - async def read_thing_init_and_call_instance_default(query: str = Depends(InitAndCallQuery())): ...
 371 + async def read_thing_init_and_call_instance_default(thing_id, query: str = Depends(InitAndCallQuery())): ...
+372 |
+373 |
+374 | # https://github.com/astral-sh/ruff/issues/21075
+note: This is an unsafe fix and may change runtime behavior
+
+FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_aliased_wrong` signature
+   --> FAST003.py:387:20
+    |
+386 | # Error: alias resolves to `Annotated[..., Depends(something_else)]`, which doesn't cover `thing_id`.
+387 | @app.get("/aliased/{thing_id}")
+    |                    ^^^^^^^^^^
+388 | async def read_thing_aliased_wrong(thing: OtherDep): ...
+    |
+help: Add `thing_id` to function signature
+385 |
+386 | # Error: alias resolves to `Annotated[..., Depends(something_else)]`, which doesn't cover `thing_id`.
+387 | @app.get("/aliased/{thing_id}")
+    - async def read_thing_aliased_wrong(thing: OtherDep): ...
+388 + async def read_thing_aliased_wrong(thing: OtherDep, thing_id): ...
+389 |
+390 |
+391 | # Error: alias is `Annotated[..., "metadata"]` — no `Depends`, so `thing_id` is unused.
+note: This is an unsafe fix and may change runtime behavior
+
+FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_aliased_no_depends` signature
+   --> FAST003.py:392:20
+    |
+391 | # Error: alias is `Annotated[..., "metadata"]` — no `Depends`, so `thing_id` is unused.
+392 | @app.get("/aliased/{thing_id}")
+    |                    ^^^^^^^^^^
+393 | async def read_thing_aliased_no_depends(thing: NonDependsAlias): ...
+    |
+help: Add `thing_id` to function signature
+390 |
+391 | # Error: alias is `Annotated[..., "metadata"]` — no `Depends`, so `thing_id` is unused.
+392 | @app.get("/aliased/{thing_id}")
+    - async def read_thing_aliased_no_depends(thing: NonDependsAlias): ...
+393 + async def read_thing_aliased_no_depends(thing: NonDependsAlias, thing_id): ...
+394 |
+395 |
+396 | # OK: `type` statement (PEP 695) alias to `Annotated[..., Depends(...)]`.
 note: This is an unsafe fix and may change runtime behavior

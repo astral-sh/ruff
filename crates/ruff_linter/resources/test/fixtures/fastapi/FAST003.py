@@ -369,3 +369,33 @@ async def read_thing_callable_dep_instance_default(query: str = Depends(Callable
 # Error: `__call__` has `other`, not `thing_id`.
 @app.get("/things/{thing_id}")
 async def read_thing_init_and_call_instance_default(query: str = Depends(InitAndCallQuery())): ...
+
+
+# https://github.com/astral-sh/ruff/issues/21075
+# `Annotated[..., Depends(...)]` hidden behind a type alias.
+ThingDep = Annotated[dict, Depends(takes_thing_id)]
+OtherDep = Annotated[dict, Depends(something_else)]
+NonDependsAlias = Annotated[dict, "metadata"]
+
+
+# OK: alias resolves to `Annotated[..., Depends(takes_thing_id)]`, which covers `thing_id`.
+@app.get("/aliased/{thing_id}")
+async def read_thing_aliased(thing: ThingDep): ...
+
+
+# Error: alias resolves to `Annotated[..., Depends(something_else)]`, which doesn't cover `thing_id`.
+@app.get("/aliased/{thing_id}")
+async def read_thing_aliased_wrong(thing: OtherDep): ...
+
+
+# Error: alias is `Annotated[..., "metadata"]` — no `Depends`, so `thing_id` is unused.
+@app.get("/aliased/{thing_id}")
+async def read_thing_aliased_no_depends(thing: NonDependsAlias): ...
+
+
+# OK: `type` statement (PEP 695) alias to `Annotated[..., Depends(...)]`.
+type ThingDepPep695 = Annotated[dict, Depends(takes_thing_id)]
+
+
+@app.get("/aliased/{thing_id}")
+async def read_thing_aliased_pep695(thing: ThingDepPep695): ...

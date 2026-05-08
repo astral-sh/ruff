@@ -268,7 +268,8 @@ impl<'a> Dependency<'a> {
             return Some(dependency);
         }
 
-        let ExprSubscript { value, slice, .. } = parameter.annotation()?.as_subscript_expr()?;
+        let ExprSubscript { value, slice, .. } =
+            annotated_subscript(parameter.annotation()?, semantic)?;
 
         if !semantic.match_typing_expr(value, "Annotated") {
             return None;
@@ -416,6 +417,44 @@ impl<'a> Dependency<'a> {
 
         Some(Self::Class(parameter_names))
     }
+}
+
+/// Resolve an annotation expression to its underlying subscript, peeking through a single
+/// level of type-alias indirection.
+///
+/// For `Annotated[X, ...]`, returns the subscript directly. For a [`ast::ExprName`] whose
+/// binding is a module-level assignment of the form `Alias = Annotated[X, ...]`, returns the
+/// right-hand side subscript. Anything more involved (re-aliasing, conditional aliases, type
+/// inference) is left to type checkers.
+///
+/// Uses [`SemanticModel::lookup_symbol`] rather than [`SemanticModel::resolve_name`] so the
+/// lookup also works during deferred annotation evaluation (PEP 649 / `from __future__ import
+/// annotations`), where the annotation's [`ast::ExprName`] has not yet been resolved.
+fn annotated_subscript<'a>(
+    annotation: &'a Expr,
+    semantic: &SemanticModel<'a>,
+) -> Option<&'a ExprSubscript> {
+    if let Expr::Subscript(subscript) = annotation {
+        return Some(subscript);
+    }
+
+    let name = annotation.as_name_expr()?;
+    let binding = semantic
+        .lookup_symbol(name.id.as_str())
+        .map(|id| semantic.binding(id))?;
+
+    if !matches!(binding.kind, BindingKind::Assignment) {
+        return None;
+    }
+
+    let value = match binding.statement(semantic)? {
+        ast::Stmt::Assign(ast::StmtAssign { value, .. }) => value.as_ref(),
+        ast::Stmt::AnnAssign(ast::StmtAnnAssign { value, .. }) => value.as_deref()?,
+        ast::Stmt::TypeAlias(ast::StmtTypeAlias { value, .. }) => value.as_ref(),
+        _ => return None,
+    };
+
+    value.as_subscript_expr()
 }
 
 fn depends_arguments<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a Arguments> {
