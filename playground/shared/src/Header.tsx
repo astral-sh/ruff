@@ -111,14 +111,21 @@ function Logo({ name, className }: { name: "ruff" | "ty"; className: string }) {
     case "ty":
       return (
         <a href="https://docs.astral.sh/ty/">
-          <svg
-            height={32}
-            viewBox="0 0 133 64"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            className={className}
-          >
-            <path d="M 64 10 H 37 V 0 H 5 V 10 H 0 V 35 H 5 V 54 C 5 59 10 64 16 64 H 64 V 40 H 37 V 35 H 54 C 59 35 64 30 64 24 V 10 Z M 99 10 H 104 V 0 H 133 V 54 C 133 59 128 64 122 64 h -53 V 40 H 101 V 35 H 79 C 74 35 69 30 69 24 V 0 H 99 Z" />
+          <svg xmlns="http://www.w3.org/2000/svg" height="32" viewBox="0 0 92 48">
+            <path
+              d="M48 7.68H27.84V0H3.84V7.68H0V25.92H3.84V40.2136C3.84 44.5139 7.32607 48 11.6264 48H48V29.76H27.84V25.92H40.2136C44.5139 25.92 48 22.4339 48 18.1336V7.68Z"
+              fill="#46EBE1"
+            ></path>
+            <text
+              x="64"
+              y="32"
+              class="mtk8"
+              fill="currentColor"
+              font-size="24px"
+              font-family="Consolas, 'Courier New', monospace"
+            >
+              ty
+            </text>
           </svg>
         </a>
       );
