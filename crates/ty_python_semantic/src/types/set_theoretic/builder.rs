@@ -481,14 +481,6 @@ impl<'db> UnionBuilder<'db> {
         self.add_in_place_impl(ty, &mut vec![]);
     }
 
-    /// Adds an element that already came from a simplified union.
-    ///
-    /// This skips all merging and redundancy checks, so it should only be used when replaying
-    /// elements from an existing [`UnionType`].
-    pub(crate) fn push_normalized(&mut self, ty: Type<'db>) {
-        self.elements.push(UnionElement::Type(ty));
-    }
-
     pub(crate) fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         let cycle_recovery = self.cycle_recovery;
         let should_widen = |literals, recursively_defined: RecursivelyDefined| {
