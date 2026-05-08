@@ -19,6 +19,7 @@ help: Remove quotes
 10 |     print(x)
 11 |
 12 |
+note: This is an unsafe fix and may change runtime behavior
 
 UP037 [*] Remove quotes from type annotation
   --> UP037_1.py:14:4
@@ -33,3 +34,4 @@ help: Remove quotes
 13 | # OK
    - X: "Tuple[int, int]" = (0, 0)
 14 + X: Tuple[int, int] = (0, 0)
+note: This is an unsafe fix and may change runtime behavior

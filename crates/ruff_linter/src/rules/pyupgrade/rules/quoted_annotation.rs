@@ -65,10 +65,19 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## Fix safety
 ///
-/// The rule's fix is marked as safe, unless [preview] and
-/// [`lint.future-annotations`] are enabled and a `from __future__ import
-/// annotations` import is added. Such an import may change the behavior of all annotations in the
-/// file.
+/// The rule's fix is marked as unsafe in two cases:
+///
+/// - When the target version is Python 3.14 or later and the file does not
+///   contain `from __future__ import annotations`. Under [PEP 649], Python
+///   defers annotation evaluation by default, but tools that introspect
+///   annotations eagerly (for example `inspect.signature(..., eval_str=True)`
+///   or `unittest.mock.create_autospec`) can still raise `NameError` when an
+///   unquoted name is only imported under `if TYPE_CHECKING:`.
+/// - When [preview] is enabled, [`lint.future-annotations`] is set to `true`,
+///   and a `from __future__ import annotations` import is added. Such an
+///   import may change the behavior of all annotations in the file.
+///
+/// [PEP 649]: https://peps.python.org/pep-0649/
 ///
 /// ## Options
 /// - `lint.future-annotations`
@@ -129,9 +138,21 @@ pub(crate) fn quoted_annotation(checker: &Checker, annotation: &str, range: Text
     };
     let unquote_edit = Edit::range_replacement(new_content, range);
 
+    // On Python 3.14+, annotations are lazily evaluated (PEP 649), but tools
+    // that introspect annotations eagerly (e.g. `inspect.signature` with
+    // `eval_str=True`, or `unittest.mock.create_autospec`) can still raise
+    // `NameError` when an unquoted name is only imported under `TYPE_CHECKING`.
+    // `from __future__ import annotations` keeps the annotation as a string,
+    // so the eager-resolution case can't fire there.
+    // See https://github.com/astral-sh/ruff/issues/20782.
+    let pep_649_unsafe = checker.target_version().defers_annotations()
+        && !checker.semantic().future_annotations_or_stub();
+
     let fix = if add_future_import {
         let import_edit = checker.importer().add_future_import();
         Fix::unsafe_edits(unquote_edit, [import_edit])
+    } else if pep_649_unsafe {
+        Fix::unsafe_edit(unquote_edit)
     } else {
         Fix::safe_edit(unquote_edit)
     };

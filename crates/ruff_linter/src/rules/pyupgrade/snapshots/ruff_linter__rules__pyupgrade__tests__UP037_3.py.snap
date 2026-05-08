@@ -19,6 +19,7 @@ help: Remove quotes
 15 +     _singleton: ClassVar[Optional[EmptyCell]] = None
 16 |     # the behavior of _singleton above should match a non-ClassVar
 17 |     _doubleton: "EmptyCell"
+note: This is an unsafe fix and may change runtime behavior
 
 UP037 [*] Remove quotes from type annotation
   --> UP037_3.py:17:17
@@ -34,3 +35,4 @@ help: Remove quotes
 16 |     # the behavior of _singleton above should match a non-ClassVar
    -     _doubleton: "EmptyCell"
 17 +     _doubleton: EmptyCell
+note: This is an unsafe fix and may change runtime behavior

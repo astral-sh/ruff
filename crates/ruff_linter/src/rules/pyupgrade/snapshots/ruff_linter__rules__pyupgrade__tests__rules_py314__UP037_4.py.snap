@@ -1,0 +1,55 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP037 [*] Remove quotes from type annotation
+  --> UP037_4.py:18:12
+   |
+18 | def foo(x: "Tuple[int, ...]") -> "Tuple[int, ...]":
+   |            ^^^^^^^^^^^^^^^^^
+19 |     return x
+   |
+help: Remove quotes
+15 |     from typing import Tuple
+16 |
+17 |
+   - def foo(x: "Tuple[int, ...]") -> "Tuple[int, ...]":
+18 + def foo(x: Tuple[int, ...]) -> "Tuple[int, ...]":
+19 |     return x
+20 |
+21 |
+note: This is an unsafe fix and may change runtime behavior
+
+UP037 [*] Remove quotes from type annotation
+  --> UP037_4.py:18:34
+   |
+18 | def foo(x: "Tuple[int, ...]") -> "Tuple[int, ...]":
+   |                                  ^^^^^^^^^^^^^^^^^
+19 |     return x
+   |
+help: Remove quotes
+15 |     from typing import Tuple
+16 |
+17 |
+   - def foo(x: "Tuple[int, ...]") -> "Tuple[int, ...]":
+18 + def foo(x: "Tuple[int, ...]") -> Tuple[int, ...]:
+19 |     return x
+20 |
+21 |
+note: This is an unsafe fix and may change runtime behavior
+
+UP037 [*] Remove quotes from type annotation
+  --> UP037_4.py:23:8
+   |
+22 | def bar() -> None:
+23 |     y: "Tuple[int, ...]" = (0, 0)
+   |        ^^^^^^^^^^^^^^^^^
+24 |     print(y)
+   |
+help: Remove quotes
+20 |
+21 |
+22 | def bar() -> None:
+   -     y: "Tuple[int, ...]" = (0, 0)
+23 +     y: Tuple[int, ...] = (0, 0)
+24 |     print(y)
+note: This is an unsafe fix and may change runtime behavior
