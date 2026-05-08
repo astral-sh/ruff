@@ -118,6 +118,37 @@ mod tests {
         Ok(())
     }
 
+    /// Regression test for <https://github.com/astral-sh/ruff/issues/23185>:
+    /// enabling `future_annotations=true` must not silently flip TC001/TC002/TC003
+    /// into strict-mode behaviour when `strict=false`. A typing-only import whose
+    /// module is already available at runtime (through a sibling import or a
+    /// parent/submodule import) should not be flagged.
+    #[test]
+    fn future_annotations_respects_non_strict_mode() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking")
+                .join("TC001-3_future_strict.py")
+                .as_path(),
+            &settings::LinterSettings {
+                future_annotations: true,
+                flake8_type_checking: super::settings::Settings {
+                    strict: false,
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rules([
+                    Rule::TypingOnlyFirstPartyImport,
+                    Rule::TypingOnlyThirdPartyImport,
+                    Rule::TypingOnlyStandardLibraryImport,
+                ])
+            },
+        )?;
+        assert!(
+            diagnostics.is_empty(),
+            "expected no TC001/TC002/TC003 diagnostics with future_annotations=true and strict=false, got: {diagnostics:#?}"
+        );
+        Ok(())
+    }
+
     // we test these rules as a pair, since they're opposites of one another
     // so we want to make sure their fixes are not going around in circles.
     #[test_case(Rule::UnquotedTypeAlias, Path::new("TC007.py"))]
