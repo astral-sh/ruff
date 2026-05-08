@@ -1475,10 +1475,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // - `if type(x) is not Y`
             // - `if Y is type(x)`
             // - `if Y is not type(x)`
+            // - `if type(x) is type(y)`
+            // - `if type(x) is not type(y)`
             // - `if x.__class__ is Y`
             // - `if x.__class__ is not Y`
             // - `if Y is x.__class__`
             // - `if Y is not x.__class__`
+            // - `if x.__class__ is y.__class__`
+            // - `if x.__class__ is not y.__class__`
             let exact_class_checks = match (
                 exact_class_narrowing_target(self.db, inference, left),
                 exact_class_narrowing_target(self.db, inference, right),
