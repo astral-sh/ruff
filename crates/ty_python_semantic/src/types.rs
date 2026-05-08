@@ -3949,6 +3949,33 @@ impl<'db> Type<'db> {
                 .into(),
 
                 Some(KnownFunction::Dataclass) => {
+                    let bool_parameter = |name: &'static str, default: bool| {
+                        Parameter::keyword_only(Name::new_static(name))
+                            .with_annotated_type(KnownClass::Bool.to_instance(db))
+                            .with_default_type(Type::bool_literal(default))
+                    };
+
+                    let mut decorator_factory_parameters = vec![
+                        bool_parameter("init", true),
+                        bool_parameter("repr", true),
+                        bool_parameter("eq", true),
+                        bool_parameter("order", false),
+                        bool_parameter("unsafe_hash", false),
+                        bool_parameter("frozen", false),
+                    ];
+
+                    if Program::get(db).python_version(db) >= ast::PythonVersion::PY310 {
+                        decorator_factory_parameters.extend([
+                            bool_parameter("match_args", true),
+                            bool_parameter("kw_only", false),
+                            bool_parameter("slots", false),
+                        ]);
+                    }
+
+                    if Program::get(db).python_version(db) >= ast::PythonVersion::PY311 {
+                        decorator_factory_parameters.push(bool_parameter("weakref_slot", false));
+                    }
+
                     CallableBinding::from_overloads(
                         self,
                         [
@@ -3970,8 +3997,6 @@ impl<'db> Type<'db> {
                                 ),
                                 Type::unknown(),
                             ),
-                            // TODO: make this overload Python-version-dependent
-
                             // def dataclass(
                             //     *,
                             //     init: bool = True,
@@ -3986,41 +4011,7 @@ impl<'db> Type<'db> {
                             //     weakref_slot: bool = False,
                             // ) -> Callable[[type[_T]], type[_T]]: ...
                             Signature::new(
-                                Parameters::new(
-                                    db,
-                                    [
-                                        Parameter::keyword_only(Name::new_static("init"))
-                                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(true)),
-                                        Parameter::keyword_only(Name::new_static("repr"))
-                                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(true)),
-                                        Parameter::keyword_only(Name::new_static("eq"))
-                                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(true)),
-                                        Parameter::keyword_only(Name::new_static("order"))
-                                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(false)),
-                                        Parameter::keyword_only(Name::new_static("unsafe_hash"))
-                                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(false)),
-                                        Parameter::keyword_only(Name::new_static("frozen"))
-                                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(false)),
-                                        Parameter::keyword_only(Name::new_static("match_args"))
-                                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(true)),
-                                        Parameter::keyword_only(Name::new_static("kw_only"))
-                                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(false)),
-                                        Parameter::keyword_only(Name::new_static("slots"))
-                                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(false)),
-                                        Parameter::keyword_only(Name::new_static("weakref_slot"))
-                                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(false)),
-                                    ],
-                                ),
+                                Parameters::new(db, decorator_factory_parameters),
                                 Type::unknown(),
                             ),
                         ],

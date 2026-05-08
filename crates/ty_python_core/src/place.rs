@@ -710,21 +710,28 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
 
     /// Helper to add a potential narrowing target expression to the set.
     fn add_narrowing_target(&self, expr: &ast::Expr, places: &mut PossiblyNarrowedPlaces) {
-        if let Some(place_expr) = PlaceExpr::try_from_expr(expr) {
-            if let Some(place) = self.places.place_id((&place_expr).into()) {
-                places.insert(place);
-            }
+        if let Some(place_expr) = PlaceExpr::try_from_expr(expr)
+            && let Some(place) = self.places.place_id((&place_expr).into())
+        {
+            places.insert(place);
         }
 
         match expr.expression_value() {
             // type(x) is Y can narrow x
             ast::Expr::Call(call) if call.arguments.args.len() == 1 => {
-                if let Some(first_arg) = call.arguments.args.first() {
-                    if let Some(place_expr) = PlaceExpr::try_from_expr(first_arg) {
-                        if let Some(place) = self.places.place_id((&place_expr).into()) {
-                            places.insert(place);
-                        }
-                    }
+                if let Some(first_arg) = call.arguments.args.first()
+                    && let Some(place_expr) = PlaceExpr::try_from_expr(first_arg)
+                    && let Some(place) = self.places.place_id((&place_expr).into())
+                {
+                    places.insert(place);
+                }
+            }
+            // x.__class__ is Y can narrow x
+            ast::Expr::Attribute(attribute) if attribute.attr.as_str() == "__class__" => {
+                if let Some(place_expr) = PlaceExpr::try_from_expr(&attribute.value)
+                    && let Some(place) = self.places.place_id((&place_expr).into())
+                {
+                    places.insert(place);
                 }
             }
             _ => {}

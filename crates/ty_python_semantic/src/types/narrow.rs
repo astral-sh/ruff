@@ -1216,6 +1216,40 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
         }
 
+        /// Return the expression being tested by an exact runtime-class check.
+        ///
+        /// `x.__class__` is modeled as equivalent to `type(x)` by [`Type::dunder_class`], so class
+        /// identity checks against either expression can narrow `x`.
+        fn exact_class_narrowing_target<'a, 'db>(
+            db: &'db dyn Db,
+            inference: &ExpressionInference<'db>,
+            expr: &'a ast::Expr,
+        ) -> Option<&'a ast::Expr> {
+            match expr.expression_value() {
+                ast::Expr::Call(ast::ExprCall {
+                    func,
+                    arguments: ast::Arguments { args, keywords, .. },
+                    ..
+                }) => {
+                    if keywords.is_empty()
+                        && let [single_argument] = &**args
+                        && let Type::ClassLiteral(called_class) = inference.expression_type(func)
+                        && called_class.is_known(db, KnownClass::Type)
+                    {
+                        Some(single_argument)
+                    } else {
+                        None
+                    }
+                }
+                ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. })
+                    if attr.as_str() == "__class__" =>
+                {
+                    Some(value)
+                }
+                _ => None,
+            }
+        }
+
         let ast::ExprCompare {
             range: _,
             node_index: _,
@@ -1441,25 +1475,26 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // - `if type(x) is not Y`
             // - `if Y is type(x)`
             // - `if Y is not type(x)`
-            if let (ast::Expr::Call(call), _, _, other) | (_, other, ast::Expr::Call(call), _) = (
-                left.expression_value(),
-                lhs_ty,
-                right.expression_value(),
-                rhs_ty,
+            // - `if type(x) is type(y)`
+            // - `if type(x) is not type(y)`
+            // - `if x.__class__ is Y`
+            // - `if x.__class__ is not Y`
+            // - `if Y is x.__class__`
+            // - `if Y is not x.__class__`
+            // - `if x.__class__ is y.__class__`
+            // - `if x.__class__ is not y.__class__`
+            let exact_class_checks = match (
+                exact_class_narrowing_target(self.db, inference, left),
+                exact_class_narrowing_target(self.db, inference, right),
             ) {
-                let ast::ExprCall {
-                    range: _,
-                    node_index: _,
-                    func,
-                    arguments:
-                        ast::Arguments {
-                            args,
-                            keywords,
-                            range: _,
-                            node_index: _,
-                        },
-                } = call;
-
+                (Some(left_target), Some(right_target)) => {
+                    [Some((left_target, rhs_ty)), Some((right_target, lhs_ty))]
+                }
+                (Some(target), None) => [Some((target, rhs_ty)), None],
+                (None, Some(target)) => [Some((target, lhs_ty)), None],
+                (None, None) => [None, None],
+            };
+            for (target_expr, other) in exact_class_checks.into_iter().flatten() {
                 // If this is `None`, it indicates that we cannot do `if type(x) is Y`
                 // narrowing: we can only do narrowing for `if type(x) is Y` and
                 // `if type(x) is not Y`, not for `if type(x) == Y` or `if type(x) != Y`.
@@ -1470,11 +1505,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 };
 
                 if let Some(is_positive) = is_positive
-                    && keywords.is_empty()
-                    && let [single_argument] = &**args
-                    && let Some(target) = PlaceExpr::try_from_expr(single_argument)
-                    && let Type::ClassLiteral(called_class) = inference.expression_type(func)
-                    && called_class.is_known(self.db, KnownClass::Type)
+                    && let Some(target) = PlaceExpr::try_from_expr(target_expr)
                     && let Some(other_class) = find_underlying_class(self.db, other)
                     // `else`-branch narrowing for `if type(x) is Y` can only be done
                     // if `Y` is a final class

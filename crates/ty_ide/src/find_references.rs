@@ -1353,6 +1353,48 @@ result = func(value=42)
     }
 
     #[test]
+    fn multi_file_parameter_references_from_keyword_argument_include_keyword_argument_labels() {
+        let test = CursorTest::builder()
+            .source(
+                "utils.py",
+                "
+def func(value: int):
+    return value * 2
+
+result = func(value<CURSOR>=42)
+",
+            )
+            .source(
+                "caller.py",
+                "
+from utils import func
+
+result = func(value=1)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 4 references
+         --> caller.py:4:15
+          |
+        4 | result = func(value=1)
+          |               -----
+          |
+         ::: utils.py:2:10
+          |
+        2 | def func(value: int):
+          |          -----
+        3 |     return value * 2
+          |            -----
+        4 |
+        5 | result = func(value=42)
+          |               -----
+          |
+        ");
+    }
+
+    #[test]
     fn multi_file_async_function_parameter_references_include_keyword_argument_labels() {
         let test = CursorTest::builder()
             .source(
