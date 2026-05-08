@@ -2873,7 +2873,9 @@ impl<'db> Type<'db> {
             return attribute;
         }
 
-        let Some(mapped_instance_ty) = Self::wrap_type_in_mapped(db, static_literal, attr_ty)
+        let ty_to_wrap = Self::extract_column_type_parameter(db, attr_ty).unwrap_or(attr_ty);
+
+        let Some(mapped_instance_ty) = Self::wrap_type_in_mapped(db, static_literal, ty_to_wrap)
         else {
             return attribute;
         };
@@ -2886,6 +2888,32 @@ impl<'db> Type<'db> {
                 public_type_policy,
             }),
             qualifiers: attribute.qualifiers,
+        }
+    }
+
+    /// If `ty` is an instance of SQLAlchemy's `Column[T]`, extract and return `T`.
+    /// Returns `None` if the type is not a Column or has no type parameter.
+    fn extract_column_type_parameter(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+        let Type::NominalInstance(instance) = ty else {
+            return None;
+        };
+        let class_type = instance.class(db);
+        let literal = class_type.class_literal(db);
+        let file = literal.file(db);
+        let module = ty_module_resolver::file_to_module(db, file)?;
+        let module_name = module.name(db).as_str();
+        let class_name = literal.name(db).as_str();
+        if class_name != "Column"
+            || !(module_name == "sqlalchemy.sql.schema"
+                || module_name.starts_with("sqlalchemy.sql"))
+        {
+            return None;
+        }
+        if let ClassType::Generic(alias) = class_type {
+            let types = alias.specialization(db).types(db);
+            types.first().copied()
+        } else {
+            None
         }
     }
 

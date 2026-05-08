@@ -575,64 +575,95 @@ impl<'db> StaticClassLiteral<'db> {
     /// plain type annotations (not `Mapped[T]`), meaning class-level attribute access
     /// should return `InstrumentedAttribute[T]` rather than the plain type `T`.
     ///
-    /// Detection criteria:
+    /// Detection criteria (primary path):
     /// - The class's MRO includes a known SQLAlchemy declarative base class
     ///   (`DeclarativeBase` or `DeclarativeBaseNoMeta` from `sqlalchemy.orm.decl_api`)
     /// - The class is a concrete table class (has `__tablename__` in its own scope
     ///   or `table=True` keyword argument)
     /// - The class is not abstract (`__abstract__` is not `True`)
+    ///
+    /// Detection criteria (heuristic fallback for `declarative_base()` classes):
+    /// When `declarative_base()` is used, the return type is `Any` in the stubs,
+    /// so the MRO contains a dynamic base instead of a named class. In that case,
+    /// we fall back to a heuristic: the class must have both `__tablename__` and
+    /// at least one attribute bound to a `Column` type from `sqlalchemy.sql.schema`.
     #[salsa::tracked]
     pub(crate) fn is_sqlalchemy_orm_table_class(self, db: &'db dyn Db) -> bool {
-        let has_orm_base_in_mro = self.iter_mro(db, None).any(|base| {
-            if let ClassBase::Class(class_type) = base {
-                let file = class_type.class_literal(db).file(db);
-                if let Some(module) = file_to_module(db, file) {
-                    let module_name = module.name(db).as_str();
-                    let class_name = class_type.name(db).as_str();
-                    matches!(
-                        (module_name, class_name),
-                        (
-                            "sqlalchemy.orm.decl_api",
-                            "DeclarativeBase" | "DeclarativeBaseNoMeta"
-                        ) | ("sqlmodel.main", "SQLModel")
-                    )
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        });
+        let mut has_orm_base_in_mro = false;
+        let mut has_dynamic_base = false;
 
-        if !has_orm_base_in_mro {
-            return false;
+        for base in self.iter_mro(db, None) {
+            match base {
+                ClassBase::Class(class_type) => {
+                    let file = class_type.class_literal(db).file(db);
+                    if let Some(module) = file_to_module(db, file) {
+                        let module_name = module.name(db).as_str();
+                        let class_name = class_type.name(db).as_str();
+                        if matches!(
+                            (module_name, class_name),
+                            (
+                                "sqlalchemy.orm.decl_api",
+                                "DeclarativeBase" | "DeclarativeBaseNoMeta"
+                            ) | ("sqlmodel.main", "SQLModel")
+                        ) {
+                            has_orm_base_in_mro = true;
+                        }
+                    }
+                }
+                ClassBase::Dynamic(_) => {
+                    has_dynamic_base = true;
+                }
+                _ => {}
+            }
         }
 
         let body_scope = self.body_scope(db);
 
-        let has_abstract = !class_member(db, body_scope, "__abstract__").is_undefined();
-        if has_abstract {
+        if has_orm_base_in_mro {
+            let has_abstract = !class_member(db, body_scope, "__abstract__").is_undefined();
+            if has_abstract {
+                return false;
+            }
+
+            let has_tablename = !class_member(db, body_scope, "__tablename__").is_undefined();
+            if has_tablename {
+                return true;
+            }
+
+            let module = parsed_module(db, self.file(db)).load(db);
+            let class_stmt = self.node(db, &module);
+            if let Some(arguments) = class_stmt.arguments.as_ref() {
+                if let Some(keyword) = arguments.find_keyword("table") {
+                    if let ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral {
+                        value: true, ..
+                    }) = &keyword.value
+                    {
+                        return true;
+                    }
+                }
+            }
+
             return false;
         }
 
-        let has_tablename = !class_member(db, body_scope, "__tablename__").is_undefined();
-        if has_tablename {
-            return true;
-        }
-
-        let module = parsed_module(db, self.file(db)).load(db);
-        let class_stmt = self.node(db, &module);
-        if let Some(arguments) = class_stmt.arguments.as_ref() {
-            if let Some(keyword) = arguments.find_keyword("table") {
-                if let ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. }) =
-                    &keyword.value
-                {
-                    return true;
-                }
-            }
+        if has_dynamic_base {
+            return Self::is_sqlalchemy_orm_table_class_heuristic(db, body_scope);
         }
 
         false
+    }
+
+    /// Heuristic fallback for detecting ORM table classes when `declarative_base()` is used.
+    ///
+    /// Since `declarative_base()` returns `Any`, the MRO won't contain a named declarative
+    /// base class. Instead, we check for `__tablename__` in the class body — this attribute
+    /// is an SQLAlchemy-specific convention, and having it in a class with a dynamic (`Any`)
+    /// base strongly indicates a legacy ORM table class created via `declarative_base()`.
+    fn is_sqlalchemy_orm_table_class_heuristic(
+        db: &'db dyn Db,
+        body_scope: ScopeId<'db>,
+    ) -> bool {
+        !class_member(db, body_scope, "__tablename__").is_undefined()
     }
 
     /// Attempt to resolve the [method resolution order] ("MRO") for this class.

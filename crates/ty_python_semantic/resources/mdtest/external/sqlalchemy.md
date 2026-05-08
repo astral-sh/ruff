@@ -221,3 +221,125 @@ user = User(name="test")
 reveal_type(user.id)  # revealed: int
 reveal_type(user.name)  # revealed: str
 ```
+
+## Legacy declarative_base() with Column and annotations
+
+Classes created via the legacy `declarative_base()` factory function (which returns `Any` in the
+stubs) should still be recognized as ORM table classes when they have `__tablename__` and `Column()`
+attributes. This matches the behavior of the mypy SQLAlchemy plugin.
+
+When annotations are present (`id: int = Column(...)`), the annotated type is used for
+wrapping. The `invalid-assignment` errors are expected because `Column[Unknown]` is not
+assignable to the annotated type — in practice the ORM metaclass handles the rewriting at
+runtime, but ty does not yet suppress these diagnostics for ORM classes.
+
+```py
+from sqlalchemy import Column, Integer, String
+from sqlalchemy.orm import declarative_base
+
+Base = declarative_base()
+
+class LegacyUser(Base):
+    __tablename__ = "legacy_users"
+
+    id: int = Column(Integer, primary_key=True)  # error: [invalid-assignment]
+    name: str = Column(String)  # error: [invalid-assignment]
+
+# Class-level access should return InstrumentedAttribute via the wrapping
+reveal_type(LegacyUser.id)  # revealed: InstrumentedAttribute[int]
+reveal_type(LegacyUser.name)  # revealed: InstrumentedAttribute[str]
+
+# Instance-level access should return the plain annotated types
+user = LegacyUser()
+reveal_type(user.id)  # revealed: int
+reveal_type(user.name)  # revealed: str
+```
+
+## Legacy declarative_base() with Column but no annotations
+
+When using bare `Column()` assignments without type annotations, ty recognizes the class as
+an ORM table class and extracts the type parameter from `Column[T]`. Currently, `Column(Integer)`
+infers as `Column[Unknown]` because ty does not yet fully resolve the overloaded `Column.__init__`
+with `Type[TypeEngine[_T]]` arguments, so the wrapped type is `Mapped[Unknown]`.
+
+```py
+from sqlalchemy import Column, Integer, String
+from sqlalchemy.orm import declarative_base
+
+Base = declarative_base()
+
+class Product(Base):
+    __tablename__ = "products"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+
+# TODO: Once ty resolves Column(Integer) as Column[int] instead of Column[Unknown],
+# these should become InstrumentedAttribute[int] and InstrumentedAttribute[str].
+reveal_type(Product.id)  # revealed: InstrumentedAttribute[Unknown]
+reveal_type(Product.name)  # revealed: InstrumentedAttribute[Unknown]
+```
+
+## Legacy declarative_base() with mixed annotated and unannotated attributes
+
+A single class can contain both annotated and unannotated Column attributes. The annotated
+ones should use the annotation type; the unannotated ones use the Column type parameter.
+
+```py
+from sqlalchemy import Column, Integer, String
+from sqlalchemy.orm import declarative_base, relationship
+
+Base = declarative_base()
+
+class Order(Base):
+    __tablename__ = "orders"
+
+    id: int = Column(Integer, primary_key=True)  # error: [invalid-assignment]
+    total = Column(Integer)
+
+# Annotated attribute uses the declared type
+reveal_type(Order.id)  # revealed: InstrumentedAttribute[int]
+# Unannotated attribute extracts from Column[T]
+reveal_type(Order.total)  # revealed: InstrumentedAttribute[Unknown]
+```
+
+## Non-ORM class with __tablename__ should NOT be detected
+
+A class with `__tablename__` but no dynamic base (no `Any` in MRO from `declarative_base()`)
+and no known ORM base should not be treated as an ORM table class.
+
+```py
+class NotAnORMClass:
+    __tablename__ = "not_orm"
+
+    id: int = 42
+    name: str = "test"
+
+# These should return the plain types, NOT InstrumentedAttribute
+reveal_type(NotAnORMClass.id)  # revealed: int
+reveal_type(NotAnORMClass.name)  # revealed: str
+```
+
+## ClassVar attributes should NOT be wrapped
+
+ClassVar attributes in ORM classes should be excluded from the wrapping logic.
+
+```py
+from typing import ClassVar
+from sqlalchemy import Column, Integer
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+class Base(DeclarativeBase):
+    pass
+
+class Config(Base):
+    __tablename__ = "config"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    max_retries: ClassVar[int] = 3
+
+# ClassVar should not be wrapped
+reveal_type(Config.max_retries)  # revealed: int
+# Regular mapped column still works
+reveal_type(Config.id)  # revealed: InstrumentedAttribute[int]
+```
