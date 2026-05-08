@@ -7027,6 +7027,31 @@ take({"<CURSOR>": 1})
     }
 
     #[test]
+    fn string_literal_completions_typed_dict_constructor_mixed_literal_keys() {
+        let builder = completion_test_builder(
+            r#"
+from typing import TypedDict
+
+class Box(TypedDict):
+    x: float
+    y: float
+    z: float
+
+Box({"<CURSOR>": 1}, y=2)
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        x :: Literal["x"]
+        y :: Literal["y"]
+        z :: Literal["z"]
+        "#,
+        );
+    }
+
+    #[test]
     fn string_literal_completions_typed_dict_keys_assignment() {
         let builder = completion_test_builder(
             r#"
