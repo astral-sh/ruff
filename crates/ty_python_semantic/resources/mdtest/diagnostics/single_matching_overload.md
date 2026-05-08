@@ -26,18 +26,15 @@ f("a")  # error: [invalid-argument-type]
 ## Bound method overloads preserve original positions
 
 When binding `Base().f`, the first overload is filtered out because its `self` parameter only
-accepts `Other`. The remaining overloads keep their original source indexes so diagnostics can point
+accepts `Child`. The remaining overloads keep their original source indexes so diagnostics can point
 at the matching declaration and list the original non-matching overloads correctly.
 
 ```py
 from typing import overload
 
-class Other:
-    pass
-
 class Base:
     @overload
-    def f(self: Other, x: bytes) -> bytes: ...
+    def f(self: "Child", x: bytes) -> bytes: ...
     @overload
     def f(self, x: int) -> int: ...
     @overload
@@ -48,6 +45,9 @@ class Base:
         y: int = 0,
     ) -> bytes | int | str:
         return x
+
+class Child(Base):
+    pass
 
 Base().f("ok", "bad")  # error: [invalid-argument-type]
 ```

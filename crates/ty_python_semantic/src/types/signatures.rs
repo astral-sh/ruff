@@ -979,13 +979,11 @@ impl<'db> Signature<'db> {
             }
         }
 
-        let inferable_typevars = self.inferable_typevars(db);
-        if (inferable_typevars == InferableTypeVars::None || !expected_self_ty.has_typevar(db))
-            && let Some(is_assignable) = fast_is_assignable_to(db, self_type, expected_self_ty)
-        {
+        if let Some(is_assignable) = fast_is_assignable_to(db, self_type, expected_self_ty) {
             return is_assignable.then(|| self.bind_self(db, Some(typing_self_type)));
         }
 
+        let inferable_typevars = self.inferable_typevars(db);
         if inferable_typevars == InferableTypeVars::None || !expected_self_ty.has_typevar(db) {
             let when = self_type.when_constraint_set_assignable_to_owned(db, expected_self_ty);
             if when.query(|_, when| when.is_always_satisfied(db)) {
@@ -1389,12 +1387,18 @@ fn fast_is_assignable_to_impl<'db>(
     target: Type<'db>,
     depth: u8,
 ) -> Option<bool> {
-    if source == target
-        || source.is_never()
-        || source.is_dynamic()
-        || target.is_dynamic()
-        || target.is_object()
-    {
+    let source = source.resolve_type_alias(db);
+    let target = target.resolve_type_alias(db);
+
+    if matches!(source, Type::TypeVar(_)) || matches!(target, Type::TypeVar(_)) {
+        return None;
+    }
+
+    if source == target {
+        return (!source.has_typevar(db)).then_some(true);
+    }
+
+    if source.is_never() || source.is_dynamic() || target.is_dynamic() || target.is_object() {
         return Some(true);
     }
 
@@ -1405,9 +1409,6 @@ fn fast_is_assignable_to_impl<'db>(
     if depth >= 8 {
         return None;
     }
-
-    let source = source.resolve_type_alias(db);
-    let target = target.resolve_type_alias(db);
 
     if let Some(source_union) = source.as_union_like(db) {
         let mut saw_unknown = false;
@@ -1438,6 +1439,12 @@ fn fast_is_assignable_to_impl<'db>(
 
     if source_class != target_class {
         if target_class.class_literal(db).is_protocol(db) {
+            return None;
+        }
+
+        if class_specialization_has_typevar(db, source)
+            || class_specialization_has_typevar(db, target)
+        {
             return None;
         }
 
@@ -1474,7 +1481,13 @@ fn fast_specializations_are_assignable_to<'db>(
                 .zip(source_specialization.generic_context(db).variables(db))
             {
                 let is_assignable = match typevar.variance(db) {
-                    TypeVarVariance::Bivariant => Some(true),
+                    TypeVarVariance::Bivariant => {
+                        if source_type.has_typevar(db) || target_type.has_typevar(db) {
+                            None
+                        } else {
+                            Some(true)
+                        }
+                    }
                     TypeVarVariance::Covariant => {
                         fast_is_assignable_to_impl(db, *source_type, *target_type, depth)
                     }
@@ -1504,6 +1517,11 @@ fn fast_specializations_are_assignable_to<'db>(
         }
         _ => None,
     }
+}
+
+fn class_specialization_has_typevar<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    ty.class_specialization(db)
+        .is_some_and(|specialization| specialization.types(db).iter().any(|ty| ty.has_typevar(db)))
 }
 
 impl<'db> VarianceInferable<'db> for &Signature<'db> {
