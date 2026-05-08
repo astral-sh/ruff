@@ -53,6 +53,7 @@ use crate::{
     },
 };
 use crate::{attribute_assignments, attribute_declarations};
+use ty_module_resolver::file_to_module;
 use ty_python_core::{
     attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
@@ -568,6 +569,70 @@ impl<'db> StaticClassLiteral<'db> {
         self.known_function_decorators(db)
             .contains(&KnownFunction::Final)
             || enum_metadata(db, ClassLiteral::Static(self)).is_some()
+    }
+
+    /// Returns `true` if this class is a SQLAlchemy/SQLModel ORM table class that uses
+    /// plain type annotations (not `Mapped[T]`), meaning class-level attribute access
+    /// should return `InstrumentedAttribute[T]` rather than the plain type `T`.
+    ///
+    /// Detection criteria:
+    /// - The class's MRO includes a known SQLAlchemy declarative base class
+    ///   (`DeclarativeBase` or `DeclarativeBaseNoMeta` from `sqlalchemy.orm.decl_api`)
+    /// - The class is a concrete table class (has `__tablename__` in its own scope
+    ///   or `table=True` keyword argument)
+    /// - The class is not abstract (`__abstract__` is not `True`)
+    #[salsa::tracked]
+    pub(crate) fn is_sqlalchemy_orm_table_class(self, db: &'db dyn Db) -> bool {
+        let has_orm_base_in_mro = self.iter_mro(db, None).any(|base| {
+            if let ClassBase::Class(class_type) = base {
+                let file = class_type.class_literal(db).file(db);
+                if let Some(module) = file_to_module(db, file) {
+                    let module_name = module.name(db).as_str();
+                    let class_name = class_type.name(db).as_str();
+                    matches!(
+                        (module_name, class_name),
+                        (
+                            "sqlalchemy.orm.decl_api",
+                            "DeclarativeBase" | "DeclarativeBaseNoMeta"
+                        ) | ("sqlmodel.main", "SQLModel")
+                    )
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        });
+
+        if !has_orm_base_in_mro {
+            return false;
+        }
+
+        let body_scope = self.body_scope(db);
+
+        let has_abstract = !class_member(db, body_scope, "__abstract__").is_undefined();
+        if has_abstract {
+            return false;
+        }
+
+        let has_tablename = !class_member(db, body_scope, "__tablename__").is_undefined();
+        if has_tablename {
+            return true;
+        }
+
+        let module = parsed_module(db, self.file(db)).load(db);
+        let class_stmt = self.node(db, &module);
+        if let Some(arguments) = class_stmt.arguments.as_ref() {
+            if let Some(keyword) = arguments.find_keyword("table") {
+                if let ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. }) =
+                    &keyword.value
+                {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 
     /// Attempt to resolve the [method resolution order] ("MRO") for this class.
