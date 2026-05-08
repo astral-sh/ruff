@@ -228,7 +228,8 @@ impl Violation for TrailingCommaOnBareTuple {
 ///
 /// ## Formatter compatibility
 /// We recommend against using this rule alongside the [formatter]. The
-/// formatter enforces consistent use of trailing commas, making the rule redundant.
+/// formatter respects trailing commas as a signal to break items across lines,
+/// which conflicts with this rule's requirement to prohibit them.
 ///
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
