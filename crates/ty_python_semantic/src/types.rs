@@ -5853,24 +5853,13 @@ impl<'db> Type<'db> {
                 Type::PropertyInstance(property.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
 
-            Type::Union(union) => {
-                union
-                    .elements(db)
-                    .iter()
-                    .map(|element| element.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-                    .fold(
-                        UnionBuilder::new(db)
-                            .unpack_aliases(false)
-                            .relation_based_simplification(
-                                visitor
-                                    .flags()
-                                    .contains(TypeMappingFlags::RELATION_BASED_UNION_SIMPLIFICATION),
-                            ),
-                        UnionBuilder::add,
-                    )
-                    .recursively_defined(union.recursively_defined(db))
-                    .build()
-            },
+            Type::Union(union) => union.map_leave_aliases_with_relation_based_simplification(
+                db,
+                visitor
+                    .flags()
+                    .contains(TypeMappingFlags::RELATION_BASED_UNION_SIMPLIFICATION),
+                |element| element.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            ),
             Type::Intersection(intersection) => {
                 let mut builder = IntersectionBuilder::new(db);
                 for positive in intersection.positive(db) {
