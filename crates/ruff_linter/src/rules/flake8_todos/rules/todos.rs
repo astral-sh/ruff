@@ -102,6 +102,12 @@ impl Violation for MissingTodoAuthor {
 ///
 /// # TODO(charlie): this comment has an issue code (matches the regex `[A-Z]+\-?\d+`)
 /// # SIXCHR-003
+///
+/// # TODO(charlie): PROJ-123 this comment has a Jira-style issue ID on the same line
+///
+/// # TODO(charlie): Fix bug (PROJ-456) with parenthesized issue ID
+///
+/// # TODO(charlie): Fix this bug PROJ-789
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.269")]
@@ -249,8 +255,12 @@ static ISSUE_LINK_OWN_LINE_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
 
 static ISSUE_LINK_TODO_LINE_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
     RegexSet::new([
-        r"\s*(http|https)://.*", // issue link
-        r"\s*#\d+.*",            // issue code - like "#003"
+        r"\s*(http|https)://.*",        // issue link
+        r"\s*#\d+.*",                   // issue code - like "#003"
+        r":\s+[A-Z]{2,}-\d+",           // Jira-style right after colon - like "TODO: PROJ-123 ..."
+        r"[A-Z]{2,}-\d+\s*$",          // Jira-style at end of line - like "fix this PROJ-123"
+        r"\([A-Z]{2,}-\d+\)",          // Jira-style in parentheses - like "(PROJ-123)"
+        r"[A-Z]{2,}-\d+\s*:",          // Jira-style followed by colon - like "PROJ-123: fix bug"
     ])
     .unwrap()
 });

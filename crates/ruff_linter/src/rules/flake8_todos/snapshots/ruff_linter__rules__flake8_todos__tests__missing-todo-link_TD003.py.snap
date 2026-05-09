@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_todos/mod.rs
+assertion_line: 27
 ---
 TD003 Missing issue link for this TODO
   --> TD003.py:15:3
@@ -60,5 +61,36 @@ TD003 Missing issue link for this TODO
 41 | # TODO: A todo with a random number, 5431
 42 |
 43 | # TODO: here's a TODO on the last line with no link
+   |   ^^^^
+44 |
+45 | # Jira-style issue IDs on the same line (should pass)
+   |
+
+TD003 Missing issue link for this TODO
+  --> TD003.py:52:3
+   |
+51 | # Jira-style patterns that should still fail
+52 | # TODO(charlie): Single letter project key A-1
+   |   ^^^^
+53 | # TODO(charlie): No hyphen pattern ABC123
+54 | # TODO(charlie): Lowercase project key abc-123
+   |
+
+TD003 Missing issue link for this TODO
+  --> TD003.py:53:3
+   |
+51 | # Jira-style patterns that should still fail
+52 | # TODO(charlie): Single letter project key A-1
+53 | # TODO(charlie): No hyphen pattern ABC123
+   |   ^^^^
+54 | # TODO(charlie): Lowercase project key abc-123
+   |
+
+TD003 Missing issue link for this TODO
+  --> TD003.py:54:3
+   |
+52 | # TODO(charlie): Single letter project key A-1
+53 | # TODO(charlie): No hyphen pattern ABC123
+54 | # TODO(charlie): Lowercase project key abc-123
    |   ^^^^
    |
