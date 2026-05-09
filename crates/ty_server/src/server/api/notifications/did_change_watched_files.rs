@@ -9,9 +9,8 @@ use crate::session::client::Client;
 use crate::system::AnySystemPath;
 use lsp_types as types;
 use lsp_types::{FileChangeType, notification as notif};
-use ruff_db::system::SystemPathBuf;
 use ty_project::Db as _;
-use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
+use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind, ExistingPathKind};
 
 pub(crate) struct DidChangeWatchedFiles;
 
@@ -26,6 +25,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         params: types::DidChangeWatchedFilesParams,
     ) -> Result<()> {
         let mut changes = Vec::new();
+        let system = session.system();
 
         for change in params.changes {
             let path = DocumentKey::from_url(&change.uri).into_file_path();
@@ -40,13 +40,21 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
 
             let change_event = match change.typ {
                 FileChangeType::CREATED => ChangeEvent::Created {
+                    kind: CreatedKind::from(ExistingPathKind::from_system(system, &system_path)),
                     path: system_path,
-                    kind: CreatedKind::Any,
                 },
-                FileChangeType::CHANGED => ChangeEvent::Changed {
-                    path: system_path,
-                    kind: ChangedKind::Any,
-                },
+                FileChangeType::CHANGED => {
+                    // We're only interested in file content or metadata changes.
+                    // Renames are modelled as create/delete events.
+                    if ExistingPathKind::from_system(system, &system_path).is_file() {
+                        ChangeEvent::Changed {
+                            path: system_path,
+                            kind: ChangedKind::Any,
+                        }
+                    } else {
+                        continue;
+                    }
+                }
                 FileChangeType::DELETED => ChangeEvent::Deleted {
                     path: system_path,
                     kind: DeletedKind::Any,
@@ -67,7 +75,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
             return Ok(());
         }
 
-        let roots: Vec<SystemPathBuf> = session
+        let roots: Vec<_> = session
             .project_dbs()
             .map(|db| db.project().root(db).to_owned())
             .collect();
