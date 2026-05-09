@@ -1031,6 +1031,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_callable_pair(db, source_partial.partial(db), target_partial.partial(db))
             }),
 
+            (
+                Type::KnownInstance(KnownInstanceType::Sentinel(source_sentinel)),
+                Type::KnownInstance(KnownInstanceType::Sentinel(target_sentinel)),
+            ) => ConstraintSet::from_bool(
+                self.constraints,
+                source_sentinel.is_same_sentinel(db, target_sentinel),
+            ),
+
             // When checking `FunctoolsPartial <: functools.partial[T]`, we need to specialize
             // the nominal instance with the partial's return type so the check is precise.
             (
@@ -2375,6 +2383,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(left)),
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(right)),
             ) => self.check_property_instance_pair(db, left, right),
+
+            (
+                Type::KnownInstance(KnownInstanceType::Sentinel(left_sentinel)),
+                Type::KnownInstance(KnownInstanceType::Sentinel(right_sentinel)),
+            ) => ConstraintSet::from_bool(
+                self.constraints,
+                !left_sentinel.is_same_sentinel(db, right_sentinel),
+            ),
 
             // any single-valued type is disjoint from another single-valued type
             // iff the two types are nonequal

@@ -117,6 +117,7 @@ pub enum KnownClass {
     Mapping,
     // typing_extensions
     ExtensionsTypeVar, // must be distinct from typing.TypeVar, backports new features
+    Sentinel,
     // Collections
     ChainMap,
     Counter,
@@ -180,6 +181,7 @@ impl KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
+            | Self::Sentinel
             | Self::Super
             | Self::WrapperDescriptorType
             | Self::UnionType
@@ -325,6 +327,7 @@ impl KnownClass {
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
             | KnownClass::TypeVarTuple
+            | KnownClass::Sentinel
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
@@ -419,6 +422,7 @@ impl KnownClass {
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
             | KnownClass::TypeVarTuple
+            | KnownClass::Sentinel
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
@@ -513,6 +517,7 @@ impl KnownClass {
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
             | KnownClass::TypeVarTuple
+            | KnownClass::Sentinel
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
@@ -610,6 +615,7 @@ impl KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
+            | Self::Sentinel
             | Self::TypeAliasType
             | Self::NoDefaultType
             | Self::NewType
@@ -720,6 +726,7 @@ impl KnownClass {
             | KnownClass::ParamSpecKwargs
             | KnownClass::ProtocolMeta
             | KnownClass::TypeVarTuple
+            | KnownClass::Sentinel
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
@@ -797,6 +804,7 @@ impl KnownClass {
             Self::ParamSpecArgs => "ParamSpecArgs",
             Self::ParamSpecKwargs => "ParamSpecKwargs",
             Self::TypeVarTuple => "TypeVarTuple",
+            Self::Sentinel => "Sentinel",
             Self::TypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
             Self::NewType => "NewType",
@@ -1193,6 +1201,7 @@ impl KnownClass {
             Self::TypeAliasType
             | Self::ExtensionsTypeVar
             | Self::TypeVarTuple
+            | Self::Sentinel
             | Self::ExtensionsParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
@@ -1315,6 +1324,7 @@ impl KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
+            | Self::Sentinel
             | Self::Enum
             | Self::EnumType
             | Self::Auto
@@ -1413,6 +1423,7 @@ impl KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
+            | Self::Sentinel
             | Self::Enum
             | Self::EnumType
             | Self::Auto
@@ -1506,6 +1517,7 @@ impl KnownClass {
             "ParamSpecArgs" => &[Self::ParamSpecArgs],
             "ParamSpecKwargs" => &[Self::ParamSpecKwargs],
             "TypeVarTuple" => &[Self::TypeVarTuple],
+            "Sentinel" => &[Self::Sentinel],
             "ChainMap" => &[Self::ChainMap],
             "Counter" => &[Self::Counter],
             "defaultdict" => &[Self::DefaultDict],
@@ -1632,6 +1644,7 @@ impl KnownClass {
             | Self::ExtensionsTypeVar
             | Self::ParamSpec
             | Self::ExtensionsParamSpec
+            | Self::Sentinel
             | Self::NamedTupleLike
             | Self::ConstraintSet
             | Self::GenericContext

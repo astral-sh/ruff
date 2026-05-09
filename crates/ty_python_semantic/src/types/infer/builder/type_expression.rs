@@ -1607,6 +1607,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
+                KnownInstanceType::Sentinel(sentinel) => {
+                    if !self.in_string_annotation() {
+                        self.infer_expression(&subscript.slice, TypeContext::default());
+                    }
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "`{}` is a sentinel and cannot be specialized",
+                            sentinel.name(self.db())
+                        ));
+                    }
+                    Type::unknown()
+                }
                 KnownInstanceType::NamedTupleSpec(_) => {
                     if !self.in_string_annotation() {
                         self.infer_expression(&subscript.slice, TypeContext::default());

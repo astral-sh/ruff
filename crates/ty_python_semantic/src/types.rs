@@ -68,7 +68,9 @@ use crate::types::generics::{
     ApplySpecialization, InferableTypeVars, Specialization, bind_typevar,
 };
 use crate::types::infer::InferenceFlags;
-use crate::types::known_instance::{InternedConstraintSet, InternedType, UnionTypeInstance};
+use crate::types::known_instance::{
+    InternedConstraintSet, InternedType, SentinelInstance, UnionTypeInstance,
+};
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraint};
@@ -2237,6 +2239,7 @@ impl<'db> Type<'db> {
                 !(special_form.check_module(KnownModule::Typing)
                     && special_form.check_module(KnownModule::TypingExtensions))
             }
+            Type::KnownInstance(KnownInstanceType::Sentinel(_)) => true,
             Type::KnownInstance(_) => false,
             Type::Callable(_) => {
                 // A callable type is never a singleton because for any given signature,
@@ -5402,6 +5405,9 @@ impl<'db> Type<'db> {
                 }
                 KnownInstanceType::Callable(callable) => Ok(Type::Callable(*callable)),
                 KnownInstanceType::LiteralStringAlias(ty) => Ok(ty.inner(db)),
+                KnownInstanceType::Sentinel(sentinel) => {
+                    Ok(Type::KnownInstance(KnownInstanceType::Sentinel(*sentinel)))
+                }
                 KnownInstanceType::FunctoolsPartial(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
                         *self, scope_id
@@ -6133,6 +6139,7 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::LiteralStringAlias(_)
                 | KnownInstanceType::NamedTupleSpec(_)
                 | KnownInstanceType::NewType(_)
+                | KnownInstanceType::Sentinel(_)
                 | KnownInstanceType::FunctoolsPartial(_) => {
                     // TODO: For some of these, we may need to try to find legacy typevars in inner types.
                 }
