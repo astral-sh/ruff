@@ -543,7 +543,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             ast::Expr::Named(named) => {
                 if !self.in_string_annotation() {
-                    self.infer_named_expression(named);
+                    self.infer_named_expression(named, TypeContext::default());
                 }
                 self.report_invalid_type_expression(
                     expression,

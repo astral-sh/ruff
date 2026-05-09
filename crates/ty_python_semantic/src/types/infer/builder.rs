@@ -912,6 +912,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_named_expression_definition(
                     named_expression.node(self.module()),
                     definition,
+                    TypeContext::default(),
                 );
             }
             DefinitionKind::Comprehension(comprehension) => {
@@ -5459,7 +5460,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::Await(await_expression) => {
                 self.infer_await_expression(await_expression, tcx)
             }
-            ast::Expr::Named(named) => self.infer_named_expression(named),
+            ast::Expr::Named(named) => self.infer_named_expression(named, tcx),
             ast::Expr::IpyEscapeCommand(_) => {
                 todo_type!("Ipy escape command support")
             }
@@ -6674,25 +6675,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .insert(self, target_type);
     }
 
-    fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type<'db> {
+    fn infer_named_expression(
+        &mut self,
+        named: &ast::ExprNamed,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
         if named.target.is_name_expr() {
             let definition = self.index.expect_single_definition(named);
-            let result = infer_definition_types(self.db(), definition);
-            self.extend_definition(result);
-            result.binding_type(definition)
+            self.infer_named_expression_definition(named, definition, tcx)
         } else {
             // For syntactically invalid targets, we still need to run type inference:
             self.infer_expression(&named.target, TypeContext::default());
-            self.infer_expression(&named.value, TypeContext::default());
+            self.infer_expression(&named.value, tcx);
             Type::unknown()
         }
     }
 
-    fn infer_named_expression_definition(
+    fn infer_named_expression_definition<'a>(
         &mut self,
-        named: &'ast ast::ExprNamed,
+        named: &'a ast::ExprNamed,
         definition: Definition<'db>,
+        tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let ast::ExprNamed {
             range: _,
@@ -6702,8 +6706,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = named;
 
         let add = self.add_binding(named.target.as_ref().into(), definition);
+        let binding_tcx = add.type_context();
+        let value_tcx = if binding_tcx.annotation.is_some() {
+            binding_tcx
+        } else {
+            tcx
+        };
 
-        let ty = self.infer_expression(value, add.type_context());
+        let ty = self.infer_expression(value, value_tcx);
         self.store_expression_type(target, ty);
         add.insert(self, ty)
     }
@@ -9951,14 +9961,14 @@ struct AddBinding<'db, 'ast> {
     is_local: bool,
 }
 
-impl<'db, 'ast> AddBinding<'db, 'ast> {
+impl<'db> AddBinding<'db, '_> {
     fn type_context(&self) -> TypeContext<'db> {
         TypeContext::new(self.declared_ty)
     }
 
-    fn insert(
+    fn insert<'builder>(
         self,
-        builder: &mut TypeInferenceBuilder<'db, 'ast>,
+        builder: &mut TypeInferenceBuilder<'db, 'builder>,
         inferred_ty: Type<'db>,
     ) -> Type<'db> {
         let declared_ty = self.declared_ty.unwrap_or(Type::unknown());

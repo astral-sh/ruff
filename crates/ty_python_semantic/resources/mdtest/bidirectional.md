@@ -37,6 +37,17 @@ def _(l: list[int] | None = None):
     l2: list[int] = l or list()
     reveal_type(l2)  # revealed: list[int]
 
+class TextContent: ...
+class TagContent: ...
+
+def expects_content(content: list[TextContent | TagContent]) -> None: ...
+def named_content() -> None:
+    content: list[TextContent | TagContent] = (bound := [TextContent()])
+    reveal_type(content)  # revealed: list[TextContent | TagContent]
+
+def invalid_named_content() -> None:
+    content: list[TextContent | TagContent] = (bound := [object()])  # error: [invalid-assignment]
+
 def f[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
 
