@@ -61,3 +61,22 @@ _ = lambda *args: f(*args, y=x)
 # https://github.com/astral-sh/ruff/issues/18675
 _ = lambda x: (string := str)(x)
 _ = lambda x: ((x := 1) and str)(x)
+
+# https://github.com/astral-sh/ruff/issues/24704
+# Forward references: the callable is defined after the lambda, so the
+# lambda's late binding is the only thing keeping the code working —
+# inlining would raise `NameError`.
+_ = lambda y: forward(y)
+_ = {"a": lambda y: forward(y)}
+
+
+def forward(y):
+    pass
+
+
+# Backward references in the same module are still safe to inline.
+def already_defined(y):
+    pass
+
+
+_ = lambda y: already_defined(y) # [unnecessary-lambda]

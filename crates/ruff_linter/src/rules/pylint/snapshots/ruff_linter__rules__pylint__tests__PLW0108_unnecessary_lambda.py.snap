@@ -171,6 +171,8 @@ help: Inline function call
    - _ = lambda x: (string := str)(x)
 62 + _ = (string := str)
 63 | _ = lambda x: ((x := 1) and str)(x)
+64 |
+65 | # https://github.com/astral-sh/ruff/issues/24704
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0108 Lambda may be unnecessary; consider inlining inner function
@@ -180,5 +182,21 @@ PLW0108 Lambda may be unnecessary; consider inlining inner function
 62 | _ = lambda x: (string := str)(x)
 63 | _ = lambda x: ((x := 1) and str)(x)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+64 |
+65 | # https://github.com/astral-sh/ruff/issues/24704
    |
 help: Inline function call
+
+PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
+  --> unnecessary_lambda.py:82:5
+   |
+82 | _ = lambda y: already_defined(y) # [unnecessary-lambda]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Inline function call
+79 |     pass
+80 |
+81 |
+   - _ = lambda y: already_defined(y) # [unnecessary-lambda]
+82 + _ = already_defined # [unnecessary-lambda]
+note: This is an unsafe fix and may change runtime behavior

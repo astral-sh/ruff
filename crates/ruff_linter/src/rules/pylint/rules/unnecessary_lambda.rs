@@ -217,6 +217,15 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
             if checker.semantic().is_current_scope(binding.scope) {
                 return;
             }
+            // Forward reference: the lambda body's late binding succeeds at
+            // call time, but inlining would raise `NameError` when the
+            // enclosing expression is evaluated. The binding must start
+            // after the lambda's entire range — bindings nested inside the
+            // call target (e.g. parameters of a lambda passed as an arg)
+            // are part of the replacement expression, not free variables.
+            if binding.range.start() >= lambda.range.end() {
+                return;
+            }
         }
     }
 
