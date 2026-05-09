@@ -701,7 +701,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             ast::Expr::Generator(generator) => {
                 if !self.in_string_annotation() {
-                    self.infer_generator_expression(generator);
+                    self.infer_generator_expression(generator, TypeContext::default());
                 }
                 self.report_invalid_type_expression(
                     expression,

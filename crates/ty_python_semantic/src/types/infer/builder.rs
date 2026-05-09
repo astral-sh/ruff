@@ -759,7 +759,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
             }
             NodeWithScopeKind::GeneratorExpression(generator) => {
-                self.infer_generator_expression_scope(generator.node(self.module()));
+                self.infer_generator_expression_scope(generator.node(self.module()), tcx);
             }
         }
 
@@ -5432,7 +5432,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::List(list) => self.infer_list_expression(list, tcx),
             ast::Expr::Set(set) => self.infer_set_expression(set, tcx),
             ast::Expr::Dict(dict) => self.infer_dict_expression(dict, tcx),
-            ast::Expr::Generator(generator) => self.infer_generator_expression(generator),
+            ast::Expr::Generator(generator) => self.infer_generator_expression(generator, tcx),
             ast::Expr::ListComp(listcomp) => {
                 self.infer_list_comprehension_expression(listcomp, tcx)
             }
@@ -6359,7 +6359,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_generator_expression(&mut self, generator: &ast::ExprGenerator) -> Type<'db> {
+    fn infer_generator_expression(
+        &mut self,
+        generator: &ast::ExprGenerator,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         let ast::ExprGenerator {
             range: _,
             node_index: _,
@@ -6369,6 +6373,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = generator;
 
         let evaluation_mode = self.infer_first_comprehension_iter(generators);
+        let yield_tcx = TypeContext::new(tcx.annotation.and_then(|annotation| {
+            annotation
+                .generator_types(self.db())
+                .and_then(|generator_types| generator_types.yield_ty)
+                .or_else(|| {
+                    if evaluation_mode.is_async() {
+                        return None;
+                    }
+
+                    annotation
+                        .known_specialization(self.db(), KnownClass::Iterable)
+                        .and_then(|specialization| match specialization.types(self.db()) {
+                            [yield_ty] => Some(*yield_ty),
+                            _ => None,
+                        })
+                })
+        }));
 
         let Some(scope_id) = self
             .index
@@ -6377,7 +6398,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.file());
-        let inference = infer_scope_types(self.db(), scope, TypeContext::default());
+        let inference = infer_scope_types(self.db(), scope, yield_tcx);
         let yield_type = inference.expression_type(elt.as_ref());
 
         if evaluation_mode.is_async() {
@@ -6502,7 +6523,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         })
     }
 
-    fn infer_generator_expression_scope(&mut self, generator: &ast::ExprGenerator) {
+    fn infer_generator_expression_scope(
+        &mut self,
+        generator: &ast::ExprGenerator,
+        tcx: TypeContext<'db>,
+    ) {
         let ast::ExprGenerator {
             range: _,
             node_index: _,
@@ -6511,7 +6536,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parenthesized: _,
         } = generator;
 
-        self.infer_expression(elt, TypeContext::default());
+        self.infer_expression(elt, tcx);
         self.infer_comprehensions(generators);
     }
 
