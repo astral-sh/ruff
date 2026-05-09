@@ -70,7 +70,9 @@ use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
     FunctionDecorators, FunctionType, KnownFunction, report_revealed_type,
 };
-use crate::types::generics::{InferableTypeVars, SpecializationBuilder, bind_typevar};
+use crate::types::generics::{
+    GenericContext, InferableTypeVars, SpecializationBuilder, bind_typevar,
+};
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::builder::typed_dict::TypedDictConstructorForm;
@@ -89,14 +91,14 @@ use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
 use crate::types::{
-    CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType, DynamicType,
-    InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder, IntersectionType,
-    KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind, MemberLookupPolicy,
-    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
-    SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType, UnionAccumulator,
-    UnionBuilder, UnionType, binding_type, infer_complete_scope_types, infer_scope_types,
-    todo_type,
+    BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType,
+    DynamicType, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind,
+    MemberLookupPolicy, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature,
+    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType,
+    UnionAccumulator, UnionBuilder, UnionType, binding_type, infer_complete_scope_types,
+    infer_scope_types, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -6359,6 +6361,64 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Derive the type context for a generator expression's yielded element from the expected type
+    /// of the generator expression itself.
+    ///
+    /// We model the generator expression as a synthetic `GeneratorType[T, Any, Any]` or
+    /// `AsyncGeneratorType[T, Any]`, then ask constraint-set assignability to solve for `T` against
+    /// the expected annotation. The solved `T` becomes the type context for the expression being
+    /// yielded, so normal assignability handles protocols and unions like `Iterable[int] | None`
+    /// without adding target-specific special cases here.
+    fn generator_yield_type_context(
+        &self,
+        tcx: TypeContext<'db>,
+        evaluation_mode: EvaluationMode,
+    ) -> TypeContext<'db> {
+        let Some(annotation) = tcx.annotation else {
+            return TypeContext::default();
+        };
+
+        let db = self.db();
+        let yield_typevar = BoundTypeVarInstance::synthetic(
+            db,
+            Name::new_static("_GeneratorYieldT"),
+            TypeVarVariance::Covariant,
+        );
+        let yield_ty = Type::TypeVar(yield_typevar);
+        let generator_ty = if evaluation_mode.is_async() {
+            KnownClass::AsyncGeneratorType.to_specialized_instance(db, &[yield_ty, Type::any()])
+        } else {
+            KnownClass::GeneratorType
+                .to_specialized_instance(db, &[yield_ty, Type::any(), Type::any()])
+        };
+
+        let generic_context = GenericContext::from_typevar_instances(db, [yield_typevar]);
+        let path_bounds = generator_ty.assignable_solutions_with_inferable(
+            db,
+            annotation,
+            generic_context.inferable_typevars(db),
+        );
+        let constraints = ConstraintSetBuilder::new();
+        let Solutions::Constrained(solutions) = path_bounds.solve(db, &constraints) else {
+            return TypeContext::default();
+        };
+
+        let mut yield_tcx: Option<UnionAccumulator<'db>> = None;
+        for solution in solutions {
+            for binding in solution {
+                if binding.bound_typevar != yield_typevar {
+                    continue;
+                }
+                match &mut yield_tcx {
+                    Some(accumulator) => accumulator.add(db, binding.solution),
+                    None => yield_tcx = Some(UnionAccumulator::new(binding.solution)),
+                }
+            }
+        }
+
+        TypeContext::new(yield_tcx.map(|accumulator| accumulator.into_type(db)))
+    }
+
     fn infer_generator_expression(
         &mut self,
         generator: &ast::ExprGenerator,
@@ -6373,23 +6433,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = generator;
 
         let evaluation_mode = self.infer_first_comprehension_iter(generators);
-        let yield_tcx = TypeContext::new(tcx.annotation.and_then(|annotation| {
-            annotation
-                .generator_types(self.db())
-                .and_then(|generator_types| generator_types.yield_ty)
-                .or_else(|| {
-                    if evaluation_mode.is_async() {
-                        return None;
-                    }
-
-                    annotation
-                        .known_specialization(self.db(), KnownClass::Iterable)
-                        .and_then(|specialization| match specialization.types(self.db()) {
-                            [yield_ty] => Some(*yield_ty),
-                            _ => None,
-                        })
-                })
-        }));
+        let yield_tcx = self.generator_yield_type_context(tcx, evaluation_mode);
 
         let Some(scope_id) = self
             .index
@@ -6399,6 +6443,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let scope = scope_id.to_scope_id(self.db(), self.file());
         let inference = infer_scope_types(self.db(), scope, yield_tcx);
+        self.extend_scope(inference);
         let yield_type = inference.expression_type(elt.as_ref());
 
         if evaluation_mode.is_async() {
