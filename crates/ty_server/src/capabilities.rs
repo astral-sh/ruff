@@ -264,7 +264,8 @@ impl ResolvedClientCapabilities {
                         .as_ref()?
                         .content_format
                         .as_ref()?
-                        .contains(&MarkupKind::Markdown),
+                        .first()
+                        == Some(&MarkupKind::Markdown),
                 )
             })
             .unwrap_or_default()
@@ -282,7 +283,8 @@ impl ResolvedClientCapabilities {
                         .as_ref()?
                         .documentation_format
                         .as_ref()?
-                        .contains(&MarkupKind::Markdown),
+                        .first()
+                        == Some(&MarkupKind::Markdown),
                 )
             })
             .unwrap_or_default()

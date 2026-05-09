@@ -32,6 +32,7 @@ mod commands;
 mod completions;
 mod configuration;
 mod folding_range;
+mod hover;
 mod initialize;
 mod inlay_hints;
 mod notebook;
@@ -1329,6 +1330,19 @@ impl TestServerBuilder {
             .semantic_tokens
             .get_or_insert_default()
             .multiline_token_support = Some(enabled);
+        self
+    }
+
+    /// Set the hover content format preference for the client.
+    ///
+    /// The formats are ordered by preference, with the first being the most preferred.
+    pub(crate) fn with_hover_content_format(mut self, formats: Vec<lsp_types::MarkupKind>) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .hover
+            .get_or_insert_default()
+            .content_format = Some(formats);
         self
     }
 
