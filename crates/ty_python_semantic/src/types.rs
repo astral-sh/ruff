@@ -35,7 +35,7 @@ pub use self::known_instance::KnownInstanceType;
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
 pub(crate) use self::set_theoretic::builder::{
-    IntersectionBuilder, UnionAccumulator, UnionBuilder,
+    IntersectionBuilder, UnionAccumulator, UnionBuilder, UnionSimplification,
 };
 pub use self::set_theoretic::{
     IntersectionType, NegativeIntersectionElements, NegativeIntersectionElementsIterator, UnionType,
@@ -251,23 +251,31 @@ type MaterializationEquivalenceVisitor<'db> =
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
     struct TypeMappingFlags: u8 {
-        /// Union rebuilding during this mapping may ask the type-relation layer for redundancy
-        /// and subtype checks.
-        const RELATION_BASED_UNION_SIMPLIFICATION = 1 << 0;
+        /// Union rebuilding during this mapping may ask the type-relation layer for redundancy and
+        /// subtype checks.
+        const SIMPLIFY_UNIONS_WITH_TYPE_RELATIONS = 1 << 0;
     }
 }
 
 impl TypeMappingFlags {
     fn for_protocol_interface() -> Self {
         let mut flags = Self::default();
-        flags.remove(Self::RELATION_BASED_UNION_SIMPLIFICATION);
+        flags.remove(Self::SIMPLIFY_UNIONS_WITH_TYPE_RELATIONS);
         flags
+    }
+
+    const fn union_simplification(self) -> UnionSimplification {
+        if self.contains(Self::SIMPLIFY_UNIONS_WITH_TYPE_RELATIONS) {
+            UnionSimplification::TypeRelations
+        } else {
+            UnionSimplification::Structural
+        }
     }
 }
 
 impl Default for TypeMappingFlags {
     fn default() -> Self {
-        Self::RELATION_BASED_UNION_SIMPLIFICATION
+        Self::SIMPLIFY_UNIONS_WITH_TYPE_RELATIONS
     }
 }
 
@@ -5853,11 +5861,9 @@ impl<'db> Type<'db> {
                 Type::PropertyInstance(property.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
 
-            Type::Union(union) => union.map_leave_aliases_with_relation_based_simplification(
+            Type::Union(union) => union.map_leave_aliases_with_simplification(
                 db,
-                visitor
-                    .flags()
-                    .contains(TypeMappingFlags::RELATION_BASED_UNION_SIMPLIFICATION),
+                visitor.flags().union_simplification(),
                 |element| element.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             ),
             Type::Intersection(intersection) => {

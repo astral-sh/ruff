@@ -45,7 +45,6 @@ use crate::types::{
     TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
-use bitflags::bitflags;
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
@@ -220,64 +219,43 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
     false
 }
 
-fn is_generic_protocol_instance<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    if !matches!(ty, Type::ProtocolInstance(_)) {
-        return false;
-    }
-
-    ty.nominal_class(db)
-        .and_then(|class| class.static_class_literal(db))
-        .is_some_and(|(_, specialization)| specialization.is_some())
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UnionSimplification {
+    /// Normalize using only structural operations that cannot call back into the type-relation
+    /// layer.
+    Structural,
+    /// Normalize using type-relation checks such as redundancy and subtyping.
+    TypeRelations,
 }
 
-bitflags! {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    struct UnionBuilderFlags: u8 {
-        /// Union normalization may ask the type-relation layer for redundancy and subtype checks.
-        const RELATION_BASED_SIMPLIFICATION = 1 << 0;
-    }
-}
-
-impl Default for UnionBuilderFlags {
+impl Default for UnionSimplification {
     fn default() -> Self {
-        Self::RELATION_BASED_SIMPLIFICATION
+        Self::TypeRelations
     }
 }
 
-/// Return `true` if union normalization may ask the relation layer about this pair.
-///
-/// Generic protocol interface construction can recurse through ever-growing specializations
-/// when a generic protocol is one side of the relation. Non-generic protocol cycles are
-/// handled by Salsa cycle recovery, and protocol-interface construction disables relation-based
-/// union simplification before nested generic protocols can force ever-growing interfaces.
-fn can_use_relation_based_simplification<'db>(
-    db: &'db dyn Db,
-    flags: UnionBuilderFlags,
-    left: Type<'db>,
-    right: Type<'db>,
-) -> bool {
-    flags.contains(UnionBuilderFlags::RELATION_BASED_SIMPLIFICATION)
-        && !is_generic_protocol_instance(db, left)
-        && !is_generic_protocol_instance(db, right)
+impl UnionSimplification {
+    const fn uses_type_relations(self) -> bool {
+        matches!(self, Self::TypeRelations)
+    }
 }
 
 fn is_redundant_for_union_simplification<'db>(
     db: &'db dyn Db,
-    flags: UnionBuilderFlags,
+    simplification: UnionSimplification,
     left: Type<'db>,
     right: Type<'db>,
 ) -> bool {
-    can_use_relation_based_simplification(db, flags, left, right)
-        && left.is_redundant_with(db, right)
+    simplification.uses_type_relations() && left.is_redundant_with(db, right)
 }
 
 fn is_subtype_for_union_simplification<'db>(
     db: &'db dyn Db,
-    flags: UnionBuilderFlags,
+    simplification: UnionSimplification,
     left: Type<'db>,
     right: Type<'db>,
 ) -> bool {
-    can_use_relation_based_simplification(db, flags, left, right) && left.is_subtype_of(db, right)
+    simplification.uses_type_relations() && left.is_subtype_of(db, right)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -366,7 +344,7 @@ impl<'db> UnionElement<'db> {
     fn try_reduce(
         &mut self,
         db: &'db dyn Db,
-        flags: UnionBuilderFlags,
+        simplification: UnionSimplification,
         other_type: Type<'db>,
     ) -> ReduceResult<'db> {
         let mut other_type_negated_cache = None;
@@ -376,8 +354,9 @@ impl<'db> UnionElement<'db> {
         let mut collapse = false;
         let mut ignore = false;
         let is_redundant =
-            |left, right| is_redundant_for_union_simplification(db, flags, left, right);
-        let is_subtype = |left, right| is_subtype_for_union_simplification(db, flags, left, right);
+            |left, right| is_redundant_for_union_simplification(db, simplification, left, right);
+        let is_subtype =
+            |left, right| is_subtype_for_union_simplification(db, simplification, left, right);
 
         // A closure called for each element in a set of literals
         // to determine whether the element should be retained in the set.
@@ -504,7 +483,7 @@ const MAX_NON_RECURSIVE_UNION_ENUM_LITERALS: usize = 8192;
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
-    flags: UnionBuilderFlags,
+    simplification: UnionSimplification,
     unpack_aliases: bool,
     /// This is enabled when joining types in a `cycle_recovery` function.
     /// Since a cycle cannot be created within a `cycle_recovery` function,
@@ -574,7 +553,7 @@ impl<'db> UnionBuilder<'db> {
         Self {
             db,
             elements: vec![],
-            flags: UnionBuilderFlags::default(),
+            simplification: UnionSimplification::default(),
             unpack_aliases: true,
             cycle_recovery: false,
             recursively_defined: RecursivelyDefined::No,
@@ -590,15 +569,13 @@ impl<'db> UnionBuilder<'db> {
         self.cycle_recovery = val;
         if self.cycle_recovery {
             self.unpack_aliases = false;
-            self.flags
-                .remove(UnionBuilderFlags::RELATION_BASED_SIMPLIFICATION);
+            self.simplification = UnionSimplification::Structural;
         }
         self
     }
 
-    pub(crate) fn relation_based_simplification(mut self, val: bool) -> Self {
-        self.flags
-            .set(UnionBuilderFlags::RELATION_BASED_SIMPLIFICATION, val);
+    pub(crate) fn simplification(mut self, simplification: UnionSimplification) -> Self {
+        self.simplification = simplification;
         self
     }
 
@@ -664,12 +641,13 @@ impl<'db> UnionBuilder<'db> {
         };
 
         let db = self.db;
-        let flags = self.flags;
+        let simplification = self.simplification;
         let mut ty_negated_cache = None;
         let mut ty_negated = || *ty_negated_cache.get_or_insert_with(|| ty.negate(db));
         let is_redundant =
-            |left, right| is_redundant_for_union_simplification(db, flags, left, right);
-        let is_subtype = |left, right| is_subtype_for_union_simplification(db, flags, left, right);
+            |left, right| is_redundant_for_union_simplification(db, simplification, left, right);
+        let is_subtype =
+            |left, right| is_subtype_for_union_simplification(db, simplification, left, right);
 
         match ty {
             Type::Union(union) => {
@@ -982,16 +960,17 @@ impl<'db> UnionBuilder<'db> {
         // unpacking them.
         let should_simplify_full = !matches!(ty, Type::TypeAlias(_)) && !self.cycle_recovery;
         let db = self.db;
-        let flags = self.flags;
+        let simplification = self.simplification;
         let is_redundant =
-            |left, right| is_redundant_for_union_simplification(db, flags, left, right);
-        let is_subtype = |left, right| is_subtype_for_union_simplification(db, flags, left, right);
+            |left, right| is_redundant_for_union_simplification(db, simplification, left, right);
+        let is_subtype =
+            |left, right| is_subtype_for_union_simplification(db, simplification, left, right);
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
 
         for (i, element) in self.elements.iter_mut().enumerate() {
-            let element_type = match element.try_reduce(self.db, self.flags, ty) {
+            let element_type = match element.try_reduce(self.db, self.simplification, ty) {
                 ReduceResult::KeepIf(keep) => {
                     if !keep {
                         to_remove.push(i);

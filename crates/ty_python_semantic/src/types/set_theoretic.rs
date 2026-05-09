@@ -13,7 +13,7 @@ use crate::{Db, FxOrderSet};
 
 pub(crate) mod builder;
 
-pub(crate) use builder::{IntersectionBuilder, UnionBuilder};
+pub(crate) use builder::{IntersectionBuilder, UnionBuilder, UnionSimplification};
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct UnionType<'db> {
@@ -143,21 +143,22 @@ impl<'db> UnionType<'db> {
         db: &'db dyn Db,
         mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        self.map_leave_aliases_with_relation_based_simplification(db, true, |element| {
-            transform_fn(element)
-        })
+        self.map_leave_aliases_with_simplification(
+            db,
+            UnionSimplification::TypeRelations,
+            |element| transform_fn(element),
+        )
     }
 
-    pub(crate) fn map_leave_aliases_with_relation_based_simplification(
+    pub(crate) fn map_leave_aliases_with_simplification(
         self,
         db: &'db dyn Db,
-        relation_based_simplification: bool,
+        simplification: UnionSimplification,
         mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        let Ok(mapped) =
-            self.try_map_leave_aliases_impl(db, relation_based_simplification, |element| {
-                Ok::<_, Infallible>(transform_fn(element))
-            });
+        let Ok(mapped) = self.try_map_leave_aliases_impl(db, simplification, |element| {
+            Ok::<_, Infallible>(transform_fn(element))
+        });
         mapped
     }
 
@@ -207,7 +208,7 @@ impl<'db> UnionType<'db> {
     fn try_map_leave_aliases_impl<E>(
         self,
         db: &'db dyn Db,
-        relation_based_simplification: bool,
+        simplification: UnionSimplification,
         mut transform_fn: impl FnMut(&Type<'db>) -> Result<Type<'db>, E>,
     ) -> Result<Type<'db>, E> {
         let elements = self.elements(db);
@@ -218,7 +219,7 @@ impl<'db> UnionType<'db> {
                 let mut builder = elements[..i].iter().copied().fold(
                     UnionBuilder::new(db)
                         .unpack_aliases(false)
-                        .relation_based_simplification(relation_based_simplification),
+                        .simplification(simplification),
                     UnionBuilder::add,
                 );
                 builder = builder.add(new_ty);
