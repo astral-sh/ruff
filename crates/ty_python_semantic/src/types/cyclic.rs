@@ -203,6 +203,15 @@ impl<T> Default for ActiveRecursionDetector<T> {
 }
 
 impl<T: Hash + Eq + Clone> ActiveRecursionDetector<T> {
+    pub(crate) fn visit<R>(
+        &self,
+        item: &T,
+        on_cycle: impl FnOnce() -> R,
+        func: impl FnOnce() -> R,
+    ) -> R {
+        self.visit_or_else(item.clone(), FxHashSet::contains, |_| on_cycle(), func)
+    }
+
     pub(crate) fn visit_or_else<R>(
         &self,
         item: T,
@@ -235,11 +244,11 @@ impl<T: Hash + Eq + Clone> ActiveRecursionDetector<T> {
 
 struct ActiveRecursionGuard<'a, T: Hash + Eq> {
     seen: &'a RefCell<FxHashSet<T>>,
-    item: &'a T,
+    item: T,
 }
 
 impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
     fn drop(&mut self) {
-        self.seen.borrow_mut().remove(self.item);
+        self.seen.borrow_mut().remove(&self.item);
     }
 }
