@@ -88,6 +88,11 @@ impl<'db> CallArgumentTypes<'db> {
             .unwrap_or(Type::unknown())
     }
 
+    /// Returns the type inferred specifically for the provided declared type, if any.
+    pub(crate) fn get_inferred_for_declared_type(&self, tcx: Type<'db>) -> Option<Type<'db>> {
+        self.types.get(&tcx).copied()
+    }
+
     /// Insert the type of this argument when inferred with the provided type context.
     pub(crate) fn insert(&mut self, tcx: impl Into<TypeContext<'db>>, ty: Type<'db>) {
         match tcx.into().annotation {

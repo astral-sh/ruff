@@ -198,6 +198,31 @@ pub(super) fn functional_typed_dict_field(
         .build()
 }
 
+/// Return a synthesized required `TypedDict` for a finite set of keyword fields.
+pub(crate) fn synthesized_typed_dict_type_from_fields<'db>(
+    db: &'db dyn Db,
+    fields: impl IntoIterator<Item = (Name, Type<'db>)>,
+    openness: TypedDictOpenness<'db>,
+) -> Option<Type<'db>> {
+    let schema = fields
+        .into_iter()
+        .map(|(name, ty)| {
+            (
+                name,
+                functional_typed_dict_field(ty, TypeQualifiers::empty(), true),
+            )
+        })
+        .collect::<TypedDictSchema<'db>>();
+
+    if schema.is_empty() {
+        None
+    } else {
+        Some(Type::TypedDict(
+            TypedDictType::from_schema_items_with_openness(db, schema, openness),
+        ))
+    }
+}
+
 /// Type that represents the set of all inhabitants (`dict` instances) that conform to
 /// a given `TypedDict` schema.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash, get_size2::GetSize)]

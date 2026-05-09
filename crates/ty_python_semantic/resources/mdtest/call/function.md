@@ -1797,3 +1797,94 @@ def _(args_tuple: tuple[int, int], args_union: tuple[int] | tuple[int, int], kwa
     f(*args_tuple, **kwargs)  # fine
     f(*args_union, **kwargs)  # fine
 ```
+
+## Dictionary-backed keyword splats
+
+A known dictionary field is inferred using the type of the keyword parameter with the same name.
+This also applies when the function has other optional keyword parameters:
+
+```py
+from collections.abc import Mapping
+from enum import Enum
+from typing import Any
+
+class Header(str, Enum):
+    REQUEST_ID = "x-request-id"
+
+def with_headers(*, extra_headers: Mapping[str, str] | None = None) -> None: ...
+def invalid_headers() -> None:
+    kwargs: dict[str, Any] = {
+        "extra_headers": {Header.REQUEST_ID: 1},
+    }
+    with_headers(**kwargs)  # error: [invalid-argument-type]
+
+def with_optional_headers(*, extra_headers: Mapping[str, str] | None = None, other: str = "") -> None: ...
+def invalid_headers_with_optional() -> None:
+    kwargs: dict[str, Any] = {
+        "extra_headers": {Header.REQUEST_ID: 1},
+    }
+    with_optional_headers(**kwargs)  # error: [invalid-argument-type]
+```
+
+Contextual inference does not suppress errors for mappings whose keys may not be strings:
+
+```py
+from typing import Any
+
+def takes_x(*, x: int) -> None: ...
+def invalid_key_type() -> None:
+    kwargs: dict[int | str, Any] = {"x": 1, 1: 2}
+    takes_x(**kwargs)  # error: [invalid-argument-type]
+```
+
+Each overload keeps its own keyword context. A non-matching overload must not widen the context used
+to infer a dictionary field for the matching overload:
+
+```py
+from typing import Any, overload
+
+@overload
+def overloaded_context(a: int, *, x: list[int]) -> int: ...
+@overload
+def overloaded_context(a: str, *, x: list[Any]) -> str: ...
+def overloaded_context(a: object, **kwargs: object) -> object: ...
+def invalid_overload_context() -> None:
+    kwargs: dict[str, object] = {"x": ["s"]}
+    overloaded_context(1, **kwargs)  # error: [no-matching-overload]
+```
+
+Context from an overload can flow into nested literals and select the matching return type:
+
+```py
+from typing import Any, Literal, TypedDict, overload
+
+class InputMessage(TypedDict):
+    role: Literal["user"]
+    content: str
+
+@overload
+def create(*, input: list[InputMessage]) -> int: ...
+@overload
+def create(*, input: str) -> str: ...
+def create(**kwargs: Any) -> object: ...
+def ok(content: str) -> None:
+    kwargs: dict[str, Any] = {
+        "input": [{"role": "user", "content": content}],
+    }
+    reveal_type(create(**kwargs))  # revealed: int
+```
+
+Known dictionary fields are matched to parameters by name, not by iteration order:
+
+```py
+from typing import Any
+
+def out_of_order(*, second: str, first: int, third: bool) -> None: ...
+def ok_out_of_order() -> None:
+    kwargs: dict[str, Any] = {
+        "first": 1,
+        "second": "s",
+        "third": True,
+    }
+    out_of_order(**kwargs)
+```
