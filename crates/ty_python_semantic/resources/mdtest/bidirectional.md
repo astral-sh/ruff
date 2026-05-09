@@ -37,6 +37,16 @@ def _(l: list[int] | None = None):
     l2: list[int] = l or list()
     reveal_type(l2)  # revealed: list[int]
 
+class TextContent: ...
+class TagContent: ...
+
+def expects_content(content: list[TextContent | TagContent]) -> None: ...
+def optional_content(content: list[TextContent | TagContent] | None) -> None:
+    expects_content(content or [TextContent()])
+
+def invalid_fallback(content: list[TextContent | TagContent] | None) -> None:
+    expects_content(content or [object()])  # error: [invalid-argument-type]
+
 def f[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
 

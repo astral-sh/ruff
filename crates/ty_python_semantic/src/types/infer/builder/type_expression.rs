@@ -529,7 +529,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             ast::Expr::BoolOp(bool_op) => {
                 if !self.in_string_annotation() {
-                    self.infer_boolean_expression(bool_op);
+                    self.infer_boolean_expression(bool_op, TypeContext::default());
                 }
                 self.report_invalid_type_expression(
                     expression,

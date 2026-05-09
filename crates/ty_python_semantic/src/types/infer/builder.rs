@@ -5444,7 +5444,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::Attribute(attribute) => self.infer_attribute_expression(attribute),
             ast::Expr::UnaryOp(unary_op) => self.infer_unary_expression(unary_op),
             ast::Expr::BinOp(binary) => self.infer_binary_expression(binary, tcx),
-            ast::Expr::BoolOp(bool_op) => self.infer_boolean_expression(bool_op),
+            ast::Expr::BoolOp(bool_op) => self.infer_boolean_expression(bool_op, tcx),
             ast::Expr::Compare(compare) => self.infer_compare_expression(compare),
             ast::Expr::Subscript(subscript) => self.infer_subscript_expression(subscript),
             ast::Expr::Slice(slice) => self.infer_slice_expression(slice),
@@ -8913,7 +8913,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_boolean_expression(&mut self, bool_op: &ast::ExprBoolOp) -> Type<'db> {
+    fn infer_boolean_expression(
+        &mut self,
+        bool_op: &ast::ExprBoolOp,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         let ast::ExprBoolOp {
             range: _,
             node_index: _,
@@ -8925,9 +8929,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             values.iter().enumerate(),
             |builder, (index, value)| {
                 let ty = if index == values.len() - 1 {
-                    builder.infer_expression(value, TypeContext::default())
+                    builder.infer_expression(value, tcx)
                 } else {
-                    builder.infer_maybe_standalone_expression(value, TypeContext::default())
+                    builder.infer_maybe_standalone_expression(value, tcx)
                 };
 
                 (ty, value.range())
