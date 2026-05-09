@@ -93,7 +93,10 @@ use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
-use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
+use crate::types::typed_dict::{
+    TypedDictAssignmentKind, TypedDictKeyAssignment, TypedDictOpenness,
+    synthesized_typed_dict_type_from_fields,
+};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
 use crate::types::{
     BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType,
@@ -5694,14 +5697,70 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         for (argument_index, ast_argument) in ast_arguments.enumerate() {
-            // Splatted arguments are inferred before parameter matching to
-            // determine their length.
-            //
-            // TODO: Re-infer splatted arguments with their type context.
-            if ast_argument.is_variadic() {
-                continue;
-            }
-            let ast_argument = ast_argument.value();
+            let ast_argument = match ast_argument {
+                // Splatted arguments are inferred before parameter matching to
+                // determine their length.
+                //
+                // TODO: Re-infer starred positional arguments with their type context.
+                ast::ArgOrKeyword::Arg(ast::Expr::Starred(_)) => continue,
+
+                ast::ArgOrKeyword::Keyword(
+                    keyword @ ast::Keyword {
+                        arg: None, value, ..
+                    },
+                ) => {
+                    // Keep `**kwargs` contexts per overload; losing overloads must not widen the
+                    // fields used by viable overloads.
+                    let mut seen = FxHashSet::default();
+                    let argument_type = self.expression_type(value);
+                    let teardown = self.setup_expression_cache();
+
+                    for (overload, binding) in &overloads_with_binding {
+                        let adjusted_argument_index = if binding.bound_type.is_some() {
+                            argument_index + 1
+                        } else {
+                            argument_index
+                        };
+                        let Some(argument_matches) =
+                            overload.argument_matches().get(adjusted_argument_index)
+                        else {
+                            continue;
+                        };
+
+                        let expected_fields: FxHashMap<_, _> = argument_matches
+                            .keyword_parameter_types(overload.signature.parameters())
+                            .collect();
+
+                        let Some(context_ty) = synthesized_typed_dict_type_from_fields(
+                            db,
+                            expected_fields.iter().map(|(name, ty)| (name.clone(), *ty)),
+                            TypedDictOpenness::Closed,
+                        ) else {
+                            continue;
+                        };
+                        if !seen.insert(context_ty) {
+                            continue;
+                        }
+
+                        if let Some(ty) = self.speculate().try_narrow_dict_kwargs(
+                            argument_type,
+                            keyword,
+                            Some(&expected_fields),
+                        ) {
+                            arguments_types.insert_type(argument_index, context_ty, ty);
+                        }
+                    }
+
+                    if teardown {
+                        self.teardown_expression_cache();
+                    }
+
+                    continue;
+                }
+
+                ast::ArgOrKeyword::Arg(argument) => argument,
+                ast::ArgOrKeyword::Keyword(keyword) => &keyword.value,
+            };
 
             let parameter_tcx = |overload: &'bindings Binding<'db>,
                                  binding: &CallableBinding<'db>| {
@@ -7933,46 +7992,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ))
     }
 
-    /// Attempt to narrow a splatted dictionary argument based on the narrowed types of individual
-    /// keys, if any.
+    /// Attempt to narrow a `**kwargs` dictionary using known string-literal fields.
     ///
-    /// Returns the intersection between the dictionary type and a synthesized typed dict of any narrowed
-    /// keys, or `None` otherwise.
+    /// When `expected_fields` is present, fresh dictionary literal fields can be inferred with
+    /// matched keyword parameter types.
     fn try_narrow_dict_kwargs(
-        &self,
+        &mut self,
         argument_type: Type<'db>,
-        argument: &'ast ast::ArgOrKeyword,
+        keyword: &ast::Keyword,
+        expected_fields: Option<&FxHashMap<Name, Type<'db>>>,
     ) -> Option<Type<'db>> {
         let db = self.db();
         let file_scope_id = self.scope().file_scope_id(db);
         let use_def = self.index.use_def_map(file_scope_id);
 
-        let keyword = argument.as_variadic()?;
-
-        if !argument_type
-            .as_nominal_instance()?
-            .has_known_class(db, KnownClass::Dict)
-        {
+        let dict_instance = argument_type.as_nominal_instance()?;
+        if !dict_instance.has_known_class(db, KnownClass::Dict) {
             return None;
         }
-
-        let definition_key = |definition: Definition<'_>| {
-            let key = match definition.kind(db) {
-                DefinitionKind::DictKeyAssignment(assignment) => assignment.key(self.module()),
-                DefinitionKind::Assignment(assignment) => {
-                    &assignment.target(self.module()).as_subscript_expr()?.slice
-                }
-                DefinitionKind::AnnotatedAssignment(assignment) => {
-                    &assignment.target(self.module()).as_subscript_expr()?.slice
-                }
-                _ => return None,
-            };
-
-            Some(key.as_string_literal_expr()?.value.to_str())
-        };
+        let (key_ty, value_ty) = argument_type.unpack_keys_and_items(db)?;
 
         // Collect the types of each distinct key.
-        let mut elements: Vec<(&str, Type<'db>)> = Vec::new();
+        let mut elements: Vec<(Name, Type<'db>)> = Vec::new();
 
         for bindings in use_def.multi_bindings_at_use(keyword.scoped_use_id(db, self.file())) {
             let place = place_from_bindings_with_reachability_cache(
@@ -7980,22 +8021,59 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 bindings.clone(),
                 &self.reachability_cache,
             );
-            let Some(key) = place.first_definition.and_then(definition_key) else {
+            let Some(first_definition) = place.first_definition else {
                 continue;
             };
+            let Some(key) = self.kwargs_definition_key(first_definition) else {
+                continue;
+            };
+            let contextual_ty = expected_fields.and_then(|expected_fields| {
+                bindings
+                    .filter_map(|binding| binding.binding.definition())
+                    .exactly_one()
+                    .ok()
+                    .and_then(|definition| {
+                        self.contextualized_kwargs_field_type(definition, &key, expected_fields)
+                    })
+            });
 
             if let Place::Defined(DefinedPlace {
-                ty: field_ty,
+                ty,
                 definedness: Definedness::AlwaysDefined,
                 ..
             }) = place.place
             {
+                let field_ty = contextual_ty.unwrap_or(ty);
                 elements.push((key, field_ty));
             }
         }
 
         if elements.is_empty() {
             return None;
+        }
+
+        let has_valid_keyword_keys = key_ty
+            .when_assignable_to(
+                db,
+                KnownClass::Str.to_instance(db),
+                &ConstraintSetBuilder::new(),
+                InferableTypeVars::None,
+            )
+            .is_always_satisfied(db);
+
+        if has_valid_keyword_keys && expected_fields.is_some() {
+            let openness = if value_ty.is_dynamic() {
+                TypedDictOpenness::Closed
+            } else {
+                TypedDictOpenness::extra(db, value_ty, false)
+            };
+            let typed_dict =
+                synthesized_typed_dict_type_from_fields(db, elements.iter().cloned(), openness)?;
+
+            return Some(IntersectionType::from_elements(
+                db,
+                [argument_type, typed_dict],
+            ));
         }
 
         // Synthesize overloads for `__getitem__` based on known dictionary elements.
@@ -8006,7 +8084,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     [
                         Parameter::positional_only(Some(Name::new_static("self"))),
                         Parameter::positional_or_keyword(Name::new_static("key"))
-                            .with_annotated_type(Type::string_literal(db, name)),
+                            .with_annotated_type(Type::string_literal(db, name.as_str())),
                     ],
                 ),
                 ty,
@@ -8034,6 +8112,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ))
     }
 
+    /// Extract the statically known string key for a `**kwargs` dictionary field definition.
+    fn kwargs_definition_key(&self, definition: Definition<'db>) -> Option<Name> {
+        let key = match definition.kind(self.db()) {
+            DefinitionKind::DictKeyAssignment(assignment) => assignment.key(self.module()),
+            DefinitionKind::Assignment(assignment) => {
+                &assignment.target(self.module()).as_subscript_expr()?.slice
+            }
+            DefinitionKind::AnnotatedAssignment(assignment) => {
+                &assignment.target(self.module()).as_subscript_expr()?.slice
+            }
+            _ => return None,
+        };
+
+        Some(Name::new(key.as_string_literal_expr()?.value.to_str()))
+    }
+
+    /// Re-infer a fresh dictionary literal field with its matched keyword parameter type.
+    fn contextualized_kwargs_field_type(
+        &mut self,
+        definition: Definition<'db>,
+        key: &Name,
+        expected_fields: &FxHashMap<Name, Type<'db>>,
+    ) -> Option<Type<'db>> {
+        let expected_ty = expected_fields.get(key).copied()?;
+        let DefinitionKind::DictKeyAssignment(assignment) = definition.kind(self.db()) else {
+            return None;
+        };
+        let value = assignment.value(self.module());
+
+        Some(self.infer_maybe_standalone_expression(value, TypeContext::new(Some(expected_ty))))
+    }
+
     /// Infer the variadic argument types needed for call binding and emit the shared diagnostics
     /// for invalid `*args` and `**kwargs` inputs.
     fn prepare_call_arguments<'a>(
@@ -8047,7 +8157,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     && argument.is_starred_expr()
                 {
                     self.store_expression_type(argument, ty);
-                } else if let Some(ty) = self.try_narrow_dict_kwargs(ty, arg_or_keyword) {
+                } else if let ast::ArgOrKeyword::Keyword(keyword) = arg_or_keyword
+                    && keyword.arg.is_none()
+                    && let Some(ty) = self.try_narrow_dict_kwargs(ty, keyword, None)
+                {
                     return ty;
                 }
 
