@@ -6364,8 +6364,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Derive the type context for a generator expression's yielded element from the expected type
     /// of the generator expression itself.
     ///
-    /// We model the generator expression as a synthetic `GeneratorType[T, Any, Any]` or
-    /// `AsyncGeneratorType[T, Any]`, then ask constraint-set assignability to solve for `T` against
+    /// We model the generator expression as a synthetic `GeneratorType[T, None, None]` or
+    /// `AsyncGeneratorType[T, None]`, then ask constraint-set assignability to solve for `T` against
     /// the expected annotation. The solved `T` becomes the type context for the expression being
     /// yielded, so normal assignability handles protocols and unions like `Iterable[int] | None`
     /// without adding target-specific special cases here.
@@ -6385,11 +6385,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             TypeVarVariance::Covariant,
         );
         let yield_ty = Type::TypeVar(yield_typevar);
+        let none = Type::none(db);
         let generator_ty = if evaluation_mode.is_async() {
-            KnownClass::AsyncGeneratorType.to_specialized_instance(db, &[yield_ty, Type::any()])
+            KnownClass::AsyncGeneratorType.to_specialized_instance(db, &[yield_ty, none])
         } else {
-            KnownClass::GeneratorType
-                .to_specialized_instance(db, &[yield_ty, Type::any(), Type::any()])
+            KnownClass::GeneratorType.to_specialized_instance(db, &[yield_ty, none, none])
         };
 
         let generic_context = GenericContext::from_typevar_instances(db, [yield_typevar]);
