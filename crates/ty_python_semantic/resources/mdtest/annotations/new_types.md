@@ -126,6 +126,17 @@ def g(_: Callable[[str], Foo]): ...
 g(Foo)  # error: [invalid-argument-type]
 ```
 
+## `NewType` pseudo-classes participate in PEP 604 unions
+
+```py
+from typing import NewType
+
+Foo = NewType("Foo", int)
+
+reveal_type(Foo | str)  # revealed: <types.UnionType special-form 'Foo | str'>
+reveal_type(str | Foo)  # revealed: <types.UnionType special-form 'str | Foo'>
+```
+
 ## `NewType` instances are `Callable` if the base type is
 
 ```py
