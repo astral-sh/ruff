@@ -48,7 +48,6 @@ pub struct GlobalConfigArgs {
     /// Overrides of individual settings using this option always take precedence
     /// over all configuration files, including configuration files that were also
     /// specified using `--config`.
-
     #[arg(
         long,
         action = clap::ArgAction::Append,
