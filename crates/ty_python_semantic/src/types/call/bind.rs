@@ -1623,13 +1623,24 @@ impl<'db> Bindings<'db> {
                             })
                         };
 
+                        let get_call_argument_type = |name| -> Option<Type<'db>> {
+                            call_arguments.iter().find_map(|(arg, types)| {
+                                if matches!(arg, Argument::Keyword(arg_name) if arg_name == name) {
+                                    types.get_default()
+                                } else {
+                                    None
+                                }
+                            })
+                        };
+
                         let has_default_value = get_argument_type("default", false).is_some()
                             || get_argument_type("default_factory", false).is_some()
                             || get_argument_type("factory", false).is_some();
 
                         let init = get_argument_type("init", true);
                         let kw_only = get_argument_type("kw_only", true);
-                        let alias = get_argument_type("alias", true);
+                        let alias = get_call_argument_type("alias")
+                            .or_else(|| get_argument_type("alias", true));
                         let converter = get_argument_type("converter", true);
 
                         // `dataclasses.field` and field-specifier functions of commonly used

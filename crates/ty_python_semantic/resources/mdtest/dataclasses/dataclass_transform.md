@@ -1177,6 +1177,35 @@ class Person:
 reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
 ```
 
+### With overloaded field specifiers that also accept `**kwargs`
+
+Literal alias metadata should still be preserved when an overloaded field specifier accepts
+additional keyword arguments.
+
+```py
+from typing import overload
+from typing_extensions import Any, dataclass_transform
+
+@overload
+def fancy_field(*, alias: str | None = None, **kwargs: Any) -> Any: ...
+@overload
+def fancy_field(default: object, *, alias: str | None = None, **kwargs: Any) -> Any: ...
+def fancy_field(default: object = ..., *, alias: str | None = None, **kwargs: Any) -> Any: ...
+
+@dataclass_transform(field_specifiers=(fancy_field,))
+class FancyBase: ...
+
+class Person(FancyBase):
+    internal_name: str | None = fancy_field(default=None, alias="name")
+
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str | None = ...) -> None
+
+Person(name="Alice")
+
+# error: [unknown-argument] "Argument `internal_name` does not match any known parameter"
+Person(internal_name="Alice")
+```
+
 ### Converter field specifier with overloaded callables
 
 ```py
