@@ -51,3 +51,28 @@ def _(one_two: OneTwo, x: IntTuple, y: StrTuple, three_four: ThreeFour):
     reveal_type(one_two + x + three_four)  # revealed: tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[3], Literal[4]]
     reveal_type(one_two + y + three_four + x)  # revealed: tuple[Literal[1], Literal[2], *tuple[int | str, ...]]
 ```
+
+## Conditional tuple concatenation
+
+```py
+def flag() -> bool:
+    return True
+
+t = ()
+if flag():
+    t += (1,)
+if flag():
+    t += (2,)
+if flag():
+    t += (3,)
+if flag():
+    t += (4,)
+if flag():
+    t += (5,)
+if flag():
+    t += (6,)
+if flag():
+    t += (7,)
+
+reveal_type(t)  # revealed: tuple[Literal[1, 2, 3, 4, 5, 6, 7], ...]
+```
