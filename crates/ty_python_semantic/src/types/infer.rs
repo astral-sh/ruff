@@ -56,7 +56,6 @@ use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
-    declaration_type,
 };
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
@@ -664,11 +663,24 @@ pub(crate) fn nearest_enclosing_class<'db>(
         .find_map(|(_, ancestor_scope)| {
             let class = ancestor_scope.node().as_class()?;
             let definition = semantic.expect_single_definition(class);
-            declaration_type(db, definition)
-                .inner_type()
-                .as_class_literal()
-                .and_then(ClassLiteral::as_static)
+            original_class_type(db, definition).and_then(ClassLiteral::as_static)
         })
+}
+
+/// Return the original class literal for a class definition.
+///
+/// For decorated classes, this is the class object before applying decorators. The public
+/// binding may be replaced by a class decorator's return type, but class-body inference still
+/// needs the original class object for implicit `self`/`cls`, `Self`, and dataclass logic.
+pub(crate) fn original_class_type<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<ClassLiteral<'db>> {
+    let inference = infer_definition_types(db, definition);
+    inference
+        .undecorated_type()
+        .unwrap_or_else(|| inference.declaration_type(definition).inner_type())
+        .as_class_literal()
 }
 
 /// Returns the type of the nearest enclosing function for the given scope.
@@ -876,7 +888,7 @@ struct DefinitionInferenceExtra<'db> {
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
 
-    /// For function definitions, the undecorated type of the function.
+    /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
 
     /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.

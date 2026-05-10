@@ -23,6 +23,7 @@ use crate::{
                 validate_paramspec_components,
             },
             function_known_decorators, infer_statement_types, nearest_enclosing_function,
+            original_class_type,
         },
         infer_definition_types, infer_scope_types,
         signatures::ReturnCallableTypeVarScope,
@@ -990,10 +991,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let class_definition = self.index.expect_single_definition(class);
-        let class_literal = infer_definition_types(db, class_definition)
-            .declaration_type(class_definition)
-            .inner_type()
-            .as_class_literal()?;
+        let class_literal = original_class_type(db, class_definition)?;
 
         let typing_self = typing_self(db, self.scope(), Some(method_definition), class_literal);
         if is_classmethod || function_name == "__new__" {

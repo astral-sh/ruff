@@ -37,6 +37,22 @@ reveal_type(generic_context(SingleTypeVarTuple))
 reveal_type(generic_context(TypeVarAndTypeVarTuple))
 ```
 
+Decorated generic classes still use the original class for their class-body generic context:
+
+```py
+class Wrap:
+    def __init__(self, cls: type[object]) -> None: ...
+
+@Wrap
+class DecoratedGeneric[T]:
+    value: T
+
+    def get_value(self) -> T:
+        return self.value
+
+reveal_type(DecoratedGeneric)  # revealed: Wrap
+```
+
 You cannot use the same typevar more than once.
 
 ```py

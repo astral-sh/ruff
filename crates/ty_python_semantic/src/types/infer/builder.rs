@@ -79,6 +79,7 @@ use crate::types::infer::builder::typed_dict::TypedDictConstructorForm;
 use crate::types::infer::{
     StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TypeExpressionFlags,
     infer_statement_types, nearest_enclosing_class, nearest_enclosing_function,
+    original_class_type,
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::newtype::NewType;
@@ -315,7 +316,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// is a stub file but we're still in a non-deferred region.
     deferred_state: DeferredExpressionState,
 
-    /// For function definitions, the undecorated type of the function.
+    /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
 
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
@@ -539,11 +540,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let enclosing_scope = index.scope(scope.file_scope_id(db));
             let class_node = enclosing_scope.node().as_class()?;
             let class_definition = index.expect_single_definition(class_node);
-            let class_literal = infer_definition_types(db, class_definition)
-                .declaration_type(class_definition)
-                .inner_type()
-                .as_class_literal()?
-                .as_static()?;
+            let class_literal = original_class_type(db, class_definition)?.as_static()?;
 
             class_literal
                 .dataclass_params(db)
@@ -821,6 +818,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                     DefinitionKind::Class(class_node) => {
+                        let original_ty = match self.region {
+                            InferenceRegion::Definition(current) if current == definition => {
+                                self.undecorated_type
+                            }
+                            _ => original_class_type(self.db(), definition).map(Type::ClassLiteral),
+                        };
+                        let ty = original_ty.unwrap_or(ty);
                         post_inference::static_class::check_static_class_definitions(
                             &self.context,
                             ty,
@@ -1504,7 +1508,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn class_context_of_current_method(&self) -> Option<ClassType<'db>> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let class_definition = self.index.class_definition_of_method(current_scope_id)?;
-        binding_type(self.db(), class_definition).to_class_type(self.db())
+        original_class_type(self.db(), class_definition)
+            .map(|class_literal| class_literal.default_specialization(self.db()))
     }
 
     /// If the current scope is a (non-lambda) function, return that function's AST node.

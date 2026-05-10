@@ -312,7 +312,7 @@ class AcceptsType:
 @AcceptsType
 class MyClass: ...
 
-reveal_type(MyClass)  # revealed: <class 'MyClass'>
+reveal_type(MyClass)  # revealed: AcceptsType
 ```
 
 ### Generic class, used as a decorator
@@ -378,6 +378,224 @@ def decorator(cls: type[int]) -> type[int]:
 @decorator
 class Baz: ...
 
-# TODO: the revealed type should ideally be `type[int]` (the decorator's return type)
-reveal_type(Baz)  # revealed: <class 'Baz'>
+reveal_type(Baz)  # revealed: type[int]
+```
+
+Class decorators can also replace the class object with an instance:
+
+```py
+from dataclasses import dataclass
+from typing import Generic, Protocol, TypeVar, overload
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class Backend(Protocol):
+    def get(self, key: str) -> bytes | None: ...
+
+class WrapBackend:
+    def __init__(self, cls: type[object]) -> None:
+        self.cls = cls
+
+    def get(self, key: str) -> bytes | None:
+        return None
+
+@WrapBackend
+class CacheClient:
+    def clone(self) -> Self:
+        reveal_type(self)  # revealed: Self@clone
+        return self
+
+    @classmethod
+    def make(cls) -> Self:
+        reveal_type(cls)  # revealed: type[Self@make]
+        return cls()
+
+reveal_type(CacheClient)  # revealed: WrapBackend
+reveal_type(CacheClient.get("x"))  # revealed: bytes | None
+
+@WrapBackend
+@dataclass
+class DataclassThenWrapped:
+    value: int
+
+reveal_type(DataclassThenWrapped)  # revealed: WrapBackend
+
+# error: [no-matching-overload]
+@dataclass
+@WrapBackend
+class WrappedThenDataclass:
+    value: int
+
+reveal_type(WrappedThenDataclass)  # revealed: Unknown
+
+@WrapBackend
+class InvalidWrappedBase(1): ...  # error: [invalid-base]
+
+@WrapBackend
+class GenericCacheClient(Generic[T]):
+    value: T
+
+    def get_value(self) -> T:
+        return self.value
+
+reveal_type(GenericCacheClient)  # revealed: WrapBackend
+
+@WrapBackend
+class OverloadedCacheClient:
+    @overload
+    # error: [invalid-overload] "Overloads for function `get` must be followed by a non-`@overload`-decorated implementation function"
+    def get(self, key: str) -> bytes: ...
+    @overload
+    def get(self, key: bytes) -> bytes: ...
+```
+
+Unannotated class decorators are assumed to preserve the class binding. We do not infer returned
+classes from decorator bodies:
+
+```py
+def personify(cls):
+    class Wrapped(cls):
+        full_name: str
+
+        def set_full_name(self, full_name: str) -> None:
+            self.full_name = full_name
+
+    return Wrapped
+
+@personify
+class Animal: ...
+
+reveal_type(Animal)  # revealed: <class 'Animal'>
+reveal_type(Animal())  # revealed: Animal
+
+Animal().set_full_name("John")  # error: [unresolved-attribute]
+```
+
+This also applies to unannotated callables that are not function definitions:
+
+```py
+lambda_decorator = lambda cls: cls
+
+@lambda_decorator
+class LambdaDecorated: ...
+
+reveal_type(LambdaDecorated)  # revealed: <class 'LambdaDecorated'>
+
+class DecoratorFactory:
+    def decorator(self, cls):
+        return cls
+
+decorator_factory = DecoratorFactory()
+
+@decorator_factory.decorator
+class BoundMethodDecorated: ...
+
+reveal_type(BoundMethodDecorated)  # revealed: <class 'BoundMethodDecorated'>
+
+class CallableDecorator:
+    def __call__(self, cls):
+        return cls
+
+callable_decorator = CallableDecorator()
+
+@callable_decorator
+class CallableInstanceDecorated: ...
+
+reveal_type(CallableInstanceDecorated)  # revealed: <class 'CallableInstanceDecorated'>
+
+class ExplicitReturnDecorator(Generic[T]):
+    def __call__(self, cls) -> T:
+        raise NotImplementedError
+
+explicit_return_decorator = ExplicitReturnDecorator()
+
+@explicit_return_decorator
+class ExplicitReturnCallableInstanceDecorated: ...
+
+reveal_type(ExplicitReturnCallableInstanceDecorated)  # revealed: Unknown
+```
+
+An unknown class decorator still makes the class binding unknown:
+
+```py
+# error: [unresolved-reference] "Name `unknown_class_decorator` used when not defined"
+@unknown_class_decorator
+class UnknownDecorated: ...
+
+reveal_type(UnknownDecorated)  # revealed: Unknown
+```
+
+An unannotated class decorator preserves the result of earlier decorators:
+
+```py
+def unannotated_identity(cls):
+    return cls
+
+@unannotated_identity
+@WrapBackend
+class WrappedThenUnannotated: ...
+
+reveal_type(WrappedThenUnannotated)  # revealed: WrapBackend
+```
+
+Metadata decorators still apply above an unannotated class-preserving decorator:
+
+```py
+from typing_extensions import deprecated
+
+def unannotated_identity(cls):
+    return cls
+
+@deprecated("use OtherClass")
+@unannotated_identity
+class DeprecatedThenUnannotated: ...
+
+DeprecatedThenUnannotated()  # error: [deprecated] "use OtherClass"
+```
+
+If a class decorator returns the original class object, we preserve the class binding so it can
+still be used in annotations and as a base class:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", bound=object)
+
+def identity_class_decorator(cls: type[T]) -> type[T]:
+    return cls
+
+@identity_class_decorator
+class PreservedClass: ...
+
+reveal_type(PreservedClass)  # revealed: <class 'PreservedClass'>
+
+class DerivedPreservedClass(PreservedClass):
+    value: PreservedClass
+```
+
+Class decorators can return intersections that expose attributes added to the decorated class
+object:
+
+```py
+from ty_extensions import Intersection
+from typing import Protocol, TypeVar
+
+class Resource:
+    def fetch(self) -> str:
+        return "data"
+
+class ResourceEnabled(Protocol):
+    resource: Resource
+
+SchemaT = TypeVar("SchemaT")
+
+def register(cls: type[SchemaT]) -> Intersection[type[SchemaT], ResourceEnabled]:
+    return cls
+
+@register
+class UserSchema:
+    id: int
+
+reveal_type(UserSchema.resource.fetch())  # revealed: str
 ```

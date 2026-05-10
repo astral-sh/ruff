@@ -76,7 +76,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::display::DisplaySettings;
 use crate::types::generics::{ApplySpecialization, GenericContext, typing_self};
-use crate::types::infer::nearest_enclosing_class;
+use crate::types::infer::{nearest_enclosing_class, original_class_type};
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
@@ -89,7 +89,7 @@ use crate::types::{
     ClassLiteral, ClassType, DynamicType, FindLegacyTypeVarsVisitor, IntersectionBuilder,
     KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
     Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
-    binding_type, definition_expression_type, infer_definition_types, walk_signature,
+    definition_expression_type, walk_signature,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -544,9 +544,8 @@ impl<'db> OverloadLiteral<'db> {
             // or there is but it isn't using the PEP-484 convention,
             // then `self`/`cls` are only implicitly positional-only if
             // it is a protocol class.
-            let class_type = binding_type(db, class_definition);
-            class_type
-                .to_class_type(db)
+            original_class_type(db, class_definition)
+                .map(|class_literal| class_literal.default_specialization(db))
                 .is_some_and(|class| class.is_protocol(db))
         }
 
@@ -593,12 +592,7 @@ impl<'db> OverloadLiteral<'db> {
             let class_scope = index.scope(class_scope_id.file_scope_id(db));
             let class_node = class_scope.node().as_class()?;
             let class_def = index.expect_single_definition(class_node);
-            let Type::ClassLiteral(class_literal) = infer_definition_types(db, class_def)
-                .declaration_type(class_def)
-                .inner_type()
-            else {
-                return None;
-            };
+            let class_literal = original_class_type(db, class_def)?;
             let class_is_generic = class_literal.generic_context(db).is_some();
             let class_is_fallback = class_literal
                 .known(db)
@@ -1219,6 +1213,12 @@ impl<'db> FunctionType<'db> {
     /// Returns `true` if this function has a trivial body.
     pub(crate) fn has_trivial_body(self, db: &'db dyn Db) -> bool {
         self.literal(db).has_trivial_body(db)
+    }
+
+    /// Returns `true` if any overload or implementation has an explicit return annotation.
+    pub(crate) fn has_explicit_return_annotation(self, db: &'db dyn Db) -> bool {
+        self.iter_overloads_and_implementation(db)
+            .any(|overload| overload.spans(db).return_type.is_some())
     }
 
     /// Returns all of the overload signatures and the implementation definition, if any, of this
