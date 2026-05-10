@@ -201,6 +201,13 @@ def new_signature(): ...
 def g4(a, __b): ...  # error: [invalid-legacy-positional-parameter]
 ```
 
+Keyword-only parameters are already explicitly not positional-only, so a leading `__` is not treated
+as an invalid attempt to use the legacy positional-only convention:
+
+```py
+def dependency_wrapper(*args, __current_user: object, **kwargs): ...
+```
+
 Parameters are also not understood as positional-only if they both start and end with `__`:
 
 ```py

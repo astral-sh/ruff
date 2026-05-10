@@ -54,31 +54,32 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/call/function.md
 39 | # signature:
 40 | @copy_type(new_signature)
 41 | def g4(a, __b): ...  # error: [invalid-legacy-positional-parameter]
-42 | def h(__x__: str): ...
-43 | 
-44 | h(__x__="foo")
-45 | def i(x: str, /, __y: int): ...
-46 | 
-47 | i("foo", __y=42)  # fine
-48 | class C:
-49 |     def method(self, __x: int): ...
-50 |     @classmethod
-51 |     def class_method(cls, __x: str): ...
-52 |     # (the name of the first parameter is irrelevant;
-53 |     # a staticmethod works the same as a free function in the global scope)
-54 |     @staticmethod
-55 |     def static_method(self, __x: int): ...  # error: [invalid-legacy-positional-parameter]
-56 |     # `__new__` is a staticmethod, but the `cls` parameter works in the same way as the `cls`
-57 |     # parameter in a classmethod, and is always passed positionally at runtime,
-58 |     # We therefore understand both `cls` and `__x` here as positional-only; we do not
-59 |     # emit `[invalid-legacy-positional-parameter]` on the method.
-60 |     def __new__(cls, __x: int): ...
-61 | 
-62 | # error: [positional-only-parameter-as-kwarg]
-63 | C(42).method(__x=1)
-64 | # error: [positional-only-parameter-as-kwarg]
-65 | C.class_method(__x="1")
-66 | C.static_method("x", __x=42)  # fine
+42 | def dependency_wrapper(*args, __current_user: object, **kwargs): ...
+43 | def h(__x__: str): ...
+44 | 
+45 | h(__x__="foo")
+46 | def i(x: str, /, __y: int): ...
+47 | 
+48 | i("foo", __y=42)  # fine
+49 | class C:
+50 |     def method(self, __x: int): ...
+51 |     @classmethod
+52 |     def class_method(cls, __x: str): ...
+53 |     # (the name of the first parameter is irrelevant;
+54 |     # a staticmethod works the same as a free function in the global scope)
+55 |     @staticmethod
+56 |     def static_method(self, __x: int): ...  # error: [invalid-legacy-positional-parameter]
+57 |     # `__new__` is a staticmethod, but the `cls` parameter works in the same way as the `cls`
+58 |     # parameter in a classmethod, and is always passed positionally at runtime,
+59 |     # We therefore understand both `cls` and `__x` here as positional-only; we do not
+60 |     # emit `[invalid-legacy-positional-parameter]` on the method.
+61 |     def __new__(cls, __x: int): ...
+62 | 
+63 | # error: [positional-only-parameter-as-kwarg]
+64 | C(42).method(__x=1)
+65 | # error: [positional-only-parameter-as-kwarg]
+66 | C.class_method(__x="1")
+67 | C.static_method("x", __x=42)  # fine
 ```
 
 # Diagnostics
@@ -166,9 +167,9 @@ info: A parameter can only be positional-only if it precedes all positional-or-k
 
 ```
 warning[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
-  --> src/mdtest_snippet.py:55:23
+  --> src/mdtest_snippet.py:56:23
    |
-55 |     def static_method(self, __x: int): ...  # error: [invalid-legacy-positional-parameter]
+56 |     def static_method(self, __x: int): ...  # error: [invalid-legacy-positional-parameter]
    |                       ----  ^^^ Parameter name begins with `__` but will not be treated as positional-only
    |                       |
    |                       Prior parameter here was positional-or-keyword
@@ -179,15 +180,15 @@ info: A parameter can only be positional-only if it precedes all positional-or-k
 
 ```
 error[positional-only-parameter-as-kwarg]: Positional-only parameter 2 (`__x`) passed as keyword argument of bound method `C.method`
-  --> src/mdtest_snippet.py:63:14
+  --> src/mdtest_snippet.py:64:14
    |
-63 | C(42).method(__x=1)
+64 | C(42).method(__x=1)
    |              ^^^^^
    |
 info: Method signature here
-  --> src/mdtest_snippet.py:49:9
+  --> src/mdtest_snippet.py:50:9
    |
-49 |     def method(self, __x: int): ...
+50 |     def method(self, __x: int): ...
    |         ^^^^^^^^^^^^^^^^^^^^^^
    |
 
@@ -195,15 +196,15 @@ info: Method signature here
 
 ```
 error[positional-only-parameter-as-kwarg]: Positional-only parameter 2 (`__x`) passed as keyword argument of bound method `C.class_method`
-  --> src/mdtest_snippet.py:65:16
+  --> src/mdtest_snippet.py:66:16
    |
-65 | C.class_method(__x="1")
+66 | C.class_method(__x="1")
    |                ^^^^^^^
    |
 info: Method signature here
-  --> src/mdtest_snippet.py:51:9
+  --> src/mdtest_snippet.py:52:9
    |
-51 |     def class_method(cls, __x: str): ...
+52 |     def class_method(cls, __x: str): ...
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 

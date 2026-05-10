@@ -3236,7 +3236,6 @@ def func_stringified_list_nested(**kwargs: "list[Unpack[TD1]]") -> None:  # erro
 def func_keyword_only_overlap(*, v1: int, **kwargs: Unpack[TD1]) -> None:  # error: [invalid-type-form]
     pass
 
-# error: [invalid-legacy-positional-parameter]
 # error: [invalid-type-form]
 def func_keyword_only_dunder_overlap(*, __x: int, **kwargs: Unpack[DunderTD]) -> None:
     pass

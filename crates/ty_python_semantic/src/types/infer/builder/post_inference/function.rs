@@ -64,6 +64,9 @@ fn check_legacy_positional_only_convention<'db>(
         if param.is_positional_only() {
             continue;
         }
+        if param.is_keyword_only() {
+            continue;
+        }
 
         // Valid uses of the PEP-484 positional-only convention will have been detected as such
         // in the first iteration over this scope, so `param.is_positional_only()` will return `true`
