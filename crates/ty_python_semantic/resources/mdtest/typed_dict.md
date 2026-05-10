@@ -489,60 +489,6 @@ Record({VALUE_KEY: "x"}, count=1)
 Record({VALUE_KEY: 1}, count=1)
 ```
 
-TypedDict constructor validation should also validate nested `TypedDict` literals inside `**{...}`:
-
-```py
-from typing import Dict, TypedDict, Union
-
-class Inner(TypedDict):
-    x: int
-
-class Outer(TypedDict):
-    inner: Inner
-
-source: Inner = {"x": 1}
-
-Outer(**{"inner": {"x": 1}})
-Outer(**{"inner": dict(x=1)})
-Outer(**{"inner": {**source}})
-Outer(**{"inner": {"x": "bad", **{"x": 1}}})
-
-assigned: Outer = {**{"inner": {"x": 1}}}
-Outer({**{"inner": {"x": 1}}})
-
-# error: [missing-typed-dict-key]
-Outer(**{"inner": {}})
-
-# error: [invalid-argument-type]
-Outer(**{"inner": {"x": "bad"}})
-
-# error: [missing-typed-dict-key]
-assigned_missing: Outer = {**{"inner": {}}}
-
-# error: [invalid-argument-type]
-Outer({**{"inner": {"x": "bad"}}})
-
-class OuterWithFallback(TypedDict):
-    inner: Union[Inner, Dict[str, object]]
-
-OuterWithFallback(**{"inner": {}})
-OuterWithFallback(**{"inner": {**source}})
-```
-
-Later merged non-`TypedDict` mappings should still be able to overwrite earlier checked keys:
-
-```py
-from typing import TypedDict
-
-class NameTD(TypedDict):
-    name: str
-
-mapping: dict[str, int] = {"name": 1}
-
-# error: [invalid-argument-type]
-NameTD(**{"name": "ok", **mapping})
-```
-
 Keyword arguments should override a positional mapping, and `TypedDict` constructor inputs should
 preserve shared required keys:
 
@@ -853,88 +799,13 @@ def _(td: TD):
 
 def _(x: Any):
     TD({"a": "foo"}, **x)
-```
 
-An optional key that is definitely present in a merged unpack should still relax the positional
-schema:
+class ExplicitDictValueTarget(TypedDict):
+    a: int
+    b: object
 
-```py
-from typing import Any, TypedDict
-from typing_extensions import NotRequired
-
-class MixedOptionalTarget(TypedDict):
-    x: int
-    opt: NotRequired[str]
-
-class MixedOptionalSource(TypedDict):
-    x: int
-    opt: int
-
-def _(source: MixedOptionalSource, kwargs: Any):
-    MixedOptionalTarget(source, **{"opt": "ok", **kwargs})
-```
-
-Mixed constructors should preserve field-directed inference for nested literals in unpacked keyword
-dicts:
-
-```py
-from typing import TypedDict
-
-class InnerA(TypedDict):
-    x: int
-
-class InnerB(TypedDict):
-    y: int
-
-class OuterUnion(TypedDict):
-    inner: InnerA | InnerB
-
-def _(existing: OuterUnion):
-    OuterUnion(existing, **{"inner": {"x": 1}})
-```
-
-Merged unpacks should preserve dict-fallback arms for nested `dict(...)` values:
-
-```py
-from typing import Dict, TypedDict
-
-class InnerFallback(TypedDict):
-    x: int
-
-class OuterFallback(TypedDict):
-    inner: InnerFallback | Dict[str, int]
-
-def _(existing: OuterFallback):
-    OuterFallback(**{"inner": dict(y=1)})
-    OuterFallback(existing, **{"inner": dict(y=1)})
-```
-
-Merged unpacks should re-infer nested `dict(...)` values with their field context:
-
-```py
-from typing import Dict, TypedDict
-
-class InnerMerged(TypedDict):
-    x: int
-
-class OuterMerged(TypedDict):
-    inner: InnerMerged
-
-assigned: OuterMerged = {**{"inner": dict(x=1)}}
-
-OuterMerged({**{"inner": dict(x=1)}})
-```
-
-Keyword-only `dict(...)` calls in `TypedDict` unions should still infer real value expressions:
-
-```py
-from typing import Dict, TypedDict, Union
-
-class DictUnionTD(TypedDict):
-    x: int
-
-# error: [unsupported-operator]
-u: Union[DictUnionTD, Dict[str, int]] = dict(x=1 + "a")
+def _(flag: bool):
+    ExplicitDictValueTarget({"a": 1} if flag else {"a": 2}, b={"a": 1})
 ```
 
 ## Union of `TypedDict`
@@ -1171,63 +1042,6 @@ def _(
     MergeTarget(**{"name": 1, **maybe_good})
 ```
 
-Merged unpacked dict literals should stay gradual when a later `Any` or `Never` unpack may overwrite
-earlier keys:
-
-```py
-from typing import Any, Never, TypedDict
-
-class GradualMergeTarget(TypedDict):
-    name: str
-
-class GradualBadName(TypedDict):
-    name: int
-
-def _(bad: GradualBadName, dyn: Any, never: Never):
-    GradualMergeTarget(**{**bad, **dyn})
-    GradualMergeTarget(**{**bad, **never})
-    GradualMergeTarget(**{"name": 1, **dyn})
-    GradualMergeTarget(**{"name": 1, **never})
-```
-
-Dynamic union arms inside merged unpacks should stay gradual too:
-
-```py
-from typing import Any, TypedDict, Union
-
-class GradualUnionTarget(TypedDict):
-    name: str
-
-class HasName(TypedDict):
-    name: str
-
-def _(existing: GradualUnionTarget, kwargs: Union[Any, HasName]):
-    GradualUnionTarget(existing, **{"name": 1, **kwargs})
-```
-
-Definite keys inside a merged unpack should still count as guaranteed after a later `Any` or `Never`
-unpack:
-
-```py
-from typing import Any, Never, TypedDict
-
-class DuplicateAfterDynamic(TypedDict):
-    name: str
-
-class HasName(TypedDict):
-    name: str
-
-def _(left: HasName, dyn: Any, never: Never):
-    # error: [parameter-already-assigned]
-    DuplicateAfterDynamic(**{"name": "x", **dyn}, name="y")
-
-    # error: [parameter-already-assigned]
-    DuplicateAfterDynamic(**{**left, **dyn}, name="y")
-
-    # error: [parameter-already-assigned]
-    DuplicateAfterDynamic(**{"name": "x", **never}, **{"name": "y"})
-```
-
 Unpacking a TypedDict with extra keys flags the extra keys as errors, for consistency with the
 behavior when passing all keys as explicit keyword arguments:
 
@@ -1343,42 +1157,6 @@ def unpack_never(data: Never) -> Info:
 
 def unpack_any(data: Any) -> Info:
     return Info(**data)
-```
-
-Mapping unpacks should report exact extra keys, preserve union key/value correlation, and avoid
-treating exact keys as definite overwrites:
-
-```py
-from collections import defaultdict
-from typing import Literal, Mapping, Never, TypedDict, Union, cast
-
-class MappingTarget(TypedDict):
-    name: str
-    count: int
-
-def _(
-    extra: Mapping[Literal["extra"], int],
-    extra_defaultdict: defaultdict[Literal["extra"], int],
-    union_mapping: Union[Mapping[Literal["name"], str], Mapping[Literal["count"], int]],
-    maybe_name: Mapping[Literal["name"], str],
-    impossible_keys: Mapping[Never, int],
-    impossible_extra: Mapping[Literal["extra"], Never],
-):
-    MappingTarget(name="ok", count=1, **union_mapping)
-    MappingTarget(name="ok", count=1, **impossible_keys)
-    MappingTarget(name="ok", count=1, **impossible_extra)
-
-    # error: [invalid-argument-type] "Argument expression after ** must be a mapping with `str` key type: Found `int`"
-    MappingTarget(name="ok", count=1, **cast(Mapping[int, int], {}))
-
-    # error: [invalid-key] "Unknown key "extra" for TypedDict `MappingTarget`"
-    MappingTarget(name="ok", count=1, **extra)
-
-    # error: [invalid-key] "Unknown key "extra" for TypedDict `MappingTarget`"
-    MappingTarget(name="ok", count=1, **extra_defaultdict)
-
-    # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `MappingTarget`: value of type `Literal[1]`"
-    MappingTarget(**{"name": 1, "count": 1, **maybe_name})
 ```
 
 PEP 695 type aliases to TypedDict types are also supported:

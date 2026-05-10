@@ -7216,25 +7216,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         arguments: &'a ast::Arguments,
     ) -> CallArguments<'a, 'db> {
-        let call_arguments = CallArguments::from_arguments(
-            arguments,
-            |arg_or_keyword, splatted_value| {
-                let ty = if matches!(arg_or_keyword, ast::ArgOrKeyword::Keyword(keyword) if keyword.arg.is_none())
-                    && splatted_value.is_dict_expr()
-                    && self
-                        .try_expression_type(splatted_value)
-                        .is_some_and(|ty| ty.is_unknown())
-                {
-                    self.expressions.remove(&splatted_value.into());
-                    if let Some(expression_cache) = &self.expression_cache {
-                        expression_cache
-                            .borrow_mut()
-                            .remove(&(splatted_value.into(), TypeContext::default()));
-                    }
-                    self.infer_expression(splatted_value, TypeContext::default())
-                } else {
-                    self.get_or_infer_expression(splatted_value, TypeContext::default())
-                };
+        let call_arguments =
+            CallArguments::from_arguments(arguments, |arg_or_keyword, splatted_value| {
+                let ty = self.get_or_infer_expression(splatted_value, TypeContext::default());
                 if let ast::ArgOrKeyword::Arg(argument) = arg_or_keyword
                     && argument.is_starred_expr()
                 {
@@ -7244,8 +7228,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 ty
-            },
-        );
+            });
 
         for arg in &arguments.args {
             if let ast::Expr::Starred(ast::ExprStarred { value, .. }) = arg {
