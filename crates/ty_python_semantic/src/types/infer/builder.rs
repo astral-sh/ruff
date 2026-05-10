@@ -3556,19 +3556,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
         } = &call_expr.arguments;
 
-        if !keywords.is_empty() || args.iter().any(|arg| arg.is_starred_expr()) {
+        if args.iter().any(|arg| arg.is_starred_expr()) {
             return None;
         }
 
-        let name_arg = match &**args {
-            [name_arg] | [name_arg, _] => name_arg,
+        let (name_arg, mut repr_arg) = match &**args {
+            [name_arg] => (name_arg, None),
+            [name_arg, repr_arg] => (name_arg, Some(repr_arg)),
             _ => return None,
         };
+
+        for keyword in keywords {
+            let Some(keyword_name) = &keyword.arg else {
+                return None;
+            };
+
+            if keyword_name.as_str() != "repr" || repr_arg.is_some() {
+                return None;
+            }
+
+            repr_arg = Some(&keyword.value);
+        }
 
         let name_ty = self.infer_expression(name_arg, TypeContext::default());
         let sentinel_name = name_ty.as_string_literal()?;
 
-        let Some(repr_arg) = args.get(1) else {
+        let Some(repr_arg) = repr_arg else {
             return Some(Type::KnownInstance(KnownInstanceType::Sentinel(
                 SentinelInstance::new(self.db(), target_name.clone(), sentinel_name, definition),
             )));

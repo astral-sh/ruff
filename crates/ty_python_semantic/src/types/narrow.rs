@@ -1250,24 +1250,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
         }
 
-        fn identity_narrowed_union<'db>(
-            db: &'db dyn Db,
-            subject_ty: Type<'db>,
-            singleton_ty: Type<'db>,
-            is_positive_check: bool,
-        ) -> Option<Type<'db>> {
-            let union = subject_ty.as_union_like(db)?;
-
-            let filtered = union.filter(db, |elem| {
-                if is_positive_check {
-                    !elem.is_disjoint_from(db, singleton_ty)
-                } else {
-                    !elem.is_subtype_of(db, singleton_ty)
-                }
-            });
-            (filtered != Type::Union(union)).then_some(filtered)
-        }
-
         let ast::ExprCompare {
             range: _,
             node_index: _,
@@ -1552,18 +1534,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 && let Some(ty) = self.evaluate_expr_compare_op(lhs_ty, rhs_ty, *op, is_positive)
             {
                 let place = self.expect_place(&narrowable);
-                let constraint = if matches!(*op, ast::CmpOp::Is | ast::CmpOp::IsNot)
-                    && rhs_ty.is_singleton(self.db)
-                    && let Some(filtered) = identity_narrowed_union(
-                        self.db,
-                        lhs_ty,
-                        rhs_ty,
-                        is_positive == (*op == ast::CmpOp::Is),
-                    ) {
-                    NarrowingConstraint::replacement(filtered)
-                } else {
-                    NarrowingConstraint::intersection(ty)
-                };
+                let constraint = NarrowingConstraint::intersection(ty);
                 constraints
                     .entry(place)
                     .and_modify(|existing| {
@@ -1585,18 +1556,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 && let Some(ty) = self.evaluate_expr_compare_op(rhs_ty, lhs_ty, *op, is_positive)
             {
                 let place = self.expect_place(&narrowable);
-                let constraint = if matches!(*op, ast::CmpOp::Is | ast::CmpOp::IsNot)
-                    && lhs_ty.is_singleton(self.db)
-                    && let Some(filtered) = identity_narrowed_union(
-                        self.db,
-                        rhs_ty,
-                        lhs_ty,
-                        is_positive == (*op == ast::CmpOp::Is),
-                    ) {
-                    NarrowingConstraint::replacement(filtered)
-                } else {
-                    NarrowingConstraint::intersection(ty)
-                };
+                let constraint = NarrowingConstraint::intersection(ty);
                 constraints
                     .entry(place)
                     .and_modify(|existing| {
