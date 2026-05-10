@@ -190,6 +190,23 @@ def test(p: str | None, q: str) -> None:
         reveal_type(p)  # revealed: str | None
 ```
 
+## Narrowing against exact finite containers
+
+```py
+from typing import Literal
+
+def finite_set_display(exponent: int | Literal["F", "n", "N"]):
+    if exponent in {"F", "n", "N"}:
+        reveal_type(exponent)  # revealed: Literal["F", "n", "N"] | int
+        return
+
+    reveal_type(exponent)  # revealed: int
+
+def finite_list_display(exponent: int | Literal["F", "n", "N"]):
+    if exponent not in ["F", "n", "N"]:
+        reveal_type(exponent)  # revealed: int
+```
+
 ## No narrowing for the right-hand side (currently)
 
 No narrowing is done for the right-hand side currently, even if the right-hand side is a valid
