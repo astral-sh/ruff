@@ -39,6 +39,7 @@
 use super::RecursivelyDefined;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
+use crate::types::tuple::TupleLength;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType, Type,
@@ -338,9 +339,9 @@ const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 256;
 /// Huge enums are not uncommon (especially in generated code), and it's annoying
 /// if reachability analysis etc. fails when analysing these enums.
 const MAX_NON_RECURSIVE_UNION_ENUM_LITERALS: usize = 8192;
-/// The maximum number of precise tuple shapes to keep in a union before collapsing them to a
+/// The maximum number of distinct tuple lengths to keep in a union before collapsing them to a
 /// single homogeneous tuple.
-const MAX_UNION_TUPLE_TYPES: usize = 32;
+const MAX_UNION_TUPLE_LENGTHS: usize = 32;
 
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
@@ -904,8 +905,7 @@ impl<'db> UnionBuilder<'db> {
         recursively_defined: RecursivelyDefined,
         types: Vec<Type<'db>>,
     ) -> Vec<Type<'db>> {
-        let mut tuple_count = 0;
-        let mut first_tuple_length = None;
+        let mut tuple_lengths = SmallVec::<[TupleLength; 8]>::new();
         let mut has_multiple_tuple_lengths = false;
 
         for ty in &types {
@@ -913,15 +913,20 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             };
 
-            tuple_count += 1;
-            has_multiple_tuple_lengths |= first_tuple_length
-                .replace(tuple.len())
-                .is_some_and(|first_tuple_length| first_tuple_length != tuple.len());
+            let tuple_length = tuple.len();
+            has_multiple_tuple_lengths |= tuple_lengths
+                .first()
+                .is_some_and(|first_tuple_length| *first_tuple_length != tuple_length);
+            if tuple_lengths.len() <= MAX_UNION_TUPLE_LENGTHS
+                && !tuple_lengths.contains(&tuple_length)
+            {
+                tuple_lengths.push(tuple_length);
+            }
         }
 
         let collapse_for_cycle_recovery =
             cycle_recovery && recursively_defined.is_yes() && has_multiple_tuple_lengths;
-        let collapse_for_size_limit = tuple_count > MAX_UNION_TUPLE_TYPES;
+        let collapse_for_size_limit = tuple_lengths.len() > MAX_UNION_TUPLE_LENGTHS;
         if !(collapse_for_cycle_recovery || collapse_for_size_limit) {
             return types;
         }
@@ -1680,7 +1685,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
 #[cfg(test)]
 mod tests {
     use super::{
-        IntersectionBuilder, MAX_NON_RECURSIVE_UNION_LITERALS, MAX_UNION_TUPLE_TYPES, Type,
+        IntersectionBuilder, MAX_NON_RECURSIVE_UNION_LITERALS, MAX_UNION_TUPLE_LENGTHS, Type,
         UnionBuilder, UnionType,
     };
 
@@ -1778,11 +1783,31 @@ mod tests {
     }
 
     #[test]
-    fn build_union_collapses_many_tuple_shapes() {
+    fn build_union_preserves_many_tuple_shapes_of_same_length() {
+        let db = setup_db();
+
+        let tuples: Vec<_> = (0..=MAX_UNION_TUPLE_LENGTHS)
+            .map(|literal| {
+                let literal = i64::try_from(literal).expect("test literal fits in i64");
+                let literal = Type::int_literal(literal);
+                Type::heterogeneous_tuple(&db, [literal, literal])
+            })
+            .collect();
+        let union_ty = UnionType::from_elements(&db, tuples.iter().copied());
+        let union = union_ty.expect_union();
+
+        assert_eq!(union.elements(&db).len(), tuples.len());
+        for tuple in tuples {
+            assert!(union.elements(&db).contains(&tuple));
+        }
+    }
+
+    #[test]
+    fn build_union_collapses_many_tuple_lengths() {
         let db = setup_db();
 
         let int_instance = KnownClass::Int.to_instance(&db);
-        let tuples = (1..=MAX_UNION_TUPLE_TYPES + 1)
+        let tuples = (1..=MAX_UNION_TUPLE_LENGTHS + 1)
             .map(|len| Type::heterogeneous_tuple(&db, std::iter::repeat_n(int_instance, len)));
         let union = UnionType::from_elements(&db, tuples);
 
