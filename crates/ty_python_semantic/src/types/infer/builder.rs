@@ -97,8 +97,9 @@ use crate::types::{
     MemberLookupPolicy, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature,
     SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
     TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType,
-    UnionAccumulator, UnionBuilder, UnionType, binding_type, infer_complete_scope_types,
-    infer_scope_types, todo_type,
+    UnionAccumulator, UnionBuilder, UnionType, binding_type,
+    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
+    todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -4501,6 +4502,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_definition(node);
     }
 
+    fn fixed_length_iterable_element_type(&self, iterable: &ast::Expr) -> Option<Type<'db>> {
+        let element_types =
+            extract_fixed_length_iterable_element_types(self.db(), iterable, |expr| {
+                self.expression_type(expr)
+            })?;
+
+        if element_types.is_empty() {
+            None
+        } else {
+            Some(UnionType::from_elements(
+                self.db(),
+                element_types.iter().copied(),
+            ))
+        }
+    }
+
     fn infer_for_statement(&mut self, for_statement: &ast::StmtFor) {
         let ast::StmtFor {
             range: _,
@@ -4509,17 +4526,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             iter,
             body,
             orelse,
-            is_async: _,
+            is_async,
         } = for_statement;
 
         self.infer_target(target, iter, &|builder, tcx| {
             // TODO: `infer_for_statement_definition` reports a diagnostic if `iter_ty` isn't iterable
             //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
             //  `for a.x in not_iterable: ...
-            builder
-                .infer_standalone_expression(iter, tcx)
-                .iterate(builder.db())
-                .homogeneous_element_type(builder.db())
+            let iterable_type = builder.infer_standalone_expression(iter, tcx);
+            if *is_async {
+                iterable_type
+                    .iterate(builder.db())
+                    .homogeneous_element_type(builder.db())
+            } else if let Some(element_type) = builder.fixed_length_iterable_element_type(iter) {
+                element_type
+            } else {
+                iterable_type
+                    .iterate(builder.db())
+                    .homogeneous_element_type(builder.db())
+            }
         });
 
         self.infer_body(body);
@@ -4547,16 +4572,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let iterable_type =
                     self.infer_standalone_expression(iterable, TypeContext::default());
 
-                iterable_type
-                    .try_iterate_with_mode(
-                        self.db(),
-                        EvaluationMode::from_is_async(for_stmt.is_async()),
-                    )
-                    .map(|tuple| tuple.homogeneous_element_type(self.db()))
-                    .unwrap_or_else(|err| {
-                        err.report_diagnostic(&self.context, iterable_type, iterable.into());
-                        err.fallback_element_type(self.db())
-                    })
+                if for_stmt.is_async() {
+                    iterable_type
+                        .try_iterate_with_mode(
+                            self.db(),
+                            EvaluationMode::from_is_async(for_stmt.is_async()),
+                        )
+                        .map(|tuple| tuple.homogeneous_element_type(self.db()))
+                        .unwrap_or_else(|err| {
+                            err.report_diagnostic(&self.context, iterable_type, iterable.into());
+                            err.fallback_element_type(self.db())
+                        })
+                } else if let Some(element_type) = self.fixed_length_iterable_element_type(iterable)
+                {
+                    element_type
+                } else {
+                    iterable_type
+                        .try_iterate_with_mode(self.db(), EvaluationMode::Sync)
+                        .map(|tuple| tuple.homogeneous_element_type(self.db()))
+                        .unwrap_or_else(|err| {
+                            err.report_diagnostic(&self.context, iterable_type, iterable.into());
+                            err.fallback_element_type(self.db())
+                        })
+                }
             }
         };
 

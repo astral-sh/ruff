@@ -103,6 +103,13 @@ for x in (1, "a", b"foo"):
 reveal_type(x)
 ```
 
+## With literal list
+
+```py
+for x in ["a", "b"]:
+    reveal_type(x)  # revealed: Literal["a", "b"]
+```
+
 ## With non-callable iterator
 
 ```py

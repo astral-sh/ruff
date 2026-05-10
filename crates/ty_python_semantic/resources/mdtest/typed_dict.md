@@ -4606,6 +4606,26 @@ def match_with_dict(u: Foo | Bar | dict):
             reveal_type(u)  # revealed: Foo | (dict[Unknown, Unknown] & ~<TypedDict with items 'tag'>)
 ```
 
+Loop variables over literal collections preserve literal key types for `TypedDict` subscripting:
+
+```py
+class EDict(TypedDict):
+    path: str
+
+def equality_key(example: EDict):
+    for key in ["path"]:
+        if key == "path":
+            reveal_type(key)  # revealed: Literal["path"]
+            reveal_type(example[key])  # revealed: str
+
+def match_key(example: EDict):
+    for key in ["path"]:
+        match key:
+            case "path":
+                reveal_type(key)  # revealed: Literal["path"]
+                reveal_type(example[key])  # revealed: str
+```
+
 ## Narrowing tagged unions of `TypedDict`s from PEP 695 type aliases
 
 PEP 695 type aliases are transparently resolved when narrowing tagged unions:
