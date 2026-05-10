@@ -371,15 +371,26 @@ class Answer(Enum):
     YES = 1
     MAYBE = 2
 
-    def is_yes(self) -> bool:
-        reveal_type(self)  # revealed: Self@is_yes
+    def is_yes_through_class_member(self) -> bool:
+        reveal_type(self)  # revealed: Self@is_yes_through_class_member
 
         match self:
             case Answer.YES:
-                reveal_type(self)  # revealed: Self@is_yes
+                reveal_type(self)  # revealed: Self@is_yes_through_class_member
                 return True
             case Answer.NO | Answer.MAYBE:
-                reveal_type(self)  # revealed: Self@is_yes & ~Literal[Answer.YES]
+                reveal_type(self)  # revealed: Self@is_yes_through_class_member & ~Literal[Answer.YES]
+                return False
+            case _:
+                assert_never(self)  # no error
+
+    def is_yes_through_self_member(self) -> bool:
+        match self:
+            case self.YES:
+                reveal_type(self)  # revealed: Self@is_yes_through_self_member
+                return True
+            case self.NO | self.MAYBE:
+                reveal_type(self)  # revealed: Self@is_yes_through_self_member & ~Literal[Answer.YES]
                 return False
             case _:
                 assert_never(self)  # no error
@@ -395,7 +406,7 @@ class Answer(Enum):
                 reveal_type(self)  # revealed: Self@assert_yes & ~Literal[Answer.YES]
                 raise ValueError("Answer is not YES")
 
-Answer.YES.is_yes()
+Answer.YES.is_yes_through_class_member()
 
 try:
     reveal_type(Answer.MAYBE.assert_yes())  # revealed: Literal[Answer.MAYBE]

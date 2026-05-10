@@ -1510,6 +1510,10 @@ class Answer(Enum):
     YES = 1
     NO = 2
 
+    def through_self(self) -> None:
+        reveal_type(self.YES)  # revealed: Literal[Answer.YES]
+        reveal_type(self.NO)  # revealed: Literal[Answer.NO]
+
 reveal_type(Answer.YES.NO)  # revealed: Literal[Answer.NO]
 
 def _(answer: Answer) -> None:

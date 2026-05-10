@@ -3535,7 +3535,11 @@ impl<'db> Type<'db> {
                     Type::LiteralValue(literal) => literal
                         .as_enum()
                         .map(|enum_literal| enum_literal.enum_class(db)),
-                    Type::NominalInstance(instance) => Some(instance.class_literal(db)),
+                    // This includes `Self` typevars with an enum-class upper bound, which allows
+                    // enum methods to access members through `self`, e.g. `case self.YES:`.
+                    Type::NominalInstance(_) | Type::TypeVar(_) => {
+                        self.nominal_class(db).map(|class| class.class_literal(db))
+                    }
                     _ => None,
                 };
 
