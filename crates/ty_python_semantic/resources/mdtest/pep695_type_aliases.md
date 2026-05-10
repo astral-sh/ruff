@@ -289,8 +289,7 @@ T = TypeVar("T")
 IntAndT = TypeAliasType("IntAndT", tuple[int, T], type_params=(T,))
 
 def f(x: IntAndT[str]) -> None:
-    # TODO: This should be `tuple[int, str]`
-    reveal_type(x)  # revealed: Unknown
+    reveal_type(x)  # revealed: tuple[int, str]
 ```
 
 ### Generic value binds type variables to alias definition

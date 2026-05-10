@@ -251,9 +251,7 @@ impl<'db> KnownInstanceType<'db> {
                 KnownClass::ParamSpec
             }
             Self::TypeVar(_) => KnownClass::TypeVar,
-            Self::TypeAliasType(TypeAliasType::PEP695(alias)) if alias.is_specialized(db) => {
-                KnownClass::GenericAlias
-            }
+            Self::TypeAliasType(alias) if alias.is_specialized(db) => KnownClass::GenericAlias,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
             Self::Deprecated(_) => KnownClass::Deprecated,
             Self::Field(_) => KnownClass::Field,

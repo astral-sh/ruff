@@ -1,5 +1,5 @@
 use crate::{
-    Db,
+    Db, FxOrderSet,
     reachability::ReachabilityConstraintsExtension,
     types::{
         KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner, SubclassOfType, Type,
@@ -15,7 +15,7 @@ use crate::{
             FunctionBodyKind, FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction,
             OverloadLiteral, function_body_kind, is_implicit_classmethod,
         },
-        generics::{enclosing_generic_contexts, typing_self},
+        generics::{GenericContext, enclosing_generic_contexts, typing_self},
         infer::{
             InferenceFlags, TypeExpressionFlags, TypeInferenceBuilder,
             builder::{
@@ -764,7 +764,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Avoid duplicate diagnostics: invalid TypedDict literals already emit specific errors.
                 let suppress_invalid_default =
                     is_invalid_typed_dict_literal(db, declared_ty, default_expr.into());
+                let default_specialized_declared_ty =
+                    type_with_available_typevar_defaults(db, declared_ty);
+
                 if !default_ty.is_assignable_to(db, declared_ty)
+                    && !default_ty.is_assignable_to(db, default_specialized_declared_ty)
                     && !suppress_invalid_default
                     && !((self.in_stub()
                         || self.in_function_overload_or_abstractmethod()
@@ -1117,4 +1121,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Some(parameter_type)
         }
     }
+}
+
+fn type_with_available_typevar_defaults<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    let mut typevars = FxOrderSet::default();
+    ty.find_legacy_typevars(db, None, &mut typevars);
+    if typevars
+        .iter()
+        .all(|typevar| typevar.default_type(db).is_none())
+    {
+        return ty;
+    }
+
+    let generic_context = GenericContext::from_typevar_instances(db, typevars.iter().copied());
+    let types = typevars.iter().map(|typevar| {
+        if typevar.default_type(db).is_some() {
+            None
+        } else {
+            Some(Type::TypeVar(*typevar))
+        }
+    });
+    ty.apply_specialization(db, generic_context.specialize_partial(db, types))
 }

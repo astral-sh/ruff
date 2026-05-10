@@ -1271,6 +1271,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     }
 }
 
+fn function_literal_is_assignable_to_asserted_callable<'db>(
+    db: &'db dyn Db,
+    actual_ty: Type<'db>,
+    asserted_ty: Type<'db>,
+) -> bool {
+    let Type::Callable(asserted_callable) = asserted_ty else {
+        return false;
+    };
+
+    let actual_callable = match actual_ty {
+        Type::FunctionLiteral(function) => function.into_callable_type(db),
+        Type::BoundMethod(bound_method) => bound_method.into_callable_type(db),
+        _ => return false,
+    };
+
+    Type::Callable(actual_callable).is_assignable_to(db, Type::Callable(asserted_callable))
+}
+
 /// Check the second argument to `isinstance()` or `issubclass()` for types that cannot be used
 /// at runtime (protocol classes, typed dicts, `typing.Any` in `isinstance`, and invalid
 /// `UnionType` elements). Handles class literals, tuples (including nested tuples), and
@@ -1920,7 +1938,13 @@ impl KnownFunction {
                 let [Some(actual_ty), Some(asserted_ty)] = parameter_types else {
                     return;
                 };
-                if actual_ty.is_equivalent_to(db, *asserted_ty) {
+                if actual_ty.is_equivalent_to(db, *asserted_ty)
+                    || function_literal_is_assignable_to_asserted_callable(
+                        db,
+                        *actual_ty,
+                        *asserted_ty,
+                    )
+                {
                     return;
                 }
                 let diagnostic =

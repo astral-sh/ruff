@@ -3771,6 +3771,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 db,
                 ast::name::Name::new(name),
                 definition,
+                None,
             )),
         ))
     }

@@ -2009,9 +2009,40 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     .elements(self.db)
                     .iter()
                     .filter(|ty| ty.has_typevar(self.db));
-                let Ok(Type::TypeVar(formal_bound_typevar)) = types_have_typevars.exactly_one()
-                else {
-                    return Ok(());
+                let formal_bound_typevar = match types_have_typevars.exactly_one() {
+                    Ok(Type::TypeVar(formal_bound_typevar)) => formal_bound_typevar,
+                    Ok(_) => return Ok(()),
+                    Err(_) => {
+                        let mut first_error = None;
+                        let mut found_matching_element = false;
+                        for actual_element in actual_union.elements(self.db) {
+                            let result = self.infer_map_impl(
+                                formal,
+                                *actual_element,
+                                polarity,
+                                &mut f,
+                                seen,
+                            );
+                            if let Err(err) = result {
+                                first_error.get_or_insert(err);
+                            } else if !actual_element
+                                .when_assignable_to(
+                                    self.db,
+                                    formal,
+                                    self.constraints,
+                                    self.inferable,
+                                )
+                                .is_never_satisfied(self.db)
+                            {
+                                found_matching_element = true;
+                            }
+                        }
+
+                        if !found_matching_element && let Some(error) = first_error {
+                            return Err(error);
+                        }
+                        return Ok(());
+                    }
                 };
                 if actual_union
                     .elements(self.db)

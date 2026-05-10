@@ -210,6 +210,24 @@ def _(a: str | int):
     assert_type(a, int | str)
 ```
 
+## Callable assertions for function literals
+
+Concrete function literals are accepted when asserted against a compatible `Callable` signature.
+
+```py
+from collections.abc import Awaitable, Callable
+from typing_extensions import assert_type
+
+def sync_func() -> str:
+    return "x"
+
+async def async_func(x: int) -> str:
+    return str(x)
+
+assert_type(sync_func, Callable[[], str])
+assert_type(async_func, Callable[[int], Awaitable[str]])
+```
+
 ## Intersections
 
 Intersections are the same when their positive and negative parts are respectively the same,

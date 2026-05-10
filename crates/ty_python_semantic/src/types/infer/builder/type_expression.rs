@@ -20,8 +20,8 @@ use ty_python_core::scope::ScopeKind;
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
     KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind, Parameter, Parameters,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType,
-    TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
+    SpecialFormType, SubclassOfType, Type, TypeContext, TypeGuardType, TypeIsType, TypeMapping,
+    TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
 };
 use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic};
 
@@ -1472,7 +1472,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
-                KnownInstanceType::TypeAliasType(type_alias @ TypeAliasType::PEP695(_)) => {
+                KnownInstanceType::TypeAliasType(type_alias) => {
                     if type_alias.specialization(self.db()).is_some() {
                         if !self.in_string_annotation() {
                             self.infer_expression(slice, TypeContext::default());
@@ -1534,19 +1534,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             Type::unknown()
                         }
                     }
-                }
-                KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(_)) => {
-                    // TODO: support generic "manual" PEP 695 type aliases
-                    let slice_ty = self.infer_expression(slice, TypeContext::default());
-                    let mut variables = FxOrderSet::default();
-                    slice_ty.bind_and_find_all_legacy_typevars(
-                        self.db(),
-                        self.typevar_binding_context,
-                        &mut variables,
-                    );
-                    let generic_context =
-                        GenericContext::from_typevar_instances(self.db(), variables);
-                    Type::Dynamic(DynamicType::UnknownGeneric(generic_context))
                 }
                 KnownInstanceType::LiteralStringAlias(_) => {
                     self.infer_expression(slice, TypeContext::default());
