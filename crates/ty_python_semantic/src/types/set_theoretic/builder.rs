@@ -340,7 +340,7 @@ const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 256;
 const MAX_NON_RECURSIVE_UNION_ENUM_LITERALS: usize = 8192;
 /// The maximum number of precise tuple shapes to keep in a union before collapsing them to a
 /// single homogeneous tuple.
-const MAX_UNION_TUPLE_TYPES: usize = 64;
+const MAX_UNION_TUPLE_TYPES: usize = 32;
 
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
