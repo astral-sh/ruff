@@ -16,7 +16,7 @@ python-version = "3.12"
 ## Propagating target type annotation
 
 ```py
-from typing import Literal
+from typing import AsyncGenerator, AsyncIterable, Generator, Iterable, Literal
 
 def list1[T](x: T) -> list[T]:
     return [x]
@@ -40,12 +40,41 @@ def _(l: list[int] | None = None):
 class TextContent: ...
 class TagContent: ...
 
-def expects_content(content: list[TextContent | TagContent]) -> None: ...
+def expects_list_content(content: list[TextContent | TagContent]) -> None: ...
 def optional_content(content: list[TextContent | TagContent] | None) -> None:
-    expects_content(content or [TextContent()])
+    expects_list_content(content or [TextContent()])
 
 def invalid_fallback(content: list[TextContent | TagContent] | None) -> None:
-    expects_content(content or [object()])  # error: [invalid-argument-type]
+    expects_list_content(content or [object()])  # error: [invalid-argument-type]
+
+def expects_generator_content(content: Generator[list[TextContent | TagContent], None, None]) -> None: ...
+def expects_iterable_content(content: Iterable[list[TextContent | TagContent]]) -> None: ...
+def expects_optional_iterable_content(content: Iterable[list[TextContent | TagContent]] | None) -> None: ...
+def generator_content() -> None:
+    expects_generator_content([TextContent()] for _ in range(1))
+    expects_iterable_content([TextContent()] for _ in range(1))
+    expects_optional_iterable_content([TextContent()] for _ in range(1))
+    expects_generator_content((reveal_type([TextContent()]) for _ in range(1)))  # revealed: list[TextContent | TagContent]
+
+def expects_int_iterable_or_str_generator(content: Generator[list[str], int, None] | Iterable[list[int]]) -> None: ...
+def generator_content_with_incompatible_generator_arm() -> None:
+    expects_int_iterable_or_str_generator((reveal_type([]) for _ in range(1)))  # revealed: list[int]
+
+def invalid_generator_content() -> None:
+    expects_generator_content([object()] for _ in range(1))  # error: [invalid-argument-type]
+    expects_optional_iterable_content([object()] for _ in range(1))  # error: [invalid-argument-type]
+
+async def async_texts() -> AsyncGenerator[TextContent, None]:
+    yield TextContent()
+
+def expects_async_generator_content(content: AsyncGenerator[list[TextContent | TagContent], None]) -> None: ...
+def expects_async_iterable_content(content: AsyncIterable[list[TextContent | TagContent]]) -> None: ...
+async def async_generator_content() -> None:
+    expects_async_generator_content([TextContent()] async for _ in async_texts())
+    expects_async_iterable_content([TextContent()] async for _ in async_texts())
+
+async def invalid_async_generator_content() -> None:
+    expects_async_generator_content([object()] async for _ in async_texts())  # error: [invalid-argument-type]
 
 def f[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
