@@ -594,9 +594,112 @@ class MyFrozenClass:
     x: int = 1
 
 class MyFrozenChildClass(MyFrozenClass): ...
+class MyFrozenGrandchildClass(MyFrozenChildClass): ...
 
 frozen = MyFrozenChildClass()
 frozen.x = 2  # error: [invalid-assignment]
+
+grandchild = MyFrozenGrandchildClass()
+grandchild.x = 2  # error: [invalid-assignment]
+```
+
+Non-field attributes on a non-dataclass subclass of a frozen dataclass are still assignable:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int = 1
+
+class MyFrozenChildClass(MyFrozenClass):
+    y: int
+
+class MyFrozenGrandchildClass(MyFrozenChildClass):
+    z: int
+
+frozen = MyFrozenChildClass()
+frozen.y = 2
+frozen.z = 2
+
+grandchild = MyFrozenGrandchildClass()
+grandchild.y = 2
+grandchild.z = 2
+grandchild.unknown = 2
+```
+
+The synthesized `__setattr__` is exposed as a member on non-dataclass subclasses of frozen
+dataclasses:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int = 1
+
+class MyFrozenChildClass(MyFrozenClass): ...
+
+child = MyFrozenChildClass()
+reveal_type(child.__setattr__)  # revealed: Overload[(name: Literal["x"], value) -> Never, (name: str, value) -> None]
+```
+
+An explicit `__setattr__` on an intermediate subclass overrides the inherited frozen dataclass
+setter:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int = 1
+
+class MyFrozenIntermediateClass(MyFrozenClass):
+    def __setattr__(self, name: str, value: object) -> None: ...  # error: [invalid-method-override]
+
+class MyFrozenChildClass(MyFrozenIntermediateClass):
+    y: int
+
+class MyFrozenGrandchildClass(MyFrozenChildClass):
+    z: int
+
+child = MyFrozenChildClass()
+child.x = 2
+child.y = 2
+child.unknown = 2
+
+grandchild = MyFrozenGrandchildClass()
+grandchild.x = 2
+grandchild.y = 2
+grandchild.z = 2
+grandchild.unknown = 2
+```
+
+Non-field attributes on subclasses of slotted frozen dataclasses are still rejected:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True, slots=True)
+class MySlottedFrozenClass:
+    x: int = 1
+
+class MySlottedFrozenChildClass(MySlottedFrozenClass):
+    y: int
+
+class MySlottedFrozenGrandchildClass(MySlottedFrozenChildClass):
+    z: int
+
+frozen = MySlottedFrozenChildClass()
+frozen.x = 2  # error: [invalid-assignment]
+frozen.y = 2  # error: [invalid-assignment]
+frozen.z = 2  # error: [invalid-assignment]
+
+grandchild = MySlottedFrozenGrandchildClass()
+grandchild.x = 2  # error: [invalid-assignment]
+grandchild.y = 2  # error: [invalid-assignment]
+grandchild.z = 2  # error: [invalid-assignment]
+grandchild.unknown = 2  # error: [invalid-assignment]
 ```
 
 The same diagnostic is emitted if a frozen dataclass is inherited, and an attempt is made to delete

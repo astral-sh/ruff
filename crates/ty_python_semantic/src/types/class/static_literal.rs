@@ -1197,6 +1197,17 @@ impl<'db> StaticClassLiteral<'db> {
             return Some(synthesized_callables.into_type(db));
         }
 
+        // An ordinary subclass of a frozen dataclass is not itself dataclass-like, so the
+        // `CodeGeneratorKind::from_class` check below would return `None` before dataclass-like
+        // synthesis runs. Still, an instance of such a subclass inherits the frozen dataclass's
+        // generated `__setattr__`, which rejects writes to frozen base fields.
+        if name == "__setattr__"
+            && let Some(synthesized_setattr) =
+                self.own_frozen_dataclass_subclass_setattr(db, specialization)
+        {
+            return Some(synthesized_setattr);
+        }
+
         let field_policy = CodeGeneratorKind::from_class(db, self.into(), specialization)?;
 
         let instance_ty =
@@ -1541,6 +1552,103 @@ impl<'db> StaticClassLiteral<'db> {
             }
             _ => None,
         }
+    }
+
+    /// Synthesize a `__setattr__` view for an ordinary subclass of a frozen dataclass.
+    ///
+    /// CPython's generated frozen-dataclass `__setattr__` rejects all writes on exact instances of
+    /// the frozen dataclass, but on subclass instances it only rejects writes to that dataclass's
+    /// fields before delegating to the next `__setattr__` in the MRO.
+    fn own_frozen_dataclass_subclass_setattr(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Option<Type<'db>> {
+        if CodeGeneratorKind::from_static_class(db, self, specialization).is_some() {
+            return None;
+        }
+
+        let frozen_base_fields =
+            self.inherited_non_slotted_frozen_dataclass_fields(db, specialization)?;
+
+        let instance_ty =
+            Type::instance(db, self.apply_optional_specialization(db, specialization));
+        let setattr_signature = |name_ty, return_ty| {
+            Signature::new(
+                Parameters::new(
+                    db,
+                    [
+                        Parameter::positional_or_keyword(Name::new_static("self"))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_or_keyword(Name::new_static("name"))
+                            .with_annotated_type(name_ty),
+                        Parameter::positional_or_keyword(Name::new_static("value")),
+                    ],
+                ),
+                return_ty,
+            )
+        };
+
+        let overloads = frozen_base_fields
+            .keys()
+            .map(|field| setattr_signature(Type::string_literal(db, field), Type::Never))
+            .chain([setattr_signature(
+                KnownClass::Str.to_instance(db),
+                Type::none(db),
+            )]);
+
+        Some(Type::Callable(CallableType::new(
+            db,
+            CallableSignature::from_overloads(overloads),
+            CallableTypeKind::FunctionLike,
+        )))
+    }
+
+    /// Return the inherited frozen dataclass fields whose generated `__setattr__` still controls
+    /// assignments on this class.
+    fn inherited_non_slotted_frozen_dataclass_fields(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Option<&'db FxIndexMap<Name, Field<'db>>> {
+        for base in self.iter_mro(db, specialization).skip(1) {
+            let (base_class, base_specialization) = base.into_class()?.static_class_literal(db)?;
+
+            // Stop if another class in the MRO replaces the generated frozen setter:
+            //
+            //   @dataclass(frozen=True)
+            //   class Frozen: x: int
+            //
+            //   class Mutable(Frozen):
+            //       def __setattr__(self, name: str, value: object) -> None: ...
+            //
+            //   class Child(Mutable): ...
+            //
+            // Writes to `Child().x` dispatch to `Mutable.__setattr__`, not to the synthesized
+            // `Frozen.__setattr__`.
+            if class_member(db, base_class.body_scope(db), "__setattr__")
+                .ignore_possibly_undefined()
+                .is_some()
+            {
+                return None;
+            }
+
+            if base_class.is_frozen_dataclass(db) == Some(true) {
+                let field_policy @ CodeGeneratorKind::DataclassLike(_) =
+                    CodeGeneratorKind::from_static_class(db, base_class, base_specialization)?
+                else {
+                    return None;
+                };
+
+                if base_class.has_dataclass_param(db, field_policy, DataclassFlags::SLOTS) {
+                    return None;
+                }
+
+                return Some(base_class.fields(db, base_specialization, field_policy));
+            }
+        }
+
+        None
     }
 
     /// Member lookup for classes that inherit from `typing.TypedDict`.
