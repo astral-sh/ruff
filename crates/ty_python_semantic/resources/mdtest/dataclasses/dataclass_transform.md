@@ -1177,33 +1177,56 @@ class Person:
 reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
 ```
 
-### With overloaded field specifiers that also accept `**kwargs`
+### With overloaded field specifier metadata
 
-Literal alias metadata should still be preserved when an overloaded field specifier accepts
-additional keyword arguments.
+Field metadata should still be preserved when an overloaded field specifier widens its metadata
+parameters during binding.
 
 ```py
 from typing import overload
 from typing_extensions import Any, dataclass_transform
 
 @overload
-def fancy_field(*, alias: str | None = None, **kwargs: Any) -> Any: ...
+def fancy_field(
+    *,
+    init: bool = True,
+    kw_only: bool = False,
+    alias: str | None = None,
+) -> Any: ...
 @overload
-def fancy_field(default: object, *, alias: str | None = None, **kwargs: Any) -> Any: ...
-def fancy_field(default: object = ..., *, alias: str | None = None, **kwargs: Any) -> Any: ...
+def fancy_field(
+    default: object,
+    *,
+    init: bool = True,
+    kw_only: bool = False,
+    alias: str | None = None,
+) -> Any: ...
+def fancy_field(
+    default: object = ...,
+    *,
+    init: bool = True,
+    kw_only: bool = False,
+    alias: str | None = None,
+) -> Any: ...
 
 @dataclass_transform(field_specifiers=(fancy_field,))
 class FancyBase: ...
 
 class Person(FancyBase):
+    id: int = fancy_field(init=False)
     internal_name: str | None = fancy_field(default=None, alias="name")
+    age: int | None = fancy_field(default=None, kw_only=True)
 
-reveal_type(Person.__init__)  # revealed: (self: Person, name: str | None = ...) -> None
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str | None = ..., *, age: int | None = ...) -> None
 
-Person(name="Alice")
+Person("Alice", age=30)
 
 # error: [unknown-argument] "Argument `internal_name` does not match any known parameter"
-Person(internal_name="Alice")
+# error: [unknown-argument] "Argument `id` does not match any known parameter"
+Person(id=1, internal_name="Alice", age=30)
+
+# error: [too-many-positional-arguments]
+Person("Alice", 30)
 ```
 
 ### Converter field specifier with overloaded callables

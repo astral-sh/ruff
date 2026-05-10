@@ -1637,10 +1637,19 @@ impl<'db> Bindings<'db> {
                             || get_argument_type("default_factory", false).is_some()
                             || get_argument_type("factory", false).is_some();
 
-                        let init = get_argument_type("init", true);
-                        let kw_only = get_argument_type("kw_only", true);
-                        let alias = get_call_argument_type("alias")
-                            .or_else(|| get_argument_type("alias", true));
+                        let get_metadata_argument_type =
+                            |name, fallback_to_default| -> Option<Type<'db>> {
+                                // These arguments are dataclass-field metadata, not value types.
+                                // Binding them against an overloaded parameter can erase literal
+                                // values like `init=False`, `kw_only=True`, or `alias="name"`,
+                                // so prefer the call-site type.
+                                get_call_argument_type(name)
+                                    .or_else(|| get_argument_type(name, fallback_to_default))
+                            };
+
+                        let init = get_metadata_argument_type("init", true);
+                        let kw_only = get_metadata_argument_type("kw_only", true);
+                        let alias = get_metadata_argument_type("alias", true);
                         let converter = get_argument_type("converter", true);
 
                         // `dataclasses.field` and field-specifier functions of commonly used
