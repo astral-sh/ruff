@@ -1591,6 +1591,97 @@ fn is_instance_truthiness<'db>(
     }
 }
 
+/// Evaluate a `dataclasses.is_dataclass` call. Return `AlwaysTrue` for types that are definitely
+/// dataclass-like classes or instances, including subclasses of dataclass-like classes.
+fn is_dataclass_truthiness<'db>(db: &'db dyn Db, ty: Type<'db>) -> Truthiness {
+    let always_true_if = |test: bool| {
+        if test {
+            Truthiness::AlwaysTrue
+        } else {
+            Truthiness::Ambiguous
+        }
+    };
+
+    match ty {
+        Type::Union(union) => always_true_if(
+            union
+                .elements(db)
+                .iter()
+                .all(|ty| is_dataclass_truthiness(db, *ty).is_always_true()),
+        ),
+
+        Type::Intersection(intersection) => always_true_if(
+            intersection
+                .positive(db)
+                .iter()
+                .any(|ty| is_dataclass_truthiness(db, *ty).is_always_true()),
+        ),
+
+        Type::NominalInstance(instance) => {
+            always_true_if(instance.class(db).is_dataclass_like_or_subclass(db))
+        }
+
+        Type::ClassLiteral(class) => always_true_if(
+            class
+                .default_specialization(db)
+                .is_dataclass_like_or_subclass(db),
+        ),
+
+        Type::GenericAlias(alias) => {
+            always_true_if(ClassType::Generic(alias).is_dataclass_like_or_subclass(db))
+        }
+
+        Type::SubclassOf(subclass_of) => always_true_if(
+            subclass_of
+                .subclass_of()
+                .into_class(db)
+                .is_some_and(|class| class.is_dataclass_like_or_subclass(db)),
+        ),
+
+        Type::TypeAlias(alias) => is_dataclass_truthiness(db, alias.value_type(db)),
+
+        Type::TypeVar(bound_typevar) => match bound_typevar.typevar(db).bound_or_constraints(db) {
+            None => Truthiness::Ambiguous,
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                is_dataclass_truthiness(db, bound)
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => always_true_if(
+                constraints
+                    .elements(db)
+                    .iter()
+                    .all(|c| is_dataclass_truthiness(db, *c).is_always_true()),
+            ),
+        },
+
+        Type::NewTypeInstance(newtype) => {
+            is_dataclass_truthiness(db, newtype.concrete_base_type(db))
+        }
+
+        Type::BoundMethod(..)
+        | Type::KnownBoundMethod(..)
+        | Type::WrapperDescriptor(..)
+        | Type::DataclassDecorator(..)
+        | Type::DataclassTransformer(..)
+        | Type::ProtocolInstance(..)
+        | Type::SpecialForm(..)
+        | Type::KnownInstance(..)
+        | Type::PropertyInstance(..)
+        | Type::AlwaysTruthy
+        | Type::AlwaysFalsy
+        | Type::BoundSuper(..)
+        | Type::TypeIs(..)
+        | Type::TypeGuard(..)
+        | Type::Callable(..)
+        | Type::Dynamic(..)
+        | Type::Divergent(_)
+        | Type::Never
+        | Type::TypedDict(_)
+        | Type::LiteralValue(..)
+        | Type::ModuleLiteral(..)
+        | Type::FunctionLiteral(..) => Truthiness::Ambiguous,
+    }
+}
+
 fn last_definition_signature_cycle_initial<'db>(
     _db: &'db dyn Db,
     _id: salsa::Id,
@@ -1742,6 +1833,8 @@ pub enum KnownFunction {
 
     /// `dataclasses.dataclass`
     Dataclass,
+    /// `dataclasses.is_dataclass`
+    IsDataclass,
     /// `dataclasses.field`
     Field,
 
@@ -1847,7 +1940,7 @@ impl KnownFunction {
             Self::AsyncContextManager => {
                 matches!(module, KnownModule::Contextlib)
             }
-            Self::Dataclass | Self::Field => {
+            Self::Dataclass | Self::IsDataclass | Self::Field => {
                 matches!(module, KnownModule::Dataclasses)
             }
             Self::TotalOrdering => module.is_functools(),
@@ -2229,6 +2322,16 @@ impl KnownFunction {
                 }
             }
 
+            KnownFunction::IsDataclass => {
+                let [Some(obj)] = parameter_types else {
+                    return;
+                };
+
+                if is_dataclass_truthiness(db, *obj).is_always_true() {
+                    overload.set_return_type(Type::bool_literal(true));
+                }
+            }
+
             known @ (KnownFunction::DunderImport | KnownFunction::ImportModule) => {
                 let [Some(first), rest @ ..] = parameter_types else {
                     return;
@@ -2339,7 +2442,9 @@ pub(crate) mod tests {
 
                 KnownFunction::AsyncContextManager => KnownModule::Contextlib,
 
-                KnownFunction::Dataclass | KnownFunction::Field => KnownModule::Dataclasses,
+                KnownFunction::Dataclass | KnownFunction::IsDataclass | KnownFunction::Field => {
+                    KnownModule::Dataclasses
+                }
 
                 KnownFunction::GetattrStatic => KnownModule::Inspect,
 
