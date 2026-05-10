@@ -993,6 +993,19 @@ impl<'db> ClassType<'db> {
         self.class_literal(db).is_typed_dict(db)
     }
 
+    /// Return true if this class, or a class in its MRO, is dataclass-like.
+    pub(crate) fn is_dataclass_like_or_subclass(self, db: &'db dyn Db) -> bool {
+        self.iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .any(|base| {
+                let (class, specialization) = base.class_literal_and_specialization(db);
+                matches!(
+                    CodeGeneratorKind::from_class(db, class, specialization),
+                    Some(CodeGeneratorKind::DataclassLike(_))
+                )
+            })
+    }
+
     /// Return `true` if this class is a subtype of (any specialization of) `class_literal`.
     pub(crate) fn is_subtype_of_class_literal(
         self,
