@@ -1875,32 +1875,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             builder.build()
-        } else if node_ty.is_assignable_to(self.db(), type_base_exception) {
-            node_ty.to_instance(self.db()).expect(
-                "`Type::to_instance()` should always return `Some()` \
-                    if called on a type assignable to `type[BaseException]`",
-            )
-        } else if node_ty.is_assignable_to(
-            self.db(),
-            Type::homogeneous_tuple(self.db(), type_base_exception),
-        ) {
-            node_ty
-                .tuple_instance_spec(self.db())
-                .and_then(|spec| {
-                    let specialization = spec
-                        .homogeneous_element_type(self.db())
-                        .to_instance(self.db());
-
-                    debug_assert!(specialization.is_some_and(|specialization_type| {
-                        specialization_type.is_assignable_to(
-                            self.db(),
-                            KnownClass::BaseException.to_instance(self.db()),
-                        )
-                    }));
-
-                    specialization
-                })
-                .unwrap_or_else(|| KnownClass::BaseException.to_instance(self.db()))
+        } else if let Some(symbol_ty) =
+            self.exception_handler_symbol_ty_from_valid_ty(node_ty, type_base_exception)
+        {
+            symbol_ty
         } else if node_ty.is_assignable_to(
             self.db(),
             UnionType::from_two_elements(
@@ -1909,6 +1887,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::homogeneous_tuple(self.db(), type_base_exception),
             ),
         ) {
+            // TODO: Handle valid handler expressions that are opaque to the structural helper
+            // above, for example a type variable bounded by the full class-or-tuple union.
             KnownClass::BaseException.to_instance(self.db())
         } else {
             if let Some(node) = node {
@@ -1928,6 +1908,61 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             class.to_specialized_instance(self.db(), &[symbol_ty])
         } else {
             symbol_ty
+        }
+    }
+
+    fn exception_handler_symbol_ty_from_valid_ty(
+        &self,
+        ty: Type<'db>,
+        type_base_exception: Type<'db>,
+    ) -> Option<Type<'db>> {
+        if let Some(tuple_spec) = ty.tuple_instance_spec(self.db()) {
+            UnionType::try_from_elements(
+                self.db(),
+                tuple_spec.all_elements().iter().map(|element| {
+                    if element.is_assignable_to(self.db(), type_base_exception) {
+                        Some(element.to_instance(self.db()).expect(
+                            "`Type::to_instance()` should always return `Some()` \
+                                if called on a type assignable to `type[BaseException]`",
+                        ))
+                    } else {
+                        None
+                    }
+                }),
+            )
+        } else if ty.is_assignable_to(self.db(), type_base_exception) {
+            Some(ty.to_instance(self.db()).expect(
+                "`Type::to_instance()` should always return `Some()` \
+                    if called on a type assignable to `type[BaseException]`",
+            ))
+        } else if ty.is_assignable_to(
+            self.db(),
+            Type::homogeneous_tuple(self.db(), type_base_exception),
+        ) {
+            Some(
+                ty.tuple_instance_spec(self.db())
+                    .and_then(|spec| {
+                        let specialization = spec
+                            .homogeneous_element_type(self.db())
+                            .to_instance(self.db());
+
+                        debug_assert!(specialization.is_some_and(|specialization_type| {
+                            specialization_type.is_assignable_to(
+                                self.db(),
+                                KnownClass::BaseException.to_instance(self.db()),
+                            )
+                        }));
+
+                        specialization
+                    })
+                    .unwrap_or_else(|| KnownClass::BaseException.to_instance(self.db())),
+            )
+        } else if let Type::Union(union) = ty {
+            union.try_map(self.db(), |element| {
+                self.exception_handler_symbol_ty_from_valid_ty(*element, type_base_exception)
+            })
+        } else {
+            None
         }
     }
 
