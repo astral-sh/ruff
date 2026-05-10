@@ -741,69 +741,15 @@ help: Replace with `Path.open()`
 74 | # https://github.com/astral-sh/ruff/issues/17693
 75 | os.stat(1)
 
-PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
-   --> full_name.py:108:1
-    |
-106 | os.replace("src", "dst", dst_dir_fd=2)
-107 |
-108 | os.getcwd()
-    | ^^^^^^^^^
-109 | os.getcwdb()
-    |
-help: Replace with `Path.cwd()`
-1   | import os
-2   | import os.path
-3   + import pathlib
-4   |
-5   | p = "/foo"
-6   | q = "bar"
---------------------------------------------------------------------------------
-106 | os.replace("src", "dst", src_dir_fd=1)
-107 | os.replace("src", "dst", dst_dir_fd=2)
-108 |
-    - os.getcwd()
-109 + pathlib.Path.cwd()
-110 | os.getcwdb()
-111 |
-112 | os.mkdir(path="directory")
-
-PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
-   --> full_name.py:109:1
-    |
-108 | os.getcwd()
-109 | os.getcwdb()
-    | ^^^^^^^^^^
-110 |
-111 | os.mkdir(path="directory")
-    |
-help: Replace with `Path.cwd()`
-1   | import os
-2   | import os.path
-3   + import pathlib
-4   |
-5   | p = "/foo"
-6   | q = "bar"
---------------------------------------------------------------------------------
-107 | os.replace("src", "dst", dst_dir_fd=2)
-108 |
-109 | os.getcwd()
-    - os.getcwdb()
-110 + pathlib.Path.cwd()
-111 |
-112 | os.mkdir(path="directory")
-113 |
-
-PTH102 [*] `os.mkdir()` should be replaced by `Path.mkdir()`
+PTH101 [*] `os.chmod()` should be replaced by `Path.chmod()`
    --> full_name.py:111:1
     |
-109 | os.getcwdb()
-110 |
-111 | os.mkdir(path="directory")
+110 | _holder = _AttrHolder()
+111 | os.chmod(_holder.fd, 0o644)
     | ^^^^^^^^
-112 |
-113 | os.mkdir(
+112 | os.chmod(_holder.name, 0o644)
     |
-help: Replace with `Path(...).mkdir()`
+help: Replace with `Path(...).chmod(...)`
 1   | import os
 2   | import os.path
 3   + import pathlib
@@ -811,24 +757,105 @@ help: Replace with `Path(...).mkdir()`
 5   | p = "/foo"
 6   | q = "bar"
 --------------------------------------------------------------------------------
-109 | os.getcwd()
-110 | os.getcwdb()
-111 |
-    - os.mkdir(path="directory")
-112 + pathlib.Path("directory").mkdir()
+109 |     name: str = ""
+110 |
+111 | _holder = _AttrHolder()
+    - os.chmod(_holder.fd, 0o644)
+112 + pathlib.Path(_holder.fd).chmod(0o644)
+113 | os.chmod(_holder.name, 0o644)
+114 |
+115 | # if `src_dir_fd` or `dst_dir_fd` are set, suppress the diagnostic
+note: This is an unsafe fix and may change runtime behavior
+
+PTH101 [*] `os.chmod()` should be replaced by `Path.chmod()`
+   --> full_name.py:112:1
+    |
+110 | _holder = _AttrHolder()
+111 | os.chmod(_holder.fd, 0o644)
+112 | os.chmod(_holder.name, 0o644)
+    | ^^^^^^^^
 113 |
-114 | os.mkdir(
-115 |     # comment 1
+114 | # if `src_dir_fd` or `dst_dir_fd` are set, suppress the diagnostic
+    |
+help: Replace with `Path(...).chmod(...)`
+1   | import os
+2   | import os.path
+3   + import pathlib
+4   |
+5   | p = "/foo"
+6   | q = "bar"
+--------------------------------------------------------------------------------
+110 |
+111 | _holder = _AttrHolder()
+112 | os.chmod(_holder.fd, 0o644)
+    - os.chmod(_holder.name, 0o644)
+113 + pathlib.Path(_holder.name).chmod(0o644)
+114 |
+115 | # if `src_dir_fd` or `dst_dir_fd` are set, suppress the diagnostic
+116 | os.replace("src", "dst", src_dir_fd=1, dst_dir_fd=2)
+note: This is an unsafe fix and may change runtime behavior
+
+PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
+   --> full_name.py:119:1
+    |
+117 | os.replace("src", "dst", dst_dir_fd=2)
+118 |
+119 | os.getcwd()
+    | ^^^^^^^^^
+120 | os.getcwdb()
+    |
+help: Replace with `Path.cwd()`
+1   | import os
+2   | import os.path
+3   + import pathlib
+4   |
+5   | p = "/foo"
+6   | q = "bar"
+--------------------------------------------------------------------------------
+117 | os.replace("src", "dst", src_dir_fd=1)
+118 | os.replace("src", "dst", dst_dir_fd=2)
+119 |
+    - os.getcwd()
+120 + pathlib.Path.cwd()
+121 | os.getcwdb()
+122 |
+123 | os.mkdir(path="directory")
+
+PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
+   --> full_name.py:120:1
+    |
+119 | os.getcwd()
+120 | os.getcwdb()
+    | ^^^^^^^^^^
+121 |
+122 | os.mkdir(path="directory")
+    |
+help: Replace with `Path.cwd()`
+1   | import os
+2   | import os.path
+3   + import pathlib
+4   |
+5   | p = "/foo"
+6   | q = "bar"
+--------------------------------------------------------------------------------
+118 | os.replace("src", "dst", dst_dir_fd=2)
+119 |
+120 | os.getcwd()
+    - os.getcwdb()
+121 + pathlib.Path.cwd()
+122 |
+123 | os.mkdir(path="directory")
+124 |
 
 PTH102 [*] `os.mkdir()` should be replaced by `Path.mkdir()`
-   --> full_name.py:113:1
+   --> full_name.py:122:1
     |
-111 | os.mkdir(path="directory")
-112 |
-113 | os.mkdir(
+120 | os.getcwdb()
+121 |
+122 | os.mkdir(path="directory")
     | ^^^^^^^^
-114 |     # comment 1
-115 |     "directory",
+123 |
+124 | os.mkdir(
     |
 help: Replace with `Path(...).mkdir()`
 1   | import os
@@ -838,341 +865,368 @@ help: Replace with `Path(...).mkdir()`
 5   | p = "/foo"
 6   | q = "bar"
 --------------------------------------------------------------------------------
-111 |
-112 | os.mkdir(path="directory")
-113 |
+120 | os.getcwd()
+121 | os.getcwdb()
+122 |
+    - os.mkdir(path="directory")
+123 + pathlib.Path("directory").mkdir()
+124 |
+125 | os.mkdir(
+126 |     # comment 1
+
+PTH102 [*] `os.mkdir()` should be replaced by `Path.mkdir()`
+   --> full_name.py:124:1
+    |
+122 | os.mkdir(path="directory")
+123 |
+124 | os.mkdir(
+    | ^^^^^^^^
+125 |     # comment 1
+126 |     "directory",
+    |
+help: Replace with `Path(...).mkdir()`
+1   | import os
+2   | import os.path
+3   + import pathlib
+4   |
+5   | p = "/foo"
+6   | q = "bar"
+--------------------------------------------------------------------------------
+122 |
+123 | os.mkdir(path="directory")
+124 |
     - os.mkdir(
     -     # comment 1
     -     "directory",
     -     mode=0o777
     - )
-114 + pathlib.Path("directory").mkdir(mode=0o777)
-115 |
-116 | os.mkdir("directory", mode=0o777, dir_fd=1)
-117 |
+125 + pathlib.Path("directory").mkdir(mode=0o777)
+126 |
+127 | os.mkdir("directory", mode=0o777, dir_fd=1)
+128 |
 note: This is an unsafe fix and may change runtime behavior
 
 PTH103 [*] `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
-   --> full_name.py:121:1
+   --> full_name.py:132:1
     |
-119 | os.mkdir("directory", mode=0o777, dir_fd=1)
-120 |
-121 | os.makedirs("name", 0o777, exist_ok=False)
+130 | os.mkdir("directory", mode=0o777, dir_fd=1)
+131 |
+132 | os.makedirs("name", 0o777, exist_ok=False)
     | ^^^^^^^^^^^
-122 |
-123 | os.makedirs("name", 0o777, False)
-    |
-help: Replace with `Path(...).mkdir(parents=True)`
-1   | import os
-2   | import os.path
-3   + import pathlib
-4   |
-5   | p = "/foo"
-6   | q = "bar"
---------------------------------------------------------------------------------
-119 |
-120 | os.mkdir("directory", mode=0o777, dir_fd=1)
-121 |
-    - os.makedirs("name", 0o777, exist_ok=False)
-122 + pathlib.Path("name").mkdir(0o777, exist_ok=False, parents=True)
-123 |
-124 | os.makedirs("name", 0o777, False)
-125 |
-
-PTH103 [*] `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
-   --> full_name.py:123:1
-    |
-121 | os.makedirs("name", 0o777, exist_ok=False)
-122 |
-123 | os.makedirs("name", 0o777, False)
-    | ^^^^^^^^^^^
-124 |
-125 | os.makedirs(name="name", mode=0o777, exist_ok=False)
-    |
-help: Replace with `Path(...).mkdir(parents=True)`
-1   | import os
-2   | import os.path
-3   + import pathlib
-4   |
-5   | p = "/foo"
-6   | q = "bar"
---------------------------------------------------------------------------------
-121 |
-122 | os.makedirs("name", 0o777, exist_ok=False)
-123 |
-    - os.makedirs("name", 0o777, False)
-124 + pathlib.Path("name").mkdir(0o777, True, False)
-125 |
-126 | os.makedirs(name="name", mode=0o777, exist_ok=False)
-127 |
-
-PTH103 [*] `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
-   --> full_name.py:125:1
-    |
-123 | os.makedirs("name", 0o777, False)
-124 |
-125 | os.makedirs(name="name", mode=0o777, exist_ok=False)
-    | ^^^^^^^^^^^
-126 |
-127 | os.makedirs("name", unknown_kwarg=True)
-    |
-help: Replace with `Path(...).mkdir(parents=True)`
-1   | import os
-2   | import os.path
-3   + import pathlib
-4   |
-5   | p = "/foo"
-6   | q = "bar"
---------------------------------------------------------------------------------
-123 |
-124 | os.makedirs("name", 0o777, False)
-125 |
-    - os.makedirs(name="name", mode=0o777, exist_ok=False)
-126 + pathlib.Path("name").mkdir(mode=0o777, exist_ok=False, parents=True)
-127 |
-128 | os.makedirs("name", unknown_kwarg=True)
-129 |
-
-PTH103 `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
-   --> full_name.py:127:1
-    |
-125 | os.makedirs(name="name", mode=0o777, exist_ok=False)
-126 |
-127 | os.makedirs("name", unknown_kwarg=True)
-    | ^^^^^^^^^^^
-128 |
-129 | # https://github.com/astral-sh/ruff/issues/20134
-    |
-help: Replace with `Path(...).mkdir(parents=True)`
-
-PTH101 [*] `os.chmod()` should be replaced by `Path.chmod()`
-   --> full_name.py:130:1
-    |
-129 | # https://github.com/astral-sh/ruff/issues/20134
-130 | os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
-    | ^^^^^^^^
-131 | os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
-    |
-help: Replace with `Path(...).chmod(...)`
-1   | import os
-2   | import os.path
-3   + import pathlib
-4   |
-5   | p = "/foo"
-6   | q = "bar"
---------------------------------------------------------------------------------
-128 | os.makedirs("name", unknown_kwarg=True)
-129 |
-130 | # https://github.com/astral-sh/ruff/issues/20134
-    - os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
-131 + pathlib.Path("pth1_link").chmod(mode=0o600, follow_symlinks=      False)
-132 | os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
 133 |
-134 | # Only diagnostic
-
-PTH101 [*] `os.chmod()` should be replaced by `Path.chmod()`
-   --> full_name.py:131:1
+134 | os.makedirs("name", 0o777, False)
     |
-129 | # https://github.com/astral-sh/ruff/issues/20134
-130 | os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
-131 | os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
-    | ^^^^^^^^
+help: Replace with `Path(...).mkdir(parents=True)`
+1   | import os
+2   | import os.path
+3   + import pathlib
+4   |
+5   | p = "/foo"
+6   | q = "bar"
+--------------------------------------------------------------------------------
+130 |
+131 | os.mkdir("directory", mode=0o777, dir_fd=1)
 132 |
-133 | # Only diagnostic
-    |
-help: Replace with `Path(...).chmod(...)`
-1   | import os
-2   | import os.path
-3   + import pathlib
-4   |
-5   | p = "/foo"
-6   | q = "bar"
---------------------------------------------------------------------------------
-129 |
-130 | # https://github.com/astral-sh/ruff/issues/20134
-131 | os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
-    - os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
-132 + pathlib.Path("pth1_link").chmod(mode=0o600, follow_symlinks=True)
-133 |
-134 | # Only diagnostic
-135 | os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
+    - os.makedirs("name", 0o777, exist_ok=False)
+133 + pathlib.Path("name").mkdir(0o777, exist_ok=False, parents=True)
+134 |
+135 | os.makedirs("name", 0o777, False)
+136 |
 
-PTH101 `os.chmod()` should be replaced by `Path.chmod()`
+PTH103 [*] `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
    --> full_name.py:134:1
     |
-133 | # Only diagnostic
-134 | os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
-    | ^^^^^^^^
+132 | os.makedirs("name", 0o777, exist_ok=False)
+133 |
+134 | os.makedirs("name", 0o777, False)
+    | ^^^^^^^^^^^
 135 |
-136 | os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
+136 | os.makedirs(name="name", mode=0o777, exist_ok=False)
+    |
+help: Replace with `Path(...).mkdir(parents=True)`
+1   | import os
+2   | import os.path
+3   + import pathlib
+4   |
+5   | p = "/foo"
+6   | q = "bar"
+--------------------------------------------------------------------------------
+132 |
+133 | os.makedirs("name", 0o777, exist_ok=False)
+134 |
+    - os.makedirs("name", 0o777, False)
+135 + pathlib.Path("name").mkdir(0o777, True, False)
+136 |
+137 | os.makedirs(name="name", mode=0o777, exist_ok=False)
+138 |
+
+PTH103 [*] `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
+   --> full_name.py:136:1
+    |
+134 | os.makedirs("name", 0o777, False)
+135 |
+136 | os.makedirs(name="name", mode=0o777, exist_ok=False)
+    | ^^^^^^^^^^^
+137 |
+138 | os.makedirs("name", unknown_kwarg=True)
+    |
+help: Replace with `Path(...).mkdir(parents=True)`
+1   | import os
+2   | import os.path
+3   + import pathlib
+4   |
+5   | p = "/foo"
+6   | q = "bar"
+--------------------------------------------------------------------------------
+134 |
+135 | os.makedirs("name", 0o777, False)
+136 |
+    - os.makedirs(name="name", mode=0o777, exist_ok=False)
+137 + pathlib.Path("name").mkdir(mode=0o777, exist_ok=False, parents=True)
+138 |
+139 | os.makedirs("name", unknown_kwarg=True)
+140 |
+
+PTH103 `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
+   --> full_name.py:138:1
+    |
+136 | os.makedirs(name="name", mode=0o777, exist_ok=False)
+137 |
+138 | os.makedirs("name", unknown_kwarg=True)
+    | ^^^^^^^^^^^
+139 |
+140 | # https://github.com/astral-sh/ruff/issues/20134
+    |
+help: Replace with `Path(...).mkdir(parents=True)`
+
+PTH101 [*] `os.chmod()` should be replaced by `Path.chmod()`
+   --> full_name.py:141:1
+    |
+140 | # https://github.com/astral-sh/ruff/issues/20134
+141 | os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
+    | ^^^^^^^^
+142 | os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
+    |
+help: Replace with `Path(...).chmod(...)`
+1   | import os
+2   | import os.path
+3   + import pathlib
+4   |
+5   | p = "/foo"
+6   | q = "bar"
+--------------------------------------------------------------------------------
+139 | os.makedirs("name", unknown_kwarg=True)
+140 |
+141 | # https://github.com/astral-sh/ruff/issues/20134
+    - os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
+142 + pathlib.Path("pth1_link").chmod(mode=0o600, follow_symlinks=      False)
+143 | os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
+144 |
+145 | # Only diagnostic
+
+PTH101 [*] `os.chmod()` should be replaced by `Path.chmod()`
+   --> full_name.py:142:1
+    |
+140 | # https://github.com/astral-sh/ruff/issues/20134
+141 | os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
+142 | os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
+    | ^^^^^^^^
+143 |
+144 | # Only diagnostic
+    |
+help: Replace with `Path(...).chmod(...)`
+1   | import os
+2   | import os.path
+3   + import pathlib
+4   |
+5   | p = "/foo"
+6   | q = "bar"
+--------------------------------------------------------------------------------
+140 |
+141 | # https://github.com/astral-sh/ruff/issues/20134
+142 | os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
+    - os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
+143 + pathlib.Path("pth1_link").chmod(mode=0o600, follow_symlinks=True)
+144 |
+145 | # Only diagnostic
+146 | os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
+
+PTH101 `os.chmod()` should be replaced by `Path.chmod()`
+   --> full_name.py:145:1
+    |
+144 | # Only diagnostic
+145 | os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
+    | ^^^^^^^^
+146 |
+147 | os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
     |
 help: Replace with `Path(...).chmod(...)`
 
 PTH104 `os.rename()` should be replaced by `Path.rename()`
-   --> full_name.py:136:1
+   --> full_name.py:147:1
     |
-134 | os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
-135 |
-136 | os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
+145 | os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
+146 |
+147 | os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
     | ^^^^^^^^^
-137 | os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
+148 | os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
     |
 help: Replace with `Path(...).rename(...)`
 
 PTH105 `os.replace()` should be replaced by `Path.replace()`
-   --> full_name.py:137:1
+   --> full_name.py:148:1
     |
-136 | os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
-137 | os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
+147 | os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
+148 | os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
     | ^^^^^^^^^^
-138 |
-139 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
+149 |
+150 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
     |
 help: Replace with `Path(...).replace(...)`
 
 PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
-   --> full_name.py:139:1
+   --> full_name.py:150:1
     |
-137 | os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
-138 |
-139 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
+148 | os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
+149 |
+150 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
     | ^^^^^^^^^^^^^^^^
-140 |
-141 | # See: https://github.com/astral-sh/ruff/issues/21794
+151 |
+152 | # See: https://github.com/astral-sh/ruff/issues/21794
     |
 help: Replace with `Path(...).samefile()`
 
 PTH104 [*] `os.rename()` should be replaced by `Path.rename()`
-   --> full_name.py:144:4
+   --> full_name.py:155:4
     |
-142 | import sys
-143 |
-144 | if os.rename("pth1.py", "pth1.py.bak"):
+153 | import sys
+154 |
+155 | if os.rename("pth1.py", "pth1.py.bak"):
     |    ^^^^^^^^^
-145 |     print("rename: truthy")
-146 | else:
+156 |     print("rename: truthy")
+157 | else:
     |
 help: Replace with `Path(...).rename(...)`
-140 |
-141 | # See: https://github.com/astral-sh/ruff/issues/21794
-142 | import sys
-143 + import pathlib
-144 |
+151 |
+152 | # See: https://github.com/astral-sh/ruff/issues/21794
+153 | import sys
+154 + import pathlib
+155 |
     - if os.rename("pth1.py", "pth1.py.bak"):
-145 + if pathlib.Path("pth1.py").rename("pth1.py.bak"):
-146 |     print("rename: truthy")
-147 | else:
-148 |     print("rename: falsey")
+156 + if pathlib.Path("pth1.py").rename("pth1.py.bak"):
+157 |     print("rename: truthy")
+158 | else:
+159 |     print("rename: falsey")
 note: This is an unsafe fix and may change runtime behavior
 
 PTH105 [*] `os.replace()` should be replaced by `Path.replace()`
-   --> full_name.py:149:4
+   --> full_name.py:160:4
     |
-147 |     print("rename: falsey")
-148 |
-149 | if os.replace("pth1.py.bak", "pth1.py"):
+158 |     print("rename: falsey")
+159 |
+160 | if os.replace("pth1.py.bak", "pth1.py"):
     |    ^^^^^^^^^^
-150 |     print("replace: truthy")
-151 | else:
+161 |     print("replace: truthy")
+162 | else:
     |
 help: Replace with `Path(...).replace(...)`
-140 |
-141 | # See: https://github.com/astral-sh/ruff/issues/21794
-142 | import sys
-143 + import pathlib
-144 |
-145 | if os.rename("pth1.py", "pth1.py.bak"):
-146 |     print("rename: truthy")
-147 | else:
-148 |     print("rename: falsey")
-149 |
+151 |
+152 | # See: https://github.com/astral-sh/ruff/issues/21794
+153 | import sys
+154 + import pathlib
+155 |
+156 | if os.rename("pth1.py", "pth1.py.bak"):
+157 |     print("rename: truthy")
+158 | else:
+159 |     print("rename: falsey")
+160 |
     - if os.replace("pth1.py.bak", "pth1.py"):
-150 + if pathlib.Path("pth1.py.bak").replace("pth1.py"):
-151 |     print("replace: truthy")
-152 | else:
-153 |     print("replace: falsey")
+161 + if pathlib.Path("pth1.py.bak").replace("pth1.py"):
+162 |     print("replace: truthy")
+163 | else:
+164 |     print("replace: falsey")
 note: This is an unsafe fix and may change runtime behavior
 
 PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
-   --> full_name.py:155:14
+   --> full_name.py:166:14
     |
-154 | try:
-155 |     for _ in os.getcwd():
+165 | try:
+166 |     for _ in os.getcwd():
     |              ^^^^^^^^^
-156 |         print("getcwd: iterable")
-157 |         break
+167 |         print("getcwd: iterable")
+168 |         break
     |
 help: Replace with `Path.cwd()`
-140 |
-141 | # See: https://github.com/astral-sh/ruff/issues/21794
-142 | import sys
-143 + import pathlib
-144 |
-145 | if os.rename("pth1.py", "pth1.py.bak"):
-146 |     print("rename: truthy")
+151 |
+152 | # See: https://github.com/astral-sh/ruff/issues/21794
+153 | import sys
+154 + import pathlib
+155 |
+156 | if os.rename("pth1.py", "pth1.py.bak"):
+157 |     print("rename: truthy")
 --------------------------------------------------------------------------------
-153 |     print("replace: falsey")
-154 |
-155 | try:
+164 |     print("replace: falsey")
+165 |
+166 | try:
     -     for _ in os.getcwd():
-156 +     for _ in pathlib.Path.cwd():
-157 |         print("getcwd: iterable")
-158 |         break
-159 | except TypeError as e:
+167 +     for _ in pathlib.Path.cwd():
+168 |         print("getcwd: iterable")
+169 |         break
+170 | except TypeError as e:
 note: This is an unsafe fix and may change runtime behavior
 
 PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
-   --> full_name.py:162:14
+   --> full_name.py:173:14
     |
-161 | try:
-162 |     for _ in os.getcwdb():
+172 | try:
+173 |     for _ in os.getcwdb():
     |              ^^^^^^^^^^
-163 |         print("getcwdb: iterable")
-164 |         break
+174 |         print("getcwdb: iterable")
+175 |         break
     |
 help: Replace with `Path.cwd()`
-140 |
-141 | # See: https://github.com/astral-sh/ruff/issues/21794
-142 | import sys
-143 + import pathlib
-144 |
-145 | if os.rename("pth1.py", "pth1.py.bak"):
-146 |     print("rename: truthy")
+151 |
+152 | # See: https://github.com/astral-sh/ruff/issues/21794
+153 | import sys
+154 + import pathlib
+155 |
+156 | if os.rename("pth1.py", "pth1.py.bak"):
+157 |     print("rename: truthy")
 --------------------------------------------------------------------------------
-160 |     print("getcwd: not iterable")
-161 |
-162 | try:
+171 |     print("getcwd: not iterable")
+172 |
+173 | try:
     -     for _ in os.getcwdb():
-163 +     for _ in pathlib.Path.cwd():
-164 |         print("getcwdb: iterable")
-165 |         break
-166 | except TypeError as e:
+174 +     for _ in pathlib.Path.cwd():
+175 |         print("getcwdb: iterable")
+176 |         break
+177 | except TypeError as e:
 note: This is an unsafe fix and may change runtime behavior
 
 PTH115 [*] `os.readlink()` should be replaced by `Path.readlink()`
-   --> full_name.py:169:14
+   --> full_name.py:180:14
     |
-168 | try:
-169 |     for _ in os.readlink(sys.executable):
+179 | try:
+180 |     for _ in os.readlink(sys.executable):
     |              ^^^^^^^^^^^
-170 |         print("readlink: iterable")
-171 |         break
+181 |         print("readlink: iterable")
+182 |         break
     |
 help: Replace with `Path(...).readlink()`
-140 |
-141 | # See: https://github.com/astral-sh/ruff/issues/21794
-142 | import sys
-143 + import pathlib
-144 |
-145 | if os.rename("pth1.py", "pth1.py.bak"):
-146 |     print("rename: truthy")
+151 |
+152 | # See: https://github.com/astral-sh/ruff/issues/21794
+153 | import sys
+154 + import pathlib
+155 |
+156 | if os.rename("pth1.py", "pth1.py.bak"):
+157 |     print("rename: truthy")
 --------------------------------------------------------------------------------
-167 |     print("getcwdb: not iterable")
-168 |
-169 | try:
+178 |     print("getcwdb: not iterable")
+179 |
+180 | try:
     -     for _ in os.readlink(sys.executable):
-170 +     for _ in pathlib.Path(sys.executable).readlink():
-171 |         print("readlink: iterable")
-172 |         break
-173 | except TypeError as e:
+181 +     for _ in pathlib.Path(sys.executable).readlink():
+182 |         print("readlink: iterable")
+183 |         break
+184 | except TypeError as e:
 note: This is an unsafe fix and may change runtime behavior

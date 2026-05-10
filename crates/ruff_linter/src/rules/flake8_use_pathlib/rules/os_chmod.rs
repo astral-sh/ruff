@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{ArgOrKeyword, ExprCall};
+use ruff_python_ast::{ArgOrKeyword, Expr, ExprCall};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -41,7 +41,12 @@ use crate::{FixAvailability, Violation};
 /// especially on older versions of Python.
 ///
 /// ## Fix Safety
-/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+/// This rule's fix is marked as unsafe in either of the following cases:
+///
+/// - The replacement would remove comments attached to the original expression.
+/// - The first argument is an attribute access (e.g., `self.fd`). `pathlib.Path`
+///   does not accept file descriptors, and the type of an attribute cannot be
+///   statically determined, so the replacement may break code that was working.
 ///
 /// ## References
 /// - [Python documentation: `Path.chmod`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.chmod)
@@ -140,7 +145,9 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
             format!("{binding}({path_code}).chmod({chmod_args})")
         };
 
-        let applicability = if checker.comment_ranges().intersects(range) {
+        let applicability = if checker.comment_ranges().intersects(range)
+            || matches!(path_arg, Expr::Attribute(_))
+        {
             Applicability::Unsafe
         } else {
             Applicability::Safe
