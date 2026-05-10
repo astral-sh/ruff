@@ -13,7 +13,18 @@ reveal_type(x)  # revealed: int | float
 
 x = (1, 2)
 x += (3, 4)
-reveal_type(x)  # revealed: tuple[Literal[1, 2, 3, 4], ...]
+reveal_type(x)  # revealed: tuple[Literal[1], Literal[2], Literal[3], Literal[4]]
+```
+
+## Fixed-length tuple of `Any`
+
+```py
+from typing import Any
+
+def f2():
+    x: tuple[Any, Any, Any] = (0, 1, 2)
+    x += (1, 2, 3)  # error: [invalid-assignment]
+    reveal_type(x)  # revealed: tuple[Any, Any, Any]
 ```
 
 ## Walrus target
