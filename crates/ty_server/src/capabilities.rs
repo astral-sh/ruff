@@ -258,15 +258,28 @@ impl ResolvedClientCapabilities {
 
         if text_document
             .and_then(|text_document| {
-                Some(
-                    text_document
-                        .hover
-                        .as_ref()?
-                        .content_format
-                        .as_ref()?
-                        .first()
-                        == Some(&MarkupKind::Markdown),
-                )
+                let formats = text_document
+                    .hover
+                    .as_ref()?
+                    .content_format
+                    .as_ref()?;
+
+                // Check if Markdown appears before PlainText in the preference list
+                let mut found_markdown = false;
+                for format in formats {
+                    match format {
+                        MarkupKind::Markdown => {
+                            found_markdown = true;
+                            break;
+                        }
+                        MarkupKind::PlainText => {
+                            break;
+                        }
+                        // Ignore unknown formats
+                        _ => continue,
+                    }
+                }
+                Some(found_markdown)
             })
             .unwrap_or_default()
         {
@@ -275,17 +288,30 @@ impl ResolvedClientCapabilities {
 
         if text_document
             .and_then(|text_document| {
-                Some(
-                    text_document
-                        .completion
-                        .as_ref()?
-                        .completion_item
-                        .as_ref()?
-                        .documentation_format
-                        .as_ref()?
-                        .first()
-                        == Some(&MarkupKind::Markdown),
-                )
+                let formats = text_document
+                    .completion
+                    .as_ref()?
+                    .completion_item
+                    .as_ref()?
+                    .documentation_format
+                    .as_ref()?;
+
+                // Check if Markdown appears before PlainText in the preference list
+                let mut found_markdown = false;
+                for format in formats {
+                    match format {
+                        MarkupKind::Markdown => {
+                            found_markdown = true;
+                            break;
+                        }
+                        MarkupKind::PlainText => {
+                            break;
+                        }
+                        // Ignore unknown formats
+                        _ => continue,
+                    }
+                }
+                Some(found_markdown)
             })
             .unwrap_or_default()
         {
