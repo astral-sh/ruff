@@ -1917,6 +1917,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         type_base_exception: Type<'db>,
     ) -> Option<Type<'db>> {
         if let Some(tuple_spec) = ty.tuple_instance_spec(self.db()) {
+            // `except (ValueError, TypeError) as e:`
             UnionType::try_from_elements(
                 self.db(),
                 tuple_spec.all_elements().iter().map(|element| {
@@ -1931,6 +1932,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }),
             )
         } else if ty.is_assignable_to(self.db(), type_base_exception) {
+            // `except ValueError as e:`
             Some(ty.to_instance(self.db()).expect(
                 "`Type::to_instance()` should always return `Some()` \
                     if called on a type assignable to `type[BaseException]`",
@@ -1939,6 +1941,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.db(),
             Type::homogeneous_tuple(self.db(), type_base_exception),
         ) {
+            // `except exception_types as e:`, where
+            // `exception_types: tuple[type[ValueError], ...]`
             Some(
                 ty.tuple_instance_spec(self.db())
                     .and_then(|spec| {
@@ -1958,6 +1962,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .unwrap_or_else(|| KnownClass::BaseException.to_instance(self.db())),
             )
         } else if let Type::Union(union) = ty {
+            // `except exception_types as e:`, where
+            // `exception_types: type[ValueError] | tuple[type[ValueError], ...]`
             union.try_map(self.db(), |element| {
                 self.exception_handler_symbol_ty_from_valid_ty(*element, type_base_exception)
             })
