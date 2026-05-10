@@ -574,6 +574,40 @@ class DerivedPreservedClass(PreservedClass):
     value: PreservedClass
 ```
 
+Class decorator factories that preserve the original class object also preserve the class binding:
+
+```py
+from collections.abc import Callable
+from typing import Any, TypeVar, overload
+
+DecoratorT = TypeVar("DecoratorT", bound=object)
+DecoratedClass = type[DecoratorT]
+
+@overload
+def identity_class_decorator_factory(cls: DecoratedClass, **kwargs: Any) -> DecoratedClass: ...
+@overload
+def identity_class_decorator_factory(
+    **kwargs: Any,
+) -> Callable[[DecoratedClass], DecoratedClass]: ...
+def identity_class_decorator_factory(
+    cls: DecoratedClass | None = None, **kwargs: Any
+) -> DecoratedClass | Callable[[DecoratedClass], DecoratedClass]:
+    def decorator(inner_cls: DecoratedClass) -> DecoratedClass:
+        return inner_cls
+
+    if cls is not None:
+        return decorator(cls)
+    return decorator
+
+@identity_class_decorator_factory(frozen=True)
+class FactoryPreservedClass: ...
+
+reveal_type(FactoryPreservedClass)  # revealed: <class 'FactoryPreservedClass'>
+
+class DerivedFactoryPreservedClass(FactoryPreservedClass):
+    value: FactoryPreservedClass
+```
+
 Class decorators can return intersections that expose attributes added to the decorated class
 object:
 

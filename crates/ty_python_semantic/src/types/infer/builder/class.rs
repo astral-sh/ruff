@@ -65,6 +65,21 @@ fn can_preserve_unknown_class_decorator_result<'db>(
         .unwrap_or_else(|| decorator_ty.try_upcast_to_callable(db).is_some())
 }
 
+fn is_unknown_decorator_result<'db>(db: &'db dyn crate::Db, ty: Type<'db>) -> bool {
+    if ty.is_unknown() {
+        return true;
+    }
+
+    let Type::SubclassOf(subclass_of) = ty.resolve_type_alias(db) else {
+        return false;
+    };
+
+    subclass_of
+        .subclass_of()
+        .into_dynamic()
+        .is_some_and(|dynamic| Type::Dynamic(dynamic).is_unknown())
+}
+
 fn class_decorator_known_preservation<'db>(
     db: &'db dyn crate::Db,
     decorator_ty: Type<'db>,
@@ -317,10 +332,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::DataclassDecorator(_) | Type::DataclassTransformer(_) => Type::unknown(),
                 decorated_ty => decorated_ty,
             };
-            // For unannotated class decorators, assume the decorator preserves the class binding
-            // instead of replacing it with `Unknown`. We do not infer returned classes from
-            // decorator bodies, because each call can create a distinct runtime class.
-            let preserves_unannotated_decorator_binding = decorated_ty.is_unknown()
+            // If a class decorator application loses all precision, preserve the original class
+            // binding when the decorator is known to preserve unknown results.
+            let preserves_unknown_decorator_binding = is_unknown_decorator_result(db, decorated_ty)
                 && (can_preserve_unknown_class_decorator_result(db, decorator_ty)
                     || matches!(&decorator_node.expression, ast::Expr::Call(call) if {
                         can_preserve_unknown_class_decorator_result(
@@ -328,7 +342,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             self.expression_type(&call.func),
                         )
                     }));
-            inferred_ty = if preserves_unannotated_decorator_binding {
+            inferred_ty = if preserves_unknown_decorator_binding {
                 inferred_ty
             } else if class_decorator_preserves_class_binding(db, original_class_ty, decorated_ty) {
                 decorated_ty
