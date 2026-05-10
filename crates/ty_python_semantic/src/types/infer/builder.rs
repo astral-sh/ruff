@@ -3578,22 +3578,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             repr_arg = Some(&keyword.value);
         }
 
-        let name_ty = self.infer_expression(name_arg, TypeContext::default());
-        let sentinel_name = name_ty.as_string_literal()?;
+        if !matches!(name_arg, ast::Expr::StringLiteral(_)) {
+            return None;
+        }
 
         let Some(repr_arg) = repr_arg else {
             return Some(Type::KnownInstance(KnownInstanceType::Sentinel(
-                SentinelInstance::new(self.db(), target_name.clone(), sentinel_name, definition),
+                SentinelInstance::new(self.db(), target_name.clone(), definition),
             )));
         };
 
-        let repr_ty = self.infer_expression(repr_arg, TypeContext::default());
-        if repr_ty.as_string_literal().is_none() && !repr_arg.is_none_literal_expr() {
+        if !matches!(repr_arg, ast::Expr::StringLiteral(_)) && !repr_arg.is_none_literal_expr() {
             return None;
         }
 
         Some(Type::KnownInstance(KnownInstanceType::Sentinel(
-            SentinelInstance::new(self.db(), target_name.clone(), sentinel_name, definition),
+            SentinelInstance::new(self.db(), target_name.clone(), definition),
         )))
     }
 

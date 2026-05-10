@@ -2,8 +2,7 @@
 
 ## `typing_extensions.Sentinel`
 
-Sentinels constructed with `typing_extensions.Sentinel` can be used directly in
-type expressions:
+Sentinels constructed with `typing_extensions.Sentinel` can be used directly in type expressions:
 
 ```py
 from typing_extensions import Sentinel, assert_type
@@ -114,4 +113,18 @@ from typing_extensions import Sentinel
 MISSING = Sentinel("MISSING")
 
 def f(x: MISSING[int]) -> None: ...  # error: [invalid-type-form]
+```
+
+Invalid sentinel constructor calls fall back to the normal call path:
+
+```py
+from typing_extensions import Sentinel
+
+NAME = "NAME"
+
+NON_LITERAL_NAME = Sentinel(NAME)
+UNKNOWN_NAME = Sentinel(UNKNOWN)  # error: [unresolved-reference]
+NON_LITERAL_REPR = Sentinel("NON_LITERAL_REPR", repr=NAME)
+UNKNOWN_REPR = Sentinel("UNKNOWN_REPR", repr=UNKNOWN)  # error: [unresolved-reference]
+UNKNOWN_KEYWORD = Sentinel("UNKNOWN_KEYWORD", unknown=NAME)  # error: [unknown-argument]
 ```

@@ -380,7 +380,6 @@ impl<'db> KnownInstanceType<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct SentinelInstance<'db> {
     pub name: Name,
-    pub sentinel_name: StringLiteralType<'db>,
     pub definition: Definition<'db>,
 }
 
