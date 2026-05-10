@@ -27,6 +27,24 @@ def f2():
     reveal_type(x)  # revealed: tuple[Any, Any, Any]
 ```
 
+## Recursive variable-length tuple
+
+```py
+from typing import Any, Mapping
+
+_marker: tuple[object] = (object(),)
+
+def make_key(args: tuple[Any, ...], kwds: Mapping[Any, object]) -> tuple[Any, ...]:
+    key: tuple[Any, ...] = args
+    if kwds:
+        key += _marker
+        for item in kwds.items():
+            key += item
+
+    reveal_type(key)  # revealed: tuple[object, ...]
+    return key
+```
+
 ## Walrus target
 
 ```py

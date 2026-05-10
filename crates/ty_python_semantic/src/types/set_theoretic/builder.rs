@@ -888,16 +888,73 @@ impl<'db> UnionBuilder<'db> {
         self.try_build().unwrap_or(Type::Never)
     }
 
+    /// In a recursively-defined union, collapses precise tuple shapes of differing lengths to a
+    /// single homogeneous variable-length tuple.
+    ///
+    /// This preserves precise tuple concatenation for acyclic inference while ensuring fixed-point
+    /// iteration can converge when each iteration appends another fixed suffix to the tuple.
+    fn collapse_tuple_shapes_for_cycle_recovery(
+        db: &'db dyn Db,
+        cycle_recovery: bool,
+        recursively_defined: RecursivelyDefined,
+        types: Vec<Type<'db>>,
+    ) -> Vec<Type<'db>> {
+        if !(cycle_recovery && recursively_defined.is_yes()) {
+            return types;
+        }
+
+        let mut first_tuple_length = None;
+        let mut has_multiple_tuple_lengths = false;
+
+        for ty in &types {
+            let Some(tuple) = ty.exact_tuple_instance_spec(db) else {
+                continue;
+            };
+
+            has_multiple_tuple_lengths |= first_tuple_length
+                .replace(tuple.len())
+                .is_some_and(|first_tuple_length| first_tuple_length != tuple.len());
+        }
+
+        if !has_multiple_tuple_lengths {
+            return types;
+        }
+
+        let mut collapsed = Vec::with_capacity(types.len());
+        let mut tuple_element_type = UnionBuilder::new(db)
+            .unpack_aliases(false)
+            .cycle_recovery(true)
+            .recursively_defined(recursively_defined);
+
+        for ty in types {
+            if let Some(tuple) = ty.exact_tuple_instance_spec(db) {
+                tuple_element_type = tuple_element_type.add(tuple.homogeneous_element_type(db));
+            } else {
+                collapsed.push(ty);
+            }
+        }
+
+        collapsed.push(Type::homogeneous_tuple(db, tuple_element_type.build()));
+        collapsed
+    }
+
     pub(crate) fn try_build(self) -> Option<Type<'db>> {
-        let type_count = self.elements.iter().map(UnionElement::type_count).sum();
+        let Self {
+            elements,
+            db,
+            unpack_aliases: _,
+            cycle_recovery,
+            recursively_defined,
+        } = self;
+        let type_count = elements.iter().map(UnionElement::type_count).sum();
         let mut types = Vec::with_capacity(type_count);
-        for element in self.elements {
+        for element in elements {
             match element {
                 UnionElement::IntLiterals(literals) => {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
                         Type::from(
                             LiteralValueType::new(literal, promotable)
-                                .with_recursively_defined(self.recursively_defined),
+                                .with_recursively_defined(recursively_defined),
                         )
                     }));
                 }
@@ -905,7 +962,7 @@ impl<'db> UnionBuilder<'db> {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
                         Type::from(
                             LiteralValueType::new(literal, promotable)
-                                .with_recursively_defined(self.recursively_defined),
+                                .with_recursively_defined(recursively_defined),
                         )
                     }));
                 }
@@ -913,7 +970,7 @@ impl<'db> UnionBuilder<'db> {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
                         Type::from(
                             LiteralValueType::new(literal, promotable)
-                                .with_recursively_defined(self.recursively_defined),
+                                .with_recursively_defined(recursively_defined),
                         )
                     }));
                 }
@@ -921,20 +978,26 @@ impl<'db> UnionBuilder<'db> {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
                         Type::from(
                             LiteralValueType::new(literal, promotable)
-                                .with_recursively_defined(self.recursively_defined),
+                                .with_recursively_defined(recursively_defined),
                         )
                     }));
                 }
                 UnionElement::Type(ty) => types.push(ty),
             }
         }
+        let types = Self::collapse_tuple_shapes_for_cycle_recovery(
+            db,
+            cycle_recovery,
+            recursively_defined,
+            types,
+        );
         match types.len() {
             0 => None,
             1 => Some(types[0]),
             _ => Some(Type::Union(UnionType::new(
-                self.db,
+                db,
                 types.into_boxed_slice(),
-                self.recursively_defined,
+                recursively_defined,
             ))),
         }
     }
