@@ -251,9 +251,7 @@ impl<'db> KnownInstanceType<'db> {
                 KnownClass::ParamSpec
             }
             Self::TypeVar(_) => KnownClass::TypeVar,
-            Self::TypeAliasType(TypeAliasType::PEP695(alias)) if alias.is_specialized(db) => {
-                KnownClass::GenericAlias
-            }
+            Self::TypeAliasType(alias) if alias.is_specialized(db) => KnownClass::GenericAlias,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
             Self::Deprecated(_) => KnownClass::Deprecated,
             Self::Field(_) => KnownClass::Field,
@@ -347,9 +345,41 @@ impl<'db> KnownInstanceType<'db> {
                 )))
             }
 
+            KnownInstanceType::TypeAliasType(type_alias) => {
+                if TypeMapping::EagerExpansion == *type_mapping {
+                    return type_alias.value_type(db).expand_eagerly(db);
+                }
+
+                let (TypeMapping::ApplySpecialization(specialization)
+                | TypeMapping::ApplySpecializationWithMaterialization {
+                    specialization, ..
+                }) = type_mapping
+                else {
+                    return Type::KnownInstance(self);
+                };
+                let Some(mut current_specialization) = specialization.as_specialization(db) else {
+                    return Type::KnownInstance(self);
+                };
+                if let TypeMapping::ApplySpecializationWithMaterialization {
+                    materialization_kind,
+                    ..
+                } = type_mapping
+                {
+                    current_specialization = current_specialization
+                        .with_materialization_kind(db, Some(*materialization_kind));
+                }
+                Type::KnownInstance(KnownInstanceType::TypeAliasType(
+                    type_alias.apply_specialization(db, |generic_context| {
+                        type_alias
+                            .specialization(db)
+                            .unwrap_or_else(|| generic_context.default_specialization(db, None))
+                            .apply_specialization(db, current_specialization)
+                    }),
+                ))
+            }
+
             KnownInstanceType::SubscriptedProtocol(_)
             | KnownInstanceType::SubscriptedGeneric(_)
-            | KnownInstanceType::TypeAliasType(_)
             | KnownInstanceType::Deprecated(_)
             | KnownInstanceType::Field(_)
             | KnownInstanceType::ConstraintSet(_)

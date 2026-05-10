@@ -214,19 +214,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
             }
-            Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(
-                _,
-            ))) => {
-                let slice_ty = self.infer_expression(slice, TypeContext::default());
-                let mut variables = FxOrderSet::default();
-                slice_ty.bind_and_find_all_legacy_typevars(
-                    db,
-                    self.typevar_binding_context,
-                    &mut variables,
-                );
-                let generic_context = GenericContext::from_typevar_instances(db, variables);
-                return Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
-            }
             Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => {
                 if let Some(generic_context) = type_alias.generic_context(db) {
                     return self.infer_explicit_type_alias_type_specialization(
@@ -540,6 +527,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let typevars = generic_context.variables(db).collect::<Vec<_>>();
         let typevars_len = typevars.len();
+        let has_todo_typevartuple_parameter = matches!(
+            value_ty,
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias))
+                if type_alias.has_todo_typevartuple_parameter(db)
+        );
 
         let mut expanded_type_arguments = Vec::with_capacity(type_arguments.len());
 
@@ -850,6 +842,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 error = Some(ExplicitSpecializationError::NonGeneric);
+            } else if has_todo_typevartuple_parameter {
+                // Manual `TypeAliasType` aliases can include a legacy `TypeVarTuple` in
+                // `type_params`, but ty does not fully model `TypeVarTuple` specialization yet.
+                // Avoid emitting arity false positives for arguments that may be consumed by it.
             } else {
                 let node = expanded_type_arguments[first_excess_type_argument_index].node;
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_ARGUMENTS, node) {
