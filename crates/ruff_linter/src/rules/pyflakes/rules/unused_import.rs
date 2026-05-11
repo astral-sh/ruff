@@ -998,18 +998,34 @@ fn symbol_used_in_dunder_all(semantic: &SemanticModel<'_>, binding: &ImportBindi
         })
 }
 
-/// Returns `true` if `binding` is a `from a.b.c... import x` whose
+/// Returns `true` if `binding` is a `from a.b...c import x` whose
 /// observable side effect (binding `b` as an attribute of `a`,
-/// `c` as an attribute of `a.b`, and so on) is relied on by some
-/// attribute access in the scope.
+/// `c` as an attribute of `a.b`, and so on, and possibly `x` as an
+/// attribute of `a.b...c` if `x` is itself a submodule) is relied on
+/// by some attribute access in the scope.
 ///
 /// `from a.b.c import x` is equivalent to running `import a.b.c` and then
-/// extracting `x` from `a.b.c`. As a side effect, `b` is set as an
-/// attribute of the `a` module object, `c` as an attribute of `a.b`, and so
-/// on. Removing the import — even if the bound name `x` is unused — can
-/// therefore break code that traverses `a.b.c.<...>` via attribute access,
-/// unless some other import in the scope provides the same side effect
-/// (i.e., another import of `a.b.c` or a submodule of it).
+/// looking up `x` on `a.b.c`. If `x` is a submodule the lookup also imports
+/// `a.b.c.x`. Removing the import — even if the bound name `x` is unused —
+/// can therefore break code that traverses `a.b.c.<...>` or `a.b.c.x.<...>`
+/// via attribute access, unless some other import in the scope already
+/// provides the same side effect.
+///
+/// Two reference patterns drive preservation:
+///
+/// * A reference whose qualified-name path begins with the full import
+///   path (`a.b.c.x[...]`) relies on `x` being set as an attribute of
+///   `a.b.c`. We preserve the import unless another import already
+///   imports `a.b.c.x` (or a submodule of it).
+/// * A reference whose qualified-name path begins with the source-module
+///   path and accesses at least one attribute (`a.b.c[...]`, length > 1)
+///   relies on `a.b.c` being imported. We preserve the import unless
+///   another `Import`/`SubmoduleImport` in the scope already imports
+///   `a.b.c` (or a submodule of it). Sibling `FromImport`s with the same
+///   source are intentionally excluded from this coverage check to avoid
+///   the case where two `from a.b.c import x`/`from a.b.c import y`
+///   statements each treat the other as covering the side effect and we
+///   then remove both (see <https://github.com/astral-sh/ruff/pull/25060>).
 ///
 /// See <https://github.com/astral-sh/ruff/issues/20120>.
 fn from_import_provides_used_submodule_attribute(
@@ -1021,68 +1037,93 @@ fn from_import_provides_used_submodule_attribute(
         return false;
     };
 
-    let qualified_name = &from_import.qualified_name;
-    let segments = qualified_name.segments();
+    let full_qname_segments = from_import.qualified_name.segments();
 
-    // We need a source module of at least two segments (e.g., `a.b` for
-    // `from a.b import x`); otherwise there's no submodule attribute side
-    // effect to worry about.
-    let source_segments = match segments.split_last() {
-        Some((_, source)) if source.len() >= 2 => source,
-        _ => return false,
+    // `from a import x` requires at least two segments; bare `from . import x`
+    // (no module name) has no submodule side effect worth preserving.
+    let Some((_, source_segments)) = full_qname_segments.split_last() else {
+        return false;
     };
+    if source_segments.is_empty() {
+        return false;
+    }
 
     // Skip relative imports (e.g., `from .pkg import x`), which we can't
     // reliably reason about at the textual qualified-name level.
     if source_segments
         .first()
         .copied()
-        .is_none_or(|first| first.starts_with('.'))
+        .is_some_and(|first| first.starts_with('.'))
     {
         return false;
     }
 
-    // If any sibling import in the scope already provides the same side
-    // effect (i.e., its qualified name has `source_segments` as a prefix),
-    // then this `FromImport`'s side effect is redundant.
-    if scope.binding_ids().any(|sibling_id| {
-        let sibling = semantic.binding(sibling_id);
-        if std::ptr::eq(sibling, binding) {
-            return false;
-        }
-        let Some(sibling_import) = sibling.as_any_import() else {
-            return false;
-        };
-        let sibling_segments = sibling_import.qualified_name().segments();
-        // For a `FromImport`, the source-module path is everything but
-        // the last segment; for `Import`/`SubmoduleImport`, the full
-        // qualified name corresponds to the imported (sub)module.
-        let sibling_source: &[&str] = match &sibling.kind {
-            BindingKind::FromImport(_) => match sibling_segments.split_last() {
-                Some((_, prefix)) => prefix,
-                None => return false,
-            },
-            _ => sibling_segments,
-        };
-        sibling_source.starts_with(source_segments)
-    }) {
-        return false;
+    // Collect qualified-name paths for every attribute-access reference in
+    // the scope. Reference owners may be any binding (typically the bare
+    // name binding for the source module), so we walk all of them.
+    let reference_paths: Vec<QualifiedName> = scope
+        .binding_ids()
+        .flat_map(|id| semantic.binding(id).references())
+        .filter_map(|ref_id| {
+            let resolved = semantic.reference(ref_id);
+            let expr_id = resolved.expression_id()?;
+            expand_to_qualified_name_attribute(semantic, expr_id)
+        })
+        .collect();
+
+    // (1) The import is needed if a reference uses the imported name via
+    //     the dotted path (`a.b.c.x[...]`) AND no other import in the
+    //     scope already imports `a.b.c.x` (or deeper). Any sibling import
+    //     kind suffices here — a same-path duplicate is a separate issue
+    //     handled by F811.
+    if reference_paths
+        .iter()
+        .any(|r| r.segments().starts_with(full_qname_segments))
+        && !scope.binding_ids().any(|sibling_id| {
+            let sibling = semantic.binding(sibling_id);
+            if std::ptr::eq(sibling, binding) {
+                return false;
+            }
+            sibling.as_any_import().is_some_and(|imp| {
+                imp.qualified_name()
+                    .segments()
+                    .starts_with(full_qname_segments)
+            })
+        })
+    {
+        return true;
     }
 
-    // Otherwise, treat the `FromImport` as used if any reference in the
-    // scope traverses an attribute chain that begins with the source
-    // module path.
-    scope.binding_ids().any(|other_id| {
-        let other = semantic.binding(other_id);
-        other.references().any(|ref_id| {
-            let resolved = semantic.reference(ref_id);
-            let Some(expr_id) = resolved.expression_id() else {
+    // (2) The import is needed if a reference goes through the source
+    //     module via at least one attribute access (`a.b.c[...]`, length
+    //     > 1) AND no `Import`/`SubmoduleImport` sibling in the scope
+    //     already imports `a.b.c` (or deeper). `FromImport` siblings are
+    //     excluded from this coverage check because they too may be
+    //     candidates for removal; assuming they cover us would let two
+    //     mutually-redundant `from a.b.c import x`/`from a.b.c import y`
+    //     statements cancel each other and both be removed.
+    let needs_source_side_effect = reference_paths.iter().any(|r| {
+        let segs = r.segments();
+        segs.len() > 1 && segs.starts_with(source_segments)
+    });
+    if needs_source_side_effect
+        && !scope.binding_ids().any(|sibling_id| {
+            let sibling = semantic.binding(sibling_id);
+            if std::ptr::eq(sibling, binding) {
                 return false;
-            };
-            let Some(prototype) = expand_to_qualified_name_attribute(semantic, expr_id) else {
-                return false;
-            };
-            prototype.segments().starts_with(source_segments)
+            }
+            match &sibling.kind {
+                BindingKind::Import(_) | BindingKind::SubmoduleImport(_) => {
+                    sibling.as_any_import().is_some_and(|imp| {
+                        imp.qualified_name().segments().starts_with(source_segments)
+                    })
+                }
+                _ => false,
+            }
         })
-    })
+    {
+        return true;
+    }
+
+    false
 }

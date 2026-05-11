@@ -41,10 +41,21 @@ def f():
     snowflake.connector
 
 
-# Error: `from os import path` has a single-segment source; there is no
-# submodule side effect to preserve.
+# OK: both `from`-imports are needed; removing both would lose the
+# `snowflake.connector.pandas_tools` side effect that `write_pandas` below
+# depends on, so neither is flagged.
 def f():
-    import os
-    from os import path
+    import snowflake.connector
+    from snowflake.connector.pandas_tools import write_pandas
+    from snowflake.connector.pandas_tools import other
 
-    os.path
+    snowflake.connector.pandas_tools.write_pandas
+
+
+# OK: top-level `from`-import. `xml.sax.make_parser` traverses through
+# `xml.sax`, which is set as an attribute of `xml` by the `from`-import.
+def f():
+    import xml
+    from xml import sax
+
+    xml.sax.make_parser

@@ -6,7 +6,7 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 +linter.preview = enabled
 
 --- Summary ---
-Removed: 2
+Removed: 5
 Added: 0
 
 --- Removed ---
@@ -48,3 +48,61 @@ help: Remove unused import: `snowflake.connector.pandas_tools.write_pandas`
 22 |
 23 |     snowflake.connector.pandas_tools
 24 |
+
+
+F401 [*] `snowflake.connector.pandas_tools.write_pandas` imported but unused
+  --> F401_36.py:49:50
+   |
+47 | def f():
+48 |     import snowflake.connector
+49 |     from snowflake.connector.pandas_tools import write_pandas
+   |                                                  ^^^^^^^^^^^^
+50 |     from snowflake.connector.pandas_tools import other
+   |
+help: Remove unused import: `snowflake.connector.pandas_tools.write_pandas`
+46 | # depends on, so neither is flagged.
+47 | def f():
+48 |     import snowflake.connector
+   -     from snowflake.connector.pandas_tools import write_pandas
+49 |     from snowflake.connector.pandas_tools import other
+50 |
+51 |     snowflake.connector.pandas_tools.write_pandas
+
+
+F401 [*] `snowflake.connector.pandas_tools.other` imported but unused
+  --> F401_36.py:50:50
+   |
+48 |     import snowflake.connector
+49 |     from snowflake.connector.pandas_tools import write_pandas
+50 |     from snowflake.connector.pandas_tools import other
+   |                                                  ^^^^^
+51 |
+52 |     snowflake.connector.pandas_tools.write_pandas
+   |
+help: Remove unused import: `snowflake.connector.pandas_tools.other`
+47 | def f():
+48 |     import snowflake.connector
+49 |     from snowflake.connector.pandas_tools import write_pandas
+   -     from snowflake.connector.pandas_tools import other
+50 |
+51 |     snowflake.connector.pandas_tools.write_pandas
+52 |
+
+
+F401 [*] `xml.sax` imported but unused
+  --> F401_36.py:59:21
+   |
+57 | def f():
+58 |     import xml
+59 |     from xml import sax
+   |                     ^^^
+60 |
+61 |     xml.sax.make_parser
+   |
+help: Remove unused import: `xml.sax`
+56 | # `xml.sax`, which is set as an attribute of `xml` by the `from`-import.
+57 | def f():
+58 |     import xml
+   -     from xml import sax
+59 |
+60 |     xml.sax.make_parser

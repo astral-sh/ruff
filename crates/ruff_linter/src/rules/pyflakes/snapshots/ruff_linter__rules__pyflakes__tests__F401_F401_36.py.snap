@@ -77,20 +77,57 @@ help: Remove unused import: `snowflake.connector.pandas_tools.write_pandas`
 40 |     snowflake.connector
 41 |
 
-F401 [*] `os.path` imported but unused
-  --> F401_36.py:48:20
+F401 [*] `snowflake.connector.pandas_tools.write_pandas` imported but unused
+  --> F401_36.py:49:50
    |
-46 | def f():
-47 |     import os
-48 |     from os import path
-   |                    ^^^^
-49 |
-50 |     os.path
+47 | def f():
+48 |     import snowflake.connector
+49 |     from snowflake.connector.pandas_tools import write_pandas
+   |                                                  ^^^^^^^^^^^^
+50 |     from snowflake.connector.pandas_tools import other
    |
-help: Remove unused import: `os.path`
-45 | # submodule side effect to preserve.
-46 | def f():
-47 |     import os
-   -     from os import path
-48 |
-49 |     os.path
+help: Remove unused import: `snowflake.connector.pandas_tools.write_pandas`
+46 | # depends on, so neither is flagged.
+47 | def f():
+48 |     import snowflake.connector
+   -     from snowflake.connector.pandas_tools import write_pandas
+49 |     from snowflake.connector.pandas_tools import other
+50 |
+51 |     snowflake.connector.pandas_tools.write_pandas
+
+F401 [*] `snowflake.connector.pandas_tools.other` imported but unused
+  --> F401_36.py:50:50
+   |
+48 |     import snowflake.connector
+49 |     from snowflake.connector.pandas_tools import write_pandas
+50 |     from snowflake.connector.pandas_tools import other
+   |                                                  ^^^^^
+51 |
+52 |     snowflake.connector.pandas_tools.write_pandas
+   |
+help: Remove unused import: `snowflake.connector.pandas_tools.other`
+47 | def f():
+48 |     import snowflake.connector
+49 |     from snowflake.connector.pandas_tools import write_pandas
+   -     from snowflake.connector.pandas_tools import other
+50 |
+51 |     snowflake.connector.pandas_tools.write_pandas
+52 |
+
+F401 [*] `xml.sax` imported but unused
+  --> F401_36.py:59:21
+   |
+57 | def f():
+58 |     import xml
+59 |     from xml import sax
+   |                     ^^^
+60 |
+61 |     xml.sax.make_parser
+   |
+help: Remove unused import: `xml.sax`
+56 | # `xml.sax`, which is set as an attribute of `xml` by the `from`-import.
+57 | def f():
+58 |     import xml
+   -     from xml import sax
+59 |
+60 |     xml.sax.make_parser

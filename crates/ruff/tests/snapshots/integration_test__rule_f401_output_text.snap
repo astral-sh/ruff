@@ -81,6 +81,20 @@ execution. To wit, the statement `import a.b` automatically executes
 `import a`, so in some sense `import a` is _always_ redundant
 in the presence of `import a.b`.
 
+Under [preview], we also avoid flagging a `from a.b import x` whose
+observable side effect (binding `b` as an attribute of `a`) is relied
+on elsewhere in the scope. For example, given:
+
+```python
+import a.b
+from a.b.c import x
+
+a.b.c.foo()
+```
+
+...the `from a.b.c import x` is preserved under preview, because
+removing it would break the `a.b.c.foo()` lookup.
+
 
 ## Fix safety
 
