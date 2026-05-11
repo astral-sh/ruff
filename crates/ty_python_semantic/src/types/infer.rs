@@ -83,6 +83,19 @@ bitflags::bitflags! {
 
 impl get_size2::GetSize for TypeExpressionFlags {}
 
+fn boxed_entries<K: Ord, V>(map: FxHashMap<K, V>) -> Box<[(K, V)]> {
+    let mut entries = map.into_iter().collect::<Vec<_>>();
+    entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
+    entries.into_boxed_slice()
+}
+
+fn entry_get<K: Ord, V: Copy>(entries: &[(K, V)], key: &K) -> Option<V> {
+    entries
+        .binary_search_by(|(candidate, _)| candidate.cmp(key))
+        .ok()
+        .map(|index| entries[index].1)
+}
+
 /// Infer all types for a [`Definition`] (including sub-expressions).
 /// Use when resolving a place use or public type of a place.
 #[salsa::tracked(
@@ -158,7 +171,7 @@ pub(crate) fn function_known_decorator_flags<'db>(
 /// function-definition inference.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct FunctionDecoratorInference<'db> {
-    expression_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expression_types: Box<[(ExpressionNodeKey, Type<'db>)]>,
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
     called_functions: Box<[FunctionType<'db>]>,
     known_decorators: FunctionDecorators,
@@ -170,11 +183,13 @@ impl<'db> FunctionDecoratorInference<'db> {
         &self,
         expression: impl Into<ExpressionNodeKey>,
     ) -> Option<Type<'db>> {
-        self.expression_types.get(&expression.into()).copied()
+        entry_get(&self.expression_types, &expression.into())
     }
 
-    pub(crate) fn expression_types(&self) -> &FxHashMap<ExpressionNodeKey, Type<'db>> {
-        &self.expression_types
+    pub(crate) fn expression_types(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (ExpressionNodeKey, Type<'db>)> + '_ {
+        self.expression_types.iter().copied()
     }
 
     pub(crate) fn bindings(
@@ -688,7 +703,7 @@ impl<'db> InferenceRegion<'db> {
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ScopeInference<'db> {
     /// The types of every expression in this region.
-    expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expressions: Box<[(ExpressionNodeKey, Type<'db>)]>,
 
     /// The extra data that is only present for few inference regions.
     extra: Option<Box<ScopeInferenceExtra<'db>>>,
@@ -718,7 +733,7 @@ impl<'db> ScopeInference<'db> {
                 cycle_recovery: Some(cycle_recovery),
                 ..ScopeInferenceExtra::default()
             })),
-            expressions: FxHashMap::default(),
+            expressions: Box::default(),
         }
     }
 
@@ -749,10 +764,7 @@ impl<'db> ScopeInference<'db> {
         &self,
         expression: impl Into<ExpressionNodeKey>,
     ) -> Option<Type<'db>> {
-        self.expressions
-            .get(&expression.into())
-            .copied()
-            .or_else(|| self.fallback_type())
+        entry_get(&self.expressions, &expression.into()).or_else(|| self.fallback_type())
     }
 
     pub(crate) fn try_expected_type(
@@ -794,7 +806,7 @@ impl<'db> ScopeInference<'db> {
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct DefinitionInference<'db> {
     /// The types of every expression in this region.
-    expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expressions: Box<[(ExpressionNodeKey, Type<'db>)]>,
 
     /// The scope this region is part of.
     #[cfg(debug_assertions)]
@@ -852,7 +864,7 @@ impl<'db> DefinitionInference<'db> {
         let _ = scope;
 
         Self {
-            expressions: FxHashMap::default(),
+            expressions: Box::default(),
             bindings: Box::default(),
             declarations: Box::default(),
             #[cfg(debug_assertions)]
@@ -912,10 +924,7 @@ impl<'db> DefinitionInference<'db> {
         &self,
         expression: impl Into<ExpressionNodeKey>,
     ) -> Option<Type<'db>> {
-        self.expressions
-            .get(&expression.into())
-            .copied()
-            .or_else(|| self.fallback_type())
+        entry_get(&self.expressions, &expression.into()).or_else(|| self.fallback_type())
     }
 
     /// Get qualifiers for an annotation expression
@@ -1004,7 +1013,7 @@ impl<'db> DefinitionInference<'db> {
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ExpressionInference<'db> {
     /// The types of every expression in this region.
-    expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expressions: Box<[(ExpressionNodeKey, Type<'db>)]>,
 
     extra: Option<Box<ExpressionInferenceExtra<'db>>>,
 
@@ -1044,7 +1053,7 @@ impl<'db> ExpressionInference<'db> {
                 cycle_recovery: Some(cycle_recovery),
                 ..ExpressionInferenceExtra::default()
             })),
-            expressions: FxHashMap::default(),
+            expressions: Box::default(),
             #[cfg(debug_assertions)]
             scope,
         }
@@ -1083,10 +1092,7 @@ impl<'db> ExpressionInference<'db> {
         &self,
         expression: impl Into<ExpressionNodeKey>,
     ) -> Option<Type<'db>> {
-        self.expressions
-            .get(&expression.into())
-            .copied()
-            .or_else(|| self.fallback_type())
+        entry_get(&self.expressions, &expression.into()).or_else(|| self.fallback_type())
     }
 
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {

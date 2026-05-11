@@ -123,7 +123,9 @@ pub(crate) mod node_key {
 
     use crate::{ast_node_ref::AstNodeRef, node_key::NodeKey};
 
-    #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
+    #[derive(
+        Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, salsa::Update, get_size2::GetSize,
+    )]
     pub struct ExpressionNodeKey(NodeKey);
 
     impl From<ast::ExprRef<'_>> for ExpressionNodeKey {

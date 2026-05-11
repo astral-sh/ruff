@@ -25,7 +25,7 @@ use ty_python_core::statement::StatementInner;
 use super::{
     DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
     FunctionDecoratorInference, InferenceRegion, ScopeInference, ScopeInferenceExtra,
-    infer_deferred_types, infer_definition_types, infer_expression_types,
+    boxed_entries, infer_deferred_types, infer_definition_types, infer_expression_types,
     infer_same_file_expression_type, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
@@ -391,7 +391,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.expressions.extend(inference.expressions.iter());
+        self.expressions
+            .extend(inference.expressions.iter().copied());
         self.declarations.extend(inference.declarations());
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
@@ -453,7 +454,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn extend_expression_unchecked(&mut self, inference: &ExpressionInference<'db>) {
-        self.expressions.extend(inference.expressions.iter());
+        self.expressions
+            .extend(inference.expressions.iter().copied());
 
         if let Some(extra) = &inference.extra {
             self.context.extend(&extra.diagnostics);
@@ -471,7 +473,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn extend_scope(&mut self, inference: &ScopeInference<'db>) {
-        self.expressions.extend(inference.expressions.iter());
+        self.expressions
+            .extend(inference.expressions.iter().copied());
 
         if let Some(extra) = &inference.extra {
             self.context.extend(&extra.diagnostics);
@@ -9203,7 +9206,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Self {
             context,
-            mut expressions,
+            expressions,
             qualifiers: _,
             mut type_expression_flags,
             mut string_annotations,
@@ -9268,10 +9271,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 })
             });
 
-        expressions.shrink_to_fit();
-
         ExpressionInference {
-            expressions,
+            expressions: boxed_entries(expressions),
             extra,
             #[cfg(debug_assertions)]
             scope,
@@ -9414,7 +9415,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let diagnostics = context.finish();
 
         FunctionDecoratorInference {
-            expression_types: expressions,
+            expression_types: boxed_entries(expressions),
             bindings: bindings.into_boxed_slice(),
             called_functions: called_functions
                 .into_iter()
@@ -9430,7 +9431,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Self {
             context,
-            mut expressions,
+            expressions,
             mut qualifiers,
             mut type_expression_flags,
             mut string_annotations,
@@ -9502,10 +9503,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        expressions.shrink_to_fit();
-
         DefinitionInference {
-            expressions,
+            expressions: boxed_entries(expressions),
             #[cfg(debug_assertions)]
             scope,
             bindings: bindings.into_boxed_slice(),
@@ -9522,7 +9521,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             mut string_annotations,
             mut expected_types,
             mut type_expression_flags,
-            mut expressions,
+            expressions,
             scope,
             cycle_recovery,
 
@@ -9567,9 +9566,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             })
         });
 
-        expressions.shrink_to_fit();
-
-        ScopeInference { expressions, extra }
+        ScopeInference {
+            expressions: boxed_entries(expressions),
+            extra,
+        }
     }
 
     const fn inference_flags(&self) -> InferenceFlags {
