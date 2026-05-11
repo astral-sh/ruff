@@ -2782,7 +2782,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // attribute resolution.
                         let mut infer_value_ty = MultiInferenceGuard::new(infer_value_ty);
 
-                        let meta_attr_ty = meta_attr_ty.bind_self_typevars(db, object_ty);
                         // Perform loud inference without type context, as we may encounter multiple equally
                         // applicable type contexts during attribute resolution.
                         let value_ty = infer_value_ty.infer_loud(self, TypeContext::default());
