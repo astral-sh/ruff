@@ -56,6 +56,33 @@ mod tests {
         }
     }
 
+    #[test]
+    fn relative_imported_submodule_highlights() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                "from . import module_a\nx = module_a<CURSOR>",
+            )
+            .source("mypackage/module_a.py", "class Test: ...")
+            .build();
+
+        assert_snapshot!(test.document_highlights(), @"
+        info[document_highlights]: Highlight 1 (Read)
+         --> mypackage/__init__.py:1:15
+          |
+        1 | from . import module_a
+          |               ^^^^^^^^
+          |
+
+        info[document_highlights]: Highlight 2 (Read)
+         --> mypackage/__init__.py:2:5
+          |
+        2 | x = module_a
+          |     ^^^^^^^^
+          |
+        ");
+    }
+
     struct HighlightResult {
         index: usize,
         file_range: FileRange,

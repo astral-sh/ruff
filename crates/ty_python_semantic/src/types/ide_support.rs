@@ -1543,23 +1543,29 @@ mod resolve_definition {
         let definitions_in_module = find_symbol_in_scope(db, global_scope, symbol_name);
 
         // Recursively resolve any import definitions found in the target module
-        if definitions_in_module.is_empty() {
-            // This might be importing a submodule, try that
-            return Vec::from_iter(resolve_from_import_submodule_definitions(
-                db,
-                file,
-                symbol_name,
-                module_name,
-            ));
-        }
-
         let mut resolved_definitions = Vec::new();
         for def in definitions_in_module {
             let resolved =
                 resolve_definition_recursive(db, def, visited, Some(symbol_name), alias_resolution);
             resolved_definitions.extend(resolved);
         }
-        resolved_definitions
+
+        if resolved_definitions.is_empty() {
+            // In `pkg/__init__.py`, `from . import child` resolves `.` to
+            // `pkg/__init__.py`. Looking up `child` there can find an import definition
+            // that recursively resolves back here (possibly through `from . import *`),
+            // so recursive resolution bottoms out before reaching the `pkg.child`
+            // submodule target. Fall back to the same submodule candidate we use when
+            // `child` has no binding in `pkg/__init__.py`.
+            Vec::from_iter(resolve_from_import_submodule_definitions(
+                db,
+                file,
+                symbol_name,
+                module_name,
+            ))
+        } else {
+            resolved_definitions
+        }
     }
 
     // Helper to resolve `from x.y import z` assuming `x.y.z` is a module.
