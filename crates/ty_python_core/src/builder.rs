@@ -147,7 +147,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     /// the most recent visit at the end of the Vec.
     current_statements: Vec<CurrentStatement<'ast>>,
     /// The match case we're currently visiting.
-    current_match_case: Option<CurrentMatchCase<'ast>>,
+    current_match_case: Option<CurrentMatchCase<'ast, 'db>>,
     /// The name of the first function parameter of the innermost function that we're currently visiting.
     current_first_parameter_name: Option<&'ast str>,
 
@@ -3017,10 +3017,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard());
 
                 let mut post_case_snapshots = vec![];
-                let mut previous_pattern: Option<PatternPredicate<'_>> = None;
+                let mut previous_pattern: Option<PatternPredicate<'db>> = None;
 
                 for (i, case) in cases.iter().enumerate() {
-                    self.current_match_case = Some(CurrentMatchCase::new(&case.pattern));
+                    self.current_match_case = Some(CurrentMatchCase::new(
+                        &case.pattern,
+                        subject,
+                        previous_pattern,
+                    ));
                     self.visit_pattern(&case.pattern);
                     self.current_match_case = None;
                     // unlike in [Stmt::If], we don't reset [no_case_matched]
@@ -3839,6 +3843,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 symbol.into(),
                 MatchPatternDefinitionNodeRef {
                     pattern: state.pattern,
+                    subject: state.subject,
+                    previous_pattern: state.previous_pattern,
                     identifier: name,
                     index: state.index,
                 },
@@ -3860,6 +3866,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 symbol.into(),
                 MatchPatternDefinitionNodeRef {
                     pattern: state.pattern,
+                    subject: state.subject,
+                    previous_pattern: state.previous_pattern,
                     identifier: name,
                     index: state.index,
                 },
@@ -4097,9 +4105,15 @@ struct CurrentStatement<'ast> {
 }
 
 #[derive(Debug, PartialEq)]
-struct CurrentMatchCase<'ast> {
+struct CurrentMatchCase<'ast, 'db> {
     /// The pattern that's part of the current match case.
     pattern: &'ast ast::Pattern,
+
+    /// The expression being matched against.
+    subject: &'ast ast::Expr,
+
+    /// The previous match case pattern, if any.
+    previous_pattern: Option<PatternPredicate<'db>>,
 
     /// The index of the sub-pattern that's being currently visited within the pattern.
     ///
@@ -4115,9 +4129,18 @@ struct CurrentMatchCase<'ast> {
     index: u32,
 }
 
-impl<'a> CurrentMatchCase<'a> {
-    fn new(pattern: &'a ast::Pattern) -> Self {
-        Self { pattern, index: 0 }
+impl<'ast, 'db> CurrentMatchCase<'ast, 'db> {
+    fn new(
+        pattern: &'ast ast::Pattern,
+        subject: &'ast ast::Expr,
+        previous_pattern: Option<PatternPredicate<'db>>,
+    ) -> Self {
+        Self {
+            pattern,
+            subject,
+            previous_pattern,
+            index: 0,
+        }
     }
 }
 

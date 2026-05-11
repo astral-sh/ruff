@@ -395,10 +395,10 @@ def _(target: int | str):
     match target:
         case 1 as x:
             y = 2
-            reveal_type(x)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(x)  # revealed: Literal[1]
         case "foo" as x:
             y = 3
-            reveal_type(x)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(x)  # revealed: Literal["foo"]
         case _:
             y = 4
 

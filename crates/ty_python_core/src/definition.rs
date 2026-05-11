@@ -12,6 +12,7 @@ use crate::LoopToken;
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
 use crate::place::ScopedPlaceId;
+use crate::predicate::PatternPredicate;
 use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
 use crate::unpack::{Unpack, UnpackPosition};
@@ -266,7 +267,7 @@ pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     Parameter(ParameterDefinitionNodeRef<'ast>),
     LambdaParameter(LambdaParameterDefinitionNodeRef<'ast>),
     WithItem(WithItemDefinitionNodeRef<'ast, 'db>),
-    MatchPattern(MatchPatternDefinitionNodeRef<'ast>),
+    MatchPattern(MatchPatternDefinitionNodeRef<'ast, 'db>),
     ExceptHandler(ExceptHandlerDefinitionNodeRef<'ast>),
     TypeVar(&'ast ast::TypeParamTypeVar),
     ParamSpec(&'ast ast::TypeParamParamSpec),
@@ -394,8 +395,8 @@ impl<'ast> From<LambdaParameterDefinitionNodeRef<'ast>> for DefinitionNodeRef<'a
     }
 }
 
-impl<'ast> From<MatchPatternDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
-    fn from(node: MatchPatternDefinitionNodeRef<'ast>) -> Self {
+impl<'ast, 'db> From<MatchPatternDefinitionNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
+    fn from(node: MatchPatternDefinitionNodeRef<'ast, 'db>) -> Self {
         Self::MatchPattern(node)
     }
 }
@@ -542,9 +543,13 @@ pub(crate) struct LambdaParameterDefinitionNodeRef<'ast> {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct MatchPatternDefinitionNodeRef<'ast> {
+pub(crate) struct MatchPatternDefinitionNodeRef<'ast, 'db> {
     /// The outermost pattern node in which the identifier being defined occurs.
     pub(crate) pattern: &'ast ast::Pattern,
+    /// The match statement subject that this pattern is matched against.
+    pub(crate) subject: &'ast ast::Expr,
+    /// The previous match case pattern, if any.
+    pub(crate) previous_pattern: Option<PatternPredicate<'db>>,
     /// The identifier being defined.
     pub(crate) identifier: &'ast ast::Identifier,
     /// The index of the identifier in the pattern when visiting the `pattern` node in evaluation
@@ -687,10 +692,14 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }),
             DefinitionNodeRef::MatchPattern(MatchPatternDefinitionNodeRef {
                 pattern,
+                subject,
+                previous_pattern,
                 identifier,
                 index,
             }) => DefinitionKind::MatchPattern(MatchPatternDefinitionKind {
                 pattern: AstNodeRef::new(parsed, pattern),
+                subject: AstNodeRef::new(parsed, subject),
+                previous_pattern,
                 identifier: AstNodeRef::new(parsed, identifier),
                 index,
             }),
@@ -859,7 +868,7 @@ pub enum DefinitionKind<'db> {
     Parameter(ParameterDefinitionNodeKind),
     LambdaParameter(LambdaParameterDefinitionNodeKind),
     WithItem(WithItemDefinitionKind<'db>),
-    MatchPattern(MatchPatternDefinitionKind),
+    MatchPattern(MatchPatternDefinitionKind<'db>),
     ExceptHandler(ExceptHandlerDefinitionKind),
     TypeVar(AstNodeRef<ast::TypeParamTypeVar>),
     ParamSpec(AstNodeRef<ast::TypeParamParamSpec>),
@@ -1120,15 +1129,29 @@ impl StarImportDefinitionKind {
 }
 
 #[derive(Clone, Debug, get_size2::GetSize)]
-pub struct MatchPatternDefinitionKind {
+pub struct MatchPatternDefinitionKind<'db> {
     pattern: AstNodeRef<ast::Pattern>,
+    subject: AstNodeRef<ast::Expr>,
+    previous_pattern: Option<PatternPredicate<'db>>,
     identifier: AstNodeRef<ast::Identifier>,
     index: u32,
 }
 
-impl MatchPatternDefinitionKind {
+impl<'db> MatchPatternDefinitionKind<'db> {
     pub fn pattern<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Pattern {
         self.pattern.node(module)
+    }
+
+    pub fn subject<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+        self.subject.node(module)
+    }
+
+    pub fn identifier<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Identifier {
+        self.identifier.node(module)
+    }
+
+    pub const fn previous_pattern(&self) -> Option<PatternPredicate<'db>> {
+        self.previous_pattern
     }
 
     pub fn index(&self) -> u32 {

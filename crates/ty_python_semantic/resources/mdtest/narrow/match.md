@@ -31,6 +31,13 @@ def get_object() -> object:
 class A: ...
 class B: ...
 
+class ClassA:
+    def method1(self) -> str:
+        match self:
+            case ClassA():
+                return ""
+        return ""
+
 x = get_object()
 
 reveal_type(x)  # revealed: object
@@ -257,6 +264,10 @@ class Color(Enum):
     GREEN = 2
     BLUE = 3
 
+class Pet(Enum):
+    DOG = "dog"
+    CAT = "cat"
+
 def _(color: Color):
     match color:
         case Color.RED | Color.GREEN:
@@ -273,6 +284,15 @@ def _(color: Color):
             reveal_type(color)  # revealed: Literal[Color.RED]
         case _:
             reveal_type(color)  # revealed: Literal[Color.GREEN, Color.BLUE]
+
+def _(subject: Color | Pet):
+    match subject:
+        case Color.RED | Color.GREEN | Color.BLUE:
+            reveal_type(subject)  # revealed: Color
+        case Pet.DOG:
+            reveal_type(subject)  # revealed: Literal[Pet.DOG]
+        case _:
+            reveal_type(subject)  # revealed: Literal[Pet.CAT]
 
 class A: ...
 class B: ...

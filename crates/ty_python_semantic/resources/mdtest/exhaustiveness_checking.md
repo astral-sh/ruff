@@ -281,7 +281,7 @@ def match_exhaustive_generic[T](obj: GenericClass[T]) -> GenericClass[T]:
             reveal_type(obj)  # revealed: GenericClass[T@match_exhaustive_generic]
             return obj
         case GenericClass(x=x):
-            reveal_type(x)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(x)  # revealed: T@match_exhaustive_generic
             reveal_type(obj)  # revealed: GenericClass[T@match_exhaustive_generic]
             return obj
 ```
@@ -416,6 +416,96 @@ def as_pattern_non_exhaustive(subject: int | str):
 
             # this diagnostic is correct: the inferred type of `subject` is `str`
             assert_never(subject)  # error: [type-assertion-failure]
+```
+
+### Star sequence patterns
+
+```py
+def star_sequence_is_exhaustive() -> int:
+    match [10]:
+        case [*values]:
+            return values[0]
+```
+
+### Name bindings in patterns
+
+```py
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Literal
+
+@dataclass
+class Person:
+    name: str
+    age: int
+
+class Box:
+    item: str
+
+def dataclass_positional_pattern(person: Person):
+    match person:
+        case Person(name, age):
+            reveal_type(name)  # revealed: str
+            reveal_type(age)  # revealed: int
+
+def class_keyword_pattern(box: Box):
+    match box:
+        case Box(item=item):
+            reveal_type(item)  # revealed: str
+
+def builtin_self_pattern(subject: int | str):
+    match subject:
+        case int(value):
+            reveal_type(value)  # revealed: int
+        case str(value):
+            reveal_type(value)  # revealed: str
+
+def or_pattern_bindings(subject: int | str):
+    match subject:
+        case int(value) | str(value):
+            reveal_type(value)  # revealed: int | str
+
+def sequence_pattern(xs: list[int]):
+    match xs:
+        case [1, 2, x]:
+            reveal_type(x)  # revealed: int
+
+def sequence_pattern_excludes_string(subject: list[int] | str):
+    match subject:
+        case [x]:
+            reveal_type(x)  # revealed: int
+
+def sequence_as_pattern_excludes_string(subject: list[int] | str):
+    match subject:
+        case [x] as sequence:
+            reveal_type(x)  # revealed: int
+            reveal_type(sequence)  # revealed: list[int]
+
+def sequence_star_pattern(xs: list[int]):
+    match xs:
+        case [first, *rest]:
+            reveal_type(first)  # revealed: int
+            reveal_type(rest)  # revealed: list[int]
+
+def mapping_rest_pattern(subject: Mapping[str, int]):
+    match subject:
+        case {"a": value, **rest}:
+            reveal_type(value)  # revealed: int
+            reveal_type(rest)  # revealed: dict[str, int]
+
+def none_as_pattern(subject: int | None):
+    match subject:
+        case None as value:
+            reveal_type(value)  # revealed: None
+
+def previous_cases_narrow_capture(subject: Literal[1, "a"] | None):
+    match subject:
+        case 1:
+            pass
+        case None:
+            pass
+        case value:
+            reveal_type(value)  # revealed: Literal["a"]
 ```
 
 ## Exhaustiveness checking for methods of enums

@@ -2145,7 +2145,30 @@ Source with applied edits:
         def my_func(command: str):
             match command.split():
                 case ["get", ab]:
-                    x[: @Todo] = ab
+                    x[: str] = ab
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        915 | class str(Sequence[str]):
+            |       ^^^
+            |
+        info: Source
+         --> main2.py:5:17
+          |
+        5 |             x[: str] = ab
+          |                 ^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", ab]:
+          -             x = ab
+        5 +             x: str = ab
         "#);
     }
 
@@ -2165,7 +2188,43 @@ Source with applied edits:
         def my_func(command: str):
             match command.split():
                 case ["get", *ab]:
-                    x[: @Todo] = ab
+                    x[: list[str]] = ab
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:2829:7
+             |
+        2829 | class list(MutableSequence[_T]):
+             |       ^^^^
+             |
+        info: Source
+         --> main2.py:5:17
+          |
+        5 |             x[: list[str]] = ab
+          |                 ^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        915 | class str(Sequence[str]):
+            |       ^^^
+            |
+        info: Source
+         --> main2.py:5:22
+          |
+        5 |             x[: list[str]] = ab
+          |                      ^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", *ab]:
+          -             x = ab
+        5 +             x: list[str] = ab
         "#);
     }
 
@@ -2185,7 +2244,58 @@ Source with applied edits:
         def my_func(command: str):
             match command.split():
                 case ["get", ("a" | "b") as ab]:
-                    x[: @Todo] = ab
+                    x[: Literal["a", "b"]] = ab
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:487:1
+            |
+        487 | Literal: _SpecialForm
+            | ^^^^^^^
+            |
+        info: Source
+         --> main2.py:5:17
+          |
+        5 |             x[: Literal["a", "b"]] = ab
+          |                 ^^^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        915 | class str(Sequence[str]):
+            |       ^^^
+            |
+        info: Source
+         --> main2.py:5:25
+          |
+        5 |             x[: Literal["a", "b"]] = ab
+          |                         ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        915 | class str(Sequence[str]):
+            |       ^^^
+            |
+        info: Source
+         --> main2.py:5:30
+          |
+        5 |             x[: Literal["a", "b"]] = ab
+          |                              ^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 + from typing import Literal
+        2 |
+        3 | def my_func(command: str):
+        4 |     match command.split():
+        5 |         case ["get", ("a" | "b") as ab]:
+          -             x = ab
+        6 +             x: Literal["a", "b"] = ab
         "#);
     }
 
@@ -2217,7 +2327,30 @@ Source with applied edits:
         def my_func(event: Click):
             match event:
                 case Click(x, button=ab):
-                    x[: @Todo] = ab
+                    x[: str] = ab
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        915 | class str(Sequence[str]):
+            |       ^^^
+            |
+        info: Source
+          --> main2.py:11:17
+           |
+        11 |             x[: str] = ab
+           |                 ^^^
+           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        8  | def my_func(event: Click):
+        9  |     match event:
+        10 |         case Click(x, button=ab):
+           -             x = ab
+        11 +             x: str = ab
         "#);
     }
 

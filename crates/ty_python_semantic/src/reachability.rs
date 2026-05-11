@@ -227,7 +227,7 @@ fn singleton_to_type(db: &dyn Db, singleton: ruff_python_ast::Singleton) -> Type
     ty
 }
 
-fn mapping_pattern_type(db: &dyn Db) -> Type<'_> {
+pub(crate) fn mapping_pattern_type(db: &dyn Db) -> Type<'_> {
     KnownClass::Mapping.to_instance(db).top_materialization(db)
 }
 
@@ -295,19 +295,28 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
 
 /// Go through the list of previous match cases, and accumulate a union of all types that were already
 /// matched by these patterns.
-fn type_excluded_by_previous_patterns<'db>(
+pub(crate) fn type_excluded_by_patterns<'db>(
     db: &'db dyn Db,
-    mut predicate: PatternPredicate<'db>,
+    mut predicate: Option<PatternPredicate<'db>>,
 ) -> Type<'db> {
     let mut builder = UnionBuilder::new(db);
-    while let Some(previous) = predicate.previous_predicate(db) {
-        predicate = *previous;
-
-        if predicate.guard(db).is_none() {
-            builder = builder.add(pattern_kind_to_type(db, predicate.kind(db)));
+    while let Some(current) = predicate {
+        if current.guard(db).is_none() {
+            builder = builder.add(pattern_kind_to_type(db, current.kind(db)));
         }
+        predicate = current.previous_predicate(db).map(|previous| *previous);
     }
     builder.build()
+}
+
+fn type_excluded_by_previous_patterns<'db>(
+    db: &'db dyn Db,
+    predicate: PatternPredicate<'db>,
+) -> Type<'db> {
+    type_excluded_by_patterns(
+        db,
+        predicate.previous_predicate(db).map(|previous| *previous),
+    )
 }
 
 /// Analyze a pattern predicate to determine its static truthiness.

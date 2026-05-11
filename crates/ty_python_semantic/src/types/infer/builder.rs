@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -36,7 +37,10 @@ use crate::place::{
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
     place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
-use crate::reachability::ReachabilityConstraintsExtension;
+use crate::reachability::{
+    ReachabilityConstraintsExtension, mapping_pattern_type, sequence_pattern_type,
+    type_excluded_by_patterns,
+};
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
@@ -80,14 +84,14 @@ use crate::types::infer::{
     StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TypeExpressionFlags,
     infer_statement_types, nearest_enclosing_class, nearest_enclosing_function,
 };
-use crate::types::narrow::NarrowingEvaluatorExtension;
+use crate::types::narrow::{NarrowingEvaluatorExtension, class_pattern_instance_type};
 use crate::types::newtype::NewType;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope};
 use crate::types::special_form::TypeQualifier;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
-use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
+use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType, TupleUnpacker};
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
 use crate::types::{
@@ -112,6 +116,7 @@ use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
 use ty_python_core::node_key::NodeKey;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
+use ty_python_core::predicate::PatternPredicate;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
 use ty_python_core::symbol::{ScopedSymbolId, Symbol};
 use ty_python_core::{
@@ -649,6 +654,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .unwrap_or_else(|| self.infer_expression(expr, tcx))
     }
 
+    /// Return an already-inferred type for `expr`, or infer it as a standalone expression if needed.
+    fn get_or_infer_maybe_standalone_expression(
+        &mut self,
+        expr: &ast::Expr,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        self.try_expression_type(expr)
+            .unwrap_or_else(|| self.infer_maybe_standalone_expression(expr, tcx))
+    }
+
     /// Store qualifiers for an annotation expression.
     fn store_qualifiers(&mut self, expr: &ast::Expr, qualifiers: TypeQualifiers) {
         if !qualifiers.is_empty() {
@@ -998,6 +1013,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DefinitionKind::MatchPattern(match_pattern) => {
                 self.infer_match_pattern_definition(
                     match_pattern.pattern(self.module()),
+                    match_pattern.subject(self.module()),
+                    match_pattern.identifier(self.module()),
+                    match_pattern.previous_pattern(),
                     match_pattern.index(),
                     definition,
                 );
@@ -2086,15 +2104,424 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_match_pattern_definition(
         &mut self,
         pattern: &'ast ast::Pattern,
-        _index: u32,
+        subject: &'ast ast::Expr,
+        identifier: &'ast ast::Identifier,
+        previous_pattern: Option<PatternPredicate<'db>>,
+        index: u32,
         definition: Definition<'db>,
     ) {
-        // TODO(dhruvmanila): The correct way to infer types here is to perform structural matching
-        // against the subject expression type (which we can query via `infer_expression_types`)
-        // and extract the type at the `index` position if the pattern matches. This will be
-        // similar to the logic in `self.infer_assignment_definition`.
+        let subject_ty = self.match_pattern_subject_ty(subject, previous_pattern);
+        let mut current_index = 0;
+        let binding_ty = self
+            .match_pattern_binding_ty(
+                pattern,
+                subject_ty,
+                identifier.id(),
+                index,
+                &mut current_index,
+            )
+            .unwrap_or_else(Type::unknown);
         self.add_binding(pattern.into(), definition)
-            .insert(self, todo_type!("`match` pattern definition types"));
+            .insert(self, binding_ty);
+    }
+
+    fn match_pattern_subject_ty(
+        &mut self,
+        subject: &'ast ast::Expr,
+        previous_pattern: Option<PatternPredicate<'db>>,
+    ) -> Type<'db> {
+        let subject_ty =
+            self.get_or_infer_maybe_standalone_expression(subject, TypeContext::default());
+
+        let excluded_ty = type_excluded_by_patterns(self.db(), previous_pattern);
+        if excluded_ty.is_never() {
+            subject_ty
+        } else {
+            IntersectionBuilder::new(self.db())
+                .add_positive(subject_ty)
+                .add_negative(excluded_ty)
+                .build()
+        }
+    }
+
+    fn binding_matches_target(
+        name: &ast::Identifier,
+        target_name: &str,
+        target_index: u32,
+        current_index: u32,
+    ) -> bool {
+        // OR patterns bind the same logical name through distinct AST nodes; include all matching
+        // names so the surviving binding gets the union of all alternatives.
+        current_index == target_index || name.id() == target_name
+    }
+
+    fn match_pattern_binding_ty(
+        &mut self,
+        pattern: &'ast ast::Pattern,
+        subject_ty: Type<'db>,
+        target_name: &str,
+        target_index: u32,
+        current_index: &mut u32,
+    ) -> Option<Type<'db>> {
+        let found = match pattern {
+            ast::Pattern::MatchValue(match_value) => {
+                self.get_or_infer_maybe_standalone_expression(
+                    &match_value.value,
+                    TypeContext::default(),
+                );
+                None
+            }
+            ast::Pattern::MatchSingleton(_) => None,
+            ast::Pattern::MatchSequence(match_sequence) => {
+                let element_tys =
+                    self.match_sequence_pattern_element_tys(match_sequence, subject_ty);
+                match_sequence
+                    .patterns
+                    .iter()
+                    .zip(element_tys)
+                    .find_map(|(pattern, element_ty)| {
+                        self.match_pattern_binding_ty(
+                            pattern,
+                            element_ty,
+                            target_name,
+                            target_index,
+                            current_index,
+                        )
+                    })
+            }
+            ast::Pattern::MatchMapping(match_mapping) => {
+                for key in &match_mapping.keys {
+                    self.get_or_infer_expression(key, TypeContext::default());
+                }
+
+                let (key_ty, value_ty) = subject_ty
+                    .unpack_keys_and_items(self.db())
+                    .unwrap_or_else(|| (Type::unknown(), Type::unknown()));
+                let rest_ty =
+                    KnownClass::Dict.to_specialized_instance(self.db(), &[key_ty, value_ty]);
+
+                let found = match_mapping.patterns.iter().find_map(|pattern| {
+                    self.match_pattern_binding_ty(
+                        pattern,
+                        value_ty,
+                        target_name,
+                        target_index,
+                        current_index,
+                    )
+                });
+
+                found.or_else(|| {
+                    match_mapping.rest.as_ref().and_then(|rest| {
+                        Self::binding_matches_target(
+                            rest,
+                            target_name,
+                            target_index,
+                            *current_index,
+                        )
+                        .then_some(rest_ty)
+                    })
+                })
+            }
+            ast::Pattern::MatchClass(match_class) => {
+                let cls_ty = self.get_or_infer_maybe_standalone_expression(
+                    &match_class.cls,
+                    TypeContext::default(),
+                );
+                let matched_subject_ty = self.match_class_subject_ty(subject_ty, cls_ty);
+                let positional_tys = self.match_class_positional_pattern_tys(
+                    match_class,
+                    cls_ty,
+                    matched_subject_ty,
+                );
+
+                let mut found = None;
+
+                for (pattern, pattern_ty) in
+                    match_class.arguments.patterns.iter().zip(positional_tys)
+                {
+                    found = self.match_pattern_binding_ty(
+                        pattern,
+                        pattern_ty,
+                        target_name,
+                        target_index,
+                        current_index,
+                    );
+                    if found.is_some() {
+                        break;
+                    }
+                }
+
+                if found.is_none() {
+                    for keyword in &match_class.arguments.keywords {
+                        let pattern_ty = self
+                            .match_class_keyword_pattern_ty(matched_subject_ty, keyword.attr.id());
+                        found = self.match_pattern_binding_ty(
+                            &keyword.pattern,
+                            pattern_ty,
+                            target_name,
+                            target_index,
+                            current_index,
+                        );
+                        if found.is_some() {
+                            break;
+                        }
+                    }
+                }
+
+                found
+            }
+            ast::Pattern::MatchStar(match_star) => match_star.name.as_ref().and_then(|name| {
+                Self::binding_matches_target(name, target_name, target_index, *current_index)
+                    .then_some(subject_ty)
+            }),
+            ast::Pattern::MatchAs(match_as) => {
+                let found = match_as.pattern.as_deref().and_then(|pattern| {
+                    self.match_pattern_binding_ty(
+                        pattern,
+                        subject_ty,
+                        target_name,
+                        target_index,
+                        current_index,
+                    )
+                });
+
+                found.or_else(|| {
+                    match_as.name.as_ref().and_then(|name| {
+                        Self::binding_matches_target(
+                            name,
+                            target_name,
+                            target_index,
+                            *current_index,
+                        )
+                        .then(|| {
+                            match_as
+                                .pattern
+                                .as_deref()
+                                .map(|pattern| {
+                                    self.match_pattern_matched_subject_ty(pattern, subject_ty)
+                                })
+                                .unwrap_or(subject_ty)
+                        })
+                    })
+                })
+            }
+            ast::Pattern::MatchOr(match_or) => {
+                let mut builder = UnionBuilder::new(self.db());
+                let mut matched = false;
+
+                for pattern in &match_or.patterns {
+                    if let Some(ty) = self.match_pattern_binding_ty(
+                        pattern,
+                        subject_ty,
+                        target_name,
+                        target_index,
+                        current_index,
+                    ) {
+                        builder = builder.add(ty);
+                        matched = true;
+                    }
+                }
+
+                matched.then(|| builder.build())
+            }
+        };
+
+        *current_index += 1;
+        found
+    }
+
+    fn match_pattern_matched_subject_ty(
+        &mut self,
+        pattern: &'ast ast::Pattern,
+        subject_ty: Type<'db>,
+    ) -> Type<'db> {
+        match pattern {
+            ast::Pattern::MatchValue(match_value) => {
+                let value_ty = self.get_or_infer_maybe_standalone_expression(
+                    &match_value.value,
+                    TypeContext::default(),
+                );
+                if value_ty.is_single_valued(self.db()) {
+                    self.intersect_types(subject_ty, value_ty)
+                } else {
+                    subject_ty
+                }
+            }
+            ast::Pattern::MatchSingleton(match_singleton) => {
+                let singleton_ty = match match_singleton.value {
+                    ast::Singleton::None => Type::none(self.db()),
+                    ast::Singleton::True => Type::bool_literal(true),
+                    ast::Singleton::False => Type::bool_literal(false),
+                };
+                self.intersect_types(subject_ty, singleton_ty)
+            }
+            ast::Pattern::MatchClass(match_class) => {
+                let cls_ty = self.get_or_infer_maybe_standalone_expression(
+                    &match_class.cls,
+                    TypeContext::default(),
+                );
+                self.match_class_subject_ty(subject_ty, cls_ty)
+            }
+            ast::Pattern::MatchAs(match_as) => match_as
+                .pattern
+                .as_deref()
+                .map(|pattern| self.match_pattern_matched_subject_ty(pattern, subject_ty))
+                .unwrap_or(subject_ty),
+            ast::Pattern::MatchOr(match_or) => UnionType::from_elements(
+                self.db(),
+                match_or
+                    .patterns
+                    .iter()
+                    .map(|pattern| self.match_pattern_matched_subject_ty(pattern, subject_ty)),
+            ),
+            ast::Pattern::MatchSequence(_) => {
+                self.intersect_types(subject_ty, sequence_pattern_type(self.db()))
+            }
+            ast::Pattern::MatchMapping(_) => {
+                self.intersect_types(subject_ty, mapping_pattern_type(self.db()))
+            }
+            ast::Pattern::MatchStar(_) => subject_ty,
+        }
+    }
+
+    fn match_sequence_pattern_element_tys(
+        &self,
+        pattern: &ast::PatternMatchSequence,
+        subject_ty: Type<'db>,
+    ) -> Vec<Type<'db>> {
+        let subject_ty = self.intersect_types(subject_ty, sequence_pattern_type(self.db()));
+        let target_len = match pattern
+            .patterns
+            .iter()
+            .position(|pattern| matches!(pattern, ast::Pattern::MatchStar(_)))
+        {
+            Some(starred_index) => {
+                TupleLength::Variable(starred_index, pattern.patterns.len() - (starred_index + 1))
+            }
+            None => TupleLength::Fixed(pattern.patterns.len()),
+        };
+        let mut unpacker = TupleUnpacker::new(self.db(), target_len);
+        let mut matched = false;
+
+        let subject_elements = match subject_ty {
+            Type::Union(union_ty) => union_ty.elements(self.db()),
+            _ => std::slice::from_ref(&subject_ty),
+        };
+
+        for subject_ty in subject_elements.iter().copied() {
+            if self.is_excluded_from_sequence_pattern(subject_ty) {
+                continue;
+            }
+
+            let tuple = subject_ty.try_iterate(self.db()).unwrap_or_else(|err| {
+                Cow::Owned(Tuple::homogeneous(err.fallback_element_type(self.db())))
+            });
+
+            if unpacker.unpack_tuple(tuple.as_ref()).is_ok() {
+                matched = true;
+            }
+        }
+
+        if matched {
+            unpacker.into_types().collect()
+        } else {
+            vec![Type::Never; pattern.patterns.len()]
+        }
+    }
+
+    fn is_excluded_from_sequence_pattern(&self, ty: Type<'db>) -> bool {
+        ty.is_subtype_of(self.db(), KnownClass::Str.to_instance(self.db()))
+            || ty.is_subtype_of(self.db(), KnownClass::Bytes.to_instance(self.db()))
+            || ty.is_subtype_of(self.db(), KnownClass::Bytearray.to_instance(self.db()))
+    }
+
+    fn match_class_subject_ty(&self, subject_ty: Type<'db>, cls_ty: Type<'db>) -> Type<'db> {
+        match cls_ty {
+            Type::ClassLiteral(class) => {
+                let class_instance_ty = class_pattern_instance_type(self.db(), subject_ty, class);
+                self.intersect_types(subject_ty, class_instance_ty)
+            }
+            dynamic @ Type::Dynamic(_) => dynamic,
+            _ => subject_ty,
+        }
+    }
+
+    fn match_class_positional_pattern_tys(
+        &self,
+        pattern: &ast::PatternMatchClass,
+        cls_ty: Type<'db>,
+        matched_subject_ty: Type<'db>,
+    ) -> Vec<Type<'db>> {
+        let positional_len = pattern.arguments.patterns.len();
+
+        if positional_len == 1 && self.is_builtin_match_self_class(cls_ty) {
+            return vec![matched_subject_ty];
+        }
+
+        let Some(match_args) = cls_ty
+            .member(self.db(), "__match_args__")
+            .ignore_possibly_undefined()
+            .and_then(|match_args_ty| match_args_ty.tuple_instance_spec(self.db()))
+        else {
+            return vec![Type::unknown(); positional_len];
+        };
+
+        (0..positional_len)
+            .map(|index| {
+                match_args
+                    .all_elements()
+                    .get(index)
+                    .and_then(|attr_ty| attr_ty.as_string_literal())
+                    .map(|attr| {
+                        self.match_class_keyword_pattern_ty(
+                            matched_subject_ty,
+                            attr.value(self.db()),
+                        )
+                    })
+                    .unwrap_or_else(Type::unknown)
+            })
+            .collect()
+    }
+
+    fn match_class_keyword_pattern_ty(
+        &self,
+        matched_subject_ty: Type<'db>,
+        attr: &str,
+    ) -> Type<'db> {
+        matched_subject_ty
+            .member(self.db(), attr)
+            .ignore_possibly_undefined()
+            .unwrap_or_else(Type::unknown)
+    }
+
+    fn is_builtin_match_self_class(&self, cls_ty: Type<'db>) -> bool {
+        let Type::ClassLiteral(class) = cls_ty else {
+            return false;
+        };
+
+        matches!(
+            class.known(self.db()),
+            Some(
+                KnownClass::Bool
+                    | KnownClass::Bytearray
+                    | KnownClass::Bytes
+                    | KnownClass::Dict
+                    | KnownClass::Float
+                    | KnownClass::FrozenSet
+                    | KnownClass::Int
+                    | KnownClass::List
+                    | KnownClass::Set
+                    | KnownClass::Str
+                    | KnownClass::Tuple
+            )
+        )
+    }
+
+    fn intersect_types(&self, left: Type<'db>, right: Type<'db>) -> Type<'db> {
+        IntersectionBuilder::new(self.db())
+            .add_positive(left)
+            .add_positive(right)
+            .build()
     }
 
     fn validate_class_pattern(&mut self, pattern: &ast::PatternMatchClass, cls_ty: Type<'db>) {

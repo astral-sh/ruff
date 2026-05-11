@@ -1,6 +1,7 @@
 use crate::Db;
 use crate::reachability::{ReachabilityConstraintsExtension, sequence_pattern_type};
 use crate::subscript::PyIndex;
+use crate::types::constraints::{ConstraintSetBuilder, Solutions};
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
@@ -299,6 +300,66 @@ impl ClassInfoConstraintFunction {
             | Type::NewTypeInstance(_) => None,
         }
     }
+}
+
+pub(crate) fn class_pattern_instance_type<'db>(
+    db: &'db dyn Db,
+    subject_ty: Type<'db>,
+    class: ClassLiteral<'db>,
+) -> Type<'db> {
+    specialized_class_pattern_instance_type(db, subject_ty, class)
+        .unwrap_or_else(|| Type::instance(db, class.top_materialization(db)))
+}
+
+fn specialized_class_pattern_instance_type<'db>(
+    db: &'db dyn Db,
+    subject_ty: Type<'db>,
+    class: ClassLiteral<'db>,
+) -> Option<Type<'db>> {
+    let static_class = class.as_static()?;
+    let generic_context = static_class.generic_context(db)?;
+    let inferable = generic_context.inferable_typevars(db);
+    let identity_instance = Type::instance(
+        db,
+        static_class.apply_specialization(db, |generic_context| {
+            generic_context.identity_specialization(db)
+        }),
+    );
+    let constraints = ConstraintSetBuilder::new();
+    let solutions =
+        identity_instance.assignable_solutions_with_inferable(db, subject_ty, inferable);
+    let Solutions::Constrained(solutions) = solutions.solve(db, &constraints) else {
+        return None;
+    };
+
+    let variables = generic_context.variables(db).collect_vec();
+    let mut builder = UnionBuilder::new(db);
+    let mut has_specialized_instance = false;
+
+    for solution in solutions {
+        let types = variables
+            .iter()
+            .map(|variable| {
+                solution
+                    .iter()
+                    .find(|binding| binding.bound_typevar.identity(db) == variable.identity(db))
+                    .map(|binding| binding.solution)
+            })
+            .collect_vec();
+
+        if types.iter().all(Option::is_none) {
+            continue;
+        }
+
+        let specialization = generic_context.specialize_recursive(db, types);
+        builder = builder.add(Type::instance(
+            db,
+            static_class.apply_optional_specialization(db, Some(specialization)),
+        ));
+        has_specialized_instance = true;
+    }
+
+    has_specialized_instance.then(|| builder.build())
 }
 
 #[derive(Hash, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
@@ -1762,16 +1823,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             return None;
         }
 
+        let subject_ty = infer_same_file_expression_type(self.db, subject, TypeContext::default());
         let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
         let place = self.expect_place(&subject);
 
         let class_type = infer_same_file_expression_type(self.db, cls, TypeContext::default());
 
         let narrowed_type = match class_type {
-            Type::ClassLiteral(class) => {
-                Type::instance(self.db, class.top_materialization(self.db))
-                    .negate_if(self.db, !is_positive)
-            }
+            Type::ClassLiteral(class) => class_pattern_instance_type(self.db, subject_ty, class)
+                .negate_if(self.db, !is_positive),
             dynamic @ Type::Dynamic(_) => dynamic,
             _ => return None,
         };
