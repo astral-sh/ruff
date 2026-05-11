@@ -32,20 +32,25 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
         //     for (x, y) in z
         // }
         // ```
-        let (open_parenthesis_comments, key_value_comments) =
-            dangling.split_at(dangling.partition_point(|comment| comment.end() < key.start()));
+        let first_expression = key.as_deref().unwrap_or(value);
+        let (open_parenthesis_comments, key_value_comments) = dangling
+            .split_at(dangling.partition_point(|comment| comment.end() < first_expression.start()));
 
         write!(
             f,
             [parenthesized(
                 "{",
                 &group(&format_with(|f| {
-                    write!(f, [group(&key.format()), token(":")])?;
+                    if let Some(key) = key {
+                        write!(f, [group(&key.format()), token(":")])?;
 
-                    if key_value_comments.is_empty() {
-                        space().fmt(f)?;
+                        if key_value_comments.is_empty() {
+                            space().fmt(f)?;
+                        } else {
+                            dangling_comments(key_value_comments).fmt(f)?;
+                        }
                     } else {
-                        dangling_comments(key_value_comments).fmt(f)?;
+                        write!(f, [token("**")])?;
                     }
 
                     write!(f, [value.format(), soft_line_break_or_space()])?;

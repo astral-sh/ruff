@@ -747,7 +747,9 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                 self.scopes.push(Scope::Comprehension {
                     is_async: generators.iter().any(|generator| generator.is_async),
                 });
-                self.visit_expr(key);
+                if let Some(key) = key {
+                    self.visit_expr(key);
+                }
                 self.visit_expr(value);
                 self.scopes.pop().unwrap();
             }
