@@ -288,6 +288,12 @@ pub struct Completion<'db> {
     /// This is generally only present when this is a completion
     /// suggestion for an unimported symbol.
     pub module_name: Option<&'db ModuleName>,
+    /// The broad origin of the module that this completion comes from,
+    /// when available.
+    ///
+    /// This is used to rank completions, but doesn't appear in the LSP
+    /// response.
+    module_dependency_kind: Option<ModuleDependencyKind>,
     /// An import statement to insert (or ensure is already
     /// present) when this completion is selected.
     pub import: Option<Edit>,
@@ -450,6 +456,7 @@ impl<'db> CompletionBuilder<'db> {
             ty: self.ty,
             kind,
             module_name: self.module_name,
+            module_dependency_kind: self.module_dependency_kind,
             import: self.import,
             builtin: self.builtin,
             is_type_check_only: self.is_type_check_only,
@@ -1114,6 +1121,26 @@ impl UserQuery {
             .map(|exact| &**exact == name)
             .unwrap_or(false)
     }
+
+    fn match_quality(&self, name: &str) -> MatchQuality {
+        let Some(query) = self.exact.as_deref() else {
+            return MatchQuality::Fuzzy;
+        };
+
+        if query == name {
+            return MatchQuality::Exact;
+        }
+
+        let query = query.to_lowercase();
+        let name = name.to_lowercase();
+        if name.starts_with(&query) {
+            MatchQuality::Prefix
+        } else if name.contains(&query) {
+            MatchQuality::Substring
+        } else {
+            MatchQuality::Fuzzy
+        }
+    }
 }
 
 /// Context used to help filter completions when collecting them.
@@ -1246,25 +1273,17 @@ struct Relevance {
     /// type checking and not at runtime.
     type_check_only: Sort,
     /// Deprecated symbols appear lower in the completion result.
-    ///
-    /// This appears before `module_dependency_kind` so deprecation
-    /// downranking applies even when a symbol's module origin would
-    /// otherwise boost it, but after `type_check_only` so runtime-
-    /// unavailable symbols still sort last.
     deprecated: Sort,
-    /// The "dependency kind" of the module where this symbol
-    /// originates from.
+    /// A broad origin ranking for completions.
     ///
-    /// This lets us, e.g., prioritize first party project modules
-    /// over third party dependencies. This applies to both symbols
-    /// already in scope and unimported symbols, essentially forming a
-    /// preference ordering for symbols based on where they came from.
-    ///
-    /// Not all completions have this set. For example, keywords or
-    /// arguments. We assume that if it's not set, then there is some
-    /// other sorting criteria being applied or that it is generally
-    /// more specific than completions where this is set.
-    module_dependency_kind: Option<ModuleDependencyKind>,
+    /// Regular stdlib, namespace package and third-party completions
+    /// intentionally tie here so match quality and label ordering can
+    /// rank different-label matches (i.e. "fuzzy" matches) before full
+    /// origin breaks same-label ties.
+    module_origin: Option<ModuleOriginRank>,
+    /// A coarse measure of how tightly the completion label matches
+    /// the user's query.
+    match_quality: MatchQuality,
 }
 
 impl Relevance {
@@ -1319,23 +1338,36 @@ impl Relevance {
             } else {
                 Sort::Even
             },
-            module_dependency_kind: c.module_dependency_kind,
+            module_origin: c
+                .module_dependency_kind
+                .map(ModuleDependencyKind::origin_rank),
+            match_quality: query.match_quality(&c.name),
         }
     }
 }
 
-/// The dependency "kind" of a module.
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+enum ModuleOriginRank {
+    Current,
+    Builtin,
+    Project,
+    StdlibSpecial,
+    Other,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+enum MatchQuality {
+    Exact,
+    Prefix,
+    Substring,
+    Fuzzy,
+}
+
+/// Classifies a completion symbol by origin.
 ///
-/// Everything above "current" is applied to unimported symbols. It
-/// categorizes them by where the module is defined. We only support
-/// three broad categories right now: stdlib, third party and project.
-/// Ideally, we would distinguish between _direct_ third party code and
-/// _indirect_ third party code, but ty doesn't yet understand how to
-/// do this (as of 2026-01-08).
-///
-/// Note that these are defined in a particular order. That
-/// is, modules in the project get higher priority than those
-/// not in the project.
+/// The variant order in this enum contributes to the ranking order for
+/// completions after the preceding fields in `Relevance`; earlier origins in
+/// this list rank higher in completions.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
 enum ModuleDependencyKind {
     /// Symbols already in scope in the user's current module.
@@ -1366,6 +1398,8 @@ enum ModuleDependencyKind {
     /// We also include `collections`
     /// for similar reasons.
     StdlibSpecial,
+    /// Symbols from the standard library.
+    Stdlib,
     /// A namespace package somewhat defies classification, since
     /// it can exist over multiple search paths. Since std doesn't
     /// use namespace packages, we just assume that they are roughly
@@ -1374,23 +1408,26 @@ enum ModuleDependencyKind {
     /// This is an erroneous assumption when the namespace
     /// package is within the user's project. Probably we
     /// could do better once we know how to navigate namespace
-    /// packages better. Regardless, we put this between
-    /// strongly preferred and weakly preferred modules as a
-    /// bad compromise for now.
+    /// packages better.
     Namespace,
     /// Symbols defined somewhere in a dependency, direct or
     /// indirect.
     ThirdParty,
-    /// Symbols from the standard library get ranked last by
-    /// the logic that they are least specific to the end user's
-    /// context.
-    ///
-    /// This is somewhat specious since while they are least
-    /// specific, some stdlib modules are very commonly used.
-    Stdlib,
 }
 
 impl ModuleDependencyKind {
+    fn origin_rank(self) -> ModuleOriginRank {
+        match self {
+            ModuleDependencyKind::Current => ModuleOriginRank::Current,
+            ModuleDependencyKind::Builtin => ModuleOriginRank::Builtin,
+            ModuleDependencyKind::Project => ModuleOriginRank::Project,
+            ModuleDependencyKind::StdlibSpecial => ModuleOriginRank::StdlibSpecial,
+            ModuleDependencyKind::Stdlib
+            | ModuleDependencyKind::Namespace
+            | ModuleDependencyKind::ThirdParty => ModuleOriginRank::Other,
+        }
+    }
+
     /// Determines the "kind" of a symbol based on the module it is
     /// defined in.
     ///
@@ -2646,17 +2683,25 @@ impl PartialEq for CompletionRanker<'_> {
     fn eq(&self, rhs: &CompletionRanker<'_>) -> bool {
         self.0.relevance == rhs.0.relevance
             && self.0.name == rhs.0.name
+            && self.0.module_dependency_kind == rhs.0.module_dependency_kind
             && self.0.module_name == rhs.0.module_name
     }
 }
 
 impl Ord for CompletionRanker<'_> {
     fn cmp(&self, rhs: &CompletionRanker<'_>) -> Ordering {
-        (&self.0.relevance, &self.0.name, &self.0.module_name).cmp(&(
-            &rhs.0.relevance,
-            &rhs.0.name,
-            &rhs.0.module_name,
-        ))
+        (
+            &self.0.relevance,
+            &self.0.name,
+            self.0.module_dependency_kind,
+            &self.0.module_name,
+        )
+            .cmp(&(
+                &rhs.0.relevance,
+                &rhs.0.name,
+                rhs.0.module_dependency_kind,
+                &rhs.0.module_name,
+            ))
     }
 }
 
@@ -6177,17 +6222,21 @@ from os.<CURSOR>
     #[test]
     fn type_check_only_is_type_check_only() {
         // `@typing.type_check_only` is a function that's unavailable at runtime
-        // and so should be the last "non-underscore" completion in `typing`
+        // and so should rank after runtime-available completions in `typing`.
         let builder = completion_test_builder("from typing import t<CURSOR>");
         let test = builder.build();
-        let last_nonunderscore = test
-            .completions()
+        let completions = test.completions();
+        let type_check_only_pos = completions
             .iter()
-            .rfind(|c| !c.name.starts_with('_'))
+            .position(|c| c.name == "type_check_only")
+            .unwrap();
+        let last_runtime_nonunderscore_pos = completions
+            .iter()
+            .rposition(|c| !c.name.starts_with('_') && !c.is_type_check_only)
             .unwrap();
 
-        assert_eq!(&last_nonunderscore.name, "type_check_only");
-        assert!(last_nonunderscore.is_type_check_only);
+        assert!(completions[type_check_only_pos].is_type_check_only);
+        assert!(type_check_only_pos > last_runtime_nonunderscore_pos);
     }
 
     #[test]
@@ -8728,33 +8777,7 @@ def no_type_check_decorator():
     }
 
     #[test]
-    fn auto_import_keeps_sys_below_third_party() {
-        let builder = CursorTest::builder()
-            .with_site_packages()
-            .source("main.py", "argv<CURSOR>")
-            .site_packages(
-                "thirdparty/__init__.py",
-                r#"
-from sys import argv as argv
-"#,
-            )
-            .completion_test_builder()
-            .module_names()
-            .filter(|c| {
-                c.name == "argv"
-                    && matches!(
-                        c.module_name.map(ModuleName::as_str),
-                        Some("sys" | "thirdparty")
-                    )
-            });
-        assert_snapshot!(builder.build().snapshot(), @"
-        argv :: thirdparty
-        argv :: sys
-        ");
-    }
-
-    #[test]
-    fn auto_import_keeps_os_below_third_party() {
+    fn auto_import_prefers_std_lib_symbol_over_third_party_symbol_with_same_name() {
         let builder = CursorTest::builder()
             .with_site_packages()
             .source("main.py", "getpid<CURSOR>")
@@ -8774,8 +8797,52 @@ from os import getpid as getpid
                     )
             });
         assert_snapshot!(builder.build().snapshot(), @"
-        getpid :: thirdparty
         getpid :: os
+        getpid :: thirdparty
+        ");
+    }
+
+    #[test]
+    fn auto_import_preserves_name_order_for_unrelated_third_party_symbol() {
+        let builder = CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", "av<CURSOR>")
+            .site_packages("thirdparty/__init__.py", "aardvark = 1")
+            .completion_test_builder()
+            .module_names()
+            .filter(|c| {
+                matches!(
+                    (c.name.as_str(), c.module_name.map(ModuleName::as_str)),
+                    ("argv", Some("sys")) | ("aardvark", Some("thirdparty"))
+                )
+            });
+        assert_snapshot!(builder.build().snapshot(), @"
+        aardvark :: thirdparty
+        argv :: sys
+        ");
+    }
+
+    #[test]
+    fn auto_import_match_quality_ranks_prefix_before_substring() {
+        let builder = CursorTest::builder()
+            .source("main.py", "prefix<CURSOR>")
+            .source(
+                "matching.py",
+                r#"
+def a_prefix():
+    pass
+
+def prefix_name():
+    pass
+"#,
+            )
+            .completion_test_builder()
+            .module_names()
+            .filter(|c| matches!(c.name.as_str(), "a_prefix" | "prefix_name"));
+
+        assert_snapshot!(builder.build().snapshot(), @"
+        prefix_name :: matching
+        a_prefix :: matching
         ");
     }
 
