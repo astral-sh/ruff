@@ -300,6 +300,7 @@ fn run_test(
 
     Program::init_or_update(db, settings);
     db.update_analysis_options(configuration.analysis.as_ref());
+    db.update_mdtest_rule_selection(configuration.rules.as_ref());
     db.set_verbosity(test.configuration().verbose());
 
     let mut all_diagnostics = vec![];
