@@ -6,16 +6,39 @@ use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
 use crate::path::{ModulePath, SearchPath, SystemOrVendoredPathRef};
-use crate::resolve::{ModuleResolveMode, ResolverContext, resolve_file_module, search_paths};
+use crate::resolve::{
+    ModuleResolveMode, ResolverContext, resolve_file_module, resolve_module_confident,
+    search_paths, setuptools_editable_finders,
+};
 
 /// List all available modules, including all sub-modules, sorted in lexicographic order.
 pub fn all_modules(db: &dyn Db) -> Vec<Module<'_>> {
     let mut modules = list_modules(db);
+    for finder in setuptools_editable_finders(db) {
+        for module in finder.nested_mapping_modules(db) {
+            let Some(module) = resolve_module_confident(db, module.name(db)) else {
+                continue;
+            };
+
+            if modules
+                .iter()
+                .all(|existing| existing.name(db) != module.name(db))
+            {
+                modules.push(module);
+            }
+        }
+    }
+
     let mut stack = modules.clone();
     while let Some(module) = stack.pop() {
         for &submodule in module.all_submodules(db) {
-            modules.push(submodule);
-            stack.push(submodule);
+            if modules
+                .iter()
+                .all(|existing| existing.name(db) != submodule.name(db))
+            {
+                modules.push(submodule);
+                stack.push(submodule);
+            }
         }
     }
     modules.sort_by_key(|module| module.name(db));
@@ -28,37 +51,65 @@ pub fn list_modules(db: &dyn Db) -> Vec<Module<'_>> {
     let mut modules: BTreeMap<&ModuleName, ListedModule<'_>> = BTreeMap::new();
     for search_path in search_paths(db, ModuleResolveMode::StubsAllowed) {
         for new in list_modules_in(db, SearchPathIngredient::new(db, search_path.clone())) {
-            match modules.entry(new.module(db).name(db)) {
-                Entry::Vacant(entry) => {
-                    entry.insert(new);
-                }
-                Entry::Occupied(mut entry) => {
-                    // A module can override a module with the same name in
-                    // a higher precedent search path when either of the following
-                    // are true:
-                    //
-                    // 1. The higher precedent search path contained a namespace
-                    //    package and the lower precedent search path contained
-                    //    a "regular" module/package.
-                    // 2. The new module is from a stub package (`foo-stubs`),
-                    //    which has priority regardless of search path ordering
-                    //    per the typing spec's import resolution ordering.
-                    let existing = entry.get();
-                    let existing_is_namespace = existing.module(db).search_path(db).is_none();
-                    let new_is_non_namespace = new.module(db).search_path(db).is_some();
-                    if (existing_is_namespace && new_is_non_namespace)
-                        || (!existing.is_stub_package(db) && new.is_stub_package(db))
-                    {
-                        entry.insert(new);
-                    }
-                }
-            }
+            insert_listed_module(db, &mut modules, new);
+        }
+    }
+
+    for finder in setuptools_editable_finders(db) {
+        for module in finder.top_level_modules(db) {
+            let Some(module) = resolve_module_confident(db, module.name(db)) else {
+                continue;
+            };
+            let listed = ListedModule::new(db, module, false);
+            insert_finder_listed_module(db, &mut modules, listed);
         }
     }
     modules
         .into_values()
         .map(|listed| listed.module(db))
         .collect()
+}
+
+fn insert_listed_module<'db>(
+    db: &'db dyn Db,
+    modules: &mut BTreeMap<&'db ModuleName, ListedModule<'db>>,
+    new: ListedModule<'db>,
+) {
+    match modules.entry(new.module(db).name(db)) {
+        Entry::Vacant(entry) => {
+            entry.insert(new);
+        }
+        Entry::Occupied(mut entry) => {
+            // A module can override a module with the same name in
+            // a higher precedent search path when either of the following
+            // are true:
+            //
+            // 1. The higher precedent search path contained a namespace
+            //    package and the lower precedent search path contained
+            //    a "regular" module/package.
+            // 2. The new module is from a stub package (`foo-stubs`),
+            //    which has priority regardless of search path ordering
+            //    per the typing spec's import resolution ordering.
+            let existing = entry.get();
+            let existing_is_namespace = existing.module(db).search_path(db).is_none();
+            let new_is_non_namespace = new.module(db).search_path(db).is_some();
+            if (existing_is_namespace && new_is_non_namespace)
+                || (!existing.is_stub_package(db) && new.is_stub_package(db))
+            {
+                entry.insert(new);
+            }
+        }
+    }
+}
+
+fn insert_finder_listed_module<'db>(
+    db: &'db dyn Db,
+    modules: &mut BTreeMap<&'db ModuleName, ListedModule<'db>>,
+    new: ListedModule<'db>,
+) {
+    if let Entry::Vacant(entry) = modules.entry(new.module(db).name(db)) {
+        entry.insert(new);
+    }
 }
 
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -412,7 +463,7 @@ mod tests {
     use crate::strategy::FallibleStrategy;
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
-    use super::list_modules;
+    use super::{all_modules, list_modules};
 
     struct ModuleDebugSnapshot<'db> {
         db: &'db dyn Db,
@@ -1240,6 +1291,244 @@ mod tests {
         ]
         "#,
         );
+    }
+
+    #[test]
+    fn setuptools_editable_finder_modules_are_listed() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.pkg.pth",
+                "import __editable___pkg_finder; __editable___pkg_finder.install()",
+            ),
+            (
+                "__editable___pkg_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"pkg": "/workspace/pkg"}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+        ];
+        let external_files = [
+            ("/workspace/pkg/__init__.py", ""),
+            ("/workspace/pkg/child.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        insta::assert_debug_snapshot!(
+            list_snapshot_filter(&db, |module| module.name(&db).as_str() == "pkg"),
+            @r#"
+        [
+            Module::File("pkg", "editable", "/workspace/pkg/__init__.py", Package, None),
+        ]
+        "#,
+        );
+
+        let editable_modules = all_modules(&db)
+            .into_iter()
+            .filter(|module| module.name(&db).as_str().starts_with("pkg"))
+            .map(|module| module.name(&db).as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(editable_modules, vec!["pkg", "pkg.child"]);
+    }
+
+    #[test]
+    fn setuptools_editable_nested_mapping_modules_are_not_listed_twice() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.pkg.pth",
+                "import __editable___pkg_finder; __editable___pkg_finder.install()",
+            ),
+            (
+                "__editable___pkg_finder.py",
+                r#"
+MAPPING: dict[str, str] = {
+    "pkg": "/workspace/pkg",
+    "pkg.child": "/workspace/custom_child",
+}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+        ];
+        let external_files = [
+            ("/workspace/pkg/__init__.py", ""),
+            ("/workspace/pkg/child/__init__.py", ""),
+            ("/workspace/custom_child/__init__.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let editable_modules = all_modules(&db)
+            .into_iter()
+            .filter(|module| module.name(&db).as_str().starts_with("pkg"))
+            .map(|module| module.name(&db).as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(editable_modules, vec!["pkg", "pkg.child"]);
+    }
+
+    #[test]
+    fn setuptools_editable_finder_listing_does_not_override_existing_namespace() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.pkg.pth",
+                "import __editable___pkg_finder; __editable___pkg_finder.install()",
+            ),
+            (
+                "__editable___pkg_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"pkg": "/workspace/pkg"}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+        ];
+        let external_files = [("/workspace/pkg/__init__.py", "")];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("pkg/member.py", "")])
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        insta::assert_debug_snapshot!(
+            list_snapshot_filter(&db, |module| module.name(&db).as_str() == "pkg"),
+            @r#"
+        [
+            Module::Namespace(ModuleName("pkg")),
+        ]
+        "#,
+        );
+    }
+
+    #[test]
+    fn setuptools_editable_namespace_listing_precedes_meta_mapping() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.pkg-a-regular.pth",
+                "import __editable___pkg_a_regular_finder; __editable___pkg_a_regular_finder.install()",
+            ),
+            (
+                "__editable___pkg_a_regular_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"pkg": "/workspace/pkg_regular"}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+            (
+                "__editable__.pkg-z-namespace.pth",
+                "import __editable___pkg_z_namespace_finder; __editable___pkg_z_namespace_finder.install()",
+            ),
+            (
+                "__editable___pkg_z_namespace_finder.py",
+                r#"
+MAPPING: dict[str, str] = {}
+NAMESPACES: dict[str, list[str]] = {"pkg": ["/workspace/pkg_namespace"]}
+"#,
+            ),
+        ];
+        let external_files = [
+            ("/workspace/pkg_regular/__init__.py", ""),
+            ("/workspace/pkg_namespace/child.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        insta::assert_debug_snapshot!(
+            list_snapshot_filter(&db, |module| module.name(&db).as_str() == "pkg"),
+            @r#"
+        [
+            Module::Namespace(ModuleName("pkg")),
+        ]
+        "#,
+        );
+
+        let module = all_modules(&db)
+            .into_iter()
+            .find(|module| module.name(&db).as_str() == "pkg")
+            .unwrap();
+        assert!(matches!(module, Module::Namespace(_)));
+    }
+
+    #[test]
+    fn setuptools_editable_virtual_namespace_mappings_are_enumerated() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.acme.pth",
+                "import __editable___acme_finder; __editable___acme_finder.install()",
+            ),
+            (
+                "__editable___acme_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"acme.plugins": "/workspace/acme_plugins"}
+NAMESPACES: dict[str, list[str]] = {"acme": []}
+"#,
+            ),
+        ];
+        let external_files = [
+            ("/workspace/acme_plugins/__init__.py", ""),
+            ("/workspace/acme_plugins/tool.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let modules = all_modules(&db)
+            .into_iter()
+            .filter(|module| module.name(&db).as_str().starts_with("acme"))
+            .map(|module| module.name(&db).as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(modules, vec!["acme", "acme.plugins", "acme.plugins.tool"]);
+    }
+
+    #[test]
+    fn setuptools_editable_virtual_namespace_mappings_skip_unreachable_modules() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.acme.pth",
+                "import __editable___acme_finder; __editable___acme_finder.install()",
+            ),
+            (
+                "__editable___acme_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"acme.plugins": "/workspace/acme_plugins"}
+NAMESPACES: dict[str, list[str]] = {"acme": []}
+"#,
+            ),
+            ("acme.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_file("/workspace/acme_plugins/__init__.py", "")
+            .unwrap();
+
+        let modules = all_modules(&db)
+            .into_iter()
+            .filter(|module| module.name(&db).as_str().starts_with("acme"))
+            .map(|module| module.name(&db).as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(modules, vec!["acme"]);
     }
 
     #[test]

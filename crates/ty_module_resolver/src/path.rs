@@ -569,6 +569,11 @@ impl SearchPath {
         matches!(&*self.0, SearchPathInner::SitePackages(_))
     }
 
+    /// Is this a path appended from a plain `.pth` editable-install entry?
+    pub(crate) fn is_editable(&self) -> bool {
+        matches!(&*self.0, SearchPathInner::Editable(_))
+    }
+
     fn is_valid_extension(&self, extension: &str) -> bool {
         if self.is_standard_library() {
             extension == "pyi"

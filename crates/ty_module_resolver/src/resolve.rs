@@ -43,6 +43,7 @@ use ruff_python_ast::{
     self as ast, PySourceType, PythonVersion,
     visitor::{Visitor, walk_body},
 };
+use ty_setuptools_editable::{finder_module_from_pth_line, parse_finder};
 
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
@@ -300,6 +301,7 @@ pub fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
         path,
         search_paths(db, ModuleResolveMode::StubsAllowed),
     )
+    .or_else(|| file_to_module_in_setuptools_editable_finders(db, file, path))
     .or_else(|| {
         file_to_module_impl(
             db,
@@ -324,11 +326,19 @@ fn file_to_module_impl<'db, 'a>(
         relative_path.to_module_name()
     })?;
 
+    module_for_file_with_name(db, file, &module_name)
+}
+
+fn module_for_file_with_name<'db>(
+    db: &'db dyn Db,
+    file: File,
+    module_name: &ModuleName,
+) -> Option<Module<'db>> {
     // Resolve the module name to see if Python would resolve the name to the same path.
     // If it doesn't, then that means that multiple modules have the same name in different
     // root paths, but that the module corresponding to `path` is in a lower priority search path,
     // in which case we ignore it.
-    let module = resolve_module(db, file, &module_name)?;
+    let module = resolve_module(db, file, module_name)?;
     let module_file = module.file(db)?;
 
     if file.path(db) == module_file.path(db) {
@@ -339,7 +349,7 @@ fn file_to_module_impl<'db, 'a>(
         // If a .py and .pyi are both defined, the .pyi will be the one returned by `resolve_module().file`,
         // which would make us erroneously believe the `.py` is *not* also this module (breaking things
         // like relative imports). So here we try `resolve_real_module().file` to cover both cases.
-        let module = resolve_real_module(db, file, &module_name)?;
+        let module = resolve_real_module(db, file, module_name)?;
         let module_file = module.file(db)?;
         if file.path(db) == module_file.path(db) {
             return Some(module);
@@ -856,13 +866,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
                         // some queries (like `list_modules_in`) will run slightly more frequently
                         // than they would otherwise.
                         if let Some(dynamic_path) = search_path.as_system_path() {
-                            if files.root(db, dynamic_path).is_none() {
-                                files.try_add_root(
-                                    db,
-                                    dynamic_path,
-                                    FileRootKind::LibrarySearchPath,
-                                );
-                            }
+                            register_editable_root(db, dynamic_path);
                         }
 
                         dynamic_paths.push(search_path);
@@ -877,6 +881,13 @@ pub(crate) fn dynamic_resolution_paths<'db>(
     }
 
     dynamic_paths
+}
+
+fn register_editable_root(db: &dyn Db, path: &SystemPath) {
+    let files = db.files();
+    if files.root(db, path).is_none() {
+        files.try_add_root(db, path, FileRootKind::LibrarySearchPath);
+    }
 }
 
 /// Iterate over the available module-resolution search paths,
@@ -955,6 +966,91 @@ impl<'db> PthFile<'db> {
             Some(SystemPath::absolute(line, site_packages))
         })
     }
+
+    /// Yield setuptools-generated finder modules referenced from executable `.pth` lines.
+    ///
+    /// Setuptools' import-hook editable install currently writes lines of the form:
+    ///
+    /// ```python
+    /// import __editable___pkg_finder; __editable___pkg_finder.install()
+    /// ```
+    ///
+    /// We intentionally recognize only this narrow, generated shape. Everything else remains
+    /// arbitrary startup code that ty does not attempt to interpret.
+    fn setuptools_editable_finder_paths(&'db self) -> impl Iterator<Item = SystemPathBuf> + 'db {
+        let PthFile {
+            path: _,
+            contents,
+            site_packages,
+        } = self;
+
+        contents.lines().filter_map(move |line| {
+            finder_module_from_pth_line(line)
+                .map(|module| site_packages.join(format!("{module}.py")))
+        })
+    }
+}
+
+/// Return the `.pth` file that first appended a plain editable search path.
+///
+/// Setuptools namespace placeholders are also appended while `.pth` files run, so comparing
+/// these origins lets us preserve the runtime ordering between an import-hook placeholder and a
+/// later plain-path editable install.
+fn pth_file_for_editable_search_path(
+    db: &dyn Db,
+    search_path: &SearchPath,
+) -> Option<(usize, SystemPathBuf)> {
+    if !search_path.is_editable() {
+        return None;
+    }
+
+    let target = search_path.as_system_path()?;
+    let SearchPaths {
+        site_packages,
+        static_paths: _,
+        stdlib_path: _,
+        typeshed_versions: _,
+        real_stdlib_path: _,
+    } = db.search_paths();
+
+    let files = db.files();
+    let system = db.system();
+
+    for (site_packages_index, site_packages_search_path) in site_packages.iter().enumerate() {
+        let site_packages_dir = site_packages_search_path
+            .as_system_path()
+            .expect("Expected site package path to be a system path");
+        let site_packages_root = files.expect_root(db, site_packages_dir);
+
+        site_packages_root.revision(db);
+
+        let pth_file_iterator = match PthFileIterator::new(db, site_packages_dir) {
+            Ok(iterator) => iterator,
+            Err(error) => {
+                tracing::warn!(
+                    "Failed to search for editable installation in {site_packages_dir}: {error}"
+                );
+                continue;
+            }
+        };
+
+        let mut all_pth_files: Vec<PthFile> = pth_file_iterator.collect();
+        all_pth_files.sort_unstable_by(|a, b| a.path.cmp(&b.path));
+
+        for pth_file in all_pth_files {
+            for installation in pth_file.items() {
+                let installation = system
+                    .canonicalize_path(&installation)
+                    .unwrap_or(installation);
+
+                if installation.as_path() == target {
+                    return Some((site_packages_index, pth_file.path.clone()));
+                }
+            }
+        }
+    }
+
+    None
 }
 
 /// Iterator that yields a [`PthFile`] instance for every `.pth` file
@@ -1018,6 +1114,658 @@ impl<'db> Iterator for PthFileIterator<'db> {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+pub(crate) struct SetuptoolsEditableFinder {
+    site_packages: SystemPathBuf,
+    site_packages_index: usize,
+    pth_path: SystemPathBuf,
+    mapping: Vec<SetuptoolsEditableMapping>,
+    namespaces: Vec<SetuptoolsEditableNamespace>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+struct SetuptoolsEditableMapping {
+    module: ModuleName,
+    path: SystemPathBuf,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+struct SetuptoolsEditableNamespace {
+    module: ModuleName,
+    paths: Vec<SystemPathBuf>,
+}
+
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn setuptools_editable_finders<'db>(db: &'db dyn Db) -> Vec<SetuptoolsEditableFinder> {
+    let SearchPaths {
+        site_packages,
+        static_paths: _,
+        stdlib_path: _,
+        typeshed_versions: _,
+        real_stdlib_path: _,
+    } = db.search_paths();
+
+    let files = db.files();
+    let system = db.system();
+    let mut finders = Vec::new();
+
+    for (site_packages_index, site_packages_search_path) in site_packages.iter().enumerate() {
+        let site_packages_dir = site_packages_search_path
+            .as_system_path()
+            .expect("Expected site package path to be a system path");
+        let site_packages_root = files.expect_root(db, site_packages_dir);
+
+        // Finder modules live beside their `.pth` files, so the site-packages root revision
+        // also invalidates this query when either file changes.
+        site_packages_root.revision(db);
+
+        let pth_file_iterator = match PthFileIterator::new(db, site_packages_dir) {
+            Ok(iterator) => iterator,
+            Err(error) => {
+                tracing::warn!(
+                    "Failed to search for setuptools editable finders in {site_packages_dir}: {error}"
+                );
+                continue;
+            }
+        };
+
+        let mut all_pth_files: Vec<PthFile> = pth_file_iterator.collect();
+        all_pth_files.sort_unstable_by(|a, b| a.path.cmp(&b.path));
+
+        for pth_file in &all_pth_files {
+            for finder_path in pth_file.setuptools_editable_finder_paths() {
+                let Some(finder) =
+                    parse_finder(system, site_packages_dir, &finder_path).and_then(|finder| {
+                        SetuptoolsEditableFinder::from_parsed_finder(
+                            &finder,
+                            site_packages_index,
+                            pth_file.path.clone(),
+                        )
+                    })
+                else {
+                    continue;
+                };
+
+                finders.push(finder);
+            }
+        }
+    }
+
+    finders
+}
+
+fn resolve_name_in_setuptools_editable_finders(
+    db: &dyn Db,
+    name: &ModuleName,
+    mode: ModuleResolveMode,
+) -> ResolveNameResult {
+    if mode.is_non_shadowable(db.python_version().minor, name.as_str()) {
+        return ResolveNameResult::Missing;
+    }
+
+    if let result @ (ResolveNameResult::Found(_) | ResolveNameResult::BlockedByTerminalModule) =
+        resolve_name_in_setuptools_editable_namespace_placeholders(db, name, mode)
+    {
+        return result;
+    }
+
+    let context = ResolverContext::new(db, db.python_version(), mode);
+    let finders = setuptools_editable_finders(db);
+
+    for finder in finders {
+        match finder.resolve_in_mapping(&context, name) {
+            found @ ResolveNameResult::Found(_) => return found,
+            ResolveNameResult::BlockedByTerminalModule => {
+                return ResolveNameResult::BlockedByTerminalModule;
+            }
+            ResolveNameResult::Missing => {}
+        }
+    }
+
+    ResolveNameResult::Missing
+}
+
+fn resolve_name_in_setuptools_editable_namespace_placeholders(
+    db: &dyn Db,
+    name: &ModuleName,
+    mode: ModuleResolveMode,
+) -> ResolveNameResult {
+    resolve_name_in_setuptools_editable_namespace_placeholders_matching(db, name, mode, |_| true)
+}
+
+fn resolve_name_in_setuptools_editable_namespace_placeholders_before_search_path(
+    db: &dyn Db,
+    name: &ModuleName,
+    mode: ModuleResolveMode,
+    search_path: &SearchPath,
+) -> ResolveNameResult {
+    let Some((site_packages_index, pth_path)) = pth_file_for_editable_search_path(db, search_path)
+    else {
+        return ResolveNameResult::Missing;
+    };
+
+    resolve_name_in_setuptools_editable_namespace_placeholders_matching(db, name, mode, |finder| {
+        finder.site_packages_index < site_packages_index
+            || (finder.site_packages_index == site_packages_index && finder.pth_path < pth_path)
+    })
+}
+
+fn resolve_name_in_setuptools_editable_namespace_placeholders_matching(
+    db: &dyn Db,
+    name: &ModuleName,
+    mode: ModuleResolveMode,
+    mut matches_finder: impl FnMut(&SetuptoolsEditableFinder) -> bool,
+) -> ResolveNameResult {
+    if mode.is_non_shadowable(db.python_version().minor, name.as_str()) {
+        return ResolveNameResult::Missing;
+    }
+
+    let context = ResolverContext::new(db, db.python_version(), mode);
+    let finders = setuptools_editable_finders(db);
+    let mut namespace_candidates = Vec::new();
+
+    // Setuptools installs namespace path hooks on `sys.path`, while its editable meta finders
+    // are appended after Python's `PathFinder`. Keep the placeholder lookup separate so callers
+    // can merge it with `PathFinder` namespace candidates without also querying meta mappings.
+    for finder in finders {
+        if !matches_finder(finder) {
+            continue;
+        }
+
+        match finder.resolve_in_namespace_placeholders(&context, name) {
+            ResolveNameResult::Found(resolved) => {
+                if resolved
+                    .iter()
+                    .any(|candidate| !candidate.is_any_namespace_package())
+                {
+                    return ResolveNameResult::Found(resolved);
+                }
+                namespace_candidates.extend(resolved);
+            }
+            ResolveNameResult::BlockedByTerminalModule => {
+                return ResolveNameResult::BlockedByTerminalModule;
+            }
+            ResolveNameResult::Missing => {}
+        }
+    }
+
+    if !namespace_candidates.is_empty() {
+        return ResolveNameResult::Found(namespace_candidates);
+    }
+
+    ResolveNameResult::Missing
+}
+
+fn file_to_module_in_setuptools_editable_finders<'db>(
+    db: &'db dyn Db,
+    file: File,
+    path: SystemOrVendoredPathRef<'_>,
+) -> Option<Module<'db>> {
+    let SystemOrVendoredPathRef::System(path) = path else {
+        return None;
+    };
+
+    setuptools_editable_finders(db).iter().find_map(|finder| {
+        finder
+            .module_name_for_path(db.system(), path)
+            .and_then(|module_name| module_for_file_with_name(db, file, &module_name))
+    })
+}
+
+impl SetuptoolsEditableFinder {
+    fn from_parsed_finder(
+        finder: &ty_setuptools_editable::Finder,
+        site_packages_index: usize,
+        pth_path: SystemPathBuf,
+    ) -> Option<Self> {
+        let mapping = finder
+            .mapping()
+            .iter()
+            .map(|mapping| {
+                Some(SetuptoolsEditableMapping {
+                    module: ModuleName::new(mapping.module())?,
+                    path: mapping.path().to_path_buf(),
+                })
+            })
+            .collect::<Option<Vec<_>>>()?;
+        let namespaces = finder
+            .namespaces()
+            .iter()
+            .map(|namespace| {
+                Some(SetuptoolsEditableNamespace {
+                    module: ModuleName::new(namespace.module())?,
+                    paths: namespace.paths().to_vec(),
+                })
+            })
+            .collect::<Option<Vec<_>>>()?;
+
+        Some(Self {
+            site_packages: finder.site_packages().to_path_buf(),
+            site_packages_index,
+            pth_path,
+            mapping,
+            namespaces,
+        })
+    }
+
+    pub(crate) fn top_level_modules<'db>(&self, db: &'db dyn Db) -> Vec<Module<'db>> {
+        let context =
+            ResolverContext::new(db, db.python_version(), ModuleResolveMode::StubsAllowed);
+        let mut modules = Vec::new();
+
+        for mapping in &self.mapping {
+            if mapping.module.parent().is_none()
+                && let Some(candidate) = resolve_setuptools_editable_path(
+                    &context,
+                    &mapping.path,
+                    &self.site_packages,
+                    false,
+                )
+            {
+                modules.push(candidate.into_module(db, mapping.module.clone()));
+            }
+        }
+
+        for namespace in &self.namespaces {
+            if namespace.module.parent().is_none()
+                && let Some(candidate) = namespace_package_candidate(&context, &self.site_packages)
+            {
+                modules.push(candidate.into_module(db, namespace.module.clone()));
+            }
+        }
+
+        modules
+    }
+
+    pub(crate) fn nested_mapping_modules<'db>(&self, db: &'db dyn Db) -> Vec<Module<'db>> {
+        let context =
+            ResolverContext::new(db, db.python_version(), ModuleResolveMode::StubsAllowed);
+        let mut modules = Vec::new();
+
+        for mapping in &self.mapping {
+            if mapping.module.parent().is_some()
+                && let Some(candidate) = resolve_setuptools_editable_path(
+                    &context,
+                    &mapping.path,
+                    &self.site_packages,
+                    false,
+                )
+            {
+                modules.push(candidate.into_module(db, mapping.module.clone()));
+            }
+        }
+
+        modules
+    }
+
+    fn resolve_in_namespace_placeholders(
+        &self,
+        context: &ResolverContext,
+        module_name: &ModuleName,
+    ) -> ResolveNameResult {
+        if let Some(namespace) = self.namespace(module_name) {
+            if let Some(candidate) = namespace_package_candidate(context, &self.site_packages) {
+                return ResolveNameResult::Found(vec![candidate]);
+            }
+            return self.resolve_in_namespace(context, namespace, module_name);
+        }
+
+        self.longest_namespace_prefix(module_name)
+            .map_or(ResolveNameResult::Missing, |namespace| {
+                self.resolve_in_namespace(context, namespace, module_name)
+            })
+    }
+
+    fn mapping_prefixes<'a>(
+        &'a self,
+        module_name: &ModuleName,
+    ) -> Vec<&'a SetuptoolsEditableMapping> {
+        let mut mappings = self
+            .mapping
+            .iter()
+            .filter(|mapping| {
+                &mapping.module == module_name || module_name.starts_with(&mapping.module)
+            })
+            .collect::<Vec<_>>();
+        mappings.sort_by_key(|mapping| mapping.module.components().count());
+        mappings
+    }
+
+    fn resolve_in_mapping(
+        &self,
+        context: &ResolverContext,
+        module_name: &ModuleName,
+    ) -> ResolveNameResult {
+        for mapping in self.mapping_prefixes(module_name) {
+            match self.resolve_in_mapping_entry(context, module_name, mapping) {
+                ResolveNameResult::Missing => {}
+                result => return result,
+            }
+        }
+
+        ResolveNameResult::Missing
+    }
+
+    fn resolve_in_mapping_entry(
+        &self,
+        context: &ResolverContext,
+        module_name: &ModuleName,
+        mapping: &SetuptoolsEditableMapping,
+    ) -> ResolveNameResult {
+        let Some(mut candidate) =
+            resolve_setuptools_editable_path(context, &mapping.path, &self.site_packages, false)
+        else {
+            return ResolveNameResult::Missing;
+        };
+
+        if &mapping.module == module_name {
+            return ResolveNameResult::Found(vec![candidate]);
+        }
+
+        let Some(relative_name) = module_name.relative_to(&mapping.module) else {
+            return ResolveNameResult::Missing;
+        };
+
+        let components = relative_name.components().collect::<Vec<_>>();
+        if components.len() == 1 {
+            return resolve_component_in_candidate(context, &mut candidate, components[0])
+                .map_or(ResolveNameResult::Missing, |candidate| {
+                    ResolveNameResult::Found(vec![candidate])
+                });
+        }
+
+        let first_child = components[0];
+        let Some(mapped_child) =
+            resolve_component_in_candidate(context, &mut candidate, first_child)
+        else {
+            return ResolveNameResult::Missing;
+        };
+
+        let intermediate_name = {
+            let mut intermediate_name = mapping.module.clone();
+            intermediate_name.extend(
+                &ModuleName::from_components(components[..components.len() - 1].iter().copied())
+                    .expect("finder descendants have valid module-name components"),
+            );
+            intermediate_name
+        };
+
+        match resolve_name_impl(
+            context.db,
+            &intermediate_name,
+            context.mode,
+            search_paths(context.db, context.mode),
+        ) {
+            ResolveNameResult::Found(_) => ResolveNameResult::Missing,
+            ResolveNameResult::BlockedByTerminalModule => {
+                ResolveNameResult::BlockedByTerminalModule
+            }
+            ResolveNameResult::Missing => {
+                match resolve_name_in_setuptools_editable_namespace_placeholders(
+                    context.db,
+                    &intermediate_name,
+                    context.mode,
+                ) {
+                    ResolveNameResult::Found(_) => ResolveNameResult::Missing,
+                    ResolveNameResult::BlockedByTerminalModule => {
+                        ResolveNameResult::BlockedByTerminalModule
+                    }
+                    ResolveNameResult::Missing => resolve_remaining_components_in_candidate(
+                        context,
+                        mapped_child,
+                        &components[1..],
+                    ),
+                }
+            }
+        }
+    }
+
+    fn namespace(&self, module_name: &ModuleName) -> Option<&SetuptoolsEditableNamespace> {
+        self.namespaces
+            .iter()
+            .find(|namespace| &namespace.module == module_name)
+    }
+
+    fn longest_namespace_prefix(
+        &self,
+        module_name: &ModuleName,
+    ) -> Option<&SetuptoolsEditableNamespace> {
+        self.namespaces
+            .iter()
+            .filter(|namespace| module_name.starts_with(&namespace.module))
+            .max_by_key(|namespace| namespace.module.components().count())
+    }
+
+    fn resolve_in_namespace(
+        &self,
+        context: &ResolverContext,
+        namespace: &SetuptoolsEditableNamespace,
+        module_name: &ModuleName,
+    ) -> ResolveNameResult {
+        let Some(relative_name) = module_name.relative_to(&namespace.module) else {
+            return ResolveNameResult::Missing;
+        };
+        let components = relative_name.components().collect::<Vec<_>>();
+        let fallback_mapping_path = namespace.paths.is_empty().then(|| {
+            self.mapping
+                .iter()
+                .find(|mapping| mapping.module == namespace.module)
+                .map(|mapping| &mapping.path)
+        });
+        let mut namespace_candidates = Vec::new();
+
+        for namespace_path in namespace
+            .paths
+            .iter()
+            .chain(fallback_mapping_path.into_iter().flatten())
+        {
+            let Some(candidate) = namespace_candidate(context, namespace_path) else {
+                continue;
+            };
+
+            match resolve_remaining_components_in_candidate(context, candidate, &components) {
+                ResolveNameResult::Found(resolved) => {
+                    if resolved
+                        .iter()
+                        .any(|candidate| !candidate.is_any_namespace_package())
+                    {
+                        return ResolveNameResult::Found(resolved);
+                    }
+                    namespace_candidates.extend(resolved);
+                }
+                ResolveNameResult::BlockedByTerminalModule => {
+                    return ResolveNameResult::BlockedByTerminalModule;
+                }
+                ResolveNameResult::Missing => {}
+            }
+        }
+
+        if namespace_candidates.is_empty() {
+            ResolveNameResult::Missing
+        } else {
+            ResolveNameResult::Found(namespace_candidates)
+        }
+    }
+
+    fn module_name_for_path(&self, system: &dyn System, path: &SystemPath) -> Option<ModuleName> {
+        self.mapping
+            .iter()
+            .filter_map(|mapping| {
+                Some((
+                    mapping,
+                    setuptools_editable_mapping_module_name(system, mapping, path)?,
+                ))
+            })
+            .max_by_key(|(mapping, _)| mapping.module.components().count())
+            .map(|(_, module_name)| module_name)
+            .or_else(|| {
+                self.namespaces.iter().find_map(|namespace| {
+                    setuptools_editable_namespace_module_name(system, namespace, path)
+                })
+            })
+    }
+}
+
+fn setuptools_editable_mapping_module_name(
+    system: &dyn System,
+    mapping: &SetuptoolsEditableMapping,
+    path: &SystemPath,
+) -> Option<ModuleName> {
+    if path == mapping.path.as_path() {
+        return Some(mapping.module.clone());
+    }
+
+    if path == mapping.path.with_extension("py").as_path()
+        || path == mapping.path.with_extension("pyi").as_path()
+    {
+        return Some(mapping.module.clone());
+    }
+
+    let relative_path = path.strip_prefix(&mapping.path).ok()?;
+    if matches!(relative_path.as_str(), "__init__.py" | "__init__.pyi") {
+        return Some(mapping.module.clone());
+    }
+
+    let search_path = SearchPath::editable(system, mapping.path.clone()).ok()?;
+    let relative_module = search_path.relativize_system_path(path)?.to_module_name()?;
+    let mut module_name = mapping.module.clone();
+    module_name.extend(&relative_module);
+    Some(module_name)
+}
+
+fn setuptools_editable_namespace_module_name(
+    system: &dyn System,
+    namespace: &SetuptoolsEditableNamespace,
+    path: &SystemPath,
+) -> Option<ModuleName> {
+    namespace.paths.iter().find_map(|namespace_path| {
+        let search_path = SearchPath::editable(system, namespace_path.clone()).ok()?;
+        let relative_module = search_path.relativize_system_path(path)?.to_module_name()?;
+        let mut module_name = namespace.module.clone();
+        module_name.extend(&relative_module);
+        Some(module_name)
+    })
+}
+
+fn namespace_candidate(
+    context: &ResolverContext,
+    namespace_path: &SystemPath,
+) -> Option<ModuleResolutionCandidate> {
+    let search_path =
+        SearchPath::editable(context.db.system(), namespace_path.to_path_buf()).ok()?;
+    register_editable_root(context.db, namespace_path);
+    Some(ModuleResolutionCandidate {
+        path: search_path.to_module_path(),
+        module: ResolvedModule::NamespacePackage,
+        py_typed: PyTyped::Untyped,
+        is_stub_package: false,
+    })
+}
+
+fn resolve_component_in_candidate(
+    context: &ResolverContext,
+    candidate: &mut ModuleResolutionCandidate,
+    component: &str,
+) -> Option<ModuleResolutionCandidate> {
+    resolve_name_in_search_path(context, candidate, component)
+        .ok()
+        .map(|()| candidate.clone())
+}
+
+fn resolve_remaining_components_in_candidate(
+    context: &ResolverContext,
+    mut candidate: ModuleResolutionCandidate,
+    components: &[&str],
+) -> ResolveNameResult {
+    for component in components {
+        if resolve_name_in_search_path(context, &mut candidate, component).is_err() {
+            return if matches!(candidate.module, ResolvedModule::Module(_)) {
+                ResolveNameResult::BlockedByTerminalModule
+            } else {
+                ResolveNameResult::Missing
+            };
+        }
+    }
+
+    ResolveNameResult::Found(vec![candidate])
+}
+
+fn namespace_package_candidate(
+    context: &ResolverContext,
+    site_packages: &SystemPath,
+) -> Option<ModuleResolutionCandidate> {
+    let search_path =
+        SearchPath::editable(context.db.system(), site_packages.to_path_buf()).ok()?;
+    Some(ModuleResolutionCandidate {
+        path: search_path.to_module_path(),
+        module: ResolvedModule::NamespacePackage,
+        py_typed: PyTyped::Untyped,
+        is_stub_package: false,
+    })
+}
+
+fn resolve_setuptools_editable_path(
+    context: &ResolverContext,
+    candidate_path: &SystemPath,
+    site_packages: &SystemPath,
+    allow_namespace_package: bool,
+) -> Option<ModuleResolutionCandidate> {
+    let search_root = candidate_path.parent().unwrap_or(site_packages);
+    let search_path = SearchPath::editable(context.db.system(), search_root.to_path_buf()).ok()?;
+    register_editable_root(context.db, search_root);
+    let mut module_path = search_path.relativize_system_path(candidate_path)?;
+
+    module_path.push("__init__");
+    if let Some(init) = resolve_file_module(&module_path, context) {
+        module_path.pop();
+        let py_typed = module_path.py_typed(context);
+        let module = if is_legacy_namespace_package(&module_path, context, init) {
+            ResolvedModule::LegacyNamespacePackage(init)
+        } else {
+            ResolvedModule::RegularPackage(init)
+        };
+
+        return Some(ModuleResolutionCandidate {
+            path: module_path,
+            module,
+            py_typed,
+            is_stub_package: false,
+        });
+    }
+
+    module_path.pop();
+    if let Some(module) = resolve_file_module(&module_path, context) {
+        return Some(ModuleResolutionCandidate {
+            path: module_path,
+            module: ResolvedModule::Module(module),
+            py_typed: PyTyped::Untyped,
+            is_stub_package: false,
+        });
+    }
+
+    if allow_namespace_package
+        && module_path.is_directory(context)
+        && let Some(path) = module_path.to_system_path()
+    {
+        let system = context.db.system();
+        if system.case_sensitivity().is_case_sensitive()
+            || system.path_exists_case_sensitive(
+                &path,
+                module_path.search_path().as_system_path().unwrap(),
+            )
+        {
+            return Some(ModuleResolutionCandidate {
+                path: module_path,
+                module: ResolvedModule::NamespacePackage,
+                py_typed: PyTyped::Untyped,
+                is_stub_package: false,
+            });
+        }
+    }
+
+    None
+}
+
 /// A thin wrapper around `ModuleName` to make it a Salsa ingredient.
 ///
 /// This is needed because Salsa requires that all query arguments are salsa ingredients.
@@ -1032,7 +1780,108 @@ struct ModuleNameIngredient<'db> {
 /// attempt to resolve the module name
 fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Option<ResolvedNames> {
     let search_paths = search_paths(db, mode);
-    resolve_name_impl(db, name, mode, search_paths)
+    match resolve_name_impl(db, name, mode, search_paths) {
+        ResolveNameResult::Found(resolved) => {
+            if resolved
+                .iter()
+                .any(|candidate| !candidate.is_any_namespace_package())
+            {
+                if let Some(editable) =
+                    resolve_name_after_setuptools_editable_namespace_shadow(db, name, mode)
+                {
+                    return editable.into_option();
+                }
+
+                if let Some(candidate) = resolved
+                    .iter()
+                    .find(|candidate| !candidate.is_any_namespace_package())
+                {
+                    match resolve_name_in_setuptools_editable_namespace_placeholders_before_search_path(
+                        db,
+                        name,
+                        mode,
+                        candidate.path.search_path(),
+                    ) {
+                        ResolveNameResult::Found(editable)
+                            if editable
+                                .iter()
+                                .any(|candidate| !candidate.is_any_namespace_package()) =>
+                        {
+                            return Some(editable);
+                        }
+                        ResolveNameResult::BlockedByTerminalModule => return None,
+                        ResolveNameResult::Found(_) | ResolveNameResult::Missing => {}
+                    }
+                }
+
+                return Some(resolved);
+            }
+
+            // Setuptools v70+ namespace placeholders add more namespace search locations.
+            // Python keeps scanning those locations before committing to a namespace-only result,
+            // so a concrete editable package or module must still be allowed to win here.
+            match resolve_name_in_setuptools_editable_namespace_placeholders(db, name, mode) {
+                ResolveNameResult::Found(editable) => {
+                    if editable
+                        .iter()
+                        .any(|candidate| !candidate.is_any_namespace_package())
+                    {
+                        Some(editable)
+                    } else {
+                        Some(resolved.into_iter().chain(editable).collect())
+                    }
+                }
+                ResolveNameResult::Missing => Some(resolved),
+                ResolveNameResult::BlockedByTerminalModule => None,
+            }
+        }
+        ResolveNameResult::Missing => {
+            resolve_name_in_setuptools_editable_finders(db, name, mode).into_option()
+        }
+        ResolveNameResult::BlockedByTerminalModule => None,
+    }
+}
+
+fn resolve_name_after_setuptools_editable_namespace_shadow(
+    db: &dyn Db,
+    name: &ModuleName,
+    mode: ModuleResolveMode,
+) -> Option<ResolveNameResult> {
+    let mut prefixes = Vec::new();
+    let mut prefix = name.parent();
+    while let Some(current) = prefix {
+        prefix = current.parent();
+        prefixes.push(current);
+    }
+    prefixes.reverse();
+
+    for prefix in prefixes {
+        let ResolveNameResult::Found(search_path_candidates) =
+            resolve_name_impl(db, &prefix, mode, search_paths(db, mode))
+        else {
+            continue;
+        };
+        if search_path_candidates
+            .iter()
+            .any(|candidate| !candidate.is_any_namespace_package())
+        {
+            continue;
+        }
+
+        let ResolveNameResult::Found(editable_candidates) =
+            resolve_name_in_setuptools_editable_namespace_placeholders(db, &prefix, mode)
+        else {
+            continue;
+        };
+        if editable_candidates
+            .iter()
+            .any(|candidate| !candidate.is_any_namespace_package())
+        {
+            return Some(resolve_name_in_setuptools_editable_finders(db, name, mode));
+        }
+    }
+
+    None
 }
 
 /// Like `resolve_name` but for cases where it failed to resolve the module
@@ -1046,7 +1895,7 @@ fn desperately_resolve_name(
     mode: ModuleResolveMode,
 ) -> Option<ResolvedNames> {
     let search_paths = absolute_desperate_search_paths(db, importing_file);
-    resolve_name_impl(db, name, mode, search_paths.iter().flatten())
+    resolve_name_impl(db, name, mode, search_paths.iter().flatten()).into_option()
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1158,7 +2007,7 @@ fn resolve_name_impl<'a>(
     name: &ModuleName,
     mode: ModuleResolveMode,
     search_paths: impl Iterator<Item = &'a SearchPath>,
-) -> Option<ResolvedNames> {
+) -> ResolveNameResult {
     let python_version = db.python_version();
     let context = ResolverContext::new(db, python_version, mode);
     let is_non_shadowable = mode.is_non_shadowable(python_version.minor, name.as_str());
@@ -1191,6 +2040,7 @@ fn resolve_name_impl<'a>(
     // reduced down to a single candidate, so maybe meh?
     let mut is_root = true;
     for component in name.components() {
+        let mut blocked_by_terminal_module = false;
         // Search for the next component in every search-path
         for mut candidate in cur_candidates.drain(..) {
             // On the first iteration, look for `mypackage-stubs` as well
@@ -1228,6 +2078,7 @@ fn resolve_name_impl<'a>(
             // guarded by `!stubs_allowed`.
 
             if resolve_name_in_search_path(&context, &mut candidate, component).is_err() {
+                blocked_by_terminal_module |= matches!(candidate.module, ResolvedModule::Module(_));
                 if candidate.missing_submodule_is_terminal() && !stubs_allowed {
                     // Everything after this package should be shadowed out by
                     // this failure But the previous results are still in play
@@ -1300,7 +2151,11 @@ fn resolve_name_impl<'a>(
         // search path ordering.
         next_candidates.sort_by_key(|c| !c.is_stub_package);
         if next_candidates.is_empty() {
-            return None;
+            return if blocked_by_terminal_module {
+                ResolveNameResult::BlockedByTerminalModule
+            } else {
+                ResolveNameResult::Missing
+            };
         }
 
         // Advance to the next level of candidates while reusing allocations
@@ -1309,7 +2164,7 @@ fn resolve_name_impl<'a>(
         is_root = false;
     }
 
-    Some(cur_candidates)
+    ResolveNameResult::Found(cur_candidates)
 }
 
 /// Attempts to resolve a module name in a particular search path.
@@ -1404,6 +2259,21 @@ fn resolve_name_in_search_path(
 }
 
 type ResolvedNames = Vec<ModuleResolutionCandidate>;
+
+enum ResolveNameResult {
+    Found(ResolvedNames),
+    Missing,
+    BlockedByTerminalModule,
+}
+
+impl ResolveNameResult {
+    fn into_option(self) -> Option<ResolvedNames> {
+        match self {
+            ResolveNameResult::Found(resolved) => Some(resolved),
+            ResolveNameResult::Missing | ResolveNameResult::BlockedByTerminalModule => None,
+        }
+    }
+}
 
 /// If `module` exists on disk with either a `.pyi` or `.py` extension,
 /// return the [`File`] corresponding to that path.
@@ -1748,7 +2618,7 @@ mod tests {
     )]
     use ruff_db::Db;
     use ruff_db::files::{File, FilePath, system_path_to_file};
-    use ruff_db::system::{DbWithTestSystem as _, DbWithWritableSystem as _};
+    use ruff_db::system::{DbWithTestSystem as _, DbWithWritableSystem as _, SystemPath};
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::PythonVersion;
 
@@ -2695,6 +3565,1000 @@ not_a_directory
             spam_module.file(&db).unwrap().path(&db),
             &FilePath::System(site_packages.join("spam/spam.py"))
         );
+    }
+
+    #[test]
+    fn setuptools_editable_install_mapping() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.gymnax.pth",
+                "import __editable___gymnax_0_0_9_finder; __editable___gymnax_0_0_9_finder.install()",
+            ),
+            (
+                "__editable___gymnax_0_0_9_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"gymnax": "/workspace/gymnax/gymnax"}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+        ];
+
+        let external_files = [
+            ("/workspace/gymnax/gymnax/__init__.py", ""),
+            ("/workspace/gymnax/gymnax/envs.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let gymnax_module_name = ModuleName::new_static("gymnax").unwrap();
+        let gymnax_envs_module_name = ModuleName::new_static("gymnax.envs").unwrap();
+
+        let gymnax_module = resolve_module_confident(&db, &gymnax_module_name).unwrap();
+        let gymnax_envs_module = resolve_module_confident(&db, &gymnax_envs_module_name).unwrap();
+
+        assert_eq!(
+            gymnax_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/gymnax/gymnax/__init__.py")
+        );
+        assert_eq!(
+            gymnax_envs_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/gymnax/gymnax/envs.py")
+        );
+
+        let gymnax_submodules = gymnax_module
+            .all_submodules(&db)
+            .iter()
+            .map(|module| module.name(&db).as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(gymnax_submodules, vec!["gymnax.envs"]);
+    }
+
+    #[test]
+    fn setuptools_editable_install_nonstandard_mapping() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.pkg.pth",
+                "import __editable___pkg_finder; __editable___pkg_finder.install()",
+            ),
+            (
+                "__editable___pkg_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"pkg": "/workspace/custom_layout"}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+        ];
+
+        let external_files = [
+            ("/workspace/custom_layout/__init__.py", ""),
+            ("/workspace/custom_layout/child.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let pkg_module_name = ModuleName::new_static("pkg").unwrap();
+        let pkg_child_module_name = ModuleName::new_static("pkg.child").unwrap();
+
+        let pkg_module = resolve_module_confident(&db, &pkg_module_name).unwrap();
+        let pkg_child_module = resolve_module_confident(&db, &pkg_child_module_name).unwrap();
+
+        assert_eq!(
+            pkg_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/custom_layout/__init__.py")
+        );
+        assert_eq!(
+            pkg_child_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/custom_layout/child.py")
+        );
+    }
+
+    #[test]
+    fn setuptools_editable_install_mapping_uses_immediate_child_lookup_only() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.pkg.pth",
+                "import __editable___pkg_finder; __editable___pkg_finder.install()",
+            ),
+            (
+                "__editable___pkg_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"pkg": "/workspace/pkg"}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+        ];
+
+        let external_files = [
+            ("/workspace/pkg/__init__.py", ""),
+            ("/workspace/pkg/child.py", ""),
+            ("/workspace/pkg/child/grandchild.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let pkg_child_module_name = ModuleName::new_static("pkg.child").unwrap();
+        let pkg_grandchild_module_name = ModuleName::new_static("pkg.child.grandchild").unwrap();
+
+        let pkg_child_module = resolve_module_confident(&db, &pkg_child_module_name).unwrap();
+
+        assert_eq!(
+            pkg_child_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/pkg/child.py")
+        );
+        assert!(
+            resolve_module_confident(&db, &pkg_grandchild_module_name).is_none(),
+            "a mapped file module remains terminal before deeper descendants"
+        );
+    }
+
+    #[test]
+    fn setuptools_editable_install_mapping_resolves_nested_package_descendants() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.pkg.pth",
+                "import __editable___pkg_finder; __editable___pkg_finder.install()",
+            ),
+            (
+                "__editable___pkg_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"pkg": "/workspace/pkg"}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+        ];
+
+        let external_files = [
+            ("/workspace/pkg/__init__.py", ""),
+            ("/workspace/pkg/child/__init__.py", ""),
+            ("/workspace/pkg/child/grandchild.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let grandchild_module_name = ModuleName::new_static("pkg.child.grandchild").unwrap();
+        let grandchild_module = resolve_module_confident(&db, &grandchild_module_name).unwrap();
+
+        assert_eq!(
+            grandchild_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/pkg/child/grandchild.py")
+        );
+    }
+
+    #[test]
+    fn setuptools_editable_install_mapping_respects_shadowed_intermediate_package() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.pkg.pth",
+                "import __editable___pkg_finder; __editable___pkg_finder.install()",
+            ),
+            (
+                "__editable___pkg_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"pkg": "/workspace/pkg"}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+            ("pkg/child/__init__.py", ""),
+        ];
+
+        let external_files = [
+            ("/workspace/pkg/__init__.py", ""),
+            ("/workspace/pkg/child/__init__.py", ""),
+            ("/workspace/pkg/child/grandchild.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let grandchild_module_name = ModuleName::new_static("pkg.child.grandchild").unwrap();
+        assert_eq!(resolve_module_confident(&db, &grandchild_module_name), None);
+    }
+
+    #[test]
+    fn setuptools_editable_install_mapping_supports_relative_import_context() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.pkg.pth",
+                "import __editable___pkg_finder; __editable___pkg_finder.install()",
+            ),
+            (
+                "__editable___pkg_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"pkg": "/workspace/pkg"}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+        ];
+
+        let external_files = [
+            ("/workspace/pkg/__init__.py", ""),
+            ("/workspace/pkg/module.py", "from .child import value"),
+            ("/workspace/pkg/child.py", "value = 1"),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let importing_file =
+            system_path_to_file(&db, SystemPath::new("/workspace/pkg/module.py")).unwrap();
+        let imported_module =
+            ModuleName::from_identifier_parts(&db, importing_file, Some("child"), 1).unwrap();
+
+        assert_eq!(
+            imported_module,
+            ModuleName::new_static("pkg.child").unwrap()
+        );
+    }
+
+    #[test]
+    fn setuptools_editable_install_top_level_module_maps_back_to_module_name() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.foo.pth",
+                "import __editable___foo_finder; __editable___foo_finder.install()",
+            ),
+            (
+                "__editable___foo_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"foo": "/workspace/foo"}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_file("/workspace/foo.py", "").unwrap();
+
+        let foo_file = system_path_to_file(&db, SystemPath::new("/workspace/foo.py")).unwrap();
+        let foo_module = file_to_module(&db, foo_file).unwrap();
+
+        assert_eq!(
+            foo_module.name(&db),
+            &ModuleName::new_static("foo").unwrap()
+        );
+    }
+
+    #[test]
+    fn setuptools_editable_install_nested_mapping_maps_back_to_module_name() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.pkg.pth",
+                "import __editable___pkg_finder; __editable___pkg_finder.install()",
+            ),
+            (
+                "__editable___pkg_finder.py",
+                r#"
+MAPPING: dict[str, str] = {
+    "pkg": "/workspace/pkg",
+    "pkg.child": "/workspace/pkg/custom_child",
+}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+        ];
+
+        let external_files = [
+            ("/workspace/pkg/__init__.py", ""),
+            ("/workspace/pkg/custom_child/__init__.py", ""),
+            ("/workspace/pkg/custom_child/module.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let module_file = system_path_to_file(
+            &db,
+            SystemPath::new("/workspace/pkg/custom_child/module.py"),
+        )
+        .unwrap();
+        let module = file_to_module(&db, module_file).unwrap();
+
+        assert_eq!(
+            module.name(&db),
+            &ModuleName::new_static("pkg.child.module").unwrap()
+        );
+    }
+
+    #[test]
+    fn setuptools_editable_install_parent_mapping_precedes_nested_exact_mapping() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.pkg.pth",
+                "import __editable___pkg_finder; __editable___pkg_finder.install()",
+            ),
+            (
+                "__editable___pkg_finder.py",
+                r#"
+MAPPING: dict[str, str] = {
+    "pkg": "/workspace/pkg",
+    "pkg.child": "/workspace/custom_child",
+}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+        ];
+
+        let external_files = [
+            ("/workspace/pkg/__init__.py", ""),
+            ("/workspace/pkg/child.py", ""),
+            ("/workspace/custom_child.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let child_module_name = ModuleName::new_static("pkg.child").unwrap();
+        let child_module = resolve_module_confident(&db, &child_module_name).unwrap();
+
+        assert_eq!(
+            child_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/pkg/child.py")
+        );
+    }
+
+    #[test]
+    fn setuptools_editable_install_exact_mapping_without_init_is_not_namespace() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.pkg.pth",
+                "import __editable___pkg_finder; __editable___pkg_finder.install()",
+            ),
+            (
+                "__editable___pkg_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"pkg": "/workspace/pkg"}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_file("/workspace/pkg/child.py", "").unwrap();
+
+        let pkg_module_name = ModuleName::new_static("pkg").unwrap();
+        assert_eq!(resolve_module_confident(&db, &pkg_module_name), None);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn setuptools_editable_install_namespace_rejects_wrong_case_child() -> anyhow::Result<()> {
+        use anyhow::Context;
+        use ruff_db::system::OsSystem;
+
+        let temp_dir = tempfile::TempDir::new()?;
+        let root = SystemPathBuf::from_path_buf(
+            temp_dir
+                .path()
+                .canonicalize()
+                .context("Failed to canonicalize temp dir")?,
+        )
+        .expect("UTF-8 path for temp dir");
+
+        let mut db = TestDb::new();
+        db.use_system(OsSystem::new(&root));
+
+        if db.system().case_sensitivity().is_case_sensitive() {
+            return Ok(());
+        }
+
+        let site_packages = root.join("site-packages");
+        let pkg_root = root.join("pkg");
+        let pth_path = site_packages.join("__editable__.pkg.pth");
+        let finder_path = site_packages.join("__editable___pkg_finder.py");
+        let pkg_init = pkg_root.join("__init__.py");
+        let nested_child = pkg_root.join("Child/grandchild.py");
+        let finder_contents = format!(
+            r#"
+MAPPING: dict[str, str] = {{"pkg": "{pkg_root}"}}
+NAMESPACES: dict[str, list[str]] = {{}}
+"#,
+            pkg_root = pkg_root.as_str(),
+        );
+
+        db.write_files([
+            (
+                &pth_path,
+                "import __editable___pkg_finder; __editable___pkg_finder.install()",
+            ),
+            (&finder_path, finder_contents.as_str()),
+            (&pkg_init, ""),
+            (&nested_child, ""),
+        ])
+        .context("Failed to write setuptools editable test files")?;
+
+        db.set_search_paths(
+            SearchPathSettings {
+                site_packages_paths: vec![site_packages],
+                ..SearchPathSettings::empty()
+            }
+            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+            .expect("Valid search path settings"),
+        );
+
+        let wrong_case_child = ModuleName::new_static("pkg.child").unwrap();
+        assert_eq!(resolve_module_confident(&db, &wrong_case_child), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn setuptools_editable_install_virtual_namespace() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.acme.pth",
+                "import __editable___acme_finder; __editable___acme_finder.install()",
+            ),
+            (
+                "__editable___acme_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"acme.plugins": "/workspace/acme_plugins"}
+NAMESPACES: dict[str, list[str]] = {"acme": []}
+"#,
+            ),
+        ];
+
+        let external_files = [
+            ("/workspace/acme_plugins/__init__.py", ""),
+            ("/workspace/acme_plugins/tool.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let acme_module_name = ModuleName::new_static("acme").unwrap();
+        let acme_plugins_module_name = ModuleName::new_static("acme.plugins").unwrap();
+        let acme_plugins_tool_module_name = ModuleName::new_static("acme.plugins.tool").unwrap();
+
+        let acme_module = resolve_module_confident(&db, &acme_module_name).unwrap();
+        let acme_plugins_module = resolve_module_confident(&db, &acme_plugins_module_name).unwrap();
+        let acme_plugins_tool_module =
+            resolve_module_confident(&db, &acme_plugins_tool_module_name).unwrap();
+
+        assert_eq!(acme_module.kind(&db), ModuleKind::Package);
+        assert_eq!(
+            acme_plugins_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/acme_plugins/__init__.py")
+        );
+        assert_eq!(
+            acme_plugins_tool_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/acme_plugins/tool.py")
+        );
+    }
+
+    #[test]
+    fn setuptools_editable_install_empty_namespace_paths_reuse_mapping() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.ns.pth",
+                "import __editable___ns_finder; __editable___ns_finder.install()",
+            ),
+            (
+                "__editable___ns_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"ns": "/workspace/ns"}
+NAMESPACES: dict[str, list[str]] = {"ns": []}
+"#,
+            ),
+        ];
+
+        let external_files = [("/workspace/ns/child.py", "")];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let child_module_name = ModuleName::new_static("ns.child").unwrap();
+        let child_module = resolve_module_confident(&db, &child_module_name).unwrap();
+
+        assert_eq!(
+            child_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/ns/child.py")
+        );
+    }
+
+    #[test]
+    fn setuptools_editable_install_namespace_stops_after_terminal_earlier_portion() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.ns-a.pth",
+                "import __editable___ns_a_finder; __editable___ns_a_finder.install()",
+            ),
+            (
+                "__editable___ns_a_finder.py",
+                r#"
+MAPPING: dict[str, str] = {}
+NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/a/ns"]}
+"#,
+            ),
+            (
+                "__editable__.ns-b.pth",
+                "import __editable___ns_b_finder; __editable___ns_b_finder.install()",
+            ),
+            (
+                "__editable___ns_b_finder.py",
+                r#"
+MAPPING: dict[str, str] = {}
+NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/b/ns"]}
+"#,
+            ),
+        ];
+
+        let external_files = [
+            ("/workspace/a/ns/child.py", ""),
+            ("/workspace/b/ns/child/grandchild.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let grandchild_module_name = ModuleName::new_static("ns.child.grandchild").unwrap();
+        assert_eq!(resolve_module_confident(&db, &grandchild_module_name), None);
+    }
+
+    #[test]
+    fn setuptools_editable_install_namespace_keeps_scanning_for_later_regular_package() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.ns-a.pth",
+                "import __editable___ns_a_finder; __editable___ns_a_finder.install()",
+            ),
+            (
+                "__editable___ns_a_finder.py",
+                r#"
+MAPPING: dict[str, str] = {}
+NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/a/ns"]}
+"#,
+            ),
+            (
+                "__editable__.ns-b.pth",
+                "import __editable___ns_b_finder; __editable___ns_b_finder.install()",
+            ),
+            (
+                "__editable___ns_b_finder.py",
+                r#"
+MAPPING: dict[str, str] = {}
+NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/b/ns"]}
+"#,
+            ),
+        ];
+
+        let external_files = [
+            ("/workspace/a/ns/child/descendant.py", ""),
+            ("/workspace/b/ns/child/__init__.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let child_module_name = ModuleName::new_static("ns.child").unwrap();
+        let child_module = resolve_module_confident(&db, &child_module_name).unwrap();
+
+        assert_eq!(
+            child_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/b/ns/child/__init__.py")
+        );
+    }
+
+    #[test]
+    fn setuptools_editable_install_namespace_merges_with_existing_namespace_portion() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.ns.pth",
+                "import __editable___ns_finder; __editable___ns_finder.install()",
+            ),
+            (
+                "__editable___ns_finder.py",
+                r#"
+MAPPING: dict[str, str] = {}
+NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/editable/ns"]}
+"#,
+            ),
+            ("ns/foo/ordinary.py", ""),
+        ];
+
+        let external_files = [
+            ("/workspace/editable/ns/foo/__init__.py", ""),
+            ("/workspace/editable/ns/foo/editable.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let foo_module_name = ModuleName::new_static("ns.foo").unwrap();
+        let foo_module = resolve_module_confident(&db, &foo_module_name).unwrap();
+
+        assert_eq!(
+            foo_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/editable/ns/foo/__init__.py")
+        );
+
+        let ordinary_module_name = ModuleName::new_static("ns.foo.ordinary").unwrap();
+        assert_eq!(resolve_module_confident(&db, &ordinary_module_name), None);
+    }
+
+    #[test]
+    fn setuptools_editable_install_mapping_does_not_replace_existing_namespace_portion() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.ns.pth",
+                "import __editable___ns_finder; __editable___ns_finder.install()",
+            ),
+            (
+                "__editable___ns_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"ns.foo": "/workspace/editable/foo"}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+            ("ns/foo/ordinary.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_file("/workspace/editable/foo/__init__.py", "")
+            .unwrap();
+
+        let foo_module_name = ModuleName::new_static("ns.foo").unwrap();
+        let foo_module = resolve_module_confident(&db, &foo_module_name).unwrap();
+
+        assert_eq!(foo_module.file(&db), None);
+    }
+
+    #[test]
+    fn setuptools_editable_install_mapping_follows_shadowing_namespace_package() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.ns-placeholder.pth",
+                "import __editable___ns_placeholder_finder; __editable___ns_placeholder_finder.install()",
+            ),
+            (
+                "__editable___ns_placeholder_finder.py",
+                r#"
+MAPPING: dict[str, str] = {}
+NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/editable/ns"]}
+"#,
+            ),
+            (
+                "__editable__.ns-mapping.pth",
+                "import __editable___ns_mapping_finder; __editable___ns_mapping_finder.install()",
+            ),
+            (
+                "__editable___ns_mapping_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"ns.foo.bar": "/workspace/mapped_bar"}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+            ("ns/foo/bar.py", ""),
+        ];
+
+        let external_files = [
+            ("/workspace/editable/ns/foo/__init__.py", ""),
+            ("/workspace/mapped_bar/__init__.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let bar_module_name = ModuleName::new_static("ns.foo.bar").unwrap();
+        let bar_module = resolve_module_confident(&db, &bar_module_name).unwrap();
+
+        assert_eq!(
+            bar_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/mapped_bar/__init__.py")
+        );
+    }
+
+    #[test]
+    fn setuptools_editable_install_mapping_does_not_walk_through_placeholder_parent() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.pkg-mapping.pth",
+                "import __editable___pkg_mapping_finder; __editable___pkg_mapping_finder.install()",
+            ),
+            (
+                "__editable___pkg_mapping_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"pkg": "/workspace/mapped/pkg"}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+            (
+                "__editable__.pkg-namespace.pth",
+                "import __editable___pkg_namespace_finder; __editable___pkg_namespace_finder.install()",
+            ),
+            (
+                "__editable___pkg_namespace_finder.py",
+                r#"
+MAPPING: dict[str, str] = {}
+NAMESPACES: dict[str, list[str]] = {"pkg": ["/workspace/namespace/pkg"]}
+"#,
+            ),
+        ];
+
+        let external_files = [
+            ("/workspace/mapped/pkg/__init__.py", ""),
+            ("/workspace/mapped/pkg/child/__init__.py", ""),
+            ("/workspace/mapped/pkg/child/grand.py", ""),
+            ("/workspace/namespace/pkg/child/marker.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let grand_module_name = ModuleName::new_static("pkg.child.grand").unwrap();
+        assert_eq!(resolve_module_confident(&db, &grand_module_name), None);
+    }
+
+    #[test]
+    fn setuptools_editable_install_namespace_supports_relative_import_context() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.ns.pth",
+                "import __editable___ns_finder; __editable___ns_finder.install()",
+            ),
+            (
+                "__editable___ns_finder.py",
+                r#"
+MAPPING: dict[str, str] = {}
+NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/ns"]}
+"#,
+            ),
+        ];
+
+        let external_files = [
+            ("/workspace/ns/child.py", "from .sibling import value"),
+            ("/workspace/ns/sibling.py", "value = 1"),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let importing_file =
+            system_path_to_file(&db, SystemPath::new("/workspace/ns/child.py")).unwrap();
+        let imported_module =
+            ModuleName::from_identifier_parts(&db, importing_file, Some("sibling"), 1).unwrap();
+
+        assert_eq!(
+            imported_module,
+            ModuleName::new_static("ns.sibling").unwrap()
+        );
+    }
+
+    #[test]
+    fn setuptools_editable_install_namespace_placeholders_precede_meta_mappings() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.pkg-ns.pth",
+                "import __editable___pkg_ns_finder; __editable___pkg_ns_finder.install()",
+            ),
+            (
+                "__editable___pkg_ns_finder.py",
+                r#"
+MAPPING: dict[str, str] = {}
+NAMESPACES: dict[str, list[str]] = {"pkg": ["/workspace/pkg_ns"]}
+"#,
+            ),
+            (
+                "__editable__.pkg-regular.pth",
+                "import __editable___pkg_regular_finder; __editable___pkg_regular_finder.install()",
+            ),
+            (
+                "__editable___pkg_regular_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"pkg": "/workspace/pkg_regular"}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+        ];
+
+        let external_files = [
+            ("/workspace/pkg_ns/child.py", ""),
+            ("/workspace/pkg_regular/__init__.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let pkg_module_name = ModuleName::new_static("pkg").unwrap();
+        let pkg_module = resolve_module_confident(&db, &pkg_module_name).unwrap();
+
+        assert_eq!(pkg_module.file(&db), None);
+    }
+
+    #[test]
+    fn setuptools_editable_install_namespace_placeholder_precedes_later_plain_pth_path() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.ns.pth",
+                "import __editable___ns_finder; __editable___ns_finder.install()",
+            ),
+            (
+                "__editable___ns_finder.py",
+                r#"
+MAPPING: dict[str, str] = {}
+NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/editable/ns"]}
+"#,
+            ),
+            ("zz-late-editable.pth", "/workspace/late"),
+        ];
+
+        let external_files = [
+            ("/workspace/editable/ns/child/__init__.py", ""),
+            ("/workspace/late/ns/child/__init__.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let child_module_name = ModuleName::new_static("ns.child").unwrap();
+        let child_module = resolve_module_confident(&db, &child_module_name).unwrap();
+
+        assert_eq!(
+            child_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/editable/ns/child/__init__.py")
+        );
+    }
+
+    #[test]
+    fn setuptools_editable_install_stops_after_terminal_parent_module() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.acme.pth",
+                "import __editable___acme_finder; __editable___acme_finder.install()",
+            ),
+            (
+                "__editable___acme_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"acme.plugins": "/workspace/acme_plugins"}
+NAMESPACES: dict[str, list[str]] = {"acme": []}
+"#,
+            ),
+            ("acme.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_file("/workspace/acme_plugins/__init__.py", "")
+            .unwrap();
+
+        let acme_plugins_module_name = ModuleName::new_static("acme.plugins").unwrap();
+        assert_eq!(
+            resolve_module_confident(&db, &acme_plugins_module_name),
+            None
+        );
+    }
+
+    #[test]
+    fn setuptools_editable_install_does_not_shadow_site_packages() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.pkg.pth",
+                "import __editable___pkg_finder; __editable___pkg_finder.install()",
+            ),
+            (
+                "__editable___pkg_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"pkg": "/workspace/editable_pkg"}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+            ("pkg.py", ""),
+        ];
+
+        let external_files = [("/workspace/editable_pkg.py", "")];
+
+        let TestCase {
+            mut db,
+            site_packages,
+            ..
+        } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let pkg_module_name = ModuleName::new_static("pkg").unwrap();
+        let pkg_module = resolve_module_confident(&db, &pkg_module_name).unwrap();
+
+        assert_eq!(
+            pkg_module.file(&db).unwrap().path(&db),
+            &FilePath::System(site_packages.join("pkg.py"))
+        );
+    }
+
+    #[test]
+    fn setuptools_editable_install_does_not_resolve_non_shadowable_modules() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.typing_extensions.pth",
+                "import __editable___typing_extensions_finder; __editable___typing_extensions_finder.install()",
+            ),
+            (
+                "__editable___typing_extensions_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"typing_extensions": "/workspace/typing_extensions"}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_file("/workspace/typing_extensions.py", "")
+            .unwrap();
+
+        let module_name = ModuleName::new_static("typing_extensions").unwrap();
+        assert_eq!(resolve_real_module_confident(&db, &module_name), None);
     }
 
     #[test]

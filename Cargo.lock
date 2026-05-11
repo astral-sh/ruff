@@ -4575,6 +4575,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tracing",
+ "ty_setuptools_editable",
  "ty_vendored",
 ]
 
@@ -4743,6 +4744,16 @@ dependencies = [
  "ty_module_resolver",
  "ty_project",
  "ty_python_core",
+]
+
+[[package]]
+name = "ty_setuptools_editable"
+version = "0.0.0"
+dependencies = [
+ "ruff_db",
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "tracing",
 ]
 
 [[package]]
