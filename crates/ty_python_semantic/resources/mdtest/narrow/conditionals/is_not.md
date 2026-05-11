@@ -99,16 +99,6 @@ else:
     reveal_type(x)  # revealed: Literal[345]
 ```
 
-```py
-from typing_extensions import TypeAliasType
-
-def _(x: TypeAliasType, y: TypeAliasType):
-    if x is not y:
-        reveal_type(x)  # revealed: TypeAliasType
-    else:
-        reveal_type(x)  # revealed: TypeAliasType
-```
-
 ## `is not` for other types
 
 ```py

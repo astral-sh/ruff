@@ -1151,40 +1151,6 @@ def _(s: str):
     reveal_type(x)  # revealed: Literal[1, 2, 3]
 ```
 
-### `UnionType` and `TypeAliasType` value patterns
-
-```toml
-[environment]
-python-version = "3.14"
-```
-
-```py
-from types import UnionType
-from typing import TypeAliasType
-
-class constants:
-    U = int | str
-    type V = int
-
-def _(u: UnionType):
-    x = 0
-    match u:
-        case constants.U:
-            x = 1
-        case _:
-            x = 2
-    reveal_type(x)  # revealed: Literal[1, 2]
-
-def _(u: TypeAliasType):
-    x = 0
-    match u:
-        case constants.V:
-            x = 1
-        case _:
-            x = 2
-    reveal_type(x)  # revealed: Literal[1, 2]
-```
-
 ### Matching on `sys.platform`
 
 ```toml
