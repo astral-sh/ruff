@@ -83,7 +83,7 @@ use crate::types::infer::{
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::newtype::NewType;
 use crate::types::set_theoretic::RecursivelyDefined;
-use crate::types::signatures::CallableSignature;
+use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope};
 use crate::types::special_form::TypeQualifier;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
@@ -4643,7 +4643,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // i.e. type variables in the return type are non-inferable,
                     // and the return types of async functions are not wrapped in `CoroutineType[...]`.
                     let return_ty = func
-                        .last_definition_lexical_raw_signature(self.db())
+                        .last_definition_raw_signature(
+                            self.db(),
+                            ReturnCallableTypeVarScope::Lexical,
+                        )
                         .return_ty;
 
                     // For generator functions, the declared return type is e.g.
@@ -7644,7 +7647,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let declared_return_ty = enclosing_function
-            .last_definition_raw_signature(self.db())
+            .last_definition_raw_signature(self.db(), ReturnCallableTypeVarScope::Public)
             .return_ty;
         let return_type_span = enclosing_function.spans(self.db()).return_type;
 
@@ -7692,7 +7695,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let annotated_return_ty = enclosing_function
-            .last_definition_raw_signature(self.db())
+            .last_definition_raw_signature(self.db(), ReturnCallableTypeVarScope::Public)
             .return_ty;
 
         let Some(outer_expected) = annotated_return_ty.generator_types(self.db()) else {

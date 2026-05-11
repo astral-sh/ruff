@@ -24,7 +24,9 @@ use crate::{
             },
             function_known_decorators, infer_statement_types, nearest_enclosing_function,
         },
-        infer_definition_types, infer_scope_types, todo_type,
+        infer_definition_types, infer_scope_types,
+        signatures::ReturnCallableTypeVarScope,
+        todo_type,
         typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation,
     },
 };
@@ -75,11 +77,18 @@ impl<'db> ExpectedReturnType<'db> {
             }
         }
 
-        let public = normalize(db, function.last_definition_raw_signature(db).return_ty);
+        let public = normalize(
+            db,
+            function
+                .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Public)
+                .return_ty,
+        );
         let lexical = function_node.type_params.is_some().then(|| {
             normalize(
                 db,
-                function.last_definition_lexical_raw_signature(db).return_ty,
+                function
+                    .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Lexical)
+                    .return_ty,
             )
         });
 
@@ -158,7 +167,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let enclosing_function = nearest_enclosing_function(db, self.index, self.scope())
                 .expect("should be in a function body scope");
             let declared_ty = enclosing_function
-                .last_definition_raw_signature(db)
+                .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Public)
                 .return_ty;
             let expected_return =
                 ExpectedReturnType::from_function(db, enclosing_function, function);

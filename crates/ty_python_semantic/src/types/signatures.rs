@@ -47,7 +47,7 @@ use ty_python_core::definition::Definition;
 
 /// Selects which binding context to use for type variables that only appear in a return-position
 /// `Callable`.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub(super) enum ReturnCallableTypeVarScope {
     /// Keep the type variables bound to the function's lexical generic context.
     Lexical,
