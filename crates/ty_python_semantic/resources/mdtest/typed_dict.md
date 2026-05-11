@@ -2690,6 +2690,21 @@ def _(node: Node, person: Person):
 _: Node = Person(name="Alice", parent=Node(name="Bob", parent=Person(name="Charlie", parent=None)))
 ```
 
+The `Self` special form can also appear in recursive `TypedDict` fields:
+
+```py
+from typing_extensions import Self
+
+class A(TypedDict):
+    pass
+
+class B(TypedDict):
+    foo: A | Self
+
+# error: [missing-typed-dict-key] "Missing required key 'foo' in TypedDict `B` constructor"
+_: B = {}
+```
+
 TypedDict constructor calls should also use field type context when inferring nested values:
 
 ```py

@@ -98,7 +98,13 @@ impl<'db> TypedDictType<'db> {
     }
 
     pub(crate) fn items(self, db: &'db dyn Db) -> &'db TypedDictSchema<'db> {
-        #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+        // Field annotations can recursively inspect this schema while the class fields are still
+        // being collected, e.g. through `typing.Self` in a `TypedDict` field.
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial=|_, _, _| TypedDictSchema::default(),
+            heap_size=ruff_memory_usage::heap_size
+        )]
         fn class_based_items<'db>(db: &'db dyn Db, class: ClassType<'db>) -> TypedDictSchema<'db> {
             let Some((class_literal, specialization)) = class.static_class_literal(db) else {
                 return TypedDictSchema::default();
