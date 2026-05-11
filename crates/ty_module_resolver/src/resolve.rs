@@ -1209,6 +1209,18 @@ fn resolve_name_in_setuptools_editable_finders(
         return result;
     }
 
+    resolve_name_in_setuptools_editable_mappings(db, name, mode)
+}
+
+fn resolve_name_in_setuptools_editable_mappings(
+    db: &dyn Db,
+    name: &ModuleName,
+    mode: ModuleResolveMode,
+) -> ResolveNameResult {
+    if mode.is_non_shadowable(db.python_version().minor, name.as_str()) {
+        return ResolveNameResult::Missing;
+    }
+
     let context = ResolverContext::new(db, db.python_version(), mode);
     let finders = setuptools_editable_finders(db);
 
@@ -1779,8 +1791,8 @@ struct ModuleNameIngredient<'db> {
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
 fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Option<ResolvedNames> {
-    let search_paths = search_paths(db, mode);
-    match resolve_name_impl(db, name, mode, search_paths) {
+    let module_search_paths = search_paths(db, mode);
+    match resolve_name_impl(db, name, mode, module_search_paths) {
         ResolveNameResult::Found(resolved) => {
             if resolved
                 .iter()
@@ -1836,6 +1848,18 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
             }
         }
         ResolveNameResult::Missing => {
+            if name.parent().is_some_and(|parent| {
+                resolve_name_impl(db, &parent, mode, search_paths(db, mode))
+                    .into_option()
+                    .is_some_and(|resolved_parent| {
+                        resolved_parent
+                            .iter()
+                            .any(|candidate| !candidate.is_any_namespace_package())
+                    })
+            }) {
+                return resolve_name_in_setuptools_editable_mappings(db, name, mode).into_option();
+            }
+
             resolve_name_in_setuptools_editable_finders(db, name, mode).into_option()
         }
         ResolveNameResult::BlockedByTerminalModule => None,
@@ -4463,6 +4487,34 @@ NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/editable/ns"]}
             child_module.file(&db).unwrap().path(&db),
             &FilePath::system("/workspace/editable/ns/child/__init__.py")
         );
+    }
+
+    #[test]
+    fn setuptools_editable_install_namespace_placeholder_stays_behind_regular_parent_package() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.ns.pth",
+                "import __editable___ns_finder; __editable___ns_finder.install()",
+            ),
+            (
+                "__editable___ns_finder.py",
+                r#"
+MAPPING: dict[str, str] = {}
+NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/editable/ns"]}
+"#,
+            ),
+            ("ns/__init__.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_file("/workspace/editable/ns/child.py", "")
+            .unwrap();
+
+        let child_module_name = ModuleName::new_static("ns.child").unwrap();
+        assert_eq!(resolve_module_confident(&db, &child_module_name), None);
     }
 
     #[test]

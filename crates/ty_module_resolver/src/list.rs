@@ -1,6 +1,7 @@
 use std::collections::btree_map::{BTreeMap, Entry};
 
 use ruff_python_ast::PythonVersion;
+use rustc_hash::FxHashSet;
 
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
@@ -14,16 +15,18 @@ use crate::resolve::{
 /// List all available modules, including all sub-modules, sorted in lexicographic order.
 pub fn all_modules(db: &dyn Db) -> Vec<Module<'_>> {
     let mut modules = list_modules(db);
+    let mut seen_modules = modules
+        .iter()
+        .map(|module| module.name(db).clone())
+        .collect::<FxHashSet<_>>();
+
     for finder in setuptools_editable_finders(db) {
         for module in finder.nested_mapping_modules(db) {
             let Some(module) = resolve_module_confident(db, module.name(db)) else {
                 continue;
             };
 
-            if modules
-                .iter()
-                .all(|existing| existing.name(db) != module.name(db))
-            {
+            if seen_modules.insert(module.name(db).clone()) {
                 modules.push(module);
             }
         }
@@ -32,10 +35,7 @@ pub fn all_modules(db: &dyn Db) -> Vec<Module<'_>> {
     let mut stack = modules.clone();
     while let Some(module) = stack.pop() {
         for &submodule in module.all_submodules(db) {
-            if modules
-                .iter()
-                .all(|existing| existing.name(db) != submodule.name(db))
-            {
+            if seen_modules.insert(submodule.name(db).clone()) {
                 modules.push(submodule);
                 stack.push(submodule);
             }
