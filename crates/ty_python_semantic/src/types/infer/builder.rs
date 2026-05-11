@@ -424,7 +424,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.expressions.extend(inference.expressions.iter());
+        self.expressions
+            .extend(inference.expressions.iter().copied());
         self.declarations.extend(inference.declarations());
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
@@ -9284,7 +9285,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Self {
             context,
-            mut expressions,
+            expressions,
             mut qualifiers,
             mut type_expression_flags,
             mut string_annotations,
@@ -9356,10 +9357,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        expressions.shrink_to_fit();
-
         StatementInferenceInner {
-            expressions,
+            expressions: boxed_entries(expressions),
             #[cfg(debug_assertions)]
             scope,
             bindings: bindings.into_boxed_slice(),

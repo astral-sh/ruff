@@ -7,7 +7,7 @@ use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use crate::Db;
-use crate::types::infer::ExpressionInference;
+use crate::types::infer::{ExpressionInference, boxed_entries, entry_get};
 use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
 use crate::types::{Type, TypeCheckDiagnostics, TypeContext, infer_expression_types};
 use ty_python_core::ExpressionNodeKey;
@@ -269,12 +269,10 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         }
     }
 
-    pub(crate) fn finish(mut self) -> UnpackResult<'db> {
-        self.targets.shrink_to_fit();
-
+    pub(crate) fn finish(self) -> UnpackResult<'db> {
         UnpackResult {
             diagnostics: self.context.finish(),
-            targets: self.targets,
+            targets: boxed_entries(self.targets),
             cycle_recovery: None,
         }
     }
@@ -282,7 +280,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
 #[derive(Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct UnpackResult<'db> {
-    targets: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    targets: Box<[(ExpressionNodeKey, Type<'db>)]>,
     diagnostics: TypeCheckDiagnostics,
 
     /// The fallback type for missing expressions.
@@ -311,10 +309,7 @@ impl<'db> UnpackResult<'db> {
         &self,
         expr: impl Into<ExpressionNodeKey>,
     ) -> Option<Type<'db>> {
-        self.targets
-            .get(&expr.into())
-            .copied()
-            .or(self.cycle_recovery)
+        entry_get(&self.targets, &expr.into()).or(self.cycle_recovery)
     }
 
     /// Returns the diagnostics in this unpacking assignment.
@@ -324,7 +319,7 @@ impl<'db> UnpackResult<'db> {
 
     pub(crate) fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
         Self {
-            targets: FxHashMap::default(),
+            targets: Box::default(),
             diagnostics: TypeCheckDiagnostics::default(),
             cycle_recovery: Some(cycle_recovery),
         }

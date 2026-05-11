@@ -83,13 +83,13 @@ bitflags::bitflags! {
 
 impl get_size2::GetSize for TypeExpressionFlags {}
 
-fn boxed_entries<K: Ord, V>(map: FxHashMap<K, V>) -> Box<[(K, V)]> {
+pub(super) fn boxed_entries<K: Ord, V>(map: FxHashMap<K, V>) -> Box<[(K, V)]> {
     let mut entries = map.into_iter().collect::<Vec<_>>();
     entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
     entries.into_boxed_slice()
 }
 
-fn entry_get<K: Ord, V: Copy>(entries: &[(K, V)], key: &K) -> Option<V> {
+pub(super) fn entry_get<K: Ord, V: Copy>(entries: &[(K, V)], key: &K) -> Option<V> {
     entries
         .binary_search_by(|(candidate, _)| candidate.cmp(key))
         .ok()
@@ -1130,7 +1130,7 @@ impl<'db> StatementInference<'db> {
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct StatementInferenceInner<'db> {
     /// The types of every expression in this region.
-    expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expressions: Box<[(ExpressionNodeKey, Type<'db>)]>,
 
     /// The scope this region is part of.
     #[cfg(debug_assertions)]
@@ -1179,7 +1179,7 @@ impl<'db> StatementInferenceInner<'db> {
         let _ = scope;
 
         Self {
-            expressions: FxHashMap::default(),
+            expressions: Box::default(),
             bindings: Box::default(),
             declarations: Box::default(),
             #[cfg(debug_assertions)]
@@ -1239,10 +1239,7 @@ impl<'db> StatementInferenceInner<'db> {
         &self,
         expression: impl Into<ExpressionNodeKey>,
     ) -> Option<Type<'db>> {
-        self.expressions
-            .get(&expression.into())
-            .copied()
-            .or_else(|| self.fallback_type())
+        entry_get(&self.expressions, &expression.into()).or_else(|| self.fallback_type())
     }
 
     fn bindings(&self) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> {
