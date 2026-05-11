@@ -160,11 +160,7 @@ impl<'db> SubclassOfType<'db> {
             },
             SubclassOfInner::TypeVar(typevar) => {
                 let mapped = typevar.apply_type_mapping_impl(db, type_mapping, visitor);
-                if mapped.is_never() {
-                    Type::Never
-                } else {
-                    mapped.to_meta_type(db)
-                }
+                mapped.to_meta_type(db)
             }
         }
     }
@@ -439,11 +435,19 @@ impl<'db> SubclassOfInner<'db> {
         })
     }
 
-    /// Transposes `type[T]` with a type variable `T` into `T: type[...]`.
+    /// Converts `type[T]` with a type variable `T` into a type variable whose bound or
+    /// constraints describe the runtime classes of `T`'s possible inhabitants.
+    ///
+    /// For ordinary nominal bounds, this looks like transposing `type[T]` into
+    /// `T: type[...]`. The conversion intentionally goes through [`Type::to_meta_type`],
+    /// though, so bounds such as function-like callables and custom metaclasses keep the
+    /// richer meta-type that callers need instead of collapsing to `type[Unknown]`.
     ///
     /// In particular:
-    /// - If `T` has an upper bound of `T: Bound`, this returns `T: type[Bound]`.
-    /// - If `T` has constraints `T: (A, B)`, this returns `T: (type[A], type[B])`.
+    /// - If `T` has an upper bound of `T: Bound`, this returns `T` with the meta-type of
+    ///   `Bound` as its upper bound.
+    /// - If `T` has constraints `T: (A, B)`, this returns `T` constrained by the meta-types
+    ///   of `A` and `B`.
     /// - Otherwise, for an unbounded type variable, this returns `type[object]`.
     ///
     /// If this is type of a concrete type `C`, returns the type unchanged.
