@@ -3810,12 +3810,14 @@ impl<'db> Type<'db> {
                                 origin,
                                 definedness,
                                 public_type_policy,
+                                definition,
                                 ..
                             }) => Place::Defined(DefinedPlace {
                                 ty: wrapped,
                                 origin,
                                 definedness,
                                 public_type_policy,
+                                definition,
                             })
                             .into(),
                             Place::Undefined => Place::bound(wrapped).into(),
