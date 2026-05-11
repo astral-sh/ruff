@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::iter;
 
+use itertools::Either::{Left, Right};
 use itertools::Itertools;
 use ruff_python_ast::{self as ast, Arguments, BoolOp, CmpOp, Expr, ExprContext, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
@@ -410,37 +411,52 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
                     })
                     .collect();
 
-                // Build the replacement by splicing source slices for the target and the
-                // type expressions, rather than letting the generator re-render them.
-                // The generator normalizes escape sequences and otherwise reformats
-                // expressions, which can break f-strings that rely on specific spelling
-                // (e.g. `\x7d` in a format spec) or change observable behavior.
-                let locator = checker.locator();
-                let target_src = locator.slice(target.range());
-                let mut type_srcs: Vec<&str> = Vec::with_capacity(types.len());
-                for value in &types {
-                    if let Expr::Tuple(tuple) = value {
-                        for elt in tuple {
-                            type_srcs.push(locator.slice(elt.range()));
+                // Flatten the type expressions into the elements they would contribute
+                // to the merged tuple. Tuple operands splice their elements; everything
+                // else contributes itself.
+                let flattened: Vec<&Expr> = types
+                    .iter()
+                    .flat_map(|value| {
+                        if let Expr::Tuple(tuple) = value {
+                            Left(tuple.iter())
+                        } else {
+                            Right(iter::once(*value))
                         }
-                    } else {
-                        type_srcs.push(locator.slice(value.range()));
-                    }
-                }
-                let combined = format!("isinstance({}, ({}))", target_src, type_srcs.join(", "));
+                    })
+                    .collect();
 
-                // Replace just the consecutive duplicate calls (and the `or`s between
-                // them) with the combined call, leaving the rest of the `BoolOp`'s source
-                // verbatim.
-                let [first, .., last] = indices.as_slice() else {
-                    unreachable!("Indices should have at least two elements")
-                };
-                let replace_range =
-                    TextRange::new(values[*first].range().start(), values[*last].range().end());
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    pad(combined, replace_range, locator),
-                    replace_range,
-                )));
+                // A single starred element on its own (e.g. `(*types)`) is a syntax
+                // error; without surrounding elements the trailing comma required by
+                // `(*types,)` is dropped during the splice. Suppress the autofix and
+                // leave the diagnostic in place.
+                let unsafe_to_merge =
+                    matches!(flattened.as_slice(), [single] if single.is_starred_expr());
+                if !unsafe_to_merge {
+                    // Build the replacement by splicing source slices for the target and the
+                    // type expressions, rather than letting the generator re-render them.
+                    // The generator normalizes escape sequences and otherwise reformats
+                    // expressions, which can break f-strings that rely on specific spelling
+                    // (e.g. `\x7d` in a format spec) or change observable behavior.
+                    let locator = checker.locator();
+                    let target_src = locator.slice(target.range());
+                    let type_srcs: Vec<&str> =
+                        flattened.iter().map(|e| locator.slice(e.range())).collect();
+                    let combined =
+                        format!("isinstance({}, ({}))", target_src, type_srcs.join(", "));
+
+                    // Replace just the consecutive duplicate calls (and the `or`s between
+                    // them) with the combined call, leaving the rest of the `BoolOp`'s source
+                    // verbatim.
+                    let [first, .., last] = indices.as_slice() else {
+                        unreachable!("Indices should have at least two elements")
+                    };
+                    let replace_range =
+                        TextRange::new(values[*first].range().start(), values[*last].range().end());
+                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                        pad(combined, replace_range, locator),
+                        replace_range,
+                    )));
+                }
             }
         }
     }

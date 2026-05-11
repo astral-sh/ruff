@@ -61,3 +61,13 @@ isinstance(f"{(lambda: 0)}", int) or isinstance(f"{(lambda: 0)}", str)
 isinstance(f"{0:{(lambda: 0)}}", int) or isinstance(f"{0:{(lambda: 0)}}", str)
 isinstance(f"{0:\x22}", int) or isinstance(f"{0:\x22}", str)
 isinstance(f"{0:\x7b}", int) or isinstance(f"{0:\x7b}", str)
+
+# Regression test for: https://github.com/astral-sh/ruff/pull/25061
+types = (int,)
+isinstance(x, (*types,)) or isinstance(x, ())
+isinstance(x, ()) or isinstance(x, (*types,))
+isinstance(x, ()) or isinstance(x, ()) or isinstance(x, (*types,))
+isinstance(x, (*types,)) or isinstance(x, (*types,))
+isinstance(x, (*types,)) or isinstance(x, int)
+isinstance(x, ()) or isinstance(x, int)
+isinstance(x, ()) or isinstance(x, ())
