@@ -65,7 +65,9 @@ pub fn run<C>(
             continue;
         }
 
-        let result = run_test(&test, &mut assertion, output_format);
+        // Buffer any immediate output from the test to emit after the header has been printed.
+        let mut test_assertion = String::new();
+        let result = run_test(&test, &mut test_assertion, output_format);
 
         let this_test_failed = result.is_err();
         any_failures = any_failures || this_test_failed;
@@ -119,6 +121,8 @@ pub fn run<C>(
         }
 
         if this_test_failed && output_format.is_cli() {
+            assertion.push_str(&test_assertion);
+
             let escaped_test_name = test.name().replace('\'', "\\'");
             let _ = writeln!(
                 assertion,
