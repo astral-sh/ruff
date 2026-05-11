@@ -100,17 +100,6 @@ os.chmod(p, dir_fd=7)
 os.chmod(8)
 os.chmod(x)
 
-# https://github.com/astral-sh/ruff/issues/17699
-# Attribute access in the first argument: the type cannot be statically determined,
-# so the fix should be marked as unsafe (the attribute may be a file descriptor).
-class _AttrHolder:
-    fd: int = 0
-    name: str = ""
-
-_holder = _AttrHolder()
-os.chmod(_holder.fd, 0o644)
-os.chmod(_holder.name, 0o644)
-
 # if `src_dir_fd` or `dst_dir_fd` are set, suppress the diagnostic
 os.replace("src", "dst", src_dir_fd=1, dst_dir_fd=2)
 os.replace("src", "dst", src_dir_fd=1)
@@ -182,3 +171,17 @@ try:
         break
 except TypeError as e:
     print("readlink: not iterable")
+
+
+# https://github.com/astral-sh/ruff/issues/17699
+# Attribute access whose binding can be resolved via `lookup_attribute`.
+# When the resolved attribute is `int`, the diagnostic is suppressed,
+# matching the behavior for `int`-annotated names elsewhere in this file.
+# Note: this only covers class-attribute access via the class itself
+# (e.g., `Cls.attr`); instance access (e.g., `obj.attr`) is not resolved.
+class _AttrHolder:
+    fd: int = 0
+    name: str = ""
+
+os.chmod(_AttrHolder.fd, 0o644)    # Suppressed: resolved as `int`
+os.chmod(_AttrHolder.name, 0o644)  # Diagnostic + fix: resolved as `str`
