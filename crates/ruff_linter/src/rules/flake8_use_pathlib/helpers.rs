@@ -59,6 +59,50 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
     violation: impl Violation,
     applicability: Applicability,
 ) {
+    check_os_pathlib_single_arg_calls_impl(
+        checker,
+        call,
+        attr,
+        fn_argument,
+        fix_enabled,
+        violation,
+        applicability,
+        false,
+    );
+}
+
+pub(crate) fn check_os_pathlib_single_arg_calls_allowing_fd(
+    checker: &Checker,
+    call: &ExprCall,
+    attr: &str,
+    fn_argument: &str,
+    fix_enabled: bool,
+    violation: impl Violation,
+    applicability: Applicability,
+) {
+    check_os_pathlib_single_arg_calls_impl(
+        checker,
+        call,
+        attr,
+        fn_argument,
+        fix_enabled,
+        violation,
+        applicability,
+        true,
+    );
+}
+
+#[expect(clippy::too_many_arguments)]
+fn check_os_pathlib_single_arg_calls_impl(
+    checker: &Checker,
+    call: &ExprCall,
+    attr: &str,
+    fn_argument: &str,
+    fix_enabled: bool,
+    violation: impl Violation,
+    applicability: Applicability,
+    allow_file_descriptor: bool,
+) {
     if call.arguments.len() != 1 {
         return;
     }
@@ -66,6 +110,10 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
     let Some(arg) = call.arguments.find_argument_value(fn_argument, 0) else {
         return;
     };
+
+    if allow_file_descriptor && is_file_descriptor(arg, checker.semantic()) {
+        return;
+    }
 
     let arg_code = checker.locator().slice(arg.range());
     let range = call.range();

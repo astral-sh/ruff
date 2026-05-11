@@ -63,3 +63,27 @@ rename(
 rename(file, "file_2.py", src_dir_fd=None, dst_dir_fd=None)
 
 rename(file, "file_2.py", src_dir_fd=1)
+
+fd = 1
+
+
+def get_fd() -> int:
+    return fd
+
+
+exists(1)
+exists(fd)
+exists(get_fd())
+exists(path=1)
+isdir(1)
+isdir(fd)
+isdir(get_fd())
+isdir(s=1)
+isfile(1)
+isfile(fd)
+isfile(get_fd())
+isfile(path=1)
+samefile(1, p)
+samefile(fd, p)
+samefile(get_fd(), p)
+samefile(f1=1, f2=p)

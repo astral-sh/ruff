@@ -171,3 +171,27 @@ try:
         break
 except TypeError as e:
     print("readlink: not iterable")
+
+fd = 1
+
+
+def get_fd() -> int:
+    return fd
+
+
+os.path.exists(1)
+os.path.exists(fd)
+os.path.exists(get_fd())
+os.path.exists(path=1)
+os.path.isdir(1)
+os.path.isdir(fd)
+os.path.isdir(get_fd())
+os.path.isdir(s=1)
+os.path.isfile(1)
+os.path.isfile(fd)
+os.path.isfile(get_fd())
+os.path.isfile(path=1)
+os.path.samefile(1, p)
+os.path.samefile(fd, p)
+os.path.samefile(get_fd(), p)
+os.path.samefile(f1=1, f2=p)

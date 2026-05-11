@@ -5,7 +5,7 @@ use ruff_python_ast::ExprCall;
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_os_path_samefile_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
-    check_os_pathlib_two_arg_calls, has_unknown_keywords_or_starred_expr,
+    check_os_pathlib_two_arg_calls, has_unknown_keywords_or_starred_expr, is_file_descriptor,
 };
 use crate::{FixAvailability, Violation};
 
@@ -67,6 +67,14 @@ impl Violation for OsPathSamefile {
 /// PTH121
 pub(crate) fn os_path_samefile(checker: &Checker, call: &ExprCall, segments: &[&str]) {
     if segments != ["os", "path", "samefile"] {
+        return;
+    }
+
+    if call
+        .arguments
+        .find_argument_value("f1", 0)
+        .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
+    {
         return;
     }
 

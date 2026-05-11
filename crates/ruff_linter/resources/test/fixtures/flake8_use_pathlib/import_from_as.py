@@ -36,3 +36,27 @@ xbasename(p)
 xdirname(p)
 xsamefile(p)
 xsplitext(p)
+
+fd = 1
+
+
+def get_fd() -> int:
+    return fd
+
+
+xexists(1)
+xexists(fd)
+xexists(get_fd())
+xexists(path=1)
+xisdir(1)
+xisdir(fd)
+xisdir(get_fd())
+xisdir(s=1)
+xisfile(1)
+xisfile(fd)
+xisfile(get_fd())
+xisfile(path=1)
+xsamefile(1, p)
+xsamefile(fd, p)
+xsamefile(get_fd(), p)
+xsamefile(f1=1, f2=p)

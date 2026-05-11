@@ -80,3 +80,19 @@ getsize(Path("filename").resolve())
 import pathlib
 
 os.path.getsize(pathlib.Path("filename"))
+
+fd = 1
+
+
+def get_fd() -> int:
+    return fd
+
+
+os.path.getsize(1)
+os.path.getsize(fd)
+os.path.getsize(get_fd())
+os.path.getsize(filename=1)
+getsize(1)
+getsize(fd)
+getsize(get_fd())
+getsize(filename=1)
