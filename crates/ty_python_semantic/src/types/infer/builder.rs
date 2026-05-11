@@ -24,8 +24,8 @@ use ty_python_core::statement::StatementInner;
 
 use super::{
     DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
-    FunctionDecoratorInference, InferenceRegion, ScopeInference, ScopeInferenceExtra,
-    boxed_entries, infer_deferred_types, infer_definition_types, infer_expression_types,
+    FrozenMap, FunctionDecoratorInference, InferenceRegion, ScopeInference, ScopeInferenceExtra,
+    infer_deferred_types, infer_definition_types, infer_expression_types,
     infer_same_file_expression_type, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
@@ -9273,7 +9273,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             });
 
         ExpressionInference {
-            expressions: boxed_entries(expressions),
+            expressions: FrozenMap::from(expressions),
             extra,
             #[cfg(debug_assertions)]
             scope,
@@ -9358,7 +9358,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         StatementInferenceInner {
-            expressions: boxed_entries(expressions),
+            expressions: FrozenMap::from(expressions),
             #[cfg(debug_assertions)]
             scope,
             bindings: bindings.into_boxed_slice(),
@@ -9414,7 +9414,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let diagnostics = context.finish();
 
         FunctionDecoratorInference {
-            expression_types: boxed_entries(expressions),
+            expression_types: FrozenMap::from(expressions),
             bindings: bindings.into_boxed_slice(),
             called_functions: called_functions
                 .into_iter()
@@ -9503,7 +9503,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         DefinitionInference {
-            expressions: boxed_entries(expressions),
+            expressions: FrozenMap::from(expressions),
             #[cfg(debug_assertions)]
             scope,
             bindings: bindings.into_boxed_slice(),
@@ -9566,7 +9566,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         ScopeInference {
-            expressions: boxed_entries(expressions),
+            expressions: FrozenMap::from(expressions),
             extra,
         }
     }
