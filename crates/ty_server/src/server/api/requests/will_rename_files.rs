@@ -1,0 +1,85 @@
+use std::collections::HashMap;
+
+use lsp_types::request::WillRenameFiles;
+use lsp_types::{RenameFilesParams, TextEdit, Url, WorkspaceEdit};
+use ruff_db::system::SystemPathBuf;
+use ty_ide::will_rename_file;
+
+use crate::document::ToRangeExt;
+use crate::server::api::traits::{
+    BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
+};
+use crate::session::SessionSnapshot;
+use crate::session::client::Client;
+use crate::system::file_to_url;
+
+pub(crate) struct WillRenameFilesHandler;
+
+impl RequestHandler for WillRenameFilesHandler {
+    type RequestType = WillRenameFiles;
+}
+
+impl BackgroundRequestHandler for WillRenameFilesHandler {
+    fn run(
+        snapshot: &SessionSnapshot,
+        _client: &Client,
+        params: RenameFilesParams,
+    ) -> crate::server::Result<Option<WorkspaceEdit>> {
+        let encoding = snapshot.position_encoding();
+        let mut all_changes: HashMap<Url, Vec<TextEdit>> = HashMap::new();
+
+        for file_rename in &params.files {
+            let Ok(old_url) = Url::parse(&file_rename.old_uri) else {
+                continue;
+            };
+            let Ok(new_url) = Url::parse(&file_rename.new_uri) else {
+                continue;
+            };
+
+            let Ok(old_std_path) = old_url.to_file_path() else {
+                continue;
+            };
+            let Ok(new_std_path) = new_url.to_file_path() else {
+                continue;
+            };
+
+            let Ok(old_path) = SystemPathBuf::from_path_buf(old_std_path) else {
+                continue;
+            };
+            let Ok(new_path) = SystemPathBuf::from_path_buf(new_std_path) else {
+                continue;
+            };
+
+            for db in snapshot.projects() {
+                let rename_edits = will_rename_file(db, &old_path, &new_path);
+
+                for edit in rename_edits {
+                    let Some(url) = file_to_url(db, edit.file) else {
+                        continue;
+                    };
+
+                    let Some(lsp_range) = edit.range.to_lsp_range(db, edit.file, encoding) else {
+                        continue;
+                    };
+
+                    all_changes.entry(url).or_default().push(TextEdit {
+                        range: lsp_range.local_range(),
+                        new_text: edit.new_text,
+                    });
+                }
+            }
+        }
+
+        if all_changes.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(WorkspaceEdit {
+                changes: Some(all_changes),
+                document_changes: None,
+                change_annotations: None,
+            }))
+        }
+    }
+}
+
+impl RetriableRequestHandler for WillRenameFilesHandler {}
