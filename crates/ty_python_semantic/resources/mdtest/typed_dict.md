@@ -5328,6 +5328,14 @@ class B(TypedDict, extra_items=ReadOnly[int]):
 class C(TypedDict, extra_items=Required[int]):
     name: str
 
+class ReplacesClass:
+    def __init__(self, cls: type[object]) -> None: ...
+
+@ReplacesClass
+# error: [invalid-type-form] "Type qualifier `typing.Required` is not valid in a TypedDict `extra_items` argument"
+class DecoratedC(TypedDict, extra_items=Required[int]):
+    name: str
+
 # error: [invalid-type-form] "Type qualifier `typing.NotRequired` is not valid in a TypedDict `extra_items` argument"
 class D(TypedDict, extra_items=NotRequired[int]):
     name: str

@@ -385,7 +385,7 @@ Class decorators can also replace the class object with an instance:
 
 ```py
 from dataclasses import dataclass
-from typing import Generic, Protocol, TypeVar, overload
+from typing import Callable, Generic, Protocol, TypeVar, overload
 from typing_extensions import Self
 
 T = TypeVar("T")
@@ -428,6 +428,19 @@ class WrappedThenDataclass:
     value: int
 
 reveal_type(WrappedThenDataclass)  # revealed: Unknown
+
+def int_decorator_factory() -> Callable[[type[object]], int]:
+    def decorator(cls: type[object]) -> int:
+        return 1
+    return decorator
+
+# error: [no-matching-overload]
+@dataclass
+@int_decorator_factory()
+class IntThenDataclass:
+    value: int
+
+reveal_type(IntThenDataclass)  # revealed: Unknown
 
 @WrapBackend
 class InvalidWrappedBase(1): ...  # error: [invalid-base]
@@ -632,4 +645,63 @@ class UserSchema:
     id: int
 
 reveal_type(UserSchema.resource.fetch())  # revealed: str
+```
+
+Metadata decorators stacked above an intersection-returning class decorator still apply to the
+original class object, while preserving the extra intersection members:
+
+```py
+from dataclasses import dataclass
+from ty_extensions import Intersection
+from typing import Protocol, TypeVar
+
+class Resource:
+    def fetch(self) -> str:
+        return "data"
+
+class ResourceEnabled(Protocol):
+    resource: Resource
+
+SchemaT = TypeVar("SchemaT")
+
+def register(cls: type[SchemaT]) -> Intersection[type[SchemaT], ResourceEnabled]:
+    return cls
+
+@dataclass
+@register
+class RegisteredDataclass:
+    id: int
+
+reveal_type(RegisteredDataclass.resource.fetch())  # revealed: str
+reveal_type(RegisteredDataclass(1))  # revealed: RegisteredDataclass
+```
+
+Class-preserving decorators stacked above an intersection-returning class decorator preserve the
+existing intersection members:
+
+```py
+from ty_extensions import Intersection
+from typing import Protocol, TypeVar
+
+class Resource:
+    def fetch(self) -> str:
+        return "data"
+
+class ResourceEnabled(Protocol):
+    resource: Resource
+
+SchemaT = TypeVar("SchemaT")
+
+def register(cls: type[SchemaT]) -> Intersection[type[SchemaT], ResourceEnabled]:
+    return cls
+
+def identity(cls: type[SchemaT]) -> type[SchemaT]:
+    return cls
+
+@identity
+@register
+class RegisteredIdentity:
+    id: int
+
+reveal_type(RegisteredIdentity.resource.fetch())  # revealed: str
 ```

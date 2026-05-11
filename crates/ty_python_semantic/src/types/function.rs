@@ -1216,6 +1216,16 @@ impl<'db> FunctionType<'db> {
     }
 
     /// Returns `true` if any overload or implementation has an explicit return annotation.
+    ///
+    /// This distinguishes untyped decorators that infer an unknown return from decorators that
+    /// explicitly promise a replacement type:
+    /// ```python
+    /// def identity(cls):
+    ///     return cls
+    ///
+    /// def replace(cls) -> object:
+    ///     return object()
+    /// ```
     pub(crate) fn has_explicit_return_annotation(self, db: &'db dyn Db) -> bool {
         self.iter_overloads_and_implementation(db)
             .any(|overload| overload.spans(db).return_type.is_some())

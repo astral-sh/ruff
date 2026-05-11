@@ -7,8 +7,8 @@ use crate::{
         infer::{
             TypeInferenceBuilder,
             builder::{DeclaredAndInferredType, DeferredExpressionState},
+            original_class_type,
         },
-        infer_definition_types,
         signatures::ParameterForm,
         special_form::TypeQualifier,
     },
@@ -18,6 +18,18 @@ use ty_module_resolver::{KnownModule, file_to_module};
 use ty_python_core::{definition::Definition, scope::NodeWithScopeRef};
 
 /// Return true if a decorator result still binds the name to the original class.
+///
+/// For example, an identity decorator keeps the public name bound to the same class:
+/// ```python
+/// def identity[T](cls: type[T]) -> type[T]:
+///     return cls
+///
+/// @identity
+/// class C: ...
+/// ```
+///
+/// This also accepts metaclass-shaped results such as `type[C]`, because those still describe the
+/// original class object even if the decorator call produced a `SubclassOf` type internally.
 fn class_decorator_preserves_class_binding<'db>(
     db: &'db dyn crate::Db,
     original_class: Type<'db>,
@@ -52,7 +64,91 @@ fn class_decorator_preserves_class_binding<'db>(
     }
 }
 
+/// Return true if a type still contains the original class object, even if it also carries extra
+/// intersection members.
+fn class_binding_retains_original_class<'db>(
+    db: &'db dyn crate::Db,
+    original_class: Type<'db>,
+    decorated_class: Type<'db>,
+) -> bool {
+    match decorated_class {
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .any(|element| class_binding_retains_original_class(db, original_class, *element)),
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| class_binding_retains_original_class(db, original_class, *element)),
+        Type::TypeAlias(alias) => {
+            class_binding_retains_original_class(db, original_class, alias.value_type(db))
+        }
+        _ => class_decorator_preserves_class_binding(db, original_class, decorated_class),
+    }
+}
+
+/// Return true if metadata decorators stacked above this decorator should still apply to the
+/// original class object.
+///
+/// Metadata decorators such as `@dataclass` should keep shaping the original class when an inner
+/// decorator preserves that class:
+/// ```python
+/// from dataclasses import dataclass
+///
+/// def identity[T](cls: type[T]) -> type[T]:
+///     return cls
+///
+/// @dataclass
+/// @identity
+/// class C:
+///     x: int
+/// ```
+///
+/// If the inner decorator returns an unrelated value, the outer metadata decorator applies to that
+/// replacement instead, so we must not record dataclass metadata on the original class.
+fn class_decorator_preserves_class_metadata<'db>(
+    db: &'db dyn crate::Db,
+    original_class: Type<'db>,
+    decorated_class: Type<'db>,
+) -> bool {
+    class_binding_retains_original_class(db, original_class, decorated_class)
+}
+
+/// Merge a class-preserving decorator result into the public binding.
+///
+/// If earlier decorators already exposed extra members through an intersection, keep those
+/// members instead of collapsing back to the undecorated class when a later decorator simply
+/// returns the original class object again.
+fn merge_class_preserving_decorator_result<'db>(
+    db: &'db dyn crate::Db,
+    original_class: Type<'db>,
+    current_binding: Type<'db>,
+    decorated_binding: Type<'db>,
+) -> Type<'db> {
+    if class_binding_retains_original_class(db, original_class, current_binding) {
+        current_binding
+    } else {
+        decorated_binding
+            .as_class_literal()
+            .map(Type::ClassLiteral)
+            .unwrap_or(original_class)
+    }
+}
+
 /// Return true if an unknown class-decorator result should preserve the decorated class binding.
+///
+/// Untyped decorators often infer an unknown return type even when they are identity decorators:
+/// ```python
+/// def decorator(cls):
+///     return cls
+///
+/// @decorator
+/// class C: ...
+/// ```
+///
+/// In that case, keeping `C` bound to the original class is usually more useful than replacing it
+/// with `Unknown`. This helper decides when that recovery is justified from the decorator type
+/// itself, rather than from the unknown result.
 fn can_preserve_unknown_class_decorator_result<'db>(
     db: &'db dyn crate::Db,
     decorator_ty: Type<'db>,
@@ -65,6 +161,19 @@ fn can_preserve_unknown_class_decorator_result<'db>(
         .unwrap_or_else(|| decorator_ty.try_upcast_to_callable(db).is_some())
 }
 
+/// Return true if applying a class decorator produced no useful replacement type.
+///
+/// Besides plain `Unknown`, class decorators can produce unknown class-object types such as
+/// `type[Any]`. Those are represented as a `SubclassOf` dynamic type, but they should trigger the
+/// same preservation fallback as an unknown result:
+/// ```python
+/// from typing import Any
+///
+/// def decorator(cls) -> type[Any]: ...
+///
+/// @decorator
+/// class C: ...
+/// ```
 fn is_unknown_decorator_result<'db>(db: &'db dyn crate::Db, ty: Type<'db>) -> bool {
     if ty.is_unknown() {
         return true;
@@ -80,6 +189,53 @@ fn is_unknown_decorator_result<'db>(db: &'db dyn crate::Db, ty: Type<'db>) -> bo
         .is_some_and(|dynamic| Type::Dynamic(dynamic).is_unknown())
 }
 
+/// Return the value type produced by applying a class decorator.
+///
+/// Synthetic dataclass-transform marker types are metadata for class construction, not real values
+/// that should replace the class binding. For example, the result of calling `model` should not be
+/// recorded as the public type of `C` merely because `model` carries dataclass-transform metadata:
+/// ```python
+/// from typing import dataclass_transform
+///
+/// @dataclass_transform()
+/// def model(cls): ...
+///
+/// @model
+/// class C: ...
+/// ```
+fn class_decorator_return_type<'db>(
+    db: &'db dyn crate::Db,
+    decorator_ty: Type<'db>,
+    decorated_ty: Type<'db>,
+) -> Type<'db> {
+    let call_arguments = CallArguments::positional([decorated_ty]);
+    let return_ty = decorator_ty.try_call(db, &call_arguments).map_or_else(
+        |error| error.return_type(db),
+        |bindings| bindings.return_type(db),
+    );
+
+    match return_ty {
+        Type::DataclassDecorator(_) | Type::DataclassTransformer(_) => Type::unknown(),
+        return_ty => return_ty,
+    }
+}
+
+/// Return the known preservation policy for a class decorator, if one can be read statically.
+///
+/// For unknown decorator results, unannotated functions are treated as likely identity-preserving:
+/// ```python
+/// def decorator(cls):
+///     return cls
+/// ```
+///
+/// Explicit return annotations are trusted instead:
+/// ```python
+/// def decorator(cls) -> object:
+///     return object()
+/// ```
+///
+/// Callable instances and protocols delegate the decision to their `__call__` member, because the
+/// decorator value itself is not the function that receives the class.
 fn class_decorator_known_preservation<'db>(
     db: &'db dyn crate::Db,
     decorator_ty: Type<'db>,
@@ -157,6 +313,42 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
+    /// Return true if an unknown class-decorator result should leave the current class type in
+    /// place.
+    ///
+    /// This handles both direct decorators and decorator factories:
+    /// ```python
+    /// def decorator(cls):
+    ///     return cls
+    ///
+    /// def decorator_factory():
+    ///     return decorator
+    ///
+    /// @decorator_factory()
+    /// class C: ...
+    /// ```
+    ///
+    /// The factory case needs the type of the call target, because the type of
+    /// `@decorator_factory()` is the returned decorator, while the expression type of
+    /// `decorator_factory` carries the static information that tells us whether an unknown result
+    /// can be preserved.
+    fn class_decorator_preserves_unknown_result(
+        &self,
+        decorator_ty: Type<'db>,
+        decorator: &ast::Decorator,
+        decorator_result_ty: Type<'db>,
+    ) -> bool {
+        let db = self.db();
+        is_unknown_decorator_result(db, decorator_result_ty)
+            && (can_preserve_unknown_class_decorator_result(db, decorator_ty)
+                || matches!(&decorator.expression, ast::Expr::Call(call) if {
+                    can_preserve_unknown_class_decorator_result(
+                        db,
+                        self.expression_type(&call.func),
+                    )
+                }))
+    }
+
     pub(super) fn infer_class_definition_statement(&mut self, class: &ast::StmtClassDef) {
         self.infer_definition(class);
     }
@@ -181,6 +373,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .iter()
             .map(|decorator| (self.infer_decorator(decorator), decorator))
             .collect();
+
+        let body_scope = self
+            .index
+            .node_scope(NodeWithScopeRef::Class(class_node))
+            .to_scope_id(db, self.file());
+
+        let maybe_known_class = KnownClass::try_from_file_and_name(db, self.file(), name);
+
+        let known_module = || file_to_module(db, self.file()).and_then(|module| module.known(db));
+        let in_typing_module = || {
+            matches!(
+                known_module(),
+                Some(KnownModule::Typing | KnownModule::TypingExtensions)
+            )
+        };
+
         let mut decorators_to_apply = Vec::with_capacity(decorator_types_and_nodes.len());
         let mut metadata_applies_to_original_class = true;
         let mut deprecated = None;
@@ -188,6 +396,32 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut dataclass_params = None;
         let mut dataclass_transformer_params = None;
         let mut total_ordering = false;
+        let original_class_ty = |deprecated,
+                                 type_check_only,
+                                 dataclass_params,
+                                 dataclass_transformer_params,
+                                 total_ordering| {
+            match (maybe_known_class, &*name.id) {
+                (None, "NamedTuple") if in_typing_module() => {
+                    Type::SpecialForm(SpecialFormType::NamedTuple)
+                }
+                (None, "Any") if in_typing_module() => Type::SpecialForm(SpecialFormType::Any),
+                (None, "InitVar") if known_module() == Some(KnownModule::Dataclasses) => {
+                    Type::SpecialForm(SpecialFormType::TypeQualifier(TypeQualifier::InitVar))
+                }
+                _ => Type::from(StaticClassLiteral::new(
+                    db,
+                    name.id.clone(),
+                    body_scope,
+                    maybe_known_class,
+                    deprecated,
+                    type_check_only,
+                    dataclass_params,
+                    dataclass_transformer_params,
+                    total_ordering,
+                )),
+            }
+        };
         for &(decorator_ty, decorator) in decorator_types_and_nodes.iter().rev() {
             if metadata_applies_to_original_class {
                 if decorator_ty
@@ -254,7 +488,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // We do not yet detect or flag `@dataclass_transform` applied to more than one
                     // overload, or an overload and the implementation both. Nevertheless, this is not
                     // allowed. We do not try to treat the offenders intelligently -- just use the
-                    // params of the last seen usage of `@dataclass_transform`
+                    // params of the last seen usage of `@dataclass_transform`.
+                    //
+                    // TODO: Decide whether a class decorator that carries
+                    // `@dataclass_transform` metadata and also declares a non-class return type
+                    // should replace the public binding or remain metadata-only in decorator
+                    // position.
                     let transformer_params = f
                         .iter_overloads_and_implementation(db)
                         .rev()
@@ -273,13 +512,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     continue;
                 }
 
-                let decorator_preserves_unknown_result =
-                    class_decorator_known_preservation(db, decorator_ty).unwrap_or(false)
-                        || matches!(&decorator.expression, ast::Expr::Call(call) if {
-                            class_decorator_known_preservation(db, self.expression_type(&call.func))
-                                .unwrap_or(false)
-                        });
-                if !decorator_preserves_unknown_result {
+                let current_original_class_ty = original_class_ty(
+                    deprecated,
+                    type_check_only,
+                    dataclass_params,
+                    dataclass_transformer_params,
+                    total_ordering,
+                );
+                let decorated_ty =
+                    class_decorator_return_type(db, decorator_ty, current_original_class_ty);
+                if !(self.class_decorator_preserves_unknown_result(
+                    decorator_ty,
+                    decorator,
+                    decorated_ty,
+                ) || class_decorator_preserves_class_metadata(
+                    db,
+                    current_original_class_ty,
+                    decorated_ty,
+                )) {
                     metadata_applies_to_original_class = false;
                 }
             }
@@ -287,45 +537,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             decorators_to_apply.push((decorator_ty, decorator));
         }
 
-        let body_scope = self
-            .index
-            .node_scope(NodeWithScopeRef::Class(class_node))
-            .to_scope_id(db, self.file());
-
-        let maybe_known_class = KnownClass::try_from_file_and_name(db, self.file(), name);
-
-        let known_module = || file_to_module(db, self.file()).and_then(|module| module.known(db));
-        let in_typing_module = || {
-            matches!(
-                known_module(),
-                Some(KnownModule::Typing | KnownModule::TypingExtensions)
-            )
-        };
-
-        let mut inferred_ty = match (maybe_known_class, &*name.id) {
-            (None, "NamedTuple") if in_typing_module() => {
-                Type::SpecialForm(SpecialFormType::NamedTuple)
-            }
-            (None, "Any") if in_typing_module() => Type::SpecialForm(SpecialFormType::Any),
-            (None, "InitVar") if known_module() == Some(KnownModule::Dataclasses) => {
-                Type::SpecialForm(SpecialFormType::TypeQualifier(TypeQualifier::InitVar))
-            }
-            _ => Type::from(StaticClassLiteral::new(
-                db,
-                name.id.clone(),
-                body_scope,
-                maybe_known_class,
-                deprecated,
-                type_check_only,
-                dataclass_params,
-                dataclass_transformer_params,
-                total_ordering,
-            )),
-        };
+        let mut inferred_ty = original_class_ty(
+            deprecated,
+            type_check_only,
+            dataclass_params,
+            dataclass_transformer_params,
+            total_ordering,
+        );
 
         let original_class_ty = inferred_ty;
-        let mut class_ty_before_replacement = inferred_ty;
-        let mut replaces_class_binding = false;
+        let mut undecorated_ty = None;
         for (decorator_ty, decorator_node) in decorators_to_apply {
             let decorated_ty = match self.apply_decorator(decorator_ty, inferred_ty, decorator_node)
             {
@@ -334,35 +555,28 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
             // If a class decorator application loses all precision, preserve the original class
             // binding when the decorator is known to preserve unknown results.
-            let preserves_unknown_decorator_binding = is_unknown_decorator_result(db, decorated_ty)
-                && (can_preserve_unknown_class_decorator_result(db, decorator_ty)
-                    || matches!(&decorator_node.expression, ast::Expr::Call(call) if {
-                        can_preserve_unknown_class_decorator_result(
-                            db,
-                            self.expression_type(&call.func),
-                        )
-                    }));
+            let preserves_unknown_decorator_binding = self
+                .class_decorator_preserves_unknown_result(
+                    decorator_ty,
+                    decorator_node,
+                    decorated_ty,
+                );
             inferred_ty = if preserves_unknown_decorator_binding {
                 inferred_ty
             } else if class_decorator_preserves_class_binding(db, original_class_ty, decorated_ty) {
-                decorated_ty
-                    .as_class_literal()
-                    .map(Type::ClassLiteral)
-                    .unwrap_or(original_class_ty)
+                merge_class_preserving_decorator_result(
+                    db,
+                    original_class_ty,
+                    inferred_ty,
+                    decorated_ty,
+                )
             } else {
+                undecorated_ty.get_or_insert(inferred_ty);
                 decorated_ty
             };
-
-            if class_decorator_preserves_class_binding(db, original_class_ty, inferred_ty) {
-                class_ty_before_replacement = inferred_ty;
-            } else {
-                replaces_class_binding = true;
-            }
         }
 
-        if replaces_class_binding {
-            self.undecorated_type = Some(class_ty_before_replacement);
-        }
+        self.undecorated_type = undecorated_ty;
 
         self.add_declaration_with_binding(
             class_node.into(),
@@ -430,9 +644,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if let Some(arguments) = class.arguments.as_deref()
             && let Some(extra_items_keyword) = arguments.find_keyword("extra_items")
         {
-            let class_type = infer_definition_types(self.db(), definition).binding_type(definition);
-            if let Type::ClassLiteral(class_literal) = class_type
-                && class_literal.is_typed_dict(self.db())
+            if original_class_type(self.db(), definition)
+                .is_some_and(|class_literal| class_literal.is_typed_dict(self.db()))
             {
                 self.infer_extra_items_kwarg(&extra_items_keyword.value);
             } else if self.in_stub() {

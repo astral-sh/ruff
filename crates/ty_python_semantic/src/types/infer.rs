@@ -672,6 +672,17 @@ pub(crate) fn nearest_enclosing_class<'db>(
 /// For decorated classes, this is the class object before applying decorators. The public
 /// binding may be replaced by a class decorator's return type, but class-body inference still
 /// needs the original class object for implicit `self`/`cls`, `Self`, and dataclass logic.
+///
+/// For example, the public binding for `C` may be the `int` returned by `replace`, but the class
+/// body and nested definitions still need the original class object:
+/// ```python
+/// def replace(cls: type[object]) -> int:
+///     return 1
+///
+/// @replace
+/// class C:
+///     def method(self) -> None: ...
+/// ```
 pub(crate) fn original_class_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,

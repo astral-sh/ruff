@@ -1745,6 +1745,36 @@ Model(x=1)
 reveal_type(Model.__init__)  # revealed: (self: Model, x: int) -> None
 ```
 
+### Decorator return types are still metadata-only in decorator position
+
+When a `@dataclass_transform()`-decorated function is used as a class decorator, we currently use
+it to shape the class like a dataclass but do not yet let an explicit non-class return annotation
+replace the public class binding.
+
+```py
+from typing import Protocol, TypeVar
+from typing_extensions import dataclass_transform
+
+class Wrapped(Protocol):
+    def f(self) -> int: ...
+
+T = TypeVar("T", bound=object)
+
+@dataclass_transform()
+def model(cls: type[T]) -> Wrapped:
+    raise NotImplementedError
+
+@model
+class C:
+    x: int
+
+reveal_type(C)  # revealed: <class 'C'>
+reveal_type(C.__init__)  # revealed: (self: C, x: int) -> None
+
+# TODO: Decide whether the explicit `Wrapped` return type should replace the public binding here.
+C.f()  # error: [unresolved-attribute]
+```
+
 ## `__dataclass_transform__` compatibility
 
 For backwards compatibility with pre-3.11 Python, ty recognizes any function named
