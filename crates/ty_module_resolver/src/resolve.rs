@@ -991,19 +991,18 @@ impl<'db> PthFile<'db> {
     }
 }
 
-/// Return the `.pth` file that first appended a plain editable search path.
+/// Return the runtime origin of a lower-priority search path that may still lose to an earlier
+/// setuptools namespace placeholder.
 ///
-/// Setuptools namespace placeholders are also appended while `.pth` files run, so comparing
-/// these origins lets us preserve the runtime ordering between an import-hook placeholder and a
-/// later plain-path editable install.
-fn pth_file_for_editable_search_path(
+/// Setuptools namespace placeholders are appended while `.pth` files run. They can therefore
+/// outrank either:
+///
+/// - a later plain-path editable install from the same `site-packages` root, or
+/// - a later configured `site-packages` root altogether.
+fn namespace_placeholder_shadowed_search_path_origin(
     db: &dyn Db,
     search_path: &SearchPath,
 ) -> Option<(usize, SystemPathBuf)> {
-    if !search_path.is_editable() {
-        return None;
-    }
-
     let target = search_path.as_system_path()?;
     let SearchPaths {
         site_packages,
@@ -1020,6 +1019,15 @@ fn pth_file_for_editable_search_path(
         let site_packages_dir = site_packages_search_path
             .as_system_path()
             .expect("Expected site package path to be a system path");
+
+        if search_path.is_site_packages() && site_packages_dir == target {
+            return Some((site_packages_index, SystemPathBuf::new()));
+        }
+
+        if !search_path.is_editable() {
+            continue;
+        }
+
         let site_packages_root = files.expect_root(db, site_packages_dir);
 
         site_packages_root.revision(db);
@@ -1251,7 +1259,8 @@ fn resolve_name_in_setuptools_editable_namespace_placeholders_before_search_path
     mode: ModuleResolveMode,
     search_path: &SearchPath,
 ) -> ResolveNameResult {
-    let Some((site_packages_index, pth_path)) = pth_file_for_editable_search_path(db, search_path)
+    let Some((site_packages_index, pth_path)) =
+        namespace_placeholder_shadowed_search_path_origin(db, search_path)
     else {
         return ResolveNameResult::Missing;
     };
@@ -4479,6 +4488,54 @@ NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/editable/ns"]}
             .build();
 
         db.write_files(external_files).unwrap();
+
+        let child_module_name = ModuleName::new_static("ns.child").unwrap();
+        let child_module = resolve_module_confident(&db, &child_module_name).unwrap();
+
+        assert_eq!(
+            child_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/editable/ns/child/__init__.py")
+        );
+    }
+
+    #[test]
+    fn setuptools_editable_install_namespace_placeholder_precedes_later_site_packages_root() {
+        let mut db = TestDb::new();
+
+        let first_site_packages = SystemPathBuf::from("/first-site-packages");
+        let second_site_packages = SystemPathBuf::from("/second-site-packages");
+
+        db.memory_file_system()
+            .create_directory_all("/src")
+            .unwrap();
+        db.write_files([
+            (
+                first_site_packages.join("__editable__.ns.pth"),
+                "import __editable___ns_finder; __editable___ns_finder.install()",
+            ),
+            (
+                first_site_packages.join("__editable___ns_finder.py"),
+                r#"
+MAPPING: dict[str, str] = {}
+NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/editable/ns"]}
+"#,
+            ),
+            (
+                SystemPathBuf::from("/workspace/editable/ns/child/__init__.py"),
+                "",
+            ),
+            (second_site_packages.join("ns/child/__init__.py"), ""),
+        ])
+        .unwrap();
+
+        db.set_search_paths(
+            SearchPathSettings {
+                site_packages_paths: vec![first_site_packages, second_site_packages],
+                ..SearchPathSettings::new(vec![SystemPathBuf::from("/src")])
+            }
+            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+            .expect("Valid search path settings"),
+        );
 
         let child_module_name = ModuleName::new_static("ns.child").unwrap();
         let child_module = resolve_module_confident(&db, &child_module_name).unwrap();
