@@ -1051,13 +1051,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         (
                             ProtocolMemberKind::Property { get_type, set_type },
                             ProtocolMemberKind::Attribute(other_type),
-                        ) => ConstraintSet::from_bool(
-                            self.constraints,
-                            get_type.is_some() && set_type.is_some(),
-                        )
-                        .and(db, self.constraints, || {
-                            check_get_set_relation(self, db, *get_type, *set_type, *other_type)
-                        }),
+                        ) => match (*get_type, *set_type) {
+                            (Some(get_type), Some(set_type)) => self
+                                .check_type_pair(db, get_type, *other_type)
+                                .and(db, self.constraints, || {
+                                    self.check_type_pair(db, *other_type, set_type)
+                                }),
+                            _ => self.never(),
+                        },
 
                         // A `@property` member can never be a subtype of a method member, as it is not necessarily
                         // accessible on the meta-type, whereas a method member must be.

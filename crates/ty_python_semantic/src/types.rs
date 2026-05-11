@@ -4893,6 +4893,23 @@ impl<'db> Type<'db> {
         let invalid_assignment_to_final =
             |qualifiers: TypeQualifiers| -> bool { qualifiers.contains(TypeQualifiers::FINAL) };
 
+        let descriptor_set_error =
+            |dunder_set_result: Result<Bindings<'db>, CallError<'db>>| match dunder_set_result {
+                Ok(bindings) => bindings
+                    .return_type(db)
+                    .is_never()
+                    .then_some(AttributeAssignmentError::FailToSet),
+                Err(dunder_set_error) => Some(if dunder_set_error.return_type(db).is_never() {
+                    AttributeAssignmentError::FailToSet
+                } else if let Some(property) =
+                    dunder_set_error.as_attempt_to_set_property_with_no_setter()
+                {
+                    AttributeAssignmentError::ReadOnlyProperty(Some(property))
+                } else {
+                    AttributeAssignmentError::FailToSet
+                }),
+            };
+
         let mut results = AttributeAssignmentErrors::default();
 
         match self {
@@ -4977,8 +4994,9 @@ impl<'db> Type<'db> {
                     }
                 }
 
-                // First, try to call the `__setattr__` dunder method. If this is present/defined, overrides
-                // assigning the attributed by the normal mechanism.
+                // Infer `__setattr__` up front so that terminal setters block all writes.
+                // Non-terminal custom setters only act as a fallback when no explicit attribute
+                // is available, matching the main assignment checker.
                 let setattr_dunder_call_result = self.try_call_dunder_with_policy(
                     db,
                     "__setattr__",
@@ -4987,141 +5005,129 @@ impl<'db> Type<'db> {
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                 );
 
-                let check_setattr_return_type = |result: Bindings<'db>| match result.return_type(db)
-                {
-                    Type::Never => {
-                        let is_setattr_synthesized = match self.class_member_with_policy(
-                            db,
-                            "__setattr__".into(),
-                            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                        ) {
-                            PlaceAndQualifiers {
-                                place: Place::Defined(DefinedPlace { ty: attr_ty, .. }),
-                                qualifiers: _,
-                            } => attr_ty.is_callable_type(),
-                            _ => false,
-                        };
-
-                        let member_exists = !self.member(db, attribute).place.is_undefined();
-
-                        Err(if !member_exists {
-                            AttributeAssignmentError::CannotAssignToUnresolved
-                        } else if is_setattr_synthesized {
-                            AttributeAssignmentError::ReadOnlyProperty(None)
-                        } else {
-                            AttributeAssignmentError::SetAttrReturnsNeverOrNoReturn
-                        })
-                    }
-                    _ => Ok(()),
+                let setattr_returns_never = match &setattr_dunder_call_result {
+                    Ok(bindings) => bindings.return_type(db).is_never(),
+                    Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
                 };
 
-                match setattr_dunder_call_result {
-                    Ok(bindings) => results.and(check_setattr_return_type(bindings)),
-                    Err(CallDunderError::PossiblyUnbound { bindings, .. }) => {
-                        results.and(check_setattr_return_type(*bindings))
+                if setattr_returns_never {
+                    let is_setattr_synthesized = match self.class_member_with_policy(
+                        db,
+                        "__setattr__".into(),
+                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                    ) {
+                        PlaceAndQualifiers {
+                            place: Place::Defined(DefinedPlace { ty: attr_ty, .. }),
+                            qualifiers: _,
+                        } => attr_ty.is_callable_type(),
+                        _ => false,
+                    };
+
+                    let member_exists = !self.member(db, attribute).place.is_undefined();
+
+                    return results.and(Err(if !member_exists {
+                        AttributeAssignmentError::CannotAssignToUnresolved
+                    } else if is_setattr_synthesized {
+                        AttributeAssignmentError::ReadOnlyProperty(None)
+                    } else {
+                        AttributeAssignmentError::SetAttrReturnsNeverOrNoReturn
+                    }));
+                }
+
+                match self.class_member(db, attribute.into()) {
+                    meta_attr @ PlaceAndQualifiers { .. } if meta_attr.is_class_var() => {
+                        results.and(Err(AttributeAssignmentError::CannotAssignToClassVar))
                     }
-                    Err(CallDunderError::CallError(..)) => {
-                        results.and(Err(AttributeAssignmentError::FailToSetAttr))
-                    }
-                    Err(CallDunderError::MethodNotAvailable) => {
-                        match self.class_member(db, attribute.into()) {
-                            meta_attr @ PlaceAndQualifiers { .. } if meta_attr.is_class_var() => {
-                                results.and(Err(AttributeAssignmentError::CannotAssignToClassVar))
-                            }
-                            PlaceAndQualifiers {
-                                place:
-                                    Place::Defined(DefinedPlace {
-                                        ty: meta_attr_ty,
-                                        definedness: meta_attr_definedness,
-                                        ..
-                                    }),
-                                qualifiers,
-                            } => {
-                                if invalid_assignment_to_final(qualifiers) {
-                                    return results
-                                        .and(Err(AttributeAssignmentError::CannotAssignToFinal));
-                                }
-
-                                // Check if it is assignable to the meta attribute type.
-                                if let Place::Defined(DefinedPlace {
-                                    ty: meta_dunder_set,
-                                    ..
-                                }) = meta_attr_ty.class_member(db, "__set__".into()).place
-                                {
-                                    let dunder_set_result = meta_dunder_set.try_call(
-                                        db,
-                                        &CallArguments::positional([meta_attr_ty, self, value_ty]),
-                                    );
-
-                                    if let Err(dunder_set_error) = dunder_set_result {
-                                        results.insert(
-                                            if let Some(property) = dunder_set_error
-                                                .as_attempt_to_set_property_with_no_setter()
-                                            {
-                                                AttributeAssignmentError::ReadOnlyProperty(Some(
-                                                    property,
-                                                ))
-                                            } else {
-                                                AttributeAssignmentError::FailToSet
-                                            },
-                                        );
-                                    }
-                                } else {
-                                    results.insert_if_error(ensure_assignable_to(meta_attr_ty));
-                                }
-
-                                // Check if it is assignable to the instance attribute type.
-                                if meta_attr_definedness == Definedness::PossiblyUndefined {
-                                    let (assignable, definedness) =
-                                        if let Place::Defined(DefinedPlace {
-                                            ty: instance_attr_ty,
-                                            definedness: instance_attr_definedness,
-                                            ..
-                                        }) = self.instance_member(db, attribute).place
-                                        {
-                                            (
-                                                ensure_assignable_to(instance_attr_ty),
-                                                instance_attr_definedness,
-                                            )
-                                        } else {
-                                            (Ok(()), Definedness::PossiblyUndefined)
-                                        };
-
-                                    results.insert_if_error(assignable);
-
-                                    if definedness == Definedness::PossiblyUndefined {
-                                        results.insert(AttributeAssignmentError::PossiblyUnbound);
-                                    }
-                                }
-
-                                results.and(Ok(()))
-                            }
-
-                            PlaceAndQualifiers {
-                                place: Place::Undefined,
+                    PlaceAndQualifiers {
+                        place:
+                            Place::Defined(DefinedPlace {
+                                ty: meta_attr_ty,
+                                definedness: meta_attr_definedness,
                                 ..
-                            } => {
-                                if let PlaceAndQualifiers {
-                                    place:
-                                        Place::Defined(DefinedPlace {
-                                            ty: instance_attr_ty,
-                                            definedness: instance_attr_definedness,
-                                            ..
-                                        }),
-                                    qualifiers,
-                                } = self.instance_member(db, attribute)
-                                {
-                                    if invalid_assignment_to_final(qualifiers) {
-                                        return results.and(Err(
-                                            AttributeAssignmentError::CannotAssignToFinal,
-                                        ));
-                                    }
+                            }),
+                        qualifiers,
+                    } => {
+                        if invalid_assignment_to_final(qualifiers) {
+                            return results.and(Err(AttributeAssignmentError::CannotAssignToFinal));
+                        }
 
-                                    if instance_attr_definedness == Definedness::PossiblyUndefined {
-                                        results.insert(AttributeAssignmentError::PossiblyUnbound);
-                                    }
-                                    results.and(ensure_assignable_to(instance_attr_ty))
-                                } else {
+                        // Check if it is assignable to the meta attribute type.
+                        if let Place::Defined(DefinedPlace {
+                            ty: meta_dunder_set,
+                            ..
+                        }) = meta_attr_ty.class_member(db, "__set__".into()).place
+                        {
+                            let dunder_set_result = meta_dunder_set.try_call(
+                                db,
+                                &CallArguments::positional([meta_attr_ty, self, value_ty]),
+                            );
+
+                            if let Some(error) = descriptor_set_error(dunder_set_result) {
+                                results.insert(error);
+                            }
+                        } else {
+                            results.insert_if_error(ensure_assignable_to(meta_attr_ty));
+                        }
+
+                        // Check if it is assignable to the instance attribute type.
+                        if meta_attr_definedness == Definedness::PossiblyUndefined {
+                            let (assignable, definedness) = if let Place::Defined(DefinedPlace {
+                                ty: instance_attr_ty,
+                                definedness: instance_attr_definedness,
+                                ..
+                            }) =
+                                self.instance_member(db, attribute).place
+                            {
+                                (
+                                    ensure_assignable_to(instance_attr_ty),
+                                    instance_attr_definedness,
+                                )
+                            } else {
+                                (Ok(()), Definedness::PossiblyUndefined)
+                            };
+
+                            results.insert_if_error(assignable);
+
+                            if definedness == Definedness::PossiblyUndefined {
+                                results.insert(AttributeAssignmentError::PossiblyUnbound);
+                            }
+                        }
+
+                        results.and(Ok(()))
+                    }
+
+                    PlaceAndQualifiers {
+                        place: Place::Undefined,
+                        ..
+                    } => {
+                        if let PlaceAndQualifiers {
+                            place:
+                                Place::Defined(DefinedPlace {
+                                    ty: instance_attr_ty,
+                                    definedness: instance_attr_definedness,
+                                    ..
+                                }),
+                            qualifiers,
+                        } = self.instance_member(db, attribute)
+                        {
+                            if invalid_assignment_to_final(qualifiers) {
+                                return results
+                                    .and(Err(AttributeAssignmentError::CannotAssignToFinal));
+                            }
+
+                            if instance_attr_definedness == Definedness::PossiblyUndefined {
+                                results.insert(AttributeAssignmentError::PossiblyUnbound);
+                            }
+                            results.and(ensure_assignable_to(instance_attr_ty))
+                        } else {
+                            match setattr_dunder_call_result {
+                                Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => {
+                                    results.and(Ok(()))
+                                }
+                                Err(CallDunderError::CallError(..)) => {
+                                    results.and(Err(AttributeAssignmentError::FailToSetAttr))
+                                }
+                                Err(CallDunderError::MethodNotAvailable) => {
                                     results.and(Err(AttributeAssignmentError::Unresolved))
                                 }
                             }
@@ -5156,16 +5162,8 @@ impl<'db> Type<'db> {
                                 &CallArguments::positional([meta_attr_ty, self, value_ty]),
                             );
 
-                            if let Err(dunder_set_error) = dunder_set_result {
-                                results.insert(
-                                    if let Some(property) =
-                                        dunder_set_error.as_attempt_to_set_property_with_no_setter()
-                                    {
-                                        AttributeAssignmentError::ReadOnlyProperty(Some(property))
-                                    } else {
-                                        AttributeAssignmentError::FailToSet
-                                    },
-                                );
+                            if let Some(error) = descriptor_set_error(dunder_set_result) {
+                                results.insert(error);
                             }
                         } else {
                             results.insert_if_error(ensure_assignable_to(meta_attr_ty));

@@ -1896,6 +1896,23 @@ def _(obj: BasicAlias):
     obj.a = 3  # error: [invalid-assignment]
 ```
 
+TODO: Converted fields should also satisfy writable-property protocols using the converter input
+type as their write type.
+
+```py
+from typing import Protocol
+from ty_extensions import is_assignable_to, is_subtype_of, static_assert
+
+class HasConvertedField(Protocol):
+    @property
+    def a(self) -> int: ...
+    @a.setter
+    def a(self, value: str) -> None: ...
+
+static_assert(is_subtype_of(Basic, HasConvertedField))  # error: [static-assert-error]
+static_assert(is_assignable_to(Basic, HasConvertedField))  # error: [static-assert-error]
+```
+
 The default parameter for a converter field should also be verified against the converter's input
 type:
 

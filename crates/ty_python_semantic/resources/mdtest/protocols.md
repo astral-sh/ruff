@@ -1775,6 +1775,38 @@ static_assert(not is_assignable_to(HasMutableXAttrWrongType, HasMutableXProperty
 static_assert(not is_assignable_to(HasMutableXProperty, HasMutableXAttrWrongType))
 ```
 
+When a property-bearing protocol is checked against a mutable-attribute protocol, its getter must
+fit reads from the attribute and its setter must accept writes through the attribute:
+
+```py
+class PropertyBase: ...
+class PropertySub(PropertyBase): ...
+
+class PropertyReadsBaseWritesSub(Protocol):
+    @property
+    def x(self) -> PropertyBase: ...
+    @x.setter
+    def x(self, value: PropertySub) -> None: ...
+
+class MutableSubAttribute(Protocol):
+    x: PropertySub
+
+static_assert(not is_subtype_of(PropertyReadsBaseWritesSub, MutableSubAttribute))
+static_assert(not is_assignable_to(PropertyReadsBaseWritesSub, MutableSubAttribute))
+
+class PropertyReadsSubWritesBase(Protocol):
+    @property
+    def x(self) -> PropertySub: ...
+    @x.setter
+    def x(self, value: PropertyBase) -> None: ...
+
+class MutableBaseAttribute(Protocol):
+    x: PropertyBase
+
+static_assert(is_subtype_of(PropertyReadsSubWritesBase, MutableBaseAttribute))
+static_assert(is_assignable_to(PropertyReadsSubWritesBase, MutableBaseAttribute))
+```
+
 A read/write property on a protocol, where the setter accepts a subtype of the type returned by the
 getter, can be satisfied by a mutable attribute of any type bounded by the upper bound of the
 getter-returned type and the lower bound of the setter-accepted type.
@@ -1857,6 +1889,39 @@ static_assert(is_subtype_of(XCustomDescriptor, HasAsymmetricXProperty))
 static_assert(is_assignable_to(XCustomDescriptor, HasAsymmetricXProperty))
 ```
 
+A writable protocol property is not satisfied by terminal setters:
+
+```py
+from typing_extensions import Never
+
+class TerminalPropertySetter:
+    @property
+    def x(self) -> int:
+        return 1
+
+    @x.setter
+    def x(self, value: int) -> Never:
+        raise RuntimeError
+
+class TerminalDescriptor:
+    def __get__(self, instance, owner) -> int:
+        return 1
+
+    def __set__(self, instance, value: int) -> Never:
+        raise RuntimeError
+
+class HasTerminalDescriptor:
+    x: TerminalDescriptor = TerminalDescriptor()
+
+static_assert(not is_subtype_of(TerminalPropertySetter, HasMutableXProperty))
+static_assert(not is_assignable_to(TerminalPropertySetter, HasMutableXProperty))
+static_assert(not is_subtype_of(HasTerminalDescriptor, HasMutableXProperty))
+static_assert(not is_assignable_to(HasTerminalDescriptor, HasMutableXProperty))
+
+terminal_property = TerminalPropertySetter()
+terminal_property.x = 1  # error: [invalid-assignment]
+```
+
 Moreover, a read-only property on a protocol can be satisfied by a nominal class that defines a
 `__getattr__` method returning a suitable type. A read/write property can be satisfied by a nominal
 class that defines a `__getattr__` method returning a suitable type *and* a `__setattr__` method
@@ -1900,6 +1965,23 @@ class HasSetAttrWithUnsuitableInput:
 
 static_assert(not is_subtype_of(HasSetAttrWithUnsuitableInput, HasMutableXProperty))
 static_assert(not is_assignable_to(HasSetAttrWithUnsuitableInput, HasMutableXProperty))
+
+class ExplicitXWithBroadSetAttr:
+    x: int
+
+    def __setattr__(self, attr: str, value: object) -> None: ...
+
+class HasStringSetter(Protocol):
+    @property
+    def x(self) -> int: ...
+    @x.setter
+    def x(self, value: str) -> None: ...
+
+static_assert(not is_subtype_of(ExplicitXWithBroadSetAttr, HasStringSetter))
+static_assert(not is_assignable_to(ExplicitXWithBroadSetAttr, HasStringSetter))
+
+explicit_x = ExplicitXWithBroadSetAttr()
+explicit_x.x = "string"  # error: [invalid-assignment]
 ```
 
 ## Subtyping of protocols with method members
