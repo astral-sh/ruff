@@ -4,7 +4,8 @@ A type is single-valued iff it is not empty and all inhabitants of it compare eq
 
 ```py
 import types
-from typing_extensions import Any, Literal, LiteralString, Never, Callable
+from types import UnionType
+from typing_extensions import Any, Literal, LiteralString, Never, Callable, TypeAliasType
 from ty_extensions import is_single_valued, static_assert, TypeOf
 
 static_assert(is_single_valued(None))
@@ -43,6 +44,10 @@ static_assert(not is_single_valued(MultiValuedHeterogeneousTupleSubclass))
 
 static_assert(not is_single_valued(Callable[..., None]))
 static_assert(not is_single_valued(Callable[[int, str], None]))
+
+static_assert(not is_single_valued(TypeAliasType))
+static_assert(not is_single_valued(UnionType))
+static_assert(is_single_valued(TypeOf[list[int]]))
 
 class A:
     def method(self): ...

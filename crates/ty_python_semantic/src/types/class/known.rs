@@ -1261,8 +1261,6 @@ impl KnownClass {
             | Self::NoDefaultType
             | Self::VersionInfo
             | Self::EllipsisType
-            | Self::TypeAliasType
-            | Self::UnionType
             | Self::NotImplementedType => Some(true),
 
             Self::Bool
@@ -1308,6 +1306,7 @@ impl KnownClass {
             | Self::OrderedDict
             | Self::SupportsIndex
             | Self::StdlibAlias
+            | Self::TypeAliasType
             | Self::TypeVar
             | Self::ExtensionsTypeVar
             | Self::ParamSpec
@@ -1344,6 +1343,7 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::Template
             | Self::Path
+            | Self::UnionType
             | Self::FunctoolsPartial => Some(false),
 
             Self::Tuple => None,
@@ -1359,7 +1359,6 @@ impl KnownClass {
             | Self::EllipsisType
             | Self::NoDefaultType
             | Self::VersionInfo
-            | Self::TypeAliasType
             | Self::NotImplementedType => true,
 
             Self::Bool
@@ -1406,6 +1405,7 @@ impl KnownClass {
             | Self::Generator
             | Self::AsyncGenerator
             | Self::Deprecated
+            | Self::TypeAliasType
             | Self::TypeVar
             | Self::ExtensionsTypeVar
             | Self::ParamSpec

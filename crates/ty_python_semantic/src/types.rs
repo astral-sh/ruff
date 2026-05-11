@@ -2223,10 +2223,10 @@ impl<'db> Type<'db> {
             // We eagerly transform `SubclassOf` to `ClassLiteral` for final types, so `SubclassOf` is never a singleton.
             Type::SubclassOf(..) => false,
             Type::BoundSuper(..) => false,
+            Type::GenericAlias(..) => false,
             Type::FunctionLiteral(..)
             | Type::WrapperDescriptor(..)
             | Type::ClassLiteral(..)
-            | Type::GenericAlias(..)
             | Type::ModuleLiteral(..) => true,
             Type::SpecialForm(special_form) => {
                 // Nearly all `SpecialForm` types are singletons, but if a symbol could validly
