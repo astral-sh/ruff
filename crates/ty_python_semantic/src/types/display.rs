@@ -1188,12 +1188,14 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::Union(union) => union
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
-            Type::Intersection(intersection) => intersection
-                .display_with(self.db, self.settings.clone())
-                .fmt_detailed(f),
-            Type::EnumComplement(complement) => {
+            Type::Intersection(intersection) => {
                 if let Some(literals) =
-                    complement.remaining_literal_types_for_display(self.db, LITERAL_POLICY.max)
+                    intersection
+                        .enum_complement(self.db)
+                        .and_then(|complement| {
+                            complement
+                                .remaining_literal_types_for_display(self.db, LITERAL_POLICY.max)
+                        })
                 {
                     DisplayLiteralGroup {
                         literals,
@@ -1202,8 +1204,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     }
                     .fmt_detailed(f)
                 } else {
-                    complement
-                        .to_intersection(self.db)
+                    intersection
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f)
                 }
@@ -2500,7 +2501,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                 return Some(vec![ty]);
             }
 
-            ty.enum_complement().and_then(|complement| {
+            ty.enum_complement(db).and_then(|complement| {
                 complement.remaining_literal_types_for_display(db, LITERAL_POLICY.max)
             })
         }

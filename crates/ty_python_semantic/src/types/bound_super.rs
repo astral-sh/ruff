@@ -738,9 +738,6 @@ impl<'db> BoundSuperType<'db> {
                 }
                 return Ok(builder.build());
             }
-            Type::EnumComplement(complement) => {
-                return delegate_to(complement.to_intersection(db));
-            }
             Type::TypeAlias(alias) => {
                 return delegate_to(alias.value_type(db));
             }

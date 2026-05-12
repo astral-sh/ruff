@@ -2423,14 +2423,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            Type::EnumComplement(complement) => self.validate_attribute_assignment(
-                target,
-                complement.to_intersection(db),
-                attribute,
-                infer_value_ty,
-                emit_diagnostics,
-            ),
-
             Type::TypeAlias(alias) => self.validate_attribute_assignment(
                 target,
                 alias.value_type(self.db()),
@@ -3071,13 +3063,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            Type::EnumComplement(complement) => self.validate_attribute_deletion(
-                target,
-                complement.to_intersection(db),
-                attribute,
-                emit_diagnostics,
-            ),
-
             // Type aliases need their own arm so aliased unions and intersections reuse the
             // specialized handling above. `NewType` instances don't: dunder lookup and attribute
             // fallback already delegate through the concrete base type when needed.
@@ -3265,7 +3250,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::WrapperDescriptor(_)
                 | Type::DataclassDecorator(_)
                 | Type::DataclassTransformer(_)
-                | Type::EnumComplement(_)
                 | Type::TypeVar(..)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy
@@ -5003,7 +4987,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::TypeAlias(alias) => propagate_callable_kind(db, alias.value_type(db), kind),
                 // Intersections are currently not handled here because that would require
                 // the decorator to be explicitly annotated as returning an intersection.
-                Type::Intersection(_) | Type::EnumComplement(_) => None,
+                Type::Intersection(_) => None,
                 // All other types cannot have a callable kind propagated to them.
                 Type::Dynamic(_)
                 | Type::Divergent(_)
@@ -9259,7 +9243,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::PropertyInstance(_)
                 | Type::Union(_)
                 | Type::Intersection(_)
-                | Type::EnumComplement(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy
                 | Type::BoundSuper(_)

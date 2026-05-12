@@ -158,7 +158,6 @@ impl<'db> ClassBase<'db> {
             }
 
             Type::PropertyInstance(_)
-            | Type::EnumComplement(_)
             | Type::LiteralValue(_)
             | Type::FunctionLiteral(_)
             | Type::Callable(..)

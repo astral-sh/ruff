@@ -990,7 +990,6 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
         Type::Dynamic(_)
         | Type::Divergent(_)
         | Type::Never
-        | Type::EnumComplement(_)
         | Type::FunctionLiteral(_)
         | Type::BoundMethod(_)
         | Type::KnownBoundMethod(_)

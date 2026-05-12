@@ -201,10 +201,6 @@ impl<'db> AllMembers<'db> {
                     .unwrap_or_default(),
             ),
 
-            Type::EnumComplement(complement) => {
-                self.extend_with_type(db, complement.to_intersection(db));
-            }
-
             Type::NominalInstance(instance) => {
                 let class = instance.class(db);
                 if let Some((class_literal, specialization)) = class.static_class_literal(db) {

@@ -169,12 +169,12 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
     };
 
-    if let Some(complement) = left.enum_complement() {
+    if let Some(complement) = left.enum_complement(db) {
         let left = complement.remaining_literal_union(db);
         return infer_binary_type_comparison(context, left, op, right, range, visitor);
     }
 
-    if let Some(complement) = right.enum_complement() {
+    if let Some(complement) = right.enum_complement(db) {
         let right = complement.remaining_literal_union(db);
         return infer_binary_type_comparison(context, left, op, right, range, visitor);
     }

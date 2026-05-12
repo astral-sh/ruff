@@ -59,7 +59,7 @@ use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
 use crate::types::enums::enum_member_literals;
-pub(crate) use crate::types::enums::{EnumComplement, EnumComplementType, enum_metadata};
+pub(crate) use crate::types::enums::{EnumComplement, enum_metadata};
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
     FunctionType, KnownFunction,
@@ -818,8 +818,6 @@ pub enum Type<'db> {
     Union(UnionType<'db>),
     /// The set of objects in all of the types in the intersection
     Intersection(IntersectionType<'db>),
-    /// An enum instance with one or more canonical enum members excluded.
-    EnumComplement(EnumComplementType<'db>),
     /// Represents objects whose `__bool__` method is deterministic:
     /// - `AlwaysTruthy`: `__bool__` always returns `True`
     /// - `AlwaysFalsy`: `__bool__` always returns `False`
@@ -1036,28 +1034,6 @@ impl<'db> Type<'db> {
         self.is_instance_of(db, KnownClass::Bool)
     }
 
-    /// Return the enum class for an instance type if this type is an enum instance.
-    ///
-    /// This identifies the class behind values annotated as an enum instance, such as `Color` in
-    /// the following example:
-    ///
-    /// ```python
-    /// from enum import Enum
-    ///
-    /// class Color(Enum):
-    ///     RED = 1
-    ///
-    /// def f(color: Color): ...
-    /// ```
-    pub(crate) fn enum_class(self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
-        self.as_nominal_instance().and_then(|instance| {
-            let class = instance.class_literal(db);
-            crate::types::enums::enum_metadata(db, class)
-                .is_some()
-                .then_some(class)
-        })
-    }
-
     /// Return the enum-complement represented by this type.
     ///
     /// An enum complement is an intersection containing exactly one enum instance type, optional
@@ -1076,9 +1052,9 @@ impl<'db> Type<'db> {
     ///     if color is not Color.RED:
     ///         reveal_type(color)  # Color, excluding Color.RED
     /// ```
-    pub(crate) fn enum_complement(self) -> Option<EnumComplement<'db>> {
+    pub(crate) fn enum_complement(self, db: &'db dyn Db) -> Option<EnumComplement<'db>> {
         match self {
-            Type::EnumComplement(complement) => Some(complement),
+            Type::Intersection(intersection) => intersection.enum_complement(db),
             _ => None,
         }
     }
@@ -1098,7 +1074,8 @@ impl<'db> Type<'db> {
     /// def f(color: Color): ...
     /// ```
     fn is_enum(&self, db: &'db dyn Db) -> bool {
-        self.enum_class(db).is_some()
+        self.as_nominal_instance()
+            .is_some_and(|instance| enum_metadata(db, instance.class_literal(db)).is_some())
     }
 
     fn is_typealias_special_form(&self) -> bool {
@@ -1739,7 +1716,7 @@ impl<'db> Type<'db> {
             return Vec::new();
         }
 
-        if let Some(complement) = ty.enum_complement() {
+        if let Some(complement) = ty.enum_complement(db) {
             return complement.remaining_literal_types(db);
         }
 
@@ -1766,7 +1743,7 @@ impl<'db> Type<'db> {
     pub(crate) fn has_finite_single_valued_union_alternatives(self, db: &'db dyn Db) -> bool {
         let ty = self.resolve_type_alias(db);
 
-        if let Some(complement) = ty.enum_complement() {
+        if let Some(complement) = ty.enum_complement(db) {
             return complement.rest(db).is_empty()
                 && complement.has_remaining_members(db)
                 && !complement
@@ -1911,7 +1888,7 @@ impl<'db> Type<'db> {
                 NegativeIntersectionElements::Single(*self),
             )),
 
-            Type::Union(_) | Type::Intersection(_) | Type::EnumComplement(_) => {
+            Type::Union(_) | Type::Intersection(_) => {
                 IntersectionBuilder::new(db).add_negative(*self).build()
             }
         }
@@ -1943,8 +1920,9 @@ impl<'db> Type<'db> {
             | Type::TypeVar(_)
             | Type::TypeAlias(_)
             | Type::SubclassOf(_)=> true,
-            Type::Intersection(_) => false,
-            Type::EnumComplement(complement) => complement.is_spellable(db),
+            Type::Intersection(intersection) => intersection
+                .enum_complement(db)
+                .is_some_and(|complement| complement.is_spellable(db)),
             Type::Divergent(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
@@ -1977,7 +1955,6 @@ impl<'db> Type<'db> {
             | Type::TypeAlias(_) => true,
 
             Type::Intersection(_)
-            | Type::EnumComplement(_)
             | Type::Divergent(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
@@ -2184,9 +2161,6 @@ impl<'db> Type<'db> {
             Type::Intersection(intersection) => intersection
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Type::Intersection),
-            Type::EnumComplement(complement) => complement
-                .to_intersection(db)
-                .recursive_type_normalized_impl(db, div, nested),
             Type::Callable(callable) => callable
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Type::Callable),
@@ -2441,11 +2415,11 @@ impl<'db> Type<'db> {
                 // our model due to [`UnionBuilder::build`].
                 false
             }
-            Type::Intersection(..) => false,
-            Type::EnumComplement(complement) => matches!(
-                complement.remaining_literal_types(db).as_slice(),
-                [literal] if literal.is_singleton(db)
-            ),
+            Type::Intersection(intersection) => {
+                intersection.enum_complement(db).is_some_and(|complement| {
+                    complement.rest(db).is_empty() && complement.has_single_remaining_member(db)
+                })
+            }
             Type::AlwaysTruthy | Type::AlwaysFalsy => false,
             Type::TypeIs(type_is) => type_is.is_bound(db),
             Type::TypeGuard(type_guard) => type_guard.is_bound(db),
@@ -2538,11 +2512,16 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_) => false,
 
-            Type::Intersection(..) => false,
-            Type::EnumComplement(complement) => matches!(
-                complement.remaining_literal_types(db).as_slice(),
-                [literal] if literal.is_single_valued(db)
-            ),
+            Type::Intersection(intersection) => {
+                intersection.enum_complement(db).is_some_and(|complement| {
+                    complement.rest(db).is_empty()
+                        && complement.has_single_remaining_member(db)
+                        && !complement
+                            .enum_class(db)
+                            .to_non_generic_instance(db)
+                            .overrides_equality(db)
+                })
+            }
         }
     }
 
@@ -2681,7 +2660,6 @@ impl<'db> Type<'db> {
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
             | Type::TypedDict(_)
-            | Type::EnumComplement(_)
             | Type::NewTypeInstance(_) => None,
         }
     }
@@ -2792,10 +2770,6 @@ impl<'db> Type<'db> {
 
             Type::Intersection(intersection) => intersection
                 .map_with_boundness_and_qualifiers(db, |elem| elem.instance_member(db, name)),
-
-            Type::EnumComplement(complement) => {
-                complement.to_intersection(db).instance_member(db, name)
-            }
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
 
@@ -3369,20 +3343,16 @@ impl<'db> Type<'db> {
                 elem.member_lookup_with_policy(db, name_str.into(), policy)
             }),
 
-            Type::Intersection(intersection) => intersection
-                .map_with_boundness_and_qualifiers(db, |elem| {
-                    elem.member_lookup_with_policy(db, name_str.into(), policy)
-                }),
-
-            Type::EnumComplement(complement) => {
+            Type::Intersection(intersection) => {
                 if matches!(name_str, "name" | "_name_" | "value" | "_value_")
+                    && let Some(complement) = intersection.enum_complement(db)
                     && let Some(member_ty) = complement.member_type(db, name_str)
                 {
                     Place::bound(member_ty).into()
                 } else {
-                    complement
-                        .to_intersection(db)
-                        .member_lookup_with_policy(db, name, policy)
+                    intersection.map_with_boundness_and_qualifiers(db, |elem| {
+                        elem.member_lookup_with_policy(db, name_str.into(), policy)
+                    })
                 }
             }
 
@@ -4323,8 +4293,6 @@ impl<'db> Type<'db> {
                     .positive_elements_or_object(db)
                     .map(|element| element.bindings(db)),
             ),
-
-            Type::EnumComplement(complement) => complement.to_intersection(db).bindings(db),
 
             Type::DataclassDecorator(_) => {
                 let typevar = BoundTypeVarInstance::synthetic(
@@ -5459,7 +5427,6 @@ impl<'db> Type<'db> {
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
             | Type::TypedDict(_)
-            | Type::EnumComplement(_)
             | Type::NewTypeInstance(_) => None,
         }
     }
@@ -5494,7 +5461,6 @@ impl<'db> Type<'db> {
             Type::GenericAlias(alias) => Ok(Type::instance(db, ClassType::from(*alias))),
 
             Type::SubclassOf(_)
-            | Type::EnumComplement(_)
             | Type::LiteralValue(_)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
@@ -5705,7 +5671,7 @@ impl<'db> Type<'db> {
     /// See `Self::dunder_class` for more details.
     #[must_use]
     pub(crate) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
-        if let Some(complement) = self.enum_complement() {
+        if let Some(complement) = self.enum_complement(db) {
             return complement.remaining_literal_union(db).to_meta_type(db);
         }
 
@@ -5750,9 +5716,6 @@ impl<'db> Type<'db> {
             Type::Intersection(_) => {
                 SubclassOfType::try_from_type(db, todo_type!("Intersection meta-type"))
                     .expect("Type::Todo should be a valid `SubclassOfInner`")
-            }
-            Type::EnumComplement(complement) => {
-                complement.remaining_literal_union(db).to_meta_type(db)
             }
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
             Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db),
@@ -6003,10 +5966,6 @@ impl<'db> Type<'db> {
                 }
                 builder.build()
             }
-
-            Type::EnumComplement(complement) => complement
-                .to_intersection(db)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
             Type::TypeIs(type_is) => visitor.visit(db, self, type_mapping, || {
                 type_is.with_type(
@@ -6261,12 +6220,6 @@ impl<'db> Type<'db> {
                     negative.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
                 }
             }
-            Type::EnumComplement(complement) => {
-                for rest in complement.rest(db) {
-                    rest.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
-                }
-            }
-
             Type::GenericAlias(alias) => {
                 alias.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
@@ -6446,7 +6399,7 @@ impl<'db> Type<'db> {
     /// Note: this method is used in the builtins `format`, `print`, `str.format` and `f-strings`.
     #[must_use]
     pub(crate) fn str(&self, db: &'db dyn Db) -> Type<'db> {
-        if let Some(complement) = (*self).enum_complement() {
+        if let Some(complement) = (*self).enum_complement(db) {
             return complement.remaining_literal_union(db).str(db);
         }
 
@@ -6575,7 +6528,7 @@ impl<'db> Type<'db> {
 
             Self::TypedDict(typed_dict) => typed_dict.type_definition(db),
 
-            Self::Union(_) | Self::Intersection(_) | Self::EnumComplement(_) => None,
+            Self::Union(_) | Self::Intersection(_) => None,
 
             Self::SpecialForm(special_form) => special_form.definition(db),
             Self::Never => Type::SpecialForm(SpecialFormType::Never).definition(db),
@@ -6878,9 +6831,6 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
                         .variance_of(db, typevar)
                 }))
                 .collect(),
-            Type::EnumComplement(complement) => {
-                complement.to_intersection(db).variance_of(db, typevar)
-            }
             Type::PropertyInstance(property_instance_type) => property_instance_type
                 .getter(db)
                 .iter()

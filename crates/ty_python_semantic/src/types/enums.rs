@@ -9,9 +9,8 @@ use crate::{
     place::{DefinedPlace, Place, place_from_bindings, place_from_declarations},
     reachability::DeclarationsIteratorExtension,
     types::{
-        ClassBase, ClassLiteral, DynamicType, EnumLiteralType, IntersectionType, KnownClass,
-        LiteralValueTypeKind, MemberLookupPolicy, NegativeIntersectionElements, StaticClassLiteral,
-        Type, UnionType,
+        ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, LiteralValueTypeKind,
+        MemberLookupPolicy, NegativeIntersectionElements, StaticClassLiteral, Type, UnionType,
         function::FunctionType,
         set_theoretic::builder::{IntersectionBuilder, UnionBuilder},
     },
@@ -165,10 +164,9 @@ impl<'db> EnumMetadata<'db> {
 
 /// A compact representation of an enum type with excluded members.
 ///
-/// This corresponds to intersection types like `Color & ~Literal[Color.RED]`, but is kept as its
-/// own type shape so callers do not have to rediscover that intersection pattern independently.
-/// The complement remains compact until some operation explicitly needs the finite literal
-/// alternatives.
+/// This summarizes intersection types like `Color & ~Literal[Color.RED]`, so callers do not have
+/// to rediscover that intersection pattern independently. The complement remains compact until
+/// some operation explicitly needs the finite literal alternatives.
 ///
 /// ```python
 /// from enum import Enum
@@ -182,7 +180,7 @@ impl<'db> EnumMetadata<'db> {
 ///         reveal_type(color)  # Color, excluding Color.RED
 /// ```
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-pub struct EnumComplementType<'db> {
+pub struct EnumComplement<'db> {
     pub(crate) enum_class: ClassLiteral<'db>,
     /// Canonical enum-member names excluded by this complement.
     #[returns(ref)]
@@ -194,12 +192,10 @@ pub struct EnumComplementType<'db> {
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for EnumComplementType<'_> {}
-
-pub(crate) type EnumComplement<'db> = EnumComplementType<'db>;
+impl get_size2::GetSize for EnumComplement<'_> {}
 
 #[salsa::tracked]
-impl<'db> EnumComplementType<'db> {
+impl<'db> EnumComplement<'db> {
     /// Recognize the compact enum-complement shape inside an intersection.
     pub(crate) fn from_intersection_parts(
         db: &'db dyn Db,
@@ -312,6 +308,11 @@ impl<'db> EnumComplementType<'db> {
     /// Return `true` if this complement still represents at least one enum member.
     pub(crate) fn has_remaining_members(self, db: &'db dyn Db) -> bool {
         self.remaining_member_count(db) > 0
+    }
+
+    /// Return `true` if this complement represents exactly one remaining enum member.
+    pub(crate) fn has_single_remaining_member(self, db: &'db dyn Db) -> bool {
+        self.remaining_member_count(db) == 1
     }
 
     /// Expand this complement to the enum literals that remain possible.
@@ -438,28 +439,6 @@ impl<'db> EnumComplementType<'db> {
         // `Color & Any & ~Literal[Color.RED]`, are not equivalent to that literal union because the
         // additional intersection components must remain.
         self.rest(db).is_empty()
-            && self
-                .remaining_literal_types(db)
-                .iter()
-                .all(|literal| literal.is_spellable(db))
-    }
-
-    /// Reconstruct the equivalent set-theoretic intersection.
-    pub(crate) fn to_intersection(self, db: &'db dyn Db) -> Type<'db> {
-        let enum_class = self.enum_class(db);
-        let mut positive = FxOrderSet::from_iter([enum_class.to_non_generic_instance(db)]);
-        positive.extend(self.rest(db).iter().copied());
-
-        let mut negative = NegativeIntersectionElements::default();
-        for name in self.excluded_names(db) {
-            negative.insert(Type::enum_literal(EnumLiteralType::new(
-                db,
-                enum_class,
-                name.clone(),
-            )));
-        }
-
-        Type::Intersection(IntersectionType::new(db, positive, negative))
     }
 }
 
