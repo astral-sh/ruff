@@ -691,12 +691,17 @@ impl<'db> ProtocolInstanceType<'db> {
     /// If this is a synthesized protocol that does not correspond to a class definition
     /// in source code, return `None`. These are "pure" abstract types, that cannot be
     /// treated in a nominal way.
-    pub(super) fn to_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
+    pub(super) fn to_nominal_instance(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<NominalInstanceType<'db>> {
         match self.inner {
             Protocol::FromClass(class) => {
                 Some(NominalInstanceType(NominalInstanceInner::NonTuple(*class)))
             }
-            Protocol::Synthesized(_) => None,
+            Protocol::Synthesized(synthesized) => synthesized
+                .origin(db)
+                .map(|origin| NominalInstanceType(NominalInstanceInner::NonTuple(*origin))),
         }
     }
 
@@ -718,7 +723,11 @@ impl<'db> ProtocolInstanceType<'db> {
             //     reveal_type(type(x))                 # mypy: "type[def (builtins.int) -> builtins.str]"
             //     reveal_type(type(x).__call__)        # mypy: "def (*args: Any, **kwds: Any) -> Any"
             // ```
-            Protocol::Synthesized(_) => KnownClass::Type.to_instance(db),
+            Protocol::Synthesized(synthesized) => synthesized
+                .origin(db)
+                .map_or_else(|| KnownClass::Type.to_instance(db), |origin| {
+                    SubclassOfType::from(db, origin)
+                }),
         }
     }
 
