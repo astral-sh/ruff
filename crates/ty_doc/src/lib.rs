@@ -509,13 +509,13 @@ fn extract_module(
                 }
             }
             DefinitionKind::TypeAlias(type_alias) => {
-                if let Some(variable) = extract_type_alias(
+                if let Some(variable) = extract_type_alias_definition(
+                    db,
                     &source_code,
                     &line_index,
+                    definition,
                     type_alias.node(&parsed),
                     &semantic_model,
-                    definition.docstring(db),
-                    document_private_items,
                 ) {
                     module.variables.push(variable);
                 }
@@ -929,9 +929,8 @@ fn extract_annotated_assignment_definition(
     assign: &AnnotatedAssignmentDefinitionKind,
     semantic_model: &SemanticModel,
 ) -> Option<VariableDoc> {
-    let target = assign.target(parsed);
     let annotation = assign.annotation(parsed);
-    let name = expr_name(target)?;
+    let name = definition.name(db)?;
 
     let signature = append_constant_default(
         annotated_variable_signature(source_code, annotation.range()),
@@ -943,7 +942,7 @@ fn extract_annotated_assignment_definition(
     collect_expression_type_links(semantic_model, annotation, &mut signature_links);
 
     Some(VariableDoc {
-        name: name.to_string(),
+        name,
         signature_links,
         signature,
         docstring: definition.docstring(db),
@@ -963,7 +962,7 @@ fn extract_assignment_definition(
 ) -> Option<VariableDoc> {
     let target = assign.target(parsed);
     let value = assign.value(parsed);
-    let name = expr_name(target)?;
+    let name = definition.name(db)?;
 
     let signature = append_constant_default(
         inferred_assignment_signature(semantic_model, target, value),
@@ -971,7 +970,7 @@ fn extract_assignment_definition(
         Some(value),
     );
     Some(VariableDoc {
-        name: name.to_string(),
+        name,
         signature_links: collect_signature_links(semantic_model, target.into(), &signature),
         signature,
         docstring: definition.docstring(db),
@@ -1018,18 +1017,15 @@ fn assignment_value_worth_inference(value: &ruff_python_ast::Expr) -> bool {
     )
 }
 
-fn extract_type_alias(
+fn extract_type_alias_definition(
+    db: &ProjectDatabase,
     source_code: &SourceCode,
     line_index: &LineIndex,
+    definition: Definition,
     type_alias: &ruff_python_ast::StmtTypeAlias,
     semantic_model: &SemanticModel,
-    docstring: Option<String>,
-    document_private_items: bool,
 ) -> Option<VariableDoc> {
-    let name = expr_name(&type_alias.name)?;
-    if !document_private_items && !is_public_name(name) {
-        return None;
-    }
+    let name = definition.name(db)?;
 
     let signature = type_alias_signature(source_code, type_alias.value.range());
     let mut signature_links =
@@ -1037,17 +1033,13 @@ fn extract_type_alias(
     collect_expression_type_links(semantic_model, &type_alias.value, &mut signature_links);
 
     Some(VariableDoc {
-        name: name.to_string(),
+        name,
         signature_links,
         signature,
-        docstring,
+        docstring: definition.docstring(db),
         source_line: line_number(line_index, type_alias),
         kind: VariableKind::TypeAlias,
     })
-}
-
-fn expr_name(expr: &ruff_python_ast::Expr) -> Option<&str> {
-    expr.as_name_expr().map(|name| name.id.as_str())
 }
 
 #[derive(Copy, Clone)]
