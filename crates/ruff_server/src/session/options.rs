@@ -32,7 +32,7 @@ pub(crate) enum ConfigurationPreference {
     EditorOnly,
 }
 
-/// A direct representation of of `configuration` schema within the client settings.
+/// A direct representation of the `configuration` schema within the client settings.
 #[derive(Clone, Debug, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(untagged)]
