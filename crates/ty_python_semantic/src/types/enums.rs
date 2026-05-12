@@ -211,11 +211,15 @@ impl<'db> EnumComplement<'db> {
             }
 
             let Type::NominalInstance(instance) = positive else {
-                return None;
+                rest.push(*positive);
+                continue;
             };
 
             let class = instance.class_literal(db);
-            enum_metadata(db, class)?;
+            if enum_metadata(db, class).is_none() {
+                rest.push(*positive);
+                continue;
+            }
 
             if enum_class.replace(class).is_some() {
                 return None;
