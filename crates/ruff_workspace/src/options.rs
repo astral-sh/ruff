@@ -2963,7 +2963,7 @@ impl IsortOptions {
         let sections = self.sections.unwrap_or_default();
 
         // Verify that `sections` doesn't contain any built-in sections.
-        let sections: FxHashMap<String, Vec<glob::Pattern>> = sections
+        let sections: FxHashMap<String, Vec<IdentifierPattern>> = sections
             .into_iter()
             .filter_map(|(section, modules)| match section {
                 ImportSection::Known(section) => {
