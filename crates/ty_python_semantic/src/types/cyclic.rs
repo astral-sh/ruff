@@ -193,6 +193,8 @@ impl<T: Hash + Eq + Clone> ActiveRecursionDetector<T> {
             return on_cycle();
         }
 
+        // Keep the active-recursion state scoped even if `func` unwinds. In some cases, we catch
+        // panics and continue handling later work on the same thread.
         let _guard = ActiveRecursionGuard {
             seen: &self.seen,
             item,
