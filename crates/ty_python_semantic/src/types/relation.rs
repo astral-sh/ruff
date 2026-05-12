@@ -2520,11 +2520,23 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 if nominal.class(db).is_final(db) =>
             {
                 self.with_recursion_guard(left, right, || {
-                    self.any_protocol_members_absent_or_disjoint(
-                        db,
-                        protocol,
-                        Type::NominalInstance(nominal),
-                    )
+                    let nominally_satisfies_protocol =
+                        protocol
+                            .to_nominal_instance()
+                            .is_some_and(|protocol_nominal| {
+                                Type::NominalInstance(nominal)
+                                    .is_subtype_of(db, Type::NominalInstance(protocol_nominal))
+                            });
+
+                    if nominally_satisfies_protocol {
+                        self.never()
+                    } else {
+                        self.any_protocol_members_absent_or_disjoint(
+                            db,
+                            protocol,
+                            Type::NominalInstance(nominal),
+                        )
+                    }
                 })
             }
 

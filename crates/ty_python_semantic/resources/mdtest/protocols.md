@@ -1744,6 +1744,28 @@ static_assert(not is_subtype_of(XSub, HasMutableXProperty))
 static_assert(not is_assignable_to(XSub, HasMutableXProperty))
 ```
 
+Writable instance attributes typed with `Self` satisfy property protocols once `Self` is bound to
+the implementation type:
+
+```py
+from typing_extensions import Self
+
+class WritableSelfAttr:
+    x: Self
+
+class HasWritableSelfAttr(Protocol):
+    @property
+    def x(self) -> WritableSelfAttr: ...
+    @x.setter
+    def x(self, value: WritableSelfAttr) -> None: ...
+
+static_assert(is_subtype_of(WritableSelfAttr, HasWritableSelfAttr))
+static_assert(is_assignable_to(WritableSelfAttr, HasWritableSelfAttr))
+
+def _(value: WritableSelfAttr) -> None:
+    value.x = WritableSelfAttr()
+```
+
 A protocol with a read/write property `x` is exactly equivalent to a protocol with a mutable
 attribute `x`. Both are subtypes of a protocol with a read-only property `x`:
 
@@ -3012,10 +3034,7 @@ class YNominal(X):
 static_assert(is_subtype_of(YProto, X))
 static_assert(is_subtype_of(YNominal, X))
 static_assert(not is_disjoint_from(YProto, X))
-# TODO: `YNominal` nominally extends `X`, so these should not be disjoint.
-# The writability check in `any_protocol_members_absent_or_disjoint` detects that
-# `int` cannot be assigned to `YNominal.x: None`, overriding the get-type result.
-static_assert(is_disjoint_from(YNominal, X))
+static_assert(not is_disjoint_from(YNominal, X))
 ```
 
 A common use case for this behaviour is that a lot of ecosystem code depends on type checkers

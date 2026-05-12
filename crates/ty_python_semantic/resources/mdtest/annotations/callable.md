@@ -497,11 +497,7 @@ def f_okay(c: Callable[[], None]):
         reveal_type(type(c).__qualname__)  # revealed: @Todo(Intersection meta-type)
 
         # `hasattr` only guarantees that an attribute is readable.
-        # TODO: This assignment should ideally be an error, since the synthesized
-        # protocol member is a read-only property. Currently, the `Callable` element
-        # of the intersection has `type.__qualname__: str` at the class level,
-        # which allows the assignment to go through.
-        c.__qualname__ = "my_callable"
+        c.__qualname__ = "my_callable"  # error: [invalid-assignment]
 ```
 
 ## From a class

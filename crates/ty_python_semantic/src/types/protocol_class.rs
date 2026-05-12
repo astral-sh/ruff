@@ -16,9 +16,9 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, AttributeAssignmentError, BoundTypeVarInstance, CallArguments,
         CallableType, ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
-        InstanceFallbackShadowsNonDataDescriptor, KnownFunction, MemberLookupPolicy,
-        PropertyInstanceType, ProtocolInstanceType, Signature, StaticClassLiteral, Type,
-        TypeMapping, TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable,
+        InstanceFallbackShadowsNonDataDescriptor, KnownFunction, MemberLookupPolicy, Parameter,
+        Parameters, PropertyInstanceType, ProtocolInstanceType, Signature, StaticClassLiteral,
+        Type, TypeMapping, TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable,
         constraints::{
             ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension,
             ResultConstraintsExtension,
@@ -821,9 +821,40 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     pub(super) fn class_member_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self.kind {
             ProtocolMemberKind::Method(callable) => Some(Type::Callable(*callable)),
-            ProtocolMemberKind::Property { .. } | ProtocolMemberKind::Attribute(_) => {
-                self.meta_get_type(db)
+            ProtocolMemberKind::Property { get_type, set_type } => {
+                let getter = (*get_type).map(|get_type| {
+                    Type::single_callable(
+                        db,
+                        Signature::new(
+                            Parameters::new(
+                                db,
+                                [Parameter::positional_only(Some(Name::new_static("self")))],
+                            ),
+                            get_type,
+                        ),
+                    )
+                });
+                let setter = (*set_type).map(|set_type| {
+                    Type::single_callable(
+                        db,
+                        Signature::new(
+                            Parameters::new(
+                                db,
+                                [
+                                    Parameter::positional_only(Some(Name::new_static("self"))),
+                                    Parameter::positional_only(Some(Name::new_static("value")))
+                                        .with_annotated_type(set_type),
+                                ],
+                            ),
+                            Type::none(db),
+                        ),
+                    )
+                });
+                Some(Type::PropertyInstance(PropertyInstanceType::new(
+                    db, getter, setter, None,
+                )))
             }
+            ProtocolMemberKind::Attribute(_) => self.meta_get_type(db),
         }
     }
 

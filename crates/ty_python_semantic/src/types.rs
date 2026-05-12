@@ -5047,6 +5047,8 @@ impl<'db> Type<'db> {
                             }),
                         qualifiers,
                     } => {
+                        let meta_attr_ty = meta_attr_ty.bind_self_typevars(db, self);
+
                         if invalid_assignment_to_final(qualifiers) {
                             return results.and(Err(AttributeAssignmentError::CannotAssignToFinal));
                         }
@@ -5078,6 +5080,8 @@ impl<'db> Type<'db> {
                             }) =
                                 self.instance_member(db, attribute).place
                             {
+                                let instance_attr_ty =
+                                    instance_attr_ty.bind_self_typevars(db, self);
                                 (
                                     ensure_assignable_to(instance_attr_ty),
                                     instance_attr_definedness,
@@ -5110,6 +5114,8 @@ impl<'db> Type<'db> {
                             qualifiers,
                         } = self.instance_member(db, attribute)
                         {
+                            let instance_attr_ty = instance_attr_ty.bind_self_typevars(db, self);
+
                             if invalid_assignment_to_final(qualifiers) {
                                 return results
                                     .and(Err(AttributeAssignmentError::CannotAssignToFinal));
