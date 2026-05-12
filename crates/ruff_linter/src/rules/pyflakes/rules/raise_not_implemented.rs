@@ -13,6 +13,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// `NotImplemented` is a special value returned by binary special methods to indicate
 /// that an operation is not implemented with respect to a particular type.
 ///
+/// Because `NotImplemented` is not an exception, it cannot be raised.
 /// Raise `NotImplementedError` instead, which is used to indicate that a method is
 /// abstract or not implemented in the derived class.
 ///
