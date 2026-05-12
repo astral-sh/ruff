@@ -1577,16 +1577,37 @@ impl SetuptoolsEditableFinder {
             return self.resolve_in_namespace(context, namespace, module_name);
         }
 
-        self.longest_namespace_prefix(module_name).map_or(
-            NamespacePlaceholderResolution::Missing,
-            |namespace| {
-                if self.namespace_placeholder_is_reachable(&namespace.module) {
-                    self.resolve_in_namespace(context, namespace, module_name)
-                } else {
-                    NamespacePlaceholderResolution::Missing
+        let mut namespace_candidates = Vec::new();
+        for namespace in self.namespace_prefixes(module_name) {
+            if !self.namespace_placeholder_is_reachable(&namespace.module) {
+                continue;
+            }
+
+            match self.resolve_in_namespace(context, namespace, module_name) {
+                NamespacePlaceholderResolution::Found(resolved) => {
+                    if resolved
+                        .iter()
+                        .any(|candidate| !candidate.is_any_namespace_package())
+                    {
+                        return NamespacePlaceholderResolution::Found(resolved);
+                    }
+                    namespace_candidates.extend(resolved);
                 }
-            },
-        )
+                NamespacePlaceholderResolution::ShadowedByRegularPackage => {
+                    return NamespacePlaceholderResolution::ShadowedByRegularPackage;
+                }
+                NamespacePlaceholderResolution::BlockedByTerminalModule => {
+                    return NamespacePlaceholderResolution::BlockedByTerminalModule;
+                }
+                NamespacePlaceholderResolution::Missing => {}
+            }
+        }
+
+        if namespace_candidates.is_empty() {
+            NamespacePlaceholderResolution::Missing
+        } else {
+            NamespacePlaceholderResolution::Found(namespace_candidates)
+        }
     }
 
     fn namespace_placeholder_is_reachable(&self, module_name: &ModuleName) -> bool {
@@ -1717,14 +1738,17 @@ impl SetuptoolsEditableFinder {
             .find(|namespace| &namespace.module == module_name)
     }
 
-    fn longest_namespace_prefix(
-        &self,
+    fn namespace_prefixes<'a>(
+        &'a self,
         module_name: &ModuleName,
-    ) -> Option<&SetuptoolsEditableNamespace> {
-        self.namespaces
+    ) -> Vec<&'a SetuptoolsEditableNamespace> {
+        let mut prefixes = self
+            .namespaces
             .iter()
             .filter(|namespace| module_name.starts_with(&namespace.module))
-            .max_by_key(|namespace| namespace.module.components().count())
+            .collect::<Vec<_>>();
+        prefixes.sort_by_key(|namespace| namespace.module.components().count());
+        prefixes
     }
 
     fn longest_strict_namespace_prefix(
@@ -4761,6 +4785,45 @@ NAMESPACES: dict[str, list[str]] = {
         assert_eq!(
             child_module.file(&db).unwrap().path(&db),
             &FilePath::system("/workspace/ns/child/__init__.py")
+        );
+    }
+
+    #[test]
+    fn setuptools_editable_install_nested_namespace_descendant_keeps_parent_portion() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.ns.pth",
+                "import __editable___ns_finder; __editable___ns_finder.install()",
+            ),
+            (
+                "__editable___ns_finder.py",
+                r#"
+MAPPING: dict[str, str] = {}
+NAMESPACES: dict[str, list[str]] = {
+    "ns": ["/workspace/ns"],
+    "ns.child": ["/workspace/detached_child"],
+}
+"#,
+            ),
+        ];
+
+        let external_files = [
+            ("/workspace/ns/child/ordinary.py", ""),
+            ("/workspace/detached_child/sibling.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let ordinary_module_name = ModuleName::new_static("ns.child.ordinary").unwrap();
+        let ordinary_module = resolve_module_confident(&db, &ordinary_module_name).unwrap();
+
+        assert_eq!(
+            ordinary_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/ns/child/ordinary.py")
         );
     }
 
