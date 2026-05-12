@@ -940,6 +940,279 @@ else:
     }
 
     #[test]
+    fn test_folding_range_multi_line_block_headers() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def choose(
+    value,
+    fallback,
+):
+    if any(
+        [
+            value,
+        ]
+    ):
+        return value
+    elif (
+        fallback
+    ):
+        return fallback
+
+class Repository[
+    Model,
+    Key,
+](
+    Mapping[Key, Model],
+    Protocol,
+):
+    pass
+
+try:
+    pass
+except (
+    ValueError,
+    TypeError,
+) as error:
+    raise error
+
+match value:
+    case {
+        "kind": kind,
+        "payload": payload,
+    }:
+        handle_mapping()
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @r#"
+        info[folding-range]: Folding Range
+          --> main.py:2:12
+           |
+         2 |   def choose(
+           |  ____________^
+         3 | |     value,
+         4 | |     fallback,
+         5 | | ):
+         6 | |     if any(
+         7 | |         [
+         8 | |             value,
+         9 | |         ]
+        10 | |     ):
+        11 | |         return value
+        12 | |     elif (
+        13 | |         fallback
+        14 | |     ):
+        15 | |         return fallback
+           | |_______________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:5:3
+           |
+         5 |   ):
+           |  ___^
+         6 | |     if any(
+         7 | |         [
+         8 | |             value,
+         9 | |         ]
+        10 | |     ):
+        11 | |         return value
+        12 | |     elif (
+        13 | |         fallback
+        14 | |     ):
+        15 | |         return fallback
+           | |_______________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:6:12
+           |
+         6 |       if any(
+           |  ____________^
+         7 | |         [
+         8 | |             value,
+         9 | |         ]
+        10 | |     ):
+        11 | |         return value
+           | |____________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:10:7
+           |
+        10 |       ):
+           |  _______^
+        11 | |         return value
+           | |____________________^
+           |
+
+        info[folding-range]: Folding Range
+         --> main.py:7:9
+          |
+        7 | /         [
+        8 | |             value,
+        9 | |         ]
+          | |_________^
+          |
+
+        info[folding-range]: Folding Range
+          --> main.py:12:11
+           |
+        12 |       elif (
+           |  ___________^
+        13 | |         fallback
+        14 | |     ):
+        15 | |         return fallback
+           | |_______________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:14:7
+           |
+        14 |       ):
+           |  _______^
+        15 | |         return fallback
+           | |_______________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:17:18
+           |
+        17 |   class Repository[
+           |  __________________^
+        18 | |     Model,
+        19 | |     Key,
+        20 | | ](
+        21 | |     Mapping[Key, Model],
+        22 | |     Protocol,
+        23 | | ):
+        24 | |     pass
+           | |________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:23:3
+           |
+        23 |   ):
+           |  ___^
+        24 | |     pass
+           | |________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:26:5
+           |
+        26 |   try:
+           |  _____^
+        27 | |     pass
+           | |________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:28:9
+           |
+        28 |   except (
+           |  _________^
+        29 | |     ValueError,
+        30 | |     TypeError,
+        31 | | ) as error:
+        32 | |     raise error
+           | |_______________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:31:12
+           |
+        31 |   ) as error:
+           |  ____________^
+        32 | |     raise error
+           | |_______________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:34:13
+           |
+        34 |   match value:
+           |  _____________^
+        35 | |     case {
+        36 | |         "kind": kind,
+        37 | |         "payload": payload,
+        38 | |     }:
+        39 | |         handle_mapping()
+           | |________________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:35:11
+           |
+        35 |       case {
+           |  ___________^
+        36 | |         "kind": kind,
+        37 | |         "payload": payload,
+        38 | |     }:
+        39 | |         handle_mapping()
+           | |________________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:38:7
+           |
+        38 |       }:
+           |  _______^
+        39 | |         handle_mapping()
+           | |________________________^
+           |
+        "#);
+    }
+
+    #[test]
+    fn test_folding_range_suppresses_header_expression_on_block_start_line() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def foo(x=[
+    bar,
+    baz,
+]):
+    qux = x[0] + 1
+    return qux
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:12
+          |
+        2 |   def foo(x=[
+          |  ____________^
+        3 | |     bar,
+        4 | |     baz,
+        5 | | ]):
+        6 | |     qux = x[0] + 1
+        7 | |     return qux
+          | |______________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:5:4
+          |
+        5 |   ]):
+          |  ____^
+        6 | |     qux = x[0] + 1
+        7 | |     return qux
+          | |______________^
+          |
+        ");
+    }
+
+    #[test]
     fn test_folding_range_preserves_inline_block_header_comment() {
         let test = CursorTest::builder()
             .source(
@@ -1811,14 +2084,23 @@ with open("file.txt") as f:
     }
 
     #[test]
-    fn test_folding_multiline() {
-        // A class definition on a single line shouldn't have
-        // any folding ranges.
+    fn test_folding_range_single_line_class() {
         let test = CursorTest::builder()
             .source("main.py", "class MyClass: pass\n<CURSOR>")
             .build();
         assert_snapshot!(test.folding_ranges(), @"No folding ranges found");
+    }
 
+    #[test]
+    fn test_folding_range_single_line_class_with_trailing_comment() {
+        let test = CursorTest::builder()
+            .source("main.py", "class MyClass: pass  # comment\n<CURSOR>")
+            .build();
+        assert_snapshot!(test.folding_ranges(), @"No folding ranges found");
+    }
+
+    #[test]
+    fn test_folding_multiline() {
         // A single LF new-line results in a folding range.
         let test = CursorTest::builder()
             .source("main.py", "class MyClass:\n    pass\n<CURSOR>")
