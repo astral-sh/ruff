@@ -600,6 +600,42 @@ def _(x: Color | None):
     result_from_star: Green | Blue | NoColor = f(*(x,))
 ```
 
+#### Enum complement as a bound overload receiver
+
+A narrowed enum complement should also preserve literal alternatives during member lookup, so
+bound-method overload resolution can still discriminate on the receiver:
+
+`overloaded.pyi`:
+
+```pyi
+from enum import Enum
+from typing import Literal, overload
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+    @overload
+    def label(self: Literal[Color.GREEN]) -> int: ...
+    @overload
+    def label(self: Literal[Color.BLUE]) -> str: ...
+```
+
+```py
+from typing import Literal
+
+from overloaded import Color
+
+def narrowed(color: Color):
+    if color is Color.RED:
+        return
+    reveal_type(color.label())  # revealed: int | str
+
+def explicit(color: Literal[Color.GREEN, Color.BLUE]):
+    reveal_type(color.label())  # revealed: int | str
+```
+
 ### Expanding PEP 695 type alias
 
 ```toml

@@ -670,6 +670,46 @@ impl<'db> IntersectionType<'db> {
         EnumComplement::from_intersection_parts(db, self.positive(db), self.negative(db))
     }
 
+    /// Return `true` if this intersection has an exact finite expansion.
+    ///
+    /// Compact enum complements are currently the only intersection form with such an expansion.
+    pub(crate) fn has_finite_alternatives(self, db: &'db dyn Db) -> bool {
+        self.enum_complement(db).is_some()
+    }
+
+    /// Return the exact finite alternatives represented by this intersection, if available.
+    pub(crate) fn finite_alternatives(self, db: &'db dyn Db) -> Option<Vec<Type<'db>>> {
+        self.enum_complement(db)
+            .map(|complement| complement.remaining_literal_types(db))
+    }
+
+    /// Return the exact finite alternative union represented by this intersection, if available.
+    pub(crate) fn finite_alternative_union(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let alternatives = self.finite_alternatives(db)?;
+        Some(match alternatives.len() {
+            0 => Type::Never,
+            1 => alternatives[0],
+            // Keep this exact. Routing these literals through `UnionBuilder` can widen very large
+            // enum complements back to the original enum class, losing the excluded members that
+            // made the compact intersection useful in the first place.
+            _ => Type::Union(UnionType::new(
+                db,
+                alternatives.into_boxed_slice(),
+                RecursivelyDefined::No,
+            )),
+        })
+    }
+
+    /// Return the finite alternatives only if they remain concise enough for display.
+    pub(crate) fn finite_alternatives_for_display(
+        self,
+        db: &'db dyn Db,
+        max_literals: usize,
+    ) -> Option<Vec<Type<'db>>> {
+        self.enum_complement(db)?
+            .remaining_literal_types_for_display(db, max_literals)
+    }
+
     /// Create an intersection type `E1 & E2 & ... & En` from a list of (positive) elements.
     ///
     /// For performance reasons, consider using [`IntersectionType::from_two_elements`] if

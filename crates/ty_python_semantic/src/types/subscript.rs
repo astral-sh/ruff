@@ -407,6 +407,10 @@ fn map_intersection_subscript<'db, F>(
 where
     F: FnMut(Type<'db>) -> Result<Type<'db>, SubscriptError<'db>>,
 {
+    if let Some(alternatives) = intersection.finite_alternative_union(db) {
+        return map_fn(alternatives);
+    }
+
     let mut results = Vec::new();
     let mut errors = Vec::new();
 

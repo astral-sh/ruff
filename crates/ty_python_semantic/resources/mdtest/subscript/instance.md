@@ -58,6 +58,34 @@ def _(flag: bool):
     reveal_type(Identity()[0])  # revealed: int | str
 ```
 
+## Enum complement as overloaded `__getitem__` receiver
+
+`overloaded.pyi`:
+
+```pyi
+from enum import Enum
+from typing import Literal, overload
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+    @overload
+    def __getitem__(self: Literal[Color.GREEN], index: int) -> int: ...
+    @overload
+    def __getitem__(self: Literal[Color.BLUE], index: int) -> str: ...
+```
+
+```py
+from overloaded import Color
+
+def _(color: Color):
+    if color is Color.RED:
+        return
+    reveal_type(color[0])  # revealed: int | str
+```
+
 ## `__getitem__` with invalid index argument
 
 ```py

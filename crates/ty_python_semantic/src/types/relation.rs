@@ -881,6 +881,23 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             })
     }
 
+    fn check_finite_intersection_source_pair(
+        &self,
+        db: &'db dyn Db,
+        source: IntersectionType<'db>,
+        target: Type<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        let alternatives = source.finite_alternatives(db)?;
+        Some(
+            alternatives
+                .iter()
+                .copied()
+                .when_all(db, self.constraints, |literal| {
+                    self.check_type_pair(db, literal, target)
+                }),
+        )
+    }
+
     /// Return a constraint set indicating the conditions under which `self.relation` holds between `source` and `target`.
     pub(super) fn check_type_pair(
         &self,
@@ -903,18 +920,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         // and unnecessary. This early return is only an optimisation.
         if self.relation.can_safely_assume_reflexivity(source) && source == target {
             return self.always();
-        }
-
-        if matches!(target, Type::LiteralValue(_) | Type::Union(_))
-            && let Some(complement) = source.enum_complement(db)
-        {
-            return complement
-                .remaining_literal_types(db)
-                .iter()
-                .copied()
-                .when_all(db, self.constraints, |literal| {
-                    self.check_type_pair(db, literal, target)
-                });
         }
 
         // Handle constraint implication first. If either `source` or `target` is a typevar, check
@@ -1290,6 +1295,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (_, Type::Union(union)) => {
+                if let Type::Intersection(intersection) = source
+                    && let Some(result) =
+                        self.check_finite_intersection_source_pair(db, intersection, target)
+                {
+                    return result;
+                }
+
                 let is_new_type_of_union = || {
                     // Normally non-unions cannot directly contain unions in our model due to the fact that we
                     // enforce a DNF structure on our set-theoretic types. However, it *is* possible for there
@@ -1419,6 +1431,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 }),
 
             (Type::Intersection(intersection), _) => {
+                if matches!(target, Type::LiteralValue(_))
+                    && let Some(result) =
+                        self.check_finite_intersection_source_pair(db, intersection, target)
+                {
+                    return result;
+                }
+
                 // An intersection type is a subtype of another type if at least one of its
                 // positive elements is a subtype of that type. If there are no positive elements,
                 // we treat `object` as the implicit positive element (e.g., `~str` is semantically
@@ -2209,6 +2228,34 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         ConstraintSet::from_bool(self.constraints, false)
     }
 
+    fn check_intersection_pair_via_elements(
+        &self,
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+        intersection: IntersectionType<'db>,
+        other: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.with_recursion_guard(left, right, || {
+            intersection
+                .positive(db)
+                .iter()
+                .when_any(db, self.constraints, |&pos_ty| {
+                    self.check_type_pair(db, pos_ty, other)
+                })
+                // A & B & Not[C] is disjoint from C
+                .or(db, self.constraints, || {
+                    intersection
+                        .negative(db)
+                        .iter()
+                        .when_any(db, self.constraints, |&neg_ty| {
+                            self.as_relation_checker(TypeRelation::Subtyping)
+                                .check_type_pair(db, other, neg_ty)
+                        })
+                })
+        })
+    }
+
     pub(super) fn check_type_pair(
         &self,
         db: &'db dyn Db,
@@ -2221,14 +2268,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
         if let Some(right) = right.materialized_divergent_fallback() {
             return self.check_type_pair(db, left, right);
-        }
-
-        if let Some(complement) = left.enum_complement(db) {
-            return self.check_type_pair(db, complement.remaining_literal_union(db), right);
-        }
-
-        if let Some(complement) = right.enum_complement(db) {
-            return self.check_type_pair(db, left, complement.remaining_literal_union(db));
         }
 
         match (left, right) {
@@ -2335,44 +2374,44 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // If we have two intersections, we test the positive elements of each one against the other intersection
             // Negative elements need a positive element on the other side in order to be disjoint.
             // This is similar to what would happen if we tried to build a new intersection that combines the two
-            (Type::Intersection(left_intersection), Type::Intersection(right_intersection)) => self
-                .with_recursion_guard(left, right, || {
-                    left_intersection
-                        .positive(db)
-                        .iter()
-                        .when_any(db, self.constraints, |&pos_ty| {
-                            self.check_type_pair(db, pos_ty, right)
-                        })
-                        .or(db, self.constraints, || {
-                            right_intersection.positive(db).iter().when_any(
-                                db,
-                                self.constraints,
-                                |&pos_ty| self.check_type_pair(db, pos_ty, left),
-                            )
-                        })
-                }),
+            (Type::Intersection(left_intersection), Type::Intersection(right_intersection)) => {
+                if let Some(alternatives) = left_intersection.finite_alternative_union(db) {
+                    self.check_type_pair(db, alternatives, right)
+                } else if let Some(alternatives) = right_intersection.finite_alternative_union(db) {
+                    self.check_type_pair(db, left, alternatives)
+                } else {
+                    self.with_recursion_guard(left, right, || {
+                        left_intersection
+                            .positive(db)
+                            .iter()
+                            .when_any(db, self.constraints, |&pos_ty| {
+                                self.check_type_pair(db, pos_ty, right)
+                            })
+                            .or(db, self.constraints, || {
+                                right_intersection.positive(db).iter().when_any(
+                                    db,
+                                    self.constraints,
+                                    |&pos_ty| self.check_type_pair(db, pos_ty, left),
+                                )
+                            })
+                    })
+                }
+            }
 
-            (Type::Intersection(intersection), other)
-            | (other, Type::Intersection(intersection)) => {
-                self.with_recursion_guard(left, right, || {
-                    intersection
-                        .positive(db)
-                        .iter()
-                        .when_any(db, self.constraints, |&pos_ty| {
-                            self.check_type_pair(db, pos_ty, other)
-                        })
-                        // A & B & Not[C] is disjoint from C
-                        .or(db, self.constraints, || {
-                            intersection.negative(db).iter().when_any(
-                                db,
-                                self.constraints,
-                                |&neg_ty| {
-                                    self.as_relation_checker(TypeRelation::Subtyping)
-                                        .check_type_pair(db, other, neg_ty)
-                                },
-                            )
-                        })
-                })
+            (Type::Intersection(intersection), other) => {
+                if let Some(alternatives) = intersection.finite_alternative_union(db) {
+                    self.check_type_pair(db, alternatives, other)
+                } else {
+                    self.check_intersection_pair_via_elements(db, left, right, intersection, other)
+                }
+            }
+
+            (other, Type::Intersection(intersection)) => {
+                if let Some(alternatives) = intersection.finite_alternative_union(db) {
+                    self.check_type_pair(db, other, alternatives)
+                } else {
+                    self.check_intersection_pair_via_elements(db, left, right, intersection, other)
+                }
             }
 
             (Type::LiteralValue(left), Type::LiteralValue(right))

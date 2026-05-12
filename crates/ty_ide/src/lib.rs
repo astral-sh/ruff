@@ -282,6 +282,10 @@ impl HasNavigationTargets for Type<'_> {
                 .collect(),
 
             Type::Intersection(intersection) => {
+                if let Some(definition) = self.definition(db) {
+                    return definition.navigation_targets(db);
+                }
+
                 // Only consider the positive elements because the negative elements are mainly from narrowing constraints.
                 let mut targets = intersection.iter_positive(db).filter(|ty| !ty.is_unknown());
 

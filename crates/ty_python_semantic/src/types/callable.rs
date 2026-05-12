@@ -81,12 +81,6 @@ impl<'db> Type<'db> {
             return fallback.try_upcast_to_callable_with_policy_and_context(db, policy, context);
         }
 
-        if let Some(complement) = self.enum_complement(db) {
-            return complement
-                .remaining_literal_union(db)
-                .try_upcast_to_callable_with_policy(db, policy);
-        }
-
         match self {
             Type::Callable(callable) => Some(CallableTypes::one(callable)),
 
@@ -272,13 +266,20 @@ impl<'db> Type<'db> {
                 Some(CallableTypes::one(partial.partial(db)))
             }
 
+            Type::Intersection(intersection) => {
+                intersection
+                    .finite_alternative_union(db)
+                    .and_then(|alternatives| {
+                        alternatives.try_upcast_to_callable_with_policy(db, policy)
+                    })
+            }
+
             // TODO
             Type::DataclassDecorator(_)
             | Type::ModuleLiteral(_)
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
             | Type::PropertyInstance(_)
-            | Type::Intersection(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_) => None,
         }

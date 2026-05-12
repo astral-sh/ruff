@@ -231,6 +231,40 @@ mod tests {
     }
 
     #[test]
+    fn goto_type_of_narrowed_singleton_enum_complement() {
+        let test = cursor_test(
+            r#"
+            from enum import Enum
+
+            class Color(Enum):
+                RED = 1
+                BLUE = 2
+
+            def f(color: Color):
+                if color is Color.RED:
+                    return
+
+                color<CURSOR>
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+          --> main.py:11:17
+           |
+        11 |                 color
+           |                 ^^^^^ Clicking here
+           |
+        info: Found 1 type definition
+         --> main.py:6:5
+          |
+        6 |     BLUE = 2
+          |     ----
+          |
+        "#);
+    }
+
+    #[test]
     fn goto_type_of_import_module() {
         let mut test = cursor_test(
             r#"

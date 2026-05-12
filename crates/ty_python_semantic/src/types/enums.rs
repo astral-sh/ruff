@@ -10,7 +10,7 @@ use crate::{
     reachability::DeclarationsIteratorExtension,
     types::{
         ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, LiteralValueTypeKind,
-        MemberLookupPolicy, NegativeIntersectionElements, StaticClassLiteral, Type, UnionType,
+        MemberLookupPolicy, NegativeIntersectionElements, StaticClassLiteral, Type,
         function::FunctionType,
         set_theoretic::builder::{IntersectionBuilder, UnionBuilder},
     },
@@ -335,11 +335,6 @@ impl<'db> EnumComplement<'db> {
             .filter(|name| !self.excluded_names(db).contains(*name))
             .map(|name| self.remaining_literal_type(db, name.clone()))
             .collect()
-    }
-
-    /// Expand this complement to the union of enum literals that remain possible.
-    pub(crate) fn remaining_literal_union(self, db: &'db dyn Db) -> Type<'db> {
-        UnionType::from_elements(db, self.remaining_literal_types(db))
     }
 
     fn remaining_literal_type(self, db: &'db dyn Db, name: Name) -> Type<'db> {

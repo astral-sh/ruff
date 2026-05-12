@@ -59,7 +59,7 @@ use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
 use crate::types::enums::enum_member_literals;
-pub(crate) use crate::types::enums::{EnumComplement, enum_metadata};
+pub(crate) use crate::types::enums::enum_metadata;
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
     FunctionType, KnownFunction,
@@ -1034,31 +1034,6 @@ impl<'db> Type<'db> {
         self.is_instance_of(db, KnownClass::Bool)
     }
 
-    /// Return the enum-complement represented by this type.
-    ///
-    /// An enum complement is an intersection containing exactly one enum instance type, optional
-    /// dynamic positive components, and zero or more negated enum literals from the same class, such
-    /// as `Color & ~Literal[Color.RED]` or `Color & Any & ~Literal[Color.RED]`. Excluded names are
-    /// canonicalized so enum aliases exclude the member they alias.
-    ///
-    /// ```python
-    /// from enum import Enum
-    ///
-    /// class Color(Enum):
-    ///     RED = 1
-    ///     BLUE = 2
-    ///
-    /// def f(color: Color):
-    ///     if color is not Color.RED:
-    ///         reveal_type(color)  # Color, excluding Color.RED
-    /// ```
-    pub(crate) fn enum_complement(self, db: &'db dyn Db) -> Option<EnumComplement<'db>> {
-        match self {
-            Type::Intersection(intersection) => intersection.enum_complement(db),
-            _ => None,
-        }
-    }
-
     /// Return `true` if this type is an enum instance type.
     ///
     /// This recognizes instance types like `Color`, not individual enum literals like
@@ -1716,11 +1691,10 @@ impl<'db> Type<'db> {
             return Vec::new();
         }
 
-        if let Some(complement) = ty.enum_complement(db) {
-            return complement.remaining_literal_types(db);
-        }
-
         match ty {
+            Type::Intersection(intersection) => {
+                intersection.finite_alternatives(db).unwrap_or_default()
+            }
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Bool) => {
                 vec![Type::bool_literal(true), Type::bool_literal(false)]
             }
@@ -1743,16 +1717,17 @@ impl<'db> Type<'db> {
     pub(crate) fn has_finite_single_valued_union_alternatives(self, db: &'db dyn Db) -> bool {
         let ty = self.resolve_type_alias(db);
 
-        if let Some(complement) = ty.enum_complement(db) {
-            return complement.rest(db).is_empty()
-                && complement.has_remaining_members(db)
-                && !complement
-                    .enum_class(db)
-                    .to_non_generic_instance(db)
-                    .overrides_equality(db);
-        }
-
         match ty {
+            Type::Intersection(intersection) => {
+                intersection.enum_complement(db).is_some_and(|complement| {
+                    complement.rest(db).is_empty()
+                        && complement.has_remaining_members(db)
+                        && !complement
+                            .enum_class(db)
+                            .to_non_generic_instance(db)
+                            .overrides_equality(db)
+                })
+            }
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Bool) => {
                 true
             }
@@ -3349,6 +3324,8 @@ impl<'db> Type<'db> {
                     && let Some(member_ty) = complement.member_type(db, name_str)
                 {
                     Place::bound(member_ty).into()
+                } else if let Some(alternatives) = intersection.finite_alternative_union(db) {
+                    alternatives.member_lookup_with_policy(db, name_str.into(), policy)
                 } else {
                     intersection.map_with_boundness_and_qualifiers(db, |elem| {
                         elem.member_lookup_with_policy(db, name_str.into(), policy)
@@ -5671,10 +5648,6 @@ impl<'db> Type<'db> {
     /// See `Self::dunder_class` for more details.
     #[must_use]
     pub(crate) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
-        if let Some(complement) = self.enum_complement(db) {
-            return complement.remaining_literal_union(db).to_meta_type(db);
-        }
-
         match self {
             Type::Never => Type::Never,
             Type::NominalInstance(instance) => instance.to_meta_type(db),
@@ -5713,9 +5686,13 @@ impl<'db> Type<'db> {
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic)),
             Type::Divergent(_) => self,
             // TODO intersections
-            Type::Intersection(_) => {
-                SubclassOfType::try_from_type(db, todo_type!("Intersection meta-type"))
-                    .expect("Type::Todo should be a valid `SubclassOfInner`")
+            Type::Intersection(intersection) => {
+                if let Some(alternatives) = intersection.finite_alternative_union(db) {
+                    alternatives.to_meta_type(db)
+                } else {
+                    SubclassOfType::try_from_type(db, todo_type!("Intersection meta-type"))
+                        .expect("Type::Todo should be a valid `SubclassOfInner`")
+                }
             }
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
             Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db),
@@ -6399,10 +6376,6 @@ impl<'db> Type<'db> {
     /// Note: this method is used in the builtins `format`, `print`, `str.format` and `f-strings`.
     #[must_use]
     pub(crate) fn str(&self, db: &'db dyn Db) -> Type<'db> {
-        if let Some(complement) = (*self).enum_complement(db) {
-            return complement.remaining_literal_union(db).str(db);
-        }
-
         match self {
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(_) | LiteralValueTypeKind::Bool(_) => self.repr(db),
@@ -6422,6 +6395,13 @@ impl<'db> Type<'db> {
                 Type::string_literal(db, &known_instance.repr(db).to_string())
             }
             ty if ty.is_subtype_of(db, Type::literal_string()) => Type::literal_string(),
+            Type::Intersection(intersection) => {
+                if let Some(alternatives) = intersection.finite_alternative_union(db) {
+                    alternatives.str(db)
+                } else {
+                    KnownClass::Str.to_instance(db)
+                }
+            }
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
         }
@@ -6456,9 +6436,10 @@ impl<'db> Type<'db> {
     /// It's the foundation for the editor's "Go to type definition" feature
     /// where the user clicks on a value and it takes them to where the value's type is defined.
     ///
-    /// This method returns `None` for unions and intersections because how these
+    /// This method returns `None` for unions and most intersections because how these
     /// should be handled, especially when some variants don't have definitions, is
-    /// specific to the call site.
+    /// specific to the call site. Exact singleton finite intersections delegate to
+    /// their only alternative, since there is no ambiguity to preserve there.
     pub fn definition(&self, db: &'db dyn Db) -> Option<TypeDefinition<'db>> {
         match self {
             Self::BoundMethod(method) => {
@@ -6528,7 +6509,14 @@ impl<'db> Type<'db> {
 
             Self::TypedDict(typed_dict) => typed_dict.type_definition(db),
 
-            Self::Union(_) | Self::Intersection(_) => None,
+            Self::Union(_) => None,
+            Self::Intersection(intersection) => {
+                let alternatives = intersection.finite_alternatives(db)?;
+                let [alternative] = alternatives.as_slice() else {
+                    return None;
+                };
+                alternative.definition(db)
+            }
 
             Self::SpecialForm(special_form) => special_form.definition(db),
             Self::Never => Type::SpecialForm(SpecialFormType::Never).definition(db),
@@ -6669,6 +6657,10 @@ impl<'db> IntersectionType<'db> {
         tcx: TypeContext<'db>,
         policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        if let Some(alternatives) = self.finite_alternative_union(db) {
+            return alternatives.try_call_dunder_with_policy(db, name, argument_types, tcx, policy);
+        }
+
         // Using `positive()` rather than `positive_elements_or_object()` is safe
         // here because `object` does not define any of the dunders that are called
         // through this path without `MRO_NO_OBJECT_FALLBACK` (e.g. `__await__`,

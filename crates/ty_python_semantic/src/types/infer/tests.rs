@@ -145,6 +145,45 @@ fn truncated_string_literals_become_literal_string() -> anyhow::Result<()> {
 }
 
 #[test]
+fn large_enum_complement_keeps_exclusions_when_materialized() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    // Keep this above the 8,192 enum-literal widening threshold in `UnionBuilder`.
+    let enum_members = (0..8_194)
+        .map(|member| format!("    M{member} = {member}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let content = format!(
+        r#"from enum import Enum
+from typing import Literal
+from typing_extensions import assert_type
+from ty_extensions import Intersection, Not, is_disjoint_from, static_assert
+
+class Huge(Enum):
+{enum_members}
+
+def narrowed(x: Huge):
+    if x is Huge.M0:
+        return
+
+    assert_type(x is Huge.M0, Literal[False])
+    assert_type(x == Huge.M0, Literal[False])
+
+static_assert(
+    is_disjoint_from(
+        Intersection[Huge, Not[Literal[Huge.M0]]],
+        Literal[Huge.M0],
+    )
+)
+"#,
+    );
+    db.write_dedented("src/a.py", &content)?;
+
+    assert_file_diagnostics(&db, "src/a.py", &[]);
+
+    Ok(())
+}
+
+#[test]
 fn adding_string_literals_and_literal_string() -> anyhow::Result<()> {
     let mut db = setup_db();
     let content = format!(
