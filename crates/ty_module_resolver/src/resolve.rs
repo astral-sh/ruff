@@ -1262,6 +1262,9 @@ fn resolve_name_in_setuptools_editable_mappings(
 
     let context = ResolverContext::new(db, db.python_version(), mode);
     let finders = setuptools_editable_finders(db);
+    if finders.is_empty() {
+        return ResolveNameResult::Missing;
+    }
 
     // Setuptools appends editable meta finders after `PathFinder`. If the
     // imported parent package came from an editable mapping, Python searches
@@ -1270,6 +1273,13 @@ fn resolve_name_in_setuptools_editable_mappings(
         resolve_name_in_imported_parent_path(db, name, mode)
     {
         return result;
+    }
+
+    if name
+        .parent()
+        .is_some_and(|parent| resolve_name(db, &parent, mode).is_none())
+    {
+        return ResolveNameResult::Missing;
     }
 
     for finder in finders {
@@ -1309,9 +1319,23 @@ fn resolve_name_in_imported_parent_path(
         return ResolveNameResult::Missing;
     };
 
-    let Some(parent_candidates) = resolve_name(db, &parent_name, mode) else {
+    let Some(mut parent_candidates) = resolve_name(db, &parent_name, mode) else {
         return ResolveNameResult::Missing;
     };
+    let Some(editable_parent_candidates) =
+        resolve_name_in_setuptools_editable_mappings(db, &parent_name, mode).into_option()
+    else {
+        return ResolveNameResult::Missing;
+    };
+    parent_candidates.retain(|candidate| {
+        editable_parent_candidates
+            .iter()
+            .any(|editable| editable.path == candidate.path)
+    });
+    if parent_candidates.is_empty() {
+        return ResolveNameResult::Missing;
+    }
+
     let context = ResolverContext::new(db, db.python_version(), mode);
     let mut child_candidates = Vec::new();
     let mut blocked_by_terminal_module = false;
@@ -3279,6 +3303,20 @@ mod tests {
     }
 
     #[test]
+    fn regular_package_missing_child_stays_a_terminal_miss() {
+        const SRC: &[FileSpec] = &[("pkg/__init__.py", "")];
+        const SITE_PACKAGES: &[FileSpec] = &[("pkg/__init__.py", ""), ("pkg/child.py", "")];
+
+        let TestCase { db, .. } = TestCaseBuilder::new()
+            .with_src_files(SRC)
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        let child_module_name = ModuleName::new_static("pkg.child").unwrap();
+        assert_eq!(resolve_module_confident(&db, &child_module_name), None);
+    }
+
+    #[test]
     fn typing_stub_over_module() {
         const SRC: &[FileSpec] = &[("foo.py", "print('Hello, world!')"), ("foo.pyi", "x: int")];
 
@@ -4241,6 +4279,36 @@ NAMESPACES: dict[str, list[str]] = {}
             grand_module.file(&db).unwrap().path(&db),
             &FilePath::system("/workspace/custom_grand.py")
         );
+    }
+
+    #[test]
+    fn setuptools_editable_install_deep_exact_mapping_requires_importable_parent() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.pkg.pth",
+                "import __editable___pkg_finder; __editable___pkg_finder.install()",
+            ),
+            (
+                "__editable___pkg_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"pkg.child.grand": "/workspace/custom_grand"}
+NAMESPACES: dict[str, list[str]] = {
+    "pkg": [],
+    "pkg.child": [],
+}
+"#,
+            ),
+            ("pkg/__init__.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_file("/workspace/custom_grand.py", "").unwrap();
+
+        let grand_module_name = ModuleName::new_static("pkg.child.grand").unwrap();
+        assert_eq!(resolve_module_confident(&db, &grand_module_name), None);
     }
 
     #[test]
