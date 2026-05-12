@@ -5143,6 +5143,10 @@ impl<'db> Type<'db> {
             }
 
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
+                let self_instance = self.to_instance(db).expect(
+                    "`to_instance` always returns `Some` for `ClassLiteral`, `GenericAlias`, and `SubclassOf`",
+                );
+
                 match self.class_member(db, attribute.into()) {
                     PlaceAndQualifiers {
                         place:
@@ -5153,6 +5157,8 @@ impl<'db> Type<'db> {
                             }),
                         qualifiers,
                     } => {
+                        let meta_attr_ty = meta_attr_ty.bind_self_typevars(db, self);
+
                         if invalid_assignment_to_final(qualifiers) {
                             return results.and(Err(AttributeAssignmentError::CannotAssignToFinal));
                         }
@@ -5186,6 +5192,8 @@ impl<'db> Type<'db> {
                                 .expect("called on Type::ClassLiteral or Type::SubclassOf")
                                 .place
                             {
+                                let class_attr_ty =
+                                    class_attr_ty.bind_self_typevars(db, self_instance);
                                 (ensure_assignable_to(class_attr_ty), class_attr_definedness)
                             } else {
                                 (Ok(()), Definedness::PossiblyUndefined)
@@ -5216,6 +5224,8 @@ impl<'db> Type<'db> {
                             .find_name_in_mro(db, attribute)
                             .expect("called on Type::ClassLiteral or Type::SubclassOf")
                         {
+                            let class_attr_ty = class_attr_ty.bind_self_typevars(db, self_instance);
+
                             if invalid_assignment_to_final(qualifiers) {
                                 return results
                                     .and(Err(AttributeAssignmentError::CannotAssignToFinal));

@@ -1766,6 +1766,23 @@ def _(value: WritableSelfAttr) -> None:
     value.x = WritableSelfAttr()
 ```
 
+Class-variable protocol members bind inherited `ClassVar[Self]` declarations against the concrete
+subclass:
+
+```py
+class Saved:
+    latest: ClassVar[Self]
+
+class SavedSub(Saved): ...
+
+class HasSavedSubLatest(Protocol):
+    latest: ClassVar[SavedSub]
+
+SavedSub.latest = SavedSub()
+static_assert(is_subtype_of(SavedSub, HasSavedSubLatest))
+static_assert(is_assignable_to(SavedSub, HasSavedSubLatest))
+```
+
 A protocol with a read/write property `x` is exactly equivalent to a protocol with a mutable
 attribute `x`. Both are subtypes of a protocol with a read-only property `x`:
 
@@ -1895,6 +1912,30 @@ static_assert(is_subtype_of(XAsymmetricProperty, HasAsymmetricXProperty))
 static_assert(is_assignable_to(XAsymmetricProperty, HasAsymmetricXProperty))
 ```
 
+A nominal property setter that accepts `Any` is assignable, but not a strict subtype, of a property
+protocol whose setter accepts a narrower fully-static type:
+
+```py
+from typing import Any
+
+class ObjectReadAnyWriteProperty:
+    @property
+    def x(self) -> object:
+        return object()
+
+    @x.setter
+    def x(self, value: Any) -> None: ...
+
+class HasObjectReadIntWriteProperty(Protocol):
+    @property
+    def x(self) -> object: ...
+    @x.setter
+    def x(self, value: int) -> None: ...
+
+static_assert(not is_subtype_of(ObjectReadAnyWriteProperty, HasObjectReadIntWriteProperty))
+static_assert(is_assignable_to(ObjectReadAnyWriteProperty, HasObjectReadIntWriteProperty))
+```
+
 A custom descriptor attribute on the nominal class will also suffice:
 
 ```py
@@ -1942,6 +1983,22 @@ static_assert(not is_assignable_to(HasTerminalDescriptor, HasMutableXProperty))
 
 terminal_property = TerminalPropertySetter()
 terminal_property.x = 1  # error: [invalid-assignment]
+```
+
+Terminal setters on protocol properties do not satisfy a writable-property protocol, but their
+getter still satisfies a read-only property protocol:
+
+```py
+class TerminalSetterProtocol(Protocol):
+    @property
+    def x(self) -> int: ...
+    @x.setter
+    def x(self, value: int) -> Never: ...
+
+static_assert(is_subtype_of(TerminalSetterProtocol, HasXProperty))
+static_assert(is_assignable_to(TerminalSetterProtocol, HasXProperty))
+static_assert(not is_subtype_of(TerminalSetterProtocol, HasMutableXProperty))
+static_assert(not is_assignable_to(TerminalSetterProtocol, HasMutableXProperty))
 ```
 
 Moreover, a read-only property on a protocol can be satisfied by a nominal class that defines a
@@ -2004,6 +2061,29 @@ static_assert(not is_assignable_to(ExplicitXWithBroadSetAttr, HasStringSetter))
 
 explicit_x = ExplicitXWithBroadSetAttr()
 explicit_x.x = "string"  # error: [invalid-assignment]
+```
+
+A protocol property setter can still be implemented by a plain mutable attribute when descriptor
+assignment may call it with exactly `(self, value)` and any trailing parameters are optional or
+variadic:
+
+```py
+class HasDefaultedSetterSuffix(Protocol):
+    @property
+    def x(self) -> int: ...
+    @x.setter
+    def x(self, value: int, audit: bool = False) -> None: ...
+
+class HasVariadicSetterSuffix(Protocol):
+    @property
+    def x(self) -> int: ...
+    @x.setter
+    def x(self, value: int, *audit: object) -> None: ...
+
+static_assert(is_subtype_of(XAttr, HasDefaultedSetterSuffix))
+static_assert(is_assignable_to(XAttr, HasDefaultedSetterSuffix))
+static_assert(is_subtype_of(XAttr, HasVariadicSetterSuffix))
+static_assert(is_assignable_to(XAttr, HasVariadicSetterSuffix))
 ```
 
 ## Subtyping of protocols with method members
