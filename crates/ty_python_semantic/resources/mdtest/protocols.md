@@ -1143,11 +1143,7 @@ def takes_hashable_or_sequence(x: Hashable | list[Hashable]): ...
 takes_hashable_or_sequence(["foo"])  # fine
 takes_hashable_or_sequence(None)  # fine
 
-# `list.__hash__` is `None` (lists are unhashable), so `list[str]` is correctly
-# detected as disjoint from `Hashable`. But `list[Hashable] <: Hashable`, so the
-# union `Hashable | list[Hashable]` simplifies to `Hashable`.
-# TODO: `list[str]` should not be disjoint from `Hashable` given the equivalence with `object`
-static_assert(is_disjoint_from(list[str], Hashable | list[Hashable]))
+static_assert(not is_disjoint_from(list[str], Hashable | list[Hashable]))
 static_assert(not is_disjoint_from(list[str], Sequence[Hashable]))
 
 static_assert(is_subtype_of(list[Hashable], Sequence[Hashable]))
@@ -2080,10 +2076,18 @@ class HasVariadicSetterSuffix(Protocol):
     @x.setter
     def x(self, value: int, *audit: object) -> None: ...
 
+class HasVariadicValueSetter(Protocol):
+    @property
+    def x(self) -> int: ...
+    @x.setter
+    def x(self, *values: int) -> None: ...
+
 static_assert(is_subtype_of(XAttr, HasDefaultedSetterSuffix))
 static_assert(is_assignable_to(XAttr, HasDefaultedSetterSuffix))
 static_assert(is_subtype_of(XAttr, HasVariadicSetterSuffix))
 static_assert(is_assignable_to(XAttr, HasVariadicSetterSuffix))
+static_assert(is_subtype_of(HasVariadicValueSetter, HasMutableXProperty))
+static_assert(is_assignable_to(HasVariadicValueSetter, HasMutableXProperty))
 ```
 
 ## Subtyping of protocols with method members

@@ -655,7 +655,10 @@ impl<'db> ProtocolMemberKind<'db> {
                     .try_call(db, &CallArguments::positional([Type::any(), Type::any()]))
                     .ok()?;
 
-                let parameter = sig.parameters().get_positional(1)?;
+                let parameter = sig
+                    .parameters()
+                    .get_positional(1)
+                    .or_else(|| sig.parameters().variadic().map(|(_, parameter)| parameter))?;
                 parameter
                     .form
                     .is_value()

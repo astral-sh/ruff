@@ -2181,7 +2181,11 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                             .place
                             .ignore_possibly_undefined()
                             .when_none_or(db, self.constraints, |attribute_type| {
-                                self.check_type_pair(db, get_type, attribute_type)
+                                if member.is_method() {
+                                    self.never()
+                                } else {
+                                    self.check_type_pair(db, get_type, attribute_type)
+                                }
                             })
                     })
                     .or(db, self.constraints, || {
@@ -2557,7 +2561,11 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                                     else {
                                         return self.never();
                                     };
-                                    self.check_type_pair(db, get_type, attribute_type)
+                                    if member.is_method() {
+                                        self.never()
+                                    } else {
+                                        self.check_type_pair(db, get_type, attribute_type)
+                                    }
                                 },
                             )
                         })
