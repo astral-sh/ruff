@@ -361,20 +361,3 @@ help: Remove commented-out code
 79 | # Script tag block followed by normal block (Ok)
 80 |
 note: This is a display-only fix and is likely to be incorrect
-
-ERA001 [*] Found commented-out code
-   --> ERA001.py:111:2
-    |
-109 | # note the leading tab character
-110 | def foo():
-111 |     # testing: Foo Bar Baz
-    |     ^^^^^^^^^^^^^^^^^^^^^^
-112 |     ...
-    |
-help: Remove commented-out code
-108 | # Regression test for https://github.com/astral-sh/ruff/issues/25116,
-109 | # note the leading tab character
-110 | def foo():
-    - 	# testing: Foo Bar Baz
-111 | 	...
-note: This is a display-only fix and is likely to be incorrect
