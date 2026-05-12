@@ -11,7 +11,7 @@ use crate::types::tuple::TupleSpec;
 use crate::types::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
     LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionBuilder, UnionType,
+    TypeVarBoundOrConstraints, UnionBuilder,
 };
 use ty_python_core::Truthiness;
 
@@ -169,13 +169,13 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
     };
 
-    if let Some(left_literals) = left.expand_enum_complement_literals(db) {
-        let left = UnionType::from_elements(db, left_literals);
+    if let Some(complement) = left.enum_complement(db) {
+        let left = complement.remaining_literal_union(db);
         return infer_binary_type_comparison(context, left, op, right, range, visitor);
     }
 
-    if let Some(right_literals) = right.expand_enum_complement_literals(db) {
-        let right = UnionType::from_elements(db, right_literals);
+    if let Some(complement) = right.enum_complement(db) {
+        let right = complement.remaining_literal_union(db);
         return infer_binary_type_comparison(context, left, op, right, range, visitor);
     }
 

@@ -81,8 +81,9 @@ impl<'db> Type<'db> {
             return fallback.try_upcast_to_callable_with_policy_and_context(db, policy, context);
         }
 
-        if let Some(literals) = self.expand_enum_complement_literals(db) {
-            return UnionType::from_elements(db, literals)
+        if let Some(complement) = self.enum_complement(db) {
+            return complement
+                .remaining_literal_union(db)
                 .try_upcast_to_callable_with_policy(db, policy);
         }
 
@@ -278,6 +279,7 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(_)
             | Type::PropertyInstance(_)
             | Type::Intersection(_)
+            | Type::EnumComplement(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_) => None,
         }

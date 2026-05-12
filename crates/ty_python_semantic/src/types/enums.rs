@@ -3,13 +3,15 @@ use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
+use crate::FxOrderSet;
 use crate::{
     Db, FxIndexMap,
     place::{DefinedPlace, Place, place_from_bindings, place_from_declarations},
     reachability::DeclarationsIteratorExtension,
     types::{
-        ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, LiteralValueTypeKind,
-        MemberLookupPolicy, StaticClassLiteral, Type,
+        ClassBase, ClassLiteral, DynamicType, EnumLiteralType, IntersectionType, KnownClass,
+        LiteralValueTypeKind, MemberLookupPolicy, NegativeIntersectionElements, StaticClassLiteral,
+        Type, UnionType,
         function::FunctionType,
         set_theoretic::builder::{IntersectionBuilder, UnionBuilder},
     },
@@ -163,10 +165,10 @@ impl<'db> EnumMetadata<'db> {
 
 /// A compact representation of an enum type with excluded members.
 ///
-/// This corresponds to intersection types like `Color & ~Literal[Color.RED]`. Keeping the
-/// complement compact lets the type lattice preserve the exclusion without eagerly expanding the
-/// enum into a literal union. Callers that need finite alternatives can ask for the remaining
-/// literal types explicitly.
+/// This corresponds to intersection types like `Color & ~Literal[Color.RED]`, but is kept as its
+/// own type shape so callers do not have to rediscover that intersection pattern independently.
+/// The complement remains compact until some operation explicitly needs the finite literal
+/// alternatives.
 ///
 /// ```python
 /// from enum import Enum
@@ -179,31 +181,76 @@ impl<'db> EnumMetadata<'db> {
 ///     if color is not Color.RED:
 ///         reveal_type(color)  # Color, excluding Color.RED
 /// ```
-#[derive(Debug, Clone)]
-pub(crate) struct EnumComplement<'db> {
-    enum_class: ClassLiteral<'db>,
-    metadata: &'db EnumMetadata<'db>,
-    excluded_names: FxHashSet<Name>,
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct EnumComplementType<'db> {
+    pub(crate) enum_class: ClassLiteral<'db>,
+    /// Canonical enum-member names excluded by this complement.
+    #[returns(ref)]
+    pub(crate) excluded_names: FxOrderSet<Name>,
     /// The rest of the intersection's positive components, such as `Any`, that must be kept when
     /// expanding the complement.
-    rest: SmallVec<[Type<'db>; 1]>,
+    #[returns(ref)]
+    pub(crate) rest: FxOrderSet<Type<'db>>,
 }
 
-impl<'db> EnumComplement<'db> {
-    /// Create a compact enum complement from an enum class, its metadata, and canonical excluded
-    /// member names.
-    pub(crate) fn new(
-        enum_class: ClassLiteral<'db>,
-        metadata: &'db EnumMetadata<'db>,
-        excluded_names: FxHashSet<Name>,
-        rest: SmallVec<[Type<'db>; 1]>,
-    ) -> Self {
-        Self {
-            enum_class,
-            metadata,
-            excluded_names,
-            rest,
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for EnumComplementType<'_> {}
+
+pub(crate) type EnumComplement<'db> = EnumComplementType<'db>;
+
+#[salsa::tracked]
+impl<'db> EnumComplementType<'db> {
+    /// Recognize the compact enum-complement shape inside an intersection.
+    pub(crate) fn from_intersection_parts(
+        db: &'db dyn Db,
+        positive: &FxOrderSet<Type<'db>>,
+        negative: &NegativeIntersectionElements<'db>,
+    ) -> Option<Self> {
+        let mut enum_class = None;
+        let mut rest = SmallVec::<[Type<'db>; 1]>::default();
+        for positive in positive {
+            if matches!(positive, Type::Dynamic(_)) {
+                rest.push(*positive);
+                continue;
+            }
+
+            let Type::NominalInstance(instance) = positive else {
+                return None;
+            };
+
+            let class = instance.class_literal(db);
+            enum_metadata(db, class)?;
+
+            if enum_class.replace(class).is_some() {
+                return None;
+            }
         }
+
+        let enum_class = enum_class?;
+        let metadata = enum_metadata(db, enum_class)?;
+
+        let mut excluded_names = FxHashSet::default();
+        for negative in negative {
+            let enum_literal = negative.as_enum_literal()?;
+            if enum_literal.enum_class(db) != enum_class {
+                return None;
+            }
+
+            let name = enum_literal.name(db);
+            let canonical_name = metadata.resolve_member(name).unwrap_or(name);
+            excluded_names.insert(canonical_name.clone());
+        }
+
+        (!excluded_names.is_empty()).then(|| {
+            let excluded_names: FxOrderSet<Name> = metadata
+                .members
+                .keys()
+                .filter(|name| excluded_names.contains(*name))
+                .cloned()
+                .collect();
+            let rest: FxOrderSet<Type<'db>> = rest.into_iter().collect();
+            Self::new(db, enum_class, excluded_names, rest)
+        })
     }
 
     /// Return the enum class whose members are represented by this complement.
@@ -220,16 +267,8 @@ impl<'db> EnumComplement<'db> {
     ///         reveal_type(color)  # Color, excluding Color.RED
     ///         # The enum class is `Color`.
     /// ```
-    pub(crate) fn enum_class(&self) -> ClassLiteral<'db> {
-        self.enum_class
-    }
-
-    /// Return `true` if at least one enum member has been excluded from this complement.
-    ///
-    /// Complements without exclusions are treated like the enum instance type itself and should
-    /// not be expanded to a literal union.
-    pub(crate) fn has_excluded_members(&self) -> bool {
-        !self.excluded_names.is_empty()
+    pub(crate) fn metadata(self, db: &'db dyn Db) -> &'db EnumMetadata<'db> {
+        enum_metadata(db, self.enum_class(db)).expect("Enum complement class is an enum")
     }
 
     /// Iterate over the canonical enum-member names excluded by this complement.
@@ -249,46 +288,33 @@ impl<'db> EnumComplement<'db> {
     ///     if color is not Color.ALSO_RED:
     ///         reveal_type(color)  # Color, excluding Color.RED
     /// ```
-    pub(crate) fn excluded_member_names(&self) -> impl Iterator<Item = &Name> {
-        self.excluded_names.iter()
+    pub(crate) fn excluded_member_names(self, db: &'db dyn Db) -> impl Iterator<Item = &'db Name> {
+        self.excluded_names(db).iter()
     }
 
     /// Return `true` if the given canonical enum-member name is excluded by this complement.
     ///
     /// Callers should pass canonical member names, not alias names. Use `EnumMetadata::resolve_member`
     /// before calling this when starting from a possibly aliased enum literal.
-    pub(crate) fn excludes_member(&self, name: &Name) -> bool {
-        self.excluded_names.contains(name)
-    }
-
-    /// Return the rest of the intersection's positive components.
-    pub(crate) fn rest(&self) -> &[Type<'db>] {
-        &self.rest
-    }
-
-    /// Return `true` if this complement carries any additional positive components.
-    pub(crate) fn has_rest(&self) -> bool {
-        !self.rest.is_empty()
+    pub(crate) fn excludes_member(self, db: &'db dyn Db, name: &Name) -> bool {
+        self.excluded_names(db).contains(name)
     }
 
     /// Count the canonical enum members still represented by this complement.
-    fn remaining_member_count(&self) -> usize {
-        self.metadata
+    fn remaining_member_count(self, db: &'db dyn Db) -> usize {
+        self.metadata(db)
             .members
             .keys()
-            .filter(|name| !self.excluded_names.contains(*name))
+            .filter(|name| !self.excluded_names(db).contains(*name))
             .count()
     }
 
     /// Return `true` if this complement still represents at least one enum member.
-    pub(crate) fn has_remaining_members(&self) -> bool {
-        self.remaining_member_count() > 0
+    pub(crate) fn has_remaining_members(self, db: &'db dyn Db) -> bool {
+        self.remaining_member_count(db) > 0
     }
 
     /// Expand this complement to the enum literals that remain possible.
-    ///
-    /// Returns `None` if the complement has no exclusions, because `Color` is a better
-    /// representation than an eagerly expanded union of all `Color` members.
     ///
     /// ```python
     /// from enum import Enum
@@ -301,29 +327,28 @@ impl<'db> EnumComplement<'db> {
     ///     if color is not Color.RED:
     ///         reveal_type(color)  # Literal[Color.BLUE]
     /// ```
-    pub(crate) fn remaining_literal_types(&self, db: &'db dyn Db) -> Option<Vec<Type<'db>>> {
-        if !self.has_excluded_members() {
-            return None;
-        }
-
-        Some(
-            self.metadata
-                .members
-                .keys()
-                .filter(|name| !self.excluded_names.contains(*name))
-                .map(|name| self.remaining_literal_type(db, name.clone()))
-                .collect(),
-        )
+    pub(crate) fn remaining_literal_types(self, db: &'db dyn Db) -> Vec<Type<'db>> {
+        self.metadata(db)
+            .members
+            .keys()
+            .filter(|name| !self.excluded_names(db).contains(*name))
+            .map(|name| self.remaining_literal_type(db, name.clone()))
+            .collect()
     }
 
-    fn remaining_literal_type(&self, db: &'db dyn Db, name: Name) -> Type<'db> {
-        let literal = Type::enum_literal(EnumLiteralType::new(db, self.enum_class, name));
-        if !self.has_rest() {
+    /// Expand this complement to the union of enum literals that remain possible.
+    pub(crate) fn remaining_literal_union(self, db: &'db dyn Db) -> Type<'db> {
+        UnionType::from_elements(db, self.remaining_literal_types(db))
+    }
+
+    fn remaining_literal_type(self, db: &'db dyn Db, name: Name) -> Type<'db> {
+        let literal = Type::enum_literal(EnumLiteralType::new(db, self.enum_class(db), name));
+        if self.rest(db).is_empty() {
             return literal;
         }
 
         let mut builder = IntersectionBuilder::new(db).add_positive(literal);
-        for rest in self.rest() {
+        for rest in self.rest(db) {
             builder = builder.add_positive(*rest);
         }
         builder.build()
@@ -346,20 +371,20 @@ impl<'db> EnumComplement<'db> {
     ///         reveal_type(color)  # Literal[Color.BLUE]
     /// ```
     pub(crate) fn remaining_literal_types_for_display(
-        &self,
+        self,
         db: &'db dyn Db,
         max_literals: usize,
     ) -> Option<Vec<Type<'db>>> {
-        if self.has_rest() {
+        if !self.rest(db).is_empty() {
             return None;
         }
 
-        let remaining_count = self.remaining_member_count();
+        let remaining_count = self.remaining_member_count(db);
         if remaining_count == 0 || remaining_count > max_literals {
             return None;
         }
 
-        self.remaining_literal_types(db)
+        Some(self.remaining_literal_types(db))
     }
 
     /// Return the type of a member attribute for all enum literals remaining in this complement.
@@ -379,27 +404,23 @@ impl<'db> EnumComplement<'db> {
     ///         reveal_type(color.name)  # Literal["BLUE"]
     ///         reveal_type(color.value)  # Literal[2]
     /// ```
-    pub(crate) fn member_type(&self, db: &'db dyn Db, member_name: &str) -> Option<Type<'db>> {
-        if !self.has_excluded_members() {
-            return None;
-        }
-
-        let is_enum_subclass = Type::ClassLiteral(self.enum_class)
+    pub(crate) fn member_type(self, db: &'db dyn Db, member_name: &str) -> Option<Type<'db>> {
+        let is_enum_subclass = Type::ClassLiteral(self.enum_class(db))
             .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db));
         let mut builder = UnionBuilder::new(db);
         let mut found_member = false;
 
         for name in self
-            .metadata
+            .metadata(db)
             .members
             .keys()
-            .filter(|name| !self.excluded_names.contains(*name))
+            .filter(|name| !self.excluded_names(db).contains(*name))
         {
             let member_ty = (match member_name {
-                "name" if is_enum_subclass => self.metadata.name_type(db, name),
-                "_name_" => self.metadata.name_type(db, name),
-                "value" if is_enum_subclass => self.metadata.value_type(name),
-                "_value_" => self.metadata.value_type(name),
+                "name" if is_enum_subclass => self.metadata(db).name_type(db, name),
+                "_name_" => self.metadata(db).name_type(db, name),
+                "value" if is_enum_subclass => self.metadata(db).value_type(name),
+                "_value_" => self.metadata(db).value_type(name),
                 _ => None,
             })?;
 
@@ -411,15 +432,34 @@ impl<'db> EnumComplement<'db> {
     }
 
     /// Return `true` if users can spell an equivalent type for this complement.
-    pub(crate) fn is_spellable(&self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_spellable(self, db: &'db dyn Db) -> bool {
         // A plain enum complement is an implementation detail for a type that users can still spell
         // as a union of the remaining enum literals. Complements with `rest` components, such as
         // `Color & Any & ~Literal[Color.RED]`, are not equivalent to that literal union because the
         // additional intersection components must remain.
-        !self.has_rest()
+        self.rest(db).is_empty()
             && self
                 .remaining_literal_types(db)
-                .is_some_and(|literals| literals.iter().all(|literal| literal.is_spellable(db)))
+                .iter()
+                .all(|literal| literal.is_spellable(db))
+    }
+
+    /// Reconstruct the equivalent set-theoretic intersection.
+    pub(crate) fn to_intersection(self, db: &'db dyn Db) -> Type<'db> {
+        let enum_class = self.enum_class(db);
+        let mut positive = FxOrderSet::from_iter([enum_class.to_non_generic_instance(db)]);
+        positive.extend(self.rest(db).iter().copied());
+
+        let mut negative = NegativeIntersectionElements::default();
+        for name in self.excluded_names(db) {
+            negative.insert(Type::enum_literal(EnumLiteralType::new(
+                db,
+                enum_class,
+                name.clone(),
+            )));
+        }
+
+        Type::Intersection(IntersectionType::new(db, positive, negative))
     }
 }
 

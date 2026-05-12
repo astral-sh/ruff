@@ -282,6 +282,7 @@ impl<'db> Type<'db> {
             | Type::SubclassOf(_)
             | Type::Union(_)
             | Type::Intersection(_)
+            | Type::EnumComplement(_)
             | Type::Callable(_)
             | Type::KnownBoundMethod(
                 KnownBoundMethodType::PropertyDunderGet(_)
@@ -906,9 +907,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
 
         if matches!(target, Type::LiteralValue(_) | Type::Union(_))
-            && let Some(source_literals) = source.expand_enum_complement_literals(db)
+            && let Some(complement) = source.enum_complement(db)
         {
-            return source_literals
+            return complement
+                .remaining_literal_types(db)
                 .iter()
                 .copied()
                 .when_all(db, self.constraints, |literal| {
@@ -995,6 +997,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (_, Type::TypeAlias(target_alias)) => self.with_recursion_guard(source, target, || {
                 self.check_type_pair(db, source, target_alias.value_type(db))
             }),
+
+            (Type::EnumComplement(complement), _) => {
+                self.check_type_pair(db, complement.to_intersection(db), target)
+            }
+
+            (_, Type::EnumComplement(complement)) => {
+                self.check_type_pair(db, source, complement.to_intersection(db))
+            }
 
             // Field definitions in dataclasses and dataclass-transformers can involve calls to
             // `dataclasses.field` or custom field-specifier functions. The annotated return type
@@ -2222,12 +2232,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             return self.check_type_pair(db, left, right);
         }
 
-        if let Some(left_literals) = left.expand_enum_complement_literals(db) {
-            return self.check_type_pair(db, UnionType::from_elements(db, left_literals), right);
+        if let Some(complement) = left.enum_complement(db) {
+            return self.check_type_pair(db, complement.remaining_literal_union(db), right);
         }
 
-        if let Some(right_literals) = right.expand_enum_complement_literals(db) {
-            return self.check_type_pair(db, left, UnionType::from_elements(db, right_literals));
+        if let Some(complement) = right.enum_complement(db) {
+            return self.check_type_pair(db, left, complement.remaining_literal_union(db));
         }
 
         match (left, right) {
@@ -2902,6 +2912,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 self.as_relation_checker(TypeRelation::Assignability)
                     .check_type_pair(db, dict_str_any, other)
                     .negate(db, self.constraints)
+            }
+
+            (Type::EnumComplement(complement), other) => {
+                self.check_type_pair(db, complement.remaining_literal_union(db), other)
+            }
+
+            (other, Type::EnumComplement(complement)) => {
+                self.check_type_pair(db, other, complement.remaining_literal_union(db))
             }
         }
     }

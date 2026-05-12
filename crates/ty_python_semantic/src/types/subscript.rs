@@ -760,6 +760,7 @@ impl<'db> Type<'db> {
                 | Type::DataclassDecorator(_)
                 | Type::DataclassTransformer(_)
                 | Type::Callable(_)
+                | Type::EnumComplement(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::GenericAlias(_)

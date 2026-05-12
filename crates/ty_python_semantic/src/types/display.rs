@@ -1191,6 +1191,10 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::Intersection(intersection) => intersection
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
+            Type::EnumComplement(complement) => complement
+                .to_intersection(self.db)
+                .display_with(self.db, self.settings.clone())
+                .fmt_detailed(f),
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(n) => write!(f.with_type(self.ty), "{n}"),
                 LiteralValueTypeKind::Bool(boolean) => {

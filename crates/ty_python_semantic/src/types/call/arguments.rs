@@ -527,10 +527,7 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
 ///
 /// In other words, it returns `true` if [`expand_type`] returns [`Some`] for the given type.
 pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    if ty
-        .enum_complement(db)
-        .is_some_and(|complement| complement.has_excluded_members())
-    {
+    if ty.enum_complement(db).is_some() {
         return true;
     }
 
@@ -557,8 +554,8 @@ pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 /// Returns [`None`] if the type cannot be expanded.
 fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
     // NOTE: Update `is_expandable_type` if this logic changes accordingly.
-    if let Some(literals) = ty.expand_enum_complement_literals(db) {
-        return Some(literals);
+    if let Some(complement) = ty.enum_complement(db) {
+        return Some(complement.remaining_literal_types(db));
     }
 
     match ty {
@@ -615,9 +612,10 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                 .elements(db)
                 .iter()
                 .flat_map(|element| {
-                    element
-                        .expand_enum_complement_literals(db)
-                        .unwrap_or_else(|| vec![*element])
+                    element.enum_complement(db).map_or_else(
+                        || vec![*element],
+                        |complement| complement.remaining_literal_types(db),
+                    )
                 })
                 .collect(),
         ),

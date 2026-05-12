@@ -288,9 +288,9 @@ impl<'db> Type<'db> {
 
             Type::Union(union) => try_union(*union)?,
 
-            Type::Intersection(_) => {
-                if let Some(literals) = self.expand_enum_complement_literals(db) {
-                    UnionType::from_elements(db, literals).try_bool_impl(
+            Type::Intersection(_) | Type::EnumComplement(_) => {
+                if let Some(complement) = self.enum_complement(db) {
+                    complement.remaining_literal_union(db).try_bool_impl(
                         db,
                         allow_short_circuit,
                         visitor,

@@ -37,7 +37,7 @@
 //! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
 use super::RecursivelyDefined;
-use crate::types::enums::enum_metadata;
+use crate::types::enums::{EnumComplement, enum_metadata};
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
@@ -149,13 +149,10 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
         let Some(complement) = types[complement_index].enum_complement(db) else {
             continue;
         };
-        if !complement.has_excluded_members() {
-            continue;
-        }
-        let enum_class = complement.enum_class();
+        let enum_class = complement.enum_class(db);
         let metadata = enum_metadata(db, enum_class).expect("Enum complement class is an enum");
         let mut shared_excluded_names: FxHashSet<_> =
-            complement.excluded_member_names().cloned().collect();
+            complement.excluded_member_names(db).cloned().collect();
 
         let mut remove_indices = Vec::new();
         for (index, ty) in types.iter().enumerate() {
@@ -164,17 +161,16 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
             }
 
             if let Some(other_complement) = ty.enum_complement(db) {
-                if other_complement.enum_class() == enum_class
-                    && other_complement.has_excluded_members()
-                    && other_complement.rest() == complement.rest()
+                if other_complement.enum_class(db) == enum_class
+                    && other_complement.rest(db) == complement.rest(db)
                 {
-                    shared_excluded_names.retain(|name| other_complement.excludes_member(name));
+                    shared_excluded_names.retain(|name| other_complement.excludes_member(db, name));
                     remove_indices.push(index);
                 }
                 continue;
             }
 
-            if complement.has_rest() {
+            if !complement.rest(db).is_empty() {
                 continue;
             }
 
@@ -195,7 +191,7 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
         if !remove_indices.is_empty() {
             let mut builder =
                 IntersectionBuilder::new(db).add_positive(enum_class.to_non_generic_instance(db));
-            for rest in complement.rest() {
+            for rest in complement.rest(db) {
                 builder = builder.add_positive(*rest);
             }
             for name in metadata
@@ -1127,6 +1123,10 @@ impl<'db> IntersectionBuilder<'db> {
                 }
                 self
             }
+            Type::EnumComplement(complement) => {
+                let db = self.db;
+                self.add_positive_impl(complement.to_intersection(db), seen_aliases)
+            }
             Type::NominalInstance(instance)
                 if enum_metadata(self.db, instance.class_literal(self.db)).is_some() =>
             {
@@ -1208,6 +1208,10 @@ impl<'db> IntersectionBuilder<'db> {
                         builder
                     },
                 )
+            }
+            Type::EnumComplement(complement) => {
+                let db = self.db;
+                self.add_negative_impl(complement.to_intersection(db), seen_aliases)
             }
             Type::LiteralValue(_) => {
                 for inner in &mut self.intersections {
@@ -1566,51 +1570,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
             }
             _ => {
                 let new_negative_enum = new_negative.as_enum_literal();
-                if let Some(new_enum) = new_negative_enum
-                    && self.positive.iter().any(|existing_positive| {
-                        existing_positive
-                            .as_nominal_instance()
-                            .is_some_and(|instance| {
-                                instance.class_literal(db) == new_enum.enum_class(db)
-                            })
-                    })
-                {
-                    for existing_positive in &self.positive {
-                        if let Some(existing_enum) = existing_positive.as_enum_literal()
-                            && existing_enum.enum_class(db) == new_enum.enum_class(db)
-                        {
-                            if existing_positive == &new_negative {
-                                *self = Self::default();
-                                self.positive.insert(Type::Never);
-                            }
-                            return;
-                        }
-
-                        if existing_positive
-                            .as_nominal_instance()
-                            .is_some_and(|instance| {
-                                instance.class_literal(db) == new_enum.enum_class(db)
-                            })
-                        {
-                            continue;
-                        }
-
-                        // S & ~T = Never    if S <: T
-                        if existing_positive.is_subtype_of(db, new_negative) {
-                            *self = Self::default();
-                            self.positive.insert(Type::Never);
-                            return;
-                        }
-                        // A & ~B = A    if A and B are disjoint
-                        if existing_positive.is_disjoint_from(db, new_negative) {
-                            return;
-                        }
-                    }
-
-                    self.negative.insert(new_negative);
-                    return;
-                }
-
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_negative) in self.negative.iter().enumerate() {
                     if let Some(new_enum) = new_negative_enum
@@ -1764,6 +1723,12 @@ impl<'db> InnerIntersectionBuilder<'db> {
             if speculative.is_never() {
                 return Type::Never;
             }
+        }
+
+        if let Some(complement) =
+            EnumComplement::from_intersection_parts(db, &self.positive, &self.negative)
+        {
+            return Type::EnumComplement(complement);
         }
 
         match (self.positive.len(), self.negative.len()) {
