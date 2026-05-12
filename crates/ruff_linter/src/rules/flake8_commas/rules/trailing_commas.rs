@@ -227,9 +227,12 @@ impl Violation for TrailingCommaOnBareTuple {
 /// ```
 ///
 /// ## Formatter compatibility
-/// We recommend against using this rule alongside the [formatter]. The
-/// formatter respects trailing commas as a signal to break items across lines,
-/// which conflicts with this rule's requirement to prohibit them.
+/// Using this rule with the [formatter] can cause conflicts because the
+/// formatter uses trailing commas as a signal to break items across lines.
+/// We recommend either:
+///
+/// * Disable this rule via the linter's [`lint.ignore`](https://docs.astral.sh/ruff/settings/#lint_ignore) setting
+/// * Set [`format.skip-magic-trailing-comma`](https://docs.astral.sh/ruff/settings/#format_skip-magic-trailing-comma) to `true`
 ///
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]

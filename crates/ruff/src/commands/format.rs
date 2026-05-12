@@ -1115,9 +1115,6 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             //     pass
             // ```
             Rule::MissingTrailingComma,
-            // The formatter respects trailing commas as a magic marker to break items
-            // across lines, which conflicts with this rule's requirement to prohibit them.
-            Rule::ProhibitedTrailingComma,
             // The formatter always removes blank lines before the docstring.
             Rule::IncorrectBlankLineBeforeClass,
         ] {
