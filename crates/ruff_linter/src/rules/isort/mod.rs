@@ -315,9 +315,8 @@ mod tests {
 
     use crate::assert_diagnostics;
     use crate::registry::Rule;
-    use crate::rules::isort::categorize::{ImportSection, KnownModules};
+    use crate::rules::isort::categorize::{ImportSection, KnownModulePattern, KnownModules};
     use crate::settings::LinterSettings;
-    use crate::settings::types::IdentifierPattern;
     use crate::test::{test_path, test_resource_path};
 
     use super::categorize::ImportType;
@@ -390,8 +389,8 @@ mod tests {
         Ok(())
     }
 
-    fn pattern(pattern: &str) -> IdentifierPattern {
-        IdentifierPattern::new(pattern).unwrap()
+    fn pattern(pattern: &str) -> KnownModulePattern {
+        KnownModulePattern::new(pattern).unwrap()
     }
 
     #[test_case(Path::new("separate_subpackage_first_and_third_party_imports.py"))]

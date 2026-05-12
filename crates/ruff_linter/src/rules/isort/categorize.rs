@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::iter;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use log::debug;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
@@ -9,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
 use crate::package::PackageRoot;
-use crate::settings::types::IdentifierPattern;
 use crate::warn_user_once;
 use ruff_macros::CacheKey;
 use ruff_python_ast::PythonVersion;
@@ -284,20 +284,20 @@ pub(crate) fn categorize_imports<'a>(
 #[derive(Debug, Clone, Default, CacheKey)]
 pub struct KnownModules {
     /// A map of known modules to their section.
-    known: Vec<(IdentifierPattern, ImportSection)>,
+    known: Vec<(KnownModulePattern, ImportSection)>,
     /// Whether any of the known modules are submodules (e.g., `foo.bar`, as opposed to `foo`).
     has_submodules: bool,
 }
 
 impl KnownModules {
     pub fn new(
-        first_party: Vec<IdentifierPattern>,
-        third_party: Vec<IdentifierPattern>,
-        local_folder: Vec<IdentifierPattern>,
-        standard_library: Vec<IdentifierPattern>,
-        user_defined: FxHashMap<String, Vec<IdentifierPattern>>,
+        first_party: Vec<KnownModulePattern>,
+        third_party: Vec<KnownModulePattern>,
+        local_folder: Vec<KnownModulePattern>,
+        standard_library: Vec<KnownModulePattern>,
+        user_defined: FxHashMap<String, Vec<KnownModulePattern>>,
     ) -> Self {
-        let known: Vec<(IdentifierPattern, ImportSection)> = user_defined
+        let known: Vec<(KnownModulePattern, ImportSection)> = user_defined
             .into_iter()
             .flat_map(|(section, modules)| {
                 modules
@@ -396,8 +396,8 @@ impl KnownModules {
     }
 
     /// Return the list of user-defined modules, indexed by section.
-    pub fn user_defined(&self) -> FxHashMap<&str, Vec<&IdentifierPattern>> {
-        let mut user_defined: FxHashMap<&str, Vec<&IdentifierPattern>> = FxHashMap::default();
+    pub fn user_defined(&self) -> FxHashMap<&str, Vec<&KnownModulePattern>> {
+        let mut user_defined: FxHashMap<&str, Vec<&KnownModulePattern>> = FxHashMap::default();
         for (module, section) in &self.known {
             if let ImportSection::UserDefined(section_name) = section {
                 user_defined
@@ -425,9 +425,58 @@ impl fmt::Display for KnownModules {
     }
 }
 
+/// Pattern used to classify configured known modules.
+///
+/// Literal entries are common in large inherited configs. Store them directly so categorization
+/// does not need to compile a [`glob::Pattern`] for every literal module name.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, CacheKey)]
+pub enum KnownModulePattern {
+    Literal(String),
+    Glob(Box<glob::Pattern>),
+}
+
+impl KnownModulePattern {
+    pub fn new(pattern: &str) -> Result<Self, glob::PatternError> {
+        // `]` is only special inside `[...]`, which necessarily includes `[`.
+        if memchr::memchr3(b'?', b'*', b'[', pattern.as_bytes()).is_some() {
+            Ok(Self::Glob(Box::new(glob::Pattern::new(pattern)?)))
+        } else {
+            Ok(Self::Literal(pattern.to_string()))
+        }
+    }
+
+    fn matches(&self, candidate: &str) -> bool {
+        match self {
+            Self::Literal(literal) => literal == candidate,
+            Self::Glob(pattern) => pattern.matches(candidate),
+        }
+    }
+
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Literal(literal) => literal,
+            Self::Glob(pattern) => pattern.as_str(),
+        }
+    }
+}
+
+impl fmt::Display for KnownModulePattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl FromStr for KnownModulePattern {
+    type Err = glob::PatternError;
+
+    fn from_str(pattern: &str) -> Result<Self, Self::Err> {
+        Self::new(pattern)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::rules::isort::categorize::match_sources;
+    use crate::rules::isort::categorize::{KnownModulePattern, match_sources};
 
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -445,6 +494,28 @@ mod tests {
     /// Helper function to create a directory and all parent directories
     fn create_dir<P: AsRef<Path>>(path: P) {
         fs::create_dir_all(path).unwrap();
+    }
+
+    #[test]
+    fn known_module_pattern_matches_literals_exactly() {
+        let pattern = KnownModulePattern::new("package.module").unwrap();
+
+        assert!(pattern.matches("package.module"));
+        assert!(!pattern.matches("package"));
+        assert!(!pattern.matches("package.module.extra"));
+    }
+
+    #[test]
+    fn known_module_pattern_preserves_glob_matching() {
+        let pattern = KnownModulePattern::new("package.*").unwrap();
+
+        assert!(pattern.matches("package.module"));
+        assert!(!pattern.matches("other.module"));
+    }
+
+    #[test]
+    fn known_module_pattern_rejects_invalid_globs() {
+        assert!(KnownModulePattern::new("package[").is_err());
     }
 
     /// Tests a traditional Python package layout:
