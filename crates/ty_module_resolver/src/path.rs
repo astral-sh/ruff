@@ -591,6 +591,28 @@ impl SearchPath {
             })
     }
 
+    /// Relativize a known directory path without interpreting dotted directory names as file
+    /// extensions.
+    #[must_use]
+    pub(crate) fn relativize_system_directory_path(&self, path: &SystemPath) -> Option<ModulePath> {
+        match &*self.0 {
+            SearchPathInner::Extra(search_path)
+            | SearchPathInner::FirstParty(search_path)
+            | SearchPathInner::StandardLibraryCustom(search_path)
+            | SearchPathInner::StandardLibraryReal(search_path)
+            | SearchPathInner::SitePackages(search_path)
+            | SearchPathInner::Editable(search_path) => {
+                path.strip_prefix(search_path)
+                    .ok()
+                    .map(|relative_path| ModulePath {
+                        search_path: self.clone(),
+                        relative_path: relative_path.as_utf8_path().to_path_buf(),
+                    })
+            }
+            SearchPathInner::StandardLibraryVendored(_) => None,
+        }
+    }
+
     #[must_use]
     pub(crate) fn relativize_system_path_only<'a>(
         &self,

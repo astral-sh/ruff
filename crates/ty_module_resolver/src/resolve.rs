@@ -2094,7 +2094,10 @@ fn resolve_setuptools_editable_path(
     let search_root = candidate_path.parent().unwrap_or(site_packages);
     let search_path = SearchPath::editable(context.db.system(), search_root.to_path_buf()).ok()?;
     register_editable_root(context.db, search_root);
-    let mut module_path = search_path.relativize_system_path(candidate_path)?;
+    // Current setuptools finder mappings may point directly at package directories with dotted
+    // basenames, e.g. `package_dir = {"pkg": "src/custom.layout"}`. Treat the mapping path as a
+    // directory for the `__init__` probe before applying normal module-file extension rules.
+    let mut module_path = search_path.relativize_system_directory_path(candidate_path)?;
 
     module_path.push("__init__");
     if let Some(init) = resolve_file_module(&module_path, context) {
@@ -2114,7 +2117,7 @@ fn resolve_setuptools_editable_path(
         });
     }
 
-    module_path.pop();
+    let module_path = search_path.relativize_system_path(candidate_path)?;
     if let Some(module) = resolve_file_module(&module_path, context) {
         return Some(ModuleResolutionCandidate {
             path: module_path,
@@ -4129,6 +4132,49 @@ NAMESPACES: dict[str, list[str]] = {}
         assert_eq!(
             pkg_child_module.file(&db).unwrap().path(&db),
             &FilePath::system("/workspace/custom_layout/child.py")
+        );
+    }
+
+    #[test]
+    fn setuptools_editable_install_dotted_package_directory_mapping() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.pkg.pth",
+                "import __editable___pkg_finder; __editable___pkg_finder.install()",
+            ),
+            (
+                "__editable___pkg_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"pkg": "/workspace/custom.layout"}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+        ];
+
+        let external_files = [
+            ("/workspace/custom.layout/__init__.py", ""),
+            ("/workspace/custom.layout/child.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let pkg_module_name = ModuleName::new_static("pkg").unwrap();
+        let pkg_child_module_name = ModuleName::new_static("pkg.child").unwrap();
+
+        let pkg_module = resolve_module_confident(&db, &pkg_module_name).unwrap();
+        let pkg_child_module = resolve_module_confident(&db, &pkg_child_module_name).unwrap();
+
+        assert_eq!(
+            pkg_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/custom.layout/__init__.py")
+        );
+        assert_eq!(
+            pkg_child_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/custom.layout/child.py")
         );
     }
 
