@@ -154,6 +154,11 @@ impl<'db> EnumMetadata<'db> {
             self.aliases.get(name)
         }
     }
+
+    /// Return `true` if this enum has at least one canonical member.
+    pub(crate) fn has_members(&self) -> bool {
+        !self.members.is_empty()
+    }
 }
 
 /// A compact representation of an enum type with excluded members.
@@ -273,6 +278,11 @@ impl<'db> EnumComplement<'db> {
             .keys()
             .filter(|name| !self.excluded_names.contains(*name))
             .count()
+    }
+
+    /// Return `true` if this complement still represents at least one enum member.
+    pub(crate) fn has_remaining_members(&self) -> bool {
+        self.remaining_member_count() > 0
     }
 
     /// Expand this complement to the enum literals that remain possible.

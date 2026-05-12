@@ -1122,6 +1122,12 @@ impl<'db> Type<'db> {
         ))
     }
 
+    /// Expand an enum complement to the remaining literal alternatives.
+    pub(crate) fn expand_enum_complement_literals(self, db: &'db dyn Db) -> Option<Vec<Type<'db>>> {
+        self.enum_complement(db)
+            .and_then(|complement| complement.remaining_literal_types(db))
+    }
+
     /// Return `true` if this type is an enum instance type.
     ///
     /// This recognizes instance types like `Color`, not individual enum literals like
@@ -1774,17 +1780,12 @@ impl<'db> Type<'db> {
     pub(crate) fn finite_single_valued_union_alternatives(self, db: &'db dyn Db) -> Vec<Type<'db>> {
         let ty = self.resolve_type_alias(db);
 
-        if let Some(literals) = ty
-            .enum_complement(db)
-            .and_then(|complement| complement.remaining_literal_types(db))
-        {
-            if literals
-                .iter()
-                .all(|literal| literal.is_single_valued_union_component(db))
-            {
-                return literals;
-            }
+        if !ty.has_finite_single_valued_union_alternatives(db) {
             return Vec::new();
+        }
+
+        if let Some(literals) = ty.expand_enum_complement_literals(db) {
+            return literals;
         }
 
         match ty {
@@ -1800,6 +1801,38 @@ impl<'db> Type<'db> {
                     .collect()
             }
             _ => Vec::new(),
+        }
+    }
+
+    /// Return `true` if `finite_single_valued_union_alternatives` would produce a non-empty list.
+    ///
+    /// Keep this separate from the materializing helper above so boolean probes do not eagerly
+    /// expand large enum domains into literal vectors.
+    pub(crate) fn has_finite_single_valued_union_alternatives(self, db: &'db dyn Db) -> bool {
+        let ty = self.resolve_type_alias(db);
+
+        if let Some(complement) = ty.enum_complement(db) {
+            return complement.has_excluded_members()
+                && !complement.has_rest()
+                && complement.has_remaining_members()
+                && !complement
+                    .enum_class()
+                    .to_non_generic_instance(db)
+                    .overrides_equality(db);
+        }
+
+        match ty {
+            Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Bool) => {
+                true
+            }
+            Type::NominalInstance(instance)
+                if enum_metadata(db, instance.class_literal(db))
+                    .is_some_and(|metadata| metadata.has_members())
+                    && !ty.overrides_equality(db) =>
+            {
+                true
+            }
+            _ => false,
         }
     }
 
@@ -1822,7 +1855,7 @@ impl<'db> Type<'db> {
     /// ```
     fn is_multi_valued_single_valued_union_component(&self, db: &'db dyn Db) -> bool {
         let ty = self.resolve_type_alias(db);
-        !ty.finite_single_valued_union_alternatives(db).is_empty()
+        ty.has_finite_single_valued_union_alternatives(db)
             || ty.is_subtype_of(db, Type::literal_string())
     }
 
@@ -2451,12 +2484,9 @@ impl<'db> Type<'db> {
                 // our model due to [`UnionBuilder::build`].
                 false
             }
-            Type::Intersection(..) => self
-                .enum_complement(db)
-                .and_then(|complement| complement.remaining_literal_types(db))
-                .is_some_and(
-                    |literals| matches!(literals.as_slice(), [literal] if literal.is_singleton(db)),
-                ),
+            Type::Intersection(..) => self.expand_enum_complement_literals(db).is_some_and(
+                |literals| matches!(literals.as_slice(), [literal] if literal.is_singleton(db)),
+            ),
             Type::AlwaysTruthy | Type::AlwaysFalsy => false,
             Type::TypeIs(type_is) => type_is.is_bound(db),
             Type::TypeGuard(type_guard) => type_guard.is_bound(db),
@@ -2549,12 +2579,9 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_) => false,
 
-            Type::Intersection(..) => self
-                .enum_complement(db)
-                .and_then(|complement| complement.remaining_literal_types(db))
-                .is_some_and(|literals| {
-                    matches!(literals.as_slice(), [literal] if literal.is_single_valued(db))
-                }),
+            Type::Intersection(..) => self.expand_enum_complement_literals(db).is_some_and(
+                |literals| matches!(literals.as_slice(), [literal] if literal.is_single_valued(db)),
+            ),
         }
     }
 
@@ -5705,6 +5732,10 @@ impl<'db> Type<'db> {
     /// See `Self::dunder_class` for more details.
     #[must_use]
     pub(crate) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
+        if let Some(literals) = self.expand_enum_complement_literals(db) {
+            return UnionType::from_elements(db, literals).to_meta_type(db);
+        }
+
         match self {
             Type::Never => Type::Never,
             Type::NominalInstance(instance) => instance.to_meta_type(db),
@@ -6430,6 +6461,10 @@ impl<'db> Type<'db> {
     /// Note: this method is used in the builtins `format`, `print`, `str.format` and `f-strings`.
     #[must_use]
     pub(crate) fn str(&self, db: &'db dyn Db) -> Type<'db> {
+        if let Some(literals) = (*self).expand_enum_complement_literals(db) {
+            return UnionType::from_elements(db, literals).str(db);
+        }
+
         match self {
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(_) | LiteralValueTypeKind::Bool(_) => self.repr(db),

@@ -289,10 +289,7 @@ impl<'db> Type<'db> {
             Type::Union(union) => try_union(*union)?,
 
             Type::Intersection(_) => {
-                if let Some(literals) = self
-                    .enum_complement(db)
-                    .and_then(|complement| complement.remaining_literal_types(db))
-                {
+                if let Some(literals) = self.expand_enum_complement_literals(db) {
                     UnionType::from_elements(db, literals).try_bool_impl(
                         db,
                         allow_short_circuit,

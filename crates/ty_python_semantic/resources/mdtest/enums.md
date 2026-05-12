@@ -1675,6 +1675,13 @@ class NoMembers(Enum): ...
 def _(answer: Answer, no_members: NoMembers):
     reveal_type(type(answer))  # revealed: <class 'Answer'>
     reveal_type(type(no_members))  # revealed: type[NoMembers]
+
+def narrowed_meta_type(answer: Answer):
+    if answer is Answer.YES:
+        return
+
+    reveal_type(type(answer))  # revealed: <class 'Answer'>
+    reveal_type(answer.__class__)  # revealed: <class 'Answer'>
 ```
 
 ### Cyclic references

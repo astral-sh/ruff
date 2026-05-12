@@ -529,8 +529,7 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
 pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     if ty
         .enum_complement(db)
-        .and_then(|complement| complement.remaining_literal_types(db))
-        .is_some()
+        .is_some_and(|complement| complement.has_excluded_members())
     {
         return true;
     }
@@ -558,10 +557,7 @@ pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 /// Returns [`None`] if the type cannot be expanded.
 fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
     // NOTE: Update `is_expandable_type` if this logic changes accordingly.
-    if let Some(literals) = ty
-        .enum_complement(db)
-        .and_then(|complement| complement.remaining_literal_types(db))
-    {
+    if let Some(literals) = ty.expand_enum_complement_literals(db) {
         return Some(literals);
     }
 
@@ -620,8 +616,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                 .iter()
                 .flat_map(|element| {
                     element
-                        .enum_complement(db)
-                        .and_then(|complement| complement.remaining_literal_types(db))
+                        .expand_enum_complement_literals(db)
                         .unwrap_or_else(|| vec![*element])
                 })
                 .collect(),

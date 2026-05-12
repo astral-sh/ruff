@@ -906,9 +906,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
 
         if matches!(target, Type::LiteralValue(_) | Type::Union(_))
-            && let Some(source_literals) = source
-                .enum_complement(db)
-                .and_then(|complement| complement.remaining_literal_types(db))
+            && let Some(source_literals) = source.expand_enum_complement_literals(db)
         {
             return source_literals
                 .iter()
@@ -2224,17 +2222,11 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             return self.check_type_pair(db, left, right);
         }
 
-        if let Some(left_literals) = left
-            .enum_complement(db)
-            .and_then(|complement| complement.remaining_literal_types(db))
-        {
+        if let Some(left_literals) = left.expand_enum_complement_literals(db) {
             return self.check_type_pair(db, UnionType::from_elements(db, left_literals), right);
         }
 
-        if let Some(right_literals) = right
-            .enum_complement(db)
-            .and_then(|complement| complement.remaining_literal_types(db))
-        {
+        if let Some(right_literals) = right.expand_enum_complement_literals(db) {
             return self.check_type_pair(db, left, UnionType::from_elements(db, right_literals));
         }
 

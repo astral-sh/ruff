@@ -417,15 +417,7 @@ fn enum_member_pattern_name<'db>(
     enum_class: ClassLiteral<'db>,
     kind: &PatternPredicateKind<'db>,
 ) -> Option<Name> {
-    let PatternPredicateKind::Value(value) = kind else {
-        return None;
-    };
-
-    let value_ty = infer_expression_type(db, *value, TypeContext::default());
-    if !value_ty.is_single_valued(db) {
-        return None;
-    }
-
+    let value_ty = pattern_kind_to_type(db, kind);
     let enum_literal = value_ty.as_enum_literal()?;
     if enum_literal.enum_class(db) != enum_class {
         return None;

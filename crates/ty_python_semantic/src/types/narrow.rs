@@ -1096,9 +1096,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     // Skip types that are handled specially (LiteralString, bool, enum, enum
                     // complements).
                     if element.is_subtype_of(self.db, Type::literal_string())
-                        || !element
-                            .finite_single_valued_union_alternatives(self.db)
-                            .is_empty()
+                        || element.has_finite_single_valued_union_alternatives(self.db)
                     {
                         continue;
                     }
@@ -1136,9 +1134,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 for element in lhs_union.elements(self.db) {
                     if element.is_single_valued(self.db)
                         || element.is_subtype_of(self.db, Type::literal_string())
-                        || !element
-                            .finite_single_valued_union_alternatives(self.db)
-                            .is_empty()
+                        || element.has_finite_single_valued_union_alternatives(self.db)
                     {
                         single_builder = single_builder.add(*element);
                     } else {
