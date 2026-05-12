@@ -199,4 +199,23 @@ help: Inline function call
 81 |
    - _ = lambda y: already_defined(y) # [unnecessary-lambda]
 82 + _ = already_defined # [unnecessary-lambda]
+83 |
+84 |
+85 | # https://github.com/astral-sh/ruff/pull/25074#pullrequestreview-4272365684
+note: This is an unsafe fix and may change runtime behavior
+
+PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
+  --> unnecessary_lambda.py:98:12
+   |
+96 | # which point the binding has resolved — still safe to inline.
+97 | def lazy_self():
+98 |     return lambda y: lazy_self(y) # [unnecessary-lambda]
+   |            ^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Inline function call
+95 | # Lazy self ref: lambda only evaluates when `lazy_self` is called, by
+96 | # which point the binding has resolved — still safe to inline.
+97 | def lazy_self():
+   -     return lambda y: lazy_self(y) # [unnecessary-lambda]
+98 +     return lazy_self # [unnecessary-lambda]
 note: This is an unsafe fix and may change runtime behavior

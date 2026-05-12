@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, ExprLambda, Parameter, ParameterWithDefault, visitor};
+use ruff_python_semantic::BindingKind;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -217,14 +218,23 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
             if checker.semantic().is_current_scope(binding.scope) {
                 return;
             }
-            // Forward reference: the lambda body's late binding succeeds at
-            // call time, but inlining would raise `NameError` when the
-            // enclosing expression is evaluated. The binding must start
-            // after the lambda's entire range — bindings nested inside the
-            // call target (e.g. parameters of a lambda passed as an arg)
-            // are part of the replacement expression, not free variables.
+            // Forward ref: binding's name appears after the lambda.
             if binding.range.start() >= lambda.range.end() {
                 return;
+            }
+            // Self ref: lambda evaluates as part of the binding's own
+            // statement (assignment RHS, def default arg).
+            if matches!(
+                binding.kind,
+                BindingKind::Assignment
+                    | BindingKind::FunctionDefinition(_)
+                    | BindingKind::ClassDefinition(_)
+            ) {
+                if let Some(stmt) = binding.statement(checker.semantic()) {
+                    if stmt.range() == checker.semantic().current_statement().range() {
+                        return;
+                    }
+                }
             }
         }
     }

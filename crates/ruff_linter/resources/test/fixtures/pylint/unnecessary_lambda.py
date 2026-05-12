@@ -80,3 +80,19 @@ def already_defined(y):
 
 
 _ = lambda y: already_defined(y) # [unnecessary-lambda]
+
+
+# https://github.com/astral-sh/ruff/pull/25074#pullrequestreview-4272365684
+# Self ref via assignment RHS: `g` isn't bound when the lambda evaluates.
+g = lambda y: g(y)
+
+
+# Self ref via def default arg: same shape, in a parameter default.
+def later(x=lambda y: later(y)):
+    return x
+
+
+# Lazy self ref: lambda only evaluates when `lazy_self` is called, by
+# which point the binding has resolved — still safe to inline.
+def lazy_self():
+    return lambda y: lazy_self(y) # [unnecessary-lambda]
