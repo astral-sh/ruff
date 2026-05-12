@@ -1,6 +1,7 @@
 //! Instance types: both nominal and structural.
 
 use std::borrow::Cow;
+use std::cell::Cell;
 use std::marker::PhantomData;
 
 use ruff_python_ast::PythonVersion;
@@ -26,6 +27,7 @@ use crate::types::relation::{
 };
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
     FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
@@ -667,6 +669,45 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
     }
 }
 
+fn interface_references_protocol<'db>(
+    db: &'db dyn Db,
+    interface: ProtocolInterface<'db>,
+    protocol: ProtocolInstanceType<'db>,
+) -> bool {
+    struct ProtocolReferenceFinder<'db> {
+        protocol: ProtocolInstanceType<'db>,
+        found: Cell<bool>,
+        recursion_guard: TypeCollector<'db>,
+    }
+
+    impl<'db> TypeVisitor<'db> for ProtocolReferenceFinder<'db> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            false
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            if self.found.get() {
+                return;
+            }
+
+            if ty == Type::ProtocolInstance(self.protocol) {
+                self.found.set(true);
+                return;
+            }
+
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+    }
+
+    let visitor = ProtocolReferenceFinder {
+        protocol,
+        found: Cell::new(false),
+        recursion_guard: TypeCollector::default(),
+    };
+    walk_protocol_interface(db, interface, &visitor);
+    visitor.found.get()
+}
+
 impl<'db> ProtocolInstanceType<'db> {
     // Keep this method private, so that the only way of constructing `ProtocolInstanceType`
     // instances is through the `Type::instance` constructor function.
@@ -806,7 +847,16 @@ impl<'db> ProtocolInstanceType<'db> {
 
                 let mapped_class = class.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
 
-                if mapped_interface == interface {
+                // During plain materialization, recursive self references can be preserved as the
+                // original class-backed protocol when cycle detection short-circuits nested
+                // materialization. Turning that shape into a synthesized protocol would create a
+                // fresh wrapper layer every time it is materialized again, so keep the stable
+                // class-backed representation instead.
+                // TODO: Remove this once https://github.com/astral-sh/ruff/pull/24981 merges.
+                if mapped_interface == interface
+                    || matches!(type_mapping, TypeMapping::Materialize(_))
+                        && interface_references_protocol(db, mapped_interface, self)
+                {
                     Self::from_class(mapped_class)
                 } else {
                     Self::synthesized(SynthesizedProtocolType::new(
