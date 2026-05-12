@@ -1619,6 +1619,45 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// If this type transparently resolves to a finite literal domain, return that canonical
+    /// domain. Otherwise, preserve the original type.
+    pub(crate) fn canonicalize_literal_domain(self, db: &'db dyn Db) -> Type<'db> {
+        fn expand_literal_domain_aliases<'db>(
+            ty: Type<'db>,
+            db: &'db dyn Db,
+            seen_aliases: &mut Vec<Type<'db>>,
+        ) -> Type<'db> {
+            match ty {
+                Type::TypeAlias(alias) => {
+                    if seen_aliases.contains(&ty) {
+                        return ty;
+                    }
+
+                    seen_aliases.push(ty);
+                    let value_ty =
+                        expand_literal_domain_aliases(alias.value_type(db), db, seen_aliases);
+                    seen_aliases.pop();
+                    value_ty
+                }
+                Type::Union(union) => UnionType::from_elements_leave_aliases(
+                    db,
+                    union
+                        .elements(db)
+                        .iter()
+                        .map(|element| expand_literal_domain_aliases(*element, db, seen_aliases)),
+                ),
+                _ => ty,
+            }
+        }
+
+        let expanded = expand_literal_domain_aliases(self, db, &mut vec![]);
+        if expanded.is_literal_or_union_of_literals(db) {
+            expanded
+        } else {
+            self
+        }
+    }
+
     pub(crate) fn is_union_of_single_valued(&self, db: &'db dyn Db) -> bool {
         let ty = self.resolve_type_alias(db);
         ty.as_union().is_some_and(|union| {

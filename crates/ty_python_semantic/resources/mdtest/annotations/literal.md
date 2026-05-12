@@ -84,7 +84,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Literal
+from typing import Literal, Optional, Union
 from enum import Enum
 
 import mod
@@ -136,6 +136,56 @@ def _(
     reveal_type(bool2)  # revealed: bool
     reveal_type(multiple)  # revealed: Literal[1, "foo", E.A]
     reveal_type(single_int_other_module)  # revealed: Literal[2]
+
+class StoreSentinel(Enum):
+    AnyNode = "AnyNode"
+    AnyEdge = "AnyEdge"
+
+type AnyNodeT = Literal[StoreSentinel.AnyNode]
+type AnyEdgeT = Literal[StoreSentinel.AnyEdge]
+type Identity[T] = T
+type SelectorWrapper[T] = T | AnyEdgeT
+type StoreSelector = AnyNodeT | AnyEdgeT
+type StoreSelectorUnion = Union[AnyNodeT, AnyEdgeT]
+type OptionalStoreSelectorUnion = Optional[StoreSelectorUnion]
+type StoreSelectorGeneric = Identity[AnyNodeT] | AnyEdgeT
+type StoreSelectorGenericWrapper = SelectorWrapper[AnyNodeT]
+type StoreSelectorAlias = StoreSelector
+
+class FeatureKey:
+    entity_t: StoreSelector
+
+def needs_selector(selector: StoreSelector) -> None:
+    pass
+
+def accepts_optional_selector(selector: StoreSelector | None) -> None:
+    pass
+
+def check_enum_instance(selector: StoreSentinel):
+    x: AnyNodeT | AnyEdgeT = selector
+    y: StoreSelector = selector
+    z: StoreSelectorUnion = selector
+    optional: OptionalStoreSelectorUnion = selector
+    generic: StoreSelectorGeneric = selector
+    wrapper: StoreSelectorGenericWrapper = selector
+
+def check_feature_key(key: FeatureKey):
+    needs_selector(key.entity_t)
+    accepts_optional_selector(key.entity_t)
+
+def check_annotated_empty_containers():
+    selectors: list[StoreSelector] = []
+    selector_map: dict[StoreSelector, bool] = {}
+
+    selectors.append(StoreSentinel.AnyNode)
+    selector_map[StoreSentinel.AnyEdge] = True
+
+def check_literal_alias_chain(
+    store_selector: Literal[StoreSelectorAlias],
+    generic_wrapper: Literal[StoreSelectorGenericWrapper],
+):
+    reveal_type(store_selector)  # revealed: StoreSentinel
+    reveal_type(generic_wrapper)  # revealed: StoreSentinel
 ```
 
 `mod.py`:

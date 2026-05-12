@@ -347,6 +347,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         }
 
                         UnionType::from_elements_leave_aliases(self.db(), [left_ty, right_ty])
+                            .canonicalize_literal_domain(self.db())
                     }
                     // anything else is an invalid annotation:
                     op => {
@@ -1503,6 +1504,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     self.typevar_binding_context,
                                     self.inference_flags(),
                                 )
+                                .map(|ty| ty.canonicalize_literal_domain(self.db()))
                                 .unwrap_or(Type::unknown())
                         }
                         None => {
@@ -1899,6 +1901,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             SpecialFormType::Optional => {
                 let param_type = self.infer_type_expression(arguments_slice);
                 UnionType::from_elements_leave_aliases(db, [param_type, Type::none(db)])
+                    .canonicalize_literal_domain(db)
             }
             SpecialFormType::Union => match arguments_slice {
                 ast::Expr::Tuple(t) => {
@@ -1906,6 +1909,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         db,
                         t.iter().map(|elt| self.infer_type_expression(elt)),
                     );
+                    let union_ty = union_ty.canonicalize_literal_domain(db);
                     self.store_expression_type(arguments_slice, union_ty);
                     union_ty
                 }
@@ -2494,7 +2498,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 match subscript_ty {
                     // type aliases to literal types
                     Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => {
-                        let value_ty = type_alias.value_type(self.db());
+                        let value_ty = type_alias
+                            .value_type(self.db())
+                            .canonicalize_literal_domain(self.db());
                         if value_ty.is_literal_or_union_of_literals(self.db()) {
                             return Ok(value_ty);
                         }
