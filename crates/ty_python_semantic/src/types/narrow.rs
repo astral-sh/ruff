@@ -540,15 +540,13 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
         return true;
     }
 
-    let left_alternatives = left_ty.finite_single_valued_union_alternatives(db);
-    if !left_alternatives.is_empty() {
+    if let Some(left_alternatives) = left_ty.finite_single_valued_union_alternatives(db) {
         return left_alternatives
             .into_iter()
             .any(|ty| could_compare_equal(db, ty, right_ty));
     }
 
-    let right_alternatives = right_ty.finite_single_valued_union_alternatives(db);
-    if !right_alternatives.is_empty() {
+    if let Some(right_alternatives) = right_ty.finite_single_valued_union_alternatives(db) {
         return right_alternatives
             .into_iter()
             .any(|ty| could_compare_equal(db, left_ty, ty));
@@ -976,8 +974,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         .all(|ty| can_narrow_to_rhs(db, *ty, rhs_ty));
                 }
 
-                let alternatives = lhs_ty.finite_single_valued_union_alternatives(db);
-                if !alternatives.is_empty() {
+                if let Some(alternatives) = lhs_ty.finite_single_valued_union_alternatives(db) {
                     return alternatives
                         .into_iter()
                         .all(|ty| can_narrow_to_rhs(db, ty, rhs_ty));
@@ -1003,8 +1000,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     return union.map(db, |ty| filter_to_cannot_be_equal(db, *ty, rhs_ty));
                 }
 
-                let alternatives = ty.finite_single_valued_union_alternatives(db);
-                if !alternatives.is_empty() {
+                if let Some(alternatives) = ty.finite_single_valued_union_alternatives(db) {
                     return UnionType::from_elements(
                         db,
                         alternatives

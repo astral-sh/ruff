@@ -881,23 +881,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             })
     }
 
-    fn check_finite_intersection_source_pair(
-        &self,
-        db: &'db dyn Db,
-        source: IntersectionType<'db>,
-        target: Type<'db>,
-    ) -> Option<ConstraintSet<'db, 'c>> {
-        let alternatives = source.finite_alternatives(db)?;
-        Some(
-            alternatives
-                .iter()
-                .copied()
-                .when_all(db, self.constraints, |literal| {
-                    self.check_type_pair(db, literal, target)
-                }),
-        )
-    }
-
     /// Return a constraint set indicating the conditions under which `self.relation` holds between `source` and `target`.
     pub(super) fn check_type_pair(
         &self,
@@ -1296,10 +1279,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (_, Type::Union(union)) => {
                 if let Type::Intersection(intersection) = source
-                    && let Some(result) =
-                        self.check_finite_intersection_source_pair(db, intersection, target)
+                    && let Some(alternatives) = intersection.finite_alternative_union(db)
                 {
-                    return result;
+                    return self.check_type_pair(db, alternatives, target);
                 }
 
                 let is_new_type_of_union = || {
@@ -1432,10 +1414,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (Type::Intersection(intersection), _) => {
                 if matches!(target, Type::LiteralValue(_))
-                    && let Some(result) =
-                        self.check_finite_intersection_source_pair(db, intersection, target)
+                    && let Some(alternatives) = intersection.finite_alternative_union(db)
                 {
-                    return result;
+                    return self.check_type_pair(db, alternatives, target);
                 }
 
                 // An intersection type is a subtype of another type if at least one of its

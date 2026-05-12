@@ -1642,7 +1642,7 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .all(|ty| ty.is_single_valued_union_component(db))
-        }) || ty.is_multi_valued_single_valued_union_component(db)
+        }) || ty.is_single_valued_union_component(db)
     }
 
     pub(crate) fn is_union_with_single_valued(&self, db: &'db dyn Db) -> bool {
@@ -1652,7 +1652,7 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|ty| ty.is_single_valued_union_component(db))
-        }) || ty.is_multi_valued_single_valued_union_component(db)
+        }) || ty.is_single_valued_union_component(db)
     }
 
     /// Return `true` if this type can participate in single-valued-union narrowing.
@@ -1675,7 +1675,10 @@ impl<'db> Type<'db> {
     ///         reveal_type(color)  # Literal[Color.BLUE]
     /// ```
     fn is_single_valued_union_component(&self, db: &'db dyn Db) -> bool {
-        self.is_single_valued(db) || self.is_multi_valued_single_valued_union_component(db)
+        let ty = self.resolve_type_alias(db);
+        ty.is_single_valued(db)
+            || ty.has_finite_single_valued_union_alternatives(db)
+            || ty.is_subtype_of(db, Type::literal_string())
     }
 
     /// Split a finite domain into the single-valued alternatives used by equality and membership
@@ -1684,29 +1687,33 @@ impl<'db> Type<'db> {
     /// This covers finite multi-valued types that `Type::is_single_valued_union_component` treats
     /// as splittable, such as `bool`, enums, and compact enum complements. `LiteralString` is
     /// intentionally excluded because it is not finite.
-    pub(crate) fn finite_single_valued_union_alternatives(self, db: &'db dyn Db) -> Vec<Type<'db>> {
+    pub(crate) fn finite_single_valued_union_alternatives(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<Vec<Type<'db>>> {
         let ty = self.resolve_type_alias(db);
-
-        if !ty.has_finite_single_valued_union_alternatives(db) {
-            return Vec::new();
-        }
 
         match ty {
             Type::Intersection(intersection) => {
-                intersection.finite_alternatives(db).unwrap_or_default()
+                let complement = intersection.enum_complement(db)?;
+                complement
+                    .has_finite_single_valued_alternatives(db)
+                    .then(|| complement.remaining_literal_types(db))
             }
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Bool) => {
-                vec![Type::bool_literal(true), Type::bool_literal(false)]
+                Some(vec![Type::bool_literal(true), Type::bool_literal(false)])
             }
             Type::NominalInstance(instance)
                 if enum_metadata(db, instance.class_literal(db)).is_some()
                     && !ty.overrides_equality(db) =>
             {
-                enum_member_literals(db, instance.class_literal(db), None)
-                    .expect("Calling `enum_member_literals` on an enum class")
-                    .collect()
+                Some(
+                    enum_member_literals(db, instance.class_literal(db), None)
+                        .expect("Calling `enum_member_literals` on an enum class")
+                        .collect(),
+                )
             }
-            _ => Vec::new(),
+            _ => None,
         }
     }
 
@@ -1718,16 +1725,9 @@ impl<'db> Type<'db> {
         let ty = self.resolve_type_alias(db);
 
         match ty {
-            Type::Intersection(intersection) => {
-                intersection.enum_complement(db).is_some_and(|complement| {
-                    complement.rest(db).is_empty()
-                        && complement.has_remaining_members(db)
-                        && !complement
-                            .enum_class(db)
-                            .to_non_generic_instance(db)
-                            .overrides_equality(db)
-                })
-            }
+            Type::Intersection(intersection) => intersection
+                .enum_complement(db)
+                .is_some_and(|complement| complement.has_finite_single_valued_alternatives(db)),
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Bool) => {
                 true
             }
@@ -1740,29 +1740,6 @@ impl<'db> Type<'db> {
             }
             _ => false,
         }
-    }
-
-    /// Return `true` for multi-valued domains that can be handled by single-valued narrowing.
-    ///
-    /// This covers types that are not themselves single-valued, but can be safely handled by the
-    /// equality and membership narrowing logic that works over single-valued alternatives, such as
-    /// `bool`, `LiteralString`, enums that do not override equality, and enum complements.
-    ///
-    /// ```python
-    /// from enum import Enum
-    ///
-    /// class Color(Enum):
-    ///     RED = 1
-    ///     BLUE = 2
-    ///
-    /// def f(color: Color | int):
-    ///     if color is not Color.RED:
-    ///         reveal_type(color)  # int | Literal[Color.BLUE]
-    /// ```
-    fn is_multi_valued_single_valued_union_component(&self, db: &'db dyn Db) -> bool {
-        let ty = self.resolve_type_alias(db);
-        ty.has_finite_single_valued_union_alternatives(db)
-            || ty.is_subtype_of(db, Type::literal_string())
     }
 
     /// Create a promotable string literal.
@@ -2390,11 +2367,9 @@ impl<'db> Type<'db> {
                 // our model due to [`UnionBuilder::build`].
                 false
             }
-            Type::Intersection(intersection) => {
-                intersection.enum_complement(db).is_some_and(|complement| {
-                    complement.rest(db).is_empty() && complement.has_single_remaining_member(db)
-                })
-            }
+            Type::Intersection(intersection) => intersection
+                .enum_complement(db)
+                .is_some_and(|complement| complement.is_singleton(db)),
             Type::AlwaysTruthy | Type::AlwaysFalsy => false,
             Type::TypeIs(type_is) => type_is.is_bound(db),
             Type::TypeGuard(type_guard) => type_guard.is_bound(db),
@@ -2487,16 +2462,9 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_) => false,
 
-            Type::Intersection(intersection) => {
-                intersection.enum_complement(db).is_some_and(|complement| {
-                    complement.rest(db).is_empty()
-                        && complement.has_single_remaining_member(db)
-                        && !complement
-                            .enum_class(db)
-                            .to_non_generic_instance(db)
-                            .overrides_equality(db)
-                })
-            }
+            Type::Intersection(intersection) => intersection
+                .enum_complement(db)
+                .is_some_and(|complement| complement.is_single_valued(db)),
         }
     }
 

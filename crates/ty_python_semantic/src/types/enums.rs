@@ -300,13 +300,16 @@ impl<'db> EnumComplement<'db> {
         self.excluded_names(db).contains(name)
     }
 
-    /// Count the canonical enum members still represented by this complement.
-    fn remaining_member_count(self, db: &'db dyn Db) -> usize {
+    fn remaining_member_names(self, db: &'db dyn Db) -> impl Iterator<Item = &'db Name> {
         self.metadata(db)
             .members
             .keys()
-            .filter(|name| !self.excluded_names(db).contains(*name))
-            .count()
+            .filter(move |name| !self.excluded_names(db).contains(*name))
+    }
+
+    /// Count the canonical enum members still represented by this complement.
+    fn remaining_member_count(self, db: &'db dyn Db) -> usize {
+        self.metadata(db).members.len() - self.excluded_names(db).len()
     }
 
     /// Return `true` if this complement still represents at least one enum member.
@@ -314,9 +317,25 @@ impl<'db> EnumComplement<'db> {
         self.remaining_member_count(db) > 0
     }
 
-    /// Return `true` if this complement represents exactly one remaining enum member.
-    pub(crate) fn has_single_remaining_member(self, db: &'db dyn Db) -> bool {
-        self.remaining_member_count(db) == 1
+    pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
+        self.rest(db).is_empty() && self.remaining_member_count(db) == 1
+    }
+
+    pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
+        self.is_singleton(db)
+            && !self
+                .enum_class(db)
+                .to_non_generic_instance(db)
+                .overrides_equality(db)
+    }
+
+    pub(crate) fn has_finite_single_valued_alternatives(self, db: &'db dyn Db) -> bool {
+        self.rest(db).is_empty()
+            && self.has_remaining_members(db)
+            && !self
+                .enum_class(db)
+                .to_non_generic_instance(db)
+                .overrides_equality(db)
     }
 
     /// Expand this complement to the enum literals that remain possible.
@@ -333,10 +352,7 @@ impl<'db> EnumComplement<'db> {
     ///         reveal_type(color)  # Literal[Color.BLUE]
     /// ```
     pub(crate) fn remaining_literal_types(self, db: &'db dyn Db) -> Vec<Type<'db>> {
-        self.metadata(db)
-            .members
-            .keys()
-            .filter(|name| !self.excluded_names(db).contains(*name))
+        self.remaining_member_names(db)
             .map(|name| self.remaining_literal_type(db, name.clone()))
             .collect()
     }
@@ -410,12 +426,7 @@ impl<'db> EnumComplement<'db> {
         let mut builder = UnionBuilder::new(db);
         let mut found_member = false;
 
-        for name in self
-            .metadata(db)
-            .members
-            .keys()
-            .filter(|name| !self.excluded_names(db).contains(*name))
-        {
+        for name in self.remaining_member_names(db) {
             let member_ty = (match member_name {
                 "name" if is_enum_subclass => self.metadata(db).name_type(db, name),
                 "_name_" => self.metadata(db).name_type(db, name),
