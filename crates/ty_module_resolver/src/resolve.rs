@@ -1555,6 +1555,16 @@ impl SetuptoolsEditableFinder {
                 return ResolveNameResult::Missing;
             }
 
+            if let Some(parent_namespace) = self.longest_strict_namespace_prefix(module_name) {
+                match self.resolve_in_namespace(context, parent_namespace, module_name) {
+                    found @ ResolveNameResult::Found(_) => return found,
+                    ResolveNameResult::BlockedByTerminalModule => {
+                        return ResolveNameResult::BlockedByTerminalModule;
+                    }
+                    ResolveNameResult::Missing => {}
+                }
+            }
+
             if let Some(candidate) = namespace_package_candidate(context, &self.site_packages) {
                 return ResolveNameResult::Found(vec![candidate]);
             }
@@ -1706,6 +1716,18 @@ impl SetuptoolsEditableFinder {
         self.namespaces
             .iter()
             .filter(|namespace| module_name.starts_with(&namespace.module))
+            .max_by_key(|namespace| namespace.module.components().count())
+    }
+
+    fn longest_strict_namespace_prefix(
+        &self,
+        module_name: &ModuleName,
+    ) -> Option<&SetuptoolsEditableNamespace> {
+        self.namespaces
+            .iter()
+            .filter(|namespace| {
+                &namespace.module != module_name && module_name.starts_with(&namespace.module)
+            })
             .max_by_key(|namespace| namespace.module.components().count())
     }
 
@@ -4602,6 +4624,45 @@ NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/b/ns"]}
         assert_eq!(
             child_module.file(&db).unwrap().path(&db),
             &FilePath::system("/workspace/b/ns/child/__init__.py")
+        );
+    }
+
+    #[test]
+    fn setuptools_editable_install_parent_namespace_path_precedes_nested_placeholder() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.ns.pth",
+                "import __editable___ns_finder; __editable___ns_finder.install()",
+            ),
+            (
+                "__editable___ns_finder.py",
+                r#"
+MAPPING: dict[str, str] = {}
+NAMESPACES: dict[str, list[str]] = {
+    "ns": ["/workspace/ns"],
+    "ns.child": ["/workspace/detached_child"],
+}
+"#,
+            ),
+        ];
+
+        let external_files = [
+            ("/workspace/ns/child/__init__.py", ""),
+            ("/workspace/detached_child/grandchild.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let child_module_name = ModuleName::new_static("ns.child").unwrap();
+        let child_module = resolve_module_confident(&db, &child_module_name).unwrap();
+
+        assert_eq!(
+            child_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/ns/child/__init__.py")
         );
     }
 
