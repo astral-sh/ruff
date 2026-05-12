@@ -1283,11 +1283,16 @@ fn resolve_name_in_setuptools_editable_mappings(
     }
 
     for finder in finders {
+        let has_exact_mapping = finder.has_exact_mapping(name);
         match finder.resolve_in_exact_mapping(&context, name) {
             found @ ResolveNameResult::Found(_) => return found,
             ResolveNameResult::BlockedByTerminalModule => {
                 return ResolveNameResult::BlockedByTerminalModule;
             }
+            // The emitted `find_spec` returns directly from its exact
+            // `fullname in MAPPING` arm, even if that mapping is now stale.
+            // Only later editable finders remain eligible after that miss.
+            ResolveNameResult::Missing if has_exact_mapping => continue,
             ResolveNameResult::Missing => {}
         }
 
@@ -1421,6 +1426,9 @@ fn resolve_name_in_setuptools_editable_namespace_placeholders_matching(
         }
 
         match finder.resolve_in_namespace_placeholders(&context, name) {
+            NamespacePlaceholderResolution::CommittedConcrete(resolved) => {
+                return ResolveNameResult::Found(resolved);
+            }
             NamespacePlaceholderResolution::Found(resolved) => {
                 if resolved
                     .iter()
@@ -1566,6 +1574,9 @@ impl SetuptoolsEditableFinder {
 
             if let Some(parent_namespace) = self.longest_strict_namespace_prefix(module_name) {
                 match self.resolve_in_namespace(context, parent_namespace, module_name) {
+                    committed @ NamespacePlaceholderResolution::CommittedConcrete(_) => {
+                        return committed;
+                    }
                     found @ NamespacePlaceholderResolution::Found(_) => return found,
                     NamespacePlaceholderResolution::ShadowedByRegularPackage => {
                         return NamespacePlaceholderResolution::ShadowedByRegularPackage;
@@ -1590,6 +1601,9 @@ impl SetuptoolsEditableFinder {
             }
 
             match self.resolve_in_namespace(context, namespace, module_name) {
+                committed @ NamespacePlaceholderResolution::CommittedConcrete(_) => {
+                    return committed;
+                }
                 NamespacePlaceholderResolution::Found(resolved) => {
                     if resolved
                         .iter()
@@ -1662,6 +1676,12 @@ impl SetuptoolsEditableFinder {
         };
 
         self.resolve_in_mapping_entry(context, module_name, mapping)
+    }
+
+    fn has_exact_mapping(&self, module_name: &ModuleName) -> bool {
+        self.mapping
+            .iter()
+            .any(|mapping| &mapping.module == module_name)
     }
 
     fn resolve_in_mapping_entry(
@@ -1785,6 +1805,7 @@ impl SetuptoolsEditableFinder {
                 .find(|mapping| mapping.module == namespace.module)
                 .map(|mapping| &mapping.path)
         });
+        let mut concrete_candidate = None;
         let mut namespace_candidates = Vec::new();
 
         for namespace_path in namespace
@@ -1801,12 +1822,16 @@ impl SetuptoolsEditableFinder {
                 candidate,
                 &components,
             ) {
+                NamespaceCandidateResolution::CommittedConcrete(resolved) => {
+                    return NamespacePlaceholderResolution::CommittedConcrete(resolved);
+                }
                 NamespaceCandidateResolution::Found(resolved) => {
                     if resolved
                         .iter()
                         .any(|candidate| !candidate.is_any_namespace_package())
                     {
-                        return NamespacePlaceholderResolution::Found(resolved);
+                        concrete_candidate.get_or_insert(resolved);
+                        continue;
                     }
                     namespace_candidates.extend(resolved);
                 }
@@ -1825,7 +1850,9 @@ impl SetuptoolsEditableFinder {
             }
         }
 
-        if namespace_candidates.is_empty() {
+        if let Some(resolved) = concrete_candidate {
+            NamespacePlaceholderResolution::Found(resolved)
+        } else if namespace_candidates.is_empty() {
             NamespacePlaceholderResolution::Missing
         } else {
             NamespacePlaceholderResolution::Found(namespace_candidates)
@@ -1936,6 +1963,7 @@ fn resolve_remaining_components_in_candidate(
 }
 
 enum NamespaceCandidateResolution {
+    CommittedConcrete(ResolvedNames),
     Found(ResolvedNames),
     Missing,
     ShadowedByRegularPackage,
@@ -1943,6 +1971,7 @@ enum NamespaceCandidateResolution {
 }
 
 enum NamespacePlaceholderResolution {
+    CommittedConcrete(ResolvedNames),
     Found(ResolvedNames),
     Missing,
     ShadowedByRegularPackage,
@@ -1954,7 +1983,10 @@ fn resolve_remaining_components_in_namespace_candidate(
     mut candidate: ModuleResolutionCandidate,
     components: &[&str],
 ) -> NamespaceCandidateResolution {
-    for component in components {
+    let commits_concrete_target = components.len() == 1;
+    let mut commits_through_regular_parent = false;
+
+    for (index, component) in components.iter().enumerate() {
         if resolve_name_in_search_path(context, &mut candidate, component).is_err() {
             return match candidate.module {
                 ResolvedModule::Module(_) => NamespaceCandidateResolution::BlockedByTerminalModule,
@@ -1966,9 +1998,24 @@ fn resolve_remaining_components_in_namespace_candidate(
                 }
             };
         }
+
+        if index + 1 < components.len()
+            && matches!(candidate.module, ResolvedModule::RegularPackage(_))
+        {
+            commits_through_regular_parent = true;
+        }
     }
 
-    NamespaceCandidateResolution::Found(vec![candidate])
+    let resolved = vec![candidate];
+    if resolved
+        .iter()
+        .any(|candidate| !candidate.is_any_namespace_package())
+        && (commits_concrete_target || commits_through_regular_parent)
+    {
+        NamespaceCandidateResolution::CommittedConcrete(resolved)
+    } else {
+        NamespaceCandidateResolution::Found(resolved)
+    }
 }
 
 fn namespace_package_candidate(
@@ -4390,6 +4437,36 @@ NAMESPACES: dict[str, list[str]] = {}
     }
 
     #[test]
+    fn setuptools_editable_install_stale_exact_mapping_skips_same_finder_parent_fallback() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.pkg.pth",
+                "import __editable___pkg_finder; __editable___pkg_finder.install()",
+            ),
+            (
+                "__editable___pkg_finder.py",
+                r#"
+MAPPING: dict[str, str] = {
+    "pkg": "/workspace/pkg",
+    "pkg.child": "/workspace/stale_child",
+}
+NAMESPACES: dict[str, list[str]] = {}
+"#,
+            ),
+            ("pkg/ordinary.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files([("/workspace/pkg/child.py", "")]).unwrap();
+
+        let child_module_name = ModuleName::new_static("pkg.child").unwrap();
+        assert_eq!(resolve_module_confident(&db, &child_module_name), None);
+    }
+
+    #[test]
     fn setuptools_editable_install_deep_exact_mapping_requires_importable_parent() {
         const SITE_PACKAGES: &[FileSpec] = &[
             (
@@ -4795,6 +4872,54 @@ NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/b/ns"]}
 
         let grand_module_name = ModuleName::new_static("ns.child.grand").unwrap();
         assert_eq!(resolve_module_confident(&db, &grand_module_name), None);
+    }
+
+    #[test]
+    fn setuptools_editable_install_namespace_concrete_parent_keeps_earlier_descendant() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.ns-a.pth",
+                "import __editable___ns_a_finder; __editable___ns_a_finder.install()",
+            ),
+            (
+                "__editable___ns_a_finder.py",
+                r#"
+MAPPING: dict[str, str] = {}
+NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/a/ns"]}
+"#,
+            ),
+            (
+                "__editable__.ns-b.pth",
+                "import __editable___ns_b_finder; __editable___ns_b_finder.install()",
+            ),
+            (
+                "__editable___ns_b_finder.py",
+                r#"
+MAPPING: dict[str, str] = {}
+NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/b/ns"]}
+"#,
+            ),
+        ];
+
+        let external_files = [
+            ("/workspace/a/ns/foo/__init__.py", ""),
+            ("/workspace/a/ns/foo/bar.py", ""),
+            ("/workspace/b/ns/foo/__init__.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let bar_module_name = ModuleName::new_static("ns.foo.bar").unwrap();
+        let bar_module = resolve_module_confident(&db, &bar_module_name).unwrap();
+
+        assert_eq!(
+            bar_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/a/ns/foo/bar.py")
+        );
     }
 
     #[test]
