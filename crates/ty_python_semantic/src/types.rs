@@ -1285,6 +1285,25 @@ impl<'db> Type<'db> {
             .and_then(|instance| instance.tuple_spec(db))
     }
 
+    /// Returns `true` if this type is a tuple instance with an available tuple specification.
+    pub fn is_tuple_instance(&self, db: &'db dyn Db) -> bool {
+        self.tuple_instance_spec(db).is_some()
+    }
+
+    /// Returns the union of all element types in this tuple instance, if available.
+    pub fn tuple_instance_homogeneous_element_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.tuple_instance_spec(db)
+            .map(|spec| spec.homogeneous_element_type(db))
+    }
+
+    /// Returns the union of the yielded element types for an iterable, if iteration can be
+    /// modeled without surfacing type-checker diagnostics.
+    pub fn iterable_homogeneous_element_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.try_iterate(db)
+            .ok()
+            .map(|spec| spec.homogeneous_element_type(db))
+    }
+
     /// If this type is an *exact* tuple type (*not* a subclass of `tuple`), returns the
     /// tuple spec.
     ///
@@ -1331,7 +1350,8 @@ impl<'db> Type<'db> {
         )
     }
 
-    pub(crate) fn has_dynamic(self, db: &'db dyn Db) -> bool {
+    /// Returns `true` if this type contains `Any`, `Unknown`, `Todo`, or another dynamic component.
+    pub fn has_dynamic(self, db: &'db dyn Db) -> bool {
         any_over_type(db, self, false, |ty| ty.is_dynamic())
     }
 

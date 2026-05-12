@@ -3,6 +3,7 @@ mod logging;
 mod printer;
 mod python_version;
 mod rule;
+mod run;
 mod version;
 
 use std::fmt::Write;
@@ -33,7 +34,7 @@ use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
 use ty_server::run_server;
 use ty_static::EnvVars;
 
-use crate::args::{CheckCommand, Command, ExplainCommand, HelpFormat, TerminalColor};
+use crate::args::{CheckCommand, Command, ExplainCommand, HelpFormat, RunCommand, TerminalColor};
 use crate::logging::{VerbosityLevel, setup_tracing};
 use crate::printer::Printer;
 pub use args::Cli;
@@ -50,6 +51,7 @@ pub fn run() -> anyhow::Result<ExitStatus> {
     match args.command {
         Command::Server => run_server().map(|()| ExitStatus::Success),
         Command::Check(check_args) => run_check(check_args),
+        Command::Run(run_args) => run_backend(run_args),
         Command::Version { output_format } => version(output_format).map(|()| ExitStatus::Success),
         Command::GenerateShellCompletion { shell } => {
             use std::io::stdout;
@@ -71,6 +73,11 @@ pub fn run() -> anyhow::Result<ExitStatus> {
             }
         },
     }
+}
+
+fn run_backend(args: RunCommand) -> anyhow::Result<ExitStatus> {
+    run::run_file(args)?;
+    Ok(ExitStatus::Success)
 }
 
 pub(crate) fn version(output_format: HelpFormat) -> Result<()> {

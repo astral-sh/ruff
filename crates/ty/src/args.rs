@@ -33,6 +33,9 @@ pub(crate) enum Command {
     /// Check a project for type errors.
     Check(CheckCommand),
 
+    /// Compile and run a typed Python subset through a WebAssembly backend.
+    Run(RunCommand),
+
     /// Start the language server
     Server,
 
@@ -56,6 +59,29 @@ pub(crate) enum Command {
         #[command(subcommand)]
         command: ExplainCommand,
     },
+}
+
+#[derive(Debug, Parser)]
+pub(crate) struct RunCommand {
+    /// Python file to compile and execute.
+    #[clap(value_name = "PATH")]
+    pub(crate) path: SystemPathBuf,
+
+    /// Write the generated WebAssembly module to this path.
+    #[arg(long, value_name = "PATH")]
+    pub(crate) emit_wasm: Option<SystemPathBuf>,
+
+    /// Write browser-ready artifacts (`index.html`, `runtime.js`, `program.wasm`) to this directory.
+    #[arg(long, value_name = "DIRECTORY")]
+    pub(crate) emit_web: Option<SystemPathBuf>,
+
+    /// Print the generated WebAssembly module as readable WAT.
+    #[arg(long)]
+    pub(crate) print_wasm: bool,
+
+    /// Compile and emit requested artifacts without running the module locally.
+    #[arg(long)]
+    pub(crate) no_execute: bool,
 }
 
 #[derive(Debug, Parser)]

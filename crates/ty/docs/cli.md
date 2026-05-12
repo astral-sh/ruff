@@ -15,6 +15,7 @@ ty <COMMAND>
 <h3 class="cli-reference">Commands</h3>
 
 <dl class="cli-reference"><dt><a href="#ty-check"><code>ty check</code></a></dt><dd><p>Check a project for type errors</p></dd>
+<dt><a href="#ty-run"><code>ty run</code></a></dt><dd><p>Compile and run a typed Python subset through a WebAssembly backend</p></dd>
 <dt><a href="#ty-server"><code>ty server</code></a></dt><dd><p>Start the language server</p></dd>
 <dt><a href="#ty-version"><code>ty version</code></a></dt><dd><p>Display ty's version</p></dd>
 <dt><a href="#ty-explain"><code>ty explain</code></a></dt><dd><p>Explain rules and other parts of ty</p></dd>
@@ -105,6 +106,30 @@ over all configuration files.</p>
 </dd><dt id="ty-check--verbose"><a href="#ty-check--verbose"><code>--verbose</code></a>, <code>-v</code></dt><dd><p>Use verbose output (or <code>-vv</code> and <code>-vvv</code> for more verbose output)</p>
 </dd><dt id="ty-check--warn"><a href="#ty-check--warn"><code>--warn</code></a> <i>rule</i></dt><dd><p>Treat the given rule as having severity 'warn'. Can be specified multiple times. Use 'all' to apply to all rules.</p>
 </dd><dt id="ty-check--watch"><a href="#ty-check--watch"><code>--watch</code></a>, <code>-W</code></dt><dd><p>Watch files for changes and recheck files related to the changed files</p>
+</dd></dl>
+
+## ty run
+
+Compile and run a typed Python subset through a WebAssembly backend
+
+<h3 class="cli-reference">Usage</h3>
+
+```
+ty run [OPTIONS] <PATH>
+```
+
+<h3 class="cli-reference">Arguments</h3>
+
+<dl class="cli-reference"><dt id="ty-run--path"><a href="#ty-run--path"><code>PATH</code></a></dt><dd><p>Python file to compile and execute</p>
+</dd></dl>
+
+<h3 class="cli-reference">Options</h3>
+
+<dl class="cli-reference"><dt id="ty-run--emit-wasm"><a href="#ty-run--emit-wasm"><code>--emit-wasm</code></a> <i>path</i></dt><dd><p>Write the generated WebAssembly module to this path</p>
+</dd><dt id="ty-run--emit-web"><a href="#ty-run--emit-web"><code>--emit-web</code></a> <i>directory</i></dt><dd><p>Write browser-ready artifacts (<code>index.html</code>, <code>runtime.js</code>, <code>program.wasm</code>) to this directory</p>
+</dd><dt id="ty-run--help"><a href="#ty-run--help"><code>--help</code></a>, <code>-h</code></dt><dd><p>Print help</p>
+</dd><dt id="ty-run--no-execute"><a href="#ty-run--no-execute"><code>--no-execute</code></a></dt><dd><p>Compile and emit requested artifacts without running the module locally</p>
+</dd><dt id="ty-run--print-wasm"><a href="#ty-run--print-wasm"><code>--print-wasm</code></a></dt><dd><p>Print the generated WebAssembly module as readable WAT</p>
 </dd></dl>
 
 ## ty server

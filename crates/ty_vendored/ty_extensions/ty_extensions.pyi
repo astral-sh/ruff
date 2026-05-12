@@ -9,6 +9,11 @@ from typing_extensions import LiteralString, Self  # noqa: UP035
 
 # Special operations
 def static_assert(condition: object, msg: LiteralString | None = None) -> None: ...
+def read_text(path: str, /) -> str:
+    """Read a UTF-8 text file when executing a `ty run` program locally."""
+
+def write_text(path: str, contents: str, /) -> None:
+    """Write a UTF-8 text file when executing a `ty run` program locally."""
 
 # Types
 Unknown: _SpecialForm
