@@ -3476,7 +3476,7 @@ impl<'db> Type<'db> {
                 inner: Protocol::Synthesized(protocol),
                 ..
             }) if policy.mro_no_object_fallback()
-                && !protocol.interface().includes_member(db, name_str) =>
+                && !protocol.interface(db).includes_member(db, name_str) =>
             {
                 Place::Undefined.into()
             }
@@ -5598,13 +5598,12 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance) => {
                 instance.class(db).iter_mro(db).find_map(from_class_base)
             }
-            Type::ProtocolInstance(instance) => {
-                if let Protocol::FromClass(class) = instance.inner {
-                    class.iter_mro(db).find_map(from_class_base)
-                } else {
-                    None
-                }
-            }
+            Type::ProtocolInstance(instance) => match instance.inner {
+                Protocol::FromClass(class) => class.iter_mro(db).find_map(from_class_base),
+                Protocol::Synthesized(synthesized) => synthesized
+                    .origin(db)
+                    .and_then(|origin| origin.iter_mro(db).find_map(from_class_base)),
+            },
             Type::Union(union) => {
                 let mut yield_builder = Some(UnionBuilder::new(db));
                 let mut send_builder = Some(UnionBuilder::new(db));
