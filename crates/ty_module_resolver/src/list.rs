@@ -70,6 +70,7 @@ pub fn list_modules(db: &dyn Db) -> Vec<Module<'_>> {
         .collect()
 }
 
+/// Insert a normally discovered module while preserving import-resolution precedence.
 fn insert_listed_module<'db>(
     db: &'db dyn Db,
     modules: &mut BTreeMap<&'db ModuleName, ListedModule<'db>>,
@@ -102,6 +103,7 @@ fn insert_listed_module<'db>(
     }
 }
 
+/// Insert a finder-backed top-level module only when ordinary listing has not claimed the name.
 fn insert_finder_listed_module<'db>(
     db: &'db dyn Db,
     modules: &mut BTreeMap<&'db ModuleName, ListedModule<'db>>,
@@ -457,7 +459,7 @@ mod tests {
     use crate::db::{Db, tests::TestDb};
     use crate::module::Module;
     use crate::resolve::{
-        ModuleResolveMode, ModuleResolveModeIngredient, dynamic_resolution_paths,
+        ModuleResolveMode, ModuleResolveModeIngredient, dynamic_resolution_path_data,
     };
     use crate::settings::SearchPathSettings;
     use crate::strategy::FallibleStrategy;
@@ -1675,7 +1677,7 @@ not_a_directory
         let events = db.take_salsa_events();
         assert_function_query_was_not_run(
             &db,
-            dynamic_resolution_paths,
+            dynamic_resolution_path_data,
             ModuleResolveModeIngredient::new(&db, ModuleResolveMode::StubsAllowed),
             &events,
         );

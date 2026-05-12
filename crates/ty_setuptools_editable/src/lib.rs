@@ -10,20 +10,17 @@ use ruff_python_parser::parse_module;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Finder {
-    site_packages: SystemPathBuf,
     mapping: Vec<Mapping>,
     namespaces: Vec<Namespace>,
 }
 
 impl Finder {
-    pub fn site_packages(&self) -> &SystemPath {
-        &self.site_packages
-    }
-
+    /// Return the literal `MAPPING` entries parsed from the generated finder module.
     pub fn mapping(&self) -> &[Mapping] {
         &self.mapping
     }
 
+    /// Return the literal `NAMESPACES` entries parsed from the generated finder module.
     pub fn namespaces(&self) -> &[Namespace] {
         &self.namespaces
     }
@@ -36,10 +33,12 @@ pub struct Mapping {
 }
 
 impl Mapping {
+    /// Return the fully-qualified module name used as a `MAPPING` key.
     pub fn module(&self) -> &str {
         &self.module
     }
 
+    /// Return the filesystem path that setuptools associates with this mapping.
     pub fn path(&self) -> &SystemPath {
         &self.path
     }
@@ -52,10 +51,12 @@ pub struct Namespace {
 }
 
 impl Namespace {
+    /// Return the fully-qualified namespace package name.
     pub fn module(&self) -> &str {
         &self.module
     }
 
+    /// Return the namespace search locations emitted by setuptools.
     pub fn paths(&self) -> &[SystemPathBuf] {
         &self.paths
     }
@@ -88,11 +89,17 @@ pub fn finder_module_from_pth_line(line: &str) -> Option<&str> {
 }
 
 /// Parse a setuptools v70.0.0+ generated finder module without executing it.
-pub fn parse_finder(
-    system: &dyn System,
-    site_packages: &SystemPath,
-    finder_path: &SystemPath,
-) -> Option<Finder> {
+///
+/// Current setuptools finder modules contain literal assignments shaped like:
+///
+/// ```python
+/// MAPPING: dict[str, str] = {"pkg": "/workspace/pkg"}
+/// NAMESPACES: dict[str, list[str]] = {"acme": ["/workspace/acme"]}
+/// ```
+///
+/// We only accept that static data shape. Arbitrary Python in the finder module is ignored rather
+/// than evaluated.
+pub fn parse_finder(system: &dyn System, finder_path: &SystemPath) -> Option<Finder> {
     let contents = match system.read_to_string(finder_path) {
         Ok(contents) => contents,
         Err(error) => {
@@ -133,12 +140,18 @@ pub fn parse_finder(
     }
 
     Some(Finder {
-        site_packages: site_packages.to_path_buf(),
         mapping: mapping?,
         namespaces: namespaces?,
     })
 }
 
+/// Parse a literal setuptools `MAPPING` dictionary.
+///
+/// The accepted Python shape is:
+///
+/// ```python
+/// MAPPING: dict[str, str] = {"pkg": "/workspace/pkg"}
+/// ```
 fn parse_mapping(value: &ast::Expr, system: &dyn System) -> Option<Vec<Mapping>> {
     let ast::Expr::Dict(ast::ExprDict { items, .. }) = value else {
         return None;
@@ -162,6 +175,13 @@ fn parse_mapping(value: &ast::Expr, system: &dyn System) -> Option<Vec<Mapping>>
         .collect()
 }
 
+/// Parse a literal setuptools `NAMESPACES` dictionary.
+///
+/// The accepted Python shape is:
+///
+/// ```python
+/// NAMESPACES: dict[str, list[str]] = {"acme": ["/workspace/acme"]}
+/// ```
 fn parse_namespaces(value: &ast::Expr, system: &dyn System) -> Option<Vec<Namespace>> {
     let ast::Expr::Dict(ast::ExprDict { items, .. }) = value else {
         return None;
@@ -195,11 +215,13 @@ fn parse_namespaces(value: &ast::Expr, system: &dyn System) -> Option<Vec<Namesp
         .collect()
 }
 
+/// Canonicalize a finder-emitted path when possible, preserving the original path on failure.
 fn canonicalized_system_path(system: &dyn System, path: &str) -> SystemPathBuf {
     let path = SystemPathBuf::from(path);
     system.canonicalize_path(&path).unwrap_or(path)
 }
 
+/// Return whether `module` matches the identifier-like finder module names setuptools emits.
 fn is_generated_finder_module(module: &str) -> bool {
     module.starts_with("__editable___")
         && module.chars().enumerate().all(|(index, character)| {

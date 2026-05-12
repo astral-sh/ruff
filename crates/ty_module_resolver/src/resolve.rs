@@ -330,6 +330,7 @@ fn file_to_module_impl<'db, 'a>(
     module_for_file_with_name(db, file, &module_name)
 }
 
+/// Return `file` as `module_name` only when normal resolution points back to that same file.
 fn module_for_file_with_name<'db>(
     db: &'db dyn Db,
     file: File,
@@ -764,7 +765,7 @@ impl SearchPaths {
 /// should come between the two `site-packages` directories when it comes to
 /// module-resolution priority.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
-struct DynamicResolutionPathData {
+pub(crate) struct DynamicResolutionPathData {
     search_paths: Vec<SearchPath>,
     plain_editable_origins: Vec<PlainEditableSearchPathOrigin>,
 }
@@ -776,8 +777,27 @@ struct PlainEditableSearchPathOrigin {
     pth_origin: PthLineOrigin,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+struct SitePackagesPthArtifacts {
+    site_packages: SystemPathBuf,
+    plain_editable_paths: Vec<(PthLineOrigin, SystemPathBuf)>,
+    setuptools_finder_paths: Vec<(PthLineOrigin, SystemPathBuf)>,
+}
+
+/// Collect dynamic module-resolution paths plus the `.pth` origins needed for precedence checks.
+///
+/// The dynamic search paths are ordinary import search locations, such as a plain editable
+/// install added by a `.pth` file:
+///
+/// ```python
+/// # site-packages/editable.pth
+/// /workspace/src
+/// ```
+///
+/// The origin metadata lets namespace placeholders emitted by setuptools keep the same ordering
+/// relationship they have while Python executes `.pth` files.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-fn dynamic_resolution_path_data<'db>(
+pub(crate) fn dynamic_resolution_path_data<'db>(
     db: &'db dyn Db,
     mode: ModuleResolveModeIngredient<'db>,
 ) -> Arc<DynamicResolutionPathData> {
@@ -816,10 +836,12 @@ fn dynamic_resolution_path_data<'db>(
         existing_paths.insert(Cow::Borrowed(path));
     }
 
-    let files = db.files();
     let system = db.system();
+    let pth_artifacts = site_packages_pth_artifacts(db);
 
-    for (site_packages_index, site_packages_search_path) in site_packages.iter().enumerate() {
+    for (site_packages_index, (site_packages_search_path, pth_artifact)) in
+        site_packages.iter().zip(pth_artifacts.iter()).enumerate()
+    {
         let site_packages_dir = site_packages_search_path
             .as_system_path()
             .expect("Expected site package path to be a system path");
@@ -827,15 +849,6 @@ fn dynamic_resolution_path_data<'db>(
         if !existing_paths.insert(Cow::Borrowed(site_packages_dir)) {
             continue;
         }
-
-        let site_packages_root = files.expect_root(db, site_packages_dir);
-
-        // This query needs to be re-executed each time a `.pth` file
-        // is added, modified or removed from the `site-packages` directory.
-        // However, we don't use Salsa queries to read the source text of `.pth` files;
-        // we use the APIs on the `System` trait directly. As such, add a dependency on the
-        // site-package directory's revision.
-        site_packages_root.revision(db);
 
         dynamic_paths
             .search_paths
@@ -847,28 +860,11 @@ fn dynamic_resolution_path_data<'db>(
         // containing a (relative or absolute) path.
         // Each of these paths may point to an editable install of a package,
         // so should be considered an additional search path.
-        let pth_file_iterator = match PthFileIterator::new(db, site_packages_dir) {
-            Ok(iterator) => iterator,
-            Err(error) => {
-                tracing::warn!(
-                    "Failed to search for editable installation in {site_packages_dir}: {error}"
-                );
-                continue;
-            }
-        };
-
-        // The Python documentation specifies that `.pth` files in `site-packages`
-        // are processed in alphabetical order, so collecting and then sorting is necessary.
-        // https://docs.python.org/3/library/site.html#module-site
-        let mut all_pth_files: Vec<PthFile> = pth_file_iterator.collect();
-        all_pth_files.sort_unstable_by(|a, b| a.path.cmp(&b.path));
-
-        let installations = all_pth_files.iter().flat_map(PthFile::items_with_origins);
-
-        for (pth_origin, installation) in installations {
+        for (pth_origin, installation) in &pth_artifact.plain_editable_paths {
+            let pth_origin = pth_origin.clone();
             let installation = system
-                .canonicalize_path(&installation)
-                .unwrap_or(installation);
+                .canonicalize_path(installation)
+                .unwrap_or_else(|_| installation.clone());
 
             if existing_paths.insert(Cow::Owned(installation.clone())) {
                 match SearchPath::editable(system, installation.clone()) {
@@ -909,14 +905,7 @@ fn dynamic_resolution_path_data<'db>(
     Arc::new(dynamic_paths)
 }
 
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn dynamic_resolution_paths<'db>(
-    db: &'db dyn Db,
-    mode: ModuleResolveModeIngredient<'db>,
-) -> Vec<SearchPath> {
-    dynamic_resolution_path_data(db, mode).search_paths.clone()
-}
-
+/// Register an editable root with the file database when it is not covered by an existing root.
 fn register_editable_root(db: &dyn Db, path: &SystemPath) {
     let files = db.files();
     if files.root(db, path).is_none() {
@@ -956,7 +945,9 @@ impl<'db> Iterator for SearchPathIterator<'db> {
             .or_else(|| stdlib_path.take())
             .or_else(|| {
                 dynamic_paths
-                    .get_or_insert_with(|| dynamic_resolution_paths(*db, *mode).iter())
+                    .get_or_insert_with(|| {
+                        dynamic_resolution_path_data(*db, *mode).search_paths.iter()
+                    })
                     .next()
             })
     }
@@ -1156,6 +1147,66 @@ impl<'db> Iterator for PthFileIterator<'db> {
     }
 }
 
+/// Collect the `.pth` artifacts that ty understands once, preserving the order in which
+/// Python processes them within each configured `site-packages` directory.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn site_packages_pth_artifacts<'db>(db: &'db dyn Db) -> Vec<SitePackagesPthArtifacts> {
+    let SearchPaths {
+        site_packages,
+        static_paths: _,
+        stdlib_path: _,
+        typeshed_versions: _,
+        real_stdlib_path: _,
+    } = db.search_paths();
+
+    let files = db.files();
+    let mut artifacts = Vec::with_capacity(site_packages.len());
+
+    for site_packages_search_path in site_packages {
+        let site_packages_dir = site_packages_search_path
+            .as_system_path()
+            .expect("Expected site package path to be a system path");
+        let site_packages_root = files.expect_root(db, site_packages_dir);
+
+        // `.pth` contents are read through `System`, so root revision changes are the tracked
+        // signal that this direct filesystem discovery should run again.
+        site_packages_root.revision(db);
+
+        let mut artifact = SitePackagesPthArtifacts {
+            site_packages: site_packages_dir.to_path_buf(),
+            plain_editable_paths: Vec::new(),
+            setuptools_finder_paths: Vec::new(),
+        };
+
+        let pth_file_iterator = match PthFileIterator::new(db, site_packages_dir) {
+            Ok(iterator) => iterator,
+            Err(error) => {
+                tracing::warn!("Failed to search for `.pth` files in {site_packages_dir}: {error}");
+                artifacts.push(artifact);
+                continue;
+            }
+        };
+
+        // The Python documentation specifies that `.pth` files in `site-packages`
+        // are processed in alphabetical order, so collecting and then sorting is necessary.
+        // https://docs.python.org/3/library/site.html#module-site
+        let mut all_pth_files: Vec<PthFile> = pth_file_iterator.collect();
+        all_pth_files.sort_unstable_by(|a, b| a.path.cmp(&b.path));
+
+        artifact
+            .plain_editable_paths
+            .extend(all_pth_files.iter().flat_map(PthFile::items_with_origins));
+        artifact.setuptools_finder_paths.extend(
+            all_pth_files
+                .iter()
+                .flat_map(PthFile::setuptools_editable_finder_paths),
+        );
+        artifacts.push(artifact);
+    }
+
+    artifacts
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct SetuptoolsEditableFinder {
     site_packages: SystemPathBuf,
@@ -1177,59 +1228,40 @@ struct SetuptoolsEditableNamespace {
     paths: Vec<SystemPathBuf>,
 }
 
+/// Parse every supported setuptools editable finder referenced by configured `site-packages`.
+///
+/// Each returned finder originates from a launcher such as:
+///
+/// ```python
+/// import __editable___pkg_finder; __editable___pkg_finder.install()
+/// ```
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn setuptools_editable_finders<'db>(db: &'db dyn Db) -> Vec<SetuptoolsEditableFinder> {
-    let SearchPaths {
-        site_packages,
-        static_paths: _,
-        stdlib_path: _,
-        typeshed_versions: _,
-        real_stdlib_path: _,
-    } = db.search_paths();
-
     let files = db.files();
     let system = db.system();
     let mut finders = Vec::new();
 
-    for (site_packages_index, site_packages_search_path) in site_packages.iter().enumerate() {
-        let site_packages_dir = site_packages_search_path
-            .as_system_path()
-            .expect("Expected site package path to be a system path");
+    for (site_packages_index, artifact) in site_packages_pth_artifacts(db).iter().enumerate() {
+        let site_packages_dir = artifact.site_packages.as_path();
         let site_packages_root = files.expect_root(db, site_packages_dir);
 
         // Finder modules live beside their `.pth` files, so the site-packages root revision
         // also invalidates this query when either file changes.
         site_packages_root.revision(db);
 
-        let pth_file_iterator = match PthFileIterator::new(db, site_packages_dir) {
-            Ok(iterator) => iterator,
-            Err(error) => {
-                tracing::warn!(
-                    "Failed to search for setuptools editable finders in {site_packages_dir}: {error}"
-                );
+        for (pth_origin, finder_path) in &artifact.setuptools_finder_paths {
+            let Some(finder) = parse_finder(system, finder_path).and_then(|finder| {
+                SetuptoolsEditableFinder::from_parsed_finder(
+                    &finder,
+                    site_packages_dir,
+                    site_packages_index,
+                    pth_origin.clone(),
+                )
+            }) else {
                 continue;
-            }
-        };
+            };
 
-        let mut all_pth_files: Vec<PthFile> = pth_file_iterator.collect();
-        all_pth_files.sort_unstable_by(|a, b| a.path.cmp(&b.path));
-
-        for pth_file in &all_pth_files {
-            for (pth_origin, finder_path) in pth_file.setuptools_editable_finder_paths() {
-                let Some(finder) =
-                    parse_finder(system, site_packages_dir, &finder_path).and_then(|finder| {
-                        SetuptoolsEditableFinder::from_parsed_finder(
-                            &finder,
-                            site_packages_index,
-                            pth_origin,
-                        )
-                    })
-                else {
-                    continue;
-                };
-
-                finders.push(finder);
-            }
+            finders.push(finder);
         }
     }
 
@@ -1269,15 +1301,12 @@ pub(crate) fn setuptools_editable_finder_search_paths<'db>(db: &'db dyn Db) -> V
     paths
 }
 
+/// Resolve a module name through supported setuptools editable finder behavior.
 fn resolve_name_in_setuptools_editable_finders(
     db: &dyn Db,
     name: &ModuleName,
     mode: ModuleResolveMode,
 ) -> ResolveNameResult {
-    if mode.is_non_shadowable(db.python_version().minor, name.as_str()) {
-        return ResolveNameResult::Missing;
-    }
-
     if let result @ (ResolveNameResult::Found(_) | ResolveNameResult::BlockedByTerminalModule) =
         resolve_name_in_setuptools_editable_namespace_placeholders(db, name, mode)
     {
@@ -1287,6 +1316,16 @@ fn resolve_name_in_setuptools_editable_finders(
     resolve_name_in_setuptools_editable_mappings(db, name, mode)
 }
 
+/// Resolve `name` through literal setuptools `MAPPING` entries.
+///
+/// For a finder containing:
+///
+/// ```python
+/// MAPPING: dict[str, str] = {"pkg": "/workspace/pkg"}
+/// ```
+///
+/// this covers both `import pkg` and descendants such as `import pkg.child`, subject to normal
+/// parent-package shadowing and terminal-module rules.
 fn resolve_name_in_setuptools_editable_mappings(
     db: &dyn Db,
     name: &ModuleName,
@@ -1344,6 +1383,16 @@ fn resolve_name_in_setuptools_editable_mappings(
     ResolveNameResult::Missing
 }
 
+/// Resolve a child through the `__path__` of a parent package imported from an editable mapping.
+///
+/// Python looks inside the already-imported parent package before asking later meta finders:
+///
+/// ```python
+/// # Finder maps `pkg` to `/workspace/pkg`.
+/// import pkg.child
+/// ```
+///
+/// `pkg.child` must first be searched relative to the mapped `pkg` package.
 fn resolve_name_in_imported_parent_path(
     db: &dyn Db,
     name: &ModuleName,
@@ -1352,11 +1401,7 @@ fn resolve_name_in_imported_parent_path(
     let Some(parent_name) = name.parent() else {
         return ResolveNameResult::Missing;
     };
-    let Some(relative_name) = name.relative_to(&parent_name) else {
-        return ResolveNameResult::Missing;
-    };
-    let mut components = relative_name.components();
-    let Some(component) = components.next() else {
+    let Some(component) = name.components().next_back() else {
         return ResolveNameResult::Missing;
     };
 
@@ -1409,6 +1454,7 @@ fn resolve_name_in_imported_parent_path(
     }
 }
 
+/// Resolve `name` through all setuptools namespace placeholders.
 fn resolve_name_in_setuptools_editable_namespace_placeholders(
     db: &dyn Db,
     name: &ModuleName,
@@ -1417,6 +1463,7 @@ fn resolve_name_in_setuptools_editable_namespace_placeholders(
     resolve_name_in_setuptools_editable_namespace_placeholders_matching(db, name, mode, |_| true)
 }
 
+/// Resolve namespace placeholders that outrank `search_path` in `.pth` execution order.
 fn resolve_name_in_setuptools_editable_namespace_placeholders_before_search_path(
     db: &dyn Db,
     name: &ModuleName,
@@ -1438,6 +1485,16 @@ fn resolve_name_in_setuptools_editable_namespace_placeholders_before_search_path
     })
 }
 
+/// Resolve namespace placeholders whose finder metadata satisfies `matches_finder`.
+///
+/// A generated finder can describe placeholder namespace search locations like:
+///
+/// ```python
+/// NAMESPACES: dict[str, list[str]] = {"acme": ["/workspace/acme"]}
+/// ```
+///
+/// Callers choose whether every placeholder is eligible or only placeholders that appeared before
+/// a lower-priority search path at interpreter startup.
 fn resolve_name_in_setuptools_editable_namespace_placeholders_matching(
     db: &dyn Db,
     name: &ModuleName,
@@ -1462,10 +1519,10 @@ fn resolve_name_in_setuptools_editable_namespace_placeholders_matching(
         }
 
         match finder.resolve_in_namespace_placeholders(&context, name) {
-            NamespacePlaceholderResolution::CommittedConcrete(resolved) => {
+            NamespaceResolution::CommittedConcrete(resolved) => {
                 return ResolveNameResult::Found(resolved);
             }
-            NamespacePlaceholderResolution::Found(resolved) => {
+            NamespaceResolution::Found(resolved) => {
                 if resolved
                     .iter()
                     .any(|candidate| !candidate.is_any_namespace_package())
@@ -1475,13 +1532,13 @@ fn resolve_name_in_setuptools_editable_namespace_placeholders_matching(
                 }
                 namespace_candidates.extend(resolved);
             }
-            NamespacePlaceholderResolution::ShadowedByRegularPackage => {
+            NamespaceResolution::ShadowedByRegularPackage => {
                 return ResolveNameResult::Missing;
             }
-            NamespacePlaceholderResolution::BlockedByTerminalModule => {
+            NamespaceResolution::BlockedByTerminalModule => {
                 return ResolveNameResult::BlockedByTerminalModule;
             }
-            NamespacePlaceholderResolution::Missing => {}
+            NamespaceResolution::Missing => {}
         }
     }
 
@@ -1496,6 +1553,7 @@ fn resolve_name_in_setuptools_editable_namespace_placeholders_matching(
     ResolveNameResult::Missing
 }
 
+/// Map a file under a supported editable finder back to the module name Python can import.
 fn file_to_module_in_setuptools_editable_finders<'db>(
     db: &'db dyn Db,
     file: File,
@@ -1513,8 +1571,10 @@ fn file_to_module_in_setuptools_editable_finders<'db>(
 }
 
 impl SetuptoolsEditableFinder {
+    /// Convert parser output into resolver data, rejecting finder keys that are not module names.
     fn from_parsed_finder(
         finder: &ty_setuptools_editable::Finder,
+        site_packages: &SystemPath,
         site_packages_index: usize,
         pth_origin: PthLineOrigin,
     ) -> Option<Self> {
@@ -1540,7 +1600,7 @@ impl SetuptoolsEditableFinder {
             .collect::<Option<Vec<_>>>()?;
 
         Some(Self {
-            site_packages: finder.site_packages().to_path_buf(),
+            site_packages: site_packages.to_path_buf(),
             site_packages_index,
             pth_origin,
             mapping,
@@ -1548,6 +1608,7 @@ impl SetuptoolsEditableFinder {
         })
     }
 
+    /// Yield filesystem roots whose contents can affect this finder's import results.
     fn editable_search_roots(&self) -> impl Iterator<Item = SystemPathBuf> + '_ {
         self.mapping
             .iter()
@@ -1565,6 +1626,7 @@ impl SetuptoolsEditableFinder {
             )
     }
 
+    /// Enumerate finder-backed top-level modules for `list_modules`.
     pub(crate) fn top_level_modules<'db>(&self, db: &'db dyn Db) -> Vec<Module<'db>> {
         let context =
             ResolverContext::new(db, db.python_version(), ModuleResolveMode::StubsAllowed);
@@ -1594,6 +1656,7 @@ impl SetuptoolsEditableFinder {
         modules
     }
 
+    /// Enumerate nested `MAPPING` entries that seed `all_modules` traversal.
     pub(crate) fn nested_mapping_modules<'db>(&self, db: &'db dyn Db) -> Vec<Module<'db>> {
         let context =
             ResolverContext::new(db, db.python_version(), ModuleResolveMode::StubsAllowed);
@@ -1615,34 +1678,35 @@ impl SetuptoolsEditableFinder {
         modules
     }
 
+    /// Resolve a module name through this finder's namespace placeholder entries.
     fn resolve_in_namespace_placeholders(
         &self,
         context: &ResolverContext,
         module_name: &ModuleName,
-    ) -> NamespacePlaceholderResolution {
+    ) -> NamespaceResolution {
         if let Some(namespace) = self.namespace(module_name) {
             if !self.namespace_placeholder_is_reachable(module_name) {
-                return NamespacePlaceholderResolution::Missing;
+                return NamespaceResolution::Missing;
             }
 
             if let Some(parent_namespace) = self.longest_strict_namespace_prefix(module_name) {
                 match self.resolve_in_namespace(context, parent_namespace, module_name) {
-                    committed @ NamespacePlaceholderResolution::CommittedConcrete(_) => {
+                    committed @ NamespaceResolution::CommittedConcrete(_) => {
                         return committed;
                     }
-                    found @ NamespacePlaceholderResolution::Found(_) => return found,
-                    NamespacePlaceholderResolution::ShadowedByRegularPackage => {
-                        return NamespacePlaceholderResolution::ShadowedByRegularPackage;
+                    found @ NamespaceResolution::Found(_) => return found,
+                    NamespaceResolution::ShadowedByRegularPackage => {
+                        return NamespaceResolution::ShadowedByRegularPackage;
                     }
-                    NamespacePlaceholderResolution::BlockedByTerminalModule => {
-                        return NamespacePlaceholderResolution::BlockedByTerminalModule;
+                    NamespaceResolution::BlockedByTerminalModule => {
+                        return NamespaceResolution::BlockedByTerminalModule;
                     }
-                    NamespacePlaceholderResolution::Missing => {}
+                    NamespaceResolution::Missing => {}
                 }
             }
 
             if let Some(candidate) = namespace_package_candidate(context, &self.site_packages) {
-                return NamespacePlaceholderResolution::Found(vec![candidate]);
+                return NamespaceResolution::Found(vec![candidate]);
             }
             return self.resolve_in_namespace(context, namespace, module_name);
         }
@@ -1654,35 +1718,36 @@ impl SetuptoolsEditableFinder {
             }
 
             match self.resolve_in_namespace(context, namespace, module_name) {
-                committed @ NamespacePlaceholderResolution::CommittedConcrete(_) => {
+                committed @ NamespaceResolution::CommittedConcrete(_) => {
                     return committed;
                 }
-                NamespacePlaceholderResolution::Found(resolved) => {
+                NamespaceResolution::Found(resolved) => {
                     if resolved
                         .iter()
                         .any(|candidate| !candidate.is_any_namespace_package())
                     {
-                        return NamespacePlaceholderResolution::Found(resolved);
+                        return NamespaceResolution::Found(resolved);
                     }
                     namespace_candidates.extend(resolved);
                 }
-                NamespacePlaceholderResolution::ShadowedByRegularPackage => {
-                    return NamespacePlaceholderResolution::ShadowedByRegularPackage;
+                NamespaceResolution::ShadowedByRegularPackage => {
+                    return NamespaceResolution::ShadowedByRegularPackage;
                 }
-                NamespacePlaceholderResolution::BlockedByTerminalModule => {
-                    return NamespacePlaceholderResolution::BlockedByTerminalModule;
+                NamespaceResolution::BlockedByTerminalModule => {
+                    return NamespaceResolution::BlockedByTerminalModule;
                 }
-                NamespacePlaceholderResolution::Missing => {}
+                NamespaceResolution::Missing => {}
             }
         }
 
         if namespace_candidates.is_empty() {
-            NamespacePlaceholderResolution::Missing
+            NamespaceResolution::Missing
         } else {
-            NamespacePlaceholderResolution::Found(namespace_candidates)
+            NamespaceResolution::Found(namespace_candidates)
         }
     }
 
+    /// Return whether every parent required for `module_name` is also a placeholder here.
     fn namespace_placeholder_is_reachable(&self, module_name: &ModuleName) -> bool {
         let mut parent = module_name.parent();
         while let Some(parent_name) = parent {
@@ -1696,6 +1761,7 @@ impl SetuptoolsEditableFinder {
         true
     }
 
+    /// Resolve `module_name` through a mapping whose key is its immediate parent.
     fn resolve_in_immediate_parent_mapping(
         &self,
         context: &ResolverContext,
@@ -1715,6 +1781,7 @@ impl SetuptoolsEditableFinder {
         self.resolve_in_mapping_entry(context, module_name, mapping)
     }
 
+    /// Resolve `module_name` through a `MAPPING` entry with the exact same module name.
     fn resolve_in_exact_mapping(
         &self,
         context: &ResolverContext,
@@ -1731,12 +1798,14 @@ impl SetuptoolsEditableFinder {
         self.resolve_in_mapping_entry(context, module_name, mapping)
     }
 
+    /// Return whether this finder has an exact `MAPPING` entry for `module_name`.
     fn has_exact_mapping(&self, module_name: &ModuleName) -> bool {
         self.mapping
             .iter()
             .any(|mapping| &mapping.module == module_name)
     }
 
+    /// Resolve an exact mapped module or one of its descendants from a single `MAPPING` entry.
     fn resolve_in_mapping_entry(
         &self,
         context: &ResolverContext,
@@ -1811,12 +1880,14 @@ impl SetuptoolsEditableFinder {
         }
     }
 
+    /// Return the namespace placeholder whose key exactly matches `module_name`.
     fn namespace(&self, module_name: &ModuleName) -> Option<&SetuptoolsEditableNamespace> {
         self.namespaces
             .iter()
             .find(|namespace| &namespace.module == module_name)
     }
 
+    /// Return namespace placeholders that prefix `module_name`, shortest prefix first.
     fn namespace_prefixes<'a>(
         &'a self,
         module_name: &ModuleName,
@@ -1830,6 +1901,7 @@ impl SetuptoolsEditableFinder {
         prefixes
     }
 
+    /// Return the longest namespace placeholder strictly above `module_name`.
     fn longest_strict_namespace_prefix(
         &self,
         module_name: &ModuleName,
@@ -1842,14 +1914,15 @@ impl SetuptoolsEditableFinder {
             .max_by_key(|namespace| namespace.module.components().count())
     }
 
+    /// Resolve `module_name` below one namespace placeholder's search locations.
     fn resolve_in_namespace(
         &self,
         context: &ResolverContext,
         namespace: &SetuptoolsEditableNamespace,
         module_name: &ModuleName,
-    ) -> NamespacePlaceholderResolution {
+    ) -> NamespaceResolution {
         let Some(relative_name) = module_name.relative_to(&namespace.module) else {
-            return NamespacePlaceholderResolution::Missing;
+            return NamespaceResolution::Missing;
         };
         let components = relative_name.components().collect::<Vec<_>>();
         let fallback_mapping_path = namespace.paths.is_empty().then(|| {
@@ -1875,10 +1948,10 @@ impl SetuptoolsEditableFinder {
                 candidate,
                 &components,
             ) {
-                NamespaceCandidateResolution::CommittedConcrete(resolved) => {
-                    return NamespacePlaceholderResolution::CommittedConcrete(resolved);
+                NamespaceResolution::CommittedConcrete(resolved) => {
+                    return NamespaceResolution::CommittedConcrete(resolved);
                 }
-                NamespaceCandidateResolution::Found(resolved) => {
+                NamespaceResolution::Found(resolved) => {
                     if resolved
                         .iter()
                         .any(|candidate| !candidate.is_any_namespace_package())
@@ -1888,30 +1961,31 @@ impl SetuptoolsEditableFinder {
                     }
                     namespace_candidates.extend(resolved);
                 }
-                NamespaceCandidateResolution::BlockedByTerminalModule => {
-                    return NamespacePlaceholderResolution::BlockedByTerminalModule;
+                NamespaceResolution::BlockedByTerminalModule => {
+                    return NamespaceResolution::BlockedByTerminalModule;
                 }
                 // If an earlier namespace portion provides a regular package
                 // for an intermediate component, Python commits to that
                 // package before it looks for deeper descendants. A later
                 // namespace portion cannot resurrect the branch, though an
                 // editable meta finder may still answer the final name later.
-                NamespaceCandidateResolution::ShadowedByRegularPackage => {
-                    return NamespacePlaceholderResolution::ShadowedByRegularPackage;
+                NamespaceResolution::ShadowedByRegularPackage => {
+                    return NamespaceResolution::ShadowedByRegularPackage;
                 }
-                NamespaceCandidateResolution::Missing => {}
+                NamespaceResolution::Missing => {}
             }
         }
 
         if let Some(resolved) = concrete_candidate {
-            NamespacePlaceholderResolution::Found(resolved)
+            NamespaceResolution::Found(resolved)
         } else if namespace_candidates.is_empty() {
-            NamespacePlaceholderResolution::Missing
+            NamespaceResolution::Missing
         } else {
-            NamespacePlaceholderResolution::Found(namespace_candidates)
+            NamespaceResolution::Found(namespace_candidates)
         }
     }
 
+    /// Recover the importable module name for a path owned by this finder.
     fn module_name_for_path(&self, system: &dyn System, path: &SystemPath) -> Option<ModuleName> {
         self.mapping
             .iter()
@@ -1931,6 +2005,7 @@ impl SetuptoolsEditableFinder {
     }
 }
 
+/// Recover a module name for `path` relative to one setuptools `MAPPING` entry.
 fn setuptools_editable_mapping_module_name(
     system: &dyn System,
     mapping: &SetuptoolsEditableMapping,
@@ -1958,6 +2033,7 @@ fn setuptools_editable_mapping_module_name(
     Some(module_name)
 }
 
+/// Recover a module name for `path` relative to one setuptools namespace placeholder.
 fn setuptools_editable_namespace_module_name(
     system: &dyn System,
     namespace: &SetuptoolsEditableNamespace,
@@ -1972,6 +2048,7 @@ fn setuptools_editable_namespace_module_name(
     })
 }
 
+/// Build a namespace-package candidate rooted at one finder-emitted namespace path.
 fn namespace_candidate(
     context: &ResolverContext,
     namespace_path: &SystemPath,
@@ -1987,6 +2064,7 @@ fn namespace_candidate(
     })
 }
 
+/// Resolve one child component beneath `candidate`, returning the advanced candidate on success.
 fn resolve_component_in_candidate(
     context: &ResolverContext,
     candidate: &mut ModuleResolutionCandidate,
@@ -1997,6 +2075,7 @@ fn resolve_component_in_candidate(
         .map(|()| candidate.clone())
 }
 
+/// Resolve the remaining mapping-descendant components beneath an already matched candidate.
 fn resolve_remaining_components_in_candidate(
     context: &ResolverContext,
     mut candidate: ModuleResolutionCandidate,
@@ -2015,7 +2094,7 @@ fn resolve_remaining_components_in_candidate(
     ResolveNameResult::Found(vec![candidate])
 }
 
-enum NamespaceCandidateResolution {
+enum NamespaceResolution {
     CommittedConcrete(ResolvedNames),
     Found(ResolvedNames),
     Missing,
@@ -2023,31 +2102,22 @@ enum NamespaceCandidateResolution {
     BlockedByTerminalModule,
 }
 
-enum NamespacePlaceholderResolution {
-    CommittedConcrete(ResolvedNames),
-    Found(ResolvedNames),
-    Missing,
-    ShadowedByRegularPackage,
-    BlockedByTerminalModule,
-}
-
+/// Resolve namespace-descendant components while preserving regular-package commit semantics.
 fn resolve_remaining_components_in_namespace_candidate(
     context: &ResolverContext,
     mut candidate: ModuleResolutionCandidate,
     components: &[&str],
-) -> NamespaceCandidateResolution {
+) -> NamespaceResolution {
     let commits_concrete_target = components.len() == 1;
     let mut commits_through_regular_parent = false;
 
     for (index, component) in components.iter().enumerate() {
         if resolve_name_in_search_path(context, &mut candidate, component).is_err() {
             return match candidate.module {
-                ResolvedModule::Module(_) => NamespaceCandidateResolution::BlockedByTerminalModule,
-                ResolvedModule::RegularPackage(_) => {
-                    NamespaceCandidateResolution::ShadowedByRegularPackage
-                }
+                ResolvedModule::Module(_) => NamespaceResolution::BlockedByTerminalModule,
+                ResolvedModule::RegularPackage(_) => NamespaceResolution::ShadowedByRegularPackage,
                 ResolvedModule::NamespacePackage | ResolvedModule::LegacyNamespacePackage(_) => {
-                    NamespaceCandidateResolution::Missing
+                    NamespaceResolution::Missing
                 }
             };
         }
@@ -2065,12 +2135,13 @@ fn resolve_remaining_components_in_namespace_candidate(
         .any(|candidate| !candidate.is_any_namespace_package())
         && (commits_concrete_target || commits_through_regular_parent)
     {
-        NamespaceCandidateResolution::CommittedConcrete(resolved)
+        NamespaceResolution::CommittedConcrete(resolved)
     } else {
-        NamespaceCandidateResolution::Found(resolved)
+        NamespaceResolution::Found(resolved)
     }
 }
 
+/// Build the synthetic namespace-package candidate used for a placeholder module itself.
 fn namespace_package_candidate(
     context: &ResolverContext,
     site_packages: &SystemPath,
@@ -2085,6 +2156,16 @@ fn namespace_package_candidate(
     })
 }
 
+/// Resolve a finder-emitted mapping path into the corresponding module candidate.
+///
+/// Current setuptools output can point a mapping directly at a package directory:
+///
+/// ```python
+/// MAPPING: dict[str, str] = {"pkg": "/workspace/custom.layout"}
+/// ```
+///
+/// The mapped path may therefore describe a package directory, a module stem, or—when allowed by
+/// the caller—a namespace-package directory.
 fn resolve_setuptools_editable_path(
     context: &ResolverContext,
     candidate_path: &SystemPath,
@@ -2260,6 +2341,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
     }
 }
 
+/// Re-resolve `name` when an editable namespace turns a namespace-only ancestor concrete.
 fn resolve_name_after_setuptools_editable_namespace_shadow(
     db: &dyn Db,
     name: &ModuleName,
@@ -2302,6 +2384,7 @@ fn resolve_name_after_setuptools_editable_namespace_shadow(
     None
 }
 
+/// Return whether namespace placeholders before the winning search path can shadow ancestors.
 fn editable_namespace_placeholders_can_shadow_regular_ancestors(
     db: &dyn Db,
     name: &ModuleName,
@@ -2728,6 +2811,7 @@ enum ResolveNameResult {
 }
 
 impl ResolveNameResult {
+    /// Keep resolved candidates and collapse missing or terminal-blocked results to `None`.
     fn into_option(self) -> Option<ResolvedNames> {
         match self {
             ResolveNameResult::Found(resolved) => Some(resolved),
@@ -5831,7 +5915,7 @@ NAMESPACES: dict[str, list[str]] = {"ns": ["/namespace/ns"]}
         let events = db.take_salsa_events();
         assert_function_query_was_not_run(
             &db,
-            dynamic_resolution_paths,
+            dynamic_resolution_path_data,
             ModuleResolveModeIngredient::new(&db, ModuleResolveMode::StubsAllowed),
             &events,
         );

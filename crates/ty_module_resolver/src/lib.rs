@@ -44,30 +44,27 @@ pub fn system_module_search_paths(db: &dyn Db) -> SystemModuleSearchPathsIter<'_
     SystemModuleSearchPathsIter {
         // Always run in `StubsAllowed` mode because we want to include as much as possible
         // and we don't care about the "real" stdlib
-        inner: search_paths(db, ModuleResolveMode::StubsAllowed),
-        setuptools_editable_finder_paths: resolve::setuptools_editable_finder_search_paths(db)
-            .iter(),
+        search_paths: search_paths(db, ModuleResolveMode::StubsAllowed),
+        finder_paths: resolve::setuptools_editable_finder_search_paths(db).iter(),
     }
 }
 
 pub struct SystemModuleSearchPathsIter<'db> {
-    inner: SearchPathIterator<'db>,
-    setuptools_editable_finder_paths: std::slice::Iter<'db, SystemPathBuf>,
+    search_paths: SearchPathIterator<'db>,
+    finder_paths: std::slice::Iter<'db, SystemPathBuf>,
 }
 
 impl<'db> Iterator for SystemModuleSearchPathsIter<'db> {
     type Item = &'db SystemPath;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(next) = self.inner.next() {
+        while let Some(next) = self.search_paths.next() {
             if let Some(system_path) = next.as_system_path() {
                 return Some(system_path);
             }
         }
 
-        self.setuptools_editable_finder_paths
-            .next()
-            .map(SystemPathBuf::as_path)
+        self.finder_paths.next().map(SystemPathBuf::as_path)
     }
 }
 

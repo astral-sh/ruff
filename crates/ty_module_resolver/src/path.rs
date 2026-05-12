@@ -593,6 +593,16 @@ impl SearchPath {
 
     /// Relativize a known directory path without interpreting dotted directory names as file
     /// extensions.
+    ///
+    /// Setuptools editable finders can map a package to a directory such as
+    /// `/workspace/custom.layout`:
+    ///
+    /// ```python
+    /// MAPPING: dict[str, str] = {"pkg": "/workspace/custom.layout"}
+    /// ```
+    ///
+    /// That path must be treated as a directory containing `pkg/__init__.py`-style package
+    /// contents, not as a module path with a `.layout` extension.
     #[must_use]
     pub(crate) fn relativize_system_directory_path(&self, path: &SystemPath) -> Option<ModulePath> {
         match &*self.0 {
