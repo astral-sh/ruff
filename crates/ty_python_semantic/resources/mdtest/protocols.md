@@ -1572,6 +1572,18 @@ class ClassVarX:
 
 static_assert(is_assignable_to(ClassVarX, ClassVarXProto))
 static_assert(is_subtype_of(ClassVarX, ClassVarXProto))
+
+class BoolClassVarX:
+    x: ClassVar[bool] = True
+
+static_assert(not is_assignable_to(BoolClassVarX, ClassVarXProto))
+static_assert(not is_subtype_of(BoolClassVarX, ClassVarXProto))
+
+class BoolClassVarXProto(Protocol):
+    x: ClassVar[bool]
+
+static_assert(not is_assignable_to(BoolClassVarXProto, ClassVarXProto))
+static_assert(not is_subtype_of(BoolClassVarXProto, ClassVarXProto))
 ```
 
 This is mentioned by the

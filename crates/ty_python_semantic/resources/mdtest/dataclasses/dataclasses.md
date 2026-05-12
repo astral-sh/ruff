@@ -1549,61 +1549,31 @@ But calling `asdict` on the class object is not allowed:
 asdict(Foo)  # error: [invalid-argument-type]
 ```
 
-`is_dataclass` is always true for dataclass instances, including instances of subclasses of
-dataclasses:
+`is_dataclass` narrows through the `TypeIs[...]` return type in typeshed. In particular, once an
+input is already known to be a dataclass, the false branch is unreachable:
 
 ```py
-from dataclasses import asdict, dataclass, is_dataclass
+from dataclasses import dataclass, is_dataclass
+from typing import final
 
 @dataclass
 class Event:
     x: int
 
-class ChildEvent(Event): ...
+@final
+class Other: ...
 
-def serialize_event(event: Event) -> dict[str, object]:
+def serialize_event(event: Event | Other) -> None:
     if is_dataclass(event):
         reveal_type(event)  # revealed: Event
-        return asdict(event)
+    else:
+        reveal_type(event)  # revealed: Other
+
+def serialize_known_event(event: Event) -> None:
+    if is_dataclass(event):
+        reveal_type(event)  # revealed: Event
     else:
         reveal_type(event)  # revealed: Never
-        return dict(event)
-
-def serialize_child_event(event: ChildEvent) -> dict[str, object]:
-    if not is_dataclass(event):
-        reveal_type(event)  # revealed: Never
-        return dict(event)
-    return asdict(event)
-
-def serialize_event_type(event_type: type[Event]) -> None:
-    if is_dataclass(event_type):
-        reveal_type(event_type)  # revealed: type[Event]
-    else:
-        reveal_type(event_type)  # revealed: Never
-```
-
-For consistency with other type checkers, `is_dataclass` is also treated as always true for
-dataclass-like classes created via `dataclass_transform`:
-
-```py
-from dataclasses import is_dataclass
-from typing_extensions import TypeVar, dataclass_transform
-
-T = TypeVar("T")
-
-@dataclass_transform()
-def model(cls: type[T]) -> type[T]:
-    return cls
-
-@model
-class StaticOnly:
-    x: int
-
-def check_static_only(instance: StaticOnly) -> None:
-    if is_dataclass(instance):
-        reveal_type(instance)  # revealed: StaticOnly
-    else:
-        reveal_type(instance)  # revealed: Never
 ```
 
 ## `dataclasses.KW_ONLY`

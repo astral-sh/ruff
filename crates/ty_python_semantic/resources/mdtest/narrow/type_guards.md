@@ -433,6 +433,24 @@ def _(x: Unrelated | Covariant[int]):
     needs_instance_of_unrelated(x)
 ```
 
+When top materialization leaves a class-backed protocol unchanged, `TypeIs` narrowing should keep
+the protocol class-backed. This preserves class-side `ClassVar` lookup through `type(x)`:
+
+```py
+from typing import ClassVar, Protocol
+from typing_extensions import TypeIs
+
+class HasClassVar(Protocol):
+    x: ClassVar[int]
+
+def is_has_class_var(x: object) -> TypeIs[HasClassVar]:
+    return True
+
+def _(x: object):
+    if is_has_class_var(x):
+        reveal_type(type(x).x)  # revealed: int
+```
+
 ## `TypeGuard` special cases
 
 ```py

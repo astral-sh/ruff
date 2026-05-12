@@ -6197,16 +6197,14 @@ impl<'db> Type<'db> {
                 }))
             }),
 
-            Type::ProtocolInstance(instance) => {
-                // TODO: Add tests for materialization once subtyping/assignability is implemented for
-                // protocols. It _might_ require changing the logic here because:
-                //
-                // > Subtyping for protocol instances involves taking account of the fact that
-                // > read-only property members, and method members, on protocols act covariantly;
-                // > write-only property members act contravariantly; and read/write attribute
-                // > members on protocols act invariantly
-                Type::ProtocolInstance(instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-            }
+            Type::ProtocolInstance(instance) => visitor.visit(db, self, type_mapping, || {
+                Type::ProtocolInstance(instance.apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                ))
+            }),
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(

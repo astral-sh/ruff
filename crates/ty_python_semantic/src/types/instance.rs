@@ -779,6 +779,22 @@ impl<'db> ProtocolInstanceType<'db> {
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self.inner {
+            // Materializing a class-backed protocol must materialize its member types, not just
+            // the wrapped class type. Keep non-materializing mappings class-backed so recursive
+            // protocol self references do not eagerly expand into synthesized protocols.
+            Protocol::FromClass(class)
+                if matches!(
+                    type_mapping,
+                    TypeMapping::Materialize(_)
+                        | TypeMapping::ApplySpecializationWithMaterialization { .. }
+                ) =>
+            {
+                Self::synthesized(SynthesizedProtocolType::new(
+                    class
+                        .interface(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
+            }
             Protocol::FromClass(class) => {
                 Self::from_class(class.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
