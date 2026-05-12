@@ -81,6 +81,14 @@ impl<'db> Type<'db> {
             return fallback.try_upcast_to_callable_with_policy_and_context(db, policy, context);
         }
 
+        if let Some(literals) = self
+            .enum_complement(db)
+            .and_then(|complement| complement.remaining_literal_types(db))
+        {
+            return UnionType::from_elements(db, literals)
+                .try_upcast_to_callable_with_policy(db, policy);
+        }
+
         match self {
             Type::Callable(callable) => Some(CallableTypes::one(callable)),
 

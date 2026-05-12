@@ -2224,6 +2224,20 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             return self.check_type_pair(db, left, right);
         }
 
+        if let Some(left_literals) = left
+            .enum_complement(db)
+            .and_then(|complement| complement.remaining_literal_types(db))
+        {
+            return self.check_type_pair(db, UnionType::from_elements(db, left_literals), right);
+        }
+
+        if let Some(right_literals) = right
+            .enum_complement(db)
+            .and_then(|complement| complement.remaining_literal_types(db))
+        {
+            return self.check_type_pair(db, left, UnionType::from_elements(db, right_literals));
+        }
+
         match (left, right) {
             (Type::Never, _) | (_, Type::Never) => self.always(),
 
