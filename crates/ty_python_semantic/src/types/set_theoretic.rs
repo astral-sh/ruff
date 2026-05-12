@@ -678,7 +678,7 @@ impl<'db> IntersectionType<'db> {
     }
 
     /// Return the exact finite alternatives represented by this intersection, if available.
-    pub(crate) fn finite_alternatives(self, db: &'db dyn Db) -> Option<Vec<Type<'db>>> {
+    pub fn finite_alternatives(self, db: &'db dyn Db) -> Option<Vec<Type<'db>>> {
         self.enum_complement(db)
             .map(|complement| complement.remaining_literal_types(db))
     }

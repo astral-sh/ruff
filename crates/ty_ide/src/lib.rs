@@ -282,8 +282,11 @@ impl HasNavigationTargets for Type<'_> {
                 .collect(),
 
             Type::Intersection(intersection) => {
-                if let Some(definition) = self.definition(db) {
-                    return definition.navigation_targets(db);
+                if let Some(alternatives) = intersection.finite_alternatives(db) {
+                    return alternatives
+                        .iter()
+                        .flat_map(|alternative| alternative.navigation_targets(db))
+                        .collect();
                 }
 
                 // Only consider the positive elements because the negative elements are mainly from narrowing constraints.
