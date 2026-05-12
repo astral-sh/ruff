@@ -1420,7 +1420,7 @@ fn resolve_name_in_setuptools_editable_namespace_placeholders_matching(
         }
 
         match finder.resolve_in_namespace_placeholders(&context, name) {
-            ResolveNameResult::Found(resolved) => {
+            NamespacePlaceholderResolution::Found(resolved) => {
                 if resolved
                     .iter()
                     .any(|candidate| !candidate.is_any_namespace_package())
@@ -1429,10 +1429,13 @@ fn resolve_name_in_setuptools_editable_namespace_placeholders_matching(
                 }
                 namespace_candidates.extend(resolved);
             }
-            ResolveNameResult::BlockedByTerminalModule => {
+            NamespacePlaceholderResolution::ShadowedByRegularPackage => {
+                return ResolveNameResult::Missing;
+            }
+            NamespacePlaceholderResolution::BlockedByTerminalModule => {
                 return ResolveNameResult::BlockedByTerminalModule;
             }
-            ResolveNameResult::Missing => {}
+            NamespacePlaceholderResolution::Missing => {}
         }
     }
 
@@ -1549,36 +1552,41 @@ impl SetuptoolsEditableFinder {
         &self,
         context: &ResolverContext,
         module_name: &ModuleName,
-    ) -> ResolveNameResult {
+    ) -> NamespacePlaceholderResolution {
         if let Some(namespace) = self.namespace(module_name) {
             if !self.namespace_placeholder_is_reachable(module_name) {
-                return ResolveNameResult::Missing;
+                return NamespacePlaceholderResolution::Missing;
             }
 
             if let Some(parent_namespace) = self.longest_strict_namespace_prefix(module_name) {
                 match self.resolve_in_namespace(context, parent_namespace, module_name) {
-                    found @ ResolveNameResult::Found(_) => return found,
-                    ResolveNameResult::BlockedByTerminalModule => {
-                        return ResolveNameResult::BlockedByTerminalModule;
+                    found @ NamespacePlaceholderResolution::Found(_) => return found,
+                    NamespacePlaceholderResolution::ShadowedByRegularPackage => {
+                        return NamespacePlaceholderResolution::ShadowedByRegularPackage;
                     }
-                    ResolveNameResult::Missing => {}
+                    NamespacePlaceholderResolution::BlockedByTerminalModule => {
+                        return NamespacePlaceholderResolution::BlockedByTerminalModule;
+                    }
+                    NamespacePlaceholderResolution::Missing => {}
                 }
             }
 
             if let Some(candidate) = namespace_package_candidate(context, &self.site_packages) {
-                return ResolveNameResult::Found(vec![candidate]);
+                return NamespacePlaceholderResolution::Found(vec![candidate]);
             }
             return self.resolve_in_namespace(context, namespace, module_name);
         }
 
-        self.longest_namespace_prefix(module_name)
-            .map_or(ResolveNameResult::Missing, |namespace| {
+        self.longest_namespace_prefix(module_name).map_or(
+            NamespacePlaceholderResolution::Missing,
+            |namespace| {
                 if self.namespace_placeholder_is_reachable(&namespace.module) {
                     self.resolve_in_namespace(context, namespace, module_name)
                 } else {
-                    ResolveNameResult::Missing
+                    NamespacePlaceholderResolution::Missing
                 }
-            })
+            },
+        )
     }
 
     fn namespace_placeholder_is_reachable(&self, module_name: &ModuleName) -> bool {
@@ -1736,9 +1744,9 @@ impl SetuptoolsEditableFinder {
         context: &ResolverContext,
         namespace: &SetuptoolsEditableNamespace,
         module_name: &ModuleName,
-    ) -> ResolveNameResult {
+    ) -> NamespacePlaceholderResolution {
         let Some(relative_name) = module_name.relative_to(&namespace.module) else {
-            return ResolveNameResult::Missing;
+            return NamespacePlaceholderResolution::Missing;
         };
         let components = relative_name.components().collect::<Vec<_>>();
         let fallback_mapping_path = namespace.paths.is_empty().then(|| {
@@ -1758,27 +1766,39 @@ impl SetuptoolsEditableFinder {
                 continue;
             };
 
-            match resolve_remaining_components_in_candidate(context, candidate, &components) {
-                ResolveNameResult::Found(resolved) => {
+            match resolve_remaining_components_in_namespace_candidate(
+                context,
+                candidate,
+                &components,
+            ) {
+                NamespaceCandidateResolution::Found(resolved) => {
                     if resolved
                         .iter()
                         .any(|candidate| !candidate.is_any_namespace_package())
                     {
-                        return ResolveNameResult::Found(resolved);
+                        return NamespacePlaceholderResolution::Found(resolved);
                     }
                     namespace_candidates.extend(resolved);
                 }
-                ResolveNameResult::BlockedByTerminalModule => {
-                    return ResolveNameResult::BlockedByTerminalModule;
+                NamespaceCandidateResolution::BlockedByTerminalModule => {
+                    return NamespacePlaceholderResolution::BlockedByTerminalModule;
                 }
-                ResolveNameResult::Missing => {}
+                // If an earlier namespace portion provides a regular package
+                // for an intermediate component, Python commits to that
+                // package before it looks for deeper descendants. A later
+                // namespace portion cannot resurrect the branch, though an
+                // editable meta finder may still answer the final name later.
+                NamespaceCandidateResolution::ShadowedByRegularPackage => {
+                    return NamespacePlaceholderResolution::ShadowedByRegularPackage;
+                }
+                NamespaceCandidateResolution::Missing => {}
             }
         }
 
         if namespace_candidates.is_empty() {
-            ResolveNameResult::Missing
+            NamespacePlaceholderResolution::Missing
         } else {
-            ResolveNameResult::Found(namespace_candidates)
+            NamespacePlaceholderResolution::Found(namespace_candidates)
         }
     }
 
@@ -1883,6 +1903,42 @@ fn resolve_remaining_components_in_candidate(
     }
 
     ResolveNameResult::Found(vec![candidate])
+}
+
+enum NamespaceCandidateResolution {
+    Found(ResolvedNames),
+    Missing,
+    ShadowedByRegularPackage,
+    BlockedByTerminalModule,
+}
+
+enum NamespacePlaceholderResolution {
+    Found(ResolvedNames),
+    Missing,
+    ShadowedByRegularPackage,
+    BlockedByTerminalModule,
+}
+
+fn resolve_remaining_components_in_namespace_candidate(
+    context: &ResolverContext,
+    mut candidate: ModuleResolutionCandidate,
+    components: &[&str],
+) -> NamespaceCandidateResolution {
+    for component in components {
+        if resolve_name_in_search_path(context, &mut candidate, component).is_err() {
+            return match candidate.module {
+                ResolvedModule::Module(_) => NamespaceCandidateResolution::BlockedByTerminalModule,
+                ResolvedModule::RegularPackage(_) => {
+                    NamespaceCandidateResolution::ShadowedByRegularPackage
+                }
+                ResolvedModule::NamespacePackage | ResolvedModule::LegacyNamespacePackage(_) => {
+                    NamespaceCandidateResolution::Missing
+                }
+            };
+        }
+    }
+
+    NamespaceCandidateResolution::Found(vec![candidate])
 }
 
 fn namespace_package_candidate(
@@ -4567,6 +4623,48 @@ NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/b/ns"]}
 
         let external_files = [
             ("/workspace/a/ns/child.py", ""),
+            ("/workspace/b/ns/child/grandchild.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let grandchild_module_name = ModuleName::new_static("ns.child.grandchild").unwrap();
+        assert_eq!(resolve_module_confident(&db, &grandchild_module_name), None);
+    }
+
+    #[test]
+    fn setuptools_editable_install_namespace_regular_child_stops_later_portions() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.ns-a.pth",
+                "import __editable___ns_a_finder; __editable___ns_a_finder.install()",
+            ),
+            (
+                "__editable___ns_a_finder.py",
+                r#"
+MAPPING: dict[str, str] = {}
+NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/a/ns"]}
+"#,
+            ),
+            (
+                "__editable__.ns-b.pth",
+                "import __editable___ns_b_finder; __editable___ns_b_finder.install()",
+            ),
+            (
+                "__editable___ns_b_finder.py",
+                r#"
+MAPPING: dict[str, str] = {}
+NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/b/ns"]}
+"#,
+            ),
+        ];
+
+        let external_files = [
+            ("/workspace/a/ns/child/__init__.py", ""),
             ("/workspace/b/ns/child/grandchild.py", ""),
         ];
 
