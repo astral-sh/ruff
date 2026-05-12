@@ -269,12 +269,13 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
     /// Create a new [`CallArguments`] containing only the arguments at the specified indices.
     ///
-    /// The resulting argument list preserves the order of `indices`. This is used to turn the
-    /// subset of forwarded outer arguments into the argument list for a synthetic sub-call:
+    /// The resulting argument list preserves the order of `indices`. Unlike [`Self::start_from`],
+    /// this can project a non-contiguous subset of the original call arguments. This is used to
+    /// turn the forwarded outer arguments into the argument list for a synthetic sub-call:
     ///
     /// ```py
-    /// def wrapper[**P, R](func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R: ...
-    /// wrapper(f, 1, y="x")  # select the `1` and `y="x"` arguments for the call to `f`
+    /// def wrapper[**P, R](func: Callable[P, R], **kwargs: P.kwargs) -> R: ...
+    /// wrapper(TagSet=[...], func=f)  # select `TagSet=[...]`, but not the later `func=f`
     /// ```
     pub(crate) fn select(&self, indices: &[usize]) -> Self {
         Self {
