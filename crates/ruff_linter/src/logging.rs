@@ -165,6 +165,7 @@ pub struct DisplayParseError {
     error: ParseError,
     path: Option<PathBuf>,
     location: ErrorLocation,
+    source_text: String,
 }
 
 impl DisplayParseError {
@@ -216,6 +217,7 @@ impl DisplayParseError {
             error,
             path,
             location,
+            source_text: source_code.text().to_owned(),
         }
     }
 
@@ -227,6 +229,11 @@ impl DisplayParseError {
     /// Return the underlying [`ParseError`].
     pub fn error(&self) -> &ParseError {
         &self.error
+    }
+
+    /// Return the source text of the file in which the error occurred.
+    pub fn source_text(&self) -> &str {
+        &self.source_text
     }
 }
 

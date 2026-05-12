@@ -1224,17 +1224,19 @@ fn format_snippet<'m>(
 
     let is_file_level = snippet.annotations.iter().any(|ann| ann.is_file_level);
     if is_file_level {
-        // TODO(brent) enable this assertion again once we set `is_file_level` for individual rules.
-        // It's causing too many false positives currently when the default is to make any
-        // annotation with a default range file-level. See
-        // https://github.com/astral-sh/ruff/issues/19688.
-        //
-        // assert!(
-        //     snippet.source.is_empty(),
-        //     "Non-empty file-level snippet that won't be rendered: {:?}",
-        //     snippet.source
-        // );
-        let header = format_header(origin, main_range, &[], is_first, snippet.cell_index);
+        // Even though we don't render the snippet body for file-level annotations, we still need
+        // to compute it so that `format_header` can derive the correct line and column numbers for
+        // the `-->` arrow from the source text.
+        let cell_index = snippet.cell_index;
+        let body = format_body(
+            snippet,
+            need_empty_header,
+            has_footer,
+            term_width,
+            anonymized_line_numbers,
+            cut_indicator,
+        );
+        let header = format_header(origin, main_range, &body.display_lines, is_first, cell_index);
         return DisplaySet {
             display_lines: header.map_or_else(Vec::new, |header| vec![header]),
             margin: Margin::new(0, 0, 0, 0, term_width, 0),

@@ -882,17 +882,25 @@ impl FormatCommandError {
 impl From<&FormatCommandError> for Diagnostic {
     fn from(error: &FormatCommandError) -> Self {
         let annotation = error.path().map(|path| {
-            let file = SourceFileBuilder::new(path.to_string_lossy(), "").finish();
-            let span = Span::from(file);
+            let source_text = if let FormatCommandError::Parse(display_parse_error) = error {
+                display_parse_error.source_text()
+            } else {
+                ""
+            };
+            let file = SourceFileBuilder::new(path.to_string_lossy(), source_text).finish();
+            let span = if let FormatCommandError::Parse(display_parse_error) = error {
+                Span::from(file).with_range(display_parse_error.error().location)
+            } else {
+                Span::from(file)
+            };
             let mut annotation = Annotation::primary(span);
             annotation.hide_snippet(true);
             annotation
         });
 
         let mut diagnostic = match error {
-            FormatCommandError::Ignore(error) => {
-                Diagnostic::new(DiagnosticId::Io, Severity::Error, error)
-            }
+            FormatCommandError::Ignore(error) =>
+                Diagnostic::new(DiagnosticId::Io, Severity::Error, error),
             FormatCommandError::Parse(display_parse_error) => Diagnostic::new(
                 DiagnosticId::InvalidSyntax,
                 Severity::Error,
@@ -902,20 +910,21 @@ impl From<&FormatCommandError> for Diagnostic {
                 return create_panic_diagnostic(panic_error, path.as_deref());
             }
             FormatCommandError::Read(_, source_error)
-            | FormatCommandError::Write(_, source_error) => {
-                Diagnostic::new(DiagnosticId::Io, Severity::Error, source_error)
-            }
+            | FormatCommandError::Write(_, source_error) =>
+                Diagnostic::new(DiagnosticId::Io, Severity::Error, source_error),
             FormatCommandError::Format(_, format_module_error) => format_module_error.into(),
-            FormatCommandError::RangeFormatNotSupported(_) => Diagnostic::new(
-                DiagnosticId::InvalidCliOption,
-                Severity::Error,
-                "Range formatting is only supported for Python files.",
-            ),
-            FormatCommandError::MarkdownExperimental(_) => Diagnostic::new(
-                DiagnosticId::PreviewFeature,
-                Severity::Warning,
-                "Markdown formatting is experimental, enable preview mode.",
-            ),
+            FormatCommandError::RangeFormatNotSupported(_) =>
+                Diagnostic::new(
+                    DiagnosticId::InvalidCliOption,
+                    Severity::Error,
+                    "Range formatting is only supported for Python files.",
+                ),
+            FormatCommandError::MarkdownExperimental(_) =>
+                Diagnostic::new(
+                    DiagnosticId::PreviewFeature,
+                    Severity::Warning,
+                    "Markdown formatting is experimental, enable preview mode.",
+                ),
         };
 
         if let Some(annotation) = annotation {
@@ -1360,9 +1369,6 @@ mod tests {
         io: test.py: Permission denied
         --> test.py:1:1
 
-        invalid-syntax: Unexpected indentation
-        --> test.py:1:1
-
         io: File not found
         --> test.py:1:1
 
@@ -1373,6 +1379,9 @@ mod tests {
         --> test.py:1:1
 
         invalid-cli-option: Range formatting is only supported for Python files.
+        --> test.py:1:1
+
+        invalid-syntax: Unexpected indentation
         --> test.py:1:1
 
         panic: Panicked at <location> when checking `test.py`: `Test panic for FormatCommandError`
