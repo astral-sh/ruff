@@ -712,7 +712,7 @@ fn class_pages_show_documented_inheritance() -> anyhow::Result<()> {
         &class,
         &[
             "<h2 id=\"inherited\"><a class=\"pm\" href=\"#inherited\"",
-            "<section id=\"inherited.0\" class=\"ig col open\"><div class=\"isum\"><button class=\"tog ht\" aria-label=\"Toggle inherited members from Base\" aria-expanded=\"true\"></button><a class=\"pm\" href=\"#inherited.0\" aria-label=\"Permalink to inherited members from Base\">§</a><span class=\"ist\">Inherited from <a class=\"class ibl\" href=\"class.Base.html\">Base</a></span></div><div class=\"dc\"><h3 class=\"ish\">Attributes</h3><div class=\"iss ats\">",
+            "<section id=\"inherited.0\" class=\"ig col open\"><div class=\"isum\"><button class=\"tog ht\" aria-label=\"Toggle inherited members from Base\" aria-expanded=\"true\"></button><a class=\"pm\" href=\"#inherited.0\" aria-label=\"Permalink to inherited members from Base\">§</a><span class=\"inherited-title\">Inherited from <a class=\"class ibl\" href=\"class.Base.html\">Base</a></span></div><div class=\"dc\"><h3 class=\"ish\">Attributes</h3><div class=\"iss ats\">",
             "id=\"inherited.0.m.0\" class=\"itm\"",
             "<a class=\"pm\" href=\"#inherited.0.m.0\" aria-label=\"Permalink\">§</a>",
             "<a class=\"src\" href=\"../src/pkg/__init__.py.html#L",

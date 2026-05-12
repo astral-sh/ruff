@@ -1,19 +1,20 @@
 use std::collections::HashMap;
 
-use crate::FxIndexSet;
 use crate::place::builtins_module_scope;
 use crate::reachability::is_range_reachable;
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
 use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::list_members::{MemberWithDefinition, all_end_of_scope_members};
 use crate::types::signatures::{ParameterForm, ParametersKind, Signature};
 use crate::types::{
     CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownUnion,
     Type, TypeContext, UnionType,
 };
 use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticModel};
+use crate::{FxIndexMap, FxIndexSet};
 use itertools::Either;
-use ruff_db::files::FileRange;
+use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::{self as ast, AnyNodeRef, name::Name};
@@ -193,6 +194,44 @@ pub fn definitions_for_name<'db>(
     } else {
         resolved_definitions
     }
+}
+
+/// Returns the members that exist at the end of a module's global scope.
+///
+/// Unlike [`crate::types::list_members::all_members`], this intentionally
+/// describes declarations and bindings in the module scope itself. It does not
+/// add import-time module attributes such as `__file__`.
+pub fn end_of_scope_module_members(db: &dyn Db, file: File) -> Vec<MemberWithDefinition<'_>> {
+    merged_end_of_scope_members(all_end_of_scope_members(db, global_scope(db, file)))
+}
+
+/// Returns the members that exist at the end of a statement-defined class body.
+pub fn end_of_scope_class_members<'db>(
+    model: &SemanticModel<'db>,
+    class: &ast::StmtClassDef,
+) -> Vec<MemberWithDefinition<'db>> {
+    let Some(class_literal) = class
+        .inferred_type(model)
+        .and_then(Type::as_class_literal)
+        .and_then(ClassLiteral::as_static)
+    else {
+        return Vec::new();
+    };
+
+    merged_end_of_scope_members(all_end_of_scope_members(
+        model.db(),
+        class_literal.body_scope(model.db()),
+    ))
+}
+
+fn merged_end_of_scope_members<'db>(
+    members: impl Iterator<Item = MemberWithDefinition<'db>>,
+) -> Vec<MemberWithDefinition<'db>> {
+    let mut merged = FxIndexMap::default();
+    for member in members {
+        merged.entry(member.member.name.clone()).or_insert(member);
+    }
+    merged.into_values().collect()
 }
 
 fn is_float_or_complex_annotation(db: &dyn Db, ty: UnionType, name: &str) -> bool {

@@ -117,6 +117,11 @@ impl<'db> Definition<'db> {
                 attribute_docstring(&module, assign_node)
                     .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
             }
+            DefinitionKind::TypeAlias(type_alias_def) => {
+                let type_alias_node = type_alias_def.node(&module);
+                attribute_docstring(&module, &type_alias_node.name)
+                    .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+            }
             DefinitionKind::Function(function_def) => {
                 let function_node = function_def.node(&module);
                 docstring_from_body(&function_node.body)

@@ -42,7 +42,8 @@ pub use ty_site_packages::{
 pub use types::ide_support::{
     ImportAliasResolution, ResolvedDefinition, TypeHierarchyClass, definitions_for_attribute,
     definitions_for_bin_op, definitions_for_imported_symbol, definitions_for_name,
-    definitions_for_unary_op, map_stub_definition, type_hierarchy_prepare, type_hierarchy_subtypes,
+    definitions_for_unary_op, end_of_scope_class_members, end_of_scope_module_members,
+    map_stub_definition, type_hierarchy_prepare, type_hierarchy_subtypes,
     type_hierarchy_supertypes,
 };
 pub use types::{DisplaySettings, TypeQualifiers};

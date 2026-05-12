@@ -20,10 +20,14 @@ use serde::Serialize;
 use ty_ide::{Docstring, exported_symbols};
 use ty_module_resolver::{ModuleName, file_to_module, resolve_module};
 use ty_project::{Db as _, ProjectDatabase};
+use ty_python_core::definition::{
+    AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, Definition, DefinitionKind,
+};
 use ty_python_semantic::types::TypeDefinition;
+use ty_python_semantic::types::ide_support::definitions_and_overloads_for_function;
 use ty_python_semantic::{
     HasType, ImportAliasResolution, ResolvedDefinition, SemanticModel, definitions_for_name,
-    type_hierarchy_supertypes,
+    end_of_scope_class_members, end_of_scope_module_members, type_hierarchy_supertypes,
 };
 
 #[derive(Debug)]
@@ -359,12 +363,6 @@ impl FunctionSignatureDoc {
 }
 
 #[derive(Debug)]
-struct ExtractedFunctionDoc {
-    function: FunctionDoc,
-    is_overload: bool,
-}
-
-#[derive(Debug)]
 struct VariableDoc {
     name: String,
     signature: String,
@@ -468,68 +466,82 @@ fn extract_module(
         functions: Vec::new(),
         variables: Vec::new(),
     };
-    let mut functions = Vec::new();
+    let mut members = end_of_scope_module_members(db, file);
+    members.sort_by_key(|member| {
+        member
+            .first_reachable_definition
+            .full_range(db, &parsed)
+            .range()
+            .start()
+    });
 
-    for (index, stmt) in body.iter().enumerate() {
-        match stmt {
-            ruff_python_ast::Stmt::AnnAssign(assign) => {
-                module.variables.extend(extract_ann_assign(
+    for member in members {
+        if !document_private_items && !is_public_name(member.member.name.as_str()) {
+            continue;
+        }
+
+        let definition = member.first_reachable_definition;
+        match definition.kind(db) {
+            DefinitionKind::AnnotatedAssignment(assign) => {
+                if let Some(variable) = extract_annotated_assignment_definition(
+                    db,
+                    &parsed,
                     &source_code,
                     &line_index,
+                    definition,
                     assign,
                     &semantic_model,
-                    docstring_after(body, index),
-                    document_private_items,
-                ))
+                ) {
+                    module.variables.push(variable);
+                }
             }
-            ruff_python_ast::Stmt::Assign(assign) => {
-                let docstring = docstring_after(body, index);
-                module.variables.extend(extract_assign(
+            DefinitionKind::Assignment(assign) => {
+                if let Some(variable) = extract_assignment_definition(
+                    db,
+                    &parsed,
                     &source_code,
                     &line_index,
+                    definition,
                     assign,
                     &semantic_model,
-                    docstring.as_deref(),
+                ) {
+                    module.variables.push(variable);
+                }
+            }
+            DefinitionKind::TypeAlias(type_alias) => {
+                if let Some(variable) = extract_type_alias(
+                    &source_code,
+                    &line_index,
+                    type_alias.node(&parsed),
+                    &semantic_model,
+                    definition.docstring(db),
                     document_private_items,
+                ) {
+                    module.variables.push(variable);
+                }
+            }
+            DefinitionKind::Function(function) => {
+                module.functions.push(extract_function_group(
+                    &parsed,
+                    &source_code,
+                    &line_index,
+                    function.node(&parsed),
+                    &semantic_model,
                 ));
             }
-            ruff_python_ast::Stmt::TypeAlias(type_alias) => {
-                module.variables.extend(extract_type_alias(
+            DefinitionKind::Class(class) => {
+                module.classes.push(extract_class(
+                    db,
                     &source_code,
                     &line_index,
-                    type_alias,
+                    class.node(&parsed),
                     &semantic_model,
-                    docstring_after(body, index),
                     document_private_items,
-                ))
-            }
-            ruff_python_ast::Stmt::FunctionDef(function) => {
-                if document_private_items || is_public_name(function.name.as_str()) {
-                    functions.push(extract_overloadable_function(
-                        &source_code,
-                        &line_index,
-                        function,
-                        &semantic_model,
-                    ));
-                }
-            }
-            ruff_python_ast::Stmt::ClassDef(class) => {
-                if document_private_items || is_public_name(class.name.as_str()) {
-                    module.classes.push(extract_class(
-                        db,
-                        &source_code,
-                        &line_index,
-                        class,
-                        &semantic_model,
-                        document_private_items,
-                    ));
-                }
+                ));
             }
             _ => {}
         }
     }
-
-    module.functions = group_overloaded_functions(functions);
 
     ExtractedModule {
         module: Some(module),
@@ -537,15 +549,58 @@ fn extract_module(
     }
 }
 
-fn extract_overloadable_function(
+fn extract_function_group(
+    parsed: &ruff_db::parsed::ParsedModuleRef,
     source_code: &SourceCode,
     line_index: &LineIndex,
     function: &ruff_python_ast::StmtFunctionDef,
     semantic_model: &SemanticModel,
-) -> ExtractedFunctionDoc {
-    ExtractedFunctionDoc {
-        is_overload: is_overload_function(function, semantic_model),
-        function: extract_function(source_code, line_index, function, semantic_model),
+) -> FunctionDoc {
+    let mut functions = definitions_and_overloads_for_function(semantic_model, function)
+        .into_iter()
+        .filter_map(|definition| definition.definition())
+        .filter_map(|definition| {
+            let DefinitionKind::Function(function) = definition.kind(semantic_model.db()) else {
+                return None;
+            };
+            Some((
+                function.node(parsed),
+                extract_function(
+                    source_code,
+                    line_index,
+                    function.node(parsed),
+                    semantic_model,
+                ),
+            ))
+        })
+        .collect::<Vec<_>>();
+
+    if functions.is_empty() {
+        return extract_function(source_code, line_index, function, semantic_model);
+    }
+
+    let implementation = functions
+        .iter()
+        .rposition(|(function, _)| !is_overload_function(function, semantic_model));
+
+    if let Some(implementation) = implementation {
+        let (_, mut function) = functions.remove(implementation);
+        function.overloads = functions
+            .iter()
+            .map(|(_, overload)| FunctionSignatureDoc::from_function(overload))
+            .collect();
+        function
+    } else {
+        let (_, mut function) = functions.remove(0);
+        function.overload_only = true;
+        function.overloads = std::iter::once(FunctionSignatureDoc::from_function(&function))
+            .chain(
+                functions
+                    .iter()
+                    .map(|(_, overload)| FunctionSignatureDoc::from_function(overload)),
+            )
+            .collect();
+        function
     }
 }
 
@@ -573,66 +628,6 @@ fn extract_function(
         overloads: Vec::new(),
         overload_only: false,
     }
-}
-
-fn group_overloaded_functions(functions: Vec<ExtractedFunctionDoc>) -> Vec<FunctionDoc> {
-    let mut grouped = Vec::new();
-    let mut pending_overloads = Vec::new();
-
-    for extracted in functions {
-        let ExtractedFunctionDoc {
-            function,
-            is_overload,
-        } = extracted;
-
-        if is_overload {
-            if pending_overloads
-                .first()
-                .is_some_and(|pending: &FunctionDoc| pending.name != function.name)
-            {
-                flush_pending_overloads(&mut grouped, &mut pending_overloads);
-            }
-            pending_overloads.push(function);
-            continue;
-        }
-
-        if pending_overloads
-            .first()
-            .is_some_and(|pending| pending.name == function.name)
-        {
-            let mut function = function;
-            function.overloads = pending_overloads
-                .iter()
-                .map(FunctionSignatureDoc::from_function)
-                .collect();
-            pending_overloads.clear();
-            grouped.push(function);
-        } else {
-            flush_pending_overloads(&mut grouped, &mut pending_overloads);
-            grouped.push(function);
-        }
-    }
-
-    flush_pending_overloads(&mut grouped, &mut pending_overloads);
-    grouped
-}
-
-fn flush_pending_overloads(grouped: &mut Vec<FunctionDoc>, pending: &mut Vec<FunctionDoc>) {
-    if pending.is_empty() {
-        return;
-    }
-
-    let mut pending_functions = std::mem::take(pending);
-    let mut function = pending_functions.remove(0);
-    function.overload_only = true;
-    function.overloads = std::iter::once(FunctionSignatureDoc::from_function(&function))
-        .chain(
-            pending_functions
-                .iter()
-                .map(FunctionSignatureDoc::from_function),
-        )
-        .collect();
-    grouped.push(function);
 }
 
 fn is_overload_function(
@@ -807,45 +802,66 @@ fn extract_class(
 ) -> ClassDoc {
     let mut methods = Vec::new();
     let mut attributes = Vec::new();
+    let parsed = parsed_module(db, semantic_model.file()).load(db);
+    let mut members = end_of_scope_class_members(semantic_model, class);
+    members.sort_by_key(|member| {
+        member
+            .first_reachable_definition
+            .full_range(db, &parsed)
+            .range()
+            .start()
+    });
 
-    for (index, stmt) in class.body.iter().enumerate() {
-        match stmt {
-            ruff_python_ast::Stmt::AnnAssign(assign) => attributes.extend(extract_ann_assign(
-                source_code,
-                line_index,
-                assign,
-                semantic_model,
-                docstring_after(&class.body, index),
-                document_private_items,
-            )),
-            ruff_python_ast::Stmt::Assign(assign) => {
-                let docstring = docstring_after(&class.body, index);
-                attributes.extend(extract_assign(
+    for member in members {
+        if !document_private_items && !is_public_name(member.member.name.as_str()) {
+            continue;
+        }
+
+        let definition = member.first_reachable_definition;
+        match definition.kind(db) {
+            DefinitionKind::AnnotatedAssignment(assign) => {
+                if let Some(attribute) = extract_annotated_assignment_definition(
+                    db,
+                    &parsed,
                     source_code,
                     line_index,
+                    definition,
                     assign,
                     semantic_model,
-                    docstring.as_deref(),
-                    document_private_items,
-                ));
+                ) {
+                    attributes.push(attribute);
+                }
             }
-            ruff_python_ast::Stmt::FunctionDef(function) => {
-                if document_private_items || is_public_name(function.name.as_str()) {
-                    if is_property_function(function, semantic_model) {
-                        attributes.push(extract_property(
-                            source_code,
-                            line_index,
-                            function,
-                            semantic_model,
-                        ));
-                    } else if !is_property_modifier_function(function) {
-                        methods.push(extract_overloadable_function(
-                            source_code,
-                            line_index,
-                            function,
-                            semantic_model,
-                        ));
-                    }
+            DefinitionKind::Assignment(assign) => {
+                if let Some(attribute) = extract_assignment_definition(
+                    db,
+                    &parsed,
+                    source_code,
+                    line_index,
+                    definition,
+                    assign,
+                    semantic_model,
+                ) {
+                    attributes.push(attribute);
+                }
+            }
+            DefinitionKind::Function(function) => {
+                let function = function.node(&parsed);
+                if is_property_function(function, semantic_model) {
+                    attributes.push(extract_property(
+                        source_code,
+                        line_index,
+                        function,
+                        semantic_model,
+                    ));
+                } else if !is_property_modifier_function(function) {
+                    methods.push(extract_function_group(
+                        &parsed,
+                        source_code,
+                        line_index,
+                        function,
+                        semantic_model,
+                    ));
                 }
             }
             _ => {}
@@ -870,7 +886,7 @@ fn extract_class(
         enum_member_names,
         docstring: docstring_from_body(&class.body),
         source_line: line_number(line_index, &class.name),
-        methods: group_overloaded_functions(methods),
+        methods,
         attributes,
     }
 }
@@ -904,73 +920,64 @@ fn extract_base_classes(
         .collect()
 }
 
-fn extract_ann_assign(
+fn extract_annotated_assignment_definition(
+    db: &ProjectDatabase,
+    parsed: &ruff_db::parsed::ParsedModuleRef,
     source_code: &SourceCode,
     line_index: &LineIndex,
-    assign: &ruff_python_ast::StmtAnnAssign,
+    definition: Definition,
+    assign: &AnnotatedAssignmentDefinitionKind,
     semantic_model: &SemanticModel,
-    docstring: Option<String>,
-    document_private_items: bool,
 ) -> Option<VariableDoc> {
-    let name = expr_name(&assign.target)?;
-    if !document_private_items && !is_public_name(name) {
-        return None;
-    }
+    let target = assign.target(parsed);
+    let annotation = assign.annotation(parsed);
+    let name = expr_name(target)?;
 
     let signature = append_constant_default(
-        annotated_variable_signature(source_code, assign.annotation.range()),
+        annotated_variable_signature(source_code, annotation.range()),
         source_code,
-        assign.value.as_deref(),
+        assign.value(parsed),
     );
-    let mut signature_links = collect_signature_links(
-        semantic_model,
-        assign.annotation.as_ref().into(),
-        &signature,
-    );
-    collect_expression_type_links(semantic_model, &assign.annotation, &mut signature_links);
+    let mut signature_links =
+        collect_signature_links(semantic_model, annotation.into(), &signature);
+    collect_expression_type_links(semantic_model, annotation, &mut signature_links);
 
     Some(VariableDoc {
         name: name.to_string(),
         signature_links,
         signature,
-        docstring,
-        source_line: line_number(line_index, assign),
+        docstring: definition.docstring(db),
+        source_line: line_number_from_range(line_index, definition.full_range(db, parsed).range()),
         kind: VariableKind::Variable,
     })
 }
 
-fn extract_assign(
+fn extract_assignment_definition(
+    db: &ProjectDatabase,
+    parsed: &ruff_db::parsed::ParsedModuleRef,
     source_code: &SourceCode,
     line_index: &LineIndex,
-    assign: &ruff_python_ast::StmtAssign,
+    definition: Definition,
+    assign: &AssignmentDefinitionKind,
     semantic_model: &SemanticModel,
-    docstring: Option<&str>,
-    document_private_items: bool,
-) -> Vec<VariableDoc> {
-    assign
-        .targets
-        .iter()
-        .filter_map(|target| {
-            let name = expr_name(target)?;
-            if !document_private_items && !is_public_name(name) {
-                return None;
-            }
+) -> Option<VariableDoc> {
+    let target = assign.target(parsed);
+    let value = assign.value(parsed);
+    let name = expr_name(target)?;
 
-            let signature = append_constant_default(
-                inferred_assignment_signature(semantic_model, target, &assign.value),
-                source_code,
-                Some(assign.value.as_ref()),
-            );
-            Some(VariableDoc {
-                name: name.to_string(),
-                signature_links: collect_signature_links(semantic_model, target.into(), &signature),
-                signature,
-                docstring: docstring.map(str::to_string),
-                source_line: line_number(line_index, assign),
-                kind: VariableKind::Variable,
-            })
-        })
-        .collect()
+    let signature = append_constant_default(
+        inferred_assignment_signature(semantic_model, target, value),
+        source_code,
+        Some(value),
+    );
+    Some(VariableDoc {
+        name: name.to_string(),
+        signature_links: collect_signature_links(semantic_model, target.into(), &signature),
+        signature,
+        docstring: definition.docstring(db),
+        source_line: line_number_from_range(line_index, definition.full_range(db, parsed).range()),
+        kind: VariableKind::Variable,
+    })
 }
 
 fn inferred_assignment_signature(
@@ -1234,15 +1241,12 @@ fn line_number(line_index: &LineIndex, ranged: impl Ranged) -> String {
     line_index.line_index(ranged.range().start()).to_string()
 }
 
-fn docstring_from_body(body: &[ruff_python_ast::Stmt]) -> Option<String> {
-    let stmt = body.first()?;
-    let expr = stmt.as_expr_stmt()?;
-    let literal = expr.value.as_string_literal_expr()?;
-    Some(literal.value.to_str().to_string())
+fn line_number_from_range(line_index: &LineIndex, range: TextRange) -> String {
+    line_index.line_index(range.start()).to_string()
 }
 
-fn docstring_after(body: &[ruff_python_ast::Stmt], index: usize) -> Option<String> {
-    let stmt = body.get(index + 1)?;
+fn docstring_from_body(body: &[ruff_python_ast::Stmt]) -> Option<String> {
+    let stmt = body.first()?;
     let expr = stmt.as_expr_stmt()?;
     let literal = expr.value.as_string_literal_expr()?;
     Some(literal.value.to_str().to_string())
@@ -1753,7 +1757,7 @@ fn render_all_items(documentation: &Documentation) -> String {
                 rows,
                 "fn",
                 &anchored_href(
-                    module_href("../", documentation, &module.name),
+                    &module_href("../", documentation, &module.name),
                     "fn",
                     &function.name,
                 ),
@@ -2476,17 +2480,14 @@ struct DocHeading<'a> {
 
 impl Render for DocHeading<'_> {
     fn render_to(&self, output: &mut String) {
-        match self.level {
-            2..=6 => {
-                output.push_str("<h");
-                output.push_str(&self.level.to_string());
-                output.push('>');
-                DocInline(self.heading).render_to(output);
-                output.push_str("</h");
-                output.push_str(&self.level.to_string());
-                output.push('>');
-            }
-            _ => {}
+        if let 2..=6 = self.level {
+            output.push_str("<h");
+            output.push_str(&self.level.to_string());
+            output.push('>');
+            DocInline(self.heading).render_to(output);
+            output.push_str("</h");
+            output.push_str(&self.level.to_string());
+            output.push('>');
         }
     }
 }
@@ -3007,12 +3008,12 @@ fn type_link_href(root: &str, documentation: &Documentation, target: &TypeLinkTa
     match target.kind {
         TypeLinkKind::Class => class_page_href(root, documentation, &target.module, &target.name),
         TypeLinkKind::TypeAlias => anchored_href(
-            module_href(root, documentation, &target.module),
+            &module_href(root, documentation, &target.module),
             "type",
             &target.name,
         ),
         TypeLinkKind::Variable => anchored_href(
-            module_href(root, documentation, &target.module),
+            &module_href(root, documentation, &target.module),
             "var",
             &target.name,
         ),
@@ -3536,7 +3537,7 @@ fn render_all_variable_items(
                 rows,
                 kind.anchor_prefix(),
                 &anchored_href(
-                    module_href("../", documentation, &module.name),
+                    &module_href("../", documentation, &module.name),
                     kind.anchor_prefix(),
                     &variable.name,
                 ),
@@ -3631,11 +3632,9 @@ fn render_inherited_members(
                 || inherited_member_anchor(group_index, "a", attribute_index),
                 |_| item_anchor("attr", &variable.name),
             );
-            let documentation_doc = variable.docstring.as_deref().or_else(|| {
-                attribute
-                    .override_member
-                    .and_then(|_| attribute.member.docstring.as_deref())
-            });
+            let documentation_doc = variable.docstring.as_deref().or(attribute
+                .override_member
+                .and(attribute.member.docstring.as_deref()));
             render_attribute_section(
                 &mut attribute_sections,
                 documentation,
@@ -3688,7 +3687,7 @@ fn render_inherited_members(
         render_attr(&mut groups, &group_anchor);
         groups.push_str("\" aria-label=\"Permalink to inherited members from ");
         render_attr(&mut groups, &group.class.name);
-        groups.push_str("\">§</a><span class=\"ist\">Inherited from ");
+        groups.push_str("\">§</a><span class=\"inherited-title\">Inherited from ");
         render_link(
             &mut groups,
             Some("class ibl"),
@@ -3722,7 +3721,7 @@ fn method_override_note<'a>(
 ) -> Option<OverrideNote<'a>> {
     find_inherited_function(documentation, class, &function.name).map(|base| OverrideNote {
         href: anchored_href(
-            class_page_href(root, documentation, &base.module.name, &base.class.name),
+            &class_page_href(root, documentation, &base.module.name, &base.class.name),
             "method",
             &base.member.name,
         ),
@@ -3739,7 +3738,7 @@ fn attribute_override_note<'a>(
 ) -> Option<OverrideNote<'a>> {
     find_inherited_attribute(documentation, class, &variable.name).map(|base| OverrideNote {
         href: anchored_href(
-            class_page_href(root, documentation, &base.module.name, &base.class.name),
+            &class_page_href(root, documentation, &base.module.name, &base.class.name),
             "attr",
             &base.member.name,
         ),
@@ -3941,6 +3940,7 @@ fn render_overload_count(output: &mut String, count: usize) {
     output.push_str("</span>");
 }
 
+#[derive(Copy, Clone)]
 struct FunctionSections<'a> {
     documentation: &'a Documentation,
     root: &'a str,
@@ -4017,7 +4017,7 @@ fn render_attribute_sections(
             variable,
             variable.docstring.as_deref(),
             &anchor,
-            override_note,
+            override_note.as_ref(),
         );
     }
 
@@ -4039,7 +4039,7 @@ fn render_attribute_section<'a>(
     variable: &'a VariableDoc,
     documentation_doc: Option<&'a str>,
     anchor: &str,
-    override_note: Option<OverrideNote<'a>>,
+    override_note: Option<&OverrideNote<'a>>,
 ) {
     let item_actions = source_href_for(root, documentation, source, Some(&variable.source_line));
     let has_collapsed_signature =
@@ -4066,7 +4066,7 @@ fn render_attribute_section<'a>(
             }
         },
         |body| {
-            if let Some(override_note) = &override_note {
+            if let Some(override_note) = override_note {
                 override_note.render_to(body);
             }
             if let Some(docstring) = documentation_doc {
@@ -4264,7 +4264,7 @@ fn class_page_href(root: &str, documentation: &Documentation, module: &str, clas
     )
 }
 
-fn anchored_href(page_href: String, anchor_prefix: &str, item_name: &str) -> String {
+fn anchored_href(page_href: &str, anchor_prefix: &str, item_name: &str) -> String {
     format!("{page_href}#{}", item_anchor(anchor_prefix, item_name))
 }
 
@@ -4552,7 +4552,7 @@ fn search_items(documentation: &Documentation) -> Vec<SearchItem> {
                 function.name.clone(),
                 format!("{}.{}", module.name, function.name),
                 anchored_href(
-                    module_href("", documentation, &module.name),
+                    &module_href("", documentation, &module.name),
                     "fn",
                     &function.name,
                 ),
@@ -4566,7 +4566,7 @@ fn search_items(documentation: &Documentation) -> Vec<SearchItem> {
                 variable.name.clone(),
                 format!("{}.{}", module.name, variable.name),
                 anchored_href(
-                    module_href("", documentation, &module.name),
+                    &module_href("", documentation, &module.name),
                     variable.kind.anchor_prefix(),
                     &variable.name,
                 ),
