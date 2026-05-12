@@ -2524,13 +2524,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 if nominal.class(db).is_final(db) =>
             {
                 self.with_recursion_guard(left, right, || {
-                    let nominally_satisfies_protocol =
-                        protocol
-                            .to_nominal_instance()
-                            .is_some_and(|protocol_nominal| {
-                                Type::NominalInstance(nominal)
-                                    .is_subtype_of(db, Type::NominalInstance(protocol_nominal))
-                            });
+                    let nominally_satisfies_protocol = protocol
+                        .to_nominal_instance(db)
+                        .is_some_and(|protocol_nominal| {
+                            Type::NominalInstance(nominal)
+                                .is_subtype_of(db, Type::NominalInstance(protocol_nominal))
+                        });
 
                     if nominally_satisfies_protocol {
                         self.never()

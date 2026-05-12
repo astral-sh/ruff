@@ -632,7 +632,7 @@ impl<'db> BoundSuperType<'db> {
                             let class = match bound {
                                 Type::NominalInstance(instance) => Some(instance.class(db)),
                                 Type::ProtocolInstance(protocol) => protocol
-                                    .to_nominal_instance()
+                                    .to_nominal_instance(db)
                                     .map(|instance| instance.class(db)),
                                 _ => None,
                             };
@@ -688,7 +688,7 @@ impl<'db> BoundSuperType<'db> {
             }
 
             Type::ProtocolInstance(protocol) => {
-                if let Some(nominal_instance) = protocol.to_nominal_instance() {
+                if let Some(nominal_instance) = protocol.to_nominal_instance(db) {
                     SuperOwnerKind::Resolved(Self::resolve_instance_super_owner(
                         db,
                         pivot_class,
@@ -748,7 +748,7 @@ impl<'db> BoundSuperType<'db> {
                         let class = match bound {
                             Type::NominalInstance(instance) => Some(instance.class(db)),
                             Type::ProtocolInstance(protocol) => protocol
-                                .to_nominal_instance()
+                                .to_nominal_instance(db)
                                 .map(|instance| instance.class(db)),
                             _ => None,
                         };

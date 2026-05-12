@@ -451,6 +451,41 @@ def _(x: object):
         reveal_type(type(x).x)  # revealed: int
 ```
 
+When top materialization rewrites a class-backed protocol, the narrowed type should still retain
+enough of its class origin for class-side lookup and nominal protocol subtyping:
+
+```py
+from typing import Any, ClassVar, Protocol
+from typing_extensions import TypeIs
+
+class HasGradualClassVar(Protocol):
+    x: ClassVar[Any]
+
+def is_has_gradual_class_var(x: object) -> TypeIs[HasGradualClassVar]:
+    return True
+
+def _(x: object):
+    if is_has_gradual_class_var(x):
+        reveal_type(type(x).x)  # revealed: Any
+
+class X(Protocol):
+    x: int
+
+class YProto(X, Protocol):
+    x: None = None  # TODO: we should emit an error here due to the Liskov violation
+
+    @property
+    def value(self) -> Any: ...
+
+def is_y_proto(x: object) -> TypeIs[YProto]:
+    return True
+
+def wants_x(x: X) -> None: ...
+def _(x: object):
+    if is_y_proto(x):
+        wants_x(x)
+```
+
 ## `TypeGuard` special cases
 
 ```py

@@ -850,6 +850,24 @@ def capybara(top: Top[Invariant[Any]], bottom: Bottom[Invariant[Any]]) -> None:
     reveal_type(bottom.attr)  # revealed: Never
 ```
 
+Materialized protocols should keep their rewritten interface visible in their display rather than
+looking identical to the original class-backed protocol:
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Top
+
+class ReadAny(Protocol):
+    @property
+    def value(self) -> Any: ...
+
+def _(plain: ReadAny, top: Top[ReadAny]) -> None:
+    reveal_type(plain)  # revealed: ReadAny
+    reveal_type(top)  # revealed: <Protocol with members 'value'>
+    reveal_type(plain.value)  # revealed: Any
+    reveal_type(top.value)  # revealed: object
+```
+
 Alias specializations also preserve the materialization polarity in contravariant positions.
 
 ```py

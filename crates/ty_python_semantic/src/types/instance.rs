@@ -464,14 +464,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // we can.
         let mut result = self.never();
 
-        if let Some(nominal_instance) = protocol.to_nominal_instance() {
+        if let Some(nominal_instance) = protocol.to_nominal_instance(db) {
             // if `ty` and `protocol` are *both* protocols, we also need to treat `ty` as if it
             // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
             // from a protocol `Q` to be a subtype of `Q` to be a subtype of `Q` if it overrides
             // `Q`'s members in a Liskov-incompatible way.
             let type_to_test = ty
                 .as_protocol_instance()
-                .and_then(ProtocolInstanceType::to_nominal_instance)
+                .and_then(|protocol| protocol.to_nominal_instance(db))
                 .map(Type::NominalInstance)
                 .unwrap_or(ty);
 
@@ -686,15 +686,10 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    /// If this is a class-based protocol, convert the protocol-instance into a nominal instance.
-    ///
-    /// If this is a synthesized protocol that does not correspond to a class definition
-    /// in source code, return `None`. These are "pure" abstract types, that cannot be
+    /// If this protocol preserves a class origin, convert the protocol-instance into a nominal
+    /// instance. Pure synthesized protocols do not have such an origin and therefore cannot be
     /// treated in a nominal way.
-    pub(super) fn to_nominal_instance(
-        self,
-        db: &'db dyn Db,
-    ) -> Option<NominalInstanceType<'db>> {
+    pub(super) fn to_nominal_instance(self, db: &'db dyn Db) -> Option<NominalInstanceType<'db>> {
         match self.inner {
             Protocol::FromClass(class) => {
                 Some(NominalInstanceType(NominalInstanceInner::NonTuple(*class)))
@@ -723,11 +718,10 @@ impl<'db> ProtocolInstanceType<'db> {
             //     reveal_type(type(x))                 # mypy: "type[def (builtins.int) -> builtins.str]"
             //     reveal_type(type(x).__call__)        # mypy: "def (*args: Any, **kwds: Any) -> Any"
             // ```
-            Protocol::Synthesized(synthesized) => synthesized
-                .origin(db)
-                .map_or_else(|| KnownClass::Type.to_instance(db), |origin| {
-                    SubclassOfType::from(db, origin)
-                }),
+            Protocol::Synthesized(synthesized) => synthesized.origin(db).map_or_else(
+                || KnownClass::Type.to_instance(db),
+                |origin| SubclassOfType::from(db, origin),
+            ),
         }
     }
 
@@ -921,7 +915,7 @@ mod synthesized_protocol {
     ///
     /// Some synthesized protocols are pure structural types. Others are materialized versions of a
     /// class-backed protocol: they need a rewritten interface for relation checking, but still
-    /// retain their class origin for nominal metadata such as display and generator semantics.
+    /// retain their class origin for nominal metadata such as generator semantics.
     #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
     pub(in crate::types) struct SynthesizedProtocolType<'db> {
         pub(in crate::types) interface: ProtocolInterface<'db>,
