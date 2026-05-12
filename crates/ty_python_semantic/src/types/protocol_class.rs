@@ -1006,23 +1006,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     member
                         .instance_set_type()
                         .when_err_or(db, self.constraints, |set_type| {
-                            if let Place::Defined(DefinedPlace {
-                                ty: Type::PropertyInstance(property),
-                                ..
-                            }) = ty.class_member(db, Name::from(member.name)).place
-                                && let ProtocolMemberKind::Property {
-                                    set_type: Some(candidate_set_type),
-                                    ..
-                                } = ProtocolMemberKind::from_property_instance(property, db)
-                            {
-                                self.check_type_pair(db, set_type, candidate_set_type)
-                            } else {
-                                ConstraintSet::from_bool(
-                                    self.constraints,
-                                    ty.validate_attribute_assignment(db, member.name, set_type)
-                                        .is_ok(),
-                                )
-                            }
+                            ConstraintSet::from_bool(
+                                self.constraints,
+                                ty.validate_attribute_assignment(db, member.name, set_type)
+                                    .is_ok(),
+                            )
                         })
                 })
                 .and(db, self.constraints, || {

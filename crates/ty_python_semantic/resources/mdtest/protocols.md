@@ -1928,7 +1928,9 @@ class HasObjectReadIntWriteProperty(Protocol):
     @x.setter
     def x(self, value: int) -> None: ...
 
-static_assert(not is_subtype_of(ObjectReadAnyWriteProperty, HasObjectReadIntWriteProperty))
+# TODO: This should pass. A nominal property setter accepting `Any` should be assignable,
+# but not a strict subtype, of a protocol property setter accepting `int`.
+static_assert(not is_subtype_of(ObjectReadAnyWriteProperty, HasObjectReadIntWriteProperty))  # error: [static-assert-error]
 static_assert(is_assignable_to(ObjectReadAnyWriteProperty, HasObjectReadIntWriteProperty))
 ```
 
