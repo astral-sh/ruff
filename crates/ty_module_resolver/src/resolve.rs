@@ -33,6 +33,7 @@ specifies ty's implementation of Python's import resolution algorithm.
 
 use std::borrow::Cow;
 use std::iter::FusedIterator;
+use std::sync::Arc;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
@@ -762,11 +763,24 @@ impl SearchPaths {
 /// The editable-install search paths for the first `site-packages` directory
 /// should come between the two `site-packages` directories when it comes to
 /// module-resolution priority.
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+struct DynamicResolutionPathData {
+    search_paths: Vec<SearchPath>,
+    plain_editable_origins: Vec<PlainEditableSearchPathOrigin>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+struct PlainEditableSearchPathOrigin {
+    path: SystemPathBuf,
+    site_packages_index: usize,
+    pth_origin: PthLineOrigin,
+}
+
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn dynamic_resolution_paths<'db>(
+fn dynamic_resolution_path_data<'db>(
     db: &'db dyn Db,
     mode: ModuleResolveModeIngredient<'db>,
-) -> Vec<SearchPath> {
+) -> Arc<DynamicResolutionPathData> {
     tracing::debug!("Resolving dynamic module resolution paths");
 
     let SearchPaths {
@@ -777,10 +791,13 @@ pub(crate) fn dynamic_resolution_paths<'db>(
         real_stdlib_path,
     } = db.search_paths();
 
-    let mut dynamic_paths = Vec::new();
+    let mut dynamic_paths = DynamicResolutionPathData {
+        search_paths: Vec::new(),
+        plain_editable_origins: Vec::new(),
+    };
 
     if site_packages.is_empty() {
-        return dynamic_paths;
+        return Arc::new(dynamic_paths);
     }
 
     let mut existing_paths: FxHashSet<_> = static_paths
@@ -802,7 +819,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
     let files = db.files();
     let system = db.system();
 
-    for site_packages_search_path in site_packages {
+    for (site_packages_index, site_packages_search_path) in site_packages.iter().enumerate() {
         let site_packages_dir = site_packages_search_path
             .as_system_path()
             .expect("Expected site package path to be a system path");
@@ -820,7 +837,9 @@ pub(crate) fn dynamic_resolution_paths<'db>(
         // site-package directory's revision.
         site_packages_root.revision(db);
 
-        dynamic_paths.push(site_packages_search_path.clone());
+        dynamic_paths
+            .search_paths
+            .push(site_packages_search_path.clone());
 
         // As well as modules installed directly into `site-packages`,
         // the directory may also contain `.pth` files.
@@ -844,9 +863,9 @@ pub(crate) fn dynamic_resolution_paths<'db>(
         let mut all_pth_files: Vec<PthFile> = pth_file_iterator.collect();
         all_pth_files.sort_unstable_by(|a, b| a.path.cmp(&b.path));
 
-        let installations = all_pth_files.iter().flat_map(PthFile::items);
+        let installations = all_pth_files.iter().flat_map(PthFile::items_with_origins);
 
-        for installation in installations {
+        for (pth_origin, installation) in installations {
             let installation = system
                 .canonicalize_path(&installation)
                 .unwrap_or(installation);
@@ -869,7 +888,14 @@ pub(crate) fn dynamic_resolution_paths<'db>(
                             register_editable_root(db, dynamic_path);
                         }
 
-                        dynamic_paths.push(search_path);
+                        dynamic_paths
+                            .plain_editable_origins
+                            .push(PlainEditableSearchPathOrigin {
+                                path: installation,
+                                site_packages_index,
+                                pth_origin,
+                            });
+                        dynamic_paths.search_paths.push(search_path);
                     }
 
                     Err(error) => {
@@ -880,7 +906,15 @@ pub(crate) fn dynamic_resolution_paths<'db>(
         }
     }
 
-    dynamic_paths
+    Arc::new(dynamic_paths)
+}
+
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn dynamic_resolution_paths<'db>(
+    db: &'db dyn Db,
+    mode: ModuleResolveModeIngredient<'db>,
+) -> Vec<SearchPath> {
+    dynamic_resolution_path_data(db, mode).search_paths.clone()
 }
 
 fn register_editable_root(db: &dyn Db, path: &SystemPath) {
@@ -948,10 +982,6 @@ struct PthLineOrigin {
 impl<'db> PthFile<'db> {
     /// Yield paths in this `.pth` file that appear to represent editable installations,
     /// and should therefore be added as module-resolution search paths.
-    fn items(&'db self) -> impl Iterator<Item = SystemPathBuf> + 'db {
-        self.items_with_origins().map(|(_, path)| path)
-    }
-
     fn items_with_origins(&'db self) -> impl Iterator<Item = (PthLineOrigin, SystemPathBuf)> + 'db {
         let PthFile {
             path,
@@ -1032,6 +1062,7 @@ impl<'db> PthFile<'db> {
 /// - a later configured `site-packages` root altogether.
 fn namespace_placeholder_shadowed_search_path_origin(
     db: &dyn Db,
+    mode: ModuleResolveMode,
     search_path: &SearchPath,
 ) -> Option<(usize, Option<PthLineOrigin>)> {
     let target = search_path.as_system_path()?;
@@ -1043,9 +1074,6 @@ fn namespace_placeholder_shadowed_search_path_origin(
         real_stdlib_path: _,
     } = db.search_paths();
 
-    let files = db.files();
-    let system = db.system();
-
     for (site_packages_index, site_packages_search_path) in site_packages.iter().enumerate() {
         let site_packages_dir = site_packages_search_path
             .as_system_path()
@@ -1054,42 +1082,17 @@ fn namespace_placeholder_shadowed_search_path_origin(
         if search_path.is_site_packages() && site_packages_dir == target {
             return Some((site_packages_index, None));
         }
-
-        if !search_path.is_editable() {
-            continue;
-        }
-
-        let site_packages_root = files.expect_root(db, site_packages_dir);
-
-        site_packages_root.revision(db);
-
-        let pth_file_iterator = match PthFileIterator::new(db, site_packages_dir) {
-            Ok(iterator) => iterator,
-            Err(error) => {
-                tracing::warn!(
-                    "Failed to search for editable installation in {site_packages_dir}: {error}"
-                );
-                continue;
-            }
-        };
-
-        let mut all_pth_files: Vec<PthFile> = pth_file_iterator.collect();
-        all_pth_files.sort_unstable_by(|a, b| a.path.cmp(&b.path));
-
-        for pth_file in all_pth_files {
-            for (origin, installation) in pth_file.items_with_origins() {
-                let installation = system
-                    .canonicalize_path(&installation)
-                    .unwrap_or(installation);
-
-                if installation.as_path() == target {
-                    return Some((site_packages_index, Some(origin)));
-                }
-            }
-        }
     }
 
-    None
+    if !search_path.is_editable() {
+        return None;
+    }
+
+    dynamic_resolution_path_data(db, ModuleResolveModeIngredient::new(db, mode))
+        .plain_editable_origins
+        .iter()
+        .find(|origin| origin.path.as_path() == target)
+        .map(|origin| (origin.site_packages_index, Some(origin.pth_origin.clone())))
 }
 
 /// Iterator that yields a [`PthFile`] instance for every `.pth` file
@@ -1231,6 +1234,39 @@ pub(crate) fn setuptools_editable_finders<'db>(db: &'db dyn Db) -> Vec<Setuptool
     }
 
     finders
+}
+
+/// Return the external directory roots that current setuptools-generated editable finders can
+/// resolve through. These roots are not ordinary `sys.path` entries, but edits under them can
+/// invalidate finder-backed imports and therefore need the same watcher coverage.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn setuptools_editable_finder_search_paths<'db>(db: &'db dyn Db) -> Vec<SystemPathBuf> {
+    let system = db.system();
+    let mut paths = Vec::new();
+    let mut existing_paths = FxHashSet::default();
+
+    for finder in setuptools_editable_finders(db) {
+        for path in finder.editable_search_roots() {
+            if !existing_paths.insert(path.clone()) {
+                continue;
+            }
+
+            match SearchPath::editable(system, path) {
+                Ok(search_path) => {
+                    let path = search_path
+                        .as_system_path()
+                        .expect("editable search paths should be system paths");
+                    register_editable_root(db, path);
+                    paths.push(path.to_path_buf());
+                }
+                Err(error) => {
+                    tracing::debug!("Skipping setuptools editable finder search path: {error}");
+                }
+            }
+        }
+    }
+
+    paths
 }
 
 fn resolve_name_in_setuptools_editable_finders(
@@ -1388,7 +1424,7 @@ fn resolve_name_in_setuptools_editable_namespace_placeholders_before_search_path
     search_path: &SearchPath,
 ) -> ResolveNameResult {
     let Some((site_packages_index, lower_priority_origin)) =
-        namespace_placeholder_shadowed_search_path_origin(db, search_path)
+        namespace_placeholder_shadowed_search_path_origin(db, mode, search_path)
     else {
         return ResolveNameResult::Missing;
     };
@@ -1510,6 +1546,23 @@ impl SetuptoolsEditableFinder {
             mapping,
             namespaces,
         })
+    }
+
+    fn editable_search_roots(&self) -> impl Iterator<Item = SystemPathBuf> + '_ {
+        self.mapping
+            .iter()
+            .map(|mapping| {
+                mapping
+                    .path
+                    .parent()
+                    .unwrap_or(&self.site_packages)
+                    .to_path_buf()
+            })
+            .chain(
+                self.namespaces
+                    .iter()
+                    .flat_map(|namespace| namespace.paths.iter().cloned()),
+            )
     }
 
     pub(crate) fn top_level_modules<'db>(&self, db: &'db dyn Db) -> Vec<Module<'db>> {
@@ -2178,6 +2231,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
             {
                 if namespace_placeholder_shadowed_search_path_origin(
                     db,
+                    mode,
                     candidate.path.search_path(),
                 )
                 .is_some()
@@ -5282,6 +5336,59 @@ NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/editable/ns"]}
     }
 
     #[test]
+    fn setuptools_editable_plain_pth_origins_are_cached_for_placeholder_ordering() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.ns.pth",
+                "import __editable___ns_finder; __editable___ns_finder.install()",
+            ),
+            (
+                "__editable___ns_finder.py",
+                r#"
+MAPPING: dict[str, str] = {}
+NAMESPACES: dict[str, list[str]] = {"ns": ["/workspace/editable/ns"]}
+"#,
+            ),
+            ("zz-late-editable.pth", "/workspace/late"),
+        ];
+
+        let external_files = [
+            ("/workspace/editable/ns/first/__init__.py", ""),
+            ("/workspace/editable/ns/second/__init__.py", ""),
+            ("/workspace/late/ns/first/__init__.py", ""),
+            ("/workspace/late/ns/second/__init__.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        let first_module_name = ModuleName::new_static("ns.first").unwrap();
+        let first_module = resolve_module_confident(&db, &first_module_name).unwrap();
+        assert_eq!(
+            first_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/editable/ns/first/__init__.py")
+        );
+
+        db.clear_salsa_events();
+        let second_module_name = ModuleName::new_static("ns.second").unwrap();
+        let second_module = resolve_module_confident(&db, &second_module_name).unwrap();
+        assert_eq!(
+            second_module.file(&db).unwrap().path(&db),
+            &FilePath::system("/workspace/editable/ns/second/__init__.py")
+        );
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run(
+            &db,
+            dynamic_resolution_path_data,
+            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::StubsAllowed),
+            &events,
+        );
+    }
+
+    #[test]
     fn setuptools_editable_install_namespace_placeholder_precedes_later_site_packages_root() {
         let mut db = TestDb::new();
 
@@ -5613,6 +5720,40 @@ NAMESPACES: dict[str, list[str]] = {}
 
         let module_name = ModuleName::new_static("typing_extensions").unwrap();
         assert_eq!(resolve_real_module_confident(&db, &module_name), None);
+    }
+
+    #[test]
+    fn setuptools_editable_finder_roots_are_system_module_search_paths() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "__editable__.pkg.pth",
+                "import __editable___pkg_finder; __editable___pkg_finder.install()",
+            ),
+            (
+                "__editable___pkg_finder.py",
+                r#"
+MAPPING: dict[str, str] = {"pkg": "/workspace/pkg"}
+NAMESPACES: dict[str, list[str]] = {"ns": ["/namespace/ns"]}
+"#,
+            ),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files([
+            ("/workspace/pkg/__init__.py", ""),
+            ("/namespace/ns/child.py", ""),
+        ])
+        .unwrap();
+
+        let search_paths = crate::system_module_search_paths(&db)
+            .map(SystemPath::to_path_buf)
+            .collect::<Vec<_>>();
+
+        assert!(search_paths.contains(&SystemPathBuf::from("/workspace")));
+        assert!(search_paths.contains(&SystemPathBuf::from("/namespace/ns")));
     }
 
     #[test]

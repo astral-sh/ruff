@@ -1,6 +1,6 @@
 use std::iter::FusedIterator;
 
-use ruff_db::system::SystemPath;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 
 pub use db::Db;
 pub use module::KnownModule;
@@ -35,30 +35,39 @@ mod typeshed;
 #[cfg(test)]
 mod testing;
 
-/// Returns an iterator over all search paths pointing to a system path
+/// Returns an iterator over system directories whose contents can affect module resolution.
+///
+/// This includes ordinary module search paths plus the external roots referenced by supported
+/// setuptools editable finders, which are not themselves `sys.path` entries but still need file
+/// watcher coverage.
 pub fn system_module_search_paths(db: &dyn Db) -> SystemModuleSearchPathsIter<'_> {
     SystemModuleSearchPathsIter {
         // Always run in `StubsAllowed` mode because we want to include as much as possible
         // and we don't care about the "real" stdlib
         inner: search_paths(db, ModuleResolveMode::StubsAllowed),
+        setuptools_editable_finder_paths: resolve::setuptools_editable_finder_search_paths(db)
+            .iter(),
     }
 }
 
 pub struct SystemModuleSearchPathsIter<'db> {
     inner: SearchPathIterator<'db>,
+    setuptools_editable_finder_paths: std::slice::Iter<'db, SystemPathBuf>,
 }
 
 impl<'db> Iterator for SystemModuleSearchPathsIter<'db> {
     type Item = &'db SystemPath;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let next = self.inner.next()?;
-
+        while let Some(next) = self.inner.next() {
             if let Some(system_path) = next.as_system_path() {
                 return Some(system_path);
             }
         }
+
+        self.setuptools_editable_finder_paths
+            .next()
+            .map(SystemPathBuf::as_path)
     }
 }
 
