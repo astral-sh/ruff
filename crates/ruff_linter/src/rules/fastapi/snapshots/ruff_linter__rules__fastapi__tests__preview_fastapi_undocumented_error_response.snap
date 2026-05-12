@@ -1,0 +1,152 @@
+---
+source: crates/ruff_linter/src/rules/fastapi/mod.rs
+---
+FAST004 FastAPI route raises HTTP 404 but does not document it in `responses=`
+  --> FAST004.py:19:1
+   |
+18 | # Violation: literal int raised but not documented.
+19 | @app.get("/missing-literal")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+20 | async def missing_literal():
+21 |     raise HTTPException(status_code=404, detail="missing")
+   |
+
+FAST004 FastAPI route raises HTTP 404 but does not document it in `responses=`
+  --> FAST004.py:25:1
+   |
+24 | # Violation: positional literal int.
+25 | @app.get("/missing-positional")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+26 | async def missing_positional():
+27 |     raise HTTPException(404, detail="missing")
+   |
+
+FAST004 FastAPI route raises HTTP 409 but does not document it in `responses=`
+  --> FAST004.py:37:1
+   |
+36 | # Violation: HTTPStatus resolves to an error code.
+37 | @app.get("/missing-http-status")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+38 | async def missing_http_status():
+39 |     raise HTTPException(status_code=HTTPStatus.CONFLICT, detail="conflict")
+   |
+
+FAST004 FastAPI route raises HTTP 403 but does not document it in `responses=`
+  --> FAST004.py:43:1
+   |
+42 | # Violation: fastapi.status constant resolves to an error code.
+43 | @app.get("/missing-fastapi-status")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+44 | async def missing_fastapi_status():
+45 |     raise HTTPException(status.HTTP_403_FORBIDDEN, detail="forbidden")
+   |
+
+FAST004 FastAPI route raises HTTP 404 but does not document it in `responses=`
+  --> FAST004.py:76:1
+   |
+75 | # Violation: returned JSONResponse error code is not documented.
+76 | @app.get("/missing-json-response")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+77 | async def missing_json_response():
+78 |     return JSONResponse({"detail": "missing"}, status_code=404)
+   |
+
+FAST004 FastAPI route raises HTTP 422 but does not document it in `responses=`
+  --> FAST004.py:82:1
+   |
+81 | # Violation: 422 always flagged (auto-422 schema is for Pydantic, not user body).
+82 | @app.get("/explicit-422")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+83 | async def explicit_422(item_id: int):
+84 |     raise HTTPException(status_code=422, detail="domain validation failed")
+   |
+
+FAST004 FastAPI route raises HTTP 503 but does not document it in `responses=`
+   --> FAST004.py:103:1
+    |
+102 | # Violation: raise inside try/except still counts.
+103 | @app.get("/raise-in-try")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^
+104 | async def raise_in_try():
+105 |     try:
+    |
+
+FAST004 FastAPI route raises HTTP 418 but does not document it in `responses=`
+   --> FAST004.py:112:1
+    |
+111 | # Violation: starlette's HTTPException is treated the same as fastapi's.
+112 | @app.get("/starlette-exception")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+113 | async def starlette_exception():
+114 |     raise StarletteHTTPException(status_code=418, detail="teapot")
+    |
+
+FAST004 FastAPI route raises HTTP 500 but does not document it in `responses=`
+   --> FAST004.py:118:1
+    |
+117 | # Violation: starlette.status constants resolve too.
+118 | @app.get("/starlette-status-const")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+119 | async def starlette_status_const():
+120 |     raise HTTPException(starlette_status.HTTP_500_INTERNAL_SERVER_ERROR)
+    |
+
+FAST004 FastAPI route raises HTTP 400, 503 but does not document them in `responses=`
+   --> FAST004.py:142:1
+    |
+141 | # Violation: two different codes raised, both missing from responses.
+142 | @app.get("/multiple-violations")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+143 | async def multiple_violations(user_id: int):
+144 |     if user_id < 0:
+    |
+
+FAST004 FastAPI route raises HTTP 404 but does not document it in `responses=`
+   --> FAST004.py:150:1
+    |
+149 | # Violation: rule fires on sync routes too.
+150 | @app.get("/sync-route")
+    | ^^^^^^^^^^^^^^^^^^^^^^^
+151 | def sync_route():
+152 |     raise HTTPException(status_code=404, detail="missing")
+    |
+
+FAST004 FastAPI route raises HTTP 409 but does not document it in `responses=`
+   --> FAST004.py:156:1
+    |
+155 | # Violation: non-GET methods are also routes (POST in this case).
+156 | @app.post("/create")
+    | ^^^^^^^^^^^^^^^^^^^^
+157 | async def create():
+158 |     raise HTTPException(status_code=409, detail="already exists")
+    |
+
+FAST004 FastAPI route raises HTTP 404 but does not document it in `responses=`
+   --> FAST004.py:175:1
+    |
+174 | # Violation: include_in_schema=True does not suppress the rule (only False does).
+175 | @app.get("/explicit-include-true", include_in_schema=True)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+176 | async def explicit_include_true():
+177 |     raise HTTPException(status_code=404, detail="missing")
+    |
+
+FAST004 FastAPI route raises HTTP 404 but does not document it in `responses=`
+   --> FAST004.py:187:1
+    |
+186 | # Violation: status_code as a positional argument to a Response constructor.
+187 | @app.get("/positional-response-status")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+188 | async def positional_response_status():
+189 |     return JSONResponse({"detail": "missing"}, 404)
+    |
+
+FAST004 FastAPI route raises HTTP 404 but does not document it in `responses=`
+   --> FAST004.py:207:1
+    |
+206 | # Violation: HTTPStatus members also expose `.value` for the int form.
+207 | @app.get("/missing-http-status-value")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+208 | async def missing_http_status_value():
+209 |     raise HTTPException(status_code=HTTPStatus.NOT_FOUND.value, detail="missing")
+    |

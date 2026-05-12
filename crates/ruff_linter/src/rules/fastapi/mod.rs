@@ -30,6 +30,16 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn preview_fastapi_undocumented_error_response() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("fastapi/FAST004.py"),
+            &LinterSettings::for_rule(Rule::FastApiUndocumentedErrorResponse).with_preview_mode(),
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::FastApiRedundantResponseModel, Path::new("FAST001.py"))]
     #[test_case(Rule::FastApiUnusedPathParameter, Path::new("FAST003.py"))]
     fn deferred_annotations_diff(rule_code: Rule, path: &Path) -> Result<()> {
