@@ -33,6 +33,7 @@ pub use all_symbols::{AllSymbolInfo, all_symbols};
 pub use code_action::{QuickFix, code_actions};
 pub use completion::{Completion, CompletionKind, CompletionSettings, completion};
 pub use doc_highlights::document_highlights;
+pub use docstring::Docstring;
 pub use document_symbols::document_symbols;
 pub use find_references::find_references;
 pub use folding_range::{FoldingRange, FoldingRangeKind, folding_ranges};
@@ -50,7 +51,9 @@ pub use semantic_tokens::{
     SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens, semantic_tokens,
 };
 pub use signature_help::{ParameterDetails, SignatureDetails, SignatureHelpInfo, signature_help};
-pub use symbols::{FlatSymbols, HierarchicalSymbols, SymbolId, SymbolInfo, SymbolKind};
+pub use symbols::{
+    FlatSymbols, HierarchicalSymbols, SymbolId, SymbolInfo, SymbolKind, exported_symbols,
+};
 pub use type_hierarchy::{
     TypeHierarchyItem, prepare_type_hierarchy, type_hierarchy_subtypes, type_hierarchy_supertypes,
 };

@@ -1037,6 +1037,23 @@ impl<'db> Type<'db> {
         })
     }
 
+    pub fn is_enum_class(&self, db: &'db dyn Db) -> bool {
+        self.as_class_literal()
+            .is_some_and(|class| enum_metadata(db, class).is_some())
+    }
+
+    pub fn enum_member_names(&self, db: &'db dyn Db) -> Option<Vec<String>> {
+        let class = self.as_class_literal()?;
+        let metadata = enum_metadata(db, class)?;
+        Some(
+            metadata
+                .members
+                .keys()
+                .map(|name| name.as_str().to_string())
+                .collect(),
+        )
+    }
+
     fn is_typealias_special_form(&self) -> bool {
         matches!(self, Type::SpecialForm(SpecialFormType::TypeAlias))
     }

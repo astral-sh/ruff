@@ -415,6 +415,11 @@ pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: File) -> FlatSymbo
     visitor.into_flat_symbols()
 }
 
+/// Returns the symbols that form the exported interface of a module.
+pub fn exported_symbols(db: &dyn Db, file: File) -> &FlatSymbols {
+    symbols_for_file_global_only(db, file)
+}
+
 fn symbols_for_file_global_only_cycle_initial(
     _db: &dyn Db,
     _id: salsa::Id,

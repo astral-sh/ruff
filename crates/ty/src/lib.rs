@@ -1,4 +1,5 @@
 mod args;
+mod doc;
 mod logging;
 mod printer;
 mod python_version;
@@ -50,6 +51,7 @@ pub fn run() -> anyhow::Result<ExitStatus> {
     match args.command {
         Command::Server => run_server().map(|()| ExitStatus::Success),
         Command::Check(check_args) => run_check(check_args),
+        Command::Doc(doc_args) => doc::run(doc_args),
         Command::Version { output_format } => version(output_format).map(|()| ExitStatus::Success),
         Command::GenerateShellCompletion { shell } => {
             use std::io::stdout;

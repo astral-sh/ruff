@@ -27,11 +27,13 @@ pub struct Cli {
     pub(crate) command: Command,
 }
 
-#[expect(clippy::large_enum_variant)]
 #[derive(Debug, clap::Subcommand)]
 pub(crate) enum Command {
     /// Check a project for type errors.
     Check(CheckCommand),
+
+    /// Generate documentation for a project.
+    Doc(DocCommand),
 
     /// Start the language server
     Server,
@@ -56,6 +58,164 @@ pub(crate) enum Command {
         #[command(subcommand)]
         command: ExplainCommand,
     },
+}
+
+#[derive(Debug, Parser)]
+#[expect(clippy::struct_excessive_bools)]
+pub(crate) struct DocCommand {
+    /// List of files or directories to document.
+    #[clap(
+        help = "List of files or directories to document [default: the project package]",
+        value_name = "PATH"
+    )]
+    pub(crate) paths: Vec<SystemPathBuf>,
+
+    /// Run the command within the given project directory.
+    ///
+    /// All `pyproject.toml` files will be discovered by walking up the directory tree from the given project directory,
+    /// as will the project's virtual environment (`.venv`) unless the `venv-path` option is set.
+    ///
+    /// Other command-line arguments (such as relative paths) will be resolved relative to the current working directory.
+    #[arg(long, value_name = "PROJECT")]
+    pub(crate) project: Option<SystemPathBuf>,
+
+    /// Directory to write generated documentation to.
+    #[arg(long, value_name = "DIRECTORY")]
+    pub(crate) output_dir: Option<SystemPathBuf>,
+
+    /// Open the generated documentation in a browser.
+    #[arg(long)]
+    pub(crate) open: bool,
+
+    /// Document private items.
+    #[arg(long)]
+    pub(crate) document_private_items: bool,
+
+    /// Path to your project's Python environment or interpreter.
+    ///
+    /// ty uses your Python environment to resolve third-party imports in your code.
+    #[arg(long, value_name = "PATH", alias = "venv")]
+    pub(crate) python: Option<SystemPathBuf>,
+
+    /// Custom directory to use for stdlib typeshed stubs.
+    #[arg(long, value_name = "PATH", alias = "custom-typeshed-dir")]
+    pub(crate) typeshed: Option<SystemPathBuf>,
+
+    /// Additional path to use as a module-resolution source (can be passed multiple times).
+    #[arg(long, value_name = "PATH")]
+    pub(crate) extra_search_path: Option<Vec<SystemPathBuf>>,
+
+    /// Python version to assume when resolving types.
+    #[arg(long, value_name = "VERSION", alias = "target-version", value_enum)]
+    pub(crate) python_version: Option<PythonVersion>,
+
+    /// Target platform to assume when resolving types.
+    #[arg(long, value_name = "PLATFORM", alias = "platform")]
+    pub(crate) python_platform: Option<String>,
+
+    #[clap(flatten)]
+    pub(crate) verbosity: Verbosity,
+
+    #[clap(flatten)]
+    pub(crate) config: ConfigsArg,
+
+    /// The path to a `ty.toml` file to use for configuration.
+    ///
+    /// While ty configuration can be included in a `pyproject.toml` file, it is not allowed in this context.
+    #[arg(long, env = EnvVars::TY_CONFIG_FILE, value_name = "PATH")]
+    pub(crate) config_file: Option<SystemPathBuf>,
+
+    /// The format to use for printing diagnostic messages.
+    #[arg(long, env = EnvVars::TY_OUTPUT_FORMAT)]
+    pub(crate) output_format: Option<OutputFormat>,
+
+    /// Respect file exclusions via `.gitignore` and other standard ignore files.
+    /// Use `--no-respect-ignore-files` to disable.
+    #[arg(
+        long,
+        overrides_with("no_respect_ignore_files"),
+        help_heading = "File selection",
+        default_missing_value = "true",
+        num_args = 0..1
+    )]
+    respect_ignore_files: Option<bool>,
+    #[clap(long, overrides_with("respect_ignore_files"), hide = true)]
+    no_respect_ignore_files: bool,
+
+    /// Enforce exclusions, even for paths passed to ty directly on the command-line.
+    /// Use `--no-force-exclude` to disable.
+    #[arg(
+        long,
+        overrides_with("no_force_exclude"),
+        help_heading = "File selection"
+    )]
+    force_exclude: bool,
+    #[clap(long, overrides_with("force_exclude"), hide = true)]
+    no_force_exclude: bool,
+
+    /// Glob patterns for files to exclude from documentation.
+    #[arg(long, help_heading = "File selection")]
+    exclude: Option<Vec<String>>,
+
+    /// Control when colored output is used.
+    #[arg(
+        long,
+        value_name = "WHEN",
+        help_heading = "Global options",
+        display_order = 1000
+    )]
+    pub(crate) color: Option<TerminalColor>,
+
+    /// Hide all progress outputs.
+    ///
+    /// For example, spinners or progress bars.
+    #[arg(global = true, long, value_parser = clap::builder::BoolishValueParser::new(), help_heading = "Global options")]
+    pub(crate) no_progress: bool,
+}
+
+impl DocCommand {
+    pub(crate) fn force_exclude(&self) -> bool {
+        resolve_bool_arg(self.force_exclude, self.no_force_exclude).unwrap_or_default()
+    }
+
+    pub(crate) fn into_options(self) -> Options {
+        let respect_ignore_files = self
+            .no_respect_ignore_files
+            .then_some(false)
+            .or(self.respect_ignore_files);
+        let options = Options {
+            environment: Some(EnvironmentOptions {
+                python_version: self.python_version.map(Into::into).map(RangedValue::cli),
+                python_platform: self
+                    .python_platform
+                    .map(|platform| RangedValue::cli(platform.into())),
+                python: self.python.map(RelativePathBuf::cli),
+                typeshed: self.typeshed.map(RelativePathBuf::cli),
+                extra_paths: self.extra_search_path.map(|extra_search_paths| {
+                    extra_search_paths
+                        .into_iter()
+                        .map(RelativePathBuf::cli)
+                        .collect()
+                }),
+                ..EnvironmentOptions::default()
+            }),
+            terminal: Some(TerminalOptions {
+                output_format: self
+                    .output_format
+                    .map(|output_format| RangedValue::cli(output_format.into())),
+                ..TerminalOptions::default()
+            }),
+            src: Some(SrcOptions {
+                respect_ignore_files,
+                exclude: self.exclude.map(|excludes| {
+                    RangedValue::cli(excludes.iter().map(RelativeGlobPattern::cli).collect())
+                }),
+                ..SrcOptions::default()
+            }),
+            ..Options::default()
+        };
+        options.combine(self.config.into_options().unwrap_or_default())
+    }
 }
 
 #[derive(Debug, Parser)]
