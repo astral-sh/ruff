@@ -3321,6 +3321,7 @@ impl<'db> Type<'db> {
             Type::Intersection(intersection) => {
                 if matches!(name_str, "name" | "_name_" | "value" | "_value_")
                     && let Some(complement) = intersection.enum_complement(db)
+                    && complement.rest(db).iter().all(Type::is_dynamic)
                     && let Some(member_ty) = complement.member_type(db, name_str)
                 {
                     Place::bound(member_ty).into()

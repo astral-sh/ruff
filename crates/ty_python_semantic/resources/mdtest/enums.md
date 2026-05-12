@@ -2610,7 +2610,7 @@ def _(answer: Answer):
 
 ```py
 from enum import Enum
-from typing import Any, TypeVar
+from typing import Any, Protocol, TypeVar
 from typing_extensions import Literal, assert_never, assert_type, overload
 from ty_extensions import Intersection
 
@@ -2659,6 +2659,20 @@ def color_value_without_red_and_with_typevar(
     if color is Color.RED:
         raise ValueError()
     reveal_type(color.value)  # revealed: Literal[2, 3]
+    return color.value
+
+class HasValue(Protocol):
+    @property
+    def value(self) -> Literal[2]: ...
+
+TWithRestrictedValue = TypeVar("TWithRestrictedValue", bound=HasValue)
+
+def color_value_without_red_and_with_restricted_typevar(
+    color: Intersection[Color, TWithRestrictedValue],
+) -> Literal[2]:
+    if color is Color.RED:
+        raise ValueError()
+    reveal_type(color.value)  # revealed: Literal[2]
     return color.value
 
 def color_truthy_without_red(color: Color) -> int:
