@@ -5,13 +5,8 @@ use std::{
 };
 
 use anyhow::{Context, bail};
-use camino::Utf8Path;
 use indexmap::{IndexMap, map::Entry};
-use ruff_db::{
-    diagnostic::{Diagnostic, FileResolver},
-    panic::PanicError,
-    system::{SystemPath, SystemPathBuf},
-};
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ruff_index::{IndexVec, newtype_index};
@@ -157,7 +152,7 @@ impl<'m, 's, C> MarkdownTest<'m, 's, C> {
         &self.section.config
     }
 
-    fn should_snapshot_diagnostics(&self) -> bool {
+    pub(crate) fn should_snapshot_diagnostics(&self) -> bool {
         self.section
             .directives
             .has_directive_set(MdtestDirective::SnapshotDiagnostics)
@@ -172,75 +167,6 @@ impl<'m, 's, C> MarkdownTest<'m, 's, C> {
         self.section
             .directives
             .has_directive_set(MdtestDirective::PullTypesSkip)
-    }
-
-    pub fn check_panic(&self, panic_info: Option<PanicError>) {
-        match panic_info {
-            Some(panic_info) => {
-                let expected_message = self
-                    .should_expect_panic()
-                    .expect("panic_info is only set when `should_expect_panic` is `Ok`");
-
-                if let Some(expected_message) = expected_message {
-                    let message = panic_info.payload.to_string();
-                    assert!(
-                        message.contains(expected_message),
-                        "Test `{}` is expected to panic with `{expected_message}`, but panicked with `{message}` instead.",
-                        self.name(),
-                    );
-                }
-            }
-            None => {
-                if let Ok(message) = self.should_expect_panic() {
-                    if let Some(message) = message {
-                        panic!(
-                            "Test `{}` is expected to panic with `{message}`, but it didn't.",
-                            self.name()
-                        );
-                    }
-                    panic!("Test `{}` is expected to panic but it didn't.", self.name());
-                }
-            }
-        }
-    }
-
-    pub fn snapshot_diagnostics(
-        &self,
-        resolver: &dyn FileResolver,
-        tool_name: &'static str,
-        relative_fixture_path: &Utf8Path,
-        snapshot_path: &Utf8Path,
-        diagnostics: &[Diagnostic],
-        mut snapshot_filter: impl FnMut(&Diagnostic) -> bool,
-    ) {
-        if self.should_snapshot_diagnostics() {
-            assert!(
-                !diagnostics.is_empty(),
-                "Test `{}` requested snapshotting diagnostics but it didn't produce any.",
-                self.name()
-            );
-
-            let snapshot = crate::create_diagnostic_snapshot(
-                resolver,
-                tool_name,
-                relative_fixture_path,
-                self,
-                diagnostics
-                    .iter()
-                    .filter(|diagnostic| snapshot_filter(diagnostic)),
-            );
-
-            let name = self.name().replace(' ', "_").replace(':', "__");
-            insta::with_settings!(
-                {
-                    snapshot_path => snapshot_path,
-                    input_file => name.clone(),
-                    filters => vec![(r"\\", "/")],
-                    prepend_module_to_snapshot => false,
-                },
-                { insta::assert_snapshot!(name, snapshot) }
-            );
-        }
     }
 }
 

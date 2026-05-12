@@ -371,7 +371,7 @@ fn run_test(
         })
         .collect();
 
-    test.check_panic(panic_info);
+    mdtest::check_panic(test, panic_info);
 
     if test.should_skip_pulling_types() && !any_pull_types_failures {
         let mut by_line = matcher::FailuresByLine::default();
@@ -391,7 +391,8 @@ fn run_test(
 
     // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
     // since they make snapshots very noisy!
-    test.snapshot_diagnostics(
+    mdtest::snapshot_diagnostics(
+        test,
         db,
         "ty",
         relative_fixture_path,

@@ -14,7 +14,7 @@ use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::matcher::Failure;
-use crate::parser::{BacktickOffsets, EmbeddedFileSourceMap};
+use crate::parser::{BacktickOffsets, EmbeddedFileSourceMap, MarkdownTest};
 
 /// Filter which tests to run in mdtest.
 ///
@@ -661,6 +661,75 @@ impl AttemptTestError<'_> {
 pub enum TestOutcome {
     Success,
     Skipped,
+}
+
+pub fn check_panic<C>(test: &MarkdownTest<'_, '_, C>, panic_info: Option<PanicError>) {
+    match panic_info {
+        Some(panic_info) => {
+            let expected_message = test
+                .should_expect_panic()
+                .expect("panic_info is only set when `should_expect_panic` is `Ok`");
+
+            if let Some(expected_message) = expected_message {
+                let message = panic_info.payload.to_string();
+                assert!(
+                    message.contains(expected_message),
+                    "Test `{}` is expected to panic with `{expected_message}`, but panicked with `{message}` instead.",
+                    test.name(),
+                );
+            }
+        }
+        None => {
+            if let Ok(message) = test.should_expect_panic() {
+                if let Some(message) = message {
+                    panic!(
+                        "Test `{}` is expected to panic with `{message}`, but it didn't.",
+                        test.name()
+                    );
+                }
+                panic!("Test `{}` is expected to panic but it didn't.", test.name());
+            }
+        }
+    }
+}
+
+pub fn snapshot_diagnostics<C>(
+    test: &MarkdownTest<'_, '_, C>,
+    resolver: &dyn FileResolver,
+    tool_name: &'static str,
+    relative_fixture_path: &Utf8Path,
+    snapshot_path: &Utf8Path,
+    diagnostics: &[Diagnostic],
+    mut snapshot_filter: impl FnMut(&Diagnostic) -> bool,
+) {
+    if test.should_snapshot_diagnostics() {
+        assert!(
+            !diagnostics.is_empty(),
+            "Test `{}` requested snapshotting diagnostics but it didn't produce any.",
+            test.name()
+        );
+
+        let snapshot = crate::create_diagnostic_snapshot(
+            resolver,
+            tool_name,
+            relative_fixture_path,
+            test,
+            diagnostics
+                .iter()
+                .filter(|diagnostic| snapshot_filter(diagnostic)),
+        );
+
+        let name = test.name().replace(' ', "_").replace(':', "__");
+        insta::with_settings!(
+            {
+                snapshot_path => snapshot_path,
+                input_file => name.clone(),
+                filters => vec![(r"\\", "/")],
+                prepend_module_to_snapshot => false,
+            },
+            { insta::assert_snapshot!(name, snapshot) }
+        );
+    }
 }
 
 #[cfg(test)]
