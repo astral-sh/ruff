@@ -907,7 +907,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
 
         if matches!(target, Type::LiteralValue(_) | Type::Union(_))
-            && let Some(complement) = source.enum_complement(db)
+            && let Some(complement) = source.enum_complement()
         {
             return complement
                 .remaining_literal_types(db)
@@ -2232,11 +2232,11 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             return self.check_type_pair(db, left, right);
         }
 
-        if let Some(complement) = left.enum_complement(db) {
+        if let Some(complement) = left.enum_complement() {
             return self.check_type_pair(db, complement.remaining_literal_union(db), right);
         }
 
-        if let Some(complement) = right.enum_complement(db) {
+        if let Some(complement) = right.enum_complement() {
             return self.check_type_pair(db, left, complement.remaining_literal_union(db));
         }
 

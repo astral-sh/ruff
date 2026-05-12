@@ -146,7 +146,7 @@ fn merge_truthiness_guarded_pair<'db>(
 /// ```
 fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'db>>) -> bool {
     for complement_index in 0..types.len() {
-        let Some(complement) = types[complement_index].enum_complement(db) else {
+        let Some(complement) = types[complement_index].enum_complement() else {
             continue;
         };
         let enum_class = complement.enum_class(db);
@@ -160,7 +160,7 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
                 continue;
             }
 
-            if let Some(other_complement) = ty.enum_complement(db) {
+            if let Some(other_complement) = ty.enum_complement() {
                 if other_complement.enum_class(db) == enum_class
                     && other_complement.rest(db) == complement.rest(db)
                 {

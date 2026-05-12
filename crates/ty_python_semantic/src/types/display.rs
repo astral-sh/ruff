@@ -1191,10 +1191,23 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::Intersection(intersection) => intersection
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
-            Type::EnumComplement(complement) => complement
-                .to_intersection(self.db)
-                .display_with(self.db, self.settings.clone())
-                .fmt_detailed(f),
+            Type::EnumComplement(complement) => {
+                if let Some(literals) =
+                    complement.remaining_literal_types_for_display(self.db, LITERAL_POLICY.max)
+                {
+                    DisplayLiteralGroup {
+                        literals,
+                        db: self.db,
+                        settings: self.settings.clone(),
+                    }
+                    .fmt_detailed(f)
+                } else {
+                    complement
+                        .to_intersection(self.db)
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)
+                }
+            }
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(n) => write!(f.with_type(self.ty), "{n}"),
                 LiteralValueTypeKind::Bool(boolean) => {
@@ -2487,7 +2500,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                 return Some(vec![ty]);
             }
 
-            ty.enum_complement(db).and_then(|complement| {
+            ty.enum_complement().and_then(|complement| {
                 complement.remaining_literal_types_for_display(db, LITERAL_POLICY.max)
             })
         }
@@ -2750,20 +2763,6 @@ struct DisplayIntersectionType<'a, 'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayIntersectionType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        if let Some(literals) = Type::Intersection(*self.ty)
-            .enum_complement(self.db)
-            .and_then(|complement| {
-                complement.remaining_literal_types_for_display(self.db, LITERAL_POLICY.max)
-            })
-        {
-            return DisplayLiteralGroup {
-                literals,
-                db: self.db,
-                settings: self.settings.clone(),
-            }
-            .fmt_detailed(f);
-        }
-
         let tys = self
             .ty
             .positive(self.db)

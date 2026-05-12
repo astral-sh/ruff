@@ -81,7 +81,7 @@ impl<'db> Type<'db> {
             return fallback.try_upcast_to_callable_with_policy_and_context(db, policy, context);
         }
 
-        if let Some(complement) = self.enum_complement(db) {
+        if let Some(complement) = self.enum_complement() {
             return complement
                 .remaining_literal_union(db)
                 .try_upcast_to_callable_with_policy(db, policy);
