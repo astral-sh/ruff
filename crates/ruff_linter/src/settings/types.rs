@@ -705,7 +705,7 @@ pub enum IdentifierPattern {
 impl IdentifierPattern {
     pub fn new(pattern: &str) -> Result<Self, glob::PatternError> {
         // `]` is only special inside `[...]`, which necessarily includes `[`.
-        if memchr::memchr3(b'?', b'*', b'[', pattern.as_bytes()).is_some() {
+        if pattern.contains(['?', '*', '[']) {
             Ok(Self::Glob(Box::new(glob::Pattern::new(pattern)?)))
         } else {
             Ok(Self::Literal(pattern.to_string()))
