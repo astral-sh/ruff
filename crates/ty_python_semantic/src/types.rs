@@ -1058,10 +1058,23 @@ impl<'db> Type<'db> {
         matches!(self, Type::Divergent(_))
     }
 
-    /// Construct an explicit recursive type binder.
-    #[allow(dead_code)]
-    pub(crate) fn recursive(db: &'db dyn Db, binder_id: salsa::Id, body: Type<'db>) -> Self {
-        Self::Recursive(recursive::RecursiveType::build(db, binder_id, body))
+    /// Construct a `Type::Recursive` with the given μ-binder id and body.
+    /// The body may contain `Type::Divergent(binder_id)` at recursive positions.
+    ///
+    /// `source_alias` is `Some` when the recursive type came from folding a named
+    /// alias body; used for display lookup of the alias name at recursive positions.
+    pub(crate) fn recursive(
+        db: &'db dyn Db,
+        binder_id: salsa::Id,
+        source_alias: Option<TypeAliasType<'db>>,
+        body: Type<'db>,
+    ) -> Self {
+        Self::Recursive(recursive::RecursiveType::build(
+            db,
+            binder_id,
+            source_alias,
+            body,
+        ))
     }
 
     /// True if this type is an explicit recursive type binder.
@@ -6282,7 +6295,7 @@ impl<'db> Type<'db> {
         self.apply_type_mapping(db, &type_mapping, TypeContext::default())
     }
 
-    fn apply_type_mapping<'a>(
+    pub(crate) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
@@ -6492,6 +6505,19 @@ impl<'db> Type<'db> {
 
             Type::TypeAlias(alias) => {
                 match type_mapping {
+                    // Phase 3: replace this alias with `Type::divergent(binder_id)` if it
+                    // matches the target definition (used to fold recursive bodies).
+                    TypeMapping::ReplaceSelfAlias { alias_def_id, binder_id } => {
+                        use salsa::plumbing::AsId;
+                        let TypeAliasType::PEP695(pep695_alias) = alias else {
+                            return self;
+                        };
+                        if pep695_alias.definition(db).as_id() == alias_def_id.into_id() {
+                            Type::divergent(binder_id.into_id())
+                        } else {
+                            self
+                        }
+                    },
                     // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
                     // detection rather than the visitor's cycle detection, because the visitor tracks
                     // Type values and `RecursiveList` is different from `RecursiveList[T]`.
@@ -6563,6 +6589,8 @@ impl<'db> Type<'db> {
                 TypeMapping::Materialize(_) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
+                TypeMapping::ReplaceSelfAlias { .. } |
+                TypeMapping::ReplaceDivergent { .. } |
                 TypeMapping::RescopeReturnCallables(_) |
                 TypeMapping::Promote(PromotionMode::Off, _) |
                 TypeMapping::Promote(PromotionMode::On, PromotionKind::SingletonsOnly) => self,
@@ -6580,6 +6608,8 @@ impl<'db> Type<'db> {
                 TypeMapping::Promote(..) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
+                TypeMapping::ReplaceSelfAlias { .. } |
+                TypeMapping::ReplaceDivergent { .. } |
                 TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
@@ -6593,6 +6623,11 @@ impl<'db> Type<'db> {
                 TypeMapping::Materialize(materialization_kind) => {
                     Type::Divergent(divergent.materialized(*materialization_kind))
                 }
+                // Phase 3: replace a specific Divergent (matching binder_id) with the replacement.
+                TypeMapping::ReplaceDivergent {
+                    binder_id,
+                    replacement,
+                } if divergent.id() == binder_id.into_id() => *replacement,
                 _ => self,
             },
             Type::Recursive(_) => self,
@@ -7644,6 +7679,28 @@ pub enum TypeMapping<'a, 'db> {
     /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
     EagerExpansion,
 
+    /// Replace `Type::TypeAlias(a)` references where `a.definition(db).as_id() == alias_def_id`
+    /// with `Type::divergent(binder_id)`. Used by Phase 3 of the μ-type project to fold
+    /// recursive alias bodies into `Type::Recursive(binder_id, body)` form.
+    ///
+    /// All other Type variants pass through transparently (recursing into children for
+    /// composite types).
+    ReplaceSelfAlias {
+        alias_def_id: recursive::BinderId,
+        binder_id: recursive::BinderId,
+    },
+
+    /// Replace `Type::Divergent(d)` markers where `d.id() == binder_id` with
+    /// the `replacement` type. Used by Phase 3 to:
+    /// - Display: substitute Divergent back to alias name for nice rendering.
+    /// - Unfold: substitute Divergent with `Type::Recursive(self)` for one-step expansion.
+    ///
+    /// Other `Type::Divergent` (with different binder ids) pass through unchanged.
+    ReplaceDivergent {
+        binder_id: recursive::BinderId,
+        replacement: Type<'db>,
+    },
+
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
 }
@@ -7691,6 +7748,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
+            | TypeMapping::ReplaceSelfAlias { .. }
+            | TypeMapping::ReplaceDivergent { .. }
             | TypeMapping::RescopeReturnCallables(_) => context,
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {
@@ -7738,6 +7797,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceType { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
+            | TypeMapping::ReplaceSelfAlias { .. }
+            | TypeMapping::ReplaceDivergent { .. }
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
     }
@@ -7766,6 +7827,10 @@ impl DivergentType {
             id,
             materialization: None,
         }
+    }
+
+    pub(crate) const fn id(&self) -> salsa::Id {
+        self.id
     }
 
     fn same_marker(self, other: Self) -> bool {
