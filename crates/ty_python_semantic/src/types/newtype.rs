@@ -51,7 +51,7 @@ impl<'db> NewType<'db> {
     }
 
     #[salsa::tracked(
-        cycle_initial=lazy_base_cycle_initial,
+        cycle_initial=|db, _, _| NewTypeBase::ClassType(ClassType::object(db)),
         heap_size=ruff_memory_usage::heap_size
     )]
     fn lazy_base(self, db: &'db dyn Db) -> NewTypeBase<'db> {
@@ -297,12 +297,4 @@ impl<'db> Iterator for NewTypeBaseIter<'db> {
             }
         }
     }
-}
-
-fn lazy_base_cycle_initial<'db>(
-    db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: NewType<'db>,
-) -> NewTypeBase<'db> {
-    NewTypeBase::ClassType(ClassType::object(db))
 }

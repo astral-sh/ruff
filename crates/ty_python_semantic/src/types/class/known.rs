@@ -1046,15 +1046,7 @@ impl KnownClass {
             class: KnownClass,
         }
 
-        fn known_class_to_class_literal_initial<'db>(
-            _db: &'db dyn Db,
-            _id: salsa::Id,
-            _class: KnownClassArgument<'db>,
-        ) -> Option<StaticClassLiteral<'db>> {
-            None
-        }
-
-        #[salsa::tracked(cycle_initial=known_class_to_class_literal_initial, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn known_class_to_class_literal<'db>(
             db: &'db dyn Db,
             class: KnownClassArgument<'db>,

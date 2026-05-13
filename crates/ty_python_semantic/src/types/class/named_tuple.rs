@@ -410,7 +410,10 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     }
 
     fn spec(self, db: &'db dyn Db) -> NamedTupleSpec<'db> {
-        #[salsa::tracked(cycle_initial=deferred_spec_initial, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(
+            cycle_initial=|db, _, _| NamedTupleSpec::unknown(db),
+            heap_size=ruff_memory_usage::heap_size
+        )]
         fn deferred_spec<'db>(db: &'db dyn Db, definition: Definition<'db>) -> NamedTupleSpec<'db> {
             let module = parsed_module(db, definition.file(db)).load(db);
             let node = definition
@@ -423,14 +426,6 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                 Type::KnownInstance(KnownInstanceType::NamedTupleSpec(spec)) => spec,
                 _ => NamedTupleSpec::unknown(db),
             }
-        }
-
-        fn deferred_spec_initial<'db>(
-            db: &'db dyn Db,
-            _id: salsa::Id,
-            _definition: Definition<'db>,
-        ) -> NamedTupleSpec<'db> {
-            NamedTupleSpec::unknown(db)
         }
 
         match self.anchor(db) {

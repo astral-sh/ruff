@@ -98,7 +98,7 @@ impl<'db> CodeGeneratorKind<'db> {
         class: StaticClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Option<Self> {
-        #[salsa::tracked(cycle_initial=code_generator_of_static_class_initial,
+        #[salsa::tracked(cycle_initial=|_, _, _, _| None,
             heap_size=ruff_memory_usage::heap_size
         )]
         fn code_generator_of_static_class<'db>(
@@ -146,15 +146,6 @@ impl<'db> CodeGeneratorKind<'db> {
             } else {
                 None
             }
-        }
-
-        fn code_generator_of_static_class_initial<'db>(
-            _db: &'db dyn Db,
-            _id: salsa::Id,
-            _class: StaticClassLiteral<'db>,
-            _specialization: Option<Specialization<'db>>,
-        ) -> Option<CodeGeneratorKind<'db>> {
-            None
         }
 
         code_generator_of_static_class(db, class, specialization)
@@ -1767,7 +1758,10 @@ impl<'db> ClassType<'db> {
 
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
-    #[salsa::tracked(cycle_initial=into_callable_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_initial=|db, _, _| CallableTypes::one(CallableType::bottom(db)),
+        heap_size=ruff_memory_usage::heap_size
+    )]
     pub(super) fn into_callable(self, db: &'db dyn Db) -> CallableTypes<'db> {
         // TODO: This mimics a lot of the logic in Type::try_call_from_constructor. Can we
         // consolidate the two? Can we invoke a class by upcasting the class into a Callable, and
@@ -1976,14 +1970,6 @@ impl<'db> ClassType<'db> {
     pub(super) fn definition_span(self, db: &'db dyn Db) -> Span {
         self.class_literal(db).header_span(db)
     }
-}
-
-fn into_callable_cycle_initial<'db>(
-    db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: ClassType<'db>,
-) -> CallableTypes<'db> {
-    CallableTypes::one(CallableType::bottom(db))
 }
 
 impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
