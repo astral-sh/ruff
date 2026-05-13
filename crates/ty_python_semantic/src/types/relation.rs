@@ -978,10 +978,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
                 ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
             }
-            // Phase 1: Type::Recursive treated as Divergent
-            (Type::Recursive(_), _) | (_, Type::Recursive(_)) => {
-                ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
-            }
+            // Phase 3: Type::Recursive — delegate to body (which has `Divergent` at
+            // recursive positions that fall through to the Divergent arm above).
+            // The HasRelationToVisitor cycle detector handles operation-level recursion.
+            (Type::Recursive(source_rec), _) => self.with_recursion_guard(source, target, || {
+                self.check_type_pair(db, *source_rec.body(db), target)
+            }),
+            (_, Type::Recursive(target_rec)) => self.with_recursion_guard(source, target, || {
+                self.check_type_pair(db, source, *target_rec.body(db))
+            }),
 
             (Type::TypeAlias(source_alias), _) => self.with_recursion_guard(source, target, || {
                 self.check_type_pair(db, source_alias.value_type(db), target)
@@ -2214,8 +2219,19 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
-            // Phase 1: Type::Recursive treated as Divergent
-            (Type::Recursive(_), _) | (_, Type::Recursive(_)) => self.never(),
+            // Phase 3: Type::Recursive — delegate to body for disjointness check.
+            (Type::Recursive(left_rec), _) => {
+                let left_body = *left_rec.body(db);
+                self.with_recursion_guard(left, right, || {
+                    self.check_type_pair(db, left_body, right)
+                })
+            }
+            (_, Type::Recursive(right_rec)) => {
+                let right_body = *right_rec.body(db);
+                self.with_recursion_guard(left, right, || {
+                    self.check_type_pair(db, left, right_body)
+                })
+            }
 
             (Type::TypeAlias(alias), _) => {
                 let left_alias_ty = alias.value_type(db);

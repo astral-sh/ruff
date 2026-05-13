@@ -47,8 +47,31 @@ impl<'db> PEP695TypeAliasType<'db> {
     }
 
     /// The RHS type of a PEP-695 style type alias with specialization applied.
+    ///
+    /// Phase 3b: when the alias is self-referential, fold the body so recursive
+    /// positions become `Type::Divergent(binder_id)`, then wrap in
+    /// `Type::Recursive(binder_id, source_alias, folded_body)`.
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
-        self.apply_function_specialization(db, self.raw_value_type(db))
+        let raw = self.raw_value_type(db);
+        let body = self.apply_function_specialization(db, raw);
+        if self.is_self_referential(db) {
+            use salsa::plumbing::AsId;
+            let binder_id = self.as_id();
+            let folded = crate::types::recursive::substitute_self_alias_with_divergent(
+                db,
+                body,
+                self.definition(db),
+                binder_id,
+            );
+            Type::recursive(
+                db,
+                binder_id,
+                Some(crate::types::TypeAliasType::PEP695(self)),
+                folded,
+            )
+        } else {
+            body
+        }
     }
 
     /// Whether this alias is *directly* self-referential — its raw body literally

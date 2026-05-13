@@ -184,8 +184,10 @@ impl ClassInfoConstraintFunction {
                     },
                 }
             }
-            // Phase 1: Type::Recursive treated as Divergent
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) => Some(classinfo),
+            Type::Dynamic(_) | Type::Divergent(_) => Some(classinfo),
+            // Phase 3: Type::Recursive — delegate to the body (which contains
+            // `Divergent` leaves at recursive positions that bottom out).
+            Type::Recursive(r) => self.generate_constraint(db, *r.body(db), is_positive),
             Type::Intersection(intersection) => {
                 if intersection.negative(db).is_empty() {
                     let mut builder = IntersectionBuilder::new(db);

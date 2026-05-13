@@ -869,8 +869,26 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 write!(f.with_type(self.ty), "{dynamic}")
             }
             Type::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
-            // Phase 1: Type::Recursive displays as "Divergent" too (will be refined in Phase 14)
-            Type::Recursive(_) => f.with_type(self.ty).write_str("Divergent"),
+            // Phase 3: Display Type::Recursive by substituting recursive-position
+            // Divergent markers with the source alias name (so that
+            // `μα. int | tuple[α, ...] | None` shows as `int | tuple[OptNestedInt, ...] | None`).
+            // If no source alias is known, fall back to showing the body as-is.
+            Type::Recursive(r) => {
+                let body = *r.body(self.db);
+                let display_ty = if let Some(source_alias) = r.source_alias(self.db) {
+                    use crate::types::TypeMapping;
+                    let mapping = TypeMapping::ReplaceDivergent {
+                        binder_id: r.binder(self.db),
+                        replacement: Type::TypeAlias(source_alias),
+                    };
+                    body.apply_type_mapping(self.db, &mapping, crate::types::TypeContext::default())
+                } else {
+                    body
+                };
+                display_ty
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f)
+            }
             Type::Never => f.with_type(self.ty).write_str("Never"),
             Type::NominalInstance(instance) => {
                 let class = instance.class(self.db);
