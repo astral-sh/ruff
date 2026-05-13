@@ -3,7 +3,7 @@ use crate::references::{ReferencesMode, references};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::SystemPath;
-use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
+use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::{Ranged, TextRange};
 use ty_module_resolver::{Module, ModuleName, file_to_module};
@@ -88,31 +88,48 @@ pub fn will_rename_file(
 
 /// Infer the new module name from old/new file paths.
 ///
-/// Uses the old module's known name and the file name change to derive
-/// the new module name. For example, renaming `foo/bar.py` to `foo/baz.py`
-/// when the old module is `foo.bar` yields `foo.baz`.
+/// For same-directory renames, replaces the last component of the old module
+/// name using [`ModuleName::parent()`]. For cross-directory moves, derives the
+/// new module name from the module's search path.
 fn infer_new_module_name(
     db: &dyn Db,
     old_path: &SystemPath,
     new_path: &SystemPath,
     old_module: &Module<'_>,
 ) -> Option<ModuleName> {
-    let old_stem = old_path.file_stem()?;
     let new_stem = new_path.file_stem()?;
-
-    let old_name_str = old_module.name(db).as_str().to_owned();
-
-    if old_stem == "__init__" || new_stem == "__init__" {
+    if new_stem == "__init__" {
         return None;
     }
 
-    let new_name_str = if let Some((prefix, _)) = old_name_str.rsplit_once('.') {
-        format!("{prefix}.{new_stem}")
-    } else {
-        new_stem.to_string()
-    };
+    let old_module_name = old_module.name(db);
 
-    ModuleName::new(&new_name_str)
+    if old_path.parent() == new_path.parent() {
+        return if let Some(parent) = old_module_name.parent() {
+            let components: Vec<&str> = parent
+                .components()
+                .chain(std::iter::once(new_stem))
+                .collect();
+            ModuleName::from_components(components)
+        } else {
+            ModuleName::new(new_stem)
+        };
+    }
+
+    // Cross-directory move: derive the full module name from the search path.
+    let search_path = old_module.search_path(db)?.as_system_path()?;
+    let new_relative = new_path.strip_prefix(search_path).ok()?;
+    let parent = new_relative.parent()?;
+    let components: Vec<&str> = if parent.as_str().is_empty() {
+        vec![new_stem]
+    } else {
+        parent
+            .components()
+            .map(|c| c.as_str())
+            .chain(std::iter::once(new_stem))
+            .collect()
+    };
+    ModuleName::from_components(components)
 }
 
 /// Scan a file for import module-path references to the old module.
@@ -150,7 +167,7 @@ struct ImportPathScanner<'a> {
     edits: &'a mut Vec<FileRenameEdit>,
 }
 
-impl<'a> StatementVisitor<'a> for ImportPathScanner<'_> {
+impl<'a> Visitor<'a> for ImportPathScanner<'_> {
     fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
         match stmt {
             ast::Stmt::ImportFrom(import_from) => {
@@ -163,13 +180,19 @@ impl<'a> StatementVisitor<'a> for ImportPathScanner<'_> {
         }
         walk_stmt(self, stmt);
     }
+
+    fn visit_expr(&mut self, expr: &'a ast::Expr) {
+        if let ast::Expr::Attribute(attr_expr) = expr {
+            self.handle_dotted_usage(attr_expr);
+        }
+        walk_expr(self, expr);
+    }
 }
 
 impl ImportPathScanner<'_> {
     /// Handle `from <module> import ...` where the module path matches the old module.
     fn handle_import_from(&mut self, import_from: &ast::StmtImportFrom) {
-        let Ok(resolved_name) =
-            ModuleName::from_import_statement(self.db, self.file, import_from)
+        let Ok(resolved_name) = ModuleName::from_import_statement(self.db, self.file, import_from)
         else {
             return;
         };
@@ -212,6 +235,31 @@ impl ImportPathScanner<'_> {
         }
     }
 
+    /// Handle attribute access chains like `pkg.old_sub.x` where `pkg.old_sub`
+    /// matches the old module name from a dotted import.
+    fn handle_dotted_usage(&mut self, attr_expr: &ast::ExprAttribute) {
+        let old_components: Vec<&str> = self.old_module_name.components().collect();
+        if old_components.len() < 2
+            || !expr_matches_module_components(
+                &ast::Expr::Attribute(attr_expr.clone()),
+                &old_components,
+            )
+        {
+            return;
+        }
+
+        let new_last = self
+            .new_module_name
+            .components()
+            .last()
+            .unwrap_or(self.new_module_name.as_str());
+        self.edits.push(FileRenameEdit {
+            file: self.file,
+            range: attr_expr.attr.range(),
+            new_text: new_last.to_string(),
+        });
+    }
+
     /// Handle `import pkg.old_sub` where the dotted name matches the old module.
     ///
     /// Single-component imports (`import old_module`) are already handled by
@@ -235,6 +283,22 @@ impl ImportPathScanner<'_> {
                 });
             }
         }
+    }
+}
+
+/// Check whether an expression is an attribute access chain matching the given
+/// module name components (e.g., `pkg.old_sub` matches `["pkg", "old_sub"]`).
+fn expr_matches_module_components(expr: &ast::Expr, components: &[&str]) -> bool {
+    match components.split_last() {
+        None => false,
+        Some((last, [])) => {
+            matches!(expr, ast::Expr::Name(name) if name.id.as_str() == *last)
+        }
+        Some((last, rest)) => matches!(
+            expr,
+            ast::Expr::Attribute(attr) if attr.attr.as_str() == *last
+                && expr_matches_module_components(&attr.value, rest)
+        ),
     }
 }
 
@@ -487,14 +551,8 @@ mod tests {
                 "class AIModelPort: ...\nclass AIModelResult: ...\n",
             ),
             ("pkg/cache_port.py", "class CachePort: ...\n"),
-            (
-                "pkg/dictionary_port.py",
-                "class DictionaryPort: ...\n",
-            ),
-            (
-                "pkg/embed_model_port.py",
-                "class EmbedModelPort: ...\n",
-            ),
+            ("pkg/dictionary_port.py", "class DictionaryPort: ...\n"),
+            ("pkg/embed_model_port.py", "class EmbedModelPort: ...\n"),
             ("pkg/ner_model_port.py", "class NERModelPort: ...\n"),
         ]);
 
@@ -569,7 +627,10 @@ mod tests {
         let db = create_test_db(&[
             ("pkg/__init__.py", ""),
             ("pkg/old_sub.py", "x = 1\n"),
-            ("consumer.py", "import pkg.old_sub\n\nprint(pkg.old_sub.x)\n"),
+            (
+                "consumer.py",
+                "import pkg.old_sub\n\nprint(pkg.old_sub.x)\n",
+            ),
         ]);
 
         let edits = will_rename_file(
@@ -580,9 +641,6 @@ mod tests {
 
         let consumer = system_path_to_file(&db, "consumer.py").unwrap();
         let result = apply_edits(&db, &edits, consumer);
-        assert_eq!(
-            result,
-            "import pkg.new_sub\n\nprint(pkg.old_sub.x)\n"
-        );
+        assert_eq!(result, "import pkg.new_sub\n\nprint(pkg.new_sub.x)\n");
     }
 }
