@@ -843,3 +843,12 @@ foo = lambda: callllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll
 # Regression tests for https://github.com/astral-sh/ruff/issues/24807
 def foo():
     subprocess.check_call(f"rm -rf {' '.join(map(lambda object_name: os.path.join(dest_path, object_name), objects_to_remove))}", shell=True)
+
+def bar():
+    lambda x=" ".join(
+        map(lambda object_name: os.path.join(dest_path, object_name), objects_to_remove)
+    ): ...
+
+value = f"prefix {
+    ' '.join(map(lambda object_name: os.path.join(dest_path, object_name), objects_to_remove))
+} suffix"
