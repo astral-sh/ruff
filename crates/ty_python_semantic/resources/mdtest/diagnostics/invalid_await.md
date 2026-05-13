@@ -94,8 +94,8 @@ async def main() -> None:
     await DeepInheritedNonCallableAwait()  # error: [invalid-await]
 ```
 
-When the expression type is a union, the binding site cannot be attributed to a single definition,
-so the secondary annotation is omitted.
+When the expression type is a union, the secondary annotation points at the first union member's
+binding site.
 
 ```py
 class A:

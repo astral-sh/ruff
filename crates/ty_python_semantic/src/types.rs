@@ -6959,6 +6959,7 @@ impl<'db> UnionType<'db> {
         let mut unbound_on: Vec<Type<'db>> = Vec::new();
         let mut any_defined = false;
         let mut possibly_undefined = false;
+        let mut first_definition: Option<Definition<'db>> = None;
 
         for element in elements {
             match element
@@ -6972,15 +6973,22 @@ impl<'db> UnionType<'db> {
                 Place::Defined(DefinedPlace {
                     ty,
                     definedness: Definedness::PossiblyUndefined,
+                    definition: element_definition,
                     ..
                 }) => {
                     builder = builder.add(ty);
                     any_defined = true;
                     possibly_undefined = true;
+                    first_definition = first_definition.or(element_definition);
                 }
-                Place::Defined(DefinedPlace { ty, .. }) => {
+                Place::Defined(DefinedPlace {
+                    ty,
+                    definition: element_definition,
+                    ..
+                }) => {
                     builder = builder.add(ty);
                     any_defined = true;
+                    first_definition = first_definition.or(element_definition);
                 }
                 Place::Undefined => {
                     unbound_on.push(*element);
@@ -7002,7 +7010,7 @@ impl<'db> UnionType<'db> {
         {
             Ok(bindings) => bindings,
             Err(CallError(kind, bindings)) => {
-                return Err(CallDunderError::CallError(kind, bindings, None));
+                return Err(CallDunderError::CallError(kind, bindings, first_definition));
             }
         };
 
@@ -8137,6 +8145,7 @@ impl<'db> ModuleLiteralType<'db> {
                 return PlaceAndQualifiers {
                     place: Place::Defined(DefinedPlace {
                         ty: outcome.return_type(db),
+                        definition: None,
                         ..place
                     }),
                     qualifiers: TypeQualifiers::FROM_MODULE_GETATTR,

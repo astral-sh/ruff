@@ -5,12 +5,12 @@ use std::convert::Infallible;
 use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin,
 };
-use ty_python_core::definition::Definition;
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
 use crate::types::{Type, TypeQualifiers};
 use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet};
+use ty_python_core::definition::Definition;
 
 pub(crate) mod builder;
 
