@@ -1463,7 +1463,7 @@ impl<'db> Specialization<'db> {
         inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::disjoint_default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = DisjointnessChecker::new(
@@ -1622,22 +1622,31 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 MaterializationKind::Bottom,
             ),
             // And A <~ B (assignability) is Bottom[A] <: Top[B]
-            (None, Some(target_mat), TypeRelation::Assignability) => self
-                .check_subtyping_in_invariant_position(
-                    db,
-                    source_type,
-                    MaterializationKind::Bottom,
-                    target_type,
-                    target_mat,
-                ),
-            (Some(source_mat), None, TypeRelation::Assignability) => self
-                .check_subtyping_in_invariant_position(
-                    db,
-                    source_type,
-                    source_mat,
-                    target_type,
-                    MaterializationKind::Top,
-                ),
+            (
+                None,
+                Some(target_mat),
+                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
+            ) => self.check_subtyping_in_invariant_position(
+                db,
+                source_type,
+                MaterializationKind::Bottom,
+                target_type,
+                target_mat,
+            ),
+            (
+                Some(source_mat),
+                None,
+                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
+            ) => self.check_subtyping_in_invariant_position(
+                db,
+                source_type,
+                source_mat,
+                target_type,
+                MaterializationKind::Top,
+            ),
+            (_, _, TypeRelation::Disjointness) => {
+                unreachable!("Disjointness is not a directional relation")
+            }
         }
     }
 

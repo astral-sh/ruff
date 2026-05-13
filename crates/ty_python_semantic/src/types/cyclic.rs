@@ -45,6 +45,10 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
     }
 }
 
+#[allow(
+    dead_code,
+    reason = "Kept as a conceptual abstraction. Phase 4 unified the existing pair visitors onto `CycleDetector<TypeRelation, (Type, Type, TypeRelation), R>`; this simpler `(Type, Type)`-keyed alias may still be useful for future relation-agnostic cycle detection."
+)]
 pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<Tag, (Type<'db>, Type<'db>), C, 1>;
 
 /// `CycleDetector` is temporary, so callers should choose the capacity that keeps observed cycle

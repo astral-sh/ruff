@@ -119,6 +119,7 @@ mod call;
 mod callable;
 mod class;
 mod class_base;
+mod coinductive;
 mod constraints;
 mod context;
 mod context_manager;

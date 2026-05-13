@@ -401,7 +401,14 @@ impl From<TypeRelation> for UpcastPolicy {
             TypeRelation::Subtyping
             | TypeRelation::Redundancy { .. }
             | TypeRelation::SubtypingAssuming => UpcastPolicy::Sound,
-            TypeRelation::Assignability => UpcastPolicy::Unsound,
+            TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
+                UpcastPolicy::Unsound
+            }
+            // Disjointness only exists as a cycle-detection key tag; it never
+            // flows through directional relation dispatching.
+            TypeRelation::Disjointness => {
+                unreachable!("Disjointness is not a directional relation")
+            }
         }
     }
 }
