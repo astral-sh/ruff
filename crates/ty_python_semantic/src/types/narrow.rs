@@ -156,9 +156,6 @@ impl ClassInfoConstraintFunction {
         };
 
         match classinfo {
-            Type::TypeAlias(alias) => {
-                self.generate_constraint(db, alias.value_type(db), is_positive)
-            }
             Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => {
                 // We can't narrow negatively from a `SubclassOf` type. `if !isinstance(x, y)`
@@ -185,10 +182,12 @@ impl ClassInfoConstraintFunction {
                 }
             }
             Type::Dynamic(_) | Type::Divergent(_) => Some(classinfo),
-            // Phase 4: co-inductive delegation through `Type::Recursive`.
-            // `unfold_one` returns the body, which contains `Divergent` leaves at α
-            // positions that bottom out via the `Type::Divergent` arm above.
-            Type::Recursive(_) => self.generate_constraint(
+            // Phase 7: `Type::Recursive` and `Type::TypeAlias` are both "opaque
+            // names" — `unfold_one` resolves both (Recursive → body, TypeAlias →
+            // value_type). Recursive bodies contain `Divergent` leaves that bottom
+            // out via the `Type::Divergent` arm above; non-recursive aliases
+            // resolve to a non-opaque type in one step.
+            Type::Recursive(_) | Type::TypeAlias(_) => self.generate_constraint(
                 db,
                 crate::types::coinductive::unfold_one(db, classinfo),
                 is_positive,

@@ -70,16 +70,20 @@ pub(crate) trait CoInductiveRelation<'db, 'c> {
     fn check_structural(&self, db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> Self::Output;
 }
 
-/// Co-inductively delegate a relation through `Type::Recursive` on either
-/// side.
+/// Co-inductively delegate a relation through an opaque type name
+/// ([`Type::Recursive`] or [`Type::TypeAlias`]).
 ///
-/// - Unfolds `Type::Recursive` (one step) on whichever side has it.
-/// - Records `(l, r, relation_key)` in the visitor; if the same triple recurses,
-///   the visitor returns its fallback (co-inductive hypothesis).
-/// - Otherwise dispatches to `checker.check_structural(db, l, r)`.
+/// - Records `(source, target, relation_key)` in the visitor *before*
+///   unfolding. Using the **pre-unfold** types as the key prevents nested
+///   non-cyclic comparisons of the same unfolded pair from being incorrectly
+///   short-circuited. (Empirical: switching to post-unfold keys caused 7 new
+///   mdtest failures during Phase 6 development.)
+/// - On cycle (same triple revisited), the visitor returns its fallback.
+/// - Otherwise unfolds both sides one step via [`unfold_pair`] and dispatches
+///   to `checker.check_structural`.
 ///
 /// This is the canonical Phase 5+ entry point used by `check_type_pair` arms
-/// to handle `Type::Recursive` without per-checker duplicated guard logic.
+/// to handle opaque type names without per-checker duplicated guard logic.
 pub(crate) fn delegate_recursive<'db, 'c, R>(
     db: &'db dyn Db,
     checker: &R,
@@ -94,23 +98,30 @@ pub(crate) fn delegate_recursive<'db, 'c, R>(
 where
     R: CoInductiveRelation<'db, 'c, Tag = TypeRelation, Output = ConstraintSet<'db, 'c>>,
 {
-    let (l, r) = unfold_pair(db, source, target);
-    let key = (l, r, checker.relation_key());
-    visitor.visit(key, || checker.check_structural(db, l, r))
+    let key = (source, target, checker.relation_key());
+    visitor.visit(key, || {
+        let (l, r) = unfold_pair(db, source, target);
+        checker.check_structural(db, l, r)
+    })
 }
 
-/// One-step unfold of a [`Type::Recursive`] to its body.
+/// One-step unfold of an opaque type name.
 ///
-/// The body contains [`Type::Divergent`] markers at recursive positions; for
-/// relations that delegate to a cycle-guarded recursive call, this is the
-/// canonical "unfold once, then keep going" step. Subsequent recursion bottoms
-/// out at `Divergent`, which existing relation arms handle as the relation's
-/// neutral element.
+/// Both [`Type::Recursive`] and [`Type::TypeAlias`] are "named opaque types"
+/// in the relation framework: their identity is not their structure. For
+/// recursive checks, the framework needs to step *inside* the name once, then
+/// detect cycles structurally via [`delegate_recursive`]'s visiting set.
 ///
-/// Non-`Recursive` types are returned unchanged.
+/// - `Type::Recursive(r)` → `*r.body(db)` (which contains `Divergent` markers
+///   at α positions; further recursion bottoms out at `Divergent`).
+/// - `Type::TypeAlias(alias)` → `alias.value_type(db)` (which, if the alias
+///   is self-referential, is itself a `Type::Recursive`; the next unfold step
+///   handles that).
+/// - All other types are returned unchanged.
 pub(crate) fn unfold_one<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
     match ty {
         Type::Recursive(r) => *r.body(db),
+        Type::TypeAlias(alias) => alias.value_type(db),
         _ => ty,
     }
 }

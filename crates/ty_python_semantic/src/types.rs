@@ -5925,6 +5925,23 @@ impl<'db> Type<'db> {
                         ))
                     }
                     _ => {
+                        // `BindSelf` / `ReplaceSelf` cannot affect a PEP 695 type
+                        // alias body: `Self` is only valid inside class scopes and
+                        // PEP 695 aliases live at module scope. Short-circuit to
+                        // preserve the alias name in display. Without this, a
+                        // recursive PEP 695 alias's `value_type` (which wraps the
+                        // body in `Type::Recursive`) compares unequal to `mapped`
+                        // (the unfolded body without the wrapping), so the
+                        // fall-through below returns the unfolded form and loses
+                        // the alias name (`callable.md:114`).
+                        if matches!(
+                            type_mapping,
+                            TypeMapping::BindSelf(..) | TypeMapping::ReplaceSelf { .. },
+                        ) && matches!(alias, TypeAliasType::PEP695(_))
+                        {
+                            return self;
+                        }
+
                         // Do not call `value_type` here. `value_type` does the specialization internally, so `apply_type_mapping` is
                         // performed without `visitor` inheritance. In the case of recursive type aliases, this leads to infinite recursion.
                         // Instead, call `raw_value_type` and perform the specialization after the `visitor` cache has been created.

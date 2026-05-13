@@ -1021,13 +1021,18 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 )
             }
 
-            (Type::TypeAlias(source_alias), _) => self.with_recursion_guard(source, target, || {
-                self.check_type_pair(db, source_alias.value_type(db), target)
-            }),
-
-            (_, Type::TypeAlias(target_alias)) => self.with_recursion_guard(source, target, || {
-                self.check_type_pair(db, source, target_alias.value_type(db))
-            }),
+            // Phase 6: TypeAlias is an opaque name, treated uniformly with
+            // `Type::Recursive` in `unfold_one`. The framework unfolds the alias
+            // via `alias.value_type(db)` then dispatches structurally.
+            (Type::TypeAlias(_), _) | (_, Type::TypeAlias(_)) => {
+                crate::types::coinductive::delegate_recursive(
+                    db,
+                    self,
+                    source,
+                    target,
+                    self.relation_visitor,
+                )
+            }
 
             // Field definitions in dataclasses and dataclass-transformers can involve calls to
             // `dataclasses.field` or custom field-specifier functions. The annotated return type
@@ -2299,18 +2304,17 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 )
             }
 
-            (Type::TypeAlias(alias), _) => {
-                let left_alias_ty = alias.value_type(db);
-                self.with_recursion_guard(left, right, || {
-                    self.check_type_pair(db, left_alias_ty, right)
-                })
-            }
-
-            (_, Type::TypeAlias(alias)) => {
-                let right_alias_ty = alias.value_type(db);
-                self.with_recursion_guard(left, right, || {
-                    self.check_type_pair(db, left, right_alias_ty)
-                })
+            // Phase 6: same delegation as the subtype-side TypeAlias arms;
+            // `unfold_one` resolves the alias via `value_type` and the framework
+            // records the pair on the disjointness visitor for cycle guarding.
+            (Type::TypeAlias(_), _) | (_, Type::TypeAlias(_)) => {
+                crate::types::coinductive::delegate_recursive(
+                    db,
+                    self,
+                    left,
+                    right,
+                    self.disjointness_visitor,
+                )
             }
 
             // `type[T]` is disjoint from a callable or protocol instance if its upper bound or constraints are.
