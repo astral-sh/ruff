@@ -1,4 +1,4 @@
-#[derive(Debug, Copy, Clone, is_macro::Is)]
+#[derive(Debug, Copy, Clone, PartialEq, is_macro::Is)]
 pub enum ExecutionContext {
     /// The reference occurs in a runtime context.
     Runtime,

@@ -1098,6 +1098,61 @@ impl<'a> SemanticModel<'a> {
                     )
                 }
             }
+            BindingKind::Assignment => {
+                // Check if this name was also defined in a TYPE_CHECKING block.
+                // If so, try to resolve via the TYPE_CHECKING binding instead.
+                // This handles cases like:
+                // ```python
+                // if TYPE_CHECKING:
+                //     from typing_extensions import override
+                // else:
+                //     override = lambda f: f
+                // ```
+                if let Some(typing_binding_id) = self
+                    .scopes
+                    .ancestor_ids(self.scope_id)
+                    .find_map(|scope_id| {
+                        self.scopes[scope_id]
+                            .get(head.id.as_str())
+                            .filter(|&id| self.bindings[id].context == ExecutionContext::Typing)
+                    })
+                {
+                    let typing_binding = &self.bindings[typing_binding_id];
+                    if matches!(
+                        typing_binding.kind,
+                        BindingKind::FromImport(_) | BindingKind::Import(_)
+                    ) {
+                        return match &typing_binding.kind {
+                            BindingKind::FromImport(FromImport { qualified_name }) => {
+                                let value_name = UnqualifiedName::from_expr(value)?;
+                                let (_, tail) = value_name.segments().split_first()?;
+                                Some(
+                                    qualified_name
+                                        .segments()
+                                        .iter()
+                                        .chain(tail)
+                                        .copied()
+                                        .collect(),
+                                )
+                            }
+                            BindingKind::Import(Import { qualified_name }) => {
+                                let value_name = UnqualifiedName::from_expr(value)?;
+                                let (_, tail) = value_name.segments().split_first()?;
+                                Some(
+                                    qualified_name
+                                        .segments()
+                                        .iter()
+                                        .chain(tail)
+                                        .copied()
+                                        .collect(),
+                                )
+                            }
+                            _ => None,
+                        };
+                    }
+                }
+                None
+            }
             _ => None,
         }
     }
