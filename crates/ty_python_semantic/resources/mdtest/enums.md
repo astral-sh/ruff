@@ -441,6 +441,48 @@ reveal_type(Planet2.MERCURY.value)  # revealed: Any
 reveal_type(Planet2.MERCURY._value_)  # revealed: Any
 ```
 
+### `__new__` without `_value_` annotation
+
+When `__new__` is defined but no explicit `_value_` annotation exists, member RHS values are passed
+to `__new__`, but the method can assign `_value_` independently. In this case, `.value` falls back
+to `Any`:
+
+```py
+from enum import Enum
+
+class Connector(Enum):
+    def __new__(cls, value: str, connector_id: int) -> "Connector":
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.connector_id = connector_id
+        return obj
+
+    GITHUB = ("github", 1)
+
+reveal_type(Connector.GITHUB.value)  # revealed: Any
+reveal_type(Connector.GITHUB._value_)  # revealed: Any
+```
+
+An explicit `_value_` annotation still takes precedence:
+
+```py
+from enum import Enum
+
+class AnnotatedConnector(Enum):
+    _value_: str
+
+    def __new__(cls, value: str, connector_id: int = 0) -> "AnnotatedConnector":
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.connector_id = connector_id
+        return obj
+
+    GITHUB = "github"
+
+reveal_type(AnnotatedConnector.GITHUB.value)  # revealed: str
+reveal_type(AnnotatedConnector.GITHUB._value_)  # revealed: str
+```
+
 ### Inherited `_value_` annotation
 
 A `_value_` annotation on a parent enum is inherited by subclasses. Member values are validated

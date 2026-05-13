@@ -31,6 +31,13 @@ pub(crate) struct EnumMetadata<'db> {
     /// When present, member values are validated by synthesizing a call to
     /// `__init__` rather than by simple type assignability.
     pub(crate) init_function: Option<FunctionType<'db>>,
+
+    /// The custom `__new__` function, if defined on this enum.
+    ///
+    /// When present, the RHS of a member declaration is not necessarily the
+    /// value exposed through `.value`; the method can assign `_value_`
+    /// independently.
+    pub(crate) new_function: Option<FunctionType<'db>>,
 }
 
 impl get_size2::GetSize for EnumMetadata<'_> {}
@@ -43,12 +50,13 @@ impl<'db> EnumMetadata<'db> {
             auto_members: FxHashSet::default(),
             value_annotation: None,
             init_function: None,
+            new_function: None,
         }
     }
 
     /// Returns the type of `.value`/`._value_` for a given enum member.
     ///
-    /// Priority: explicit `_value_` annotation, then `__init__` → `Any`,
+    /// Priority: explicit `_value_` annotation, then custom construction hooks → `Any`,
     /// then the inferred member value type.
     pub(crate) fn value_type(&self, member_name: &Name) -> Option<Type<'db>> {
         if !self.members.contains_key(member_name) {
@@ -56,7 +64,7 @@ impl<'db> EnumMetadata<'db> {
         }
         if let Some(annotation) = self.value_annotation {
             Some(annotation)
-        } else if self.init_function.is_some() {
+        } else if self.init_function.is_some() || self.new_function.is_some() {
             Some(Type::Dynamic(DynamicType::Any))
         } else {
             self.members.get(member_name).copied()
@@ -76,7 +84,7 @@ impl<'db> EnumMetadata<'db> {
     /// narrowed to a specific member (e.g. `x: MyEnum` where `MyEnum` has multiple members).
     ///
     /// If there is an explicit `_value_` annotation, returns that.
-    /// If there is a custom `__init__`, returns `Any`.
+    /// If there is a custom `__init__` or `__new__`, returns `Any`.
     /// Otherwise, returns the union of all member value types.
     pub(crate) fn instance_value_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         if self.members.is_empty() {
@@ -84,7 +92,7 @@ impl<'db> EnumMetadata<'db> {
         }
         if let Some(annotation) = self.value_annotation {
             Some(annotation)
-        } else if self.init_function.is_some() {
+        } else if self.init_function.is_some() || self.new_function.is_some() {
             Some(Type::Dynamic(DynamicType::Any))
         } else {
             let union = self
@@ -221,6 +229,7 @@ pub(crate) fn enum_metadata<'db>(
                 auto_members: FxHashSet::default(),
                 value_annotation: None,
                 init_function: None,
+                new_function: None,
             });
         }
     };
@@ -431,8 +440,9 @@ pub(crate) fn enum_metadata<'db>(
     let value_annotation =
         custom_value_annotation(db, scope_id).or_else(|| inherited_value_annotation(db, class));
 
-    // Look up a custom `__init__`, falling back to parent enum classes.
+    // Look up custom construction hooks, falling back to parent enum classes.
     let init_function = custom_init(db, scope_id).or_else(|| inherited_init(db, class));
+    let new_function = custom_new(db, scope_id).or_else(|| inherited_new(db, class));
 
     Some(EnumMetadata {
         members,
@@ -440,6 +450,7 @@ pub(crate) fn enum_metadata<'db>(
         auto_members,
         value_annotation,
         init_function,
+        new_function,
     })
 }
 
@@ -492,6 +503,14 @@ fn inherited_init<'db>(
     iter_parent_enum_classes(db, class).find_map(|base| custom_init(db, base.body_scope(db)))
 }
 
+/// Looks up an inherited `__new__` from parent enum classes in the MRO.
+fn inherited_new<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<FunctionType<'db>> {
+    iter_parent_enum_classes(db, class).find_map(|base| custom_new(db, base.body_scope(db)))
+}
+
 /// Returns the custom `__init__` function type if one is defined on the enum.
 fn custom_init<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<FunctionType<'db>> {
     let init_symbol_id = place_table(db, scope).symbol_id("__init__")?;
@@ -503,6 +522,22 @@ fn custom_init<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<FunctionType
     .ignore_possibly_undefined()?;
 
     match init_type {
+        Type::FunctionLiteral(f) => Some(f),
+        _ => None,
+    }
+}
+
+/// Returns the custom `__new__` function type if one is defined on the enum.
+fn custom_new<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<FunctionType<'db>> {
+    let new_symbol_id = place_table(db, scope).symbol_id("__new__")?;
+    let new_type = place_from_declarations(
+        db,
+        use_def_map(db, scope).end_of_scope_symbol_declarations(new_symbol_id),
+    )
+    .ignore_conflicting_declarations()
+    .ignore_possibly_undefined()?;
+
+    match new_type {
         Type::FunctionLiteral(f) => Some(f),
         _ => None,
     }
