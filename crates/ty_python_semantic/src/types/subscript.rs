@@ -530,19 +530,10 @@ impl<'db> Type<'db> {
             // unfold of its body. The `Divergent` α-markers in the body are
             // substituted with the recursive type itself so element results
             // preserve the recursive structure.
-            (Type::Recursive(rec), _) => {
-                let body = *rec.body(db);
-                let mapping = crate::types::TypeMapping::ReplaceDivergent {
-                    binder_id: rec.binder(db),
-                    replacement: Type::Recursive(rec),
-                };
-                let unfolded = body.apply_type_mapping(
-                    db,
-                    &mapping,
-                    crate::types::TypeContext::default(),
-                );
-                Some(unfolded.subscript(db, slice_ty, expr_context))
-            }
+            (Type::Recursive(rec), _) => Some(
+                rec.unfold_preserving_binder(db)
+                    .subscript(db, slice_ty, expr_context),
+            ),
 
             (Type::TypeAlias(alias), _) => {
                 Some(alias.value_type(db).subscript(db, slice_ty, expr_context))

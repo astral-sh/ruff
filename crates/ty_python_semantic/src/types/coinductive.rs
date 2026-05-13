@@ -14,41 +14,40 @@
 //!   arms to handle opaque type names. Records the pair in the visitor for
 //!   cycle detection, unfolds one step, then dispatches to the implementer's
 //!   `check_structural`.
-//! - [`unfold_one`] / [`unfold_pair`]: low-level one-step unfold helpers.
-//!   Most callers should prefer [`delegate_recursive`] which performs unfold
-//!   together with cycle detection.
+//! - [`unfold_one`]: low-level one-step unfold helper. Most callers should
+//!   prefer [`delegate_recursive`] which performs unfold together with cycle
+//!   detection.
 
 use crate::Db;
 use crate::types::Type;
 use crate::types::constraints::ConstraintSet;
 use crate::types::cyclic::CycleDetector;
+use crate::types::recursive::RecursiveType;
 use crate::types::relation::TypeRelation;
 
 /// A relation that supports co-inductive reasoning over [`Type::Recursive`].
 ///
-/// Implementors associate:
-/// - a `Tag` marker type (used to disambiguate the cycle-detection set)
-/// - an `Output` type (typically `bool` or `ConstraintSet<'db, 'c>`)
-///
-/// They also expose:
-/// - `relation_key()` — the value-level tag identifying *which* relation this
-///   instance checks (e.g. `TypeRelation::Subtyping`, `TypeRelation::Disjointness`).
-///   Used as the third component of the cycle-detection visiting key so that
+/// Implementors expose:
+/// - `relation_key()` — the value-level [`TypeRelation`] identifying *which*
+///   relation this instance checks (`Subtyping`, `Disjointness`, …). Used as
+///   the third component of the cycle-detection visiting key so that
 ///   different relations on the same `(Type, Type)` pair don't share cycle
 ///   state.
-/// - `check_structural(db, l, r)` — the actual structural check, called by the
-///   framework after unfold + cycle-guard logic decides this pair needs a real
-///   recursion step.
+/// - `check_structural(db, l, r)` — the actual structural check, called by
+///   the framework after unfold + cycle-guard logic decides this pair needs
+///   a real recursion step.
 pub(crate) trait CoInductiveRelation<'db, 'c> {
-    type Tag: 'static;
-    type Output: Clone;
-
     /// The relation's value-level tag, used in the cycle-detection key.
-    fn relation_key(&self) -> Self::Tag;
+    fn relation_key(&self) -> TypeRelation;
 
     /// Perform the structural check. The framework calls this after unfold +
     /// cycle-guard logic has decided that this pair needs a recursive step.
-    fn check_structural(&self, db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> Self::Output;
+    fn check_structural(
+        &self,
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> ConstraintSet<'db, 'c>;
 }
 
 /// Co-inductively delegate a relation through an opaque type name
@@ -59,7 +58,7 @@ pub(crate) trait CoInductiveRelation<'db, 'c> {
 ///   non-cyclic comparisons of the same unfolded pair from being incorrectly
 ///   short-circuited (a post-unfold key empirically broke ~7 mdtest cases).
 /// - On cycle (same triple revisited), the visitor returns its fallback.
-/// - Otherwise unfolds both sides one step via [`unfold_pair`] and dispatches
+/// - Otherwise unfolds both sides one step via [`unfold_one`] and dispatches
 ///   to `checker.check_structural`.
 ///
 /// This is the canonical entry point used by `check_type_pair` arms to handle
@@ -74,14 +73,13 @@ pub(crate) fn delegate_recursive<'db, 'c, R>(
         (Type<'db>, Type<'db>, TypeRelation),
         ConstraintSet<'db, 'c>,
     >,
-) -> R::Output
+) -> ConstraintSet<'db, 'c>
 where
-    R: CoInductiveRelation<'db, 'c, Tag = TypeRelation, Output = ConstraintSet<'db, 'c>>,
+    R: CoInductiveRelation<'db, 'c>,
 {
     let key = (source, target, checker.relation_key());
     visitor.visit(key, || {
-        let (l, r) = unfold_pair(db, source, target);
-        checker.check_structural(db, l, r)
+        checker.check_structural(db, unfold_one(db, source), unfold_one(db, target))
     })
 }
 
@@ -106,11 +104,35 @@ pub(crate) fn unfold_one<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
     }
 }
 
-/// Unfold both sides of a pair if either is a [`Type::Recursive`].
-pub(crate) fn unfold_pair<'db>(
+/// Find the `Type::Recursive` that wraps `divergent`'s α-binder by scanning a
+/// relation-framework visitor's active seen set. Returns `None` if no such
+/// `Type::Recursive` is currently being visited (legacy implicit-recursion path
+/// where `Divergent` is used as a dynamic-like marker without a corresponding
+/// `Type::Recursive` wrapper).
+///
+/// Shared by `TypeRelationChecker` and `DisjointnessChecker`; they pass their
+/// respective visitor.
+pub(crate) fn find_wrapping_recursive<'db>(
     db: &'db dyn Db,
-    left: Type<'db>,
-    right: Type<'db>,
-) -> (Type<'db>, Type<'db>) {
-    (unfold_one(db, left), unfold_one(db, right))
+    divergent: crate::types::DivergentType,
+    visitor: &CycleDetector<
+        TypeRelation,
+        (Type<'db>, Type<'db>, TypeRelation),
+        ConstraintSet<'db, '_>,
+    >,
+) -> Option<RecursiveType<'db>> {
+    let binder_id = divergent.id();
+    let found = std::cell::Cell::new(None);
+    visitor.any_active(|(left, right, _)| {
+        for side in [*left, *right] {
+            if let Type::Recursive(rec) = side
+                && rec.binder_id(db) == binder_id
+            {
+                found.set(Some(rec));
+                return true;
+            }
+        }
+        false
+    });
+    found.into_inner()
 }

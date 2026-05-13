@@ -340,14 +340,9 @@ impl<'db> Type<'db> {
             _ => None,
         };
         if let Some(rec) = rec_to_unfold {
-            let body = *rec.body(db);
-            let mapping = crate::types::TypeMapping::ReplaceDivergent {
-                binder_id: rec.binder(db),
-                replacement: Type::Recursive(rec),
-            };
-            let unfolded =
-                body.apply_type_mapping(db, &mapping, crate::types::TypeContext::default());
-            return unfolded.try_iterate_with_mode(db, mode);
+            return rec
+                .unfold_preserving_binder(db)
+                .try_iterate_with_mode(db, mode);
         }
 
         if let Some(special_case) = non_async_special_case(db, self) {

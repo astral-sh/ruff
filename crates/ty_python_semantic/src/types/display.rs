@@ -874,22 +874,10 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             // `μα. int | tuple[α, ...] | None` shows as
             // `int | tuple[OptNestedInt, ...] | None`. If no source alias is known
             // (implicit recursion from inference cycles), fall back to the body as-is.
-            Type::Recursive(r) => {
-                let body = *r.body(self.db);
-                let display_ty = if let Some(source_alias) = r.source_alias(self.db) {
-                    use crate::types::TypeMapping;
-                    let mapping = TypeMapping::ReplaceDivergent {
-                        binder_id: r.binder(self.db),
-                        replacement: Type::TypeAlias(source_alias),
-                    };
-                    body.apply_type_mapping(self.db, &mapping, crate::types::TypeContext::default())
-                } else {
-                    body
-                };
-                display_ty
-                    .display_with(self.db, self.settings.clone())
-                    .fmt_detailed(f)
-            }
+            Type::Recursive(r) => r
+                .body_with_alias_marker(self.db)
+                .display_with(self.db, self.settings.clone())
+                .fmt_detailed(f),
             Type::Never => f.with_type(self.ty).write_str("Never"),
             Type::NominalInstance(instance) => {
                 let class = instance.class(self.db);
