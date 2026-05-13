@@ -696,7 +696,7 @@ impl Display for RequiredVersion {
 ///
 /// Literal patterns without glob metacharacters fall back on string
 /// comparison to avoid the overhead of constructing a [`glob::Pattern`].
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, CacheKey)]
 pub enum IdentifierPattern {
     Literal(String),
     Glob(Box<glob::Pattern>),
@@ -738,12 +738,6 @@ impl FromStr for IdentifierPattern {
 
     fn from_str(pattern: &str) -> Result<Self, Self::Err> {
         Self::new(pattern)
-    }
-}
-
-impl CacheKey for IdentifierPattern {
-    fn cache_key(&self, state: &mut CacheKeyHasher) {
-        self.as_str().cache_key(state);
     }
 }
 
