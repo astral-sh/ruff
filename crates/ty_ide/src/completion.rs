@@ -2613,6 +2613,8 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
                 .find_map(|ty| imp(db, ty, visitor))?,
             Type::Dynamic(_)
             | Type::Divergent(_)
+            // Phase 1: Type::Recursive treated as Divergent
+            | Type::Recursive(_)
             | Type::Never
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)

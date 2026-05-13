@@ -399,6 +399,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
             // the result would then become Any or Unknown, respectively).
             (div @ Type::Divergent(_), _, _) | (_, div @ Type::Divergent(_), _) => Some(div),
+            // Phase 1: Type::Recursive treated as Divergent
+            (rec @ Type::Recursive(_), _, _) | (_, rec @ Type::Recursive(_), _) => Some(rec),
 
             (any @ Type::Dynamic(DynamicType::Any), _, _)
             | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),

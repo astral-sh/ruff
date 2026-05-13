@@ -164,6 +164,8 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             | Type::ClassLiteral(_)
             | Type::SpecialForm(_)
             | Type::Divergent(_)
+            // Phase 1: Type::Recursive treated as Divergent (atomic for now)
+            | Type::Recursive(_)
             | Type::Dynamic(_) => TypeKind::Atomic,
 
             // Non-atomic types

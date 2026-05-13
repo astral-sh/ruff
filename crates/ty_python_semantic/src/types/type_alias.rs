@@ -51,6 +51,29 @@ impl<'db> PEP695TypeAliasType<'db> {
         self.apply_function_specialization(db, self.raw_value_type(db))
     }
 
+    /// Whether this alias is *directly* self-referential — its raw body literally
+    /// mentions itself as `Type::TypeAlias(a)` with the same definition.
+    ///
+    /// Phase 2 limitation: this does not follow mutually-recursive chains
+    /// (e.g. `type R = R2 | int; type R2 = R`). Such cases will be handled
+    /// when later phases introduce transitive detection or shift to a
+    /// fixpoint-driven approach.
+    ///
+    /// Used by Phase 3+ to decide when to wrap `value_type` results in
+    /// `Type::Recursive`. Not currently consumed elsewhere.
+    #[allow(dead_code)]
+    #[salsa::tracked(heap_size = ruff_memory_usage::heap_size)]
+    pub(crate) fn is_self_referential(self, db: &'db dyn Db) -> bool {
+        let raw = self.raw_value_type(db);
+        let self_def = self.definition(db);
+        crate::types::visitor::any_over_type(db, raw, false, |ty| match ty {
+            Type::TypeAlias(crate::types::TypeAliasType::PEP695(other)) => {
+                other.definition(db) == self_def
+            }
+            _ => false,
+        })
+    }
+
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.
     /// Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(

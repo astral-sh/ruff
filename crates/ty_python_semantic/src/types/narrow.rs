@@ -184,7 +184,8 @@ impl ClassInfoConstraintFunction {
                     },
                 }
             }
-            Type::Dynamic(_) | Type::Divergent(_) => Some(classinfo),
+            // Phase 1: Type::Recursive treated as Divergent
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) => Some(classinfo),
             Type::Intersection(intersection) => {
                 if intersection.negative(db).is_empty() {
                     let mut builder = IntersectionBuilder::new(db);
@@ -2111,6 +2112,8 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 
         Type::Dynamic(_)
         | Type::Divergent(_)
+        // Phase 1: Type::Recursive treated as Divergent
+        | Type::Recursive(_)
         | Type::Never
         | Type::FunctionLiteral(_)
         | Type::BoundMethod(_)
@@ -2200,6 +2203,8 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         // always guarded by that check.
         Type::Dynamic(_)
         | Type::Divergent(_)
+        // Phase 1: Type::Recursive treated as Divergent
+        | Type::Recursive(_)
         | Type::Never
         | Type::FunctionLiteral(_)
         | Type::BoundMethod(_)

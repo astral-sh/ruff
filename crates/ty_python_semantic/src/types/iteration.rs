@@ -217,6 +217,8 @@ impl<'db> Type<'db> {
                 // N.B. This special case isn't strictly necessary, it's just an obvious optimization
                 Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
                 Type::Divergent(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
+                // Phase 1: Type::Recursive treated as Divergent
+                Type::Recursive(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
 
                 Type::FunctionLiteral(_)
                 | Type::GenericAlias(_)
