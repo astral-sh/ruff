@@ -224,9 +224,8 @@ impl ProjectDatabase {
             }
         }
 
-        for path in deduplicate_nested_paths(sync_recursively) {
-            Files::sync_recursively(self, &path);
-        }
+        let sync_recursively = deduplicate_nested_paths(sync_recursively).collect::<Vec<_>>();
+        Files::sync_all_recursive(self, &sync_recursively);
 
         if reload_project {
             // The active project root may have been deleted. Start rediscovery from
