@@ -118,11 +118,6 @@ mod tests {
         Ok(())
     }
 
-    /// Regression test for <https://github.com/astral-sh/ruff/issues/23185>:
-    /// enabling `future_annotations=true` must not silently flip TC001/TC002/TC003
-    /// into strict-mode behaviour when `strict=false`. A typing-only import whose
-    /// module is already available at runtime (through a sibling import or a
-    /// parent/submodule import) should not be flagged.
     #[test]
     fn future_annotations_respects_non_strict_mode() -> Result<()> {
         let diagnostics = test_path(
@@ -142,10 +137,7 @@ mod tests {
                 ])
             },
         )?;
-        assert!(
-            diagnostics.is_empty(),
-            "expected no TC001/TC002/TC003 diagnostics with future_annotations=true and strict=false, got: {diagnostics:#?}"
-        );
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 

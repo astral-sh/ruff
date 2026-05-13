@@ -284,11 +284,8 @@ pub(crate) fn typing_only_runtime_import(
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
 
-        // In un-strict mode, don't flag typing-only imports that are implicitly loaded by way
-        // of a valid runtime import. The `future_annotations` setting only controls whether a
-        // `from __future__ import annotations` import is auto-inserted as part of the fix; it
-        // is an orthogonal concern from strict mode and should not flip the flagging behaviour
-        // (see https://github.com/astral-sh/ruff/issues/23185).
+        // If we're in un-strict mode, don't flag typing-only imports that are
+        // implicitly loaded by way of a valid runtime import.
         if !checker.settings().flake8_type_checking.strict
             && runtime_imports
                 .iter()

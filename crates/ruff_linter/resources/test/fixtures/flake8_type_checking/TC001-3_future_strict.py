@@ -2,14 +2,11 @@
 #
 # With `future-annotations = true` and `strict = false`, a typing-only import
 # that is implicitly loaded by a valid runtime-used sibling import from the
-# same module should NOT be flagged as TC001/TC002/TC003. Previously, enabling
-# `future_annotations` silently flipped these rules into strict-mode behaviour.
+# same module should NOT be flagged as TC001/TC002/TC003.
 
 
 def from_collections_abc():
     # `Set` is used at runtime, so `Iterable` is implicitly available at runtime.
-    # In un-strict mode (even with `future_annotations=true`), this should not
-    # be flagged.
     from collections.abc import Iterable, Set
 
     def f(x: Iterable[int]) -> Set[int]:
@@ -18,7 +15,7 @@ def from_collections_abc():
 
 def from_pkg():
     # `pkg` is used at runtime, `A` is typing-only but implicitly runtime-available
-    # via `pkg`. Should not be flagged in un-strict mode.
+    # via `pkg`.
     import pkg
     from pkg import A
 
@@ -28,7 +25,6 @@ def from_pkg():
 
 def submodule_implicit():
     # `pkg.bar` is used at runtime, which implicitly makes `pkg` available.
-    # Should not be flagged in un-strict mode.
     import pkg
     import pkg.bar
 
