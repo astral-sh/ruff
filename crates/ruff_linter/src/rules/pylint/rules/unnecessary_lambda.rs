@@ -214,11 +214,24 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
     for name in &names {
         if let Some(binding_id) = checker.semantic().resolve_name(name) {
             let binding = checker.semantic().binding(binding_id);
+
+            // The lambda is necessary if it uses one of its own parameters as the function call.
+            // Ex) `lambda x, y: x(y)`
             if checker.semantic().is_current_scope(binding.scope) {
+                return;
+            }
+
+            // Don't suggest inlining if the binding appears after the lambda and is defined
+            // outside of it (not a builtin and not inside the lambda body itself).
+            if binding.range.start() > lambda.range().start()
+                && !binding.kind.is_builtin()
+                && !lambda.range().contains_range(binding.range())
+            {
                 return;
             }
         }
     }
+
 
     let mut diagnostic = checker.report_diagnostic(UnnecessaryLambda, lambda.range());
     // Suppress the fix if the assignment expression target shadows one of the lambda's parameters.

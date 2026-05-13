@@ -61,3 +61,10 @@ _ = lambda *args: f(*args, y=x)
 # https://github.com/astral-sh/ruff/issues/18675
 _ = lambda x: (string := str)(x)
 _ = lambda x: ((x := 1) and str)(x)
+
+# https://github.com/astral-sh/ruff/issues/24704
+# Don't suggest inlining if the function is defined after the lambda.
+x = {"a": lambda y: f(y)}
+
+def f(y):
+    pass
