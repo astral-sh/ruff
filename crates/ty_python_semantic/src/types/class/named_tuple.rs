@@ -235,7 +235,9 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     #[salsa::tracked(
         returns(ref),
         heap_size=ruff_memory_usage::heap_size,
-        cycle_initial=dynamic_namedtuple_mro_cycle_initial
+        cycle_initial=|db, _, self_| Mro::from_error(
+            db, ClassType::NonGeneric(ClassLiteral::DynamicNamedTuple(self_)),
+        ),
     )]
     pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
@@ -447,17 +449,6 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     pub(super) fn has_known_fields(self, db: &'db dyn Db) -> bool {
         self.spec(db).has_known_fields(db)
     }
-}
-
-fn dynamic_namedtuple_mro_cycle_initial<'db>(
-    db: &'db dyn Db,
-    _id: salsa::Id,
-    self_: DynamicNamedTupleLiteral<'db>,
-) -> Mro<'db> {
-    Mro::from_error(
-        db,
-        ClassType::NonGeneric(ClassLiteral::DynamicNamedTuple(self_)),
-    )
 }
 
 /// Anchor for identifying a dynamic `namedtuple`/`NamedTuple` class literal.

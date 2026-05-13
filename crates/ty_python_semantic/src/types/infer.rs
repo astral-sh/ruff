@@ -141,7 +141,9 @@ impl<'a, K, V> IntoIterator for &'a mut FrozenMap<K, V> {
 /// Use when resolving a place use or public type of a place.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=definition_cycle_initial,
+    cycle_initial=|db, id, definition: Definition<'db>| {
+        DefinitionInference::cycle_initial(definition.scope(db), Type::divergent(id))
+    },
     cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
     },
@@ -164,14 +166,6 @@ pub(crate) fn infer_definition_types<'db>(
 
     TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index, &module)
         .finish_definition()
-}
-
-fn definition_cycle_initial<'db>(
-    db: &'db dyn Db,
-    id: salsa::Id,
-    definition: Definition<'db>,
-) -> DefinitionInference<'db> {
-    DefinitionInference::cycle_initial(definition.scope(db), Type::divergent(id))
 }
 
 /// Infer decorator expression types for a function definition.
@@ -258,7 +252,9 @@ impl<'db> FunctionDecoratorInference<'db> {
 /// file, or in a file with `from __future__ import annotations`, or stringified annotations.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=deferred_cycle_initial,
+    cycle_initial=|db, id, definition: Definition<'db>| {
+        DefinitionInference::cycle_initial(definition.scope(db), Type::divergent(id))
+    },
     cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
     },
@@ -282,14 +278,6 @@ pub(crate) fn infer_deferred_types<'db>(
 
     TypeInferenceBuilder::new(db, InferenceRegion::Deferred(definition), index, &module)
         .finish_definition()
-}
-
-fn deferred_cycle_initial<'db>(
-    db: &'db dyn Db,
-    id: salsa::Id,
-    definition: Definition<'db>,
-) -> DefinitionInference<'db> {
-    DefinitionInference::cycle_initial(definition.scope(db), Type::divergent(id))
 }
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
@@ -484,7 +472,9 @@ pub(super) fn infer_statement_types<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=statement_cycle_initial,
+    cycle_initial=|db, id, statement: StatementInner<'db>| {
+        StatementInferenceInner::cycle_initial(statement.scope(db), Type::divergent(id))
+    },
     cycle_fn=|db, cycle, previous: &StatementInferenceInner<'db>, inference: StatementInferenceInner<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
     },
@@ -508,15 +498,6 @@ fn infer_statement_types_impl<'db>(
 
     TypeInferenceBuilder::new(db, InferenceRegion::Statement(statement), index, &module)
         .finish_statement()
-}
-
-fn statement_cycle_initial<'db>(
-    db: &'db dyn Db,
-    id: salsa::Id,
-    statement: StatementInner<'db>,
-) -> StatementInferenceInner<'db> {
-    let cycle_recovery = Type::divergent(id);
-    StatementInferenceInner::cycle_initial(statement.scope(db), cycle_recovery)
 }
 
 /// An `Expression` with an optional `TypeContext`.
