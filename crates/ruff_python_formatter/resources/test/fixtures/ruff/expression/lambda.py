@@ -852,3 +852,7 @@ def bar():
 value = f"prefix {
     ' '.join(map(lambda object_name: os.path.join(dest_path, object_name), objects_to_remove))
 } suffix"
+
+# This can also be triggered in nested, interned elements within `BestFitting` elements
+def foo():
+    subprocess.check_call(f"rm -rf {' '.join(map(lambda object_name: max(candidate_paths, key=lambda candidate: os.path.join(dest_path, object_name, candidate)), objects_to_remove))}", shell=True)
