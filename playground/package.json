@@ -35,6 +35,6 @@
     "typescript": "^6.0.0",
     "typescript-eslint": "^8.26.1",
     "vite": "^8.0.0",
-    "wasm-pack": "^0.14.0"
+    "wasm-pack": "^0.13.1"
   }
 }
