@@ -4473,6 +4473,7 @@ dependencies = [
  "tracing-flame",
  "tracing-subscriber",
  "ty_combine",
+ "ty_doc",
  "ty_module_resolver",
  "ty_project",
  "ty_python_core",
@@ -4522,6 +4523,28 @@ dependencies = [
  "ty_module_resolver",
  "ty_project",
  "walkdir",
+]
+
+[[package]]
+name = "ty_doc"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "html-escape",
+ "rayon",
+ "ruff_db",
+ "ruff_python_ast",
+ "ruff_python_formatter",
+ "ruff_python_parser",
+ "ruff_source_file",
+ "ruff_text_size",
+ "serde",
+ "serde_json",
+ "ty_ide",
+ "ty_module_resolver",
+ "ty_project",
+ "ty_python_core",
+ "ty_python_semantic",
 ]
 
 [[package]]

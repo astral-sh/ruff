@@ -18,7 +18,7 @@ use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
     call_signature_details, call_type_simplified_by_overloads, constructor_signature,
     definitions_and_overloads_for_function, definitions_for_keyword_argument,
-    typed_dict_key_definition,
+    property_getter_definitions_for_function, typed_dict_key_definition,
 };
 use ty_python_semantic::{
     HasDefinition, HasOptionalDefinition, HasType, ImportAliasResolution, SemanticModel,
@@ -469,11 +469,11 @@ impl GotoTarget<'_> {
             // the same logical symbol.
             GotoTarget::FunctionDef(function) => {
                 let mut defs = definitions_and_overloads_for_function(model, function);
-                defs.extend(
-                    property_getter_definitions(function, model, alias_resolution)
-                        .into_iter()
-                        .flatten(),
-                );
+                defs.extend(property_getter_definitions_for_function(
+                    model,
+                    function,
+                    alias_resolution,
+                ));
                 Some(defs)
             }
 
@@ -1210,29 +1210,6 @@ fn convert_resolved_definitions_to_targets<'db>(
             }
         })
         .collect()
-}
-
-/// If a function is a property setter or deleter (e.g., decorated with
-/// `@my_property.setter`), return the definitions for the property getter.
-/// This ensures that the setter/deleter function name is recognized as a
-/// co-definition of the same logical symbol as the getter.
-fn property_getter_definitions<'db>(
-    function: &ast::StmtFunctionDef,
-    model: &SemanticModel<'db>,
-    alias_resolution: ImportAliasResolution,
-) -> Option<Vec<ResolvedDefinition<'db>>> {
-    for decorator in &function.decorator_list {
-        if let Some(attr_expr) = decorator.expression.as_attribute_expr()
-            && matches!(attr_expr.attr.as_str(), "setter" | "deleter")
-            && matches!(
-                attr_expr.value.inferred_type(model),
-                Some(Type::PropertyInstance(_))
-            )
-        {
-            return definitions_for_expression(model, (&*attr_expr.value).into(), alias_resolution);
-        }
-    }
-    None
 }
 
 /// Shared helper to get definitions for an expr (that is presumably a name/attr)

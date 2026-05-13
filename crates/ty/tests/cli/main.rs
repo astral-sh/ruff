@@ -1,5 +1,6 @@
 mod analysis_options;
 mod config_option;
+mod doc;
 mod exit_code;
 mod file_selection;
 mod fixes;
@@ -996,8 +997,14 @@ impl CliTest {
     }
 
     pub(crate) fn command(&self) -> Command {
+        let mut command = self.ty_command();
+        command.arg("check");
+        command
+    }
+
+    pub(crate) fn ty_command(&self) -> Command {
         let mut command = Command::new(&self.ty_binary_path);
-        command.current_dir(&self.project_dir).arg("check");
+        command.current_dir(&self.project_dir);
 
         // Unset all environment variables because they can affect test behavior.
         command.env_clear();

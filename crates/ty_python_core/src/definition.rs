@@ -94,6 +94,12 @@ impl<'db> Definition<'db> {
                     .as_name_expr()
                     .map(|name_expr| name_expr.id.as_str().to_string())
             }
+            DefinitionKind::AnnotatedAssignment(assignment) => {
+                let target_node = assignment.target.node(&module);
+                target_node
+                    .as_name_expr()
+                    .map(|name_expr| name_expr.id.as_str().to_string())
+            }
             _ => None,
         }
     }
@@ -115,6 +121,11 @@ impl<'db> Definition<'db> {
             DefinitionKind::AnnotatedAssignment(assign_def) => {
                 let assign_node = assign_def.target(&module);
                 attribute_docstring(&module, assign_node)
+                    .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+            }
+            DefinitionKind::TypeAlias(type_alias_def) => {
+                let type_alias_node = type_alias_def.node(&module);
+                attribute_docstring(&module, &type_alias_node.name)
                     .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
             }
             DefinitionKind::Function(function_def) => {
