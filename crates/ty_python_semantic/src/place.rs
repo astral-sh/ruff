@@ -271,24 +271,18 @@ impl<'db> Place<'db> {
                     ty: Type::Union(union),
                     ..
                 },
-            ) => union
-                .map_with_boundness(db, |elem| {
-                    Place::Defined(DefinedPlace { ty: *elem, ..place })
-                        .try_call_dunder_get(db, owner)
-                })
-                .with_definition(place.definition),
+            ) => union.map_with_boundness(db, |elem| {
+                Place::Defined(DefinedPlace { ty: *elem, ..place }).try_call_dunder_get(db, owner)
+            }),
 
             Place::Defined(
                 place @ DefinedPlace {
                     ty: Type::Intersection(intersection),
                     ..
                 },
-            ) => intersection
-                .map_with_boundness(db, |elem| {
-                    Place::Defined(DefinedPlace { ty: *elem, ..place })
-                        .try_call_dunder_get(db, owner)
-                })
-                .with_definition(place.definition),
+            ) => intersection.map_with_boundness(db, |elem| {
+                Place::Defined(DefinedPlace { ty: *elem, ..place }).try_call_dunder_get(db, owner)
+            }),
 
             Place::Defined(defined) => {
                 if let Some((dunder_get_return_ty, _)) =
@@ -296,6 +290,7 @@ impl<'db> Place<'db> {
                 {
                     Place::Defined(DefinedPlace {
                         ty: dunder_get_return_ty,
+                        definition: None,
                         ..defined
                     })
                 } else {

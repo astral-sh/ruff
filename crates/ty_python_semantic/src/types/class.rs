@@ -2456,6 +2456,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         let mut union = UnionBuilder::new(db);
         let mut union_qualifiers = TypeQualifiers::empty();
         let mut is_definitely_bound = false;
+        let mut first_definition: Option<Definition<'db>> = None;
 
         for superclass in self.mro_iter {
             match superclass {
@@ -2475,6 +2476,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 ty,
                                 origin,
                                 definedness: boundness,
+                                definition: member_definition,
                                 ..
                             }),
                         qualifiers,
@@ -2494,6 +2496,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         // higher up in the MRO, and build a union of all inferred types (and
                         // possibly-declared types):
                         union = union.add(ty);
+                        first_definition = first_definition.or(member_definition);
 
                         // TODO: We could raise a diagnostic here if there are conflicting type
                         // qualifiers
@@ -2520,7 +2523,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 origin: TypeOrigin::Inferred,
                 definedness: boundness,
                 public_type_policy: PublicTypePolicy::Raw,
-                definition: None,
+                definition: first_definition,
             })
             .with_qualifiers(union_qualifiers)
         };
