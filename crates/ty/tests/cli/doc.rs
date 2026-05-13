@@ -14,6 +14,16 @@ fn assert_contains_none(content: &str, needles: &[&str]) {
     }
 }
 
+fn assert_appears_before(content: &str, left: &str, right: &str) {
+    let left = content
+        .find(left)
+        .unwrap_or_else(|| panic!("missing `{left}`"));
+    let right = content
+        .find(right)
+        .unwrap_or_else(|| panic!("missing `{right}`"));
+    assert!(left < right, "expected `{left}` to appear before `{right}`");
+}
+
 #[test]
 fn generates_project_documentation() -> anyhow::Result<()> {
     let case = CliTest::with_files([
@@ -178,7 +188,8 @@ fn generates_project_documentation() -> anyhow::Result<()> {
         &[
             "Class <span>Widget</span>",
             "src/pkg/__init__.py.html#L",
-            "<h3><a href=\"#attributes\">Attributes</a></h3><ul class=\"block item-list\"><li><a href=\"#attr.name\">name</a>",
+            "<h3><a href=\"#attributes\">Attributes</a></h3><ul class=\"block item-list\">",
+            "<li><a href=\"#attr.name\">name</a>",
             "<h3><a href=\"#methods\">Methods</a></h3><ul class=\"block item-list\"><li><a href=\"#method.__init__\">__init__</a>",
             "<div class=\"iss ats\">",
             "<section id=\"attr.name\" class=\"itm\">",
@@ -266,6 +277,65 @@ fn generates_project_documentation() -> anyhow::Result<()> {
             "id=\"L",
             "<span class=\"kw\">class</span> Widget:",
         ],
+    );
+
+    Ok(())
+}
+
+#[test]
+fn members_are_grouped_and_sorted_by_name() -> anyhow::Result<()> {
+    let case = CliTest::with_files([(
+        "pkg/__init__.py",
+        r#"
+        ZETA = 1
+        type TextAlias = str
+        ALPHA = 2
+
+        class Zebra:
+            zeta: int
+            alpha: int
+
+            def zeta_method(self) -> None:
+                pass
+
+            def alpha_method(self) -> None:
+                pass
+
+        class Alpha:
+            pass
+
+        def zeta() -> None:
+            pass
+
+        def alpha() -> None:
+            pass
+        "#,
+    )])?;
+
+    assert_cmd_snapshot!(case.ty_command().arg("doc").arg("--color").arg("never"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+     Documenting project (<temp_dir>/)
+        Finished documentation in 0.000s
+       Generated <temp_dir>/target/doc/project/index.html
+
+    ----- stderr -----
+    ");
+
+    let output = case.root().join("target/doc/project");
+    let module = std::fs::read_to_string(output.join("pkg/index.html"))?;
+    assert_appears_before(&module, ">Alpha</a></dt>", ">Zebra</a></dt>");
+    assert_appears_before(&module, "id=\"fn.alpha\"", "id=\"fn.zeta\"");
+    assert_appears_before(&module, "id=\"var.ALPHA\"", "id=\"var.ZETA\"");
+    assert_appears_before(&module, "id=\"var.ZETA\"", "id=\"type.TextAlias\"");
+
+    let class = std::fs::read_to_string(output.join("pkg/class.Zebra.html"))?;
+    assert_appears_before(&class, "id=\"attr.alpha\"", "id=\"attr.zeta\"");
+    assert_appears_before(
+        &class,
+        "id=\"method.alpha_method\"",
+        "id=\"method.zeta_method\"",
     );
 
     Ok(())
@@ -675,6 +745,10 @@ fn class_pages_show_documented_inheritance() -> anyhow::Result<()> {
                 """Inherited property."""
                 return ""
 
+            @inherited_property.setter
+            def inherited_property(self, value: str) -> None:
+                pass
+
             def overridden(self) -> int:
                 """Base method."""
                 return 1
@@ -814,6 +888,55 @@ fn emits_parse_warnings_but_still_generates_docs() -> anyhow::Result<()> {
     ");
 
     assert!(case.root().join("target/doc/project/index.html").exists());
+
+    Ok(())
+}
+
+#[test]
+fn sibling_stub_modules_take_precedence() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("pkg/__init__.py", ""),
+        (
+            "pkg/api.py",
+            r#"
+            """Runtime module docs."""
+
+            class RuntimeOnly:
+                """Runtime class."""
+            "#,
+        ),
+        (
+            "pkg/api.pyi",
+            r#"
+            """Stub module docs."""
+
+            class StubOnly:
+                """Stub class."""
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.ty_command().arg("doc").arg("--color").arg("never"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+     Documenting project (<temp_dir>/)
+        Finished documentation in 0.000s
+       Generated <temp_dir>/target/doc/project/index.html
+
+    ----- stderr -----
+    ");
+
+    let module =
+        std::fs::read_to_string(case.root().join("target/doc/project/pkg/api/index.html"))?;
+    assert_contains_all(
+        &module,
+        &["Stub module docs.", "StubOnly", "src/pkg/api.pyi.html#L1"],
+    );
+    assert_contains_none(
+        &module,
+        &["Runtime module docs.", "RuntimeOnly", "src/pkg/api.py.html"],
+    );
 
     Ok(())
 }

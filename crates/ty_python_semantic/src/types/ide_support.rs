@@ -17,7 +17,7 @@ use itertools::Either;
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
-use ruff_python_ast::{self as ast, AnyNodeRef, name::Name};
+use ruff_python_ast::{self as ast, AnyNodeRef, ExprRef, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -593,6 +593,86 @@ pub fn definitions_and_overloads_for_function<'db>(
             .collect()
     } else {
         vec![ResolvedDefinition::Definition(function.definition(model))]
+    }
+}
+
+/// The overload declarations and optional implementation for a function definition.
+#[derive(Debug, Clone)]
+pub struct FunctionOverloadDetails<'db> {
+    /// Overload declarations in source order.
+    pub overloads: Vec<ResolvedDefinition<'db>>,
+
+    /// The runtime implementation, if one exists.
+    pub implementation: Option<ResolvedDefinition<'db>>,
+}
+
+/// Returns overload declarations and the optional implementation for a function.
+pub fn function_overload_details<'db>(
+    model: &SemanticModel<'db>,
+    function: &ast::StmtFunctionDef,
+) -> FunctionOverloadDetails<'db> {
+    if let Some(function_type) = function
+        .inferred_type(model)
+        .and_then(Type::as_function_literal)
+    {
+        let db = model.db();
+        let (overloads, implementation) = function_type.overloads_and_implementation(db);
+
+        FunctionOverloadDetails {
+            overloads: overloads
+                .iter()
+                .copied()
+                .filter_map(|overload| overload.signature(db).definition())
+                .map(ResolvedDefinition::Definition)
+                .collect(),
+            implementation: implementation
+                .and_then(|implementation| implementation.signature(db).definition())
+                .map(ResolvedDefinition::Definition),
+        }
+    } else {
+        FunctionOverloadDetails {
+            overloads: Vec::new(),
+            implementation: Some(ResolvedDefinition::Definition(function.definition(model))),
+        }
+    }
+}
+
+/// Returns getter definitions for a property setter or deleter function.
+pub fn property_getter_definitions_for_function<'db>(
+    model: &SemanticModel<'db>,
+    function: &ast::StmtFunctionDef,
+    alias_resolution: ImportAliasResolution,
+) -> Vec<ResolvedDefinition<'db>> {
+    for decorator in &function.decorator_list {
+        if let Some(attribute) = decorator.expression.as_attribute_expr()
+            && matches!(attribute.attr.as_str(), "setter" | "deleter")
+            && matches!(
+                attribute.value.inferred_type(model),
+                Some(Type::PropertyInstance(_))
+            )
+        {
+            return definitions_for_property_expression(
+                model,
+                (&*attribute.value).into(),
+                alias_resolution,
+            );
+        }
+    }
+
+    Vec::new()
+}
+
+fn definitions_for_property_expression<'db>(
+    model: &SemanticModel<'db>,
+    expression: ExprRef<'_>,
+    alias_resolution: ImportAliasResolution,
+) -> Vec<ResolvedDefinition<'db>> {
+    match expression {
+        ExprRef::Name(name) => {
+            definitions_for_name(model, name.id.as_str(), expression.into(), alias_resolution)
+        }
+        ExprRef::Attribute(attribute) => definitions_for_attribute(model, attribute),
+        _ => Vec::new(),
     }
 }
 
