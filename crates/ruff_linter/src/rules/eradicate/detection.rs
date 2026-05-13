@@ -76,7 +76,7 @@ static POSITIVE_CASES: LazyLock<RegexSet> = LazyLock::new(|| {
 
 /// Returns `true` if a comment contains Python code.
 pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
-    let line = line.trim_start_matches([' ', '#']).trim_end();
+    let line = line.trim_start_matches([' ', '\t', '#']).trim_end();
 
     // Fast path: if none of the indicators are present, the line is not code.
     if !CODE_INDICATORS.is_match(line) {
@@ -165,6 +165,16 @@ mod tests {
             "# SPDX-License-Identifier: MIT",
             &[]
         ));
+
+        // Regression test for tab-indented comments (issue #25116)
+        assert!(!comment_contains_code("\t# testing: Foo Bar Baz", &[]));
+        assert!(!comment_contains_code("\t\t# testing: Foo Bar Baz", &[]));
+        assert!(!comment_contains_code("\t# testing:", &[]));
+
+        assert!(comment_contains_code("\t# x = 1", &[]));
+        assert!(comment_contains_code("\t\t# x = 1", &[]));
+        assert!(comment_contains_code("\t# import os", &[]));
+        assert!(comment_contains_code("\t#return x", &[]));
 
         // TODO(charlie): This should be `true` under aggressive mode.
         assert!(!comment_contains_code("#},", &[]));
