@@ -12,6 +12,7 @@ license = { workspace = true }
 
 [lib]
 doctest = false
+test = false
 
 [dependencies]
 ruff_db = { workspace = true }
@@ -31,7 +32,6 @@ html-escape = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-tracing = { workspace = true }
 
 [lints]
 workspace = true

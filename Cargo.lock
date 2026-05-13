@@ -4533,7 +4533,6 @@ dependencies = [
  "ruff_text_size",
  "serde",
  "serde_json",
- "tracing",
  "ty_ide",
  "ty_module_resolver",
  "ty_project",
