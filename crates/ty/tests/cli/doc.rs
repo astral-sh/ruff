@@ -175,12 +175,19 @@ fn generates_project_documentation() -> anyhow::Result<()> {
             "id=\"var.VALUE\"",
             "<dt id=\"var.VALUE\" class=\"ve\"><a class=\"pm vpm\" href=\"#var.VALUE\" aria-label=\"Permalink to var VALUE\">§</a><code class=\"vs var\">VALUE: <a class=\"bi\" href=\"https://docs.python.org/3/library/functions.html#int\">int</a> = <span class=\"num\">1</span></code>",
             "Value docs.",
-            "<dt id=\"var.CONFIG\" class=\"ve\"><a class=\"pm vpm\" href=\"#var.CONFIG\" aria-label=\"Permalink to var CONFIG\">§</a><code class=\"vs var\">CONFIG: <a class=\"bi\" href=\"https://docs.python.org/3/library/functions.html#dict\">dict</a>[<a class=\"bi\" href=\"https://docs.python.org/3/library/functions.html#str\">str</a>, <a class=\"bi\" href=\"https://docs.python.org/3/library/functions.html#str\">str</a>]</code>",
+            "<dt id=\"var.CONFIG\" class=\"ve\"><a class=\"pm vpm\" href=\"#var.CONFIG\" aria-label=\"Permalink to var CONFIG\">§</a><code class=\"vs var\">CONFIG</code>",
             "Config docs.",
             "<dt id=\"type.StringAlias\" class=\"ve\"><a class=\"pm vpm\" href=\"#type.StringAlias\" aria-label=\"Permalink to type StringAlias\">§</a><code class=\"vs type\">StringAlias = <a class=\"bi\" href=\"https://docs.python.org/3/library/functions.html#str\">str</a></code>",
         ],
     );
-    assert_contains_none(&module, &["<h2>Module <a href=\"", "CONFIG = { ... }"]);
+    assert_contains_none(
+        &module,
+        &[
+            "<h2>Module <a href=\"",
+            "CONFIG = { ... }",
+            "CONFIG: <a class=\"bi\"",
+        ],
+    );
 
     let class = std::fs::read_to_string(output.join("pkg/class.Widget.html"))?;
     assert_contains_all(
@@ -1070,6 +1077,16 @@ fn all_items_follow_ty_public_exports() -> anyhow::Result<()> {
         &all_items,
         &["pkg.Hidden", "pkg.hidden", "pkg.HIDDEN_VALUE"],
     );
+
+    let module = std::fs::read_to_string(output_dir.join("project/pkg/index.html"))?;
+    assert_contains_all(
+        &module,
+        &[
+            "<dt id=\"var.__all__\" class=\"ve\">",
+            "<code class=\"vs var\">__all__</code>",
+        ],
+    );
+    assert_contains_none(&module, &["__all__:"]);
 
     Ok(())
 }

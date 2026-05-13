@@ -558,7 +558,6 @@ pub(crate) fn extract_module(
                     &line_index,
                     definition,
                     assign,
-                    &semantic_model,
                 ) {
                     module.variables.push(variable);
                 }
@@ -865,7 +864,6 @@ fn extract_class(
                     line_index,
                     definition,
                     assign,
-                    semantic_model,
                 ) {
                     attributes.push(attribute);
                 }
@@ -1034,63 +1032,19 @@ fn extract_assignment_definition(
     line_index: &LineIndex,
     definition: Definition,
     assign: &AssignmentDefinitionKind,
-    semantic_model: &SemanticModel,
 ) -> Option<VariableDoc> {
-    let target = assign.target(parsed);
     let value = assign.value(parsed);
     let name = definition.name(db)?;
 
-    let signature = append_constant_default(
-        inferred_assignment_signature(semantic_model, target, value),
-        source_code,
-        Some(value),
-    );
+    let signature = append_constant_default(String::new(), source_code, Some(value));
     Some(VariableDoc {
         name,
-        signature_links: collect_signature_links(semantic_model, target.into(), &signature),
+        signature_links: BTreeMap::new(),
         signature,
         docstring: definition.docstring(db),
         source_line: line_number_from_range(line_index, definition.full_range(db, parsed).range()),
         kind: VariableKind::Variable,
     })
-}
-
-fn inferred_assignment_signature(
-    semantic_model: &SemanticModel,
-    target: &ruff_python_ast::Expr,
-    value: &ruff_python_ast::Expr,
-) -> String {
-    if !assignment_value_worth_inference(value) {
-        return String::new();
-    }
-
-    let Some(ty) = target.inferred_type(semantic_model) else {
-        return String::new();
-    };
-    if ty.is_unknown() {
-        return String::new();
-    }
-
-    let label = ty.display(semantic_model.db()).to_string();
-    if label == "Unknown" || label.starts_with("Literal[") {
-        String::new()
-    } else {
-        format!(": {label}")
-    }
-}
-
-fn assignment_value_worth_inference(value: &ruff_python_ast::Expr) -> bool {
-    matches!(
-        value,
-        ruff_python_ast::Expr::Dict(_)
-            | ruff_python_ast::Expr::Set(_)
-            | ruff_python_ast::Expr::List(_)
-            | ruff_python_ast::Expr::Tuple(_)
-            | ruff_python_ast::Expr::DictComp(_)
-            | ruff_python_ast::Expr::SetComp(_)
-            | ruff_python_ast::Expr::ListComp(_)
-            | ruff_python_ast::Expr::Generator(_)
-    )
 }
 
 fn extract_type_alias_definition(
