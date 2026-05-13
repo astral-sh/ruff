@@ -342,8 +342,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::AirflowTaskBranchAsShortCircuit) {
                 airflow::rules::task_branch_as_short_circuit(checker, function_def);
             }
-            if checker.is_rule_enabled(Rule::AirflowTaskMultipleOutputsImplicit) {
-                airflow::rules::task_multiple_outputs_implicit(checker, function_def);
+            if checker.is_rule_enabled(Rule::AirflowTaskImplicitMultipleOutputs) {
+                airflow::rules::task_implicit_multiple_outputs(checker, function_def);
             }
             if checker.is_rule_enabled(Rule::Airflow3Removal) {
                 airflow::rules::airflow_3_removal_function_def(checker, function_def);

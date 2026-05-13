@@ -69,11 +69,11 @@ const SUPPORTED_VARIANTS: &[&str] = &[
 /// return a dict.
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
-pub(crate) struct AirflowTaskMultipleOutputsImplicit {
+pub(crate) struct AirflowTaskImplicitMultipleOutputs {
     inferred: bool,
 }
 
-impl Violation for AirflowTaskMultipleOutputsImplicit {
+impl Violation for AirflowTaskImplicitMultipleOutputs {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
@@ -91,7 +91,7 @@ impl Violation for AirflowTaskMultipleOutputsImplicit {
 }
 
 /// AIR202
-pub(crate) fn task_multiple_outputs_implicit(checker: &Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn task_implicit_multiple_outputs(checker: &Checker, function_def: &StmtFunctionDef) {
     let semantic = checker.semantic();
     if !semantic.seen_module(Modules::AIRFLOW) {
         return;
@@ -119,7 +119,7 @@ pub(crate) fn task_multiple_outputs_implicit(checker: &Checker, function_def: &S
 
     let inferred = annotation_is_mapping;
     let mut diagnostic = checker.report_diagnostic(
-        AirflowTaskMultipleOutputsImplicit { inferred },
+        AirflowTaskImplicitMultipleOutputs { inferred },
         decorator.range(),
     );
     diagnostic.set_fix(build_fix(decorator, inferred, checker));

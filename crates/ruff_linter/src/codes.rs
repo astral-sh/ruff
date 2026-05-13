@@ -1137,7 +1137,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Airflow, "003") => rules::airflow::rules::AirflowVariableGetOutsideTask,
         (Airflow, "004") => rules::airflow::rules::AirflowTaskBranchAsShortCircuit,
         (Airflow, "201") => rules::airflow::rules::AirflowXcomPullInTemplateString,
-        (Airflow, "202") => rules::airflow::rules::AirflowTaskMultipleOutputsImplicit,
+        (Airflow, "202") => rules::airflow::rules::AirflowTaskImplicitMultipleOutputs,
         (Airflow, "301") => rules::airflow::rules::Airflow3Removal,
         (Airflow, "302") => rules::airflow::rules::Airflow3MovedToProvider,
         (Airflow, "303") => rules::airflow::rules::Airflow3IncompatibleFunctionSignature,
