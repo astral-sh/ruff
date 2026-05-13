@@ -1285,7 +1285,8 @@ impl<'db> FunctionType<'db> {
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(
-        returns(ref), cycle_initial=last_definition_signature_cycle_initial,
+        returns(ref),
+        cycle_initial=|_, _, _|Signature::bottom(),
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
@@ -1298,7 +1299,8 @@ impl<'db> FunctionType<'db> {
     /// The `return_callable_typevar_scope` controls whether type variables that only appear in a
     /// return-position `Callable` stay bound to the function or move to the returned callable.
     #[salsa::tracked(
-        returns(ref), cycle_initial=last_definition_raw_signature_cycle_initial,
+        returns(ref),
+        cycle_initial=|_, _, _, _|Signature::bottom(),
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn last_definition_raw_signature(
@@ -1720,23 +1722,6 @@ fn is_instance_truthiness<'db>(
             Truthiness::Ambiguous
         }
     }
-}
-
-fn last_definition_signature_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _function: FunctionType<'db>,
-) -> Signature<'db> {
-    Signature::bottom()
-}
-
-fn last_definition_raw_signature_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _function: FunctionType<'db>,
-    _return_callable_typevar_scope: ReturnCallableTypeVarScope,
-) -> Signature<'db> {
-    Signature::bottom()
 }
 
 /// Returns `true` if the function body is stub-like, ignoring a leading docstring.
