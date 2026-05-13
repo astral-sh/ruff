@@ -1,4 +1,4 @@
-use ruff_python_ast::{Arguments, Expr, ExprCall};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprCall};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -79,6 +79,13 @@ pub(crate) fn unnecessary_list_call(checker: &Checker, expr: &Expr, call: &ExprC
         return;
     }
     let mut diagnostic = checker.report_diagnostic(UnnecessaryListCall, expr.range());
+    if matches!(
+        argument,
+        Expr::ListComp(ast::ExprListComp { elt, .. }) if elt.is_starred_expr()
+    ) {
+        // The LibCST-based fixer does not yet support PEP 798 unpacking comprehensions.
+        return;
+    }
     diagnostic.try_set_fix(|| {
         fixes::fix_unnecessary_list_call(expr, checker.locator(), checker.stylist())
             .map(Fix::unsafe_edit)

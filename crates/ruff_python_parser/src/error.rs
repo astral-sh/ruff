@@ -505,6 +505,16 @@ pub enum FStringKind {
     NestedQuote,
 }
 
+/// The type of PEP 798 unpacking-comprehension error for
+/// [`UnsupportedSyntaxErrorKind::UnpackingInComprehension`].
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, get_size2::GetSize)]
+pub enum ComprehensionUnpackingKind {
+    IterableInList,
+    IterableInSet,
+    IterableInGenerator,
+    DictInDict,
+}
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, get_size2::GetSize)]
 pub enum UnparenthesizedNamedExprKind {
     SequenceIndex,
@@ -843,93 +853,32 @@ pub enum UnsupportedSyntaxErrorKind {
     /// [PEP 646]: https://peps.python.org/pep-0646/#change-2-args-as-a-typevartuple
     StarAnnotation,
 
-    /// Represents the use of iterable unpacking inside a list comprehension
-    /// before Python 3.15.
+    /// Represents the use of iterable or dictionary unpacking inside a comprehension before Python
+    /// 3.15.
     ///
     /// ## Examples
     ///
-    /// Before Python 3.15, list comprehensions could not use iterable
-    /// unpacking in their element expression:
+    /// Before Python 3.15, comprehensions could not use iterable or dictionary unpacking in their
+    /// element expression:
     ///
     /// ```python
     /// [*x for x in y]  # SyntaxError
-    /// ```
-    ///
-    /// Starting with Python 3.15, [PEP 798] allows iterable unpacking within
-    /// list comprehensions:
-    ///
-    /// ```python
-    /// [*x for x in y]
-    /// ```
-    ///
-    /// [PEP 798]: https://peps.python.org/pep-0798/
-    IterableUnpackingInListComprehension,
-
-    /// Represents the use of iterable unpacking inside a set comprehension
-    /// before Python 3.15.
-    ///
-    /// ## Examples
-    ///
-    /// Before Python 3.15, set comprehensions could not use iterable
-    /// unpacking in their element expression:
-    ///
-    /// ```python
     /// {*x for x in y}  # SyntaxError
-    /// ```
-    ///
-    /// Starting with Python 3.15, [PEP 798] allows iterable unpacking within
-    /// set comprehensions:
-    ///
-    /// ```python
-    /// {*x for x in y}
-    /// ```
-    ///
-    /// [PEP 798]: https://peps.python.org/pep-0798/
-    IterableUnpackingInSetComprehension,
-
-    /// Represents the use of iterable unpacking inside a generator expression
-    /// before Python 3.15.
-    ///
-    /// ## Examples
-    ///
-    /// Before Python 3.15, generator expressions could not use iterable
-    /// unpacking in their element expression:
-    ///
-    /// ```python
     /// (*x for x in y)  # SyntaxError
-    /// ```
-    ///
-    /// Starting with Python 3.15, [PEP 798] allows iterable unpacking within
-    /// generator expressions:
-    ///
-    /// ```python
-    /// (*x for x in y)
-    /// ```
-    ///
-    /// [PEP 798]: https://peps.python.org/pep-0798/
-    IterableUnpackingInGeneratorExpression,
-
-    /// Represents the use of dictionary unpacking inside a dict comprehension
-    /// before Python 3.15.
-    ///
-    /// ## Examples
-    ///
-    /// Before Python 3.15, dict comprehensions could not use dictionary
-    /// unpacking in their element expression:
-    ///
-    /// ```python
     /// {**d for d in dicts}  # SyntaxError
     /// ```
     ///
-    /// Starting with Python 3.15, [PEP 798] allows dictionary unpacking within
-    /// dict comprehensions:
+    /// Starting with Python 3.15, [PEP 798] allows unpacking within comprehensions:
     ///
     /// ```python
+    /// [*x for x in y]
+    /// {*x for x in y}
+    /// (*x for x in y)
     /// {**d for d in dicts}
     /// ```
     ///
     /// [PEP 798]: https://peps.python.org/pep-0798/
-    DictUnpackingInDictComprehension,
+    UnpackingInComprehension(ComprehensionUnpackingKind),
 
     /// Represents the use of tuple unpacking in a `for` statement iterator clause before Python
     /// 3.9.
@@ -1076,18 +1025,18 @@ impl Display for UnsupportedSyntaxError {
                 "Cannot use star expression in index"
             }
             UnsupportedSyntaxErrorKind::StarAnnotation => "Cannot use star annotation",
-            UnsupportedSyntaxErrorKind::IterableUnpackingInListComprehension => {
-                "Cannot use iterable unpacking in a list comprehension"
-            }
-            UnsupportedSyntaxErrorKind::IterableUnpackingInSetComprehension => {
-                "Cannot use iterable unpacking in a set comprehension"
-            }
-            UnsupportedSyntaxErrorKind::IterableUnpackingInGeneratorExpression => {
-                "Cannot use iterable unpacking in a generator expression"
-            }
-            UnsupportedSyntaxErrorKind::DictUnpackingInDictComprehension => {
-                "Cannot use dictionary unpacking in a dict comprehension"
-            }
+            UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                ComprehensionUnpackingKind::IterableInList,
+            ) => "Cannot use iterable unpacking in a list comprehension",
+            UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                ComprehensionUnpackingKind::IterableInSet,
+            ) => "Cannot use iterable unpacking in a set comprehension",
+            UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                ComprehensionUnpackingKind::IterableInGenerator,
+            ) => "Cannot use iterable unpacking in a generator expression",
+            UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                ComprehensionUnpackingKind::DictInDict,
+            ) => "Cannot use dictionary unpacking in a dict comprehension",
             UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
                 "Cannot use iterable unpacking in `for` statements"
             }
@@ -1160,16 +1109,7 @@ impl UnsupportedSyntaxErrorKind {
                 Change::Added(PythonVersion::PY311)
             }
             UnsupportedSyntaxErrorKind::StarAnnotation => Change::Added(PythonVersion::PY311),
-            UnsupportedSyntaxErrorKind::IterableUnpackingInListComprehension => {
-                Change::Added(PythonVersion::PY315)
-            }
-            UnsupportedSyntaxErrorKind::IterableUnpackingInSetComprehension => {
-                Change::Added(PythonVersion::PY315)
-            }
-            UnsupportedSyntaxErrorKind::IterableUnpackingInGeneratorExpression => {
-                Change::Added(PythonVersion::PY315)
-            }
-            UnsupportedSyntaxErrorKind::DictUnpackingInDictComprehension => {
+            UnsupportedSyntaxErrorKind::UnpackingInComprehension(_) => {
                 Change::Added(PythonVersion::PY315)
             }
             UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {

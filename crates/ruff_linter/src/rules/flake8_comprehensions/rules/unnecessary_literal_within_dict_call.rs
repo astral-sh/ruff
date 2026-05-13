@@ -85,6 +85,7 @@ pub(crate) fn unnecessary_literal_within_dict_call(checker: &Checker, call: &ast
         argument,
         Expr::DictComp(ast::ExprDictComp { key: None, .. })
     ) {
+        // The LibCST-based fixer does not yet support PEP 798 unpacking comprehensions.
         return;
     }
 

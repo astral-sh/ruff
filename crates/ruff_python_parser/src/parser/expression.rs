@@ -12,7 +12,9 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::error::{FStringKind, StarTupleKind, UnparenthesizedNamedExprKind};
+use crate::error::{
+    ComprehensionUnpackingKind, FStringKind, StarTupleKind, UnparenthesizedNamedExprKind,
+};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{FunctionKind, Parser, helpers};
 use crate::string::{
@@ -731,7 +733,9 @@ impl<'src> Parser<'src> {
                         TokenKind::Async | TokenKind::For => {
                             if parsed_expr.is_unparenthesized_starred_expr() {
                                 parser.add_unsupported_syntax_error(
-                                    UnsupportedSyntaxErrorKind::IterableUnpackingInGeneratorExpression,
+                                    UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                                        ComprehensionUnpackingKind::IterableInGenerator,
+                                    ),
                                     parsed_expr.range(),
                                 );
                             }
@@ -2036,7 +2040,9 @@ impl<'src> Parser<'src> {
                 // [*x for x in y]
                 if first_element.is_unparenthesized_starred_expr() {
                     self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::IterableUnpackingInListComprehension,
+                        UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                            ComprehensionUnpackingKind::IterableInList,
+                        ),
                         first_element.range(),
                     );
                 }
@@ -2105,7 +2111,9 @@ impl<'src> Parser<'src> {
 
             if matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
                 self.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::DictUnpackingInDictComprehension,
+                    UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                        ComprehensionUnpackingKind::DictInDict,
+                    ),
                     TextRange::new(start, value.range().end()),
                 );
 
@@ -2127,7 +2135,9 @@ impl<'src> Parser<'src> {
             TokenKind::Async | TokenKind::For => {
                 if key_or_element.is_unparenthesized_starred_expr() {
                     self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::IterableUnpackingInSetComprehension,
+                        UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                            ComprehensionUnpackingKind::IterableInSet,
+                        ),
                         key_or_element.range(),
                     );
                 } else if key_or_element.is_unparenthesized_named_expr() {
@@ -2244,7 +2254,9 @@ impl<'src> Parser<'src> {
                 // grammar: `genexp`
                 if parsed_expr.is_unparenthesized_starred_expr() {
                     self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::IterableUnpackingInGeneratorExpression,
+                        UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                            ComprehensionUnpackingKind::IterableInGenerator,
+                        ),
                         parsed_expr.range(),
                     );
                 }
