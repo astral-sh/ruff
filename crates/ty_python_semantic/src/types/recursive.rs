@@ -3,15 +3,11 @@
 //! [`RecursiveType<'db>`] is an explicit μ-binder representation of recursive types:
 //! `μα. body` where `α` is referenced inside `body` as `Type::Divergent(binder_id)`.
 //!
-//! This module is introduced in Phase 1 of the μ-type proof-of-concept project.
-//! At this phase, the variant exists structurally but is treated equivalently to
-//! a bare `Type::Divergent(binder_id)` by all match arms — no semantic change.
-//!
-//! In later phases:
-//! - Phase 2: `PEP695TypeAliasType::value_type` will construct `Type::Recursive`
-//!   for self-referential aliases.
-//! - Phase 3: A one-step `unfold` operation will be added.
-//! - Phase 4+: A co-inductive operation framework will dispatch on `Type::Recursive`.
+//! For self-referential PEP 695 type aliases, `PEP695TypeAliasType::value_type`
+//! constructs a `Type::Recursive` whose `body` has each self-reference replaced
+//! by `Type::Divergent(binder_id)`. The co-inductive relation framework in
+//! [`crate::types::coinductive`] dispatches on `Type::Recursive` by unfolding
+//! one step and recording the visiting pair to break cycles.
 
 use crate::Db;
 use crate::types::{Type, TypeAliasType, TypeContext, TypeMapping};
@@ -46,8 +42,7 @@ pub struct RecursiveType<'db> {
 
     /// The PEP 695 (or manual) alias whose body this recursive type was constructed
     /// from. Used for display: a `Divergent(binder_id)` inside `body` is rendered as
-    /// the alias's name. `None` for implicit recursive types from inference cycles
-    /// (those will be introduced in later phases).
+    /// the alias's name. `None` for implicit recursive types from inference cycles.
     pub source_alias: Option<TypeAliasType<'db>>,
 
     /// The body of the recursive type, possibly containing the binder's `Divergent`
@@ -81,30 +76,25 @@ impl<'db> RecursiveType<'db> {
         self.binder(db).into_id()
     }
 
-    /// One-step unfold: substitute `Type::Divergent(binder_id)` in body with
-    /// `Type::Recursive(self)`. This is the standard equi-recursive
-    /// unfold operation `μα.body → body[α := μα.body]`.
+    /// One-step unfold: returns the body as-is. The body contains
+    /// `Type::Divergent(binder_id)` markers at recursive positions; downstream
+    /// callers in the co-inductive framework rely on those markers bottoming
+    /// out at the `Type::Divergent` arm of relation checks.
     ///
-    /// In Phase 3+, operations that need to "look inside" a recursive type
-    /// call this to get one-step expansion, then use co-inductive cycle
-    /// detection (via pair-visiting set) for subsequent recursion.
+    /// Note: this is not the textbook equi-recursive unfold
+    /// `μα.body → body[α := μα.body]` — that would re-introduce the recursive
+    /// type. The framework's cycle detection works by recording the pre-unfold
+    /// pair in the visitor, so the simpler "body with Divergent leaves" form
+    /// is sufficient.
     #[allow(dead_code)]
     pub(crate) fn unfold(self, db: &'db dyn Db) -> Type<'db> {
-        let body = *self.body(db);
-        // TODO Phase 3+: implement actual substitution. For now this is a stub
-        // that returns the body as-is. When the body contains
-        // `Type::Divergent(binder_id)` markers, those need to be replaced with
-        // `Type::Recursive(self)` to produce true one-step unfold.
-        //
-        // Implementation will use the TypeMapping mechanism (similar to
-        // ReplaceSelfAlias but in reverse: replace Divergent → Recursive).
-        body
+        *self.body(db)
     }
 }
 
 /// Folds a Type by replacing self-references to the given alias definition with
-/// `Type::Divergent(binder_id)` markers. Used by Phase 3+ to construct
-/// `Type::Recursive` bodies from raw alias bodies.
+/// `Type::Divergent(binder_id)` markers — used to build a `Type::Recursive` body
+/// from a raw alias body.
 ///
 /// The resulting type has `Divergent(binder_id)` at recursive positions, making
 /// the structure finite (recursion is captured by the binder rather than by

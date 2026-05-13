@@ -903,10 +903,10 @@ pub enum Type<'db> {
     Dynamic(DynamicType<'db>),
     /// A cycle marker used during recursive type inference.
     Divergent(DivergentType),
-    /// An explicit μ-binder representing a recursive type.
-    ///
-    /// This is introduced while recovering recursive Salsa queries so the recursive edge can later
-    /// be folded back to a concrete binder instead of being left as a dynamic-like placeholder.
+    /// An explicit μ-binder representing a recursive type. The `body` of the
+    /// `RecursiveType` may contain `Type::Divergent(binder_id)` at recursive
+    /// positions; α-binding via `binder_id` is what distinguishes one
+    /// recursive type from another.
     Recursive(recursive::RecursiveType<'db>),
     /// The empty set of values
     Never,
@@ -1098,6 +1098,19 @@ impl<'db> Type<'db> {
             (Type::Divergent(left), Type::Divergent(right)) => left.same_marker(right),
             _ => false,
         }
+    }
+
+    /// Returns `true` if any `Type::Divergent(d)` with `d.id() == binder_id` appears
+    /// anywhere inside `self` (recursively through unions, intersections, callables,
+    /// nominal instances, tuples, …). Used by recursive-alias `value_type` construction
+    /// to decide whether the binder's α-marker survived normalisation.
+    pub(crate) fn contains_divergent_with_id(self, db: &'db dyn Db, binder_id: salsa::Id) -> bool {
+        any_over_type(
+            db,
+            self,
+            false,
+            |ty| matches!(ty, Type::Divergent(d) if d.id() == binder_id),
+        )
     }
 
     /// If `self` is a materialized `Divergent` type, returns the concrete type it should
@@ -2050,7 +2063,7 @@ impl<'db> Type<'db> {
                 .negated_divergent()
                 .expect("matched `Type::Divergent` above"),
 
-            Type::Recursive(recursive) => Type::divergent(recursive.binder_id(db))
+            Type::Recursive(r) => Type::divergent(r.binder_id(db))
                 .negated_divergent()
                 .expect("Divergent always negates"),
 
@@ -3751,7 +3764,6 @@ impl<'db> Type<'db> {
                         receiver,
                     )
                 }),
-
                 Type::Intersection(intersection) => {
                     if let Some(complement) = intersection.enum_complement(db) {
                         enums::member_lookup_for_enum_complement(db, complement, name_str, policy)
@@ -6506,8 +6518,9 @@ impl<'db> Type<'db> {
 
             Type::TypeAlias(alias) => {
                 match type_mapping {
-                    // Phase 3: replace this alias with `Type::divergent(binder_id)` if it
-                    // matches the target definition (used to fold recursive bodies).
+                    // Replace this alias with `Type::divergent(binder_id)` if it matches the
+                    // target definition. Used to fold recursive alias bodies into
+                    // `Type::Recursive` form.
                     TypeMapping::ReplaceSelfAlias { alias_def_id, binder_id } => {
                         use salsa::plumbing::AsId;
                         let TypeAliasType::PEP695(pep695_alias) = alias else {
@@ -6536,6 +6549,49 @@ impl<'db> Type<'db> {
                             | ApplySpecialization::Partial { .. }
                     ) =>
                     {
+                        // α-binding short-circuit: for self-referential PEP 695 aliases,
+                        // composing the inner specialization with the new one triggers
+                        // `Specialization::apply_type_mapping_impl`, which queries
+                        // `typevar.variance(db)`, which walks the alias body and may
+                        // re-enter this arm with a progressively-deeper nested
+                        // specialization (`R[T]` → `R[list[T]]` → `R[list[list[T]]]`
+                        // → …). The `ApplyTypeMappingVisitor`'s cycle detector keys on
+                        // `Type`, so each new specialization is a fresh key and the
+                        // cycle is never broken.
+                        //
+                        // Returning `self` treats the alias's existing specialization
+                        // as the α-bound name: applying a further mapping leaves it
+                        // unchanged. The alias still resolves to a finite shape via
+                        // `value_type` when actually consumed.
+                        //
+                        // Only fire when the incoming specialization originates from
+                        // THE ALIAS'S OWN generic context — that is the proliferation
+                        // pattern. When the specialization comes from a *different*
+                        // generic context (e.g. `R[T@R2]` inside `R2`'s body being
+                        // specialized with `R2`'s typevars `{T@R2 := int}`), the
+                        // composition produces a finite shape `R[int]` and must be
+                        // propagated; otherwise the inner alias keeps its outer-scope
+                        // typevars and structural equivalence with a differently-shaped
+                        // recursive alias fails (`aliases.md:405,409`).
+                        if let TypeAliasType::PEP695(pep695_alias) = alias
+                            && pep695_alias.is_self_referential(db)
+                        {
+                            let alias_context = pep695_alias.generic_context(db);
+                            let spec_context = match specialization {
+                                ApplySpecialization::Specialization(s)
+                                | ApplySpecialization::TypeAlias(s) => {
+                                    Some(s.generic_context(db))
+                                }
+                                ApplySpecialization::Partial {
+                                    generic_context, ..
+                                } => Some(*generic_context),
+                                _ => None,
+                            };
+                            if spec_context == alias_context {
+                                return self;
+                            }
+                        }
+
                         let mut current_specialization = specialization.as_specialization(db).unwrap();
                         if let TypeMapping::ApplySpecializationWithMaterialization {
                             materialization_kind,
@@ -6641,7 +6697,8 @@ impl<'db> Type<'db> {
                 TypeMapping::Materialize(materialization_kind) => {
                     Type::Divergent(divergent.materialized(*materialization_kind))
                 }
-                // Phase 3: replace a specific Divergent (matching binder_id) with the replacement.
+                // Replace a specific Divergent (matching binder_id) with the replacement.
+                // Used by display to substitute the α-binder marker with the source alias.
                 TypeMapping::ReplaceDivergent {
                     binder_id,
                     replacement,
@@ -7698,8 +7755,8 @@ pub enum TypeMapping<'a, 'db> {
     EagerExpansion,
 
     /// Replace `Type::TypeAlias(a)` references where `a.definition(db).as_id() == alias_def_id`
-    /// with `Type::divergent(binder_id)`. Used by Phase 3 of the μ-type project to fold
-    /// recursive alias bodies into `Type::Recursive(binder_id, body)` form.
+    /// with `Type::divergent(binder_id)`. Used to fold recursive alias bodies into
+    /// `Type::Recursive(binder_id, body)` form.
     ///
     /// All other Type variants pass through transparently (recursing into children for
     /// composite types).
@@ -7708,10 +7765,9 @@ pub enum TypeMapping<'a, 'db> {
         binder_id: recursive::BinderId,
     },
 
-    /// Replace `Type::Divergent(d)` markers where `d.id() == binder_id` with
-    /// the `replacement` type. Used by Phase 3 to:
-    /// - Display: substitute Divergent back to alias name for nice rendering.
-    /// - Unfold: substitute Divergent with `Type::Recursive(self)` for one-step expansion.
+    /// Replace `Type::Divergent(d)` markers where `d.id() == binder_id` with the
+    /// `replacement` type. Used by display to substitute the α-binder marker with
+    /// the source alias name for nicer rendering.
     ///
     /// Other `Type::Divergent` (with different binder ids) pass through unchanged.
     ReplaceDivergent {

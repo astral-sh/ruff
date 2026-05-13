@@ -603,7 +603,6 @@ impl<'db> BoundSuperType<'db> {
             Type::Never => SuperOwnerKind::Dynamic(DynamicType::Unknown),
             Type::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
             Type::Divergent(divergent) => SuperOwnerKind::Divergent(divergent),
-            // Phase 1: Type::Recursive treated as Divergent of its binder_id
             Type::Recursive(r) => {
                 SuperOwnerKind::Divergent(crate::types::DivergentType::new(r.binder_id(db)))
             }
