@@ -5923,13 +5923,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = set;
 
         let elts = elts.iter().map(|elt| [Some(elt)]).collect_vec();
-        let mut infer_elt_ty =
-            |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
+        let fallback_tcx = self.incomplete_typed_dict_key_context(set, tcx);
+        let mut infer_elt_ty = |builder: &mut Self, arg: ArgExpr<'db, '_>| {
+            let (_, elt, elt_tcx) = arg;
+            let elt_tcx = if elt_tcx.annotation.is_some() {
+                elt_tcx
+            } else {
+                fallback_tcx
+            };
+
+            builder.infer_expression(elt, elt_tcx)
+        };
 
         self.infer_collection_literal(KnownClass::Set, &elts, &mut infer_elt_ty, tcx)
             .unwrap_or_else(|| {
                 KnownClass::Set.to_specialized_instance(self.db(), &[Type::unknown()])
             })
+    }
+
+    fn incomplete_typed_dict_key_context(
+        &self,
+        set: &ast::ExprSet,
+        tcx: TypeContext<'db>,
+    ) -> TypeContext<'db> {
+        // While editing `{"key": value}` as a `TypedDict` literal, `{""}` parses as a
+        // set until the colon is typed. Preserve key completions in that transient state.
+        let [elt] = set.elts.as_slice() else {
+            return TypeContext::default();
+        };
+
+        if !elt.is_string_literal_expr() {
+            return TypeContext::default();
+        }
+
+        TypeContext::new(
+            tcx.annotation
+                .and_then(|annotation| self.typed_dict_key_expected_type(annotation)),
+        )
     }
 
     fn infer_dict_expression(&mut self, dict: &ast::ExprDict, tcx: TypeContext<'db>) -> Type<'db> {
