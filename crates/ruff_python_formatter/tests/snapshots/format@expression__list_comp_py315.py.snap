@@ -32,6 +32,12 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression
     for d in dicts
 }
 
+{
+    **  # comment between ** and d
+    d
+    for d in dicts
+}
+
 (*x for x in y)
 
 f(*x for x in y)
@@ -76,6 +82,12 @@ nested-string-quote-style  = alternating
 {**d for d in dicts}
 
 {**d for d in dicts}
+
+{
+    **  # comment between ** and d
+    d
+    for d in dicts
+}
 
 (*x for x in y)
 

@@ -867,14 +867,68 @@ pub enum UnsupportedSyntaxErrorKind {
 
     /// Represents the use of iterable unpacking inside a set comprehension
     /// before Python 3.15.
+    ///
+    /// ## Examples
+    ///
+    /// Before Python 3.15, set comprehensions could not use iterable
+    /// unpacking in their element expression:
+    ///
+    /// ```python
+    /// {*x for x in y}  # SyntaxError
+    /// ```
+    ///
+    /// Starting with Python 3.15, [PEP 798] allows iterable unpacking within
+    /// set comprehensions:
+    ///
+    /// ```python
+    /// {*x for x in y}
+    /// ```
+    ///
+    /// [PEP 798]: https://peps.python.org/pep-0798/
     IterableUnpackingInSetComprehension,
 
     /// Represents the use of iterable unpacking inside a generator expression
     /// before Python 3.15.
+    ///
+    /// ## Examples
+    ///
+    /// Before Python 3.15, generator expressions could not use iterable
+    /// unpacking in their element expression:
+    ///
+    /// ```python
+    /// (*x for x in y)  # SyntaxError
+    /// ```
+    ///
+    /// Starting with Python 3.15, [PEP 798] allows iterable unpacking within
+    /// generator expressions:
+    ///
+    /// ```python
+    /// (*x for x in y)
+    /// ```
+    ///
+    /// [PEP 798]: https://peps.python.org/pep-0798/
     IterableUnpackingInGeneratorExpression,
 
     /// Represents the use of dictionary unpacking inside a dict comprehension
     /// before Python 3.15.
+    ///
+    /// ## Examples
+    ///
+    /// Before Python 3.15, dict comprehensions could not use dictionary
+    /// unpacking in their element expression:
+    ///
+    /// ```python
+    /// {**d for d in dicts}  # SyntaxError
+    /// ```
+    ///
+    /// Starting with Python 3.15, [PEP 798] allows dictionary unpacking within
+    /// dict comprehensions:
+    ///
+    /// ```python
+    /// {**d for d in dicts}
+    /// ```
+    ///
+    /// [PEP 798]: https://peps.python.org/pep-0798/
     DictUnpackingInDictComprehension,
 
     /// Represents the use of tuple unpacking in a `for` statement iterator clause before Python

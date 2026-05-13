@@ -26,6 +26,12 @@
     for d in dicts
 }
 
+{
+    **  # comment between ** and d
+    d
+    for d in dicts
+}
+
 (*x for x in y)
 
 f(*x for x in y)

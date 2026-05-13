@@ -6485,7 +6485,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let scope = scope_id.to_scope_id(self.db(), self.file());
         let inference = infer_scope_types(self.db(), scope, yield_tcx);
         self.extend_scope(inference);
-        let yield_type = Self::comprehension_element_type(self.db(), elt, inference);
+        let yield_type = self.comprehension_element_type(elt, inference);
 
         if evaluation_mode.is_async() {
             KnownClass::AsyncGeneratorType
@@ -6499,13 +6499,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn comprehension_element_type(
-        db: &'db dyn Db,
+        &self,
         element: &ast::Expr,
         inference: &ScopeInference<'db>,
     ) -> Type<'db> {
         let element_type = inference.expression_type(element);
         if element.is_starred_expr() {
-            element_type.iterate(db).homogeneous_element_type(db)
+            element_type
+                .iterate(self.db())
+                .homogeneous_element_type(self.db())
         } else {
             element_type
         }

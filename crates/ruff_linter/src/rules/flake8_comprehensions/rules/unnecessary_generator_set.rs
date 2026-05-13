@@ -8,7 +8,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
-use crate::{AlwaysFixableViolation, Edit, Fix};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::flake8_comprehensions::helpers;
 
@@ -48,7 +48,9 @@ pub(crate) struct UnnecessaryGeneratorSet {
     short_circuit: bool,
 }
 
-impl AlwaysFixableViolation for UnnecessaryGeneratorSet {
+impl Violation for UnnecessaryGeneratorSet {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         if self.short_circuit {
@@ -58,12 +60,12 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorSet {
         }
     }
 
-    fn fix_title(&self) -> String {
-        if self.short_circuit {
+    fn fix_title(&self) -> Option<String> {
+        Some(if self.short_circuit {
             "Rewrite using `set()`".to_string()
         } else {
             "Rewrite as a set comprehension".to_string()
-        }
+        })
     }
 }
 
@@ -118,6 +120,9 @@ pub(crate) fn unnecessary_generator_set(checker: &Checker, call: &ast::ExprCall)
         },
         call.range(),
     );
+    if elt.is_starred_expr() {
+        return;
+    }
     let fix = {
         // Replace `set(` with `}`.
         let call_start = Edit::replacement(

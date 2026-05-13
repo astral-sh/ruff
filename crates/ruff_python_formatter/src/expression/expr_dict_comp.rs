@@ -51,6 +51,13 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
                         }
                     } else {
                         write!(f, [token("**")])?;
+                        if let Some(first) = comments.leading(value.as_ref()).first() {
+                            if first.line_position().is_own_line() {
+                                hard_line_break().fmt(f)?;
+                            } else {
+                                write!(f, [space(), space()])?;
+                            }
+                        }
                     }
 
                     write!(f, [value.format(), soft_line_break_or_space()])?;

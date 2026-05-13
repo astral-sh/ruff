@@ -7,7 +7,7 @@ use ruff_python_ast::token::parenthesized_range;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Edit, Fix};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::flake8_comprehensions::helpers;
 
@@ -47,7 +47,9 @@ pub(crate) struct UnnecessaryGeneratorList {
     short_circuit: bool,
 }
 
-impl AlwaysFixableViolation for UnnecessaryGeneratorList {
+impl Violation for UnnecessaryGeneratorList {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         if self.short_circuit {
@@ -57,12 +59,12 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorList {
         }
     }
 
-    fn fix_title(&self) -> String {
-        if self.short_circuit {
+    fn fix_title(&self) -> Option<String> {
+        Some(if self.short_circuit {
             "Rewrite using `list()`".to_string()
         } else {
             "Rewrite as a list comprehension".to_string()
-        }
+        })
     }
 }
 
@@ -117,6 +119,9 @@ pub(crate) fn unnecessary_generator_list(checker: &Checker, call: &ast::ExprCall
         },
         call.range(),
     );
+    if elt.is_starred_expr() {
+        return;
+    }
     let fix = {
         // Replace `list(` with `[`.
         let call_start = Edit::replacement(
