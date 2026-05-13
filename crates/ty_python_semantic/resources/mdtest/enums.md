@@ -558,6 +558,49 @@ class Child(Parent):
 reveal_type(Child.A.value)  # revealed: Any
 ```
 
+### Inherited `__new__`
+
+A custom `__new__` on a parent enum is inherited by subclasses. Without an explicit `_value_`
+annotation, subclass member values remain dynamic:
+
+```py
+from enum import Enum
+
+class Base(Enum):
+    def __new__(cls, value: str, connector_id: int) -> "Base":
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.connector_id = connector_id
+        return obj
+
+class Child(Base):
+    GITHUB = ("github", 1)
+
+reveal_type(Child.GITHUB.value)  # revealed: Any
+reveal_type(Child.GITHUB._value_)  # revealed: Any
+```
+
+An explicit `_value_` annotation on the subclass still takes precedence:
+
+```py
+from enum import Enum
+
+class Base(Enum):
+    def __new__(cls, value: str, connector_id: int = 0) -> "Base":
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.connector_id = connector_id
+        return obj
+
+class Child(Base):
+    _value_: str
+
+    GITHUB = "github"
+
+reveal_type(Child.GITHUB.value)  # revealed: str
+reveal_type(Child.GITHUB._value_)  # revealed: str
+```
+
 ### Non-member attributes with disallowed type
 
 Methods, callables, descriptors (including properties), and nested classes that are defined in the
