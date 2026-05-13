@@ -4,11 +4,11 @@ use rustc_hash::FxHashSet;
 
 use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
+use crate::types::coinductive::CoInductiveRelation;
 use crate::types::constraints::{
     ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
     OwnedConstraintSet,
 };
-use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
@@ -206,6 +206,18 @@ pub(crate) enum TypeRelation {
     /// relationships with a typevar. This will eventually replace `Assignability`, but allows us
     /// to start using the new relation in a controlled manner in some places.
     ConstraintSetAssignability,
+
+    /// The "disjointness" relation. `D` is disjoint from `C` if their intersection
+    /// is empty (no possible runtime value satisfies both types).
+    ///
+    /// Unlike the other variants of this enum, this relation is symmetric and is
+    /// **never** dispatched on by [`TypeRelationChecker`] — directional checkers
+    /// only handle subtype-shaped relations. `Disjointness` exists here as a
+    /// value-level tag so that the same [`PairVisitor`] type can carry cycle
+    /// detection for `is_disjoint_from` and `has_relation_to` in a single namespace,
+    /// unifying the previously-separate `HasRelationToVisitor` /
+    /// `IsDisjointVisitor` type aliases.
+    Disjointness,
 }
 
 impl TypeRelation {
@@ -229,6 +241,9 @@ impl TypeRelation {
             TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => {
                 ty.subtyping_is_always_reflexive()
             }
+            // Disjointness only appears as a cycle-detection key, never as a
+            // directional checker's relation field.
+            TypeRelation::Disjointness => false,
         }
     }
 }
@@ -332,7 +347,7 @@ impl<'db> Type<'db> {
         inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::disjoint_default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker {
@@ -378,7 +393,7 @@ impl<'db> Type<'db> {
             context_tree: ErrorContextTree::enabled(),
             given: ConstraintSet::from_bool(&builder, false),
             relation_visitor: &HasRelationToVisitor::default(&builder),
-            disjointness_visitor: &IsDisjointVisitor::default(&builder),
+            disjointness_visitor: &IsDisjointVisitor::disjoint_default(&builder),
             signature_relation_visitor: &SignatureRelationVisitor::default(),
             materialization_visitor: &ApplyTypeMappingVisitor::default(),
         };
@@ -497,7 +512,7 @@ impl<'db> Type<'db> {
         relation: TypeRelation,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::disjoint_default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker {
@@ -569,7 +584,7 @@ impl<'db> Type<'db> {
         materialization_visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::disjoint_default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let checker = EquivalenceChecker {
             constraints,
@@ -611,7 +626,7 @@ impl<'db> Type<'db> {
         inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::disjoint_default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = DisjointnessChecker {
@@ -627,25 +642,40 @@ impl<'db> Type<'db> {
     }
 }
 
-/// A [`PairVisitor`] that is used in `has_relation_to` methods.
+/// A unified [`PairVisitor`]-style cycle detector keyed on `(Type, Type, TypeRelation)`.
+///
+/// The `TypeRelation` in the key distinguishes which relation is being checked
+/// for the pair. This lets a single cycle-detector type carry both
+/// `has_relation_to` (subtype-shaped, fallback `true`) and `is_disjoint_from`
+/// (symmetric, fallback `false`) — previously two separate visitor type
+/// aliases.
 pub(crate) type HasRelationToVisitor<'db, 'c> =
     CycleDetector<TypeRelation, (Type<'db>, Type<'db>, TypeRelation), ConstraintSet<'db, 'c>>;
 
 impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
+    /// Construct a visitor for directional `has_relation_to`-style checks. The
+    /// co-inductive fallback is `true` ("assume the relation holds when we
+    /// loop").
     pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
         HasRelationToVisitor::new(ConstraintSet::from_bool(constraints, true))
     }
 }
 
-/// A [`PairVisitor`] that is used in `is_disjoint_from` methods.
-pub(crate) type IsDisjointVisitor<'db, 'c> = PairVisitor<'db, IsDisjoint, ConstraintSet<'db, 'c>>;
+/// A [`PairVisitor`]-style cycle detector for `is_disjoint_from`. Shares the
+/// underlying [`CycleDetector`] type with [`HasRelationToVisitor`] — the only
+/// difference is the co-inductive fallback (`false`, "assume not disjoint when
+/// we loop"). The key's `TypeRelation` component is fixed to
+/// [`TypeRelation::Disjointness`].
+pub(crate) type IsDisjointVisitor<'db, 'c> = HasRelationToVisitor<'db, 'c>;
 
-#[derive(Debug)]
-pub(crate) struct IsDisjoint;
-
-impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
-    pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
-        IsDisjointVisitor::new(ConstraintSet::from_bool(constraints, false))
+impl<'db, 'c>
+    CycleDetector<TypeRelation, (Type<'db>, Type<'db>, TypeRelation), ConstraintSet<'db, 'c>>
+{
+    /// Construct a visitor with the `is_disjoint_from` co-inductive fallback
+    /// (`false`). Use [`HasRelationToVisitor::default`] for the directional
+    /// `true`-fallback case.
+    pub(crate) fn disjoint_default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
+        Self::new(ConstraintSet::from_bool(constraints, false))
     }
 }
 
@@ -978,15 +1008,18 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
                 ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
             }
-            // Phase 3: Type::Recursive — delegate to body (which has `Divergent` at
-            // recursive positions that fall through to the Divergent arm above).
-            // The HasRelationToVisitor cycle detector handles operation-level recursion.
-            (Type::Recursive(source_rec), _) => self.with_recursion_guard(source, target, || {
-                self.check_type_pair(db, *source_rec.body(db), target)
-            }),
-            (_, Type::Recursive(target_rec)) => self.with_recursion_guard(source, target, || {
-                self.check_type_pair(db, source, *target_rec.body(db))
-            }),
+            // Phase 5: delegate through the co-inductive framework. Handles
+            // unfold + pair-visiting cycle guard + dispatch to
+            // `<Self as CoInductiveRelation>::check_structural` in one call.
+            (Type::Recursive(_), _) | (_, Type::Recursive(_)) => {
+                crate::types::coinductive::delegate_recursive(
+                    db,
+                    self,
+                    source,
+                    target,
+                    self.relation_visitor,
+                )
+            }
 
             (Type::TypeAlias(source_alias), _) => self.with_recursion_guard(source, target, || {
                 self.check_type_pair(db, source_alias.value_type(db), target)
@@ -1072,6 +1105,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
                         _ => false,
                     },
+                    TypeRelation::Disjointness => unreachable!(
+                        "Disjointness is not a directional relation; never flows to TypeRelationChecker"
+                    ),
                 },
             ),
             (_, Type::Dynamic(_)) => ConstraintSet::from_bool(
@@ -1090,6 +1126,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         }
                         _ => false,
                     },
+                    TypeRelation::Disjointness => unreachable!(
+                        "Disjointness is not a directional relation; never flows to TypeRelationChecker"
+                    ),
                 },
             ),
 
@@ -1390,6 +1429,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
                             source.bottom_materialization(db)
                         }
+                        TypeRelation::Disjointness => {
+                            unreachable!("Disjointness is not a directional relation")
+                        }
                     };
                     intersection
                         .negative(db)
@@ -1402,6 +1444,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                                 TypeRelation::Assignability
                                 | TypeRelation::ConstraintSetAssignability => {
                                     neg_ty.bottom_materialization(db)
+                                }
+                                TypeRelation::Disjointness => {
+                                    unreachable!("Disjointness is not a directional relation")
                                 }
                             };
                             self.as_disjointness_checker()
@@ -2034,6 +2079,28 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     }
 }
 
+// Phase 5: dispatch the directional relation through the co-inductive framework.
+// `check_structural` is the structural-comparison entry point that
+// `coinductive::delegate_recursive` calls after unfolding `Type::Recursive` and
+// after pair-visiting cycle detection has cleared the call.
+impl<'c, 'db: 'c> CoInductiveRelation<'db, 'c> for TypeRelationChecker<'_, 'c, 'db> {
+    type Tag = TypeRelation;
+    type Output = ConstraintSet<'db, 'c>;
+
+    fn relation_key(&self) -> TypeRelation {
+        self.relation
+    }
+
+    fn check_structural(
+        &self,
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.check_type_pair(db, left, right)
+    }
+}
+
 pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     given: ConstraintSet<'db, 'c>,
@@ -2169,7 +2236,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         target: Type<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        self.disjointness_visitor.visit((source, target), work)
+        self.disjointness_visitor
+            .visit((source, target, TypeRelation::Disjointness), work)
     }
 
     fn any_protocol_members_absent_or_disjoint(
@@ -2219,18 +2287,16 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
-            // Phase 3: Type::Recursive — delegate to body for disjointness check.
-            (Type::Recursive(left_rec), _) => {
-                let left_body = *left_rec.body(db);
-                self.with_recursion_guard(left, right, || {
-                    self.check_type_pair(db, left_body, right)
-                })
-            }
-            (_, Type::Recursive(right_rec)) => {
-                let right_body = *right_rec.body(db);
-                self.with_recursion_guard(left, right, || {
-                    self.check_type_pair(db, left, right_body)
-                })
+            // Phase 5: same delegation pattern as `TypeRelationChecker`, but
+            // through the disjointness visitor (different co-inductive fallback).
+            (Type::Recursive(_), _) | (_, Type::Recursive(_)) => {
+                crate::types::coinductive::delegate_recursive(
+                    db,
+                    self,
+                    left,
+                    right,
+                    self.disjointness_visitor,
+                )
             }
 
             (Type::TypeAlias(alias), _) => {
@@ -2914,5 +2980,27 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 || check_optional_methods(left.deleter(db), right.deleter(db)),
             )
         })
+    }
+}
+
+// Phase 5: dispatch the symmetric disjointness relation through the
+// co-inductive framework. `relation_key()` is fixed to
+// `TypeRelation::Disjointness`; the structural step delegates to the existing
+// `check_type_pair` implementation.
+impl<'c, 'db: 'c> CoInductiveRelation<'db, 'c> for DisjointnessChecker<'_, 'c, 'db> {
+    type Tag = TypeRelation;
+    type Output = ConstraintSet<'db, 'c>;
+
+    fn relation_key(&self) -> TypeRelation {
+        TypeRelation::Disjointness
+    }
+
+    fn check_structural(
+        &self,
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.check_type_pair(db, left, right)
     }
 }

@@ -733,7 +733,7 @@ impl<'db> ProtocolInstanceType<'db> {
         ) -> bool {
             let constraints = ConstraintSetBuilder::new();
             let relation_visitor = HasRelationToVisitor::default(&constraints);
-            let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+            let disjointness_visitor = IsDisjointVisitor::disjoint_default(&constraints);
             let signature_relation_visitor = SignatureRelationVisitor::default();
             let materialization_visitor = ApplyTypeMappingVisitor::default();
             let checker = TypeRelationChecker::subtyping(

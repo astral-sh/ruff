@@ -185,9 +185,14 @@ impl ClassInfoConstraintFunction {
                 }
             }
             Type::Dynamic(_) | Type::Divergent(_) => Some(classinfo),
-            // Phase 3: Type::Recursive — delegate to the body (which contains
-            // `Divergent` leaves at recursive positions that bottom out).
-            Type::Recursive(r) => self.generate_constraint(db, *r.body(db), is_positive),
+            // Phase 4: co-inductive delegation through `Type::Recursive`.
+            // `unfold_one` returns the body, which contains `Divergent` leaves at α
+            // positions that bottom out via the `Type::Divergent` arm above.
+            Type::Recursive(_) => self.generate_constraint(
+                db,
+                crate::types::coinductive::unfold_one(db, classinfo),
+                is_positive,
+            ),
             Type::Intersection(intersection) => {
                 if intersection.negative(db).is_empty() {
                     let mut builder = IntersectionBuilder::new(db);
