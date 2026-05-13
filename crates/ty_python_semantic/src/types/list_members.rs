@@ -270,6 +270,8 @@ impl<'db> AllMembers<'db> {
 
             Type::Dynamic(_)
             | Type::Divergent(_)
+            // Phase 1: Type::Recursive treated as Divergent
+            | Type::Recursive(_)
             | Type::Never
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy

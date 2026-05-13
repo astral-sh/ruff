@@ -281,6 +281,8 @@ impl<'db> Type<'db> {
              => true,
             Type::Dynamic(_)
             | Type::Divergent(_)
+            // Phase 1: Type::Recursive treated as Divergent
+            | Type::Recursive(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
             | Type::GenericAlias(_)
@@ -1136,6 +1138,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 if self.relation.is_assignability() && source.inherits_from_explicit_any() =>
             {
                 self.always()
+            }
+            // Phase 1: Type::Recursive treated as Divergent
+            (Type::Recursive(_), _) | (_, Type::Recursive(_)) => {
+                ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
             }
 
             (Type::TypeAlias(source_alias), _) => self.with_recursion_guard(source, target, || {
@@ -2541,6 +2547,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
+            // Phase 1: Type::Recursive treated as Divergent
+            (Type::Recursive(_), _) | (_, Type::Recursive(_)) => self.never(),
 
             (Type::TypeAlias(alias), _) => {
                 let left_alias_ty = alias.value_type(db);
