@@ -3,7 +3,7 @@ use std::fmt::Write;
 use crate::{
     Db,
     types::{
-        GenericContext, Type, definition_expression_type,
+        GenericContext, Type, UnionType, definition_expression_type,
         display::qualified_name_components_from_scope, generics::Specialization, visitor,
     },
 };
@@ -16,6 +16,42 @@ use ty_python_core::{
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+
+/// Strip bare `Type::Divergent(binder_id)` leaves that sit as direct members of
+/// the top-level union in `ty`.
+///
+/// Mirrors the `Divergent`-stripping that the legacy `raw_value_type` cycle
+/// recovery path performs via `Union::recursive_type_normalized_impl`, but
+/// applied only at the body's outermost union level so that recursive markers
+/// nested inside generics (e.g. `list[Divergent | str]`,
+/// `tuple[Divergent, ...]`) are preserved.
+///
+/// - `int | Divergent(binder)` → `int`
+/// - `int | tuple[Divergent(binder), ...]` → unchanged
+/// - `list[Divergent(binder) | str]` → unchanged
+fn strip_top_level_divergent<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    binder_id: salsa::Id,
+) -> Type<'db> {
+    let Type::Union(union) = ty else {
+        return ty;
+    };
+    let kept: Vec<Type<'db>> = union
+        .elements(db)
+        .iter()
+        .copied()
+        .filter(|elem| !matches!(elem, Type::Divergent(d) if d.id() == binder_id))
+        .collect();
+    if kept.len() == union.elements(db).len() {
+        return ty;
+    }
+    match kept.len() {
+        0 => Type::divergent(binder_id),
+        1 => kept[0],
+        _ => UnionType::from_elements(db, kept),
+    }
+}
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PEP695TypeAliasType<'db> {
@@ -48,9 +84,14 @@ impl<'db> PEP695TypeAliasType<'db> {
 
     /// The RHS type of a PEP-695 style type alias with specialization applied.
     ///
-    /// Phase 3b: when the alias is self-referential, fold the body so recursive
-    /// positions become `Type::Divergent(binder_id)`, then wrap in
-    /// `Type::Recursive(binder_id, source_alias, folded_body)`.
+    /// For self-referential aliases, the body is folded so that each recursive
+    /// position becomes `Type::Divergent(binder_id)`, then any bare
+    /// `Divergent` leaf that sits as a direct member of the body's top-level
+    /// union is stripped (so `int | Divergent` collapses to `int` for
+    /// `IntOr`-style aliases). If the body still contains the binder's
+    /// `Divergent` anywhere — nested inside `tuple[Divergent, ...]`,
+    /// `list[Divergent | str]`, etc. — wrap the result in `Type::Recursive`;
+    /// otherwise return the simplified body directly.
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let raw = self.raw_value_type(db);
         let body = self.apply_function_specialization(db, raw);
@@ -63,29 +104,43 @@ impl<'db> PEP695TypeAliasType<'db> {
                 self.definition(db),
                 binder_id,
             );
-            Type::recursive(
-                db,
-                binder_id,
-                Some(crate::types::TypeAliasType::PEP695(self)),
-                folded,
-            )
+            let simplified = strip_top_level_divergent(db, folded, binder_id);
+            if simplified.contains_divergent_with_id(db, binder_id) {
+                Type::recursive(
+                    db,
+                    binder_id,
+                    Some(crate::types::TypeAliasType::PEP695(self)),
+                    simplified,
+                )
+            } else {
+                simplified
+            }
         } else {
             body
         }
     }
 
-    /// Whether this alias is *directly* self-referential — its raw body literally
-    /// mentions itself as `Type::TypeAlias(a)` with the same definition.
+    /// Whether this alias is *directly* self-referential — its raw body
+    /// literally mentions itself as `Type::TypeAlias(a)` with the same
+    /// definition. Used to decide when `value_type` should wrap the result in
+    /// `Type::Recursive`, and to drive α-binding short-circuits in
+    /// `Type::is_redundant_with` and `Type::apply_type_mapping_impl`.
     ///
-    /// Phase 2 limitation: this does not follow mutually-recursive chains
-    /// (e.g. `type R = R2 | int; type R2 = R`). Such cases will be handled
-    /// when later phases introduce transitive detection or shift to a
-    /// fixpoint-driven approach.
+    /// Limitation: this does not follow mutually-recursive chains
+    /// (e.g. `type R = R2 | int; type R2 = R`). Transitive detection would
+    /// require either an AST-based walker or a fixpoint over the
+    /// type-alias graph.
     ///
-    /// Used by Phase 3+ to decide when to wrap `value_type` results in
-    /// `Type::Recursive`. Not currently consumed elsewhere.
+    /// `cycle_initial = true` is required because callers (e.g. the `TypeAlias`
+    /// arm of `Type::apply_type_mapping_impl`) invoke this method
+    /// transitively from inside its own `any_over_type` traversal. Re-entering
+    /// for the same alias means the body refers to itself by definition, so
+    /// `true` is the sound co-inductive fallback.
     #[allow(dead_code)]
-    #[salsa::tracked(heap_size = ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_initial = |_, _, _| true,
+        heap_size = ruff_memory_usage::heap_size,
+    )]
     pub(crate) fn is_self_referential(self, db: &'db dyn Db) -> bool {
         let raw = self.raw_value_type(db);
         let self_def = self.definition(db);

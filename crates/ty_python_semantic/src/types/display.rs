@@ -869,10 +869,11 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 write!(f.with_type(self.ty), "{dynamic}")
             }
             Type::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
-            // Phase 3: Display Type::Recursive by substituting recursive-position
-            // Divergent markers with the source alias name (so that
-            // `μα. int | tuple[α, ...] | None` shows as `int | tuple[OptNestedInt, ...] | None`).
-            // If no source alias is known, fall back to showing the body as-is.
+            // Display `Type::Recursive` by substituting recursive-position `Divergent`
+            // markers with the source alias name, then printing the body. So
+            // `μα. int | tuple[α, ...] | None` shows as
+            // `int | tuple[OptNestedInt, ...] | None`. If no source alias is known
+            // (implicit recursion from inference cycles), fall back to the body as-is.
             Type::Recursive(r) => {
                 let body = *r.body(self.db);
                 let display_ty = if let Some(source_alias) = r.source_alias(self.db) {

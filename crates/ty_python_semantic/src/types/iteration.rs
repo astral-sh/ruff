@@ -217,7 +217,10 @@ impl<'db> Type<'db> {
                 // N.B. This special case isn't strictly necessary, it's just an obvious optimization
                 Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
                 Type::Divergent(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
-                // Phase 1: Type::Recursive treated as Divergent
+                // `Type::Recursive` is already unfolded one step at the entry of
+                // `try_iterate_with_mode`; if it reaches here (e.g. via the
+                // `Type::Union`/`Type::Intersection` recursion above) we still
+                // need a tuple spec to fall back to.
                 Type::Recursive(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
 
                 Type::FunctionLiteral(_)
@@ -314,6 +317,37 @@ impl<'db> Type<'db> {
                 }
                 Err(CallDunderError::MethodNotAvailable) => Err(IterationError::UnboundAiterError),
             };
+        }
+
+        // Iterating an opaque recursive type means iterating one-step unfold of
+        // its body. Substituting the binder's `Divergent` α-markers with the
+        // recursive type itself preserves the recursive structure for the
+        // element types — `for item in (x: μα. list[α | str])` gives `item:
+        // μα. list[α | str] | str`, not just `α | str`.
+        //
+        // The `Type::TypeAlias` case handles `for item in (x: A)` where
+        // `type A = list[A | str]`: `A.value_type` is `Type::Recursive` but
+        // without this branch, `non_async_special_case` below would unwrap
+        // `TypeAlias → value_type` and bottom out at `homogeneous(Recursive)`,
+        // dropping the `| str` element-type branch
+        // (`pep695_type_aliases.md:586,597,610`).
+        let rec_to_unfold = match self {
+            Type::Recursive(rec) => Some(rec),
+            Type::TypeAlias(alias) => match alias.value_type(db) {
+                Type::Recursive(rec) => Some(rec),
+                _ => None,
+            },
+            _ => None,
+        };
+        if let Some(rec) = rec_to_unfold {
+            let body = *rec.body(db);
+            let mapping = crate::types::TypeMapping::ReplaceDivergent {
+                binder_id: rec.binder(db),
+                replacement: Type::Recursive(rec),
+            };
+            let unfolded =
+                body.apply_type_mapping(db, &mapping, crate::types::TypeContext::default());
+            return unfolded.try_iterate_with_mode(db, mode);
         }
 
         if let Some(special_case) = non_async_special_case(db, self) {

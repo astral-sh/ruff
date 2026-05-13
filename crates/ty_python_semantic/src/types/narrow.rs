@@ -182,11 +182,10 @@ impl ClassInfoConstraintFunction {
                 }
             }
             Type::Dynamic(_) | Type::Divergent(_) => Some(classinfo),
-            // Phase 7: `Type::Recursive` and `Type::TypeAlias` are both "opaque
-            // names" — `unfold_one` resolves both (Recursive → body, TypeAlias →
-            // value_type). Recursive bodies contain `Divergent` leaves that bottom
-            // out via the `Type::Divergent` arm above; non-recursive aliases
-            // resolve to a non-opaque type in one step.
+            // `Type::Recursive` and `Type::TypeAlias` are both opaque names;
+            // `unfold_one` resolves either to a non-opaque type in one step.
+            // Recursive bodies contain `Divergent` leaves that bottom out via
+            // the `Type::Divergent` arm above.
             Type::Recursive(_) | Type::TypeAlias(_) => self.generate_constraint(
                 db,
                 crate::types::coinductive::unfold_one(db, classinfo),
@@ -2118,7 +2117,6 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 
         Type::Dynamic(_)
         | Type::Divergent(_)
-        // Phase 1: Type::Recursive treated as Divergent
         | Type::Recursive(_)
         | Type::Never
         | Type::FunctionLiteral(_)
@@ -2209,7 +2207,6 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         // always guarded by that check.
         Type::Dynamic(_)
         | Type::Divergent(_)
-        // Phase 1: Type::Recursive treated as Divergent
         | Type::Recursive(_)
         | Type::Never
         | Type::FunctionLiteral(_)

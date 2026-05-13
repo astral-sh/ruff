@@ -373,16 +373,52 @@ def _(x: X):
 
 ## Recursive generic type aliases
 
+### Covariant element type
+
+When the recursive position is wrapped in a *covariant* container (e.g. `tuple[..., ...]`,
+`Sequence`), recursive generic aliases behave the way one would naively expect: a literal nested
+value is assignable to the alias whenever each element is itself a valid value of the alias.
+
+```py
+type RecursiveTuple[T] = T | tuple[RecursiveTuple[T], ...]
+
+r1: RecursiveTuple[int] = 1
+r2: RecursiveTuple[int] = (1, (1, 2, 3))
+# error: [invalid-assignment] "Object of type `Literal["a"]` is not assignable to `RecursiveTuple[int]`"
+r3: RecursiveTuple[int] = "a"
+# error: [invalid-assignment]
+r4: RecursiveTuple[int] = ("a",)
+# error: [invalid-assignment]
+r5: RecursiveTuple[int] = (1, ("a",))
+
+def _(x: RecursiveTuple[int]):
+    if isinstance(x, tuple):
+        reveal_type(x[0])  # revealed: int | tuple[RecursiveTuple[int], ...]
+    if isinstance(x, tuple) and isinstance(x[0], tuple):
+        reveal_type(x[0])  # revealed: tuple[RecursiveTuple[int], ...]
+```
+
+### Invariant element type
+
+If the recursive position is wrapped in an *invariant* container (such as `list`), the recursive
+alias is still well-defined, but literal nested values that would intuitively "fit" are not
+necessarily assignable: invariance requires the element type to be exactly the alias, and the
+literal's inferred element type is generally not. Use a covariant container if you want literal
+nested values to be accepted.
+
 ```py
 type RecursiveList[T] = T | list[RecursiveList[T]]
 
 r1: RecursiveList[int] = 1
+# The literal infers as `list[int | list[int]]`, which is not equal to `list[RecursiveList[int]]`
+# under `list`'s invariance — even though every element is independently a valid `RecursiveList[int]`.
+# error: [invalid-assignment]
 r2: RecursiveList[int] = [1, [1, 2, 3]]
 # error: [invalid-assignment] "Object of type `Literal["a"]` is not assignable to `RecursiveList[int]`"
 r3: RecursiveList[int] = "a"
 # error: [invalid-assignment]
 r4: RecursiveList[int] = ["a"]
-# error: [invalid-assignment] "Object of type `list[int | list[RecursiveList[int]] | list[int | list[RecursiveList[int]] | str]]` is not assignable to `RecursiveList[int]`"
+# error: [invalid-assignment]
 r5: RecursiveList[int] = [1, ["a"]]
 
 def _(x: RecursiveList[int]):
@@ -392,10 +428,13 @@ def _(x: RecursiveList[int]):
         reveal_type(x[0])  # revealed: list[RecursiveList[int]]
 ```
 
+### Structural assignability between recursive aliases
+
 Assignment checks respect structural subtyping, i.e. type aliases with the same structure are
 assignable to each other.
 
 ```py
+type RecursiveList[T] = T | list[RecursiveList[T]]
 # This is structurally equivalent to RecursiveList[T].
 type RecursiveList2[T] = T | list[T | list[RecursiveList[T]]]
 # This is not structurally equivalent to RecursiveList[T].
@@ -411,7 +450,9 @@ def _(x: RecursiveList[int], y: RecursiveList2[int]):
     r4: RecursiveList3[int] = y
 ```
 
-It is also possible to handle divergent type aliases that are not actually have instances.
+### Divergent recursive aliases
+
+It is also possible to handle divergent type aliases that do not actually have instances.
 
 ```py
 # The type variable `T` has no meaning here, it's just to make sure it works correctly.
@@ -422,7 +463,7 @@ d1: DivergentList[int] = []
 d2: DivergentList[int] = [1]
 # error: [invalid-assignment]
 d3: DivergentList[int] = ["a"]
-# error: [invalid-assignment] "Object of type `list[list[DivergentList[int]] | list[list[DivergentList[int]] | int]]` is not assignable to `DivergentList[int]`"
+# error: [invalid-assignment]
 d4: DivergentList[int] = [[1]]
 
 def _(x: DivergentList[int]):

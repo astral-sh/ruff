@@ -291,7 +291,6 @@ impl<'db> Type<'db> {
              => true,
             Type::Dynamic(_)
             | Type::Divergent(_)
-            // Phase 1: Type::Recursive treated as Divergent
             | Type::Recursive(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
@@ -841,6 +840,32 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             .visit((source, target, self.relation), work)
     }
 
+    /// Find the `Type::Recursive` that wraps `divergent`'s α-binder, by looking
+    /// for it in the relation visitor's active seen set. Returns `None` if no
+    /// such `Type::Recursive` is currently being visited (this can happen
+    /// during legacy implicit-recursion cycles where `Divergent` is used as a
+    /// dynamic-like marker without a corresponding `Type::Recursive` wrapper).
+    fn find_wrapping_recursive(
+        &self,
+        db: &'db dyn Db,
+        divergent: crate::types::DivergentType,
+    ) -> Option<crate::types::recursive::RecursiveType<'db>> {
+        let binder_id = divergent.id();
+        let found = std::cell::Cell::new(None);
+        self.relation_visitor.any_active(|(left, right, _)| {
+            for side in [*left, *right] {
+                if let Type::Recursive(rec) = side
+                    && rec.binder_id(db) == binder_id
+                {
+                    found.set(Some(rec));
+                    return true;
+                }
+            }
+            false
+        });
+        found.into_inner()
+    }
+
     /// Is `target` a metaclass instance (a nominal instance of a subclass of `builtins.type`)?
     ///
     /// This does not include all types that are subtypes of `builtins.type`! The semantic
@@ -1002,15 +1027,37 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // In some specific situations, `Any`/`Unknown`/`@Todo` can be simplified out of unions and intersections,
-            // but this is not true for divergent types (and moving this case any lower down appears to cause
-            // "too many cycle iterations" panics).
-            (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
-                ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
+            // In some specific situations, `Any`/`Unknown`/`@Todo` can be simplified out of
+            // unions and intersections, but this is not true for divergent types (and moving
+            // this case any lower down appears to cause "too many cycle iterations" panics).
+            //
+            // Co-inductive resolution: if the `Divergent` marker is the α-binder of an
+            // in-flight `Type::Recursive` visit, replace the `Divergent` with the wrapping
+            // `Type::Recursive` and re-enter `check_type_pair`. The visitor's pair-key
+            // cycle detection then short-circuits if the exact (Recursive, other, relation)
+            // triple is already on the stack, otherwise the structural check continues into
+            // the body. Without this re-entry, the bare-`Divergent` fallback (assignability
+            // default) is too permissive — e.g. it would make `str <: Divergent` succeed
+            // under assignability, breaking invariance checks on `list[Recursive]`.
+            (Type::Divergent(divergent), other) | (other, Type::Divergent(divergent)) => {
+                if let Some(wrapping) = self.find_wrapping_recursive(db, divergent) {
+                    let is_left = matches!(source, Type::Divergent(d) if d.id() == divergent.id());
+                    let recursive_ty = Type::Recursive(wrapping);
+                    if is_left {
+                        self.check_type_pair(db, recursive_ty, other)
+                    } else {
+                        self.check_type_pair(db, other, recursive_ty)
+                    }
+                } else {
+                    ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
+                }
             }
-            // Phase 5: delegate through the co-inductive framework. Handles
-            // unfold + pair-visiting cycle guard + dispatch to
-            // `<Self as CoInductiveRelation>::check_structural` in one call.
+            // `Type::Recursive` and `Type::TypeAlias` are both opaque names
+            // that `coinductive::delegate_recursive` handles uniformly:
+            // it records the pair on the visitor for cycle detection, unfolds
+            // one step (`Recursive` → body with `Divergent` leaves, `TypeAlias`
+            // → resolved value type), and dispatches structurally via
+            // `<Self as CoInductiveRelation>::check_structural`.
             (Type::Recursive(_), _) | (_, Type::Recursive(_)) => {
                 crate::types::coinductive::delegate_recursive(
                     db,
@@ -1021,9 +1068,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 )
             }
 
-            // Phase 6: TypeAlias is an opaque name, treated uniformly with
-            // `Type::Recursive` in `unfold_one`. The framework unfolds the alias
-            // via `alias.value_type(db)` then dispatches structurally.
             (Type::TypeAlias(_), _) | (_, Type::TypeAlias(_)) => {
                 crate::types::coinductive::delegate_recursive(
                     db,
@@ -2084,7 +2128,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     }
 }
 
-// Phase 5: dispatch the directional relation through the co-inductive framework.
+// Dispatch the directional relation through the co-inductive framework.
 // `check_structural` is the structural-comparison entry point that
 // `coinductive::delegate_recursive` calls after unfolding `Type::Recursive` and
 // after pair-visiting cycle detection has cleared the call.
@@ -2245,6 +2289,30 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             .visit((source, target, TypeRelation::Disjointness), work)
     }
 
+    /// Find the wrapping `Type::Recursive` for `divergent`'s α-binder by
+    /// searching the disjointness visitor's active seen set. Mirrors
+    /// [`TypeRelationChecker::find_wrapping_recursive`].
+    fn find_wrapping_recursive(
+        &self,
+        db: &'db dyn Db,
+        divergent: crate::types::DivergentType,
+    ) -> Option<crate::types::recursive::RecursiveType<'db>> {
+        let binder_id = divergent.id();
+        let found = std::cell::Cell::new(None);
+        self.disjointness_visitor.any_active(|(left, right, _)| {
+            for side in [*left, *right] {
+                if let Type::Recursive(rec) = side
+                    && rec.binder_id(db) == binder_id
+                {
+                    found.set(Some(rec));
+                    return true;
+                }
+            }
+            false
+        });
+        found.into_inner()
+    }
+
     fn any_protocol_members_absent_or_disjoint(
         &self,
         db: &'db dyn Db,
@@ -2291,9 +2359,29 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::Never, _) | (_, Type::Never) => self.always(),
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
-            (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
-            // Phase 5: same delegation pattern as `TypeRelationChecker`, but
-            // through the disjointness visitor (different co-inductive fallback).
+            // Co-inductive resolution: replace `Divergent` with its wrapping
+            // `Type::Recursive` (looked up from the visitor's active seen set) and
+            // re-enter. The visitor short-circuits if the (Recursive, other) pair is
+            // already on the stack; otherwise structural disjointness reasoning continues
+            // into the body. Falls back to the legacy "Divergent is never-disjoint"
+            // semantics when no wrapping `Type::Recursive` is found.
+            (Type::Divergent(divergent), other) | (other, Type::Divergent(divergent)) => {
+                if let Some(wrapping) = self.find_wrapping_recursive(db, divergent) {
+                    let is_left = matches!(left, Type::Divergent(d) if d.id() == divergent.id());
+                    let recursive_ty = Type::Recursive(wrapping);
+                    if is_left {
+                        self.check_type_pair(db, recursive_ty, other)
+                    } else {
+                        self.check_type_pair(db, other, recursive_ty)
+                    }
+                } else {
+                    self.never()
+                }
+            }
+            // Same delegation pattern as `TypeRelationChecker::check_type_pair`
+            // for opaque-name types (`Type::Recursive`, `Type::TypeAlias`),
+            // routed through the disjointness visitor (whose co-inductive
+            // fallback is `false`, "not disjoint when we loop").
             (Type::Recursive(_), _) | (_, Type::Recursive(_)) => {
                 crate::types::coinductive::delegate_recursive(
                     db,
@@ -2304,9 +2392,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 )
             }
 
-            // Phase 6: same delegation as the subtype-side TypeAlias arms;
-            // `unfold_one` resolves the alias via `value_type` and the framework
-            // records the pair on the disjointness visitor for cycle guarding.
             (Type::TypeAlias(_), _) | (_, Type::TypeAlias(_)) => {
                 crate::types::coinductive::delegate_recursive(
                     db,
@@ -2987,10 +3072,9 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
     }
 }
 
-// Phase 5: dispatch the symmetric disjointness relation through the
-// co-inductive framework. `relation_key()` is fixed to
-// `TypeRelation::Disjointness`; the structural step delegates to the existing
-// `check_type_pair` implementation.
+// Dispatch the symmetric disjointness relation through the co-inductive
+// framework. `relation_key()` is fixed to `TypeRelation::Disjointness`; the
+// structural step delegates to the existing `check_type_pair` implementation.
 impl<'c, 'db: 'c> CoInductiveRelation<'db, 'c> for DisjointnessChecker<'_, 'c, 'db> {
     type Tag = TypeRelation;
     type Output = ConstraintSet<'db, 'c>;

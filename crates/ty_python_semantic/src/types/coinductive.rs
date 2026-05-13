@@ -1,22 +1,8 @@
 //! Co-inductive relation framework.
 //!
-//! This module provides a small framework for writing type relations that
-//! transparently handle [`Type::Recursive`] via co-inductive reasoning.
-//!
-//! ## Background
-//!
-//! The Phase 0 codebase had a "visitor zoo": each relation
-//! (`has_relation_to`, `is_disjoint_from`, `is_equivalent_to`, …) carried its
-//! own [`crate::types::cyclic::PairVisitor`] alias and threaded a `&Visitor`
-//! parameter through many `_impl` methods. Phase 3 added a [`Type::Recursive`]
-//! variant whose body contains [`Type::Divergent`] markers at recursive
-//! positions. The current arms in [`crate::types::relation`] handle that
-//! variant via `with_recursion_guard(...)`, which is itself a thin wrapper
-//! over the relation's `PairVisitor`.
-//!
-//! This module abstracts the shared pattern (unfold → delegate → cycle-guard)
-//! into helpers, so that subsequent phases can migrate each relation onto a
-//! uniform API.
+//! This module provides the dispatch surface used by relation checkers
+//! (`has_relation_to`, `is_disjoint_from`, …) to handle opaque type names
+//! ([`Type::Recursive`] and [`Type::TypeAlias`]) co-inductively.
 //!
 //! ## What this module provides
 //!
@@ -25,10 +11,9 @@
 //!   used in the cycle-detection visiting key) and `check_structural(db, l, r)`
 //!   (the structural-comparison body invoked after unfold + cycle guard).
 //! - [`delegate_recursive`]: the canonical entry point used by `check_type_pair`
-//!   arms to handle `Type::Recursive`. Unfolds once, records the pair in the
-//!   visitor, dispatches to the implementer's `check_structural`. Removes the
-//!   need for per-checker `with_recursion_guard` boilerplate at recursive
-//!   arms.
+//!   arms to handle opaque type names. Records the pair in the visitor for
+//!   cycle detection, unfolds one step, then dispatches to the implementer's
+//!   `check_structural`.
 //! - [`unfold_one`] / [`unfold_pair`]: low-level one-step unfold helpers.
 //!   Most callers should prefer [`delegate_recursive`] which performs unfold
 //!   together with cycle detection.
@@ -54,10 +39,6 @@ use crate::types::relation::TypeRelation;
 /// - `check_structural(db, l, r)` — the actual structural check, called by the
 ///   framework after unfold + cycle-guard logic decides this pair needs a real
 ///   recursion step.
-///
-/// Phase 5 makes this trait dispatchable from [`delegate_recursive`], which
-/// uniformly handles `Type::Recursive` unfolding for any relation that
-/// implements the trait.
 pub(crate) trait CoInductiveRelation<'db, 'c> {
     type Tag: 'static;
     type Output: Clone;
@@ -74,16 +55,15 @@ pub(crate) trait CoInductiveRelation<'db, 'c> {
 /// ([`Type::Recursive`] or [`Type::TypeAlias`]).
 ///
 /// - Records `(source, target, relation_key)` in the visitor *before*
-///   unfolding. Using the **pre-unfold** types as the key prevents nested
+///   unfolding. Using the pre-unfold types as the key prevents nested
 ///   non-cyclic comparisons of the same unfolded pair from being incorrectly
-///   short-circuited. (Empirical: switching to post-unfold keys caused 7 new
-///   mdtest failures during Phase 6 development.)
+///   short-circuited (a post-unfold key empirically broke ~7 mdtest cases).
 /// - On cycle (same triple revisited), the visitor returns its fallback.
 /// - Otherwise unfolds both sides one step via [`unfold_pair`] and dispatches
 ///   to `checker.check_structural`.
 ///
-/// This is the canonical Phase 5+ entry point used by `check_type_pair` arms
-/// to handle opaque type names without per-checker duplicated guard logic.
+/// This is the canonical entry point used by `check_type_pair` arms to handle
+/// opaque type names without per-checker duplicated guard logic.
 pub(crate) fn delegate_recursive<'db, 'c, R>(
     db: &'db dyn Db,
     checker: &R,

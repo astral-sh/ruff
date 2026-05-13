@@ -46,7 +46,7 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
 
 #[allow(
     dead_code,
-    reason = "Kept as a conceptual abstraction. Phase 4 unified the existing pair visitors onto `CycleDetector<TypeRelation, (Type, Type, TypeRelation), R>`; this simpler `(Type, Type)`-keyed alias may still be useful for future relation-agnostic cycle detection."
+    reason = "Kept as a conceptual abstraction. In-tree pair visitors all use the `(Type, Type, TypeRelation)`-keyed `CycleDetector` directly; this simpler `(Type, Type)`-keyed alias is reserved for future relation-agnostic cycle detection."
 )]
 pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<Tag, (Type<'db>, Type<'db>), C>;
 
@@ -78,6 +78,31 @@ impl<Tag, T, R> CycleDetector<Tag, T, R> {
             fallback: Some(fallback),
             _tag: PhantomData,
         }
+    }
+
+    /// Returns true if any currently-active visit key satisfies `predicate`.
+    ///
+    /// Iterates only the `seen` (active-recursion) set, not the completed
+    /// `cache`. Use this to ask "are we currently inside a `visit` for a key
+    /// matching some shape?" — e.g. to recognise a `Divergent` α-binder marker
+    /// as bound by an in-progress `Type::Recursive` visit.
+    pub(crate) fn any_active(&self, predicate: impl Fn(&T) -> bool) -> bool {
+        self.seen.borrow().iter().any(predicate)
+    }
+
+    /// The co-inductive fallback this detector returns on cycle.
+    #[allow(
+        dead_code,
+        reason = "Reserved for callers that need the fallback value directly (currently all in-tree callers route through `visit`, which uses the fallback internally on cycle)."
+    )]
+    pub(crate) fn fallback(&self) -> R
+    where
+        R: Clone,
+    {
+        self.fallback
+            .as_ref()
+            .expect("CycleDetector::fallback requires a fallback to have been set")
+            .clone()
     }
 }
 

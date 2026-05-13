@@ -38,14 +38,36 @@
 
 use super::RecursivelyDefined;
 use crate::types::enums::{enum_member_literals, enum_metadata};
+use crate::types::recursive::RecursiveType;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType, Type,
-    TypeVarBoundOrConstraints, UnionType,
+    TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 use smallvec::SmallVec;
+
+/// Returns the body of `rec` with its `Type::Divergent` α-binder markers
+/// substituted back to the source `Type::TypeAlias` (when known).
+///
+/// Used by [`IntersectionBuilder::add_positive_impl`] /
+/// [`IntersectionBuilder::add_negative_impl`] when unfolding a
+/// `Type::Recursive` so that distribution can proceed over the body's union
+/// elements. Re-tagging the recursive positions as `Type::TypeAlias` lets the
+/// downstream `seen_aliases` cycle guard (and display) treat them as the same
+/// opaque name rather than the bare `Divergent` marker.
+fn recursive_body_with_alias_marker<'db>(db: &'db dyn Db, rec: RecursiveType<'db>) -> Type<'db> {
+    let body = *rec.body(db);
+    let Some(source_alias) = rec.source_alias(db) else {
+        return body;
+    };
+    let mapping = TypeMapping::ReplaceDivergent {
+        binder_id: rec.binder(db),
+        replacement: Type::TypeAlias(source_alias),
+    };
+    body.apply_type_mapping(db, &mapping, TypeContext::default())
+}
 
 /// Extract `(core, guard)` from truthiness-guarded intersections.
 ///
@@ -988,6 +1010,23 @@ impl<'db> IntersectionBuilder<'db> {
                 let value_type = alias.value_type(self.db);
                 self.add_positive_impl(value_type, seen_aliases)
             }
+            Type::Recursive(rec) => {
+                if seen_aliases.contains(&ty) {
+                    for inner in &mut self.intersections {
+                        inner.positive.insert(ty);
+                    }
+                    return self;
+                }
+                seen_aliases.push(ty);
+                // Unfold the recursive type so that the `Type::Union` arm below can
+                // distribute over the body's union elements (the body is e.g.
+                // `int | tuple[Divergent, ...] | None` for `OptNestedInt`).
+                // Substitute the `Divergent` α-marker back to the source `TypeAlias`
+                // so that recursive references inside the body keep their alias-name
+                // display and re-trigger this recursive-unfold path if visited again.
+                let body = recursive_body_with_alias_marker(self.db, rec);
+                self.add_positive_impl(body, seen_aliases)
+            }
             Type::Union(union) => {
                 // Distribute ourself over this union: for each union element, clone ourself and
                 // intersect with that union element, then create a new union-of-intersections with all
@@ -1090,6 +1129,17 @@ impl<'db> IntersectionBuilder<'db> {
                 seen_aliases.push(ty);
                 let value_type = alias.value_type(self.db);
                 self.add_negative_impl(value_type, seen_aliases)
+            }
+            Type::Recursive(rec) => {
+                if seen_aliases.contains(&ty) {
+                    for inner in &mut self.intersections {
+                        inner.negative.insert(ty);
+                    }
+                    return self;
+                }
+                seen_aliases.push(ty);
+                let body = recursive_body_with_alias_marker(self.db, rec);
+                self.add_negative_impl(body, seen_aliases)
             }
             Type::Union(union) => {
                 for elem in union.elements(self.db) {

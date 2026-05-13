@@ -524,8 +524,25 @@ impl<'db> Type<'db> {
         let value_ty = self;
 
         let inferred = match (value_ty, slice_ty) {
-            // Phase 1: Type::Recursive treated as Divergent
-            (Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never, _) => Some(Ok(value_ty)),
+            (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
+
+            // Subscripting an opaque recursive type means subscripting one-step
+            // unfold of its body. The `Divergent` α-markers in the body are
+            // substituted with the recursive type itself so element results
+            // preserve the recursive structure.
+            (Type::Recursive(rec), _) => {
+                let body = *rec.body(db);
+                let mapping = crate::types::TypeMapping::ReplaceDivergent {
+                    binder_id: rec.binder(db),
+                    replacement: Type::Recursive(rec),
+                };
+                let unfolded = body.apply_type_mapping(
+                    db,
+                    &mapping,
+                    crate::types::TypeContext::default(),
+                );
+                Some(unfolded.subscript(db, slice_ty, expr_context))
+            }
 
             (Type::TypeAlias(alias), _) => {
                 Some(alias.value_type(db).subscript(db, slice_ty, expr_context))

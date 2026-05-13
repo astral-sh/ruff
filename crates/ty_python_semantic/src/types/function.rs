@@ -1603,7 +1603,6 @@ fn is_instance_truthiness<'db>(
         | Type::Callable(..)
         | Type::Dynamic(..)
         | Type::Divergent(_)
-        // Phase 1: Type::Recursive treated as Divergent
         | Type::Recursive(_)
         | Type::Never
         | Type::TypedDict(_) => {

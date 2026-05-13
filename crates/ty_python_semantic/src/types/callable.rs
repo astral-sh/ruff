@@ -65,7 +65,6 @@ impl<'db> Type<'db> {
                 db,
                 Signature::dynamic(self),
             ))),
-            // Phase 1: Type::Recursive treated as Divergent
             Type::Recursive(_) => Some(CallableTypes::one(CallableType::function_like(
                 db,
                 Signature::dynamic(self),
