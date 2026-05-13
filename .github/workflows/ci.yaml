@@ -299,11 +299,11 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@1329c298aa20c3257846c9b2e0e55967df3e3c37 # v2.75.25
+        uses: taiki-e/install-action@cca35edeb1d01366c2843b68fc3ca441446d73d3 # v2.77.1
         with:
           tool: cargo-nextest
       - name: "Install cargo insta"
-        uses: taiki-e/install-action@1329c298aa20c3257846c9b2e0e55967df3e3c37 # v2.75.25
+        uses: taiki-e/install-action@cca35edeb1d01366c2843b68fc3ca441446d73d3 # v2.77.1
         with:
           tool: cargo-insta
       - name: "Install uv"
@@ -367,7 +367,7 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@1329c298aa20c3257846c9b2e0e55967df3e3c37 # v2.75.25
+        uses: taiki-e/install-action@cca35edeb1d01366c2843b68fc3ca441446d73d3 # v2.77.1
         with:
           tool: cargo-nextest
       - name: "Install uv"
@@ -404,7 +404,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@1329c298aa20c3257846c9b2e0e55967df3e3c37 # v2.75.25
+        uses: taiki-e/install-action@cca35edeb1d01366c2843b68fc3ca441446d73d3 # v2.77.1
         with:
           tool: cargo-nextest
       - name: "Install uv"
@@ -1043,7 +1043,7 @@ jobs:
         run: rustup show
 
       - name: "Install codspeed"
-        uses: taiki-e/install-action@1329c298aa20c3257846c9b2e0e55967df3e3c37 # v2.75.25
+        uses: taiki-e/install-action@cca35edeb1d01366c2843b68fc3ca441446d73d3 # v2.77.1
         with:
           tool: cargo-codspeed
 
@@ -1082,7 +1082,7 @@ jobs:
         run: rustup show
 
       - name: "Install codspeed"
-        uses: taiki-e/install-action@1329c298aa20c3257846c9b2e0e55967df3e3c37 # v2.75.25
+        uses: taiki-e/install-action@cca35edeb1d01366c2843b68fc3ca441446d73d3 # v2.77.1
         with:
           tool: cargo-codspeed
 
@@ -1125,7 +1125,7 @@ jobs:
           version: "0.11.10"
 
       - name: "Install codspeed"
-        uses: taiki-e/install-action@1329c298aa20c3257846c9b2e0e55967df3e3c37 # v2.75.25
+        uses: taiki-e/install-action@cca35edeb1d01366c2843b68fc3ca441446d73d3 # v2.77.1
         with:
           tool: cargo-codspeed
 
@@ -1179,7 +1179,7 @@ jobs:
         run: rustup show
 
       - name: "Install codspeed"
-        uses: taiki-e/install-action@1329c298aa20c3257846c9b2e0e55967df3e3c37 # v2.75.25
+        uses: taiki-e/install-action@cca35edeb1d01366c2843b68fc3ca441446d73d3 # v2.77.1
         with:
           tool: cargo-codspeed
 
@@ -1221,7 +1221,7 @@ jobs:
           version: "0.11.10"
 
       - name: "Install codspeed"
-        uses: taiki-e/install-action@1329c298aa20c3257846c9b2e0e55967df3e3c37 # v2.75.25
+        uses: taiki-e/install-action@cca35edeb1d01366c2843b68fc3ca441446d73d3 # v2.77.1
         with:
           tool: cargo-codspeed
 
