@@ -342,6 +342,46 @@ fn members_are_grouped_and_sorted_by_name() -> anyhow::Result<()> {
 }
 
 #[test]
+fn markdown_docblocks_preserve_non_breaking_indents_and_hard_breaks() -> anyhow::Result<()> {
+    let case = CliTest::with_files([(
+        "pkg/__init__.py",
+        r#"
+        def field() -> None:
+            """Describe a field.
+
+            Args:
+                default: Default value if the field is not set.
+                default_factory: A callable to generate the default value.
+                    This may use already validated data.
+            """
+        "#,
+    )])?;
+
+    assert_cmd_snapshot!(case.ty_command().arg("doc").arg("--color").arg("never"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+     Documenting project (<temp_dir>/)
+        Finished documentation in 0.000s
+       Generated <temp_dir>/target/doc/project/index.html
+
+    ----- stderr -----
+    ");
+
+    let module = std::fs::read_to_string(case.root().join("target/doc/project/pkg/index.html"))?;
+    assert_contains_all(
+        &module,
+        &[
+            "<p>Describe a field.</p>",
+            "<p>Args:<br>&nbsp;&nbsp;&nbsp;&nbsp;default: Default value if the field is not set.<br>&nbsp;&nbsp;&nbsp;&nbsp;default_factory: A callable to generate the default value.<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This may use already validated data.</p>",
+        ],
+    );
+    assert_contains_none(&module, &["&amp;nbsp;"]);
+
+    Ok(())
+}
+
+#[test]
 fn explicit_paths_can_document_tests() -> anyhow::Result<()> {
     let case = CliTest::with_files([(
         "tests/test_pkg.py",

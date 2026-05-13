@@ -1034,6 +1034,7 @@ impl Render for DocMarkdown<'_> {
         let mut in_code_block = false;
 
         for raw_line in self.0.lines() {
+            let hard_break = raw_line.ends_with("  ");
             let line = raw_line.trim_end();
             let trimmed = line.trim();
 
@@ -1075,7 +1076,10 @@ impl Render for DocMarkdown<'_> {
             } else {
                 flush_unordered_list(body, &mut unordered_list);
                 flush_ordered_list(body, &mut ordered_list);
-                paragraph.push(trimmed);
+                paragraph.push(DocParagraphLine {
+                    text: trimmed,
+                    hard_break,
+                });
             }
         }
 
@@ -1086,15 +1090,31 @@ impl Render for DocMarkdown<'_> {
     }
 }
 
-fn flush_paragraph(body: &mut String, paragraph: &mut Vec<&str>) {
+#[derive(Copy, Clone)]
+struct DocParagraphLine<'a> {
+    text: &'a str,
+    hard_break: bool,
+}
+
+fn flush_paragraph(body: &mut String, paragraph: &mut Vec<DocParagraphLine<'_>>) {
     if paragraph.is_empty() {
         return;
     }
 
     body.push_str("<p>");
-    DocInline(&paragraph.join(" ")).render_to(body);
+    let paragraph_line_count = paragraph.len();
+    let mut previous_hard_break = false;
+    for (index, line) in paragraph.drain(..).enumerate() {
+        if index > 0 && !previous_hard_break {
+            body.push(' ');
+        }
+        DocInline(line.text).render_to(body);
+        if line.hard_break && index + 1 < paragraph_line_count {
+            body.push_str("<br>");
+        }
+        previous_hard_break = line.hard_break;
+    }
     body.push_str("</p>");
-    paragraph.clear();
 }
 
 struct DocHeading<'a> {
@@ -1188,6 +1208,12 @@ impl Render for DocInline<'_> {
         let mut remaining = self.0;
 
         while !remaining.is_empty() {
+            if let Some(after_entity) = remaining.strip_prefix("&nbsp;") {
+                body.push_str("&nbsp;");
+                remaining = after_entity;
+                continue;
+            }
+
             if let Some(after_start) = remaining.strip_prefix('`') {
                 if let Some(end) = after_start.find('`') {
                     let (code, after_end) = after_start.split_at(end);
