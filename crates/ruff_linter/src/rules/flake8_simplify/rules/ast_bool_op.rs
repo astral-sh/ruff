@@ -394,33 +394,26 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
                 expr.range(),
             );
             if !contains_effect(target, |id| checker.semantic().has_builtin_binding(id)) {
-                // Grab the types used in each duplicate `isinstance` call (e.g., `int` and `str`
-                // in `isinstance(obj, int) or isinstance(obj, str)`).
-                let types: Vec<&Expr> = indices
+                // Flatten the type expressions from each duplicate `isinstance` call into the
+                // elements they would contribute to the merged tuple. Tuple operands splice
+                // their elements; everything else contributes itself.
+                let flattened: Vec<&Expr> = indices
                     .iter()
-                    .map(|index| &values[*index])
-                    .map(|expr| {
+                    .map(|index| {
                         let Expr::Call(ast::ExprCall {
                             arguments: Arguments { args, .. },
                             ..
-                        }) = expr
+                        }) = &values[*index]
                         else {
                             unreachable!("Indices should only contain `isinstance` calls")
                         };
                         args.get(1).expect("`isinstance` should have two arguments")
                     })
-                    .collect();
-
-                // Flatten the type expressions into the elements they would contribute
-                // to the merged tuple. Tuple operands splice their elements; everything
-                // else contributes itself.
-                let flattened: Vec<&Expr> = types
-                    .iter()
                     .flat_map(|value| {
                         if let Expr::Tuple(tuple) = value {
                             Left(tuple.iter())
                         } else {
-                            Right(iter::once(*value))
+                            Right(iter::once(value))
                         }
                     })
                     .collect();
@@ -439,19 +432,31 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
                     // (e.g. `\x7d` in a format spec) or change observable behavior.
                     let locator = checker.locator();
                     let target_src = locator.slice(target.range());
-                    let type_srcs: Vec<&str> =
-                        flattened.iter().map(|e| locator.slice(e.range())).collect();
-                    let combined =
-                        format!("isinstance({}, ({}))", target_src, type_srcs.join(", "));
+                    let type_srcs = flattened
+                        .iter()
+                        .map(|e| locator.slice(e.range()))
+                        .join(", ");
+                    let combined = format!("isinstance({target_src}, ({type_srcs}))");
 
-                    // Replace just the consecutive duplicate calls (and the `or`s between
-                    // them) with the combined call, leaving the rest of the `BoolOp`'s source
-                    // verbatim.
+                    // Replace the consecutive duplicate calls (and the `or`s between them) with
+                    // the combined call. Extend the replacement to absorb any parentheses that
+                    // wrap the first or last operand within the `BoolOp`; otherwise those
+                    // parentheses would be left dangling against a merged operand that has its
+                    // own balance, producing invalid syntax (e.g. `((isinstance(x, int)) or
+                    // isinstance(x, str))`).
                     let [first, .., last] = indices.as_slice() else {
                         unreachable!("Indices should have at least two elements")
                     };
-                    let replace_range =
-                        TextRange::new(values[*first].range().start(), values[*last].range().end());
+                    let tokens = checker.tokens();
+                    let first = &values[*first];
+                    let last = &values[*last];
+                    let start = parenthesized_range(first.into(), expr.into(), tokens)
+                        .unwrap_or(first.range())
+                        .start();
+                    let end = parenthesized_range(last.into(), expr.into(), tokens)
+                        .unwrap_or(last.range())
+                        .end();
+                    let replace_range = TextRange::new(start, end);
                     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                         pad(combined, replace_range, locator),
                         replace_range,

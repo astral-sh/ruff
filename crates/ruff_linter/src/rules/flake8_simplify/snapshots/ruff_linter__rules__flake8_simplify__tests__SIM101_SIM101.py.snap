@@ -180,7 +180,7 @@ help: Merge `isinstance` calls for `a`
 51 |
 52 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722460483
    - if(isinstance(a, int)) or (isinstance(a, float)):
-53 + if(isinstance(a, (int, float))):
+53 + if isinstance(a, (int, float)):
 54 |     pass
 55 |
 56 | # Regression test for: https://github.com/astral-sh/ruff/issues/19601
@@ -344,6 +344,7 @@ help: Merge `isinstance` calls for `x`
 71 + isinstance(x, (*types, int))
 72 | isinstance(x, ()) or isinstance(x, int)
 73 | isinstance(x, ()) or isinstance(x, ())
+74 | ((isinstance(x, int)) or isinstance(x, str))
 note: This is an unsafe fix and may change runtime behavior
 
 SIM101 [*] Multiple `isinstance` calls for `x`, merge into a single call
@@ -354,6 +355,7 @@ SIM101 [*] Multiple `isinstance` calls for `x`, merge into a single call
 72 | isinstance(x, ()) or isinstance(x, int)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 73 | isinstance(x, ()) or isinstance(x, ())
+74 | ((isinstance(x, int)) or isinstance(x, str))
    |
 help: Merge `isinstance` calls for `x`
 69 | isinstance(x, ()) or isinstance(x, ()) or isinstance(x, (*types,))
@@ -362,6 +364,8 @@ help: Merge `isinstance` calls for `x`
    - isinstance(x, ()) or isinstance(x, int)
 72 + isinstance(x, (int))
 73 | isinstance(x, ()) or isinstance(x, ())
+74 | ((isinstance(x, int)) or isinstance(x, str))
+75 | (isinstance(x, int) or isinstance(x, str))
 note: This is an unsafe fix and may change runtime behavior
 
 SIM101 [*] Multiple `isinstance` calls for `x`, merge into a single call
@@ -371,6 +375,8 @@ SIM101 [*] Multiple `isinstance` calls for `x`, merge into a single call
 72 | isinstance(x, ()) or isinstance(x, int)
 73 | isinstance(x, ()) or isinstance(x, ())
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+74 | ((isinstance(x, int)) or isinstance(x, str))
+75 | (isinstance(x, int) or isinstance(x, str))
    |
 help: Merge `isinstance` calls for `x`
 70 | isinstance(x, (*types,)) or isinstance(x, (*types,))
@@ -378,4 +384,61 @@ help: Merge `isinstance` calls for `x`
 72 | isinstance(x, ()) or isinstance(x, int)
    - isinstance(x, ()) or isinstance(x, ())
 73 + isinstance(x, ())
+74 | ((isinstance(x, int)) or isinstance(x, str))
+75 | (isinstance(x, int) or isinstance(x, str))
+76 | isinstance(x, int) or (isinstance(x, str))
+note: This is an unsafe fix and may change runtime behavior
+
+SIM101 [*] Multiple `isinstance` calls for `x`, merge into a single call
+  --> SIM101.py:74:2
+   |
+72 | isinstance(x, ()) or isinstance(x, int)
+73 | isinstance(x, ()) or isinstance(x, ())
+74 | ((isinstance(x, int)) or isinstance(x, str))
+   |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+75 | (isinstance(x, int) or isinstance(x, str))
+76 | isinstance(x, int) or (isinstance(x, str))
+   |
+help: Merge `isinstance` calls for `x`
+71 | isinstance(x, (*types,)) or isinstance(x, int)
+72 | isinstance(x, ()) or isinstance(x, int)
+73 | isinstance(x, ()) or isinstance(x, ())
+   - ((isinstance(x, int)) or isinstance(x, str))
+74 + (isinstance(x, (int, str)))
+75 | (isinstance(x, int) or isinstance(x, str))
+76 | isinstance(x, int) or (isinstance(x, str))
+note: This is an unsafe fix and may change runtime behavior
+
+SIM101 [*] Multiple `isinstance` calls for `x`, merge into a single call
+  --> SIM101.py:75:2
+   |
+73 | isinstance(x, ()) or isinstance(x, ())
+74 | ((isinstance(x, int)) or isinstance(x, str))
+75 | (isinstance(x, int) or isinstance(x, str))
+   |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+76 | isinstance(x, int) or (isinstance(x, str))
+   |
+help: Merge `isinstance` calls for `x`
+72 | isinstance(x, ()) or isinstance(x, int)
+73 | isinstance(x, ()) or isinstance(x, ())
+74 | ((isinstance(x, int)) or isinstance(x, str))
+   - (isinstance(x, int) or isinstance(x, str))
+75 + (isinstance(x, (int, str)))
+76 | isinstance(x, int) or (isinstance(x, str))
+note: This is an unsafe fix and may change runtime behavior
+
+SIM101 [*] Multiple `isinstance` calls for `x`, merge into a single call
+  --> SIM101.py:76:1
+   |
+74 | ((isinstance(x, int)) or isinstance(x, str))
+75 | (isinstance(x, int) or isinstance(x, str))
+76 | isinstance(x, int) or (isinstance(x, str))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Merge `isinstance` calls for `x`
+73 | isinstance(x, ()) or isinstance(x, ())
+74 | ((isinstance(x, int)) or isinstance(x, str))
+75 | (isinstance(x, int) or isinstance(x, str))
+   - isinstance(x, int) or (isinstance(x, str))
+76 + isinstance(x, (int, str))
 note: This is an unsafe fix and may change runtime behavior
