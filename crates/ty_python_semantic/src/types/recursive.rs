@@ -90,6 +90,43 @@ impl<'db> RecursiveType<'db> {
     pub(crate) fn unfold(self, db: &'db dyn Db) -> Type<'db> {
         *self.body(db)
     }
+
+    /// Returns the body with its `Type::Divergent` α-binder markers substituted
+    /// back to the source `Type::TypeAlias` (when `source_alias` is `Some`).
+    /// Used by display and by `IntersectionBuilder`'s `Type::Recursive` arms.
+    ///
+    /// Re-tagging recursive positions as `Type::TypeAlias` lets downstream
+    /// `seen_aliases`-style cycle guards (and display) treat them as the same
+    /// opaque name rather than the bare `Divergent` marker.
+    pub(crate) fn body_with_alias_marker(self, db: &'db dyn Db) -> Type<'db> {
+        let body = *self.body(db);
+        let Some(source_alias) = self.source_alias(db) else {
+            return body;
+        };
+        let mapping = TypeMapping::ReplaceDivergent {
+            binder_id: self.binder(db),
+            replacement: Type::TypeAlias(source_alias),
+        };
+        body.apply_type_mapping(db, &mapping, TypeContext::default())
+    }
+
+    /// Returns the body with its `Type::Divergent` α-binder markers substituted
+    /// back to `Type::Recursive(self)` — the μ-binder preserved at the recursive
+    /// position so further structural operations (iteration, subscript, …) can
+    /// continue to descend.
+    ///
+    /// Compare with [`body_with_alias_marker`][Self::body_with_alias_marker],
+    /// which substitutes the source `TypeAlias` instead — used for display and
+    /// for `IntersectionBuilder`'s distribution where re-finding the alias name
+    /// matters.
+    pub(crate) fn unfold_preserving_binder(self, db: &'db dyn Db) -> Type<'db> {
+        let body = *self.body(db);
+        let mapping = TypeMapping::ReplaceDivergent {
+            binder_id: self.binder(db),
+            replacement: Type::Recursive(self),
+        };
+        body.apply_type_mapping(db, &mapping, TypeContext::default())
+    }
 }
 
 /// Folds a Type by replacing self-references to the given alias definition with
