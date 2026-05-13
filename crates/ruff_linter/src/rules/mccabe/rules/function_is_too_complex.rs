@@ -45,6 +45,12 @@ use crate::checkers::ast::Checker;
 ///     return 1
 /// ```
 ///
+/// Note that the refactored version may have the same McCabe complexity
+/// (due to the same number of decision points), but it improves
+/// readability through early returns and a flatter structure.
+/// To meaningfully reduce McCabe complexity, consider extracting
+/// complex logic into smaller helper functions.
+///
 /// ## Options
 /// - `lint.mccabe.max-complexity`
 #[derive(ViolationMetadata)]
