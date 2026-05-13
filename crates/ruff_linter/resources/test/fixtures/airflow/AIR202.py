@@ -152,3 +152,23 @@ def sensor_returning_dict():
 
 def plain_function_returning_dict() -> dict:
     return {"x": 1}
+
+
+# --- Nested-scope negatives: dict returns inside nested defs/classes should NOT flag ---
+
+
+@task
+def nested_function_returning_dict():  # should NOT flag: dict returned by inner fn, not outer
+    def inner():
+        return {"x": 1}
+
+    return inner()
+
+
+@task
+def nested_class_method_returning_dict():  # should NOT flag: dict returned by inner class method
+    class Inner:
+        def make(self):
+            return {"x": 1}
+
+    return Inner().make()
