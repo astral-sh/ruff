@@ -54,6 +54,7 @@ mod tests {
 
     #[test_case(Rule::UnnecessaryGeneratorList, Path::new("C400_py315.py"))]
     #[test_case(Rule::UnnecessaryGeneratorSet, Path::new("C401_py315.py"))]
+    #[test_case(Rule::UnnecessaryListComprehensionSet, Path::new("C403_py315.py"))]
     #[test_case(Rule::UnnecessaryListCall, Path::new("C411_py315.py"))]
     #[test_case(Rule::UnnecessaryLiteralWithinDictCall, Path::new("C418_py315.py"))]
     #[test_case(Rule::UnnecessaryComprehensionInCall, Path::new("C419_py315.py"))]
@@ -80,6 +81,24 @@ mod tests {
             &LinterSettings {
                 preview: PreviewMode::Enabled,
                 ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UnnecessaryLiteralWithinTupleCall, Path::new("C409_py315.py"))]
+    fn preview_rules_py315(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_comprehensions").join(path).as_path(),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY315)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
