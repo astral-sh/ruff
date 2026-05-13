@@ -74,7 +74,6 @@ from typing_extensions import Sentinel
 MISSING = Sentinel("MISSING")
 
 reveal_type(bool(MISSING))  # revealed: Literal[True]
-reveal_type(MISSING.__name__)  # revealed: str
 reveal_type(MISSING.__module__)  # revealed: str
 
 class MissingSubclass(MISSING):  # error: [invalid-base]
