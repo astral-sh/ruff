@@ -79,6 +79,21 @@ def body_dict_literal_annotated_non_mapping() -> int:  # AIR202
     return {"x": 1}
 
 
+# --- Decorator call-form coverage: should flag ---
+
+
+@task(retries=3)
+def call_form_with_kwarg() -> dict:  # AIR202
+    return {"x": 1}
+
+
+@task(
+    retries=3,
+)
+def call_form_multiline() -> dict:  # AIR202
+    return {"x": 1}
+
+
 # --- Variant decorators: should flag ---
 
 
@@ -104,6 +119,11 @@ def variant_docker() -> Mapping[str, int]:  # AIR202
 
 @task.kubernetes
 def variant_kubernetes():  # AIR202
+    return {"a": 1}
+
+
+@task.short_circuit(trigger_rule="all_done")
+def variant_short_circuit_call() -> dict:  # AIR202
     return {"a": 1}
 
 

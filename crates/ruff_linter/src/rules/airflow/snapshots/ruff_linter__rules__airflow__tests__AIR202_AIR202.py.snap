@@ -232,75 +232,58 @@ note: This is an unsafe fix and may change runtime behavior
 AIR202 [*] `@task`-decorated function relies on `multiple_outputs` inference
   --> AIR202.py:85:1
    |
-85 | @task.branch
-   | ^^^^^^^^^^^^
-86 | def variant_branch():  # AIR202
-87 |     return {"a": 1}
+85 | @task(retries=3)
+   | ^^^^^^^^^^^^^^^^
+86 | def call_form_with_kwarg() -> dict:  # AIR202
+87 |     return {"x": 1}
    |
-help: Add `multiple_outputs=False`
-82 | # --- Variant decorators: should flag ---
+help: Add `multiple_outputs=True`
+82 | # --- Decorator call-form coverage: should flag ---
 83 |
 84 |
-   - @task.branch
-85 + @task.branch(multiple_outputs=False)
-86 | def variant_branch():  # AIR202
-87 |     return {"a": 1}
+   - @task(retries=3)
+85 + @task(multiple_outputs=True, retries=3)
+86 | def call_form_with_kwarg() -> dict:  # AIR202
+87 |     return {"x": 1}
 88 |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR202 [*] `@task`-decorated function relies on `multiple_outputs` inference
   --> AIR202.py:90:1
    |
-90 | @task.short_circuit
-   | ^^^^^^^^^^^^^^^^^^^
-91 | def variant_short_circuit():  # AIR202
-92 |     return {"a": 1}
-   |
-help: Add `multiple_outputs=False`
-87 |     return {"a": 1}
-88 |
-89 |
-   - @task.short_circuit
-90 + @task.short_circuit(multiple_outputs=False)
-91 | def variant_short_circuit():  # AIR202
-92 |     return {"a": 1}
-93 |
-note: This is an unsafe fix and may change runtime behavior
-
-AIR202 [*] `@task`-decorated function relies on `multiple_outputs` inference
-  --> AIR202.py:95:1
-   |
-95 | @task.virtualenv
-   | ^^^^^^^^^^^^^^^^
-96 | def variant_virtualenv() -> dict:  # AIR202
-97 |     return {"a": 1}
+90 | / @task(
+91 | |     retries=3,
+92 | | )
+   | |_^
+93 |   def call_form_multiline() -> dict:  # AIR202
+94 |       return {"x": 1}
    |
 help: Add `multiple_outputs=True`
-92 |     return {"a": 1}
-93 |
-94 |
-   - @task.virtualenv
-95 + @task.virtualenv(multiple_outputs=True)
-96 | def variant_virtualenv() -> dict:  # AIR202
-97 |     return {"a": 1}
-98 |
+88 |
+89 |
+90 | @task(
+   -     retries=3,
+91 +     multiple_outputs=True, retries=3,
+92 | )
+93 | def call_form_multiline() -> dict:  # AIR202
+94 |     return {"x": 1}
 note: This is an unsafe fix and may change runtime behavior
 
 AIR202 [*] `@task`-decorated function relies on `multiple_outputs` inference
    --> AIR202.py:100:1
     |
-100 | @task.docker(image="python:3.11")
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-101 | def variant_docker() -> Mapping[str, int]:  # AIR202
+100 | @task.branch
+    | ^^^^^^^^^^^^
+101 | def variant_branch():  # AIR202
 102 |     return {"a": 1}
     |
-help: Add `multiple_outputs=True`
-97  |     return {"a": 1}
+help: Add `multiple_outputs=False`
+97  | # --- Variant decorators: should flag ---
 98  |
 99  |
-    - @task.docker(image="python:3.11")
-100 + @task.docker(multiple_outputs=True, image="python:3.11")
-101 | def variant_docker() -> Mapping[str, int]:  # AIR202
+    - @task.branch
+100 + @task.branch(multiple_outputs=False)
+101 | def variant_branch():  # AIR202
 102 |     return {"a": 1}
 103 |
 note: This is an unsafe fix and may change runtime behavior
@@ -308,18 +291,94 @@ note: This is an unsafe fix and may change runtime behavior
 AIR202 [*] `@task`-decorated function relies on `multiple_outputs` inference
    --> AIR202.py:105:1
     |
-105 | @task.kubernetes
-    | ^^^^^^^^^^^^^^^^
-106 | def variant_kubernetes():  # AIR202
+105 | @task.short_circuit
+    | ^^^^^^^^^^^^^^^^^^^
+106 | def variant_short_circuit():  # AIR202
 107 |     return {"a": 1}
     |
 help: Add `multiple_outputs=False`
 102 |     return {"a": 1}
 103 |
 104 |
-    - @task.kubernetes
-105 + @task.kubernetes(multiple_outputs=False)
-106 | def variant_kubernetes():  # AIR202
+    - @task.short_circuit
+105 + @task.short_circuit(multiple_outputs=False)
+106 | def variant_short_circuit():  # AIR202
 107 |     return {"a": 1}
 108 |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR202 [*] `@task`-decorated function relies on `multiple_outputs` inference
+   --> AIR202.py:110:1
+    |
+110 | @task.virtualenv
+    | ^^^^^^^^^^^^^^^^
+111 | def variant_virtualenv() -> dict:  # AIR202
+112 |     return {"a": 1}
+    |
+help: Add `multiple_outputs=True`
+107 |     return {"a": 1}
+108 |
+109 |
+    - @task.virtualenv
+110 + @task.virtualenv(multiple_outputs=True)
+111 | def variant_virtualenv() -> dict:  # AIR202
+112 |     return {"a": 1}
+113 |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR202 [*] `@task`-decorated function relies on `multiple_outputs` inference
+   --> AIR202.py:115:1
+    |
+115 | @task.docker(image="python:3.11")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+116 | def variant_docker() -> Mapping[str, int]:  # AIR202
+117 |     return {"a": 1}
+    |
+help: Add `multiple_outputs=True`
+112 |     return {"a": 1}
+113 |
+114 |
+    - @task.docker(image="python:3.11")
+115 + @task.docker(multiple_outputs=True, image="python:3.11")
+116 | def variant_docker() -> Mapping[str, int]:  # AIR202
+117 |     return {"a": 1}
+118 |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR202 [*] `@task`-decorated function relies on `multiple_outputs` inference
+   --> AIR202.py:120:1
+    |
+120 | @task.kubernetes
+    | ^^^^^^^^^^^^^^^^
+121 | def variant_kubernetes():  # AIR202
+122 |     return {"a": 1}
+    |
+help: Add `multiple_outputs=False`
+117 |     return {"a": 1}
+118 |
+119 |
+    - @task.kubernetes
+120 + @task.kubernetes(multiple_outputs=False)
+121 | def variant_kubernetes():  # AIR202
+122 |     return {"a": 1}
+123 |
+note: This is an unsafe fix and may change runtime behavior
+
+AIR202 [*] `@task`-decorated function relies on `multiple_outputs` inference
+   --> AIR202.py:125:1
+    |
+125 | @task.short_circuit(trigger_rule="all_done")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+126 | def variant_short_circuit_call() -> dict:  # AIR202
+127 |     return {"a": 1}
+    |
+help: Add `multiple_outputs=True`
+122 |     return {"a": 1}
+123 |
+124 |
+    - @task.short_circuit(trigger_rule="all_done")
+125 + @task.short_circuit(multiple_outputs=True, trigger_rule="all_done")
+126 | def variant_short_circuit_call() -> dict:  # AIR202
+127 |     return {"a": 1}
+128 |
 note: This is an unsafe fix and may change runtime behavior
