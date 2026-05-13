@@ -65,6 +65,22 @@ def reverse_negative_check(x: int | MISSING | OTHER) -> None:
         reveal_type(x)  # revealed: MISSING
 ```
 
+Sentinel objects are always truthy, expose the standard sentinel metadata attributes, and are
+rejected as class bases:
+
+```py
+from typing_extensions import Sentinel
+
+MISSING = Sentinel("MISSING")
+
+reveal_type(bool(MISSING))  # revealed: Literal[True]
+reveal_type(MISSING.__name__)  # revealed: str
+reveal_type(MISSING.__module__)  # revealed: str
+
+class MissingSubclass(MISSING):  # error: [invalid-base]
+    pass
+```
+
 Sentinels declared in class scope can also be used in type expressions:
 
 ```py
