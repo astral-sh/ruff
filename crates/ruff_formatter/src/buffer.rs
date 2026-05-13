@@ -406,6 +406,11 @@ fn clean_interned(
                         Some((cleaned, &interned[index + 1..]))
                     }
                 }
+                FormatElement::BestFitting { .. } => {
+                    let mut cleaned = Vec::new();
+                    cleaned.extend_from_slice(&interned[..index]);
+                    Some((cleaned, &interned[index..]))
+                }
 
                 element => {
                     if state.should_drop(element) {
@@ -422,20 +427,28 @@ fn clean_interned(
         let result = match result {
             // Copy the whole interned buffer so that becomes possible to change the necessary elements.
             Some((mut cleaned, rest)) => {
-                for element in rest {
+                let mut element_stack = rest.iter().rev().collect::<Vec<_>>();
+                while let Some(element) = element_stack.pop() {
                     if state.should_drop(element) {
                         continue;
                     }
 
-                    let element = match element {
-                        FormatElement::Line(LineMode::SoftOrSpace) => FormatElement::Space,
+                    match element {
+                        FormatElement::Line(LineMode::SoftOrSpace) => {
+                            cleaned.push(FormatElement::Space);
+                        }
                         FormatElement::Interned(interned) => {
-                            FormatElement::Interned(clean_interned(interned, interned_cache))
+                            cleaned.push(FormatElement::Interned(clean_interned(
+                                interned,
+                                interned_cache,
+                            )));
+                        }
+                        FormatElement::BestFitting { variants, mode: _ } => {
+                            element_stack.extend(variants.most_flat().iter().rev());
                         }
 
-                        element => element.clone(),
-                    };
-                    cleaned.push(element);
+                        element => cleaned.push(element.clone()),
+                    }
                 }
 
                 Interned::new(cleaned)
