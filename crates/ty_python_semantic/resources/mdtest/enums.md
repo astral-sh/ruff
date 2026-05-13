@@ -601,6 +601,25 @@ reveal_type(Child.GITHUB.value)  # revealed: str
 reveal_type(Child.GITHUB._value_)  # revealed: str
 ```
 
+Member values are still validated against the inherited `__new__` signature, even when `_value_` is
+explicitly annotated:
+
+```py
+from enum import Enum
+
+class Base(Enum):
+    def __new__(cls, value: int, connector_id: int = 0) -> "Base":
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.connector_id = connector_id
+        return obj
+
+class Child(Base):
+    _value_: str
+
+    GITHUB = "github"  # error: [invalid-assignment]
+```
+
 ### Non-member attributes with disallowed type
 
 Methods, callables, descriptors (including properties), and nested classes that are defined in the

@@ -253,16 +253,31 @@ fn check_class_declaration<'db>(
             let skip_type_check = (context.in_stub() && is_ellipsis) || is_auto;
 
             if !skip_type_check {
+                if let Some(new_function) = enum_info.new_function {
+                    check_enum_member_against_constructor_hook(
+                        context,
+                        new_function,
+                        Type::from(class),
+                        member_value_type,
+                        &member.name,
+                        *first_reachable_definition,
+                        EnumConstructorHook::New,
+                    );
+                }
+
                 if let Some(init_function) = enum_info.init_function {
-                    check_enum_member_against_init(
+                    check_enum_member_against_constructor_hook(
                         context,
                         init_function,
                         instance_of_class,
                         member_value_type,
                         &member.name,
                         *first_reachable_definition,
+                        EnumConstructorHook::Init,
                     );
-                } else if let Some(expected_type) = enum_info.value_annotation {
+                } else if enum_info.new_function.is_none()
+                    && let Some(expected_type) = enum_info.value_annotation
+                {
                     if !member_value_type.is_assignable_to(db, expected_type) {
                         if let Some(builder) = context.report_lint(
                             &INVALID_ASSIGNMENT,
@@ -1145,25 +1160,41 @@ fn check_post_init_signature<'db>(
     );
 }
 
-/// Validates an enum member value against the enum's `__init__` signature.
+#[derive(Clone, Copy, Debug)]
+enum EnumConstructorHook {
+    New,
+    Init,
+}
+
+impl EnumConstructorHook {
+    fn name(self) -> &'static str {
+        match self {
+            Self::New => "__new__",
+            Self::Init => "__init__",
+        }
+    }
+}
+
+/// Validates an enum member value against an enum construction hook signature.
 ///
-/// The enum metaclass unpacks tuple values as positional arguments to `__init__`,
+/// The enum metaclass unpacks tuple values as positional arguments to `__new__` and `__init__`,
 /// and passes non-tuple values as a single argument. This function synthesizes
-/// a call to `__init__` with the appropriate arguments and reports a diagnostic
+/// a call with the appropriate arguments and reports a diagnostic
 /// if the call would fail.
-fn check_enum_member_against_init<'db>(
+fn check_enum_member_against_constructor_hook<'db>(
     context: &InferContext<'db, '_>,
-    init_function: FunctionType<'db>,
-    self_type: Type<'db>,
+    function: FunctionType<'db>,
+    bound_self_type: Type<'db>,
     member_value_type: Type<'db>,
     member_name: &Name,
     definition: Definition<'db>,
+    hook: EnumConstructorHook,
 ) {
     let db = context.db();
 
     // The enum metaclass unpacks tuple values as positional args:
-    //   MEMBER = (a, b, c)  →  __init__(self, a, b, c)
-    //   MEMBER = x          →  __init__(self, x)
+    //   MEMBER = (a, b, c)  →  __new__(cls, a, b, c) / __init__(self, a, b, c)
+    //   MEMBER = x          →  __new__(cls, x) / __init__(self, x)
     let args: Vec<Type<'db>> = if let Type::NominalInstance(instance) = member_value_type {
         if let Some(spec) = instance.tuple_spec(db) {
             if let Tuple::Fixed(fixed) = &*spec {
@@ -1180,10 +1211,10 @@ fn check_enum_member_against_init<'db>(
     };
 
     let call_args = CallArguments::positional(args);
-    let call_args = call_args.with_self(Some(self_type));
+    let call_args = call_args.with_self(Some(bound_self_type));
 
     let constraints = ConstraintSetBuilder::new();
-    let result = Type::FunctionLiteral(init_function)
+    let result = Type::FunctionLiteral(function)
         .bindings(db)
         .match_parameters(db, &call_args)
         .check_types(db, &constraints, &call_args, TypeContext::default(), &[]);
@@ -1194,11 +1225,12 @@ fn check_enum_member_against_init<'db>(
             definition.focus_range(db, context.module()),
         ) {
             let mut diagnostic = builder.into_diagnostic(format_args!(
-                "Enum member `{member_name}` is incompatible with `__init__`",
+                "Enum member `{member_name}` is incompatible with `{}`",
+                hook.name(),
             ));
             diagnostic.info(format_args!(
                 "Expected compatible arguments for `{}`",
-                Type::FunctionLiteral(init_function).display(db),
+                Type::FunctionLiteral(function).display(db),
             ));
         }
     }
