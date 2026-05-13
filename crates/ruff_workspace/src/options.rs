@@ -22,7 +22,6 @@ use ruff_linter::rules::flake8_quotes::settings::Quote;
 use ruff_linter::rules::flake8_tidy_imports::settings::{
     AllImports, ApiBan, ImportSelection, ImportSelector, Strictness,
 };
-use ruff_linter::rules::isort::categorize::KnownModulePattern;
 use ruff_linter::rules::isort::settings::RelativeImportsOrder;
 use ruff_linter::rules::isort::{ImportSection, ImportType};
 use ruff_linter::rules::pep8_naming::settings::IgnoreNames;
@@ -2920,7 +2919,7 @@ impl IsortOptions {
             .map(|names| {
                 names
                     .into_iter()
-                    .map(|name| KnownModulePattern::new(&name))
+                    .map(|name| IdentifierPattern::new(&name))
                     .collect()
             })
             .transpose()
@@ -2931,7 +2930,7 @@ impl IsortOptions {
             .map(|names| {
                 names
                     .into_iter()
-                    .map(|name| KnownModulePattern::new(&name))
+                    .map(|name| IdentifierPattern::new(&name))
                     .collect()
             })
             .transpose()
@@ -2942,7 +2941,7 @@ impl IsortOptions {
             .map(|names| {
                 names
                     .into_iter()
-                    .map(|name| KnownModulePattern::new(&name))
+                    .map(|name| IdentifierPattern::new(&name))
                     .collect()
             })
             .transpose()
@@ -2953,7 +2952,7 @@ impl IsortOptions {
             .map(|names| {
                 names
                     .into_iter()
-                    .map(|name| KnownModulePattern::new(&name))
+                    .map(|name| IdentifierPattern::new(&name))
                     .collect()
             })
             .transpose()
@@ -2964,7 +2963,7 @@ impl IsortOptions {
         let sections = self.sections.unwrap_or_default();
 
         // Verify that `sections` doesn't contain any built-in sections.
-        let sections: FxHashMap<String, Vec<KnownModulePattern>> = sections
+        let sections: FxHashMap<String, Vec<IdentifierPattern>> = sections
             .into_iter()
             .filter_map(|(section, modules)| match section {
                 ImportSection::Known(section) => {
@@ -2977,7 +2976,7 @@ impl IsortOptions {
                 let modules = modules
                     .into_iter()
                     .map(|module| {
-                        KnownModulePattern::new(&module)
+                        IdentifierPattern::new(&module)
                             .map_err(isort::settings::SettingsError::InvalidUserDefinedSection)
                     })
                     .collect::<Result<Vec<_>, isort::settings::SettingsError>>()?;
