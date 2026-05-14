@@ -1043,7 +1043,37 @@ if flag():
 else:
     a = f
 
-reveal_type(a)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
+reveal_type(a)  # revealed: (def a() -> Unknown) | (Overload[(x: int) -> int, (x: str) -> str])
+```
+
+### Conditional overloaded value and fallback implementation
+
+`module.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: str) -> str: ...
+```
+
+`main.py`:
+
+```py
+from module import f
+
+def flag() -> bool:
+    return True
+
+if flag():
+    g = f
+else:
+    def g(x: bytes) -> bytes:
+        return x
+
+reveal_type(g)  # revealed: (Overload[(x: int) -> int, (x: str) -> str]) | (def g(x: bytes) -> bytes)
 ```
 
 ### Later overload set after shadowed overload set
