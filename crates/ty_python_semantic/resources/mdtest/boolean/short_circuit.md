@@ -125,3 +125,13 @@ def _(flag1: bool, flag2: bool):
         # error: [possibly-unresolved-reference]
         reveal_type(z)  # revealed: Literal[1]
 ```
+
+## Negated expressions
+
+```py
+def _(x: str):
+    if not (x and (y := x)):
+        raise ValueError
+
+    reveal_type(y)  # revealed: str & ~AlwaysFalsy
+```
