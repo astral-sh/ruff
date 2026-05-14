@@ -1010,6 +1010,63 @@ def bar(): ...
 reveal_type(bar)
 ```
 
+### Regression: local overload shadowed by an imported overloaded function in another branch
+
+We used to panic on snippets like this, because the post-inference overload checks for the local `a`
+definition would resolve the end-of-scope public binding to the imported `f` overload set, then try
+to render the `f` definitions using the current file's AST.
+
+`module.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: str) -> str: ...
+```
+
+`main.py`:
+
+```py
+from typing import overload
+from module import f
+
+def flag() -> bool:
+    return True
+
+if flag():
+    @overload
+    def a(): ...
+
+else:
+    a = f
+
+reveal_type(a)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
+```
+
+### Later overload set after shadowed overload set
+
+```py
+from typing import overload
+
+def flag() -> bool:
+    return True
+
+if flag():
+    @overload
+    def a(x: int) -> int: ...
+    @overload
+    def a(x: str) -> str: ...
+
+@overload
+# error: [invalid-overload] "Overloads for function `a` must be followed by a non-`@overload`-decorated implementation function"
+def a(x: bytes) -> bytes: ...
+@overload
+def a(x: bool) -> bool: ...
+```
+
 ### Regression: `def` statement shadows a non-`def` symbol with the same name, defined in the same scope
 
 This is an even more pathological version of the above test. This version used to fail in the same

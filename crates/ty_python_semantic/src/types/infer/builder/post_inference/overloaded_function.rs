@@ -58,11 +58,6 @@ pub(crate) fn check_overloaded_function<'db>(
 
     let place = definition.place(db);
 
-    if !seen_overloaded_places.insert(place) {
-        // We have already checked this overloaded function in this scope, so we can skip it.
-        return;
-    }
-
     let use_def = index.use_def_map(context.scope().file_scope_id(db));
 
     let Place::Defined(DefinedPlace {
@@ -77,6 +72,18 @@ pub(crate) fn check_overloaded_function<'db>(
     else {
         return;
     };
+
+    if !function.contains_definition(db, definition) {
+        // The public end-of-scope binding for this place can be a different overloaded function
+        // value assigned to the same name. In that case, the current local overload definition is
+        // shadowed, and checking the public function here would report against the wrong function.
+        return;
+    }
+
+    if !seen_overloaded_places.insert(place) {
+        // We have already checked this overloaded function in this scope, so we can skip it.
+        return;
+    }
 
     if !seen_public_functions.insert(function) {
         // We have already checked this overloaded function as a public function, so we can skip it.
