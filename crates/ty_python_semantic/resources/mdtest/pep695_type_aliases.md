@@ -458,7 +458,7 @@ def _(x: Bar[int]):
 ### Recursive aliases in operations
 
 ```py
-from typing import Callable, Iterator, Literal, TypedDict, overload
+from typing import Callable, Concatenate, Iterator, Literal, TypedDict, overload
 from ty_extensions import Intersection, Not, all_members, has_member
 
 class RecursiveItem: ...
@@ -563,6 +563,21 @@ type RecursiveCallableSpecialization[T] = Callable[[], RecursiveCallableSpeciali
 
 def reveal_recursive_callable_specialization(x: RecursiveCallableSpecialization[int]):
     reveal_type(x)  # revealed: () -> RecursiveCallableSpecialization[list[int]]
+
+type RecursiveConcatenateCallable[**P] = Callable[[], RecursiveConcatenateCallable[Concatenate[int, P]]]
+
+def reveal_recursive_concatenate_callable(x: RecursiveConcatenateCallable):
+    reveal_type(x)  # revealed: () -> RecursiveConcatenateCallable[(int, /, *args: Unknown, **kwargs: Unknown)]
+
+type RecursiveParamspecCallable[**P] = Callable[P, RecursiveParamspecCallable[Concatenate[int, P]]]
+
+def reveal_recursive_paramspec_callable(x: RecursiveParamspecCallable):
+    reveal_type(x)  # revealed: (...) -> RecursiveParamspecCallable[(int, /, *args: Unknown, **kwargs: Unknown)]
+
+type RecursiveUnionCallable[T] = Callable[[RecursiveUnionCallable[T]], RecursiveUnionCallable[T | RecursiveUnionCallable[T]]]
+
+def reveal_recursive_union_callable(x: RecursiveUnionCallable[int]):
+    reveal_type(x)  # revealed: (RecursiveUnionCallable[int], /) -> RecursiveUnionCallable[int | RecursiveUnionCallable[int]]
 
 type RecursiveTruthinessSpecialization[T] = int | RecursiveTruthinessSpecialization[list[T]]
 
