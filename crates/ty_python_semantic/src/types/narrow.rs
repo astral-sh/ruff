@@ -1398,49 +1398,60 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             && is_or_contains_typeddict(self.db, rhs_type)
         {
             let is_negative_check = is_positive == (ops[0] == ast::CmpOp::NotIn);
-            if is_negative_check {
-                let requires_key = |td: TypedDictType<'db>| -> bool {
-                    td.items(self.db)
-                        .get(key.value(self.db))
-                        .is_some_and(TypedDictField::is_required)
+            let is_positive_check = is_positive == (ops[0] == ast::CmpOp::In);
+
+            let requires_key = |td: TypedDictType<'db>| -> bool {
+                td.items(self.db)
+                    .get(key.value(self.db))
+                    .is_some_and(TypedDictField::is_required)
+            };
+            let may_contain_key = |td: TypedDictType<'db>| -> bool {
+                let items = td.items(self.db);
+                items.contains_key(key.value(self.db)) || !items.is_closed()
+            };
+
+            if is_negative_check || is_positive_check {
+                let keep = |ty: Type<'db>| match ty {
+                    Type::TypedDict(td) => {
+                        if is_negative_check {
+                            !requires_key(td)
+                        } else {
+                            may_contain_key(td)
+                        }
+                    }
+                    Type::Intersection(intersection) => {
+                        let mut typed_dicts = intersection
+                            .positive(self.db)
+                            .iter()
+                            .copied()
+                            .filter_map(Type::as_typed_dict);
+                        if is_negative_check {
+                            !typed_dicts.any(requires_key)
+                        } else {
+                            typed_dicts.all(may_contain_key)
+                        }
+                    }
+                    _ => true,
                 };
 
                 let resolved_rhs_type = rhs_type.resolve_type_alias(self.db);
 
                 let narrowed = match resolved_rhs_type {
                     Type::TypedDict(td) => {
-                        if requires_key(td) {
-                            Type::Never
-                        } else {
+                        if keep(Type::TypedDict(td)) {
                             resolved_rhs_type
+                        } else {
+                            Type::Never
                         }
                     }
                     Type::Intersection(intersection) => {
-                        if intersection
-                            .positive(self.db)
-                            .iter()
-                            .copied()
-                            .filter_map(Type::as_typed_dict)
-                            .any(requires_key)
-                        {
-                            Type::Never
-                        } else {
+                        if keep(Type::Intersection(intersection)) {
                             resolved_rhs_type
+                        } else {
+                            Type::Never
                         }
                     }
-                    Type::Union(union) => {
-                        // remove all members of the union that would require the key
-                        union.filter(self.db, |ty| match ty {
-                            Type::TypedDict(td) => !requires_key(*td),
-                            Type::Intersection(intersection) => !intersection
-                                .positive(self.db)
-                                .iter()
-                                .copied()
-                                .filter_map(Type::as_typed_dict)
-                                .any(requires_key),
-                            _ => true,
-                        })
-                    }
+                    Type::Union(union) => union.filter(self.db, |ty| keep(*ty)),
                     _ => resolved_rhs_type,
                 };
 

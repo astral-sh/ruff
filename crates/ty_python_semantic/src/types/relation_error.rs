@@ -90,6 +90,15 @@ pub(crate) enum ErrorContext<'db> {
         source_field: Type<'db>,
         target_field: Type<'db>,
     },
+    TypedDictExtraItemsInSource {
+        source: TypedDictType<'db>,
+        target: TypedDictType<'db>,
+    },
+    TypedDictExtraFieldInSource {
+        field_name: Name,
+        source: TypedDictType<'db>,
+        target: TypedDictType<'db>,
+    },
     TypedDictNotAssignableToDict(TypedDictType<'db>),
     IncompatibleReturnTypes {
         source: Type<'db>,
@@ -238,6 +247,20 @@ impl<'db> ErrorContext<'db> {
                 target = typed_dict_name(target),
                 source_field = source_field.display(db),
                 target_field = target_field.display(db),
+            ),
+            Self::TypedDictExtraItemsInSource { source, target } => format!(
+                "{source} may contain extra items that are not allowed by closed {target}",
+                source = typed_dict_name(source),
+                target = typed_dict_name(target),
+            ),
+            Self::TypedDictExtraFieldInSource {
+                field_name,
+                source,
+                target,
+            } => format!(
+                "field \"{field_name}\" is present in {source} but not allowed by closed {target}",
+                source = typed_dict_name(source),
+                target = typed_dict_name(target),
             ),
             Self::TypedDictNotAssignableToDict(typed_dict) => {
                 help_messages.insert(HelpMessages::TypedDictNotAssignableToDict);

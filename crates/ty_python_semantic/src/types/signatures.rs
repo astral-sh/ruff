@@ -32,7 +32,7 @@ use crate::types::relation::{
 };
 use crate::types::typed_dict::{
     UnpackedTypedDictKey, extract_unpacked_typed_dict_keys_from_kwargs_annotation,
-    extract_unpacked_typed_dict_keys_from_value_type,
+    extract_unpacked_typed_dict_keys_from_value_type, typed_dict_value_type_is_closed,
 };
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
@@ -3053,10 +3053,12 @@ impl<'db> Parameters<'db> {
                 }
 
                 // TODO: Use the unpacked `TypedDict`'s `extra_items` type instead of `object`.
-                // TODO: Omit `**kwargs` here for closed `TypedDict`s.
-                value.push(
-                    Parameter::keyword_variadic(kwargs_name).with_annotated_type(Type::object()),
-                );
+                if !parameter.unpacked_typed_dict_is_closed(db) {
+                    value.push(
+                        Parameter::keyword_variadic(kwargs_name)
+                            .with_annotated_type(Type::object()),
+                    );
+                }
             } else {
                 value.push(parameter);
             }
@@ -3997,6 +3999,17 @@ impl<'db> Parameter<'db> {
             ))
         .then(|| extract_unpacked_typed_dict_keys_from_value_type(db, self.annotated_type))
         .flatten()
+    }
+
+    fn unpacked_typed_dict_is_closed(&self, db: &'db dyn Db) -> bool {
+        (self.is_keyword_variadic()
+            && matches!(
+                self.annotation_kind,
+                ParameterAnnotationKind::UnpackedTypedDictKwargs
+            ))
+        .then(|| typed_dict_value_type_is_closed(db, self.annotated_type))
+        .flatten()
+        .unwrap_or_default()
     }
 
     /// Annotated type of the parameter. If no annotation was provided, this is `Unknown`.

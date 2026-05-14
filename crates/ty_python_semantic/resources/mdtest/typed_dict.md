@@ -171,6 +171,39 @@ carol_update = Person(name="Carol", age=31)
 reveal_type(bob | carol_update)  # revealed: Person
 ```
 
+Closed `TypedDict` patch targets still reject sources that might introduce extra keys:
+
+```py
+from typing_extensions import TypedDict
+
+class ClosedPatchTarget(TypedDict, closed=True):
+    x: int
+
+class ClosedPatchExtra(TypedDict, closed=True):
+    x: int
+    y: int
+
+class OpenPatchSource(TypedDict):
+    x: int
+
+closed_patch_target: ClosedPatchTarget = {"x": 1}
+closed_patch_extra: ClosedPatchExtra = {"x": 1, "y": 2}
+open_patch_source: OpenPatchSource = {"x": 1}
+
+# error: [invalid-argument-type]
+closed_patch_target.update(closed_patch_extra)
+
+# error: [invalid-argument-type]
+closed_patch_target.update(open_patch_source)
+
+# error: [invalid-argument-type]
+closed_patch_target.update([("z", 1)])
+
+reveal_type(closed_patch_target | closed_patch_extra)  # revealed: ClosedPatchExtra
+
+reveal_type(closed_patch_target | open_patch_source)  # revealed: OpenPatchSource
+```
+
 Compatible `TypedDict` subset updates are also accepted for `|=`:
 
 ```py
@@ -815,6 +848,59 @@ class ExplicitDictValueTarget(TypedDict):
 
 def _(flag: bool):
     ExplicitDictValueTarget({"a": 1} if flag else {"a": 2}, b={"a": 1})
+```
+
+For closed `TypedDict`s, overridden keys from the positional mapping are still allowed, but other
+extra keys are rejected:
+
+```py
+from typing_extensions import TypedDict
+
+class ClosedMixedTarget(TypedDict, closed=True):
+    x: int
+    y: int
+
+class ClosedMixedSource(TypedDict, closed=True):
+    x: int
+    y: str
+
+class ClosedMixedExtraSource(TypedDict, closed=True):
+    x: int
+    y: str
+    z: int
+
+class OpenMixedSource(TypedDict):
+    x: int
+    y: str
+
+def _(
+    source: ClosedMixedSource,
+    extra_source: ClosedMixedExtraSource,
+    open_source: OpenMixedSource,
+):
+    ClosedMixedTarget(source, y=1)
+
+    # error: [invalid-key] "Unknown key "z" for TypedDict `ClosedMixedTarget`"
+    ClosedMixedTarget(extra_source, y=1)
+
+    # error: [invalid-argument-type]
+    ClosedMixedTarget(open_source, y=1)
+```
+
+Closed intersections only expose keys that are allowed by every closed arm:
+
+```py
+from typing_extensions import NotRequired, TypedDict
+from ty_extensions import Intersection
+
+class ClosedIntersectionTarget(TypedDict, closed=True):
+    x: int
+
+class OptionalIntersectionY(TypedDict):
+    y: NotRequired[int]
+
+def _(arg: Intersection[ClosedIntersectionTarget, OptionalIntersectionY]):
+    ClosedIntersectionTarget(arg, x=1)
 ```
 
 ## Union of `TypedDict`
@@ -3019,13 +3105,17 @@ class TD6(TypedDict("TD6", {"x": InitVar[int]})): ...  # error: [invalid-type-fo
 
 ## Function syntax with `closed`
 
-The `closed` keyword is accepted but not yet fully supported:
+The `closed` keyword is accepted and affects structural assignability:
 
 ```py
 from typing_extensions import TypedDict
+from ty_extensions import static_assert, is_assignable_to
 
-# closed is accepted (no error)
 OtherMessage = TypedDict("OtherMessage", {"id": int, "content": str}, closed=True)
+OpenMessage = TypedDict("OpenMessage", {"id": int, "content": str})
+
+static_assert(is_assignable_to(OtherMessage, OpenMessage))
+static_assert(not is_assignable_to(OpenMessage, OtherMessage))
 
 # Non-bool arguments are rejected:
 # error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
@@ -3192,7 +3282,8 @@ Extra keyword arguments are modeled according to the unpacked `TypedDict`'s open
 policy.
 
 ```py
-from typing_extensions import TypedDict, Unpack
+from typing import Callable, Protocol, TypeVar
+from typing_extensions import ParamSpec, TypedDict, Unpack
 
 class Movie(TypedDict, extra_items=bool):
     name: str
@@ -3214,9 +3305,42 @@ def closed_movie(**kwargs: Unpack[ClosedMovie]) -> None:
 
 closed_movie(name="Blade Runner")
 
-# TODO: Once `closed` is supported, this should be an unknown-argument error because closed
-# TypedDicts should not add a trailing `**kwargs` parameter.
+# error: [unknown-argument]
 closed_movie(name="Blade Runner", year=1982)
+
+class OpenMovieSource(TypedDict):
+    name: str
+
+def _(source: OpenMovieSource, closed: ClosedMovie):
+    closed_movie(**closed)
+
+    # error: [invalid-argument-type]
+    closed_movie(**source)
+
+class ExplicitClosedMovieView(Protocol):
+    def __call__(self, *, name: str) -> None: ...
+
+explicit_closed_movie: ExplicitClosedMovieView = closed_movie
+
+def _(source: OpenMovieSource, closed: ClosedMovie):
+    explicit_closed_movie(**closed)
+
+    # error: [invalid-argument-type]
+    explicit_closed_movie(**source)
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def preserve_params(func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+decorated_closed_movie = preserve_params(closed_movie)
+
+def _(source: OpenMovieSource, closed: ClosedMovie):
+    decorated_closed_movie(**closed)
+
+    # error: [invalid-argument-type]
+    decorated_closed_movie(**source)
 ```
 
 ### Assignability with explicit keyword-only signatures
@@ -4585,14 +4709,12 @@ class ClosedBar(TypedDict, closed=True):
 
 def _(u: ClosedFoo | ClosedBar, v: Literal["foo"]):
     if "foo" in u:
-        # TODO: should be `ClosedFoo`
-        reveal_type(u)  # revealed: ClosedFoo | ClosedBar
+        reveal_type(u)  # revealed: ClosedFoo
     else:
         reveal_type(u)  # revealed: ClosedBar
 
     if v in u:
-        # TODO: should be `ClosedFoo`
-        reveal_type(u)  # revealed: ClosedFoo | ClosedBar
+        reveal_type(u)  # revealed: ClosedFoo
     else:
         reveal_type(u)  # revealed: ClosedBar
 ```
@@ -4612,8 +4734,7 @@ def _(
     if "bar" not in u:
         reveal_type(u)  # revealed: ClosedFoo
     else:
-        # TODO: should be `ClosedBar & Any`
-        reveal_type(u)  # revealed: ClosedFoo | (ClosedBar & Any)
+        reveal_type(u)  # revealed: ClosedBar & Any
 
     if "bar" not in v:
         reveal_type(v)  # revealed: Never
@@ -4623,8 +4744,7 @@ def _(
     if w not in u:
         reveal_type(u)  # revealed: ClosedFoo
     else:
-        # TODO: should be `ClosedBar & Any`
-        reveal_type(u)  # revealed: ClosedFoo | (ClosedBar & Any)
+        reveal_type(u)  # revealed: ClosedBar & Any
 ```
 
 ## Narrowing tagged unions of `TypedDict`s with `match` statements
@@ -5115,8 +5235,9 @@ class Extra(TypedDict, extra_items=Never):
 class Closed(TypedDict, closed=True):
     x: int
 
-static_assert(is_equivalent_to(Extra, Closed))
-static_assert(is_subtype_of(Extra, Closed))
+# TODO: Once `extra_items` is supported, these should pass.
+static_assert(is_equivalent_to(Extra, Closed))  # error: [static-assert-error]
+static_assert(is_subtype_of(Extra, Closed))  # error: [static-assert-error]
 static_assert(is_subtype_of(Closed, Extra))
 ```
 
@@ -5130,8 +5251,7 @@ from typing_extensions import TypedDict
 class Empty(TypedDict, closed=True): ...
 
 def _(empty: Empty) -> None:
-    # TODO: should be `Literal[False]`
-    reveal_type(bool(empty))  # revealed: bool
+    reveal_type(bool(empty))  # revealed: Literal[False]
 ```
 
 ### Closed TypedDict is structurally final but not nominally final
@@ -5152,9 +5272,15 @@ class ClosedChild(Closed): ...
 
 static_assert(is_equivalent_to(ClosedChild, Closed))
 
-# TODO: should be error: [invalid-typed-dict-header] "Cannot add new items to a closed TypedDict"
 class BadChild(Closed):
+    # error: [invalid-typed-dict-header] "Cannot add item `age` to a closed TypedDict"
     age: int
+
+class Other(TypedDict):
+    age: int
+
+# error: [invalid-typed-dict-header] "Cannot add item `age` to a closed TypedDict"
+class BadSibling(Closed, Other): ...
 ```
 
 ### Indexing into extra-items TypedDict with `str` key is allowed and returns extra-items type
@@ -5230,7 +5356,7 @@ class BadChild1(ExtraBase, closed=False): ...
 class ClosedBase(TypedDict, closed=True):
     name: str
 
-# TODO: should be error: [invalid-typed-dict-header]
+# error: [invalid-typed-dict-header]
 class BadChild2(ClosedBase, closed=False): ...
 ```
 
@@ -5281,6 +5407,13 @@ c: ClosedMovie = {"name": "Blade Runner", "year": 1982}
 
 # error: [invalid-key]
 ClosedMovie(name="Blade Runner", year=1982)
+
+class OpenMovieSource(TypedDict):
+    name: str
+
+def _(source: OpenMovieSource):
+    # error: [invalid-argument-type]
+    ClosedMovie(**source)
 ```
 
 The functional syntax also supports `extra_items`:
@@ -5602,9 +5735,7 @@ class Open(TypedDict):
 static_assert(is_assignable_to(Closed, Open))
 
 # An open TypedDict is not assignable to a closed one (might have extra keys)
-#
-# TODO: should pass
-static_assert(not is_assignable_to(Open, Closed))  # error: [static-assert-error]
+static_assert(not is_assignable_to(Open, Closed))
 
 # An extra-items TypedDict is assignable to an open one
 static_assert(is_assignable_to(ExtraInt, Open))
@@ -5667,8 +5798,7 @@ class Closed(TypedDict, closed=True):
     name: str
     age: int
 
-# TODO: should pass
-static_assert(is_assignable_to(Closed, Mapping[str, str | int]))  # error: [static-assert-error]
+static_assert(is_assignable_to(Closed, Mapping[str, str | int]))
 static_assert(not is_assignable_to(Closed, Mapping[str, str]))
 ```
 

@@ -139,6 +139,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         let mut total = true;
+        let mut closed = false;
 
         for kw in keywords {
             let Some(arg) = &kw.arg else {
@@ -164,11 +165,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
 
                     if arg_name == "total" {
-                        if kw_type.bool(db).is_always_false() {
-                            total = false;
-                        } else if !kw_type.bool(db).is_always_true() {
-                            total = true;
-                        }
+                        total = !kw_type.bool(db).is_always_false();
+                    } else if arg_name == "closed" {
+                        closed = kw_type.bool(db).is_always_true();
                     }
                 }
                 "extra_items" => {
@@ -280,7 +279,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let call_u32 = call_node_index
                     .as_u32()
                     .expect("call node should not be NodeIndex::NONE");
-                let schema = self.infer_dangling_typeddict_spec(fields_arg, total);
+                let schema = self.infer_dangling_typeddict_spec(fields_arg, total, closed);
 
                 DynamicTypedDictAnchor::ScopeOffset {
                     scope,
@@ -474,9 +473,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         fields_arg: &ast::Expr,
         total: bool,
+        closed: bool,
     ) -> TypedDictSchema<'db> {
         let db = self.db();
         let mut schema = TypedDictSchema::default();
+        schema.set_closed(closed);
 
         let ast::Expr::Dict(dict_expr) = fields_arg else {
             return schema;

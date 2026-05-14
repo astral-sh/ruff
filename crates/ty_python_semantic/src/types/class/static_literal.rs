@@ -650,7 +650,7 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     /// Compute `TypedDict` parameters dynamically based on MRO detection and AST parsing.
-    fn typed_dict_params(self, db: &'db dyn Db) -> Option<TypedDictParams> {
+    pub(crate) fn typed_dict_params(self, db: &'db dyn Db) -> Option<TypedDictParams> {
         if !self.is_typed_dict(db) {
             return None;
         }

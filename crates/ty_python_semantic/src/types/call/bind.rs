@@ -50,7 +50,9 @@ use crate::types::signatures::{
     PartialApplication, PartialSignatureApplication,
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
-use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
+use crate::types::typed_dict::{
+    extract_unpacked_typed_dict_keys_from_value_type, typed_dict_value_type_is_closed,
+};
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral,
@@ -4346,9 +4348,21 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument_index: usize,
         argument_type: Option<Type<'db>>,
     ) {
-        if let Some(unpacked_keys) =
-            argument_type.and_then(|ty| extract_unpacked_typed_dict_keys_from_value_type(db, ty))
+        if let Some(argument_type) = argument_type
+            && let Some(unpacked_keys) =
+                extract_unpacked_typed_dict_keys_from_value_type(db, argument_type)
         {
+            if self.parameters.keyword_variadic().is_none()
+                && typed_dict_value_type_is_closed(db, argument_type)
+                    .is_some_and(|is_closed| !is_closed)
+            {
+                self.errors
+                    .push(BindingError::OpenTypedDictUnpackToFiniteSignature {
+                        argument_index: self.get_argument_index(argument_index),
+                        provided_ty: argument_type,
+                    });
+            }
+
             // Special case TypedDict-shaped values because we know which keys are present.
             for (name, unpacked_key) in unpacked_keys {
                 let _ = self.match_keyword(
@@ -5613,6 +5627,7 @@ impl<'db> Binding<'db> {
             !matches!(
                 error,
                 BindingError::MissingArguments { .. }
+                    | BindingError::OpenTypedDictUnpackToFiniteSignature { .. }
                     | BindingError::UnknownArgument { .. }
                     | BindingError::PositionalOnlyParameterAsKwarg { .. }
                     | BindingError::TooManyPositionalArguments { .. }
@@ -6089,6 +6104,11 @@ pub(crate) enum BindingError<'db> {
         argument_index: Option<usize>,
         provided_ty: Type<'db>,
     },
+    /// An open `TypedDict` was unpacked into a signature with no `**kwargs` parameter.
+    OpenTypedDictUnpackToFiniteSignature {
+        argument_index: Option<usize>,
+        provided_ty: Type<'db>,
+    },
     /// One or more required parameters (that is, with no default) is not supplied by any argument.
     MissingArguments {
         parameters: ParameterContexts,
@@ -6154,6 +6174,7 @@ impl BindingError<'_> {
             self,
             Self::InvalidArgumentType { .. }
                 | Self::InvalidKeyType { .. }
+                | Self::OpenTypedDictUnpackToFiniteSignature { .. }
                 | Self::UnknownArgument { .. }
                 | Self::PositionalOnlyParameterAsKwarg { .. }
                 | Self::TooManyPositionalArguments { .. }
@@ -6179,6 +6200,7 @@ impl BindingError<'_> {
         match self {
             BindingError::InvalidArgumentType { argument_index, .. }
             | BindingError::InvalidKeyType { argument_index, .. }
+            | BindingError::OpenTypedDictUnpackToFiniteSignature { argument_index, .. }
             | BindingError::UnknownArgument { argument_index, .. }
             | BindingError::PositionalOnlyParameterAsKwarg { argument_index, .. }
             | BindingError::ParameterAlreadyAssigned { argument_index, .. }
@@ -6258,6 +6280,7 @@ impl<'db> BindingError<'db> {
             // Matching errors: the overload doesn't apply to these arguments
             Self::InvalidArgumentType { .. }
             | Self::InvalidKeyType { .. }
+            | Self::OpenTypedDictUnpackToFiniteSignature { .. }
             | Self::MissingArguments { .. }
             | Self::UnknownArgument { .. }
             | Self::PositionalOnlyParameterAsKwarg { .. }
@@ -6440,6 +6463,33 @@ impl<'db> BindingError<'db> {
 
                 if let Some(compound_diag) = compound_diag {
                     compound_diag.add_context(context.db(), &mut diag);
+                }
+            }
+
+            Self::OpenTypedDictUnpackToFiniteSignature {
+                argument_index,
+                provided_ty,
+            } => {
+                let range = Self::get_node(node, *argument_index);
+                let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
+                    return;
+                };
+
+                let provided_ty_display = provided_ty.display(context.db());
+                let mut diag = builder.into_diagnostic(
+                    "Cannot unpack an open TypedDict into a signature with no `**kwargs` parameter",
+                );
+                diag.set_primary_message(format_args!("Found `{provided_ty_display}`"));
+
+                if let Some(compound_diag) = compound_diag {
+                    compound_diag.add_context(context.db(), &mut diag);
+                } else if let Some(spans) = callable_ty.function_spans(context.db()) {
+                    let mut sub = SubDiagnostic::new(
+                        SubDiagnosticSeverity::Info,
+                        format_args!("{callable_kind} signature here"),
+                    );
+                    sub.annotate(Annotation::primary(spans.signature));
+                    diag.sub(sub);
                 }
             }
 

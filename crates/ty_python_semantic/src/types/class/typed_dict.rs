@@ -398,20 +398,26 @@ fn synthesize_typed_dict_update<'db>(
             .with_definition(field.first_declaration())
     });
 
-    let update_patch_ty = if let Type::TypedDict(typed_dict) = instance_ty {
-        Type::TypedDict(typed_dict.to_update_patch(db))
+    let (update_patch_ty, receiver_is_closed) = if let Type::TypedDict(typed_dict) = instance_ty {
+        (
+            Type::TypedDict(typed_dict.to_update_patch(db)),
+            typed_dict.is_closed(db),
+        )
     } else {
-        instance_ty
+        (instance_ty, false)
     };
 
-    let str_object_tuple =
-        Type::heterogeneous_tuple(db, [KnownClass::Str.to_instance(db), Type::object()]);
-
-    let value_ty = UnionType::from_two_elements(
-        db,
-        update_patch_ty,
-        KnownClass::Iterable.to_specialized_instance(db, &[str_object_tuple]),
-    );
+    let value_ty = if receiver_is_closed {
+        update_patch_ty
+    } else {
+        let str_object_tuple =
+            Type::heterogeneous_tuple(db, [KnownClass::Str.to_instance(db), Type::object()]);
+        UnionType::from_two_elements(
+            db,
+            update_patch_ty,
+            KnownClass::Iterable.to_specialized_instance(db, &[str_object_tuple]),
+        )
+    };
 
     let parameters = [
         Parameter::positional_only(Some(Name::new_static("self"))).with_annotated_type(instance_ty),

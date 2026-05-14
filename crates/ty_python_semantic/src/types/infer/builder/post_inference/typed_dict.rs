@@ -12,8 +12,10 @@ use crate::{
         ClassType, StaticClassLiteral, Type, TypedDictType,
         class::CodeGeneratorKind,
         context::InferContext,
-        diagnostic::{INVALID_TYPED_DICT_FIELD, INVALID_TYPED_DICT_STATEMENT},
-        typed_dict::TypedDictField,
+        diagnostic::{
+            INVALID_TYPED_DICT_FIELD, INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT,
+        },
+        typed_dict::{TypedDictField, typed_dict_params_from_class_def},
     },
 };
 use ty_python_core::definition::Definition;
@@ -26,6 +28,7 @@ pub(super) fn validate_typed_dict_class<'db>(
 ) {
     validate_typed_dict_class_body(context, class_node);
     validate_typed_dict_field_overrides(context, class, direct_bases);
+    validate_closed_typed_dict_inheritance(context, class, class_node, direct_bases);
 }
 
 fn validate_typed_dict_class_body(context: &InferContext<'_, '_>, class_node: &ast::StmtClassDef) {
@@ -137,6 +140,69 @@ fn validate_typed_dict_field_overrides<'db>(
                 own_field_definition,
                 inherited_field_definition,
             );
+        }
+    }
+}
+
+fn validate_closed_typed_dict_inheritance<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    class_node: &ast::StmtClassDef,
+    direct_bases: &[ClassType<'db>],
+) {
+    let db = context.db();
+    let closed_bases: Vec<_> = direct_bases
+        .iter()
+        .copied()
+        .filter(|base| {
+            base.class_literal(db).is_typed_dict(db) && TypedDictType::new(*base).is_closed(db)
+        })
+        .collect();
+
+    if closed_bases.is_empty() {
+        return;
+    }
+
+    let params = typed_dict_params_from_class_def(class_node);
+    if params.is_closed_explicitly_set()
+        && !params.is_closed()
+        && let Some(keyword) = class_node
+            .arguments
+            .as_ref()
+            .and_then(|arguments| arguments.find_keyword("closed"))
+        && let Some(builder) = context.report_lint(&INVALID_TYPED_DICT_HEADER, keyword)
+    {
+        builder.into_diagnostic("Cannot inherit from a closed TypedDict with `closed=False`");
+    }
+
+    let child_fields = TypedDictType::new(class.identity_specialization(db)).items(db);
+    let own_fields = class.own_fields(db, None, CodeGeneratorKind::TypedDict);
+    let mut reported_fields = FxHashSet::default();
+
+    for base in closed_bases {
+        let base_items = TypedDictType::new(base).items(db);
+        for (field_name, _) in child_fields {
+            if base_items.contains_key(field_name.as_str()) {
+                continue;
+            }
+
+            if !reported_fields.insert(field_name.clone()) {
+                continue;
+            }
+
+            let span = own_fields
+                .get(field_name.as_str())
+                .and_then(|field| field.first_declaration)
+                .map_or_else(
+                    || class.header_range(db),
+                    |definition| definition.full_range(db, context.module()).range(),
+                );
+
+            if let Some(builder) = context.report_lint(&INVALID_TYPED_DICT_HEADER, span) {
+                builder.into_diagnostic(format_args!(
+                    "Cannot add item `{field_name}` to a closed TypedDict"
+                ));
+            }
         }
     }
 }
