@@ -1060,6 +1060,27 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         Some(builder.build())
     }
 
+    fn exact_collection_literal_membership_values(
+        &self,
+        elts: &[ast::Expr],
+        inference: &ExpressionInference<'db>,
+    ) -> Type<'db> {
+        let mut builder = UnionBuilder::new(self.db);
+
+        for element in elts {
+            if element.is_starred_expr() {
+                continue;
+            }
+
+            let element_ty = inference.expression_type(element);
+            if is_exact_membership_value_domain(self.db, element_ty) {
+                builder = builder.add(element_ty);
+            }
+        }
+
+        builder.build()
+    }
+
     // TODO `expr_in` and `expr_not_in` should perhaps be unified with `expr_eq` and `expr_ne`,
     // since `eq` and `ne` are equivalent to `in` and `not in` with only one element in the RHS.
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
@@ -1166,6 +1187,25 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         self.evaluate_expr_not_in(lhs_ty, rhs_values)
     }
 
+    fn evaluate_expr_not_in_from_rhs_expr(
+        &mut self,
+        lhs_ty: Type<'db>,
+        rhs_ty: Type<'db>,
+        rhs_expr: &ast::Expr,
+        inference: &ExpressionInference<'db>,
+    ) -> Option<Type<'db>> {
+        let rhs_values = match rhs_expr.expression_value() {
+            ast::Expr::List(ast::ExprList { elts, .. })
+            | ast::Expr::Set(ast::ExprSet { elts, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                self.exact_collection_literal_membership_values(elts, inference)
+            }
+            _ => self.exact_fixed_length_membership_values(rhs_ty)?,
+        };
+
+        self.evaluate_expr_not_in(lhs_ty, rhs_values)
+    }
+
     fn evaluate_expr_compare_op(
         &mut self,
         lhs_ty: Type<'db>,
@@ -1190,6 +1230,24 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
             ast::CmpOp::NotIn => self.evaluate_expr_not_in_from_type(lhs_ty, rhs_ty),
             _ => None,
+        }
+    }
+
+    fn evaluate_expr_compare_op_with_rhs_expr(
+        &mut self,
+        lhs_ty: Type<'db>,
+        rhs_ty: Type<'db>,
+        rhs_expr: &ast::Expr,
+        inference: &ExpressionInference<'db>,
+        op: ast::CmpOp,
+        is_positive: bool,
+    ) -> Option<Type<'db>> {
+        let op = if is_positive { op } else { op.negate() };
+
+        if matches!(op, ast::CmpOp::NotIn) {
+            self.evaluate_expr_not_in_from_rhs_expr(lhs_ty, rhs_ty, rhs_expr, inference)
+        } else {
+            self.evaluate_expr_compare_op(lhs_ty, rhs_ty, op, true)
         }
     }
 
@@ -1561,7 +1619,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // - `if x not in y`
             if narrowable_ast(left)
                 && let Some(narrowable) = PlaceExpr::try_from_expr(left)
-                && let Some(ty) = self.evaluate_expr_compare_op(lhs_ty, rhs_ty, *op, is_positive)
+                && let Some(ty) = self.evaluate_expr_compare_op_with_rhs_expr(
+                    lhs_ty,
+                    rhs_ty,
+                    right,
+                    inference,
+                    *op,
+                    is_positive,
+                )
             {
                 let place = self.expect_place(&narrowable);
                 let constraint = NarrowingConstraint::intersection(ty);

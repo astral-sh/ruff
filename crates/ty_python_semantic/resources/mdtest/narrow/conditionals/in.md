@@ -198,6 +198,46 @@ def union_tuple_slot_with_exact_value(
     else:
         reveal_type(x)  # revealed: Literal[1, 2, 3]
 
+def fresh_list_literal(x: str | None) -> None:
+    if x not in [None, ""]:
+        reveal_type(x)  # revealed: str
+    else:
+        reveal_type(x)  # revealed: None | str
+
+def fresh_list_literal_preserves_other_literals(x: Literal["", "a"] | None) -> None:
+    if x not in [None, ""]:
+        reveal_type(x)  # revealed: Literal["a"]
+    else:
+        reveal_type(x)  # revealed: None | Literal["", "a"]
+
+def fresh_set_literal(exponent: int | Literal["F", "n", "N"]) -> None:
+    if exponent not in {"F", "n", "N"}:
+        reveal_type(exponent)  # revealed: int
+    else:
+        reveal_type(exponent)  # revealed: Literal["F", "n", "N"] | int
+
+def pydantic_like_exponent(exponent: int | Literal["F", "n", "N"]) -> None:
+    if exponent in {"F", "n", "N"}:
+        return
+    reveal_type(exponent)  # revealed: int
+
+def home_assistant_like_timespan(timespan: str | None) -> None:
+    if timespan in {"", "NOT_IMPLEMENTED", None}:
+        return
+    reveal_type(timespan)  # revealed: str
+
+def sympy_like_filter(filter: Literal["Z", "Q", "R", "C"] | None) -> None:
+    if filter not in [None, "C"]:
+        reveal_type(filter)  # revealed: Literal["Z", "Q", "R"]
+    else:
+        reveal_type(filter)  # revealed: None | Literal["Z", "Q", "R", "C"]
+
+def mixed_non_exact_values(result: list[int] | dict[str, int] | str | None) -> None:
+    if result not in [b"", [], {}, None]:
+        reveal_type(result)  # revealed: list[int] | dict[str, int] | str
+    else:
+        reveal_type(result)  # revealed: list[int] | dict[str, int] | None | str
+
 def local_literal_rhs(x: str | None) -> None:
     unavailable = [None, ""]
     if x not in unavailable:
@@ -212,6 +252,20 @@ def mutable_global_rhs(x: str | None, unavailable: set[str | None]) -> None:
         reveal_type(x)  # revealed: str | None
     else:
         reveal_type(x)  # revealed: str | None
+
+def predicate_alias(x: str | None) -> None:
+    has_value = x not in [None, ""]
+    if has_value:
+        reveal_type(x)  # revealed: str
+    else:
+        reveal_type(x)  # revealed: None | str
+
+def predicate_alias_float(x: float | None) -> None:
+    has_value = x not in [1.0, None]
+    if has_value:
+        reveal_type(x)  # revealed: int | float
+    else:
+        reveal_type(x)  # revealed: int | float | None
 ```
 
 ## No narrowing for the right-hand side (currently)
