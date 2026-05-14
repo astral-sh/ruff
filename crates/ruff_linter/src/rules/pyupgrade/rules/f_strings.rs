@@ -131,12 +131,14 @@ impl<'a> FormatSummaryValues<'a> {
         })
     }
 
+    /// Return the next positional index.
     fn arg_auto(&mut self) -> usize {
         let idx = self.auto_index;
         self.auto_index += 1;
         idx
     }
 
+    /// Return the positional argument at the given index.
     fn arg_positional(&mut self, index: usize) -> Option<&Expr> {
         let arg = self.args.get(index).copied()?;
         if let Some(count) = self.args_used.get_mut(index) {
@@ -145,6 +147,7 @@ impl<'a> FormatSummaryValues<'a> {
         Some(arg)
     }
 
+    /// Return the keyword argument with the given name.
     fn arg_keyword(&mut self, key: &str) -> Option<&Expr> {
         let arg = self.kwargs.get(key).copied()?;
         if let Some(count) = self.kwargs_used.get_mut(key) {
