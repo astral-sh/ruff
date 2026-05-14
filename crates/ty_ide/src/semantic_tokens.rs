@@ -371,10 +371,8 @@ impl<'db> SemanticTokenVisitor<'db> {
                     && let Some(value_ty) = value.inferred_type(&model)
                 {
                     if matches!(value_ty, Type::KnownInstance(KnownInstanceType::TypeVar(_))) {
-                        return Some((
-                            SemanticTokenType::TypeParameter,
-                            SemanticTokenModifier::empty(),
-                        ));
+                        modifiers.remove(SemanticTokenModifier::READONLY);
+                        return Some((SemanticTokenType::TypeParameter, modifiers));
                     }
 
                     if value_ty.is_class_literal()
@@ -1319,10 +1317,10 @@ y = 'hello'
             r#"
 from typing import Generic, TypeVar
 
-T = TypeVar("T")
+KT = TypeVar("KT")
 
-class Box(Generic[T]):
-    value: T
+class Box(Generic[KT]):
+    value: KT
 "#,
         );
 
@@ -1332,14 +1330,14 @@ class Box(Generic[T]):
         "typing" @ 6..12: Namespace
         "Generic" @ 20..27: Variable
         "TypeVar" @ 29..36: Class
-        "T" @ 38..39: TypeParameter [definition]
-        "TypeVar" @ 42..49: Class
-        "\"T\"" @ 50..53: String
-        "Box" @ 62..65: Class [definition]
-        "Generic" @ 66..73: Variable
-        "T" @ 74..75: TypeParameter
-        "value" @ 83..88: Variable [definition]
-        "T" @ 90..91: TypeParameter
+        "KT" @ 38..40: TypeParameter [definition]
+        "TypeVar" @ 43..50: Class
+        "\"KT\"" @ 51..55: String
+        "Box" @ 64..67: Class [definition]
+        "Generic" @ 68..75: Variable
+        "KT" @ 76..78: TypeParameter
+        "value" @ 86..91: Variable [definition]
+        "KT" @ 93..95: TypeParameter
         "#);
     }
 
