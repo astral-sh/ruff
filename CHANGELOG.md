@@ -25,7 +25,7 @@ Released on 2026-05-14.
 
 ### Performance
 
-- \[`isort`\] Avoid constructing `glob::Patterns` for literal known modules ([#25123](https://github.com/astral-sh/ruff/pull/25123))
+- \[`isort`\] Avoid constructing `glob::Pattern`s for literal known modules ([#25123](https://github.com/astral-sh/ruff/pull/25123))
 
 ### CLI
 
