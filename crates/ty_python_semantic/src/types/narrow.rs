@@ -572,6 +572,11 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
     }
 }
 
+fn is_exact_membership_value_domain<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    let ty = ty.resolve_type_alias(db);
+    ty == Type::Never || ty.is_single_valued(db)
+}
+
 struct NarrowingConstraintsBuilder<'db, 'ast> {
     db: &'db dyn Db,
     module: &'ast ParsedModuleRef,
@@ -1038,6 +1043,23 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
+    fn exact_fixed_length_membership_values(&self, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+        let iterable = rhs_ty.try_iterate(self.db).ok()?;
+        let fixed_length = iterable.as_fixed_length()?;
+        let mut builder = UnionBuilder::new(self.db);
+
+        for element_ty in fixed_length.all_elements().iter().copied() {
+            if !is_exact_membership_value_domain(self.db, element_ty) {
+                // A union-typed slot is not a set of guaranteed runtime values; a one-element
+                // `tuple[Literal[1, 2]]` contains either `1` or `2`, not both.
+                return None;
+            }
+            builder = builder.add(element_ty);
+        }
+
+        Some(builder.build())
+    }
+
     // TODO `expr_in` and `expr_not_in` should perhaps be unified with `expr_eq` and `expr_ne`,
     // since `eq` and `ne` are equivalent to `in` and `not in` with only one element in the RHS.
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
@@ -1085,13 +1107,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    fn evaluate_expr_not_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+    fn evaluate_expr_not_in(
+        &mut self,
+        lhs_ty: Type<'db>,
+        rhs_values: Type<'db>,
+    ) -> Option<Type<'db>> {
         let lhs_ty = lhs_ty.resolve_type_alias(self.db);
-
-        let rhs_values = rhs_ty
-            .try_iterate(self.db)
-            .ok()?
-            .homogeneous_element_type(self.db);
 
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
             // Exclude the RHS values from the entire (single-valued) LHS domain.
@@ -1136,6 +1157,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
+    fn evaluate_expr_not_in_from_type(
+        &mut self,
+        lhs_ty: Type<'db>,
+        rhs_ty: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let rhs_values = self.exact_fixed_length_membership_values(rhs_ty)?;
+        self.evaluate_expr_not_in(lhs_ty, rhs_values)
+    }
+
     fn evaluate_expr_compare_op(
         &mut self,
         lhs_ty: Type<'db>,
@@ -1158,7 +1188,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             ast::CmpOp::Eq => self.evaluate_expr_eq(lhs_ty, rhs_ty),
             ast::CmpOp::NotEq => self.evaluate_expr_ne(lhs_ty, rhs_ty),
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
-            ast::CmpOp::NotIn => self.evaluate_expr_not_in(lhs_ty, rhs_ty),
+            ast::CmpOp::NotIn => self.evaluate_expr_not_in_from_type(lhs_ty, rhs_ty),
             _ => None,
         }
     }
