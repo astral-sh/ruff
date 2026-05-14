@@ -4,7 +4,7 @@
 # All additional options are passed to `rooster release`
 set -eu
 
-export UV_PREVIEW=0
+export UV_PREVIEW=1
 
 script_root="$(realpath "$(dirname "$0")")"
 project_root="$(dirname "$script_root")"
