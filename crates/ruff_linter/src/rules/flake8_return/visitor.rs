@@ -1,5 +1,6 @@
 use ruff_python_ast::helpers::any_over_body;
 use ruff_python_ast::{self as ast, ElifElseClause, Expr, Identifier, Stmt};
+use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
 
 use ruff_python_ast::visitor;
@@ -231,12 +232,16 @@ pub(crate) fn has_conditional_body(with: &ast::StmtWith, semantic: &SemanticMode
 
 /// Returns `true` if the `finally` clause of a `try` enclosing the pending
 /// `return` reads the assigned name. The `finally` runs after the `return`,
-/// so removing the assignment would hide the value from it (issue #17292).
+/// so removing the assignment would hide the value from it.
 ///
 /// `except` handlers are **not** checked: they are alternative control-flow
 /// paths to the `return`. If an exception fires, the assignment never
 /// completed, so the handler reads whatever value the name had before the
 /// `try` either way — removing the assignment does not change that.
+///
+/// An enclosing `try` whose `finalbody` already contains the assignment is
+/// skipped: that `finally` is currently executing, so its reads can't fire
+/// after the `return`. Outer enclosing tries still apply.
 fn is_observed_by_enclosing_try(stmt_assign: &ast::StmtAssign, parents: &[&Stmt]) -> bool {
     let [Expr::Name(target)] = stmt_assign.targets.as_slice() else {
         return false;
@@ -252,5 +257,11 @@ fn is_observed_by_enclosing_try(stmt_assign: &ast::StmtAssign, parents: &[&Stmt]
     parents
         .iter()
         .filter_map(|stmt| stmt.as_try_stmt())
+        .filter(|stmt_try| {
+            !stmt_try
+                .finalbody
+                .iter()
+                .any(|s| s.range().contains_range(stmt_assign.range()))
+        })
         .any(|stmt_try| any_over_body(&stmt_try.finalbody, &name_read))
 }

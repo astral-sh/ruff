@@ -394,3 +394,25 @@ help: Remove unnecessary assignment
 523 |         x = "done"
 524 |
 note: This is an unsafe fix and may change runtime behavior
+
+RET504 [*] Unnecessary assignment to `x` before `return` statement
+   --> RET504.py:544:16
+    |
+542 |     finally:
+543 |         x = foo()
+544 |         return x  # RET504
+    |                ^
+545 |
+546 | # Return inside an inner `finally`, but an outer `finally` reads the name —
+    |
+help: Remove unnecessary assignment
+540 |     try:
+541 |         pass
+542 |     finally:
+    -         x = foo()
+    -         return x  # RET504
+543 +         return foo()
+544 |
+545 | # Return inside an inner `finally`, but an outer `finally` reads the name —
+546 | # no RET504 (the outer `finally` runs after the inner `return`).
+note: This is an unsafe fix and may change runtime behavior

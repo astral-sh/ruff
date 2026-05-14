@@ -532,3 +532,26 @@ def f():
         def _cleanup():
             log(x)
         _cleanup()
+
+# Assignment and return both inside `finally` — RET504 fires. The `finally`
+# is already executing, so its body has no second pass that could read `x`
+# after the return.
+def f():
+    try:
+        pass
+    finally:
+        x = foo()
+        return x  # RET504
+
+# Return inside an inner `finally`, but an outer `finally` reads the name —
+# no RET504 (the outer `finally` runs after the inner `return`).
+def f():
+    x = ""
+    try:
+        try:
+            pass
+        finally:
+            x = foo()
+            return x
+    finally:
+        log(x)
