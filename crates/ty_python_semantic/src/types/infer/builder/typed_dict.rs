@@ -328,12 +328,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             item_types.insert(item.value.node_index().load(), value_ty);
         }
 
-        validate_typed_dict_dict_literal(&self.context, typed_dict, dict, dict.into(), |expr| {
-            item_types
-                .get(&expr.node_index().load())
-                .copied()
-                .unwrap_or(Type::unknown())
-        })
+        validate_typed_dict_dict_literal(
+            &self.context,
+            typed_dict,
+            dict,
+            dict.into(),
+            |expr: &ast::Expr, tcx: TypeContext<'db>| {
+                item_types
+                    .get(&expr.node_index().load())
+                    .copied()
+                    .unwrap_or_else(|| {
+                        let _ = tcx;
+                        Type::unknown()
+                    })
+            },
+        )
         .ok()
         .map(|_| Type::TypedDict(typed_dict))
     }
@@ -364,7 +373,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             TypedDictConstructorForm::MixedPositionalAndKeywords => {
                 let unpacked_keyword_types =
-                    infer_unpacked_keyword_types(arguments, &mut |expr, tcx| {
+                    infer_unpacked_keyword_types(arguments, |expr, tcx| {
                         self.get_or_infer_expression(expr, tcx)
                     });
                 let keyword_keys = collect_guaranteed_keyword_keys(
@@ -372,6 +381,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     typed_dict,
                     arguments,
                     &unpacked_keyword_types,
+                    &mut |expr, tcx| self.get_or_infer_expression(expr, tcx),
                 );
                 let positional_target =
                     typed_dict_with_relaxed_keys(self.db(), typed_dict, &keyword_keys);
