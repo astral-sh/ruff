@@ -535,4 +535,17 @@ mod tests {
         assert_diagnostics!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn up032_pep701_py312() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP032_pep701.py"),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY312.into(),
+                ..settings::LinterSettings::for_rule(Rule::FString)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
 }

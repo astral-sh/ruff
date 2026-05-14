@@ -4,10 +4,10 @@ use anyhow::{Context, Result};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::helpers::{any_over_expr, contains_effect};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{self as ast, Expr, Keyword, StringFlags};
+use ruff_python_ast::{self as ast, Expr, Keyword, PythonVersion, StringFlags};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
@@ -65,17 +65,33 @@ struct FormatSummaryValues<'a> {
     args: Vec<&'a Expr>,
     kwargs: FxHashMap<&'a str, &'a Expr>,
     auto_index: usize,
+    /// Reference counts, used to detect arguments whose evaluation would be
+    /// silently dropped by conversion to an f-string.
+    args_used: Vec<u32>,
+    kwargs_used: FxHashMap<&'a str, u32>,
+    /// `true` if any format field uses a post-argument accessor (`{x.y}`, `{x[k]}`),
+    /// which evaluates at format time and may mutate state another argument reads.
+    field_has_accessors: bool,
 }
 
 impl<'a> FormatSummaryValues<'a> {
-    fn try_from_call(call: &'a ast::ExprCall, locator: &'a Locator) -> Option<Self> {
+    fn try_from_call(
+        call: &'a ast::ExprCall,
+        locator: &'a Locator,
+        target_version: PythonVersion,
+    ) -> Option<Self> {
+        // Pre-PEP 701 (Python 3.12), an f-string interpolation can't reuse the outer
+        // quote or span multiple lines, so inlining such args would be a `SyntaxError`.
+        let supports_pep_701 = target_version.supports_pep_701();
         let mut extracted_args: Vec<&Expr> = Vec::new();
         let mut extracted_kwargs: FxHashMap<&str, &Expr> = FxHashMap::default();
 
         for arg in &*call.arguments.args {
-            if matches!(arg, Expr::Starred(..))
-                || contains_quotes(locator.slice(arg))
-                || locator.contains_line_break(arg.range())
+            if matches!(arg, Expr::Starred(..)) {
+                return None;
+            }
+            if !supports_pep_701
+                && (contains_quotes(locator.slice(arg)) || locator.contains_line_break(arg.range()))
             {
                 return None;
             }
@@ -89,7 +105,10 @@ impl<'a> FormatSummaryValues<'a> {
                 node_index: _,
             } = keyword;
             let key = arg.as_ref()?;
-            if contains_quotes(locator.slice(value)) || locator.contains_line_break(value.range()) {
+            if !supports_pep_701
+                && (contains_quotes(locator.slice(value))
+                    || locator.contains_line_break(value.range()))
+            {
                 return None;
             }
             extracted_kwargs.insert(key, value);
@@ -99,28 +118,51 @@ impl<'a> FormatSummaryValues<'a> {
             return None;
         }
 
+        let args_used = vec![0; extracted_args.len()];
+        let kwargs_used = extracted_kwargs.keys().map(|k| (*k, 0u32)).collect();
+
         Some(Self {
             args: extracted_args,
             kwargs: extracted_kwargs,
             auto_index: 0,
+            args_used,
+            kwargs_used,
+            field_has_accessors: false,
         })
     }
 
-    /// Return the next positional index.
     fn arg_auto(&mut self) -> usize {
         let idx = self.auto_index;
         self.auto_index += 1;
         idx
     }
 
-    /// Return the positional argument at the given index.
-    fn arg_positional(&self, index: usize) -> Option<&Expr> {
-        self.args.get(index).copied()
+    fn arg_positional(&mut self, index: usize) -> Option<&Expr> {
+        let arg = self.args.get(index).copied()?;
+        if let Some(count) = self.args_used.get_mut(index) {
+            *count = count.saturating_add(1);
+        }
+        Some(arg)
     }
 
-    /// Return the keyword argument with the given name.
-    fn arg_keyword(&self, key: &str) -> Option<&Expr> {
-        self.kwargs.get(key).copied()
+    fn arg_keyword(&mut self, key: &str) -> Option<&Expr> {
+        let arg = self.kwargs.get(key).copied()?;
+        if let Some(count) = self.kwargs_used.get_mut(key) {
+            *count = count.saturating_add(1);
+        }
+        Some(arg)
+    }
+
+    fn unreferenced_args(&self) -> impl Iterator<Item = &'a Expr> + '_ {
+        let positional = self
+            .args
+            .iter()
+            .zip(&self.args_used)
+            .filter_map(|(arg, count)| (*count == 0).then_some(*arg));
+        let keyword = self.kwargs.iter().filter_map(|(key, value)| {
+            (self.kwargs_used.get(key).copied().unwrap_or(0) == 0).then_some(*value)
+        });
+        positional.chain(keyword)
     }
 }
 
@@ -303,6 +345,13 @@ impl FStringConversion {
 
                     let field = FieldName::parse(&field_name)?;
 
+                    // Record format-time accessors (`{x.y}`, `{x[k]}`) before borrowing
+                    // `summary` for the argument lookup, since those accessors evaluate
+                    // at format time and can mutate state that other arguments read.
+                    if !field.parts.is_empty() {
+                        summary.field_has_accessors = true;
+                    }
+
                     // Map from field type to specifier.
                     let specifier = match field.field_type {
                         FieldType::Auto => IndexOrKeyword::Index(summary.arg_auto()),
@@ -414,7 +463,9 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
         return;
     };
 
-    let Some(mut summary) = FormatSummaryValues::try_from_call(call, checker.locator()) else {
+    let Some(mut summary) =
+        FormatSummaryValues::try_from_call(call, checker.locator(), checker.target_version())
+    else {
         return;
     };
 
@@ -461,6 +512,10 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
 
     let mut contents = String::with_capacity(checker.locator().slice(call).len());
     let mut prev_end = call.start();
+    // Suppress inter-token whitespace after a dropped leading empty-literal patch
+    // (e.g., `"" "{x}".format(x)`), but preserve the leading slice for the first
+    // patch when no empty literal preceded it (e.g., `(` before `("{a}" "{b}")`).
+    let mut emitted_real_content = false;
     for (range, conversion) in patches {
         let fstring = match conversion {
             FStringConversion::Convert(fstring) => Some(fstring),
@@ -473,12 +528,15 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
             FStringConversion::SideEffects => unreachable!(),
         };
         if let Some(fstring) = fstring {
-            contents.push_str(
-                checker
-                    .locator()
-                    .slice(TextRange::new(prev_end, range.start())),
-            );
+            if emitted_real_content || prev_end == call.start() {
+                contents.push_str(
+                    checker
+                        .locator()
+                        .slice(TextRange::new(prev_end, range.start())),
+                );
+            }
             contents.push_str(&fstring);
+            emitted_real_content = true;
         }
         prev_end = range.end();
     }
@@ -525,17 +583,38 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
     let has_comments = checker.comment_ranges().intersects(call.arguments.range());
 
     if !has_comments {
-        if contents.is_empty() {
+        let is_builtin = |id: &str| checker.semantic().has_builtin_binding(id);
+
+        // Downgrade to an unsafe fix when conversion may change runtime behavior.
+        // Refer: https://github.com/astral-sh/ruff/issues/15874
+        let walrus_dropped = summary
+            .unreferenced_args()
+            .any(|arg| matches!(arg, Expr::Named(_)));
+        let dropped_side_effect = summary
+            .unreferenced_args()
+            .any(|arg| contains_effect(arg, is_builtin));
+        let total_references =
+            summary.args_used.iter().sum::<u32>() + summary.kwargs_used.values().sum::<u32>();
+        let accessor_eval_order = summary.field_has_accessors
+            && total_references > 1
+            && summary
+                .args
+                .iter()
+                .chain(summary.kwargs.values())
+                .any(|arg| contains_effect(arg, is_builtin));
+
+        let edit = if contents.is_empty() {
             // Ex) `''.format(self.project)`
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                checker.locator().slice(literal).to_string(),
-                call.range(),
-            )));
+            Edit::range_replacement(checker.locator().slice(literal).to_string(), call.range())
         } else {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                contents,
-                call.range(),
-            )));
-        }
+            Edit::range_replacement(contents, call.range())
+        };
+
+        let fix = if walrus_dropped || dropped_side_effect || accessor_eval_order {
+            Fix::unsafe_edit(edit)
+        } else {
+            Fix::safe_edit(edit)
+        };
+        diagnostic.set_fix(fix);
     }
 }

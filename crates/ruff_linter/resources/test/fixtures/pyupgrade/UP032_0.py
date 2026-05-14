@@ -129,6 +129,24 @@ async def c():
 "{}".format(1 * 2)
 
 ###
+# Soundness — should emit unsafe fix because behavior may differ.
+# Refer: https://github.com/astral-sh/ruff/issues/15874
+###
+
+# Walrus binding referenced only by the dropped argument.
+"{1}".format(x := 1, x)
+
+# Unreferenced argument with side effects (a function call) — the converted
+# f-string silently drops the call.
+"a".format(foo())
+
+# Format-time accessor mutates state read by another argument.
+"{[x]} {}".format(d, len(d))
+
+# Multi-field with accessor and a side-effecting argument.
+"{0.attr} {1}".format(obj, side_effect())
+
+###
 # Non-errors
 ###
 
