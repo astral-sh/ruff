@@ -2015,9 +2015,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         loop_header_kind: &LoopHeaderDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
-        // These cutoffs were chosen by benchmarking real isort to keep loop analysis
+        // This cutoff was chosen by benchmarking real isort to keep loop analysis
         // overhead minimal while preserving diagnostics.
-        const MAX_EXACT_LOOP_HEADER_BINDINGS: usize = 128;
         const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 4096;
 
         let db = self.db();
@@ -2029,9 +2028,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Loop-header types are an approximation point for loop fixpoint analysis. Inferring the
         // exact union of every visible loop-back binding can recursively force inference of large
         // boolean expressions and explode on real-world loops.
-        if loop_header.reachable_bindings.len() > MAX_EXACT_LOOP_HEADER_BINDINGS
-            || use_def.reachability_constraints().used_interiors().len()
-                > MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES
+        if use_def.reachability_constraints().used_interiors().len()
+            > MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES
         {
             self.bindings.insert(definition, Type::unknown());
             return;

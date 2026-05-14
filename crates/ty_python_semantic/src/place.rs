@@ -1250,9 +1250,8 @@ fn loop_header_reachability_impl<'db>(
     definition: Definition<'db>,
     is_cycle_initial: bool,
 ) -> LoopHeaderReachability<'db> {
-    // These cutoffs were chosen by benchmarking real isort to keep loop analysis
+    // This cutoff was chosen by benchmarking real isort to keep loop analysis
     // overhead minimal while preserving diagnostics.
-    const MAX_EXACT_LOOP_HEADER_REACHABILITY_BINDINGS: usize = 128;
     const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 2048;
 
     let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
@@ -1267,10 +1266,8 @@ fn loop_header_reachability_impl<'db>(
     let mut deleted_reachability = Truthiness::AlwaysFalse;
     let mut reachable_bindings = FxIndexSet::default();
     let live_bindings: Vec<_> = loop_header.bindings_for_place(place).collect();
-    let live_binding_count = live_bindings.len();
-    let use_exact_reachability = live_binding_count <= MAX_EXACT_LOOP_HEADER_REACHABILITY_BINDINGS
-        && use_def.reachability_constraints().used_interiors().len()
-            <= MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES;
+    let use_exact_reachability = use_def.reachability_constraints().used_interiors().len()
+        <= MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES;
 
     for live_binding in live_bindings {
         let reachability = if is_cycle_initial {
