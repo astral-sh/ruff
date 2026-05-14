@@ -73,7 +73,8 @@ pub(crate) fn strip_with_multi_characters(
         return;
     };
 
-    if value.chars().count() > 1 && !value.chars().all_unique() {
+    let chars: Vec<char> = value.chars().collect();
+    if chars.len() > 1 && !chars.iter().copied().all_unique() {
         checker.report_diagnostic(StripWithMultiCharacters, expr.range());
     }
 }
