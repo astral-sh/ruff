@@ -165,7 +165,7 @@ def test(x: Literal["a", "b", "c"] | None | int = None):
 ## Direct `not in` conditional
 
 ```py
-from typing import Literal
+from typing import Any, Literal
 
 def test(x: Literal["a", "b", "c"] | None | int = None):
     if x not in ("a", "c"):
@@ -174,6 +174,48 @@ def test(x: Literal["a", "b", "c"] | None | int = None):
         reveal_type(x)  # revealed: Literal["b"] | None | int
     else:
         reveal_type(x)  # revealed: Literal["a", "c"] | int
+
+def broad_set_element(x: Literal[1, 2], values: set[int]) -> None:
+    if x not in values:
+        reveal_type(x)  # revealed: Literal[1, 2]
+    else:
+        reveal_type(x)  # revealed: Literal[1, 2]
+
+def union_tuple_slot(x: Literal[1, 2], values: tuple[Literal[1, 2]]) -> None:
+    if x not in values:
+        reveal_type(x)  # revealed: Literal[1, 2]
+    else:
+        reveal_type(x)  # revealed: Literal[1, 2]
+
+def union_tuple_slot_with_exact_value(
+    x: Literal[1, 2, 3],
+    values: tuple[Literal[1, 2], Literal[3]],
+) -> None:
+    if x not in values:
+        reveal_type(x)  # revealed: Literal[1, 2]
+    else:
+        reveal_type(x)  # revealed: Literal[1, 2, 3]
+
+def tuple_with_any_slot(x: str | None, missing: Any) -> None:
+    if x not in (missing, None):
+        reveal_type(x)  # revealed: str
+    else:
+        reveal_type(x)  # revealed: str | None
+
+def local_literal_rhs(x: str | None) -> None:
+    unavailable = [None, ""]
+    if x not in unavailable:
+        # TODO: This should narrow to `str` if we can prove that the local
+        # literal collection has not been mutated or aliased before the test.
+        reveal_type(x)  # revealed: str | None
+    else:
+        reveal_type(x)  # revealed: None | str
+
+def mutable_global_rhs(x: str | None, unavailable: set[str | None]) -> None:
+    if x not in unavailable:
+        reveal_type(x)  # revealed: str | None
+    else:
+        reveal_type(x)  # revealed: str | None
 ```
 
 ## No narrowing for the right-hand side (currently)
