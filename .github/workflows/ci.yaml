@@ -255,6 +255,30 @@ jobs:
         run: rustup component add rustfmt
       - run: cargo fmt --all --check
 
+  shellcheck:
+    name: "shellcheck"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version: "1.26.2"
+      - name: "Run ShellCheck"
+        env:
+          GOSUMDB: sum.golang.org
+        run: |
+          files=()
+          while IFS= read -r -d '' file; do
+            files+=("${file}")
+          done < <(git ls-files -z '*.sh')
+          if ((${#files[@]} == 0)); then
+            exit 0
+          fi
+          go run github.com/wasilibs/go-shellcheck/cmd/shellcheck@v0.11.1 "${files[@]}"
+
   cargo-clippy:
     name: "cargo clippy"
     runs-on: ubuntu-latest
@@ -1255,6 +1279,7 @@ jobs:
       - cargo-test-linux
       - cargo-test-wasm
       - cargo-build-msrv
+      - shellcheck
       - scripts
       - prek
       - docs
