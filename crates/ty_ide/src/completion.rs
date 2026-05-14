@@ -7054,7 +7054,7 @@ take({"<CURSOR>"})
     }
 
     #[test]
-    fn string_literal_completions_in_incomplete_typed_dict_literal_key_prefers_set_context() {
+    fn string_literal_completions_in_incomplete_typed_dict_literal_key_combines_set_context() {
         let builder = completion_test_builder(
             r#"
 from typing import Literal, TypedDict
@@ -7072,7 +7072,12 @@ take({"<CURSOR>"})
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
-            @r#"item :: Literal["item"]"#,
+            @r#"
+        item :: Literal["item"]
+        x :: Literal["x"]
+        y :: Literal["y"]
+        z :: Literal["z"]
+        "#,
         );
     }
 
