@@ -796,7 +796,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: cargo-bins/cargo-binstall@4852a15cf01e4f33958ce547326406fe78f27c38 # v1.19.0
-      - run: cargo binstall --no-confirm cargo-shear
+      - run: cargo binstall --no-confirm cargo-shear@1.11.2
       - run: cargo shear --deny-warnings
 
   ty-completion-evaluation:
