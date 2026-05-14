@@ -18,7 +18,9 @@ use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
 use ty_python_core::place::{PlaceExprRef, ScopedPlaceId};
 use ty_python_core::predicate::{Predicate, ScopedPredicateId};
-use ty_python_core::reachability_constraints::ReachabilityConstraints;
+use ty_python_core::reachability_constraints::{
+    ReachabilityConstraints, ScopedReachabilityConstraintId,
+};
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
     BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
@@ -1248,6 +1250,10 @@ fn loop_header_reachability_impl<'db>(
     definition: Definition<'db>,
     is_cycle_initial: bool,
 ) -> LoopHeaderReachability<'db> {
+    // This cutoff was chosen by benchmarking real isort to keep loop analysis
+    // overhead minimal while preserving diagnostics.
+    const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 2048;
+
     let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
         unreachable!("`loop_header_reachability` called with non-loop-header definition");
     };
@@ -1259,12 +1265,21 @@ fn loop_header_reachability_impl<'db>(
 
     let mut deleted_reachability = Truthiness::AlwaysFalse;
     let mut reachable_bindings = FxIndexSet::default();
+    let live_bindings: Vec<_> = loop_header.bindings_for_place(place).collect();
+    let use_exact_reachability = use_def.reachability_constraints().used_interiors().len()
+        <= MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES;
 
-    for live_binding in loop_header.bindings_for_place(place) {
+    for live_binding in live_bindings {
         let reachability = if is_cycle_initial {
             Truthiness::Ambiguous
-        } else {
+        } else if use_exact_reachability {
             evaluate_reachability(db, use_def, live_binding.reachability_constraint())
+        } else if live_binding.reachability_constraint()
+            == ScopedReachabilityConstraintId::ALWAYS_FALSE
+        {
+            Truthiness::AlwaysFalse
+        } else {
+            Truthiness::Ambiguous
         };
         // Skip unreachable bindings.
         if reachability.is_always_false() {
