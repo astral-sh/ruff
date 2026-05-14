@@ -1554,6 +1554,139 @@ for _ in range(1_000_000):
         x = 2
 ```
 
+### Large reachability constraint graphs fall back to `Unknown`
+
+```py
+def f(items, flags):
+    x = 1
+    for item in items:
+        # This example is just over the exact loop-header reachability cutoff. If it falls
+        # below the cutoff, this line reveals `Literal[1, 2]`.
+        reveal_type(x)  # revealed: Literal[1] | Unknown
+        if flags[200]:
+            x = 2
+    for item0 in items:
+        if flags[0]:
+            x = item0
+        for item1 in items:
+            if flags[1]:
+                x = item1
+            for item2 in items:
+                if flags[2]:
+                    x = item2
+                for item3 in items:
+                    if flags[3]:
+                        x = item3
+                    for item4 in items:
+                        if flags[4]:
+                            x = item4
+                        for item5 in items:
+                            if flags[5]:
+                                x = item5
+        for item6 in items:
+            if flags[6]:
+                x = item6
+            for item7 in items:
+                if flags[7]:
+                    x = item7
+                for item8 in items:
+                    if flags[8]:
+                        x = item8
+                    for item9 in items:
+                        if flags[9]:
+                            x = item9
+                        for item10 in items:
+                            if flags[10]:
+                                x = item10
+    for item11 in items:
+        if flags[11]:
+            x = item11
+        for item12 in items:
+            if flags[12]:
+                x = item12
+            for item13 in items:
+                if flags[13]:
+                    x = item13
+                for item14 in items:
+                    if flags[14]:
+                        x = item14
+                    for item15 in items:
+                        if flags[15]:
+                            x = item15
+                        for item16 in items:
+                            if flags[16]:
+                                x = item16
+        for item17 in items:
+            if flags[17]:
+                x = item17
+            for item18 in items:
+                if flags[18]:
+                    x = item18
+                for item19 in items:
+                    if flags[19]:
+                        x = item19
+                    for item20 in items:
+                        if flags[20]:
+                            x = item20
+                        for item21 in items:
+                            if flags[21]:
+                                x = item21
+    if flags[100]:
+        x = 0
+    if flags[101]:
+        x = 1
+    if flags[102]:
+        x = 2
+    if flags[103]:
+        x = 3
+    if flags[104]:
+        x = 4
+    if flags[105]:
+        x = 5
+    if flags[106]:
+        x = 6
+    if flags[107]:
+        x = 7
+    if flags[108]:
+        x = 8
+    if flags[109]:
+        x = 9
+    if flags[110]:
+        x = 10
+    if flags[111]:
+        x = 11
+    if flags[112]:
+        x = 12
+    if flags[113]:
+        x = 13
+    if flags[114]:
+        x = 14
+    if flags[115]:
+        x = 15
+    if flags[116]:
+        x = 16
+    if flags[117]:
+        x = 17
+    if flags[118]:
+        x = 18
+    if flags[119]:
+        x = 19
+    if flags[120]:
+        x = 20
+    if flags[121]:
+        x = 21
+    if flags[122]:
+        x = 22
+    if flags[123]:
+        x = 23
+    if flags[124]:
+        x = 24
+    if flags[125]:
+        x = 25
+    if flags[126]:
+        x = 26
+```
+
 ### `Divergent` in narrowing conditions doesn't run afoul of "monotonic widening" in cycle recovery
 
 This test looks for a complicated inference failure case that came up during implementation. See the
