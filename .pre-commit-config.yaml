@@ -74,12 +74,6 @@ repos:
       - id: check-github-workflows
         priority: 0
 
-  - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: v0.11.0.1
-    hooks:
-      - id: shellcheck
-        priority: 0
-
   - repo: https://github.com/executablebooks/mdformat
     rev: 1.0.0
     hooks:
