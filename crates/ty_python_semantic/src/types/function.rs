@@ -1914,6 +1914,20 @@ pub enum KnownFunction {
     NewClass,
 }
 
+fn call_argument_node<'a>(
+    call_expression: &'a ast::ExprCall,
+    name: &str,
+    position: usize,
+) -> Option<ast::AnyNodeRef<'a>> {
+    call_expression
+        .arguments
+        .find_argument(name, position)
+        .map(|argument| match argument {
+            ast::ArgOrKeyword::Arg(expr) => ast::AnyNodeRef::from(expr),
+            ast::ArgOrKeyword::Keyword(keyword) => ast::AnyNodeRef::from(keyword),
+        })
+}
+
 impl KnownFunction {
     pub fn into_classinfo_constraint_function(self) -> Option<ClassInfoConstraintFunction> {
         match self {
@@ -2124,17 +2138,7 @@ impl KnownFunction {
                 let truthiness = match parameter_ty.try_bool(db) {
                     Ok(truthiness) => truthiness,
                     Err(err) => {
-                        let condition = call_expression
-                            .arguments
-                            .find_argument("condition", 0)
-                            .map(|argument| match argument {
-                                ruff_python_ast::ArgOrKeyword::Arg(expr) => {
-                                    ast::AnyNodeRef::from(expr)
-                                }
-                                ruff_python_ast::ArgOrKeyword::Keyword(keyword) => {
-                                    ast::AnyNodeRef::from(keyword)
-                                }
-                            })
+                        let condition = call_argument_node(call_expression, "condition", 0)
                             .unwrap_or(ast::AnyNodeRef::from(call_expression));
 
                         err.report_diagnostic(context, condition);
@@ -2169,13 +2173,14 @@ impl KnownFunction {
                             parameter_ty = parameter_ty.display(db)
                         ))
                     };
-                    diagnostic.annotate(
-                        Annotation::secondary(context.span(&call_expression.arguments.args[0]))
-                            .message(format_args!(
+                    if let Some(condition) = call_argument_node(call_expression, "condition", 0) {
+                        diagnostic.annotate(
+                            Annotation::secondary(context.span(condition)).message(format_args!(
                                 "Inferred type of argument is `{}`",
                                 parameter_ty.display(db)
                             )),
-                    );
+                        );
+                    }
                 }
             }
 

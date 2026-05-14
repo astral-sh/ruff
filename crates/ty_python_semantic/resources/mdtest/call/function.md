@@ -1228,6 +1228,13 @@ from ty_extensions import static_assert
 # error: [missing-argument] "No argument provided for required parameter `condition` of function `static_assert`"
 static_assert()
 
+# error: [static-assert-error] "Static assertion error: argument evaluates to `False`"
+static_assert(condition=False)
+
+# error: [static-assert-error] "Static assertion error: argument of type `Unknown` has an ambiguous static truthiness"
+# error: [invalid-syntax]
+static_assert(**)
+
 # error: [too-many-positional-arguments] "Too many positional arguments to function `static_assert`: expected 2, got 3"
 # error: [invalid-argument-type] "Argument to function `static_assert` is incorrect: Expected `LiteralString | None`, found `Literal[2]`"
 static_assert(True, 2, 3)
