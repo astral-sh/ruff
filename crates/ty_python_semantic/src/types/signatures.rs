@@ -27,10 +27,7 @@ use crate::types::generics::{
     ApplySpecialization, GenericContext, InferableTypeVars, Specialization, walk_generic_context,
 };
 use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
-use crate::types::relation::{
-    AliasRelationVisitor, HasRelationToVisitor, InvariantRelationVisitor, IsDisjointVisitor,
-    TypeRelation, TypeRelationChecker,
-};
+use crate::types::relation::{RelationVisitors, TypeRelation, TypeRelationChecker};
 use crate::types::typed_dict::{
     UnpackedTypedDictKey, extract_unpacked_typed_dict_keys_from_kwargs_annotation,
     extract_unpacked_typed_dict_keys_from_value_type,
@@ -456,19 +453,11 @@ impl<'db> CallableSignature<'db> {
         other: &Self,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_visitor = HasRelationToVisitor::default(constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
-        let invariant_relation_visitor = InvariantRelationVisitor::default();
-        let alias_relation_visitor = AliasRelationVisitor::default();
+        let relation_visitors = RelationVisitors::new(constraints);
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::constraint_set_assignability(
             constraints,
-            &relation_visitor,
-            &disjointness_visitor,
-            &signature_relation_visitor,
-            &invariant_relation_visitor,
-            &alias_relation_visitor,
+            &relation_visitors,
             &materialization_visitor,
         );
         checker.check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
@@ -1149,19 +1138,11 @@ impl<'db> Signature<'db> {
         let implementation = self.clone().with_return_type(Type::unknown());
         let overload = overload.clone().with_return_type(Type::unknown());
         let constraints = ConstraintSetBuilder::new();
-        let relation_visitor = HasRelationToVisitor::default(&constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
-        let invariant_relation_visitor = InvariantRelationVisitor::default();
-        let alias_relation_visitor = AliasRelationVisitor::default();
+        let relation_visitors = RelationVisitors::new(&constraints);
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::constraint_set_assignability_with_context(
             &constraints,
-            &relation_visitor,
-            &disjointness_visitor,
-            &signature_relation_visitor,
-            &invariant_relation_visitor,
-            &alias_relation_visitor,
+            &relation_visitors,
             &materialization_visitor,
         );
 
@@ -1187,19 +1168,11 @@ impl<'db> Signature<'db> {
         debug_assert!(overload.is_non_generic());
 
         let constraints = ConstraintSetBuilder::new();
-        let relation_visitor = HasRelationToVisitor::default(&constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
-        let invariant_relation_visitor = InvariantRelationVisitor::default();
-        let alias_relation_visitor = AliasRelationVisitor::default();
+        let relation_visitors = RelationVisitors::new(&constraints);
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::assignability_with_context(
             &constraints,
-            &relation_visitor,
-            &disjointness_visitor,
-            &signature_relation_visitor,
-            &invariant_relation_visitor,
-            &alias_relation_visitor,
+            &relation_visitors,
             &materialization_visitor,
         );
 
@@ -1270,19 +1243,11 @@ impl<'db> Signature<'db> {
         other: &Self,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_visitor = HasRelationToVisitor::default(constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
-        let invariant_relation_visitor = InvariantRelationVisitor::default();
-        let alias_relation_visitor = AliasRelationVisitor::default();
+        let relation_visitors = RelationVisitors::new(constraints);
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::constraint_set_assignability(
             constraints,
-            &relation_visitor,
-            &disjointness_visitor,
-            &signature_relation_visitor,
-            &invariant_relation_visitor,
-            &alias_relation_visitor,
+            &relation_visitors,
             &materialization_visitor,
         );
         checker.check_signature_pair(db, self, other)
@@ -1686,7 +1651,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Use `always` as the cycle value so valid fixed points can close; any real mismatch in
         // the finite layer still bubbles out of `work`, because only exact active revisits take
         // this branch and the result is not memoized.
-        self.signature_relation_visitor
+        self.relation_visitors
+            .signature
             .visit(&key, || self.always(), work)
     }
 
