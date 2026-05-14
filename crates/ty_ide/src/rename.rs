@@ -24,11 +24,12 @@ pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text
 
     let current_file_in_project = is_file_in_project(db, file);
 
-    let definition_targets = goto_target
-        .get_definition_targets(&model, ReferencesMode::Rename.to_import_alias_resolution())?
-        .declaration_targets(&model, &goto_target)?;
+    let declaration_targets = goto_target
+        .definitions(&model, ReferencesMode::Rename.to_import_alias_resolution())?
+        .goto_declaration(&model, &goto_target)?
+        .into_navigation_targets(model.db());
 
-    for target in &definition_targets {
+    for target in &declaration_targets {
         let target_file = target.file();
 
         // If definition is outside the project, refuse rename

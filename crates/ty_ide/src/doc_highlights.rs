@@ -67,7 +67,7 @@ mod tests {
             .build();
 
         assert_snapshot!(test.document_highlights(), @"
-        info[document_highlights]: Highlight 1 (Read)
+        info[document_highlights]: Highlight 1 (Other)
          --> mypackage/__init__.py:1:15
           |
         1 | from . import module_a
