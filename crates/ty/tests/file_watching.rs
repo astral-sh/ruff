@@ -7,7 +7,8 @@ use ruff_db::Db as _;
 use ruff_db::files::{File, FileError, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{
-    OsSystem, System, SystemPath, SystemPathBuf, UserConfigDirectoryOverrideGuard, file_time_now,
+    OsSystem, System, SystemPath, SystemPathBuf, TestSystem, UserConfigDirectoryOverrideGuard,
+    file_time_now,
 };
 use ruff_python_ast::PythonVersion;
 use ty_module_resolver::{Module, ModuleName, resolve_module_confident};
@@ -18,11 +19,13 @@ use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
 use ty_python_core::platform::PythonPlatform;
+use ty_static::EnvVars;
 
 struct TestCase {
     db: ProjectDatabase,
     watcher: Option<ProjectWatcher>,
     changes_receiver: crossbeam::channel::Receiver<Vec<ChangeEvent>>,
+    _user_config_directory_override: UserConfigDirectoryOverrideGuard,
     /// The temporary directory that contains the test files.
     /// We need to hold on to it in the test case or the temp files get deleted.
     _temp_dir: tempfile::TempDir,
@@ -393,9 +396,14 @@ where
     std::fs::create_dir_all(project_path.as_std_path())
         .with_context(|| format!("Failed to create project directory `{project_path}`"))?;
 
-    let system = OsSystem::new(&project_path);
+    // Keep file-watching tests independent from the shell and user config that run the test binary.
+    let os_system = OsSystem::new(&project_path);
+    let user_config_directory_override = os_system.with_user_config_directory(None);
+    let system = TestSystem::new(os_system.clone());
+    isolate_environment(&system);
+
     let mut setup_context = SetupContext {
-        system: &system,
+        system: &os_system,
         root_path: &root_path,
         options: None,
         included_paths: None,
@@ -453,6 +461,7 @@ where
         db,
         changes_receiver: receiver,
         watcher: Some(watcher),
+        _user_config_directory_override: user_config_directory_override,
         _temp_dir: temp_dir,
         root_dir: root_path,
     };
@@ -477,6 +486,18 @@ where
         .try_take_watch_changes(event_for_file(".watcher_ready"), Duration::from_millis(500));
 
     Ok(test_case)
+}
+
+fn isolate_environment(system: &TestSystem) {
+    for name in [
+        EnvVars::VIRTUAL_ENV,
+        EnvVars::CONDA_PREFIX,
+        EnvVars::CONDA_DEFAULT_ENV,
+        EnvVars::CONDA_ROOT,
+        EnvVars::PYTHONPATH,
+    ] {
+        system.remove_env_var(name);
+    }
 }
 
 /// Updates the content of a file and ensures that the last modified file time is updated.
