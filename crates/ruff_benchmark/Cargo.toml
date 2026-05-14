@@ -19,7 +19,6 @@ doctest = false
 [dependencies]
 ruff_db = { workspace = true, features = ["testing"] }
 ruff_linter = { workspace = true, optional = true }
-ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true, optional = true }
 ruff_python_parser = { workspace = true, optional = true }
 ruff_python_trivia = { workspace = true, optional = true }
@@ -41,6 +40,7 @@ mimalloc = { workspace = true, optional = true }
 
 [dev-dependencies]
 rayon = { workspace = true }
+ruff_python_ast = { workspace = true }
 rustc-hash = { workspace = true }
 
 [features]
@@ -103,7 +103,6 @@ ignored = [
     "ruff_python_formatter",
     "ruff_python_parser",
     "ruff_python_trivia",
-    "ty-project",
     "mimalloc",
     "tikv-jemallocator"
 ]

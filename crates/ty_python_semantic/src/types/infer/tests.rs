@@ -2,14 +2,14 @@ use super::builder::TypeInferenceBuilder;
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, global_symbol};
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::FileScopeId;
-use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
 use crate::types::{KnownClass, KnownInstanceType, check_types};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
+use ty_python_core::definition::Definition;
+use ty_python_core::scope::FileScopeId;
+use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
 
 use super::*;
 

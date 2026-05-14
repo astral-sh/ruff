@@ -729,10 +729,10 @@ static_assert(is_subtype_of(Qux, HasX))
 static_assert(is_assignable_to(Qux, HasX))
 
 class HalfUnknownQux:
-    def __init__(self, x: int) -> None:
-        self.x = x
+    def __init__(self, x: int, y, flag: bool) -> None:
+        self.x = x if flag else y
 
-reveal_type(HalfUnknownQux(1).x)  # revealed: Unknown | int
+reveal_type(HalfUnknownQux(1, "foo", True).x)  # revealed: int | Unknown
 
 static_assert(not is_subtype_of(HalfUnknownQux, HasX))
 static_assert(is_assignable_to(HalfUnknownQux, HasX))

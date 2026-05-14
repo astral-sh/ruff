@@ -14,7 +14,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::diagnostic::DiagnosticGuard;
 use crate::lint::{GetLintError, Level, LintMetadata, LintRegistry, LintStatus};
-pub use crate::suppression::add_ignore::{suppress_all, suppress_single};
+pub use crate::suppression::add_ignore::{SuppressFix, suppress_all, suppress_single};
 use crate::suppression::parser::{
     ParseError, ParseErrorKind, SuppressionComment, SuppressionParser,
 };

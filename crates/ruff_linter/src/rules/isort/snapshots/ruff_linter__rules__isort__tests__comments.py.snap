@@ -50,10 +50,10 @@ help: Organize imports
    -
 6  | # Comment 3b
 7  | import C
-   -
-   - import B  # Comment 4
 8  + import D
 9  |
+   - import B  # Comment 4
+   -
 10 | # Comment 5
    -
 11 | # Comment 6

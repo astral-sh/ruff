@@ -9,7 +9,7 @@ S103 `os.chmod` setting a permissive mask `0o227` on file or directory
 6 | os.chmod("/etc/passwd", 0o227)  # Error
   |                         ^^^^^
 7 | os.chmod("/etc/passwd", 0o7)  # Error
-8 | os.chmod("/etc/passwd", 0o664)  # OK
+8 | os.chmod("/etc/passwd", 0o664)  # OK (stable); Error (preview, S_IWGRP)
   |
 
 S103 `os.chmod` setting a permissive mask `0o7` on file or directory
@@ -18,7 +18,7 @@ S103 `os.chmod` setting a permissive mask `0o7` on file or directory
 6 | os.chmod("/etc/passwd", 0o227)  # Error
 7 | os.chmod("/etc/passwd", 0o7)  # Error
   |                         ^^^
-8 | os.chmod("/etc/passwd", 0o664)  # OK
+8 | os.chmod("/etc/passwd", 0o664)  # OK (stable); Error (preview, S_IWGRP)
 9 | os.chmod("/etc/passwd", 0o777)  # Error
   |
 
@@ -26,7 +26,7 @@ S103 `os.chmod` setting a permissive mask `0o777` on file or directory
   --> S103.py:9:25
    |
  7 | os.chmod("/etc/passwd", 0o7)  # Error
- 8 | os.chmod("/etc/passwd", 0o664)  # OK
+ 8 | os.chmod("/etc/passwd", 0o664)  # OK (stable); Error (preview, S_IWGRP)
  9 | os.chmod("/etc/passwd", 0o777)  # Error
    |                         ^^^^^
 10 | os.chmod("/etc/passwd", 0o770)  # Error
@@ -36,12 +36,12 @@ S103 `os.chmod` setting a permissive mask `0o777` on file or directory
 S103 `os.chmod` setting a permissive mask `0o770` on file or directory
   --> S103.py:10:25
    |
- 8 | os.chmod("/etc/passwd", 0o664)  # OK
+ 8 | os.chmod("/etc/passwd", 0o664)  # OK (stable); Error (preview, S_IWGRP)
  9 | os.chmod("/etc/passwd", 0o777)  # Error
 10 | os.chmod("/etc/passwd", 0o770)  # Error
    |                         ^^^^^
 11 | os.chmod("/etc/passwd", 0o776)  # Error
-12 | os.chmod("/etc/passwd", 0o760)  # OK
+12 | os.chmod("/etc/passwd", 0o760)  # OK (stable); Error (preview, S_IWGRP)
    |
 
 S103 `os.chmod` setting a permissive mask `0o776` on file or directory
@@ -51,7 +51,7 @@ S103 `os.chmod` setting a permissive mask `0o776` on file or directory
 10 | os.chmod("/etc/passwd", 0o770)  # Error
 11 | os.chmod("/etc/passwd", 0o776)  # Error
    |                         ^^^^^
-12 | os.chmod("/etc/passwd", 0o760)  # OK
+12 | os.chmod("/etc/passwd", 0o760)  # OK (stable); Error (preview, S_IWGRP)
 13 | os.chmod("~/.bashrc", 511)  # Error
    |
 
@@ -59,7 +59,7 @@ S103 `os.chmod` setting a permissive mask `0o777` on file or directory
   --> S103.py:13:23
    |
 11 | os.chmod("/etc/passwd", 0o776)  # Error
-12 | os.chmod("/etc/passwd", 0o760)  # OK
+12 | os.chmod("/etc/passwd", 0o760)  # OK (stable); Error (preview, S_IWGRP)
 13 | os.chmod("~/.bashrc", 511)  # Error
    |                       ^^^
 14 | os.chmod("/etc/hosts", 0o777)  # Error
@@ -69,7 +69,7 @@ S103 `os.chmod` setting a permissive mask `0o777` on file or directory
 S103 `os.chmod` setting a permissive mask `0o777` on file or directory
   --> S103.py:14:24
    |
-12 | os.chmod("/etc/passwd", 0o760)  # OK
+12 | os.chmod("/etc/passwd", 0o760)  # OK (stable); Error (preview, S_IWGRP)
 13 | os.chmod("~/.bashrc", 511)  # Error
 14 | os.chmod("/etc/hosts", 0o777)  # Error
    |                        ^^^^^
@@ -118,7 +118,7 @@ S103 `os.chmod` setting a permissive mask `0o777` on file or directory
 19 | os.chmod(keyfile, stat.S_IRWXO | stat.S_IRWXG | stat.S_IRWXU)  # Error
    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 20 | os.chmod("~/hidden_exec", stat.S_IXGRP)  # Error
-21 | os.chmod("~/hidden_exec", stat.S_IXOTH)  # OK
+21 | os.chmod("~/hidden_exec", stat.S_IXOTH)  # OK (stable); Error (preview, S_IXOTH)
    |
 
 S103 `os.chmod` setting a permissive mask `0o10` on file or directory
@@ -128,7 +128,7 @@ S103 `os.chmod` setting a permissive mask `0o10` on file or directory
 19 | os.chmod(keyfile, stat.S_IRWXO | stat.S_IRWXG | stat.S_IRWXU)  # Error
 20 | os.chmod("~/hidden_exec", stat.S_IXGRP)  # Error
    |                           ^^^^^^^^^^^^
-21 | os.chmod("~/hidden_exec", stat.S_IXOTH)  # OK
+21 | os.chmod("~/hidden_exec", stat.S_IXOTH)  # OK (stable); Error (preview, S_IXOTH)
 22 | os.chmod("/etc/passwd", stat.S_IWOTH)  # Error
    |
 
@@ -136,7 +136,7 @@ S103 `os.chmod` setting a permissive mask `0o2` on file or directory
   --> S103.py:22:25
    |
 20 | os.chmod("~/hidden_exec", stat.S_IXGRP)  # Error
-21 | os.chmod("~/hidden_exec", stat.S_IXOTH)  # OK
+21 | os.chmod("~/hidden_exec", stat.S_IXOTH)  # OK (stable); Error (preview, S_IXOTH)
 22 | os.chmod("/etc/passwd", stat.S_IWOTH)  # Error
    |                         ^^^^^^^^^^^^
 23 | os.chmod("/etc/passwd", 0o100000000)  # Error
@@ -145,8 +145,71 @@ S103 `os.chmod` setting a permissive mask `0o2` on file or directory
 S103 `os.chmod` setting an invalid mask on file or directory
   --> S103.py:23:25
    |
-21 | os.chmod("~/hidden_exec", stat.S_IXOTH)  # OK
+21 | os.chmod("~/hidden_exec", stat.S_IXOTH)  # OK (stable); Error (preview, S_IXOTH)
 22 | os.chmod("/etc/passwd", stat.S_IWOTH)  # Error
 23 | os.chmod("/etc/passwd", 0o100000000)  # Error
    |                         ^^^^^^^^^^^
+24 |
+25 | # https://github.com/astral-sh/ruff/issues/18863
+   |
+
+S103 `os.chmod` setting a permissive mask `0o11` on file or directory
+  --> S103.py:27:30
+   |
+25 | # https://github.com/astral-sh/ruff/issues/18863
+26 | os.chmod("/etc/secrets.txt", 0o21)  # OK (stable); Error (preview, S_IWGRP)
+27 | os.chmod("/etc/secrets.txt", 0o11)  # Error (S_IXGRP)
+   |                              ^^^^
+   |
+
+S103 `os.chmod` setting a permissive mask `0o777` on file or directory
+  --> S103.py:31:20
+   |
+30 | def f(path, mode):
+31 |     os.chmod(path, mode | 0o777)  # Error (statically-known dangerous bits)
+   |                    ^^^^^^^^^^^^
+32 |     os.chmod(path, mode | 0o700)  # OK (no dangerous bits in known-set)
+33 |     os.chmod(path, mode & 0o700)  # OK (no bits known to be set)
+   |
+
+S103 `os.chmod` setting a permissive mask `0o777` on file or directory
+  --> S103.py:37:30
+   |
+36 | os.chmod("/etc/secrets.txt", 0o777777 & 0o700)  # OK (partial-AND cancels out-of-range)
+37 | os.chmod("/etc/secrets.txt", 0o777777 & 0o777)  # Error
+   |                              ^^^^^^^^^^^^^^^^
+38 | os.chmod("/etc/passwd", 0o200000)  # Error (bit outside 0o7777)
+   |
+
+S103 `os.chmod` setting an invalid mask on file or directory
+  --> S103.py:38:25
+   |
+36 | os.chmod("/etc/secrets.txt", 0o777777 & 0o700)  # OK (partial-AND cancels out-of-range)
+37 | os.chmod("/etc/secrets.txt", 0o777777 & 0o777)  # Error
+38 | os.chmod("/etc/passwd", 0o200000)  # Error (bit outside 0o7777)
+   |                         ^^^^^^^^
+39 |
+40 | os.chmod("/etc/passwd", 99999999999999999999999)  # Error (oversized)
+   |
+
+S103 `os.chmod` setting an invalid mask on file or directory
+  --> S103.py:40:25
+   |
+38 | os.chmod("/etc/passwd", 0o200000)  # Error (bit outside 0o7777)
+39 |
+40 | os.chmod("/etc/passwd", 99999999999999999999999)  # Error (oversized)
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^
+41 | os.chmod("/etc/passwd", 99999999999999999999999 & 0o200000)  # OK
+42 | os.chmod("/etc/passwd", 99999999999999999999999 | 0o777)  # Error (oversized)
+   |
+
+S103 `os.chmod` setting an invalid mask on file or directory
+  --> S103.py:42:25
+   |
+40 | os.chmod("/etc/passwd", 99999999999999999999999)  # Error (oversized)
+41 | os.chmod("/etc/passwd", 99999999999999999999999 & 0o200000)  # OK
+42 | os.chmod("/etc/passwd", 99999999999999999999999 | 0o777)  # Error (oversized)
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+43 |
+44 | os.chmod("/tmp/x", 18446744073709551616 ^ 18446744073709551616)  # OK (both sides identical)
    |

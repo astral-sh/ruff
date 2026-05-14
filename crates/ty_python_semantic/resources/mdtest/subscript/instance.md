@@ -2,12 +2,20 @@
 
 ## `__getitem__` unbound
 
-<!-- snapshot-diagnostics -->
-
 ```py
 class NotSubscriptable: ...
 
-a = NotSubscriptable()[0]  # error: [not-subscriptable]
+# snapshot: not-subscriptable
+a = NotSubscriptable()[0]
+```
+
+```snapshot
+error[not-subscriptable]: Cannot subscript object of type `NotSubscriptable` with no `__getitem__` method
+ --> src/mdtest_snippet.py:4:5
+  |
+4 | a = NotSubscriptable()[0]
+  |     ^^^^^^^^^^^^^^^^^^^^^
+  |
 ```
 
 ## `__getitem__` not callable
@@ -20,7 +28,7 @@ class NotSubscriptable:
 # transformed into a `not-subscriptable` diagnostic with a subdiagnostic explaining
 # that this was because `__getitem__` was possibly not callable
 #
-# error: [call-non-callable] "Method `__getitem__` of type `Unknown | None` may not be callable on object of type `NotSubscriptable`"
+# error: [call-non-callable] "Method `__getitem__` of type `None | Unknown` may not be callable on object of type `NotSubscriptable`"
 a = NotSubscriptable()[0]
 ```
 
@@ -89,7 +97,7 @@ class NoSetitem:
     __setitem__ = None
 
 a = NoSetitem()
-a[0] = 0  # error: "Method `__setitem__` of type `Unknown | None` may not be callable on object of type `NoSetitem`"
+a[0] = 0  # error: "Method `__setitem__` of type `None | Unknown` may not be callable on object of type `NoSetitem`"
 ```
 
 ## Valid `__setitem__` method

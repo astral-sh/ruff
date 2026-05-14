@@ -197,6 +197,18 @@ def contains(y, x):
 
 where the `bool()` conversion itself implicitly calls `__bool__` under the hood.
 
+```py
+class NotBoolable:
+    __bool__: int = 3
+
+class WithContains:
+    def __contains__(self, item) -> NotBoolable:
+        return NotBoolable()
+
+# snapshot: unsupported-bool-conversion
+10 in WithContains()
+```
+
 TODO: Ideally the message would explain to the user what's wrong. E.g,
 
 ```ignore
@@ -208,18 +220,27 @@ error: [operator] cannot use `in` operator on object of type `WithContains`
 
 It may also be more appropriate to use `unsupported-operator` as the error code.
 
-<!-- snapshot-diagnostics -->
+```snapshot
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
+ --> src/mdtest_snippet.py:9:1
+  |
+9 | 10 in WithContains()
+  | ^^^^^^^^^^^^^^^^^^^^
+  |
+info: `__bool__` on `NotBoolable` must be callable
+```
 
 ```py
-class NotBoolable:
-    __bool__: int = 3
-
-class WithContains:
-    def __contains__(self, item) -> NotBoolable:
-        return NotBoolable()
-
-# error: [unsupported-bool-conversion]
-10 in WithContains()
-# error: [unsupported-bool-conversion]
+# snapshot: unsupported-bool-conversion
 10 not in WithContains()
+```
+
+```snapshot
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
+  --> src/mdtest_snippet.py:11:1
+   |
+11 | 10 not in WithContains()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: `__bool__` on `NotBoolable` must be callable
 ```

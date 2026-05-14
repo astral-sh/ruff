@@ -105,6 +105,7 @@ fn format_text_document(
 ) -> Result<super::FormatResponse> {
     let settings = query.settings();
     let file_path = query.virtual_file_path();
+    let source_type = query.source_type_for_format();
 
     // If the document is excluded, return early.
     if is_document_excluded_for_formatting(
@@ -119,7 +120,7 @@ fn format_text_document(
     let source = text_document.contents();
     let formatted = crate::format::format(
         text_document,
-        query.source_type(),
+        source_type,
         &settings.formatter,
         &file_path,
         backend,

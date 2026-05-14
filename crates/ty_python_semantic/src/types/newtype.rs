@@ -1,11 +1,11 @@
 use crate::Db;
-use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::types::constraints::ConstraintSet;
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visitor};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashSet;
+use ty_python_core::definition::{Definition, DefinitionKind};
 
 /// A `typing.NewType` declaration, either from the perspective of the
 /// identity-callable-that-acts-like-a-subtype-in-type-expressions returned by the call to
@@ -51,7 +51,7 @@ impl<'db> NewType<'db> {
     }
 
     #[salsa::tracked(
-        cycle_initial=lazy_base_cycle_initial,
+        cycle_initial=|db, _, _| NewTypeBase::ClassType(ClassType::object(db)),
         heap_size=ruff_memory_usage::heap_size
     )]
     fn lazy_base(self, db: &'db dyn Db) -> NewTypeBase<'db> {
@@ -297,12 +297,4 @@ impl<'db> Iterator for NewTypeBaseIter<'db> {
             }
         }
     }
-}
-
-fn lazy_base_cycle_initial<'db>(
-    db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: NewType<'db>,
-) -> NewTypeBase<'db> {
-    NewTypeBase::ClassType(ClassType::object(db))
 }

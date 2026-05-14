@@ -53,6 +53,10 @@ def foo3[**P = [int, str]]() -> None:
 def foo4[**P, **Q = P]():
     reveal_type(P)  # revealed: ParamSpec
     reveal_type(Q)  # revealed: ParamSpec
+
+# error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+def foo5[**Q, **P = [Q]]() -> None:
+    pass
 ```
 
 Other values are invalid.
@@ -123,6 +127,16 @@ def invalid_stringified_annotation[**P](
 def invalid_stringified_variable_annotation[**P](y: Any) -> None:
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     x: "P" = y
+
+class InvalidSpecializationTarget[**P]:
+    attr: Callable[P, None]
+
+def invalid_specialization[**Q](
+    # error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+    a: InvalidSpecializationTarget[[Q]],
+    # error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+    b: InvalidSpecializationTarget[Q,],
+) -> None: ...
 ```
 
 ## Validating `P.args` and `P.kwargs` usage
@@ -287,6 +301,9 @@ class TwoParamSpec[**P1, **P2]:
 
 class TypeVarAndParamSpec[T1, **P1]:
     attr: Callable[P1, T1]
+
+class ParamSpecAndTypeVar[**P1, T1]:
+    attr: Callable[P1, T1]
 ```
 
 Explicit specialization of a generic class involving `ParamSpec` is done by providing either a list
@@ -307,6 +324,21 @@ reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (...) -> None
 
 # error: [invalid-type-arguments] "No type argument provided for required type variable `P1` of class `OnlyParamSpec`"
 reveal_type(OnlyParamSpec[()]().attr)  # revealed: (...) -> None
+```
+
+Specializing a union of generic classes supports the same `ParamSpec` argument forms.
+
+```py
+if input():
+    class ConditionalParamSpec[**P]:
+        attr: Callable[P, None]
+
+else:
+    class ConditionalParamSpec[**P]:
+        attr: Callable[P, None]
+
+def conditional_class_paramspec[**P](_: ConditionalParamSpec[P]) -> None: ...
+def conditional_class_paramspec_list(_: ConditionalParamSpec[[int, str]]) -> None: ...
 ```
 
 An explicit tuple expression (unlike an implicit one that omits the parentheses) is also accepted
@@ -345,6 +377,7 @@ reveal_type(TypeVarAndParamSpec[int, []]().attr)  # revealed: () -> int
 reveal_type(TypeVarAndParamSpec[int, [int, str]]().attr)  # revealed: (int, str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, [str]]().attr)  # revealed: (str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, ...]().attr)  # revealed: (...) -> int
+reveal_type(ParamSpecAndTypeVar[[int, str], str]().attr)  # revealed: (int, str, /) -> str
 
 # error: [invalid-type-arguments] "ParamSpec `P2` is unbound"
 reveal_type(TypeVarAndParamSpec[int, P2]().attr)  # revealed: (...) -> int
@@ -374,6 +407,61 @@ both mypy and Pyright allow this and there are usages of this in the wild e.g.,
 
 ```py
 reveal_type(TypeVarAndParamSpec[int, Any]().attr)  # revealed: (...) -> int
+```
+
+`...` has the same gradual behavior when used as a `ParamSpec` argument in a generic class,
+regardless of the variance of the `ParamSpec`.
+
+```py
+from typing import Callable
+
+class Command[**P]:
+    callback: Callable[P, None]
+
+# confirm that Command is invariant in P
+def _(of_int: Command[int], of_bool: Command[bool]) -> None:
+    a: Command[int] = of_bool  # error: [invalid-assignment]
+    b: Command[bool] = of_int  # error: [invalid-assignment]
+
+# but gradual signature is still assignable in both directions
+def _(concrete: Command[[str]], gradual: Command[...]) -> None:
+    a: Command[...] = concrete
+    b: Command[[str]] = gradual
+```
+
+`ParamSpec` specializations in generic classes are compared using the callable parameter relation.
+This avoids rejecting wrappers around callbacks that are safe to use with a positional-only callback
+protocol.
+
+```py
+from collections.abc import Callable
+from typing import Final
+
+class Job[**P]:
+    target: Final[Callable[P, None]]
+
+    def __init__(self, target: Callable[P, None]) -> None:
+        self.target = target
+
+def named(x: int) -> None:
+    pass
+
+def defaulted(x: int | None = None) -> None:
+    pass
+
+def wrong(x: str) -> None:
+    pass
+
+named_job = Job(named)
+defaulted_job = Job(defaulted)
+wrong_job = Job(wrong)
+
+def takes_int_job(job: Job[[int]]) -> None:
+    pass
+
+takes_int_job(named_job)
+takes_int_job(defaulted_job)
+takes_int_job(wrong_job)  # error: [invalid-argument-type]
 ```
 
 ## `ParamSpec` cannot specialize a `TypeVar`, and vice versa
@@ -678,12 +766,12 @@ class Foo[**P]:
 
 def bar[**P](foo: Foo[P]) -> None:
     reveal_type(foo)  # revealed: Foo[P@bar]
-    reveal_type(foo.args)  # revealed: Unknown | P@bar.args
-    reveal_type(foo.kwargs)  # revealed: Unknown | P@bar.kwargs
+    reveal_type(foo.args)  # revealed: P@bar.args
+    reveal_type(foo.kwargs)  # revealed: P@bar.kwargs
 ```
 
-ty will check whether the argument after `**` is a mapping type but as instance attribute are
-unioned with `Unknown`, it shouldn't error here.
+ty will check whether the argument after `**` is a mapping type, but the inferred attribute type
+preserves the parameter pack here, so it shouldn't error.
 
 ```py
 from typing import Callable
@@ -740,6 +828,60 @@ reveal_type(f)
 
 ### Overloads
 
+#### Return type filtering
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+class A: ...
+class B: ...
+class C: ...
+
+@overload
+def f1(x: A) -> A: ...
+@overload
+def f1(x: B) -> B: ...
+@overload
+def f1(x: C) -> C: ...
+@overload
+def f2(x: A) -> A: ...
+@overload
+def f2(x: B) -> A: ...
+```
+
+```py
+from typing import Callable
+from overloaded import f1, f2, A, B, C
+
+def change_return_type_a[**P](f: Callable[P, A]) -> Callable[P, C]:
+    def nested(*args: P.args, **kwargs: P.kwargs) -> C:
+        return C()
+    return nested
+
+def change_return_type_b[**P](f: Callable[P, B]) -> Callable[P, C]:
+    def nested(*args: P.args, **kwargs: P.kwargs) -> C:
+        return C()
+    return nested
+
+def change_union_return_type[**P](f: Callable[P, A | B]) -> Callable[P, C]:
+    def nested(*args: P.args, **kwargs: P.kwargs) -> C:
+        return C()
+    return nested
+
+reveal_type(change_return_type_a(f1))  # revealed: (x: A) -> C
+reveal_type(change_union_return_type(f1))  # revealed: Overload[(x: A) -> C, (x: B) -> C]
+
+reveal_type(change_return_type_a(f2))  # revealed: Overload[(x: A) -> C, (x: B) -> C]
+reveal_type(change_union_return_type(f2))  # revealed: Overload[(x: A) -> C, (x: B) -> C]
+
+# error: [invalid-argument-type]
+reveal_type(change_return_type_b(f2))  # revealed: (...) -> C
+```
+
+#### Parameter type filtering
+
 `overloaded.pyi`:
 
 ```pyi
@@ -749,38 +891,16 @@ from typing import overload
 def int_int(x: int) -> int: ...
 @overload
 def int_int(x: str) -> int: ...
-@overload
-def int_str(x: int) -> int: ...
-@overload
-def int_str(x: str) -> str: ...
-@overload
-def str_str(x: int) -> str: ...
-@overload
-def str_str(x: str) -> str: ...
 ```
 
 ```py
 from typing import Callable
-from overloaded import int_int, int_str, str_str
-
-def change_return_type[**P](f: Callable[P, int]) -> Callable[P, str]:
-    def nested(*args: P.args, **kwargs: P.kwargs) -> str:
-        return str(f(*args, **kwargs))
-    return nested
+from overloaded import int_int
 
 def with_parameters[**P](f: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> Callable[P, str]:
     def nested(*args: P.args, **kwargs: P.kwargs) -> str:
         return str(f(*args, **kwargs))
     return nested
-
-reveal_type(change_return_type(int_int))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
-
-# TODO: This shouldn't error and should pick the first overload because of the return type
-# error: [invalid-argument-type]
-reveal_type(change_return_type(int_str))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
-
-# error: [invalid-argument-type]
-reveal_type(change_return_type(str_str))  # revealed: (...) -> str
 
 # TODO: This should reveal the matching overload instead
 reveal_type(with_parameters(int_int, 1))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
@@ -934,7 +1054,7 @@ class Container[**P]:
 
     def try_assign[**Q](self, f: Callable[Q, None]) -> Callable[Q, None]:
         # error: [invalid-return-type] "Return type does not match returned value: expected `(**Q@try_assign) -> None`, found `(**P@Container) -> None`"
-        # error: [invalid-argument-type] "Argument to bound method `method` is incorrect: Expected `(**P@Container) -> None`, found `(**Q@try_assign) -> None`"
+        # error: [invalid-argument-type] "Argument to bound method `Container.method` is incorrect: Expected `(**P@Container) -> None`, found `(**Q@try_assign) -> None`"
         return self.method(f)
 ```
 

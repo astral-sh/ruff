@@ -109,6 +109,18 @@ impl From<(u8, u8)> for PythonVersion {
     }
 }
 
+impl TryFrom<(i64, i64)> for PythonVersion {
+    type Error = std::num::TryFromIntError;
+
+    fn try_from(value: (i64, i64)) -> Result<Self, Self::Error> {
+        let (major, minor) = value;
+        Ok(Self {
+            major: u8::try_from(major)?,
+            minor: u8::try_from(minor)?,
+        })
+    }
+}
+
 impl fmt::Display for PythonVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let PythonVersion { major, minor } = self;

@@ -99,6 +99,7 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::BadFilePermissions, Path::new("S103.py"))]
     #[test_case(Rule::SuspiciousPickleUsage, Path::new("S301.py"))]
     #[test_case(Rule::SuspiciousEvalUsage, Path::new("S307.py"))]
     #[test_case(Rule::SuspiciousMarkSafeUsage, Path::new("S308.py"))]

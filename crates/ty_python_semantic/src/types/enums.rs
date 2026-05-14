@@ -6,13 +6,14 @@ use smallvec::SmallVec;
 use crate::{
     Db, FxIndexMap,
     place::{DefinedPlace, Place, place_from_bindings, place_from_declarations},
-    semantic_index::{definition::DefinitionKind, place_table, scope::ScopeId, use_def_map},
+    reachability::DeclarationsIteratorExtension,
     types::{
         ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, LiteralValueTypeKind,
         MemberLookupPolicy, StaticClassLiteral, Type, function::FunctionType,
         set_theoretic::builder::UnionBuilder,
     },
 };
+use ty_python_core::{definition::DefinitionKind, place_table, scope::ScopeId, use_def_map};
 
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct EnumMetadata<'db> {
@@ -30,6 +31,13 @@ pub(crate) struct EnumMetadata<'db> {
     /// When present, member values are validated by synthesizing a call to
     /// `__init__` rather than by simple type assignability.
     pub(crate) init_function: Option<FunctionType<'db>>,
+
+    /// The custom `__new__` function, if defined on this enum.
+    ///
+    /// When present, the RHS of a member declaration is not necessarily the
+    /// value exposed through `.value`; the method can assign `_value_`
+    /// independently.
+    pub(crate) new_function: Option<FunctionType<'db>>,
 }
 
 impl get_size2::GetSize for EnumMetadata<'_> {}
@@ -42,12 +50,13 @@ impl<'db> EnumMetadata<'db> {
             auto_members: FxHashSet::default(),
             value_annotation: None,
             init_function: None,
+            new_function: None,
         }
     }
 
     /// Returns the type of `.value`/`._value_` for a given enum member.
     ///
-    /// Priority: explicit `_value_` annotation, then `__init__` → `Any`,
+    /// Priority: explicit `_value_` annotation, then custom construction hooks → `Any`,
     /// then the inferred member value type.
     pub(crate) fn value_type(&self, member_name: &Name) -> Option<Type<'db>> {
         if !self.members.contains_key(member_name) {
@@ -55,7 +64,7 @@ impl<'db> EnumMetadata<'db> {
         }
         if let Some(annotation) = self.value_annotation {
             Some(annotation)
-        } else if self.init_function.is_some() {
+        } else if self.init_function.is_some() || self.new_function.is_some() {
             Some(Type::Dynamic(DynamicType::Any))
         } else {
             self.members.get(member_name).copied()
@@ -75,7 +84,7 @@ impl<'db> EnumMetadata<'db> {
     /// narrowed to a specific member (e.g. `x: MyEnum` where `MyEnum` has multiple members).
     ///
     /// If there is an explicit `_value_` annotation, returns that.
-    /// If there is a custom `__init__`, returns `Any`.
+    /// If there is a custom `__init__` or `__new__`, returns `Any`.
     /// Otherwise, returns the union of all member value types.
     pub(crate) fn instance_value_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         if self.members.is_empty() {
@@ -83,7 +92,7 @@ impl<'db> EnumMetadata<'db> {
         }
         if let Some(annotation) = self.value_annotation {
             Some(annotation)
-        } else if self.init_function.is_some() {
+        } else if self.init_function.is_some() || self.new_function.is_some() {
             Some(Type::Dynamic(DynamicType::Any))
         } else {
             let union = self
@@ -152,6 +161,33 @@ pub(crate) fn enum_ignored_names<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -
     }
 }
 
+/// If `value_ty` is a hashable literal and already exists in `enum_values`,
+/// record it as an alias and return `true`. Otherwise track it as canonical.
+fn try_register_alias<'db>(
+    value_ty: Type<'db>,
+    name: &Name,
+    enum_values: &mut FxHashMap<Type<'db>, Name>,
+    aliases: &mut FxHashMap<Name, Name>,
+) -> bool {
+    if !matches!(
+        value_ty.as_literal_value_kind(),
+        Some(
+            LiteralValueTypeKind::Bool(_)
+                | LiteralValueTypeKind::Int(_)
+                | LiteralValueTypeKind::String(_)
+                | LiteralValueTypeKind::Bytes(_)
+        )
+    ) {
+        return false;
+    }
+    if let Some(canonical) = enum_values.get(&value_ty) {
+        aliases.insert(name.clone(), canonical.clone());
+        return true;
+    }
+    enum_values.insert(value_ty, name.clone());
+    false
+}
+
 /// List all members of an enum.
 #[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| Some(EnumMetadata::empty()), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn enum_metadata<'db>(
@@ -173,6 +209,29 @@ pub(crate) fn enum_metadata<'db>(
             return None;
         }
         ClassLiteral::DynamicNamedTuple(..) | ClassLiteral::DynamicTypedDict(..) => return None,
+        ClassLiteral::DynamicEnum(enum_lit) => {
+            let spec = enum_lit.spec(db);
+            if !spec.has_known_members(db) {
+                return None;
+            }
+            let mut members = FxIndexMap::default();
+            let mut aliases = FxHashMap::default();
+            let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
+            for (name, ty) in spec.members(db) {
+                if try_register_alias(*ty, name, &mut enum_values, &mut aliases) {
+                    continue;
+                }
+                members.insert(name.clone(), *ty);
+            }
+            return Some(EnumMetadata {
+                members,
+                aliases,
+                auto_members: FxHashSet::default(),
+                value_annotation: None,
+                init_function: None,
+                new_function: None,
+            });
+        }
     };
 
     // This is a fast path to avoid traversing the MRO of known classes
@@ -194,6 +253,8 @@ pub(crate) fn enum_metadata<'db>(
     let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
     let mut auto_counter = 0;
     let mut auto_members = FxHashSet::default();
+    let mut prev_value_was_non_literal_int = false;
+    let mut prev_bool_literal = None;
     let ignored_names = enum_ignored_names(db, scope_id);
 
     let mut aliases = FxHashMap::default();
@@ -282,7 +343,15 @@ pub(crate) fn enum_metadata<'db>(
                                             custom_mixins.as_slice(),
                                             [] | [Some(KnownClass::Int)]
                                         ) {
-                                            Type::int_literal(auto_counter)
+                                            if prev_value_was_non_literal_int {
+                                                KnownClass::Int.to_instance(db)
+                                            } else if let Some(prev_bool_literal) =
+                                                prev_bool_literal
+                                            {
+                                                Type::int_literal(i64::from(prev_bool_literal) + 1)
+                                            } else {
+                                                Type::int_literal(auto_counter)
+                                            }
                                         } else {
                                             Type::any()
                                         }
@@ -323,26 +392,8 @@ pub(crate) fn enum_metadata<'db>(
                 }
             };
 
-            // Duplicate values are aliases that are not considered separate members. This check is only
-            // performed if we can infer a precise literal type for the enum member. If we only get `int`,
-            // we don't know if it's a duplicate or not.
-            if matches!(
-                value_ty.as_literal_value_kind(),
-                Some(
-                    LiteralValueTypeKind::Bool(_)
-                        | LiteralValueTypeKind::Int(_)
-                        | LiteralValueTypeKind::String(_)
-                        | LiteralValueTypeKind::Bytes(_)
-                )
-            ) {
-                if let Some(canonical) = enum_values.get(&value_ty) {
-                    // This is a duplicate value, create an alias to the canonical (first) member
-                    aliases.insert(name.clone(), canonical.clone());
-                    return None;
-                }
-
-                // This is the first occurrence of this value, track it as the canonical member
-                enum_values.insert(value_ty, name.clone());
+            if try_register_alias(value_ty, name, &mut enum_values, &mut aliases) {
+                return None;
             }
 
             let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
@@ -363,6 +414,18 @@ pub(crate) fn enum_metadata<'db>(
                 return None;
             }
 
+            //Ttrack whether this member's value is a non-literal `int`, so a
+            // following `auto()` knows to widen its result to `int`.
+            prev_value_was_non_literal_int = value_ty.as_int_like_literal().is_none()
+                && value_ty.is_assignable_to(db, KnownClass::Int.to_instance(db));
+            prev_bool_literal =
+                value_ty
+                    .as_literal_value_kind()
+                    .and_then(|literal| match literal {
+                        LiteralValueTypeKind::Bool(value) => Some(value),
+                        _ => None,
+                    });
+
             Some((name.clone(), value_ty))
         })
         .collect::<FxIndexMap<_, _>>();
@@ -377,8 +440,9 @@ pub(crate) fn enum_metadata<'db>(
     let value_annotation =
         custom_value_annotation(db, scope_id).or_else(|| inherited_value_annotation(db, class));
 
-    // Look up a custom `__init__`, falling back to parent enum classes.
+    // Look up custom construction hooks, falling back to parent enum classes.
     let init_function = custom_init(db, scope_id).or_else(|| inherited_init(db, class));
+    let new_function = custom_new(db, scope_id).or_else(|| inherited_new(db, class));
 
     Some(EnumMetadata {
         members,
@@ -386,11 +450,13 @@ pub(crate) fn enum_metadata<'db>(
         auto_members,
         value_annotation,
         init_function,
+        new_function,
     })
 }
 
-/// Iterates over parent enum classes in the MRO, skipping known classes
-/// (like `Enum`, `StrEnum`, etc.) that we handle specially.
+/// Iterates over parent enum classes in the MRO, skipping known enum
+/// infrastructure classes but including `IntEnum`, `Flag`, and `IntFlag`
+/// which declare `_value_` annotations that should be inherited.
 fn iter_parent_enum_classes<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
@@ -401,7 +467,13 @@ fn iter_parent_enum_classes<'db>(
         .filter_map(ClassBase::into_class)
         .filter_map(move |class_type| {
             let base = class_type.class_literal(db).as_static()?;
-            (base.known(db).is_none() && is_enum_class_by_inheritance(db, base)).then_some(base)
+            let is_traversable = base.known(db).is_none_or(|k| {
+                matches!(
+                    k,
+                    KnownClass::IntEnum | KnownClass::Flag | KnownClass::IntFlag
+                )
+            });
+            (is_traversable && is_enum_class_by_inheritance(db, base)).then_some(base)
         })
 }
 
@@ -431,6 +503,14 @@ fn inherited_init<'db>(
     iter_parent_enum_classes(db, class).find_map(|base| custom_init(db, base.body_scope(db)))
 }
 
+/// Looks up an inherited `__new__` from parent enum classes in the MRO.
+fn inherited_new<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<FunctionType<'db>> {
+    iter_parent_enum_classes(db, class).find_map(|base| custom_new(db, base.body_scope(db)))
+}
+
 /// Returns the custom `__init__` function type if one is defined on the enum.
 fn custom_init<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<FunctionType<'db>> {
     let init_symbol_id = place_table(db, scope).symbol_id("__init__")?;
@@ -442,6 +522,22 @@ fn custom_init<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<FunctionType
     .ignore_possibly_undefined()?;
 
     match init_type {
+        Type::FunctionLiteral(f) => Some(f),
+        _ => None,
+    }
+}
+
+/// Returns the custom `__new__` function type if one is defined on the enum.
+fn custom_new<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<FunctionType<'db>> {
+    let new_symbol_id = place_table(db, scope).symbol_id("__new__")?;
+    let new_type = place_from_declarations(
+        db,
+        use_def_map(db, scope).end_of_scope_symbol_declarations(new_symbol_id),
+    )
+    .ignore_conflicting_declarations()
+    .ignore_possibly_undefined()?;
+
+    match new_type {
         Type::FunctionLiteral(f) => Some(f),
         _ => None,
     }

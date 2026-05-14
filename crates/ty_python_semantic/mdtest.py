@@ -40,12 +40,14 @@ class MDTestRunner:
     filters: list[str]
     enable_external: bool
     upgrade_lockfiles: bool
+    update_snapshots: bool
 
     def __init__(
         self,
         filters: list[str] | None,
         enable_external: bool,
         upgrade_lockfiles: bool,
+        update_snapshots: bool,
     ) -> None:
         self.mdtest_executable = None
         self.console = Console()
@@ -55,6 +57,7 @@ class MDTestRunner:
         ]
         self.enable_external = enable_external
         self.upgrade_lockfiles = upgrade_lockfiles
+        self.update_snapshots = update_snapshots
 
     def _run_cargo_test(self, *, message_format: Literal["human", "json"]) -> str:
         return subprocess.check_output(
@@ -70,7 +73,12 @@ class MDTestRunner:
                 message_format,
             ],
             cwd=CRATE_ROOT,
-            env=dict(os.environ, CLI_COLOR="1"),
+            env=dict(
+                os.environ,
+                CLI_COLOR="1",
+                CARGO_PROFILE_DEV_OPT_LEVEL="0" if self.filters else "1",
+                CARGO_PROFILE_DEV_DEBUG="line-tables-only",
+            ),
             stderr=subprocess.STDOUT,
             text=True,
         )
@@ -103,12 +111,12 @@ class MDTestRunner:
         return True
 
     def _get_executable_path_from_json(self, json_output: str) -> None:
-        for json_line in json_output.splitlines():
+        for json_line in json_output.splitlines()[::-1]:
             try:
                 data = json.loads(json_line)
             except json.JSONDecodeError:
                 continue
-            if data.get("target", {}).get("name") == "mdtest":
+            if data.get("target", {}).get("name") == "mdtest" and data["executable"]:
                 self.mdtest_executable = Path(data["executable"])
                 break
         else:
@@ -132,6 +140,7 @@ class MDTestRunner:
                 INSTA_OUTPUT="none",
                 MDTEST_EXTERNAL="1" if self.enable_external else "0",
                 MDTEST_UPGRADE_LOCKFILES="1" if self.upgrade_lockfiles else "0",
+                MDTEST_UPDATE_SNAPSHOTS="1" if self.update_snapshots else "0",
             ),
             capture_output=capture_output,
             text=True,
@@ -317,6 +326,11 @@ def main() -> None:
         help="By default, lockfiles will be upgraded when dependency requirements in the Markdown test change."
         + " Set this flag to never upgrade any lockfiles.",
     )
+    parser.add_argument(
+        "--no-snapshot-updates",
+        action="store_true",
+        help="By default, inline snapshots will be updated automatically when they are stale. Set this flag to disable this.",
+    )
 
     args = parser.parse_args()
 
@@ -325,6 +339,7 @@ def main() -> None:
             filters=args.filters,
             enable_external=args.enable_external,
             upgrade_lockfiles=not args.no_lockfile_upgrades,
+            update_snapshots=not args.no_snapshot_updates,
         )
         runner.watch()
     except KeyboardInterrupt:

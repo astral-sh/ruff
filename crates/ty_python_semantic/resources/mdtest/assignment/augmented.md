@@ -47,18 +47,28 @@ reveal_type(x)  # revealed: int
 
 ## Unsupported types
 
-<!-- snapshot-diagnostics -->
-
 ```py
 class C:
     def __isub__(self, other: str) -> int:
         return 42
 
 x = C()
-# error: [unsupported-operator] "Operator `-=` is not supported between objects of type `C` and `Literal[1]`"
+# snapshot: unsupported-operator
 x -= 1
 
 reveal_type(x)  # revealed: int
+```
+
+```snapshot
+error[unsupported-operator]: Unsupported `-=` operation
+ --> src/mdtest_snippet.py:7:1
+  |
+7 | x -= 1
+  | -^^^^-
+  | |    |
+  | |    Has type `Literal[1]`
+  | Has type `C`
+  |
 ```
 
 ## Method union

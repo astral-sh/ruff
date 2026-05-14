@@ -113,7 +113,7 @@ class B:
 
 def _(flag: bool):
     cls = A if flag else B
-    # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `str`, found `Literal[1]`"
+    # error: [invalid-argument-type] "Argument to `B.__init__` is incorrect: Expected `str`, found `Literal[1]`"
     reveal_type(cls(1))  # revealed: A | B
 ```
 
@@ -129,8 +129,8 @@ class B:
     def __init__(self, x: int) -> None: ...
 
 def _(factory: type[A] | type[B]):
-    # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `int`, found `Literal["hello"]`"
-    # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `int`, found `Literal["hello"]`"
+    # error: [invalid-argument-type] "Argument to `A.__init__` is incorrect: Expected `int`, found `Literal["hello"]`"
+    # error: [invalid-argument-type] "Argument to `B.__init__` is incorrect: Expected `int`, found `Literal["hello"]`"
     factory("hello")
 ```
 
@@ -155,8 +155,8 @@ class IntDiag(DeferredDiagBase[int]): ...
 class StrDiag(DeferredDiagBase[str]): ...
 
 def _(factory: type[IntDiag] | type[StrDiag]):
-    # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `int`, found `float`"
-    # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `str`, found `float`"
+    # error: [invalid-argument-type] "Argument to `DeferredDiagBase.__init__` is incorrect: Expected `int`, found `float`"
+    # error: [invalid-argument-type] "Argument to `DeferredDiagBase.__init__` is incorrect: Expected `str`, found `float`"
     factory(1.2)
 ```
 
@@ -212,13 +212,21 @@ def _(flag: bool):
 
 ## Union including a special-cased function
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
+def identity[T](x: T) -> T:
+    return x
+
 def _(flag: bool):
     if flag:
-        f = str
+        f = identity
     else:
         f = repr
-    reveal_type(str("string"))  # revealed: Literal["string"]
+    reveal_type(identity("string"))  # revealed: Literal["string"]
     reveal_type(repr("string"))  # revealed: Literal["'string'"]
     reveal_type(f("string"))  # revealed: Literal["string", "'string'"]
 ```
@@ -316,7 +324,7 @@ class RecursiveAttr:
     def update(self):
         self.i = self.i + 1
 
-reveal_type(RecursiveAttr().i)  # revealed: Unknown | int
+reveal_type(RecursiveAttr().i)  # revealed: int
 
 # Here are some recursive but saturating examples. Because it's difficult to statically determine whether literal unions saturate or diverge,
 # we widen them early, even though they may actually be convergent.
@@ -327,7 +335,7 @@ class RecursiveAttr2:
     def update(self):
         self.i = (self.i + 1) % 4
 
-reveal_type(RecursiveAttr2().i)  # revealed: Unknown | Literal[0, 1, 2, 3]
+reveal_type(RecursiveAttr2().i)  # revealed: int
 
 class RecursiveAttr3:
     def __init__(self):
@@ -337,7 +345,7 @@ class RecursiveAttr3:
         self.i = (self.i + 1) % 5
 
 # Going beyond the MAX_RECURSIVE_UNION_LITERALS limit:
-reveal_type(RecursiveAttr3().i)  # revealed: Unknown | int
+reveal_type(RecursiveAttr3().i)  # revealed: int
 ```
 
 We set a much higher limit for non-recursive unions of enum literals, because huge enums are common
@@ -899,8 +907,6 @@ def _(flag: bool):
 
 ## Union of intersections with failing bindings
 
-<!-- snapshot-diagnostics -->
-
 When calling a union where one element is an intersection of callables, and all bindings in that
 intersection fail, we should report errors with both union and intersection context.
 
@@ -922,10 +928,61 @@ class BytesCaller:
 
 def test(f: Intersection[IntCaller, StrCaller] | BytesCaller):
     # Call with None - should fail for IntCaller, StrCaller, and BytesCaller
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
+    # snapshot: invalid-argument-type
+    # snapshot: invalid-argument-type
+    # snapshot: invalid-argument-type
     f(None)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to bound method `IntCaller.__call__` is incorrect
+  --> src/mdtest_snippet.py:21:7
+   |
+21 |     f(None)
+   |       ^^^^ Expected `int`, found `None`
+   |
+info: Method defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __call__(self, x: int) -> int:
+  |         ^^^^^^^^       ------ Parameter declared here
+  |
+info: Intersection element `IntCaller` is incompatible with this call site
+info: Attempted to call intersection type `IntCaller & StrCaller`
+info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
+
+
+error[invalid-argument-type]: Argument to bound method `BytesCaller.__call__` is incorrect
+  --> src/mdtest_snippet.py:21:7
+   |
+21 |     f(None)
+   |       ^^^^ Expected `bytes`, found `None`
+   |
+info: Method defined here
+  --> src/mdtest_snippet.py:13:9
+   |
+13 |     def __call__(self, x: bytes) -> bytes:
+   |         ^^^^^^^^       -------- Parameter declared here
+   |
+info: Union variant `BytesCaller` is incompatible with this call site
+info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
+
+
+error[invalid-argument-type]: Argument to bound method `StrCaller.__call__` is incorrect
+  --> src/mdtest_snippet.py:21:7
+   |
+21 |     f(None)
+   |       ^^^^ Expected `str`, found `None`
+   |
+info: Method defined here
+ --> src/mdtest_snippet.py:9:9
+  |
+9 |     def __call__(self, x: str) -> str:
+  |         ^^^^^^^^       ------ Parameter declared here
+  |
+info: Intersection element `StrCaller` is incompatible with this call site
+info: Attempted to call intersection type `IntCaller & StrCaller`
+info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
 ```
 
 ## Union semantics with constrained callable typevars

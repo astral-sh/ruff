@@ -1,5 +1,6 @@
 use crate::Db;
 use crate::glob::{ExcludeFilter, IncludeExcludeFilter, IncludeFilter, PortableGlobKind};
+use crate::metadata::python_version::SupportedPythonVersion;
 use crate::metadata::settings::{OverrideSettings, SrcSettings};
 
 use super::settings::{Override, Settings, TerminalSettings};
@@ -20,23 +21,26 @@ use ruff_macros::{Combine, OptionsMetadata, RustDoc};
 use ruff_options_metadata::{OptionSet, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHasher;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt::{self, Debug, Display};
 use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 use std::sync::Arc;
+use strum::IntoEnumIterator;
 use thiserror::Error;
 use ty_combine::Combine;
 use ty_module_resolver::{
     ModuleGlobSet, ModuleGlobSetBuilder, SearchPathSettings, SearchPathSettingsError, SearchPaths,
 };
+use ty_python_core::platform::PythonPlatform;
+use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings};
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
-    AnalysisSettings, MisconfigurationStrategy, ProgramSettings, PythonEnvironment, PythonPlatform,
-    PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource, SitePackagesPaths,
-    SysPrefixPathOrigin,
+    AnalysisSettings, PythonEnvironment, PythonVersionFileSource, PythonVersionSource,
+    PythonVersionWithSource, SitePackagesPaths, SysPrefixPathOrigin,
+    inferred_python_version_source_annotation,
 };
 use ty_static::EnvVars;
 
@@ -159,24 +163,15 @@ impl Options {
         system: &dyn System,
         vendored: &VendoredFileSystem,
         strategy: &Strategy,
-    ) -> Result<ProgramSettings, Strategy::Error<anyhow::Error>> {
+    ) -> Result<(ProgramSettings, Vec<ProgramSettingsDiagnostic>), Strategy::Error<anyhow::Error>>
+    {
+        let mut diagnostics = Vec::new();
         let environment = self.environment.or_default();
 
-        let options_python_version =
-            environment
-                .python_version
-                .as_ref()
-                .map(|ranged_version| PythonVersionWithSource {
-                    version: **ranged_version,
-                    source: match ranged_version.source() {
-                        ValueSource::Cli => PythonVersionSource::Cli,
-                        ValueSource::File(path) => PythonVersionSource::ConfigFile(
-                            PythonVersionFileSource::new(path.clone(), ranged_version.range()),
-                        ),
-                        ValueSource::Editor => PythonVersionSource::Editor,
-                    },
-                });
-
+        let configured_python_version = environment
+            .python_version
+            .as_ref()
+            .map(python_version_from_config);
         let python_platform = environment
             .python_platform
             .as_deref()
@@ -249,14 +244,20 @@ impl Options {
             }).ok()
         });
 
-        let python_version = options_python_version
+        let python_version = configured_python_version
+            .map(PythonVersionResolution::Configured)
             .or_else(|| {
-                python_environment
-                    .as_ref()?
-                    .python_version_from_metadata()
+                let inferred_python_version = python_environment
+                    .as_ref()
+                    .and_then(|python_environment| {
+                        python_environment.python_version_from_metadata()
+                    })
                     .cloned()
+                    .or_else(|| site_packages_paths.python_version_from_layout());
+
+                inferred_python_version.map(PythonVersionResolution::Inferred)
             })
-            .or_else(|| site_packages_paths.python_version_from_layout())
+            .and_then(|resolution| resolution.into_program_version(&mut diagnostics))
             .unwrap_or_default();
 
         // Safe mode is handled inside this function, so we just assume this can't fail
@@ -275,11 +276,14 @@ impl Options {
             python_version = python_version.version
         );
 
-        Ok(ProgramSettings {
-            python_version,
-            python_platform,
-            search_paths,
-        })
+        Ok((
+            ProgramSettings {
+                python_version,
+                python_platform,
+                search_paths,
+            },
+            diagnostics,
+        ))
     }
 
     #[expect(clippy::too_many_arguments)]
@@ -542,27 +546,145 @@ impl Options {
     }
 }
 
-fn deserialize_supported_python_version<'de, D>(
-    deserializer: D,
-) -> Result<Option<RangedValue<PythonVersion>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let python_version = Option::<RangedValue<PythonVersion>>::deserialize(deserializer)?;
-
-    if let Some(python_version) = &python_version
-        && !PythonVersion::iter().any(|supported_version| supported_version == **python_version)
-    {
-        return Err(serde::de::Error::custom(format!(
-            "unsupported value `{python_version}` for `python-version`; expected one of {}",
-            PythonVersion::iter()
-                .map(|version| format!("`{version}`"))
-                .collect::<Vec<_>>()
-                .join(", ")
-        )));
+fn python_version_from_config(
+    ranged_version: &RangedValue<SupportedPythonVersion>,
+) -> PythonVersionWithSource {
+    PythonVersionWithSource {
+        version: PythonVersion::from(**ranged_version),
+        source: match ranged_version.source() {
+            ValueSource::Cli => PythonVersionSource::Cli,
+            ValueSource::File(path) => PythonVersionSource::ConfigFile(
+                PythonVersionFileSource::new(path.clone(), ranged_version.range()),
+            ),
+            ValueSource::Editor => PythonVersionSource::Editor,
+        },
     }
+}
 
-    Ok(python_version)
+/// A Python version before unsupported inferred versions are filtered.
+#[derive(Eq, PartialEq, Debug, Clone)]
+enum PythonVersionResolution {
+    /// The Python version was configured directly by the user.
+    Configured(PythonVersionWithSource),
+    /// The Python version was inferred from the environment.
+    Inferred(PythonVersionWithSource),
+}
+
+impl PythonVersionResolution {
+    fn into_program_version(
+        self,
+        diagnostics: &mut Vec<ProgramSettingsDiagnostic>,
+    ) -> Option<PythonVersionWithSource> {
+        match self {
+            Self::Configured(python_version) => Some(python_version),
+            Self::Inferred(python_version) => {
+                if SupportedPythonVersion::try_from(python_version.version).is_ok() {
+                    Some(python_version)
+                } else {
+                    diagnostics.push(ProgramSettingsDiagnostic::UnsupportedInferredPythonVersion(
+                        python_version,
+                    ));
+                    None
+                }
+            }
+        }
+    }
+}
+
+/// A diagnostic produced while resolving [`ProgramSettings`].
+///
+/// These diagnostics are kept separate from [`OptionDiagnostic`] while program settings are
+/// resolved so that this step does not need access to the database.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum ProgramSettingsDiagnostic {
+    /// The Python version inferred from the environment is newer than ty supports.
+    UnsupportedInferredPythonVersion(PythonVersionWithSource),
+}
+
+impl ProgramSettingsDiagnostic {
+    /// Convert this program-settings diagnostic into a diagnostic that can be stored on a project.
+    pub(crate) fn into_diagnostic(self, db: &dyn Db) -> OptionDiagnostic {
+        match self {
+            Self::UnsupportedInferredPythonVersion(python_version) => {
+                unsupported_inferred_python_version_diagnostic(db, &python_version)
+            }
+        }
+    }
+}
+
+/// Construct an [`OptionDiagnostic`] to indicate that the inferred Python version is unsupported.
+fn unsupported_inferred_python_version_diagnostic(
+    db: &dyn Db,
+    python_version: &PythonVersionWithSource,
+) -> OptionDiagnostic {
+    let expected = SupportedPythonVersion::iter()
+        .map(|version| format!("`{version}`"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let fallback = PythonVersion::latest_ty();
+
+    let mut diagnostic = OptionDiagnostic::new(
+        DiagnosticId::UnsupportedPythonVersion,
+        format!(
+            "Ignoring unsupported inferred Python version `{}`; ty will use Python {fallback} instead.",
+            python_version.version
+        ),
+        Severity::Warning,
+    )
+    .sub(SubDiagnostic::new(
+        SubDiagnosticSeverity::Info,
+        format!("Expected one of {expected}."),
+    ))
+    .sub(SubDiagnostic::new(
+        SubDiagnosticSeverity::Info,
+        "Set `environment.python-version` explicitly to override the inferred version.",
+    ));
+
+    diagnostic = match &python_version.source {
+        source @ PythonVersionSource::ConfigFile(_) => diagnostic
+            .with_annotation(inferred_python_version_source_annotation(db, source))
+            .sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                "The version was inferred from a configuration file.",
+            )),
+        source @ PythonVersionSource::PyvenvCfgFile(_) => diagnostic
+            .with_annotation(inferred_python_version_source_annotation(db, source))
+            .sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                "The version was inferred from your virtual environment metadata.",
+            )),
+        PythonVersionSource::InstallationDirectoryLayout {
+            site_packages_parent_dir,
+            source,
+        } => diagnostic
+            .with_annotation(inferred_python_version_source_annotation(
+                db,
+                &PythonVersionSource::InstallationDirectoryLayout {
+                    site_packages_parent_dir: site_packages_parent_dir.clone(),
+                    source: source.clone(),
+                },
+            ))
+            .sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                format!(
+                    "The version was inferred from the `lib/{site_packages_parent_dir}/site-packages` directory layout.",
+                ),
+            )),
+        PythonVersionSource::Cli => diagnostic.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            "The version was inferred from the command line.",
+        )),
+        PythonVersionSource::Editor => diagnostic.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            "The version was inferred from your editor.",
+        )),
+        PythonVersionSource::Default => diagnostic.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            "ty fell back to its default Python version.",
+        )),
+    };
+
+    diagnostic
 }
 
 /// Return the site-packages from the environment ty is installed in, as derived from ty's
@@ -647,7 +769,7 @@ pub struct EnvironmentOptions {
 
     /// Specifies the version of Python that will be used to analyze the source code.
     /// The version should be specified as a string in the format `M.m` where `M` is the major version
-    /// and `m` is the minor (e.g. `"3.0"` or `"3.6"`).
+    /// and `m` is the minor (e.g. `"3.7"` or `"3.12"`).
     /// If a version is provided, ty will generate errors if the source code makes use of language features
     /// that are not supported in that version.
     ///
@@ -662,19 +784,15 @@ pub struct EnvironmentOptions {
     /// For some language features, ty can also understand conditionals based on comparisons
     /// with `sys.version_info`. These are commonly found in typeshed, for example,
     /// to reflect the differing contents of the standard library across Python versions.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_supported_python_version"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#""3.14""#,
-        value_type = r#""3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | "3.14" | <major>.<minor>"#,
+        value_type = r#""3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | "3.14" | "3.15""#,
         example = r#"
             python-version = "3.12"
         "#
     )]
-    pub python_version: Option<RangedValue<PythonVersion>>,
+    pub python_version: Option<RangedValue<SupportedPythonVersion>>,
 
     /// Specifies the target platform that will be used to analyze the source code.
     /// If specified, ty will understand conditions based on comparisons with `sys.platform`, such
@@ -2066,7 +2184,7 @@ impl OptionDiagnostic {
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct ProjectOptionsOverrides {
     pub config_file_override: Option<SystemPathBuf>,
-    pub fallback_python_version: Option<RangedValue<PythonVersion>>,
+    pub fallback_python_version: Option<RangedValue<SupportedPythonVersion>>,
     pub fallback_python: Option<RelativePathBuf>,
     pub options: Options,
 }

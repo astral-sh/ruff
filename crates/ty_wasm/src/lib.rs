@@ -17,16 +17,17 @@ use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_ide::{
-    InlayHintSettings, MarkupKind, RangedValue, document_highlights, find_references,
-    goto_declaration, goto_definition, goto_type_definition, hover, inlay_hints,
+    Hint as IdeHint, InlayHintSettings, MarkupKind, RangedValue, can_rename, document_highlights,
+    find_references, goto_declaration, goto_definition, goto_type_definition, hover, inlay_hints,
+    rename,
 };
-use ty_ide::{NavigationTarget, NavigationTargets, signature_help};
+use ty_ide::{NavigationTarget, NavigationTargets, hints, signature_help};
 use ty_project::metadata::options::Options;
 use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use ty_project::{CheckMode, ProjectMetadata};
 use ty_project::{Db, ProjectDatabase};
-use ty_python_semantic::{FallibleStrategy, Program};
+use ty_python_core::program::{FallibleStrategy, Program};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -164,12 +165,22 @@ impl Workspace {
         )
         .map_err(into_error)?;
 
-        let program_settings = project
+        let (program_settings, program_settings_diagnostics) = project
             .to_program_settings(&self.system, self.db.vendored(), &FallibleStrategy)
             .map_err(into_error)?;
         Program::get(&self.db).update_from_settings(&mut self.db, program_settings);
 
-        self.db.project().reload(&mut self.db, project);
+        let (settings, settings_diagnostics) = project
+            .to_settings(&self.db, &FallibleStrategy)
+            .map_err(into_error)?;
+
+        self.db.project().reload(
+            &mut self.db,
+            project,
+            Some(settings),
+            settings_diagnostics,
+            program_settings_diagnostics,
+        );
 
         Ok(())
     }
@@ -184,7 +195,7 @@ impl Workspace {
             .map_err(into_error)?;
 
         self.db.apply_changes(
-            vec![ChangeEvent::Created {
+            &[ChangeEvent::Created {
                 path: path.clone(),
                 kind: CreatedKind::File,
             }],
@@ -217,7 +228,7 @@ impl Workspace {
             .map_err(into_error)?;
 
         self.db.apply_changes(
-            vec![
+            &[
                 ChangeEvent::Changed {
                     path: system_path.to_path_buf(),
                     kind: ChangedKind::FileContent,
@@ -251,7 +262,7 @@ impl Workspace {
                 .map_err(into_error)?;
 
             self.db.apply_changes(
-                vec![ChangeEvent::Deleted {
+                &[ChangeEvent::Deleted {
                     path: system_path.to_path_buf(),
                     kind: DeletedKind::File,
                 }],
@@ -268,6 +279,14 @@ impl Workspace {
         let result = self.db.check_file(file_id.file);
 
         Ok(result.into_iter().map(Diagnostic::wrap).collect())
+    }
+
+    #[wasm_bindgen(js_name = "hints")]
+    pub fn hints(&self, file_id: &FileHandle) -> Result<Vec<Hint>, Error> {
+        Ok(hints(&self.db, file_id.file)
+            .into_iter()
+            .map(|hint| Hint::from_ide_hint(&self.db, file_id.file, self.position_encoding, &hint))
+            .collect())
     }
 
     /// Checks all open files
@@ -409,6 +428,63 @@ impl Workspace {
                     &source,
                     self.position_encoding,
                 )),
+            })
+            .collect())
+    }
+
+    #[wasm_bindgen(js_name = "prepareRename")]
+    pub fn prepare_rename(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Option<Range>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(range) = can_rename(&self.db, file_id.file, offset) else {
+            return Ok(None);
+        };
+
+        Ok(Some(Range::from_text_range(
+            range,
+            &index,
+            &source,
+            self.position_encoding,
+        )))
+    }
+
+    #[wasm_bindgen]
+    pub fn rename(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+        new_name: &str,
+    ) -> Result<Vec<RenameEdit>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        if can_rename(&self.db, file_id.file, offset).is_none() {
+            return Ok(Vec::new());
+        }
+
+        let Some(rename_results) = rename(&self.db, file_id.file, offset, new_name) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(rename_results
+            .into_iter()
+            .map(|target| RenameEdit {
+                path: target.file().path(&self.db).to_string(),
+                range: Range::from_file_range(
+                    &self.db,
+                    target.file_range(),
+                    self.position_encoding,
+                ),
+                new_text: new_name.to_string(),
             })
             .collect())
     }
@@ -777,6 +853,33 @@ impl FileHandle {
 pub struct Diagnostic {
     #[wasm_bindgen(readonly)]
     inner: diagnostic::Diagnostic,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Hint {
+    #[wasm_bindgen(getter_with_clone)]
+    pub message: String,
+    pub range: Range,
+}
+
+impl Hint {
+    fn from_ide_hint(
+        db: &dyn Db,
+        file: File,
+        position_encoding: PositionEncoding,
+        hint: &IdeHint,
+    ) -> Self {
+        Self {
+            message: hint.message(),
+            range: Range::from_text_range(
+                hint.range,
+                &line_index(db, file),
+                &source_text(db, file),
+                position_encoding,
+            ),
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -1178,6 +1281,16 @@ impl From<ty_ide::CompletionKind> for CompletionKind {
 #[wasm_bindgen]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextEdit {
+    pub range: Range,
+    #[wasm_bindgen(getter_with_clone)]
+    pub new_text: String,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenameEdit {
+    #[wasm_bindgen(getter_with_clone)]
+    pub path: String,
     pub range: Range,
     #[wasm_bindgen(getter_with_clone)]
     pub new_text: String,

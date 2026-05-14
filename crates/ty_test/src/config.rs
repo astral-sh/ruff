@@ -12,11 +12,10 @@
 //! dependencies = ["pydantic==2.12.2"]
 //! ```
 
-use anyhow::Context;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
 use serde::{Deserialize, Serialize};
-use ty_python_semantic::PythonPlatform;
+use ty_python_core::platform::PythonPlatform;
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
@@ -41,10 +40,6 @@ pub(crate) struct MarkdownTestConfig {
 }
 
 impl MarkdownTestConfig {
-    pub(crate) fn from_str(s: &str) -> anyhow::Result<Self> {
-        toml::from_str(s).context("Error while parsing Markdown TOML config")
-    }
-
     pub(crate) fn python_version(&self) -> Option<PythonVersion> {
         self.environment.as_ref()?.python_version
     }

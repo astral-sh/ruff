@@ -424,7 +424,7 @@ impl LintRegistry {
 
     /// Iterates over all removed lints.
     pub fn removed(&self) -> impl Iterator<Item = LintId> + '_ {
-        self.by_name.iter().filter_map(|(_, value)| {
+        self.by_name.values().filter_map(|value| {
             if let LintEntry::Removed(metadata) = value {
                 Some(*metadata)
             } else {

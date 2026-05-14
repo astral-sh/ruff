@@ -3,21 +3,20 @@
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
-use crate::metadata::options::{OptionDiagnostic, ToSettingsError};
+use crate::metadata::options::{OptionDiagnostic, ProgramSettingsDiagnostic};
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 #[cfg(feature = "testing")]
 pub use db::tests::TestDb;
 pub use db::{ChangeResult, CheckMode, Db, ProjectDatabase, SalsaMemoryDump};
 use files::{Index, Indexed, IndexedFiles};
-pub use fixes::suppress_all_diagnostics;
+
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
 use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
+    Diagnostic, DiagnosticId, Severity, SubDiagnostic, SubDiagnosticSeverity,
 };
 use ruff_db::files::{File, FileRootKind};
 use ruff_db::parsed::parsed_module;
-use ruff_db::source::{SourceTextError, source_text};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
 use salsa::{Database, Durability, Setter};
@@ -26,16 +25,10 @@ use std::collections::hash_set;
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
-use thiserror::Error;
 use ty_python_semantic::lint::RuleSelection;
-use ty_python_semantic::types::check_types;
-use ty_python_semantic::{
-    FallibleStrategy, MisconfigurationStrategy, add_inferred_python_version_hint_to_diagnostic,
-};
 
 mod db;
 mod files;
-mod fixes;
 pub mod glob;
 pub mod metadata;
 mod walk;
@@ -173,16 +166,22 @@ impl ProgressReporter for CollectReporter {
 
 #[salsa::tracked]
 impl Project {
-    pub fn from_metadata<Strategy: MisconfigurationStrategy>(
+    /// Create a project from resolved metadata and settings.
+    ///
+    /// Program-settings diagnostics are accepted separately so callers do not need to know how to
+    /// convert and merge them into the stored project settings diagnostics.
+    pub(crate) fn from_metadata(
         db: &dyn Db,
         metadata: ProjectMetadata,
-        strategy: &Strategy,
-    ) -> Result<Self, Strategy::Error<ToSettingsError>> {
-        let (settings, diagnostics) =
-            metadata
-                .options()
-                .to_settings(db, metadata.root(), strategy)?;
-
+        settings: Settings,
+        settings_diagnostics: Vec<OptionDiagnostic>,
+        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
+    ) -> Self {
+        let diagnostics = Self::settings_diagnostics_with_program_diagnostics(
+            db,
+            settings_diagnostics,
+            program_settings_diagnostics,
+        );
         let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
             .durability(Durability::MEDIUM)
             .open_fileset_durability(Durability::LOW)
@@ -191,7 +190,7 @@ impl Project {
 
         project.try_add_file_root(db);
 
-        Ok(project)
+        project
     }
 
     fn try_add_file_root(self, db: &dyn Db) {
@@ -243,39 +242,78 @@ impl Project {
         )
     }
 
-    pub fn reload(self, db: &mut dyn Db, metadata: ProjectMetadata) {
+    /// Reload the project after its metadata or settings have changed.
+    ///
+    /// Program-settings diagnostics are converted and merged here to keep reload behavior
+    /// consistent with initial project creation.
+    pub fn reload(
+        self,
+        db: &mut dyn Db,
+        metadata: ProjectMetadata,
+        settings: Option<Settings>,
+        settings_diagnostics: Vec<OptionDiagnostic>,
+        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
+    ) {
         tracing::debug!("Reloading project");
+        let metadata_changed = &metadata != self.metadata(db);
+        let settings_diagnostics = Self::settings_diagnostics_with_program_diagnostics(
+            db,
+            settings_diagnostics,
+            program_settings_diagnostics,
+        );
 
         self.reload_files(db);
 
-        if &metadata == self.metadata(db) {
-            return;
+        if let Some(settings) = settings
+            && self.settings(db) != &settings
+        {
+            self.set_settings(db).to(Box::new(settings));
         }
 
-        match metadata
-            .options()
-            .to_settings(db, metadata.root(), &FallibleStrategy)
-        {
-            Ok((settings, settings_diagnostics)) => {
-                if self.settings(db) != &settings {
-                    self.set_settings(db).to(Box::new(settings));
-                }
+        if self.settings_diagnostics(db) != settings_diagnostics {
+            self.set_settings_diagnostics(db).to(settings_diagnostics);
+        }
 
-                if self.settings_diagnostics(db) != settings_diagnostics {
-                    self.set_settings_diagnostics(db).to(settings_diagnostics);
-                }
-            }
-            Err(error) => {
-                tracing::warn!(
-                    "Keeping old project configuration because loading the new settings failed with: {error}"
-                );
-                self.set_settings_diagnostics(db)
-                    .to(vec![error.into_diagnostic()]);
-            }
+        if !metadata_changed {
+            return;
         }
 
         self.set_metadata(db).to(Box::new(metadata));
         self.try_add_file_root(db);
+    }
+
+    /// Replace stored settings diagnostics after recomputing program settings.
+    ///
+    /// This is used when a change affects [`ty_python_core::program::ProgramSettings`] without
+    /// reloading the full project.
+    pub(crate) fn update_settings_diagnostics(
+        self,
+        db: &mut dyn Db,
+        settings_diagnostics: Vec<OptionDiagnostic>,
+        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
+    ) {
+        let settings_diagnostics = Self::settings_diagnostics_with_program_diagnostics(
+            db,
+            settings_diagnostics,
+            program_settings_diagnostics,
+        );
+
+        if self.settings_diagnostics(db) != settings_diagnostics {
+            self.set_settings_diagnostics(db).to(settings_diagnostics);
+        }
+    }
+
+    fn settings_diagnostics_with_program_diagnostics(
+        db: &dyn Db,
+        mut settings_diagnostics: Vec<OptionDiagnostic>,
+        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
+    ) -> Vec<OptionDiagnostic> {
+        settings_diagnostics.extend(
+            program_settings_diagnostics
+                .into_iter()
+                .map(|diagnostic| diagnostic.into_diagnostic(db)),
+        );
+        settings_diagnostics
     }
 
     /// Checks the project and its dependencies according to the project's check mode.
@@ -298,12 +336,7 @@ impl Project {
         let files = ProjectFiles::new(db, self);
         reporter.set_files(files.len());
 
-        diagnostics.extend(
-            files
-                .diagnostics()
-                .iter()
-                .map(IOErrorDiagnostic::to_diagnostic),
-        );
+        diagnostics.extend_from_slice(files.diagnostics());
 
         reporter.report_diagnostics(db, diagnostics);
 
@@ -367,10 +400,9 @@ impl Project {
             return Vec::new();
         }
 
-        match check_file_impl(db, file) {
-            Ok(diagnostics) => diagnostics.to_vec(),
-            Err(diagnostic) => vec![diagnostic.clone()],
-        }
+        check_file_impl(db, file)
+            .map(<[Diagnostic]>::to_vec)
+            .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
     }
 
     /// Opens a file in the project.
@@ -563,7 +595,7 @@ impl Project {
     /// Replaces the diagnostics from indexing the project files with `diagnostics`.
     ///
     /// This is a no-op if the project files haven't been indexed yet.
-    pub fn replace_index_diagnostics(self, db: &mut dyn Db, diagnostics: Vec<IOErrorDiagnostic>) {
+    pub fn replace_index_diagnostics(self, db: &mut dyn Db, diagnostics: Vec<Diagnostic>) {
         let Some(mut index) = IndexedFiles::indexed_mut(db, self) else {
             return;
         };
@@ -614,56 +646,15 @@ impl Project {
     }
 }
 
-#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnostic> {
-    let mut diagnostics: Vec<Diagnostic> = Vec::new();
-
-    // Abort checking if there are IO errors.
-    let source = source_text(db, file);
-
-    if let Some(read_error) = source.read_error() {
-        return Err(IOErrorDiagnostic {
-            file: Some(file),
-            error: read_error.clone().into(),
-        }
-        .to_diagnostic());
-    }
-
-    let parsed = parsed_module(db, file);
-
-    let parsed_ref = parsed.load(db);
-    diagnostics.extend(
-        parsed_ref
-            .errors()
-            .iter()
-            .map(|error| Diagnostic::invalid_syntax(file, &error.error, error)),
-    );
-
-    diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
-        let mut error = Diagnostic::invalid_syntax(file, error, error);
-        add_inferred_python_version_hint_to_diagnostic(db, &mut error, "parsing syntax");
-        error
-    }));
-
     {
         let db = AssertUnwindSafe(db);
-        match catch(&**db, file, || check_types(*db, file)) {
-            Ok(type_check_diagnostics) => {
-                diagnostics.extend(type_check_diagnostics);
-            }
-            Err(diagnostic) => diagnostics.push(diagnostic),
+        match catch(&**db, file, || ty_python_semantic::check_file(*db, file)) {
+            Ok(result) => result,
+            Err(diagnostic) => Ok(Box::new([diagnostic])),
         }
     }
-
-    diagnostics.sort_unstable_by_key(|diagnostic| {
-        diagnostic
-            .primary_span()
-            .and_then(|span| span.range())
-            .unwrap_or_default()
-            .start()
-    });
-
-    Ok(diagnostics.into_boxed_slice())
 }
 
 #[derive(Debug)]
@@ -680,7 +671,7 @@ impl<'a> ProjectFiles<'a> {
         }
     }
 
-    fn diagnostics(&self) -> &[IOErrorDiagnostic] {
+    fn diagnostics(&self) -> &[Diagnostic] {
         match self {
             ProjectFiles::OpenFiles(_) => &[],
             ProjectFiles::Indexed(files) => files.diagnostics(),
@@ -724,31 +715,6 @@ impl Iterator for ProjectFilesIter<'_> {
 }
 
 impl FusedIterator for ProjectFilesIter<'_> {}
-
-#[derive(Debug, Clone, get_size2::GetSize)]
-pub struct IOErrorDiagnostic {
-    file: Option<File>,
-    error: IOErrorKind,
-}
-
-impl IOErrorDiagnostic {
-    fn to_diagnostic(&self) -> Diagnostic {
-        let mut diag = Diagnostic::new(DiagnosticId::Io, Severity::Error, &self.error);
-        if let Some(file) = self.file {
-            diag.annotate(Annotation::primary(Span::from(file)));
-        }
-        diag
-    }
-}
-
-#[derive(Error, Debug, Clone, get_size2::GetSize)]
-enum IOErrorKind {
-    #[error(transparent)]
-    Walk(#[from] walk::WalkError),
-
-    #[error(transparent)]
-    SourceText(#[from] SourceTextError),
-}
 
 fn catch<F, R>(db: &dyn Db, file: File, f: F) -> Result<R, Diagnostic>
 where

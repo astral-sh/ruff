@@ -78,7 +78,7 @@ pub(crate) fn check_noqa(
         let noqa_offsets = diagnostic
             .parent()
             .into_iter()
-            .chain(diagnostic.range().map(TextRange::start).into_iter())
+            .chain(diagnostic.range().map(TextRange::start))
             .map(|position| noqa_line_for.resolve(position))
             .unique();
 

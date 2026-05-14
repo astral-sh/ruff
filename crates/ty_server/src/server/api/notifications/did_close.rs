@@ -4,7 +4,6 @@ use lsp_types::{DidCloseTextDocumentParams, TextDocumentIdentifier};
 
 use crate::server::Result;
 use crate::server::api::LSPResult;
-use crate::server::api::diagnostics::clear_diagnostics_if_needed;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
@@ -34,7 +33,7 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
             .with_failure_code(ErrorCode::InternalError)?;
 
         if should_clear_diagnostics {
-            clear_diagnostics_if_needed(&document, session, client);
+            session.clear_diagnostics_if_needed(&document, client);
         }
 
         Ok(())

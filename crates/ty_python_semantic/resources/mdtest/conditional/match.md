@@ -33,6 +33,42 @@ def _(target: int):
     reveal_type(y)
 ```
 
+## With sequence wildcard
+
+```py
+from collections.abc import Sequence
+
+def sequence_star_pattern_is_exhaustive(paths: list[int]) -> None:
+    match paths:
+        case [*_paths]:
+            raise ValueError
+
+    reveal_type(paths)  # revealed: Never
+
+def sequence_star_pattern_is_not_exhaustive_for_text(paths: Sequence[str]) -> None:
+    match paths:
+        case [*_paths]:
+            raise ValueError
+
+    # `str`, `bytes`, and `bytearray` are subtypes of `Sequence`, but sequence
+    # patterns explicitly do not match them.
+    # TODO: After https://github.com/astral-sh/ty/issues/3314 is fixed, the
+    # `Sequence[str] & bytes` and `Sequence[str] & bytearray` intersections
+    # should simplify to `Never`.
+    reveal_type(paths)  # revealed: str | (Sequence[str] & bytes) | (Sequence[str] & bytearray)
+
+def sequence_prefix_star_pattern_is_not_catch_all(paths: Sequence[str]) -> None:
+    match paths:
+        case []:
+            raise ValueError
+        case [_first]:
+            raise ValueError
+        case [_first, _second, *_paths]:
+            raise ValueError
+
+    reveal_type(paths)  # revealed: Sequence[str]
+```
+
 ## Basic match
 
 ```py

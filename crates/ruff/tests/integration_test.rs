@@ -916,7 +916,7 @@ fn full_output_preview() {
         .args(["--preview", "--select=E741"])
         .build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("l = 1"), @r###"
+        .pass_stdin("l = 1"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -930,7 +930,7 @@ fn full_output_preview() {
     Found 1 error.
 
     ----- stderr -----
-    "###);
+    ");
 }
 
 #[test]
@@ -945,7 +945,7 @@ preview = true
 ",
     )?;
     let mut cmd = RuffCheck::default().config(&pyproject_toml).build();
-    assert_cmd_snapshot!(cmd.arg("--select=E741").pass_stdin("l = 1"), @r###"
+    assert_cmd_snapshot!(cmd.arg("--select=E741").pass_stdin("l = 1"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -959,7 +959,7 @@ preview = true
     Found 1 error.
 
     ----- stderr -----
-    "###);
+    ");
     Ok(())
 }
 
@@ -1254,7 +1254,7 @@ fn preview_enabled_prefix() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF9", "--output-format=concise", "--preview"])
         .build();
-    assert_cmd_snapshot!(cmd, @r###"
+    assert_cmd_snapshot!(cmd, @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1268,7 +1268,7 @@ fn preview_enabled_prefix() {
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
-    "###);
+    ");
 }
 
 #[test]
@@ -1276,7 +1276,7 @@ fn preview_enabled_all() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "ALL", "--output-format=concise", "--preview"])
         .build();
-    assert_cmd_snapshot!(cmd, @r###"
+    assert_cmd_snapshot!(cmd, @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1294,7 +1294,7 @@ fn preview_enabled_all() {
     ----- stderr -----
     warning: `incorrect-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `incorrect-blank-line-before-class`.
     warning: `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible. Ignoring `multi-line-summary-second-line`.
-    "###);
+    ");
 }
 
 #[test]
@@ -1303,7 +1303,7 @@ fn preview_enabled_direct() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF911", "--output-format=concise", "--preview"])
         .build();
-    assert_cmd_snapshot!(cmd, @r###"
+    assert_cmd_snapshot!(cmd, @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1311,7 +1311,7 @@ fn preview_enabled_direct() {
     Found 1 error.
 
     ----- stderr -----
-    "###);
+    ");
 }
 
 #[test]
@@ -1417,7 +1417,7 @@ fn preview_enabled_group_ignore() {
             "--output-format=concise",
         ])
         .build();
-    assert_cmd_snapshot!(cmd, @r###"
+    assert_cmd_snapshot!(cmd, @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1431,7 +1431,7 @@ fn preview_enabled_group_ignore() {
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
-    "###);
+    ");
 }
 
 #[test]
@@ -2397,7 +2397,7 @@ select = ["RUF017"]
     let mut cmd = RuffCheck::default().config(&ruff_toml).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = [1, 2, 3]\ny = [4, 5, 6]\nsum([x, y], [])"),
-            @r###"
+            @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2415,7 +2415,7 @@ select = ["RUF017"]
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -2438,7 +2438,7 @@ unfixable = ["RUF"]
     let mut cmd = RuffCheck::default().config(&ruff_toml).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = [1, 2, 3]\ny = [4, 5, 6]\nsum([x, y], [])"),
-            @r###"
+            @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2455,7 +2455,7 @@ unfixable = ["RUF"]
     Found 1 error.
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }

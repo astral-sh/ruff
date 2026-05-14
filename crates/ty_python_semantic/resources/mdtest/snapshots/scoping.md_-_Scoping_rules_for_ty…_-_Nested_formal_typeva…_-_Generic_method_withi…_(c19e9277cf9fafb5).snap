@@ -26,7 +26,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md
 error[shadowed-type-variable]: Generic function `bad` uses type variable `T` already bound by an enclosing scope
  --> src/mdtest_snippet.py:5:9
   |
-4 |     # error: [shadowed-type-variable]
 5 |     def bad[T](self, a: T, b: T) -> None: ...
   |         ^^^ `T` used in function definition here
   |
@@ -34,7 +33,6 @@ error[shadowed-type-variable]: Generic function `bad` uses type variable `T` alr
   |
 1 | class C[T]:
   |       - Type variable `T` is bound in this enclosing scope
-2 |     def ok[S](self, a: S, b: S) -> None: ...
   |
 
 ```

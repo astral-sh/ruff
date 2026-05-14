@@ -33,7 +33,6 @@ fn config_override_python_version() -> anyhow::Result<()> {
     error[unresolved-attribute]: Module `sys` has no member `last_exc`
      --> test.py:5:7
       |
-    4 | # Access `sys.last_exc` that was only added in Python 3.12
     5 | print(sys.last_exc)
       |       ^^^^^^^^^^^^
       |
@@ -41,7 +40,6 @@ fn config_override_python_version() -> anyhow::Result<()> {
     info: Python 3.11 was assumed when resolving the `last_exc` attribute
      --> pyproject.toml:3:18
       |
-    2 | [tool.ty.environment]
     3 | python-version = "3.11"
       |                  ^^^^^^ Python version configuration
       |
@@ -92,8 +90,6 @@ fn config_override_python_platform() -> anyhow::Result<()> {
     info[revealed-type]: Revealed type
      --> test.py:5:13
       |
-    3 | from typing_extensions import reveal_type
-    4 |
     5 | reveal_type(sys.platform)
       |             ^^^^^^^^^^^^ `Literal["linux"]`
       |
@@ -110,8 +106,6 @@ fn config_override_python_platform() -> anyhow::Result<()> {
     info[revealed-type]: Revealed type
      --> test.py:5:13
       |
-    3 | from typing_extensions import reveal_type
-    4 |
     5 | reveal_type(sys.platform)
       |             ^^^^^^^^^^^^ `LiteralString`
       |
@@ -156,7 +150,6 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
     info: Python 3.8 was assumed when resolving types
      --> pyproject.toml:3:18
       |
-    2 | [tool.ty.environment]
     3 | python-version = "3.8"
       |                  ^^^^^ Python version configuration
       |
@@ -411,8 +404,6 @@ import colorama
       |
     1 | import foo
       |        ^^^
-    2 | import bar
-    3 | import colorama
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
@@ -423,8 +414,6 @@ import colorama
     error[unresolved-import]: Cannot resolve imported module `colorama`
      --> test.py:3:8
       |
-    1 | import foo
-    2 | import bar
     3 | import colorama
       |        ^^^^^^^^
       |
@@ -448,10 +437,8 @@ import colorama
     error[unresolved-import]: Cannot resolve imported module `bar`
      --> test.py:2:8
       |
-    1 | import foo
     2 | import bar
       |        ^^^
-    3 | import colorama
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
@@ -462,8 +449,6 @@ import colorama
     error[unresolved-import]: Cannot resolve imported module `colorama`
      --> test.py:3:8
       |
-    1 | import foo
-    2 | import bar
     3 | import colorama
       |        ^^^^^^^^
       |
@@ -487,10 +472,8 @@ import colorama
     error[unresolved-import]: Cannot resolve imported module `bar`
      --> test.py:2:8
       |
-    1 | import foo
     2 | import bar
       |        ^^^
-    3 | import colorama
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
@@ -501,8 +484,6 @@ import colorama
     error[unresolved-import]: Cannot resolve imported module `colorama`
      --> test.py:3:8
       |
-    1 | import foo
-    2 | import bar
     3 | import colorama
       |        ^^^^^^^^
       |
@@ -526,10 +507,8 @@ import colorama
     error[unresolved-import]: Cannot resolve imported module `bar`
      --> test.py:2:8
       |
-    1 | import foo
     2 | import bar
       |        ^^^
-    3 | import colorama
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
@@ -540,8 +519,6 @@ import colorama
     error[unresolved-import]: Cannot resolve imported module `colorama`
      --> test.py:3:8
       |
-    1 | import foo
-    2 | import bar
     3 | import colorama
       |        ^^^^^^^^
       |
@@ -598,7 +575,6 @@ import bar",
       |
     1 | import foo
       |        ^^^
-    2 | import bar
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
@@ -825,7 +801,6 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
       |
     2 | version = 3.8
       |           ^^^ Virtual environment metadata
-    3 | home = foo/bar/bin
       |
     info: No Python version was specified on the command line or in a configuration file
 
@@ -925,13 +900,10 @@ fn config_file_annotation_showing_where_python_version_set_syntax_error() -> any
       |
     2 | match object():
       | ^^^^^
-    3 |     case int():
-    4 |         pass
       |
     info: Python 3.8 was assumed when parsing syntax
      --> pyproject.toml:3:19
       |
-    2 | [project]
     3 | requires-python = ">=3.8"
       |                   ^^^^^^^ Python version configuration
       |
@@ -950,8 +922,6 @@ fn config_file_annotation_showing_where_python_version_set_syntax_error() -> any
       |
     2 | match object():
       | ^^^^^
-    3 |     case int():
-    4 |         pass
       |
     info: Python 3.9 was assumed when parsing syntax because it was specified on the command line
 
@@ -1145,14 +1115,35 @@ fn config_file_unsupported_python_version() -> anyhow::Result<()> {
       |
     3 | python-version = "2.7"
       |                  ^^^^^
-    unsupported value `2.7` for `python-version`; expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`
+    unknown variant `2.7`, expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`
 
       Cause: TOML parse error at line 3, column 18
       |
     3 | python-version = "2.7"
       |                  ^^^^^
-    unsupported value `2.7` for `python-version`; expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`
+    unknown variant `2.7`, expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`
     "#);
+
+    Ok(())
+}
+
+#[test]
+fn cli_unsupported_python_version() -> anyhow::Result<()> {
+    let case = CliTest::with_file("test.py", "")?;
+
+    assert_cmd_snapshot!(case.command().arg("--python-version=2.7"), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value '2.7' for '--python-version <VERSION>'
+      [possible values: 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.15]
+
+      tip: a similar value exists: '3.7'
+
+    For more information, try '--help'.
+    ");
 
     Ok(())
 }
@@ -1189,6 +1180,58 @@ fn config_file_python_setting_directory_with_no_site_packages() -> anyhow::Resul
       |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Could not find a `site-packages` directory for this Python installation/executable
       |
     "#);
+
+    Ok(())
+}
+
+#[test]
+fn config_file_python_setting_directory_with_unsupported_python_version() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.environment]
+            python = "venv"
+            "#,
+        ),
+        (
+            "venv/pyvenv.cfg",
+            r#"
+            version_info = 3.16.0
+            home = base/bin
+            "#,
+        ),
+        if cfg!(target_os = "windows") {
+            ("base/bin/python.exe", "")
+        } else {
+            ("base/bin/python", "")
+        },
+        if cfg!(target_os = "windows") {
+            ("venv/Lib/site-packages/foo.py", "")
+        } else {
+            ("venv/lib/python3.16/site-packages/foo.py", "")
+        },
+        ("test.py", ""),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning[unsupported-python-version]: Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.14 instead.
+     --> venv/pyvenv.cfg:2:16
+      |
+    2 | version_info = 3.16.0
+      |                ^^^^^^
+      |
+    info: Expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`.
+    info: Set `environment.python-version` explicitly to override the inferred version.
+    info: The version was inferred from your virtual environment metadata.
+    
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -1264,28 +1307,20 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     error[unresolved-attribute]: Module `os` has no member `grantpt`
      --> main.py:4:1
       |
-    2 | import os
-    3 |
     4 | os.grantpt(1) # only available on unix, Python 3.13 or newer
       | ^^^^^^^^^^
-    5 |
-    6 | from typing import LiteralString  # added in Python 3.11
       |
     info: The member may be available on other Python versions or platforms
     info: Python 3.10 was assumed when resolving the `grantpt` attribute
      --> ty.toml:3:18
       |
-    2 | [environment]
     3 | python-version = "3.10"
       |                  ^^^^^^ Python version configuration
-    4 | python-platform = "linux"
       |
 
     error[unresolved-import]: Module `typing` has no member `LiteralString`
      --> main.py:6:20
       |
-    4 | os.grantpt(1) # only available on unix, Python 3.13 or newer
-    5 |
     6 | from typing import LiteralString  # added in Python 3.11
       |                    ^^^^^^^^^^^^^
       |
@@ -1293,10 +1328,8 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     info: Python 3.10 was assumed when resolving imports
      --> ty.toml:3:18
       |
-    2 | [environment]
     3 | python-version = "3.10"
       |                  ^^^^^^ Python version configuration
-    4 | python-platform = "linux"
       |
 
     Found 2 diagnostics
@@ -1493,11 +1526,8 @@ home = ./
     error[unresolved-import]: Module `package1` has no member `WorkingVenv`
      --> test.py:4:22
       |
-    2 | from package1 import ActiveVenv
-    3 | from package1 import ChildConda
     4 | from package1 import WorkingVenv
       |                      ^^^^^^^^^^^
-    5 | from package1 import BaseConda
       |
 
     Found 1 diagnostic
@@ -1517,8 +1547,6 @@ home = ./
       |
     2 | from package1 import ActiveVenv
       |                      ^^^^^^^^^^
-    3 | from package1 import ChildConda
-    4 | from package1 import WorkingVenv
       |
 
     Found 1 diagnostic
@@ -1536,11 +1564,8 @@ home = ./
     error[unresolved-import]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
-    2 | from package1 import ActiveVenv
     3 | from package1 import ChildConda
       |                      ^^^^^^^^^^
-    4 | from package1 import WorkingVenv
-    5 | from package1 import BaseConda
       |
 
     Found 1 diagnostic
@@ -1559,11 +1584,8 @@ home = ./
     error[unresolved-import]: Module `package1` has no member `WorkingVenv`
      --> test.py:4:22
       |
-    2 | from package1 import ActiveVenv
-    3 | from package1 import ChildConda
     4 | from package1 import WorkingVenv
       |                      ^^^^^^^^^^^
-    5 | from package1 import BaseConda
       |
 
     Found 1 diagnostic
@@ -1586,8 +1608,6 @@ home = ./
       |
     2 | from package1 import ActiveVenv
       |                      ^^^^^^^^^^
-    3 | from package1 import ChildConda
-    4 | from package1 import WorkingVenv
       |
 
     Found 1 diagnostic
@@ -1606,11 +1626,8 @@ home = ./
     error[unresolved-import]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
-    2 | from package1 import ActiveVenv
     3 | from package1 import ChildConda
       |                      ^^^^^^^^^^
-    4 | from package1 import WorkingVenv
-    5 | from package1 import BaseConda
       |
 
     Found 1 diagnostic
@@ -1629,11 +1646,8 @@ home = ./
     error[unresolved-import]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
-    2 | from package1 import ActiveVenv
     3 | from package1 import ChildConda
       |                      ^^^^^^^^^^
-    4 | from package1 import WorkingVenv
-    5 | from package1 import BaseConda
       |
 
     Found 1 diagnostic
@@ -1652,8 +1666,6 @@ home = ./
     error[unresolved-import]: Module `package1` has no member `BaseConda`
      --> test.py:5:22
       |
-    3 | from package1 import ChildConda
-    4 | from package1 import WorkingVenv
     5 | from package1 import BaseConda
       |                      ^^^^^^^^^
       |
@@ -1743,8 +1755,6 @@ home = ./
       |
     2 | from package1 import ActiveVenv
       |      ^^^^^^^^
-    3 | from package1 import ChildConda
-    4 | from package1 import WorkingVenv
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
@@ -1754,11 +1764,8 @@ home = ./
     error[unresolved-import]: Cannot resolve imported module `package1`
      --> test.py:3:6
       |
-    2 | from package1 import ActiveVenv
     3 | from package1 import ChildConda
       |      ^^^^^^^^
-    4 | from package1 import WorkingVenv
-    5 | from package1 import BaseConda
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
@@ -1768,11 +1775,8 @@ home = ./
     error[unresolved-import]: Cannot resolve imported module `package1`
      --> test.py:4:6
       |
-    2 | from package1 import ActiveVenv
-    3 | from package1 import ChildConda
     4 | from package1 import WorkingVenv
       |      ^^^^^^^^
-    5 | from package1 import BaseConda
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
@@ -1782,8 +1786,6 @@ home = ./
     error[unresolved-import]: Cannot resolve imported module `package1`
      --> test.py:5:6
       |
-    3 | from package1 import ChildConda
-    4 | from package1 import WorkingVenv
     5 | from package1 import BaseConda
       |      ^^^^^^^^
       |
@@ -1809,8 +1811,6 @@ home = ./
       |
     2 | from package1 import ActiveVenv
       |                      ^^^^^^^^^^
-    3 | from package1 import ChildConda
-    4 | from package1 import WorkingVenv
       |
 
     Found 1 diagnostic
@@ -1828,11 +1828,8 @@ home = ./
     error[unresolved-import]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
-    2 | from package1 import ActiveVenv
     3 | from package1 import ChildConda
       |                      ^^^^^^^^^^
-    4 | from package1 import WorkingVenv
-    5 | from package1 import BaseConda
       |
 
     Found 1 diagnostic
@@ -1851,8 +1848,6 @@ home = ./
     error[unresolved-import]: Module `package1` has no member `BaseConda`
      --> test.py:5:22
       |
-    3 | from package1 import ChildConda
-    4 | from package1 import WorkingVenv
     5 | from package1 import BaseConda
       |                      ^^^^^^^^^
       |
@@ -1877,8 +1872,6 @@ home = ./
       |
     2 | from package1 import ActiveVenv
       |                      ^^^^^^^^^^
-    3 | from package1 import ChildConda
-    4 | from package1 import WorkingVenv
       |
 
     Found 1 diagnostic
@@ -1897,8 +1890,6 @@ home = ./
     error[unresolved-import]: Module `package1` has no member `BaseConda`
      --> test.py:5:22
       |
-    3 | from package1 import ChildConda
-    4 | from package1 import WorkingVenv
     5 | from package1 import BaseConda
       |                      ^^^^^^^^^
       |
@@ -1919,11 +1910,8 @@ home = ./
     error[unresolved-import]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
-    2 | from package1 import ActiveVenv
     3 | from package1 import ChildConda
       |                      ^^^^^^^^^^
-    4 | from package1 import WorkingVenv
-    5 | from package1 import BaseConda
       |
 
     Found 1 diagnostic
@@ -1942,8 +1930,6 @@ home = ./
     error[unresolved-import]: Module `package1` has no member `BaseConda`
      --> test.py:5:22
       |
-    3 | from package1 import ChildConda
-    4 | from package1 import WorkingVenv
     5 | from package1 import BaseConda
       |                      ^^^^^^^^^
       |
@@ -2076,8 +2062,6 @@ fn ty_environment_and_discovered_venv() -> anyhow::Result<()> {
     error[unresolved-import]: Module `shared_package` has no member `FromLocalVenv`
      --> test.py:9:28
       |
-    7 | from shared_package import FromTyEnv
-    8 | # Should NOT resolve (shadowed by ty's environment version)
     9 | from shared_package import FromLocalVenv
       |                            ^^^^^^^^^^^^^
       |
@@ -2154,7 +2138,6 @@ fn ty_environment_and_active_environment() -> anyhow::Result<()> {
       |
     2 | from ty_package import TyEnvClass
       |      ^^^^^^^^^^
-    3 | from active_package import ActiveClass
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
@@ -2272,11 +2255,8 @@ fn ty_system_environment_and_local_venv() -> anyhow::Result<()> {
     error[unresolved-import]: Cannot resolve imported module `system_package`
      --> test.py:3:6
       |
-    2 | # Should NOT resolve (system Python site-packages excluded when .venv exists)
     3 | from system_package import SystemEnvClass
       |      ^^^^^^^^^^^^^^
-    4 | # Should resolve from local .venv
-    5 | from local_package import LocalClass
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
@@ -2312,7 +2292,6 @@ fn src_root_deprecation_warning() -> anyhow::Result<()> {
     warning[deprecated-setting]: The `src.root` setting is deprecated. Use `environment.root` instead.
      --> pyproject.toml:3:8
       |
-    2 | [tool.ty.src]
     3 | root = "./src"
       |        ^^^^^^^
       |
@@ -2348,11 +2327,8 @@ fn src_root_deprecation_warning_with_environment_root() -> anyhow::Result<()> {
     warning[deprecated-setting]: The `src.root` setting is deprecated. Use `environment.root` instead.
      --> pyproject.toml:3:8
       |
-    2 | [tool.ty.src]
     3 | root = "./src"
       |        ^^^^^^^
-    4 |
-    5 | [tool.ty.environment]
       |
     info: The `src.root` setting was ignored in favor of the `environment.root` setting
 
@@ -2393,11 +2369,8 @@ fn environment_root_takes_precedence_over_src_root() -> anyhow::Result<()> {
     warning[deprecated-setting]: The `src.root` setting is deprecated. Use `environment.root` instead.
      --> pyproject.toml:3:8
       |
-    2 | [tool.ty.src]
     3 | root = "./src"
       |        ^^^^^^^
-    4 |
-    5 | [tool.ty.environment]
       |
     info: The `src.root` setting was ignored in favor of the `environment.root` setting
 
@@ -2578,18 +2551,15 @@ fn default_root_tests_package() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
     error[unresolved-import]: Cannot resolve imported module `bar`
      --> tests/test_bar.py:3:6
       |
-    2 | from foo import foo
     3 | from bar import bar  # expected unresolved import
       |      ^^^
-    4 |
-    5 | print(f"{foo} {bar}")
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/src (first-party code)
@@ -2600,7 +2570,7 @@ fn default_root_tests_package() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "#);
+    ");
 
     Ok(())
 }
@@ -2651,18 +2621,15 @@ fn default_root_python_package() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
     error[unresolved-import]: Cannot resolve imported module `bar`
      --> python/test_bar.py:3:6
       |
-    2 | from foo import foo
     3 | from bar import bar  # expected unresolved import
       |      ^^^
-    4 |
-    5 | print(f"{foo} {bar}")
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/src (first-party code)
@@ -2673,7 +2640,7 @@ fn default_root_python_package() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "#);
+    ");
 
     Ok(())
 }
@@ -2696,18 +2663,15 @@ fn default_root_python_package_pyi() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
     error[unresolved-import]: Cannot resolve imported module `bar`
      --> python/test_bar.py:3:6
       |
-    2 | from foo import foo
     3 | from bar import bar  # expected unresolved import
       |      ^^^
-    4 |
-    5 | print(f"{foo} {bar}")
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/src (first-party code)
@@ -2718,7 +2682,7 @@ fn default_root_python_package_pyi() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "#);
+    ");
 
     Ok(())
 }
@@ -2737,7 +2701,7 @@ fn pythonpath_is_respected() -> anyhow::Result<()> {
     ])?;
 
     assert_cmd_snapshot!(case.command(),
-        @r#"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2746,7 +2710,6 @@ fn pythonpath_is_respected() -> anyhow::Result<()> {
       |
     2 | import baz
       |        ^^^
-    3 | print(f"{baz.it}")
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/src (first-party code)
@@ -2757,7 +2720,7 @@ fn pythonpath_is_respected() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "#);
+    ");
 
     assert_cmd_snapshot!(case.command()
         .env("PYTHONPATH", case.root().join("baz-dir")),
@@ -2791,7 +2754,7 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
     ])?;
 
     assert_cmd_snapshot!(case.command(),
-        @r#"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2800,7 +2763,6 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
       |
     2 | import baz
       |        ^^^
-    3 | import foo
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/src (first-party code)
@@ -2811,11 +2773,8 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
     error[unresolved-import]: Cannot resolve imported module `foo`
      --> src/main.py:3:8
       |
-    2 | import baz
     3 | import foo
       |        ^^^
-    4 |
-    5 | print(f"{baz.it}")
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/src (first-party code)
@@ -2826,7 +2785,7 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "#);
+    ");
 
     let pythonpath =
         std::env::join_paths([case.root().join("baz-dir"), case.root().join("foo-dir")])?;

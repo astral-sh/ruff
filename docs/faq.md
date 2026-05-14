@@ -107,7 +107,7 @@ One minor difference is that Ruff doesn't include all the 'opinionated' rules fr
 
 ## How does Ruff's linter compare to Pylint?
 
-At time of writing, Pylint implements ~409 total rules, while Ruff implements over 800, of which at
+At time of writing, Pylint implements ~409 total rules, while Ruff implements over 900, of which at
 least 209 overlap with the Pylint rule set (see: [#970](https://github.com/astral-sh/ruff/issues/970)).
 
 Pylint implements many rules that Ruff does not, and vice versa. For example, Pylint does more type

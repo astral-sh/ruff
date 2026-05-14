@@ -8,7 +8,7 @@ mod text_document;
 use std::collections::HashMap;
 
 use lsp_types::{PositionEncodingKind, Url};
-pub use notebook::NotebookDocument;
+pub(crate) use notebook::NotebookDocument;
 pub(crate) use range::{NotebookRange, RangeExt, ToRangeExt};
 pub(crate) use replacement::Replacement;
 pub use text_document::TextDocument;
@@ -44,7 +44,7 @@ impl From<PositionEncoding> for ruff_source_file::PositionEncoding {
 /// A unique document ID, derived from a URL passed as part of an LSP request.
 /// This document ID can point to either be a standalone Python file, a full notebook, or a cell within a notebook.
 #[derive(Clone, Debug)]
-pub enum DocumentKey {
+pub(crate) enum DocumentKey {
     Notebook(Url),
     NotebookCell(Url),
     Text(Url),

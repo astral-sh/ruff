@@ -24,7 +24,7 @@ expression: code_actions
           "href": "https://ty.dev/rules#possibly-missing-submodule"
         },
         "source": "ty",
-        "message": "Submodule `parser` might not have been imported"
+        "message": "Submodule `parser` might not have been imported\n\nhelp: Consider explicitly importing `html.parser`"
       }
     ],
     "edit": {

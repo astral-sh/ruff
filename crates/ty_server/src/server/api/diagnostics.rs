@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Write as _;
 use std::hash::{DefaultHasher, Hash as _, Hasher as _};
 
 use lsp_types::notification::PublishDiagnostics;
@@ -9,7 +10,7 @@ use lsp_types::{
 use ruff_diagnostics::Applicability;
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
-use ty_python_semantic::types::ide_support::{UnusedBinding, unused_bindings};
+use ty_ide::{Hint, hints};
 
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::{File, FileRange};
@@ -28,7 +29,7 @@ use crate::{PositionEncoding, Session};
 #[derive(Debug)]
 pub(super) struct Diagnostics {
     items: Vec<ruff_db::diagnostic::Diagnostic>,
-    unused_bindings: Vec<UnusedBinding>,
+    unnecessary_hints: Vec<Hint>,
     encoding: PositionEncoding,
     file_or_notebook: File,
 }
@@ -39,9 +40,9 @@ impl Diagnostics {
     /// Returns `None` if there are no diagnostics.
     pub(super) fn result_id_from_hash(
         diagnostics: &[ruff_db::diagnostic::Diagnostic],
-        unused_bindings: &[UnusedBinding],
+        unnecessary_hints: &[Hint],
     ) -> Option<String> {
-        if diagnostics.is_empty() && unused_bindings.is_empty() {
+        if diagnostics.is_empty() && unnecessary_hints.is_empty() {
             return None;
         }
 
@@ -49,7 +50,7 @@ impl Diagnostics {
         let mut hasher = DefaultHasher::new();
 
         diagnostics.hash(&mut hasher);
-        unused_bindings.hash(&mut hasher);
+        unnecessary_hints.hash(&mut hasher);
 
         Some(format!("{:016x}", hasher.finish()))
     }
@@ -58,7 +59,7 @@ impl Diagnostics {
     ///
     /// Returns `None` if there are no diagnostics.
     pub(super) fn result_id(&self) -> Option<String> {
-        Self::result_id_from_hash(&self.items, &self.unused_bindings)
+        Self::result_id_from_hash(&self.items, &self.unnecessary_hints)
     }
 
     pub(super) fn to_lsp_diagnostics(
@@ -76,7 +77,7 @@ impl Diagnostics {
                 cell_diagnostics.entry(cell_url.clone()).or_default();
             }
 
-            for diagnostic in &self.items {
+            for diagnostic in &*self.items {
                 let Some((url, lsp_diagnostic)) = to_lsp_diagnostic(
                     db,
                     diagnostic,
@@ -98,12 +99,12 @@ impl Diagnostics {
                     .push(lsp_diagnostic);
             }
 
-            for binding in &self.unused_bindings {
-                let Some((url, lsp_diagnostic)) = unused_binding_to_lsp_diagnostic(
+            for hint in &self.unnecessary_hints {
+                let Some((url, lsp_diagnostic)) = unnecessary_hint_to_lsp_diagnostic(
                     db,
                     self.file_or_notebook,
                     self.encoding,
-                    binding,
+                    hint,
                 ) else {
                     continue;
                 };
@@ -137,11 +138,11 @@ impl Diagnostics {
                     )
                 })
                 .collect::<Vec<_>>();
-            diagnostics.extend(unused_bindings_to_lsp_diagnostics(
+            diagnostics.extend(unnecessary_hints_to_lsp_diagnostics(
                 db,
                 self.file_or_notebook,
                 self.encoding,
-                &self.unused_bindings,
+                &self.unnecessary_hints,
             ));
             LspDiagnostics::TextDocument(diagnostics)
         }
@@ -170,18 +171,6 @@ impl LspDiagnostics {
             }
         }
     }
-}
-
-pub(super) fn clear_diagnostics_if_needed(
-    document: &DocumentHandle,
-    session: &Session,
-    client: &Client,
-) {
-    if session.client_capabilities().supports_pull_diagnostics() && !document.is_cell_or_notebook()
-    {
-        return;
-    }
-    session.clear_diagnostics(client, document.url());
 }
 
 /// Publishes the diagnostics for the given document snapshot using the [publish diagnostics
@@ -356,43 +345,36 @@ pub(super) fn compute_diagnostics(
     };
 
     let diagnostics = db.check_file(file);
-    let unused_bindings = collect_unused_bindings(db, file);
+    let unnecessary_hints = hints(db, file);
 
     Some(Diagnostics {
         items: diagnostics,
-        unused_bindings,
+        unnecessary_hints,
         encoding,
         file_or_notebook: file,
     })
 }
 
-pub(super) fn collect_unused_bindings(db: &ProjectDatabase, file: File) -> Vec<UnusedBinding> {
-    if !db.project().should_check_file(db, file) {
-        return Vec::new();
-    }
-    unused_bindings(db, file).clone()
-}
-
-pub(super) fn unused_bindings_to_lsp_diagnostics(
+pub(super) fn unnecessary_hints_to_lsp_diagnostics(
     db: &ProjectDatabase,
     file: File,
     encoding: PositionEncoding,
-    unused_bindings: &[UnusedBinding],
+    hints: &[Hint],
 ) -> Vec<Diagnostic> {
-    unused_bindings
+    hints
         .iter()
-        .filter_map(|binding| unused_binding_to_lsp_diagnostic(db, file, encoding, binding))
+        .filter_map(|hint| unnecessary_hint_to_lsp_diagnostic(db, file, encoding, hint))
         .map(|(_, diagnostic)| diagnostic)
         .collect()
 }
 
-fn unused_binding_to_lsp_diagnostic(
+fn unnecessary_hint_to_lsp_diagnostic(
     db: &ProjectDatabase,
     file: File,
     encoding: PositionEncoding,
-    binding: &UnusedBinding,
+    hint: &Hint,
 ) -> Option<(Option<Url>, Diagnostic)> {
-    let range = binding.range.to_lsp_range(db, file, encoding)?;
+    let range = hint.range.to_lsp_range(db, file, encoding)?;
     let url = range.to_location().map(|location| location.uri);
 
     Some((
@@ -403,7 +385,7 @@ fn unused_binding_to_lsp_diagnostic(
             code: None,
             code_description: None,
             source: Some(DIAGNOSTIC_NAME.into()),
-            message: format!("`{}` is unused", binding.name),
+            message: hint.message(),
             related_information: None,
             tags: Some(vec![DiagnosticTag::UNNECESSARY]),
             data: None,
@@ -496,6 +478,40 @@ pub(super) fn to_lsp_diagnostic(
 
     let data = DiagnosticData::try_from_diagnostic(db, diagnostic, encoding);
 
+    let mut message = if supports_related_information {
+        // Show both the primary and annotation messages if available,
+        // because we don't create a related information for the primary message.
+        if let Some(annotation_message) = diagnostic
+            .primary_annotation()
+            .and_then(|annotation| annotation.get_message())
+        {
+            format!("{}: {annotation_message}", diagnostic.primary_message())
+        } else {
+            diagnostic.primary_message().to_string()
+        }
+    } else {
+        diagnostic.concise_message().to_string()
+    };
+
+    // Append info sub-diagnostics that have no location (and thus
+    // can't be shown as "related information") to the message.
+    let mut first = true;
+    for sub_diagnostic in diagnostic.sub_diagnostics() {
+        if sub_diagnostic.primary_annotation().is_none() {
+            if first {
+                message.push('\n');
+                first = false;
+            }
+            write!(
+                message,
+                "\n{severity}: {hint}",
+                hint = sub_diagnostic.concise_message(),
+                severity = sub_diagnostic.severity()
+            )
+            .ok();
+        }
+    }
+
     Some((
         url,
         Diagnostic {
@@ -505,20 +521,7 @@ pub(super) fn to_lsp_diagnostic(
             code: Some(NumberOrString::String(diagnostic.id().to_string())),
             code_description,
             source: Some(DIAGNOSTIC_NAME.into()),
-            message: if supports_related_information {
-                // Show both the primary and annotation messages if available,
-                // because we don't create a related information for the primary message.
-                if let Some(annotation_message) = diagnostic
-                    .primary_annotation()
-                    .and_then(|annotation| annotation.get_message())
-                {
-                    format!("{}: {annotation_message}", diagnostic.primary_message())
-                } else {
-                    diagnostic.primary_message().to_string()
-                }
-            } else {
-                diagnostic.concise_message().to_string()
-            },
+            message,
             related_information,
             data: serde_json::to_value(data).ok(),
         },

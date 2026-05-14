@@ -28,9 +28,9 @@ test = false
 ty_ide = { workspace = true }
 ty_project = { workspace = true, default-features = false, features = [
     "deflate",
-    "format"
+    "format",
 ] }
-ty_python_semantic = { workspace = true }
+ty_python_core = { workspace = true }
 
 ruff_db = { workspace = true, default-features = false, features = [] }
 ruff_diagnostics = { workspace = true }

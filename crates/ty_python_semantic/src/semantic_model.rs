@@ -2,7 +2,7 @@ use ruff_db::files::{File, FilePath};
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
-use ruff_python_ast::{Expr, ExprRef, HasNodeIndex, name::Name};
+use ruff_python_ast::{Expr, ExprRef, name::Name};
 use ruff_python_parser::Parsed;
 use ruff_source_file::LineIndex;
 use rustc_hash::FxHashMap;
@@ -12,16 +12,16 @@ use ty_module_resolver::{
 
 use crate::Db;
 use crate::place::implicit_globals::all_implicit_module_globals;
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::place_table;
-use crate::semantic_index::scope::FileScopeId;
-use crate::semantic_index::semantic_index;
-use crate::semantic_index::symbol::Symbol;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{
-    Type, TypeQualifiers, binding_type, declaration_type, infer_complete_scope_types,
+    CycleDetector, Type, TypeQualifiers, binding_type, declaration_type, infer_complete_scope_types,
 };
+use ty_python_core::definition::Definition;
+use ty_python_core::place_table;
+use ty_python_core::scope::FileScopeId;
+use ty_python_core::semantic_index;
+use ty_python_core::symbol::Symbol;
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
 ///
@@ -437,6 +437,77 @@ impl<'db> SemanticModel<'db> {
             _ => TypeQualifiers::empty(),
         }
     }
+
+    /// Returns completion candidates for a string-literal expression based on its expected type.
+    pub fn expected_string_literal_completions(
+        &self,
+        string_expr: &ast::ExprStringLiteral,
+    ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
+        struct StringLiteralCandidates;
+        type StringLiteralCandidatesVisitor<'db> = CycleDetector<
+            StringLiteralCandidates,
+            Type<'db>,
+            Vec<ExpectedStringLiteralCompletion<'db>>,
+        >;
+
+        fn collect<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            visitor: &StringLiteralCandidatesVisitor<'db>,
+        ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
+            match ty {
+                Type::LiteralValue(literal) => literal
+                    .as_string()
+                    .map(|string_literal| {
+                        let value = string_literal.value(db).to_string();
+                        vec![ExpectedStringLiteralCompletion {
+                            ty: Type::string_literal(db, &value),
+                            value,
+                        }]
+                    })
+                    .unwrap_or_default(),
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .flat_map(|element| collect(db, *element, visitor))
+                    .collect(),
+                Type::Intersection(intersection) => intersection
+                    .positive(db)
+                    .iter()
+                    .flat_map(|element| collect(db, *element, visitor))
+                    .collect(),
+                Type::TypeAlias(alias) => {
+                    visitor.visit(ty, || collect(db, alias.value_type(db), visitor))
+                }
+                _ => Vec::new(),
+            }
+        }
+
+        let Some(expected_ty) = self.string_literal_completion_expected_type(string_expr) else {
+            return Vec::new();
+        };
+
+        let mut candidates = collect(
+            self.db,
+            expected_ty,
+            &StringLiteralCandidatesVisitor::default(),
+        );
+        candidates.sort_unstable_by(|left, right| left.value.cmp(&right.value));
+        candidates.dedup_by(|left, right| left.value == right.value);
+        candidates
+    }
+
+    fn string_literal_completion_expected_type(
+        &self,
+        string_expr: &ast::ExprStringLiteral,
+    ) -> Option<Type<'db>> {
+        let expr = ast::ExprRef::from(string_expr);
+        let index = semantic_index(self.db, self.file);
+        let file_scope = index.try_expression_scope_id(&self.expr_ref_in_ast(expr))?;
+        let scope = file_scope.to_scope_id(self.db, self.file);
+
+        infer_complete_scope_types(self.db, scope).try_expected_type(expr)
+    }
 }
 
 /// The type and definition of a symbol.
@@ -498,6 +569,12 @@ pub struct Completion<'db> {
     /// use it mainly in tests so that we can write less
     /// noisy tests.
     pub builtin: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExpectedStringLiteralCompletion<'db> {
+    pub value: String,
+    pub ty: Type<'db>,
 }
 
 pub trait HasType {
@@ -674,20 +751,6 @@ impl HasType for ast::ExceptHandlerExceptHandler {
         Some(binding_type(model.db, definition))
     }
 }
-
-/// Implemented by types for which the semantic index tracks their scope.
-pub(crate) trait HasTrackedScope: HasNodeIndex {}
-
-impl HasTrackedScope for ast::Expr {}
-
-impl HasTrackedScope for ast::ExprRef<'_> {}
-impl HasTrackedScope for &ast::ExprRef<'_> {}
-
-// We never explicitly register the scope of an `Identifier`.
-// However, `ExpressionsScopeMap` stores the text ranges of each scope.
-// That allows us to look up the identifier's scope for as long as it's
-// inside an expression (because the ranges overlap).
-impl HasTrackedScope for ast::Identifier {}
 
 #[cfg(test)]
 mod tests {

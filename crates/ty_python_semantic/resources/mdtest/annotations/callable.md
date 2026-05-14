@@ -385,9 +385,9 @@ But providing fewer than 2 arguments to `Concatenate` is an error:
 # fmt: off
 
 def _(
-    c: Callable[Concatenate[int], int],  # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 1"
-    d: Callable[Concatenate[(int,)], int],  # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 1"
-    e: Callable[Concatenate[()], int]  # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 0"
+    c: Callable[Concatenate[int], int],  # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
+    d: Callable[Concatenate[(int,)], int],  # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
+    e: Callable[Concatenate[()], int]  # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 0)"
 ):
     reveal_type(c)  # revealed: (...) -> int
     reveal_type(d)  # revealed: (...) -> int
@@ -525,6 +525,21 @@ class A(Base):
 
 # revealed: () -> A
 reveal_type(into_regular_callable(A))
+```
+
+## Nested callable relations still reach the leaf mismatch
+
+```py
+from typing import Callable
+
+from ty_extensions import is_assignable_to, static_assert
+
+static_assert(
+    not is_assignable_to(
+        Callable[[], Callable[[], int]],
+        Callable[[], Callable[[], str]],
+    )
+)
 ```
 
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

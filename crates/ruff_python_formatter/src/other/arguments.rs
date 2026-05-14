@@ -61,7 +61,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                     };
                 }
                 _ => {
-                    for arg_or_keyword in item.arguments_source_order() {
+                    for arg_or_keyword in item.iter_source_order() {
                         match arg_or_keyword {
                             ArgOrKeyword::Arg(arg) => {
                                 joiner.entry(arg, &arg.format());

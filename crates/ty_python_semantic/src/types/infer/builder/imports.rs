@@ -7,7 +7,6 @@ use ty_module_resolver::{
 use crate::{
     Program, TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
     place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin},
-    semantic_index::definition::Definition,
     types::{
         Type, TypeAndQualifiers,
         diagnostic::{
@@ -19,6 +18,7 @@ use crate::{
         infer_definition_types,
     },
 };
+use ty_python_core::definition::Definition;
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_import_statement(&mut self, import: &ast::StmtImport) {

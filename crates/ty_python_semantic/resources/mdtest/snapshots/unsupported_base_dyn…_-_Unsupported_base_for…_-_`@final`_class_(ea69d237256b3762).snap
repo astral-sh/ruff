@@ -28,8 +28,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unsupported_
 error[subclass-of-final-class]: Class `X` cannot inherit from final class `FinalClass`
  --> src/mdtest_snippet.py:7:16
   |
-5 |     pass
-6 |
 7 | X = type("X", (FinalClass,), {})  # error: [subclass-of-final-class]
   |                ^^^^^^^^^^
   |

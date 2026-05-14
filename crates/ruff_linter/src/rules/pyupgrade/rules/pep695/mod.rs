@@ -292,15 +292,13 @@ pub(crate) fn expr_name_to_type_var<'a>(
         Expr::Subscript(ExprSubscript {
             value: subscript_value,
             ..
-        }) => {
-            if semantic.match_typing_expr(subscript_value, "TypeVar") {
-                return Some(TypeVar {
-                    name: &name.id,
-                    restriction: None,
-                    kind: TypeParamKind::TypeVar,
-                    default: None,
-                });
-            }
+        }) if semantic.match_typing_expr(subscript_value, "TypeVar") => {
+            return Some(TypeVar {
+                name: &name.id,
+                restriction: None,
+                kind: TypeParamKind::TypeVar,
+                default: None,
+            });
         }
         Expr::Call(ExprCall {
             func, arguments, ..

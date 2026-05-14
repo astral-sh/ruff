@@ -27,7 +27,7 @@ use ty_project::watch::{ChangeEvent, CreatedKind};
 use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
 
 use index::DocumentError;
-use ty_python_semantic::UseDefaultStrategy;
+use ty_python_core::program::UseDefaultStrategy;
 
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
@@ -325,15 +325,6 @@ impl Session {
         &mut self.project_state_mut(path).db
     }
 
-    /// Returns a reference to the project's [`ProjectDatabase`] corresponding to the given path, if
-    /// any.
-    pub(crate) fn project_db_for_path(
-        &self,
-        path: impl AsRef<SystemPath>,
-    ) -> Option<&ProjectDatabase> {
-        self.project_state_for_path(path).map(|state| &state.db)
-    }
-
     /// Returns a reference to the project's [`ProjectState`] in which the given `path` belongs.
     ///
     /// If the path is a system path, it will return the project database that is closest to the
@@ -364,8 +355,17 @@ impl Session {
                 // where it can't prove that the `range_mut` call and the `self.projects.values_mut`
                 // never borrow `self.projects` mutably at the same time.
                 // https://rust-lang.github.io/rfcs/2094-nll.html#problem-case-3-conditional-control-flow-across-functions
-                if self.projects.range(range.clone()).next_back().is_some() {
-                    return self.projects.range_mut(range).next_back().unwrap().1;
+                if self
+                    .projects
+                    .range(range.clone())
+                    .any(|(workspace_root, _)| system_path.starts_with(workspace_root))
+                {
+                    return self
+                        .projects
+                        .range_mut(range)
+                        .rfind(|(workspace_root, _)| system_path.starts_with(workspace_root))
+                        .unwrap()
+                        .1;
                 }
 
                 self.project_state_virtual_fallback_mut()
@@ -382,9 +382,10 @@ impl Session {
         &self,
         path: impl AsRef<SystemPath>,
     ) -> Option<&ProjectState> {
+        let path = path.as_ref();
         self.projects
-            .range(..=path.as_ref().to_path_buf())
-            .next_back()
+            .range(..=path.to_path_buf())
+            .rfind(|(workspace_root, _)| path.starts_with(workspace_root))
             .map(|(_, project)| project)
     }
 
@@ -406,7 +407,7 @@ impl Session {
     pub(crate) fn apply_changes(
         &mut self,
         path: &AnySystemPath,
-        changes: Vec<ChangeEvent>,
+        changes: &[ChangeEvent],
     ) -> ChangeResult {
         let overrides = path.as_system().and_then(|root| {
             self.workspaces()
@@ -845,12 +846,20 @@ impl Session {
             })
             .collect();
         for doc in documents_to_clear {
-            self.clear_diagnostics(client, doc.url());
+            self.clear_diagnostics_if_needed(&doc, client);
         }
 
         self.bump_revision();
 
         Ok(())
+    }
+
+    pub(crate) fn clear_diagnostics_if_needed(&self, document: &DocumentHandle, client: &Client) {
+        if self.client_capabilities().supports_pull_diagnostics() && !document.is_cell_or_notebook()
+        {
+            return;
+        }
+        self.clear_diagnostics(client, document.url());
     }
 
     /// Clears the diagnostics for the document identified by `uri`.
@@ -1207,7 +1216,7 @@ impl Session {
                 } else {
                     ChangeEvent::Opened(system_path.clone())
                 };
-                self.apply_changes(path, vec![event]);
+                self.apply_changes(path, &[event]);
 
                 if is_not_python {
                     return;
@@ -1535,9 +1544,10 @@ impl Workspaces {
     /// Returns a reference to the workspace for the given path, [`None`] if there's no workspace
     /// registered for the path.
     fn for_path(&self, path: impl AsRef<SystemPath>) -> Option<&Workspace> {
+        let path = path.as_ref();
         self.workspaces
-            .range(..=path.as_ref().to_path_buf())
-            .next_back()
+            .range(..=path.to_path_buf())
+            .rfind(|(workspace_root, _)| path.starts_with(workspace_root))
             .map(|(_, db)| db)
     }
 
@@ -1836,14 +1846,14 @@ impl DocumentHandle {
         let path = self.notebook_or_file_path();
         let changes = match path {
             AnySystemPath::System(system_path) => {
-                vec![ChangeEvent::file_content_changed(system_path.clone())]
+                [ChangeEvent::file_content_changed(system_path.clone())]
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
-                vec![ChangeEvent::ChangedVirtual(virtual_path.clone())]
+                [ChangeEvent::ChangedVirtual(virtual_path.clone())]
             }
         };
 
-        session.apply_changes(path, changes);
+        session.apply_changes(path, &changes);
     }
 
     fn set_version(&mut self, version: DocumentVersion) {
