@@ -6016,13 +6016,70 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = set;
 
         let elts = elts.iter().map(|elt| [Some(elt)]).collect_vec();
-        let mut infer_elt_ty =
-            |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
+        let fallback_tcx = self.incomplete_typed_dict_key_context(set, tcx);
+        let mut infer_elt_ty = |builder: &mut Self, arg: ArgExpr<'db, '_>| {
+            let (_, elt, elt_tcx) = arg;
+            builder.infer_set_element(elt, elt_tcx, fallback_tcx)
+        };
 
         self.infer_collection_literal(KnownClass::Set, &elts, &mut infer_elt_ty, tcx)
             .unwrap_or_else(|| {
                 KnownClass::Set.to_specialized_instance(self.db(), &[Type::unknown()])
             })
+    }
+
+    /// Infers a set element, optionally with a fallback context for an incomplete `TypedDict` key.
+    ///
+    /// When normal set element context is available, semantic inference keeps that context. If a
+    /// `TypedDict` key fallback is also available, it is only added to the stored expected type used
+    /// by IDE string-literal completions.
+    fn infer_set_element(
+        &mut self,
+        elt: &ast::Expr,
+        elt_tcx: TypeContext<'db>,
+        fallback_tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        let inference_tcx = if elt_tcx.annotation.is_some() {
+            elt_tcx
+        } else {
+            fallback_tcx
+        };
+        let inferred_ty = self.infer_expression(elt, inference_tcx);
+
+        // `expected_types` is IDE completion metadata. If normal set inference already has a
+        // string-literal context, preserve that semantic context for inference while also offering
+        // the transient `TypedDict` key fallback as a completion candidate.
+        if let (Some(elt_ty), Some(fallback_ty)) = (elt_tcx.annotation, fallback_tcx.annotation) {
+            self.store_expected_type(
+                elt,
+                UnionType::from_two_elements(self.db(), elt_ty, fallback_ty),
+            );
+        }
+
+        inferred_ty
+    }
+
+    /// Returns a fallback type context for completing a `TypedDict` key while editing.
+    ///
+    /// While editing `{"key": value}` as a `TypedDict` literal, `{"key"}` parses as a set
+    /// until the colon is typed. This preserves key completions in that transient state.
+    fn incomplete_typed_dict_key_context(
+        &self,
+        set: &ast::ExprSet,
+        tcx: TypeContext<'db>,
+    ) -> TypeContext<'db> {
+        let [elt] = set.elts.as_slice() else {
+            return TypeContext::default();
+        };
+
+        if !elt.is_string_literal_expr() {
+            return TypeContext::default();
+        }
+
+        TypeContext::new(
+            tcx.annotation
+                .and_then(|annotation| self.typed_dict_key_expected_type(annotation)),
+        )
     }
 
     fn infer_dict_expression(&mut self, dict: &ast::ExprDict, tcx: TypeContext<'db>) -> Type<'db> {
