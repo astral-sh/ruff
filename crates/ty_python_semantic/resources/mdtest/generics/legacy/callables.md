@@ -299,6 +299,39 @@ result = apply_twice(f, x, y)
 reveal_type(result)
 ```
 
+Generic calls can combine evidence from an iterable with contravariant evidence from a callback for
+the same type variable. Passing `list[Derived]` with a `Callable[[Base], int]` callback preserves
+`list[Derived]` as the return type.
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+
+class Base: ...
+
+class Derived(Base):
+    foo: int = 1
+
+def sort_key(value: Base) -> int:
+    return 0
+
+def use_sorted(items: list[Derived]) -> int:
+    sorted_items = sorted(items, key=sort_key)
+    # revealed: list[Derived]
+    reveal_type(sorted_items)
+    return sorted_items[0].foo
+
+def collect_with_key(items: list[T], key: Callable[[T], int]) -> list[T]:
+    return items
+
+def use_collected(items: list[Derived]) -> int:
+    collected_items = collect_with_key(items, sort_key)
+    # revealed: list[Derived]
+    reveal_type(collected_items)
+    return collected_items[0].foo
+```
+
 An overloaded callable returned from a generic callable factory should still be assignable to the
 declared generic callable return type.
 

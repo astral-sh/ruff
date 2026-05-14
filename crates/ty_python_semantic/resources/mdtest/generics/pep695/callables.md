@@ -303,6 +303,95 @@ result = apply_twice(f, x, y)
 reveal_type(result)
 ```
 
+Generic calls can combine evidence from an iterable with contravariant evidence from a callback for
+the same type variable. Passing `list[Derived]` with a `Callable[[Base], int]` callback preserves
+the return type `list[Derived]`.
+
+```py
+class Base: ...
+
+class Derived(Base):
+    foo: int = 1
+
+def sort_key(value: Base) -> int:
+    return 0
+
+def use_sorted(items: list[Derived]) -> int:
+    sorted_items = sorted(items, key=sort_key)
+    # revealed: list[Derived]
+    reveal_type(sorted_items)
+    return sorted_items[0].foo
+```
+
+## Callable constraints through type aliases
+
+When an argument type alias contains a type variable, the aliased iterable element type determines
+the returned item type. Contravariant evidence from the key function is preserved, and the helper
+returns `list[AliasDerived]`.
+
+```py
+from collections.abc import Callable, Iterable
+
+class AliasBase: ...
+
+class AliasDerived(AliasBase):
+    foo: int = 1
+
+type Items[T] = Iterable[T]
+
+def alias_sort_key(value: AliasBase) -> int:
+    return 0
+
+def collect[T](items: Items[T], key: Callable[[T], int]) -> list[T]:
+    return list(items)
+
+def use_collected(items: list[AliasDerived]) -> int:
+    collected_items = collect(items, alias_sort_key)
+    # revealed: list[AliasDerived]
+    reveal_type(collected_items)
+    return collected_items[0].foo
+```
+
+When a callback only accepts a literal type, inference preserves that literal for `T`. Passing `1`
+with a `Callable[[Literal[1]], None]` callback returns a callable that still requires `Literal[1]`.
+
+```py
+from collections.abc import Callable
+from typing import Literal
+
+def preserves_literal[T](x: T, callback: Callable[[T], None]) -> Callable[[T], None]:
+    return callback
+
+def only_one(value: Literal[1]) -> None:
+    pass
+
+reveal_type(preserves_literal(1, only_one))  # revealed: (Literal[1], /) -> None
+```
+
+## Callable constraints with nested unions
+
+A callable parameter whose argument type is a union of type variables constrains each variable
+independently. Passing `X1`, `X2`, and a consumer of `X1 | X2` returns `tuple[X1, X2]`.
+
+```py
+from collections.abc import Callable
+
+class X1: ...
+class X2: ...
+
+def consume(value: X1 | X2) -> None:
+    pass
+
+def pair[T1, T2](left: T1, right: T2, callback: Callable[[T1 | T2], None]) -> tuple[T1, T2]:
+    callback(left)
+    callback(right)
+    return left, right
+
+result = pair(X1(), X2(), consume)
+# revealed: tuple[X1, X2]
+reveal_type(result)
+```
+
 An overloaded callable returned from a generic callable factory should still be assignable to the
 declared generic callable return type.
 

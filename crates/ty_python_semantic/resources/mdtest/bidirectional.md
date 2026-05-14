@@ -232,7 +232,7 @@ def return_invalid_dict() -> TD:
 ## Propagating return type annotation
 
 ```py
-from typing import overload, Callable
+from typing import overload, Callable, Iterable
 
 def list1[T](x: T) -> list[T]:
     return [x]
@@ -280,6 +280,23 @@ def h[T](x: T, cond: bool) -> T | list[T]:
 
 def i[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
+
+def accepts_callback[T](callback: Callable[[T], None]) -> list[T]:
+    raise NotImplementedError
+
+def consume_int(x: int) -> None: ...
+
+reveal_type(accepts_callback(consume_int))  # revealed: list[int]
+xs: list[int] = accepts_callback(consume_int)
+
+def make_with_callback[T](x: Iterable[T], callback: Callable[[T], None]) -> list[T]:
+    raise NotImplementedError
+
+ints = [1]
+
+def consume_object(x: object) -> None: ...
+
+objects: list[object] = make_with_callback(ints, consume_object)
 ```
 
 ## Type context sources

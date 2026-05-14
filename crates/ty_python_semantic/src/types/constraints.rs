@@ -565,6 +565,15 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.node.solutions(db, builder)
     }
 
+    pub(crate) fn path_bounds(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> PathBounds<'db> {
+        self.verify_builder(builder);
+        PathBounds::compute(db, builder, self.node)
+    }
+
     #[expect(dead_code)] // Keep this around for debugging purposes
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
         self.node

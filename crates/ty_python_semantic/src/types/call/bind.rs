@@ -4800,16 +4800,22 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
             // If the TypeVar has an upper bound, only use the promoted type if it
             // still satisfies the bound.
-            if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
-                if !promoted.is_assignable_to(self.db, bound) {
-                    return None;
-                }
+            if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints
+                && !promoted.is_assignable_to(self.db, bound)
+            {
+                return None;
             }
 
             Some(promoted)
         };
 
-        let specialization = builder.build_with(generic_context, maybe_promote);
+        let specialization = builder
+            .build_from_solver_constraints(
+                generic_context,
+                &preferred_type_mappings,
+                &maybe_promote,
+            )
+            .unwrap_or_else(|| builder.build_with(generic_context, &maybe_promote));
 
         self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
         self.specialization = Some(specialization);
@@ -4837,11 +4843,22 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
                 let declared_type = parameters[parameter_index].annotated_type();
                 let argument_type = argument_types.get_for_declared_type(declared_type);
+                let actual_type = variadic_argument_type.unwrap_or(argument_type);
 
-                let specialization_result = builder.infer_map(
-                    declared_type,
-                    variadic_argument_type.unwrap_or(argument_type),
-                    |(identity, _, inferred_ty)| {
+                let parameter = &parameters[parameter_index];
+                if (parameter.is_variadic()
+                    || parameter.is_keyword_variadic()
+                    || parameter.has_starred_annotation())
+                    && (builder.has_inferable_typevar(declared_type)
+                        || builder.has_inferable_typevar(actual_type))
+                {
+                    builder.mark_solver_constraints_unsupported();
+                } else if !matches!(declared_type, Type::Callable(_)) {
+                    builder.stage_solver_constraint(declared_type, actual_type);
+                }
+
+                let specialization_result =
+                    builder.infer_map(declared_type, actual_type, |(identity, _, inferred_ty)| {
                         // Avoid widening the inferred type if it is already assignable to the
                         // preferred declared type.
                         if let Some(preferred_ty) = preferred_type_mappings.get(&identity) {
@@ -4857,8 +4874,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         }
 
                         Some(inferred_ty)
-                    },
-                );
+                    });
 
                 if let Err(error) = specialization_result {
                     specialization_errors.push(BindingError::SpecializationError {

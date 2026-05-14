@@ -12,7 +12,7 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
-    Solutions,
+    PathBounds, Solutions,
 };
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
@@ -26,7 +26,9 @@ use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
 };
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::visitor::{
+    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
@@ -1787,6 +1789,28 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     constraints: &'c ConstraintSetBuilder<'db>,
     inferable: InferableTypeVars<'db>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
+    solver_constraint_state: SolverConstraintState<'db, 'c>,
+}
+
+#[derive(Debug)]
+enum SolverConstraintState<'db, 'c> {
+    Pending(Vec<PendingSolverConstraint<'db>>),
+    Enabled(ConstraintSet<'db, 'c>),
+    Unsupported,
+}
+
+enum SolverConstraintKind<'db> {
+    /// A constraint that cannot affect specialization.
+    Irrelevant,
+    Ordinary,
+    Callable(CallableType<'db>),
+    Unsupported,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct PendingSolverConstraint<'db> {
+    formal: Type<'db>,
+    actual: Type<'db>,
 }
 
 /// An assignment from a bound type variable to a given type, along with the variance of the outermost
@@ -1804,7 +1828,162 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             constraints,
             inferable,
             types: FxHashMap::default(),
+            solver_constraint_state: SolverConstraintState::Pending(Vec::new()),
         }
+    }
+
+    /// Stage ordinary argument constraints until a supported callable activates solver-backed solving.
+    pub(crate) fn stage_solver_constraint(&mut self, formal: Type<'db>, actual: Type<'db>) {
+        let has_inferable_typevar =
+            self.has_inferable_typevar(formal) || self.has_inferable_typevar(actual);
+        if matches!(
+            &self.solver_constraint_state,
+            SolverConstraintState::Unsupported
+        ) || !has_inferable_typevar
+        {
+            return;
+        }
+
+        match &mut self.solver_constraint_state {
+            SolverConstraintState::Pending(pending) => {
+                pending.push(PendingSolverConstraint { formal, actual });
+            }
+            SolverConstraintState::Enabled(_) => {
+                self.materialize_solver_constraint(formal, actual);
+            }
+            SolverConstraintState::Unsupported => {}
+        }
+    }
+
+    pub(crate) fn mark_solver_constraints_unsupported(&mut self) {
+        self.solver_constraint_state = SolverConstraintState::Unsupported;
+    }
+
+    /// Activate solver-backed constraint solving from a supported callable comparison.
+    ///
+    /// If flushing pending ordinary constraints finds an unsupported comparison involving an
+    /// inferable type variable, return `None`. In that case, the specialization has to be
+    /// built from eager typevar mappings.
+    fn activate_solver_constraints(
+        &mut self,
+        formal: Type<'db>,
+        actual: Type<'db>,
+    ) -> Option<CallableType<'db>> {
+        if matches!(
+            self.solver_constraint_state,
+            SolverConstraintState::Unsupported
+        ) {
+            return None;
+        }
+
+        let actual_callable = match self.solver_constraint_kind(formal, actual) {
+            SolverConstraintKind::Callable(actual_callable) => actual_callable,
+            SolverConstraintKind::Unsupported => {
+                self.solver_constraint_state = SolverConstraintState::Unsupported;
+                return None;
+            }
+            SolverConstraintKind::Irrelevant | SolverConstraintKind::Ordinary => return None,
+        };
+
+        let first_constraint =
+            actual.when_constraint_set_assignable_to(self.db, formal, self.constraints);
+        let pending = match &mut self.solver_constraint_state {
+            SolverConstraintState::Pending(pending) => std::mem::take(pending),
+            SolverConstraintState::Enabled(existing) => {
+                *existing = existing.and(self.db, self.constraints, || first_constraint);
+                return Some(actual_callable);
+            }
+            SolverConstraintState::Unsupported => return None,
+        };
+
+        self.solver_constraint_state = SolverConstraintState::Enabled(first_constraint);
+        for PendingSolverConstraint { formal, actual } in pending {
+            self.materialize_solver_constraint(formal, actual);
+            if matches!(
+                self.solver_constraint_state,
+                SolverConstraintState::Unsupported
+            ) {
+                return None;
+            }
+        }
+
+        Some(actual_callable)
+    }
+
+    /// Accumulate an assignability constraint only for comparisons the solver can represent.
+    fn materialize_solver_constraint(&mut self, formal: Type<'db>, actual: Type<'db>) {
+        match self.solver_constraint_kind(formal, actual) {
+            SolverConstraintKind::Irrelevant => return,
+            SolverConstraintKind::Unsupported => {
+                self.solver_constraint_state = SolverConstraintState::Unsupported;
+                return;
+            }
+            SolverConstraintKind::Ordinary | SolverConstraintKind::Callable(_) => {}
+        }
+
+        let when = actual.when_constraint_set_assignable_to(self.db, formal, self.constraints);
+        if let SolverConstraintState::Enabled(existing) = &mut self.solver_constraint_state {
+            *existing = existing.and(self.db, self.constraints, || when);
+        }
+    }
+
+    pub(crate) fn has_inferable_typevar(&self, ty: Type<'db>) -> bool {
+        any_over_type(self.db, ty, false, |ty| match ty {
+            Type::TypeVar(typevar) => typevar.is_inferable(self.db, self.inferable),
+
+            Type::TypeAlias(alias) => alias.specialization(self.db).is_some_and(|specialization| {
+                specialization
+                    .types(self.db)
+                    .iter()
+                    .any(|ty| self.has_inferable_typevar(*ty))
+            }),
+
+            _ => false,
+        })
+    }
+
+    fn solver_constraint_kind(
+        &self,
+        formal: Type<'db>,
+        actual: Type<'db>,
+    ) -> SolverConstraintKind<'db> {
+        if !self.has_inferable_typevar(formal) && !self.has_inferable_typevar(actual) {
+            return SolverConstraintKind::Irrelevant;
+        }
+
+        let has_unsupported_type = |ty| {
+            any_over_type(self.db, ty, false, |ty| match ty {
+                Type::TypeVar(typevar) => typevar.is_paramspec(self.db),
+                Type::Callable(callable) => !Self::supports_callable(self.db, callable),
+                _ => false,
+            })
+        };
+
+        if has_unsupported_type(formal) || has_unsupported_type(actual) {
+            return SolverConstraintKind::Unsupported;
+        }
+
+        if !matches!(formal, Type::Callable(_)) {
+            return SolverConstraintKind::Ordinary;
+        }
+
+        let Some(callables) = actual.try_upcast_to_callable(self.db) else {
+            return SolverConstraintKind::Unsupported;
+        };
+
+        match callables.as_slice() {
+            [callable] if Self::supports_callable(self.db, *callable) => {
+                SolverConstraintKind::Callable(*callable)
+            }
+            _ => SolverConstraintKind::Unsupported,
+        }
+    }
+
+    fn supports_callable(db: &'db dyn Db, callable: CallableType<'db>) -> bool {
+        matches!(
+            callable.signatures(db).overloads.as_slice(),
+            [signature] if signature.generic_context.is_none() && signature.parameters().is_standard()
+        )
     }
 
     /// Build a specialization, using a caller-provided hook to select the solution for each
@@ -1842,6 +2021,98 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             });
 
         generic_context.specialize_recursive(db, types)
+    }
+
+    pub(crate) fn build_from_solver_constraints(
+        &mut self,
+        generic_context: GenericContext<'db>,
+        preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+        mut choose: impl FnMut(
+            BoundTypeVarInstance<'db>,
+            Option<(Type<'db>, Type<'db>)>,
+        ) -> Option<Type<'db>>,
+    ) -> Option<Specialization<'db>> {
+        let solver_constraints = match &self.solver_constraint_state {
+            SolverConstraintState::Pending(_) | SolverConstraintState::Unsupported => return None,
+            SolverConstraintState::Enabled(solver_constraints) => *solver_constraints,
+        };
+
+        let db = self.db;
+        let solver_constraints =
+            solver_constraints.remove_noninferable(db, self.constraints, self.inferable);
+        let path_bounds = solver_constraints.path_bounds(db, self.constraints);
+
+        // Each BDD path represents one satisfiable way to combine all argument constraints.
+        // For each typevar, solve the path's lower/upper bounds. Prefer a caller-provided type
+        // only if it satisfies those same bounds. Then let `choose` adjust the candidate, again
+        // only if the adjusted type stays within the path bounds.
+        let solutions = path_bounds.solve_with(|typevar, _variance, lower, upper| {
+            let solution = PathBounds::default_solve(db, self.constraints, typevar, lower, upper)?;
+            let is_within_bounds = |ty| {
+                !lower
+                    .when_constraint_set_assignable_to(db, ty, self.constraints)
+                    .is_never_satisfied(db)
+                    && !ty
+                        .when_constraint_set_assignable_to(db, upper, self.constraints)
+                        .is_never_satisfied(db)
+            };
+            let mut choose_within_bounds = |ty| {
+                choose(typevar, Some((ty, ty)))
+                    .filter(|&chosen| is_within_bounds(chosen))
+                    .unwrap_or(ty)
+            };
+
+            if let Some(preferred) = preferred_type_mappings.get(&typevar.identity(db)).copied()
+                && is_within_bounds(preferred)
+                && PathBounds::default_solve(db, self.constraints, typevar, preferred, preferred)
+                    .is_ok()
+            {
+                return Ok(Some(choose_within_bounds(preferred)));
+            }
+
+            Ok(solution.map(choose_within_bounds))
+        });
+
+        // A single call specialization has to summarize all satisfiable paths. If different paths
+        // solve the same type variable differently, keep all alternatives by unioning them.
+        let mut solved: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>> =
+            FxHashMap::default();
+        match solutions {
+            Solutions::Unsatisfiable => return None,
+            Solutions::Unconstrained => {}
+            Solutions::Constrained(solutions) => {
+                for solution in solutions {
+                    for binding in solution {
+                        let identity = binding.bound_typevar.identity(db);
+                        solved
+                            .entry(identity)
+                            .and_modify(|existing| existing.add(db, binding.solution))
+                            .or_insert_with(|| UnionAccumulator::new(binding.solution));
+                    }
+                }
+            }
+        }
+
+        let types = generic_context
+            .variables_inner(db)
+            .iter()
+            .map(|(identity, variable)| {
+                if let Some(mapped_ty) = solved.get_mut(identity) {
+                    let mapped_ty = mapped_ty.get_or_build(db);
+
+                    return Some(mapped_ty);
+                }
+
+                if let Some(mapped_ty) = self.types.get_mut(identity) {
+                    let mapped_ty = mapped_ty.get_or_build(db);
+                    let chosen = choose(*variable, Some((mapped_ty, mapped_ty)));
+                    return Some(chosen.unwrap_or(mapped_ty));
+                }
+
+                choose(*variable, None)
+            });
+
+        Some(generic_context.specialize_recursive(db, types))
     }
 
     /// Insert a type mapping for a bound typevar.
@@ -2503,6 +2774,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
 
             (Type::Callable(formal_callable), _) => {
+                if let Some(actual_callable) = self.activate_solver_constraints(formal, actual) {
+                    let actual_callables = CallableTypes::one(actual_callable);
+                    let _ = self.infer_from_callable_signature(
+                        formal,
+                        formal_callable.signatures(self.db),
+                        &actual_callables,
+                        f,
+                    );
+                    return Ok(());
+                }
+
                 let Some(actual_callables) = actual.try_upcast_to_callable(self.db) else {
                     return Ok(());
                 };
