@@ -1062,7 +1062,7 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_kwargs_annotation<'db>(
 /// in multiple validation passes. Precomputing them avoids re-inference in speculative builders.
 pub(super) fn infer_unpacked_keyword_types<'db>(
     arguments: &Arguments,
-    expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
+    mut expression_type_fn: impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) -> Vec<Option<Type<'db>>> {
     arguments
         .keywords
@@ -1124,14 +1124,12 @@ pub(super) fn collect_guaranteed_keyword_keys<'db>(
             continue;
         };
 
-        let mut shadowed_keys = OrderSet::new();
         collect_guaranteed_keys_from_merged_unpacked_keyword(
             db,
             typed_dict,
             &keyword.value,
             unpacked_type,
             &mut provided_keys,
-            &mut shadowed_keys,
             expression_type_fn,
         );
     }
@@ -1139,15 +1137,13 @@ pub(super) fn collect_guaranteed_keyword_keys<'db>(
     provided_keys
 }
 
-/// Collects keys guaranteed by one unpacked constructor argument, honoring merged `**{...}`
-/// overwrite semantics.
+/// Collects keys guaranteed by one unpacked constructor argument.
 fn collect_guaranteed_keys_from_merged_unpacked_keyword<'db>(
     db: &'db dyn Db,
     typed_dict: TypedDictType<'db>,
     expr: &ast::Expr,
     unpacked_type: Type<'db>,
     provided_keys: &mut OrderSet<Name>,
-    shadowed_keys: &mut OrderSet<Name>,
     expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) {
     if let ast::Expr::Dict(dict_expr) = expr {
@@ -1155,11 +1151,7 @@ fn collect_guaranteed_keys_from_merged_unpacked_keyword<'db>(
             if let Some(key_expr) = &item.key {
                 let key_ty = expression_type_fn(key_expr, TypeContext::default());
                 if let Some(key_literal) = key_ty.as_string_literal() {
-                    let key = Name::new(key_literal.value(db));
-                    if !shadowed_keys.contains(&key) {
-                        provided_keys.insert(key.clone());
-                        shadowed_keys.insert(key);
-                    }
+                    provided_keys.insert(Name::new(key_literal.value(db)));
                 }
             } else {
                 let nested_ty = expression_type_fn(&item.value, TypeContext::default());
@@ -1169,7 +1161,6 @@ fn collect_guaranteed_keys_from_merged_unpacked_keyword<'db>(
                     &item.value,
                     nested_ty,
                     provided_keys,
-                    shadowed_keys,
                     expression_type_fn,
                 );
             }
@@ -1178,19 +1169,13 @@ fn collect_guaranteed_keys_from_merged_unpacked_keyword<'db>(
     }
 
     if unpacked_keyword_is_gradual(db, unpacked_type) {
-        for (key_name, field) in typed_dict.items(db) {
-            if field.is_required() && !shadowed_keys.contains(key_name) {
-                provided_keys.insert(key_name.clone());
-            }
-            shadowed_keys.insert(key_name.clone());
-        }
+        provided_keys.extend(typed_dict.items(db).keys().cloned());
     } else if let Some(unpacked_keys) =
         extract_unpacked_typed_dict_keys_from_value_type(db, unpacked_type)
     {
         for (key, unpacked_key) in unpacked_keys {
-            if unpacked_key.is_required && !shadowed_keys.contains(&key) {
-                provided_keys.insert(key.clone());
-                shadowed_keys.insert(key);
+            if unpacked_key.is_required {
+                provided_keys.insert(key);
             }
         }
     }
@@ -1774,14 +1759,12 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
         );
     }
 
-    // Never and Dynamic types are special: they can have any keys, so we skip
-    // validation and mark all required keys as provided.
+    // Never and Dynamic types are special: they can have any keys, so we skip validation and mark
+    // all target keys as provided.
     if unpacked_keyword_is_gradual(db, unpacked_type) {
         shadowed_keys.extend(items.keys().cloned());
-        for (key_name, field) in items {
-            if field.is_required() {
-                guaranteed_keys.entry(key_name.clone()).or_insert(None);
-            }
+        for key_name in items.keys() {
+            guaranteed_keys.entry(key_name.clone()).or_insert(None);
         }
         return true;
     } else if let Some(unpacked_keys) =

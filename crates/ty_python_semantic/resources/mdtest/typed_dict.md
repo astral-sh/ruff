@@ -800,6 +800,15 @@ def _(td: TD):
 def _(x: Any):
     TD({"a": "foo"}, **x)
 
+class OptionalOverrideTarget(TypedDict, total=False):
+    a: int
+
+class BadOptionalSource(TypedDict):
+    a: str
+
+def _(source: BadOptionalSource, kwargs: Any):
+    OptionalOverrideTarget(source, **{"a": 1, **kwargs})
+
 class ExplicitDictValueTarget(TypedDict):
     a: int
     b: object

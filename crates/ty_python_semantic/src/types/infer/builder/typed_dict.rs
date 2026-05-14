@@ -333,7 +333,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             typed_dict,
             dict,
             dict.into(),
-            &mut |expr: &ast::Expr, tcx: TypeContext<'db>| {
+            |expr: &ast::Expr, tcx: TypeContext<'db>| {
                 item_types
                     .get(&expr.node_index().load())
                     .copied()
@@ -373,7 +373,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             TypedDictConstructorForm::MixedPositionalAndKeywords => {
                 let unpacked_keyword_types =
-                    infer_unpacked_keyword_types(arguments, &mut |expr, tcx| {
+                    infer_unpacked_keyword_types(arguments, |expr, tcx| {
                         self.get_or_infer_expression(expr, tcx)
                     });
                 let keyword_keys = collect_guaranteed_keyword_keys(
