@@ -2154,12 +2154,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     fn narrow_with_required_typeddict_key(&self, ty: Type<'db>, key: &str) -> Type<'db> {
         let key_presence_constraint = typeddict_key_getitem_protocol(self.db, key);
 
-        let constrain = |ty| {
-            IntersectionBuilder::new(self.db)
-                .add_positive(ty)
-                .add_positive(key_presence_constraint)
-                .build()
-        };
+        let db = self.db;
+        let constrain = |ty| IntersectionType::from_two_elements(db, ty, key_presence_constraint);
 
         match ty.resolve_type_alias(self.db) {
             Type::TypedDict(typed_dict) => {
