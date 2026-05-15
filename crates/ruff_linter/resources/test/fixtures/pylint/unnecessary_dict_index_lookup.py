@@ -51,3 +51,22 @@ def rewrite_client_arrays(value_arrays: dict[str, list[int]]) -> dict[str, list[
         else:
             mapped_arrays[mapped_label] = [value_arrays[label][i] for i in range(len(array))]  # PLR1733
     return mapped_arrays
+
+
+# FP: for-else with inner loop variable accessed in else clause
+# The else clause runs when the inner loop completes without break.
+# The inner loop variable may be unbound or stale, so dict[index] lookups
+# in the else clause should NOT be flagged (issue #25150).
+def for_else_no_false_positive(result: dict[str, float]) -> dict[str, float]:
+    for res_glob, res_priority in result.items():
+        if res_priority > 0:
+            break
+    else:
+        # `res_glob` is bound to the LAST iteration's key if loop completed without break.
+        # `res_priority` is similarly the last iteration's value.
+        # Replacing result[res_glob] with res_priority here is INCORRECT
+        # because the outer loop's variables may not be in scope in all cases.
+        for res_glob in result.keys():
+            if result[res_glob] <= 0:
+                result.pop(res_glob)
+    return result
