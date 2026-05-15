@@ -4508,7 +4508,7 @@ impl<'db> IncompatibleBases<'db> {
                         !disjoint_base
                             .class
                             .default_specialization(db)
-                            .is_subclass_of(db, other_base.class.default_specialization(db))
+                            .is_subtype_of_class_literal(db, other_base.class)
                     })
             })
             .map(|(base, info)| (*base, *info))

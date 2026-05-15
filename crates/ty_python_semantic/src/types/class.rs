@@ -2567,15 +2567,17 @@ impl<'db> DisjointBase<'db> {
 
     /// Two disjoint bases can only coexist in a class's MRO if one is a subclass of the other
     fn could_coexist_in_mro_with(&self, db: &'db dyn Db, other: &Self) -> bool {
+        // CPython's layout check operates on runtime classes. Type arguments are irrelevant here:
+        // a generic disjoint base and any specialization of that base share the same layout.
         self == other
             || self
                 .class
                 .default_specialization(db)
-                .is_subclass_of(db, other.class.default_specialization(db))
+                .is_subtype_of_class_literal(db, other.class)
             || other
                 .class
                 .default_specialization(db)
-                .is_subclass_of(db, self.class.default_specialization(db))
+                .is_subtype_of_class_literal(db, self.class)
     }
 }
 
