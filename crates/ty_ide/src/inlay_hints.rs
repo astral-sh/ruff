@@ -570,10 +570,12 @@ fn arg_matches_name(argument: &Expr, name: &str) -> bool {
 }
 
 /// Returns `true` when `argument_name` is either the parameter name, or has the
-/// parameter name as a full underscore-separated prefix or suffix.
+/// parameter name as a full underscore-separated prefix or suffix. The parameter
+/// name is accepted in its raw spelling; leading and trailing underscores are
+/// ignored before matching.
 fn name_matches_parameter(argument_name: &str, parameter_name: &str) -> bool {
     let argument_name = argument_name.to_lowercase();
-    let parameter_name = parameter_name.to_lowercase();
+    let parameter_name = parameter_name.trim_matches('_').to_lowercase();
 
     argument_name == parameter_name
         || argument_name
@@ -5925,6 +5927,29 @@ Source with applied edits:
         PARAM = 1
 
         foo(TEST, PARAM)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_argument_name_suppressed_by_normalized_parameter_name() {
+        let mut test = inlay_hint_test(
+            "
+            def trailing(param_: int): pass
+            def leading(_param: int): pass
+            param = 1
+
+            trailing(param)
+            leading(param)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def trailing(param_: int): pass
+        def leading(_param: int): pass
+        param = 1
+
+        trailing(param)
+        leading(param)
         ");
     }
 
