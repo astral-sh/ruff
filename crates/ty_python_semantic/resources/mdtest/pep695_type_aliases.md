@@ -209,6 +209,21 @@ def f(x: IntOrStr, y: str | bytes):
     reveal_type(z)  # revealed: (int & ~AlwaysFalsy) | str | bytes
 ```
 
+## Loop-carried augmented unions
+
+PEP 604 unions created by augmented assignment should converge when the previous loop iteration
+already contains the same type alias:
+
+```py
+def f(condition: bool):
+    type Left = int
+    alias = Left
+
+    while condition:
+        type Right = str
+        alias |= Right
+```
+
 ## Multiple layers of union aliases
 
 ```py

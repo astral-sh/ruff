@@ -518,10 +518,24 @@ impl<'db> UnionTypeInstance<'db> {
             }
         }
 
+        let union_type = builder.build();
+
+        // `A | B | B` is the same runtime union value as `A | B`. Reuse the existing union
+        // instance when its semantic union already contains the new operand, rather than storing
+        // an ever-deeper value-expression tree like `((A | B) | B) | B`.
+        for ty in &value_expr_types {
+            if let Type::KnownInstance(KnownInstanceType::UnionType(union)) = ty
+                && let Ok(&existing_union) = union.union_type(db).as_ref()
+                && existing_union == union_type
+            {
+                return *ty;
+            }
+        }
+
         Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::new(
             db,
             Some(value_expr_types),
-            Ok(builder.build()),
+            Ok(union_type),
         )))
     }
 
