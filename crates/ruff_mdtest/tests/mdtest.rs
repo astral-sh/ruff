@@ -15,7 +15,7 @@ fn mdtest(fixture_path: &Utf8Path, content: String) -> datatest_stable::Result<(
         .join(fixture_path.strip_prefix(".").unwrap_or(fixture_path));
 
     let test_name = fixture_path
-        .strip_prefix("./resources/mdtest")
+        .strip_prefix("../ruff_linter/resources/mdtest")
         .unwrap_or(fixture_path)
         .as_str();
 
@@ -26,12 +26,12 @@ fn mdtest(fixture_path: &Utf8Path, content: String) -> datatest_stable::Result<(
         &snapshot_path,
         short_title,
         test_name,
-        "ruff_linter",
+        "ruff_mdtest",
     )?;
 
     Ok(())
 }
 
 datatest_stable::harness! {
-    { test = mdtest, root = "./resources/mdtest", pattern = r"\.md$" },
+    { test = mdtest, root = "../ruff_linter/resources/mdtest", pattern = r"\.md$" },
 }

@@ -302,7 +302,7 @@ max-line-length = 100
 ```
 ````
 
-Mdtests are run as part of a normal `cargo test` invocation as part of the `ruff_linter` crate.
+Mdtests are run as part of a normal `cargo test` invocation as part of the `ruff_mdtest` crate.
 
 ### Example: Adding an auto-fix
 

@@ -26,5 +26,12 @@ anyhow = { workspace = true }
 camino = { workspace = true }
 salsa = { workspace = true }
 
+[dev-dependencies]
+datatest-stable = { workspace = true }
+
+[[test]]
+name = "mdtest"
+harness = false
+
 [lints]
 workspace = true
