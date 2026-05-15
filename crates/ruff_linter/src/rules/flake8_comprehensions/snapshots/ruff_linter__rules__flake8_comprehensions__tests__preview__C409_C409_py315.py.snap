@@ -1,6 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 1
+
+--- Added ---
 C409 Unnecessary list comprehension passed to `tuple()` (rewrite as a generator)
  --> C409_py315.py:3:1
   |

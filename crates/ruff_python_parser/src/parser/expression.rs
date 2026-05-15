@@ -2084,6 +2084,13 @@ impl<'src> Parser<'src> {
         // (*x for x in y)
         // f(*x for x in y)
 
+        // test_err pep_798_invalid_dict_unpacking_comprehensions_py315
+        // # parse_options: {"target-version": "3.15"}
+        // {*k: v for k, v in items}
+        // {k: *v for k, v in items}
+        // {**k: v for k, v in items}
+        // {k: **v for k, v in items}
+
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
@@ -2108,18 +2115,40 @@ impl<'src> Parser<'src> {
             // Handle dictionary unpacking. Here, the grammar is `'**' bitwise_or`
             // which requires limiting the expression.
             let value = self.parse_expression_with_bitwise_or_precedence();
+            let unpack_range = TextRange::new(start, value.range().end());
 
             if matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
                 self.add_unsupported_syntax_error(
                     UnsupportedSyntaxErrorKind::UnpackingInComprehension(
                         ComprehensionUnpackingKind::DictInDict,
                     ),
-                    TextRange::new(start, value.range().end()),
+                    unpack_range,
                 );
 
                 return Expr::DictComp(
                     self.parse_dictionary_comprehension_expression(None, value.expr, start),
                 );
+            }
+
+            if self.at(TokenKind::Colon) {
+                self.add_error(ParseErrorType::InvalidStarredExpressionUsage, unpack_range);
+
+                self.bump(TokenKind::Colon);
+                let dict_value = self.parse_conditional_expression_or_higher();
+
+                if matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
+                    return Expr::DictComp(self.parse_dictionary_comprehension_expression(
+                        Some(value.expr),
+                        dict_value.expr,
+                        start,
+                    ));
+                }
+
+                return Expr::Dict(self.parse_dictionary_expression(
+                    Some(value.expr),
+                    dict_value.expr,
+                    start,
+                ));
             }
 
             return Expr::Dict(self.parse_dictionary_expression(None, value.expr, start));
@@ -2182,7 +2211,18 @@ impl<'src> Parser<'src> {
                 }
 
                 self.bump(TokenKind::Colon);
-                let value = self.parse_conditional_expression_or_higher();
+                let value = if self.at(TokenKind::DoubleStar) {
+                    let unpack_start = self.node_start();
+                    self.bump(TokenKind::DoubleStar);
+                    let value = self.parse_expression_with_bitwise_or_precedence();
+                    self.add_error(
+                        ParseErrorType::InvalidStarredExpressionUsage,
+                        TextRange::new(unpack_start, value.range().end()),
+                    );
+                    value
+                } else {
+                    self.parse_conditional_expression_or_higher()
+                };
 
                 if matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
                     Expr::DictComp(self.parse_dictionary_comprehension_expression(
