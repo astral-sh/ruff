@@ -6327,12 +6327,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // We use a forward assignability check (`collection_instance ≤ tcx`) to infer what each
         // typevar maps to in the type context. For example, if the type context is `list[int]` and
         // `collection_instance` is `list[T]`, the check produces `T = int`.
-        //
-        // Variance is determined from the constraint bounds: a constraint with only an upper bound
-        // (`lower = Never`) indicates a covariant position, while a constraint with only a lower
-        // bound (`upper = object`) indicates contravariant. This correctly handles cases where the
-        // type context is a covariant superclass of the collection (e.g., `Sequence[Any]` as type
-        // context for `list[T]`).
         let (elt_tcx_constraints, elt_tcx_variance) = {
             let mut elt_tcx_constraints: FxHashMap<
                 BoundTypeVarIdentity<'db>,
@@ -6343,18 +6337,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if let Some(tcx) = tcx.annotation
                 && tcx.class_specialization(self.db()).is_some()
-                // Skip constraint extraction when the type context contains UnspecializedTypeVar
-                // placeholders (from partially-specialized parameter types during multi-inference
-                // for overloaded calls). The assignability check would walk through protocol
-                // supertypes and produce constraints contaminated by the placeholder, which
-                // collapse to `Any` during solution extraction and bypass downstream filters.
-                //
-                // TODO: UnspecializedTypeVar should be removed entirely once the
-                // SpecializationBuilder uses constraint sets internally, at which point the
-                // typevars that it currently replaces can instead be existentially quantified away
-                // (as is already done for generic callable assignability in
-                // `check_signature_pair`).
-                && !tcx.has_unspecialized_type_var(self.db())
             {
                 let db = self.db();
                 let collection_instance = Type::instance(db, ClassType::Generic(collection_alias));
