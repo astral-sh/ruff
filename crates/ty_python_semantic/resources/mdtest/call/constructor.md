@@ -63,6 +63,28 @@ reveal_type(Foo())  # revealed: Foo
 reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
+## `__new__` with an invalid decorator and unresolved return annotation
+
+Regression test for <https://github.com/astral-sh/ty/issues/3470>.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import TypeVar
+from typing_extensions import deprecated
+
+class C:
+    @deprecated  # error: [invalid-argument-type] "LiteralString"
+    def __new__() -> T:  # error: [empty-body] "TypeVar"
+        pass
+
+C()
+T = TypeVar
+```
+
 ## `__new__` present on a superclass
 
 If the `__new__` method is defined on a superclass, we can still infer the signature of the
