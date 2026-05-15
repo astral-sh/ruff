@@ -456,7 +456,7 @@ pub(crate) fn enum_metadata<'db>(
     let custom_value_annotation = custom_value_annotation(db, scope_id);
     let value_annotation = custom_value_annotation.or_else(|| {
         if custom_enum_metaclass_new {
-            None
+            inherited_user_defined_value_annotation(db, class)
         } else {
             inherited_value_annotation(db, class)
         }
@@ -494,7 +494,7 @@ fn custom_enum_metaclass_new<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db
 
 /// Iterates over parent enum classes in the MRO, skipping known enum
 /// infrastructure classes but including `IntEnum`, `Flag`, and `IntFlag`
-/// which declare `_value_` annotations that should be inherited.
+/// which declare `_value_` annotations that normally should be inherited.
 fn iter_parent_enum_classes<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
@@ -530,6 +530,16 @@ fn inherited_value_annotation<'db>(
     class: StaticClassLiteral<'db>,
 ) -> Option<Type<'db>> {
     iter_parent_enum_classes(db, class)
+        .find_map(|base| custom_value_annotation(db, base.body_scope(db)))
+}
+
+/// Looks up an inherited `_value_` annotation from user-defined parent enum classes in the MRO.
+fn inherited_user_defined_value_annotation<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<Type<'db>> {
+    iter_parent_enum_classes(db, class)
+        .filter(|base| base.known(db).is_none())
         .find_map(|base| custom_value_annotation(db, base.body_scope(db)))
 }
 
