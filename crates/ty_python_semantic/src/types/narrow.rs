@@ -2153,19 +2153,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 
     fn narrow_with_present_key(&self, ty: Type<'db>, key: &str) -> Type<'db> {
-        fn skip_present_key_constraint<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> bool {
-            match ty.resolve_type_alias(db) {
-                // Enum literals come from user-defined classes that could satisfy the protocol.
-                Type::LiteralValue(literal) => !literal.is_enum(),
-                Type::TypedDict(typed_dict) => typed_dict.items(db).contains_key(key),
-                Type::Intersection(intersection) => intersection
-                    .positive(db)
-                    .iter()
-                    .any(|element| skip_present_key_constraint(db, *element, key)),
-                _ => false,
-            }
-        }
-
         let key_presence_constraint = typeddict_key_getitem_protocol(self.db, key);
 
         let db = self.db;
@@ -2179,13 +2166,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .iter()
                     .map(|element| self.narrow_with_present_key(*element, key)),
             ),
-            resolved => {
-                if skip_present_key_constraint(self.db, resolved, key) {
-                    resolved
-                } else {
-                    constrain(ty)
-                }
-            }
+            _ => constrain(ty),
         }
     }
 

@@ -4593,7 +4593,12 @@ def dictionary_union(u: Foo | dict[Literal["a", "b"], int]):
 
 def literal_union(u: Foo | Literal["abc"]):
     if "a" in u:
-        reveal_type(u)  # revealed: (Foo & <Protocol with members '__getitem__'>) | Literal["abc"]
+        # revealed: (Foo & <Protocol with members '__getitem__'>) | (Literal["abc"] & <Protocol with members '__getitem__'>)
+        reveal_type(u)
+
+def literal_union_key_access(obj: Foo | Literal["a"]):
+    if "c" in obj:
+        reveal_type(obj["c"])  # revealed: object
 ```
 
 This still accepts guarded key access in the branch, without pretending that an open `TypedDict`
