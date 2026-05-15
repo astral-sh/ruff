@@ -4086,6 +4086,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let target_ty = if let Some(value_ty) = value_ty {
                 let declared_ty = annotated.inner_type();
                 if value_ty.is_assignable_to(self.db(), declared_ty) {
+                    if let ast::Expr::Attribute(attr_expr) = target.as_ref() {
+                        if !annotated.qualifiers.contains(TypeQualifiers::FINAL) {
+                            let object_ty = self.expression_type(&attr_expr.value);
+                            let mut infer_assigned_ty =
+                                |_: &mut Self, _: TypeContext<'db>| value_ty;
+                            self.validate_attribute_assignment(
+                                attr_expr,
+                                object_ty,
+                                attr_expr.attr.id(),
+                                &mut infer_assigned_ty,
+                                true,
+                            );
+                        }
+                    }
                     value_ty
                 } else {
                     if let Some(builder) = self

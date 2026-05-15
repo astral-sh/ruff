@@ -99,6 +99,17 @@ error[invalid-assignment]: Object of type `None` is not assignable to `str`
   |
 ```
 
+An annotated assignment to an existing attribute outside `self` should also be validated against the
+attribute's declared type.
+
+```py
+class C:
+    declared: int
+
+c = C()
+c.declared: str = "foo"  # error: [invalid-assignment]
+```
+
 ## `ClassVar`s
 
 These can only be set on class objects:
