@@ -1,29 +1,14 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{ReturnStatementVisitor, map_callable};
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Decorator, Expr, ExprAttribute, StmtFunctionDef};
-use ruff_python_semantic::{Modules, SemanticModel};
+use ruff_python_ast::{self as ast, Decorator, Expr, ExprAttribute, Stmt, StmtFunctionDef};
+use ruff_python_semantic::analyze;
+use ruff_python_semantic::{BindingKind, Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::add_argument;
 use crate::{Edit, Fix, FixAvailability, Violation};
-
-/// Variants of `@task.<variant>` that accept `multiple_outputs`. `task.sensor`
-/// is intentionally excluded because the sensor decorator hardcodes
-/// `multiple_outputs=False`.
-const SUPPORTED_VARIANTS: &[&str] = &[
-    "python",
-    "virtualenv",
-    "external_python",
-    "branch",
-    "branch_virtualenv",
-    "branch_external_python",
-    "short_circuit",
-    "docker",
-    "kubernetes",
-    "pyspark",
-];
 
 /// ## What it does
 /// Checks for `@task`-decorated functions whose `multiple_outputs` behavior is
@@ -70,7 +55,7 @@ const SUPPORTED_VARIANTS: &[&str] = &[
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct AirflowTaskImplicitMultipleOutputs {
-    inferred: bool,
+    annotation_is_mapping: bool,
 }
 
 impl Violation for AirflowTaskImplicitMultipleOutputs {
@@ -82,7 +67,7 @@ impl Violation for AirflowTaskImplicitMultipleOutputs {
     }
 
     fn fix_title(&self) -> Option<String> {
-        if self.inferred {
+        if self.annotation_is_mapping {
             Some("Add `multiple_outputs=True`".to_string())
         } else {
             Some("Add `multiple_outputs=False`".to_string())
@@ -111,18 +96,17 @@ pub(crate) fn task_implicit_multiple_outputs(checker: &Checker, function_def: &S
         .as_deref()
         .is_some_and(|annotation| annotation_resolves_to_mapping(annotation, semantic));
 
-    let body_returns_dict = body_has_dict_return(function_def, semantic);
-
-    if !annotation_is_mapping && !body_returns_dict {
+    if !annotation_is_mapping && !body_has_dict_return(function_def, semantic) {
         return;
     }
 
-    let inferred = annotation_is_mapping;
     let mut diagnostic = checker.report_diagnostic(
-        AirflowTaskImplicitMultipleOutputs { inferred },
+        AirflowTaskImplicitMultipleOutputs {
+            annotation_is_mapping,
+        },
         decorator.range(),
     );
-    diagnostic.set_fix(build_fix(decorator, inferred, checker));
+    diagnostic.set_fix(build_fix(decorator, annotation_is_mapping, checker));
 }
 
 /// Return the matched `@task` (or supported `@task.<variant>`) decorator on
@@ -148,10 +132,22 @@ fn is_supported_task_decorator(decorator: &Decorator, semantic: &SemanticModel) 
         return true;
     }
 
-    // `@task.<variant>` or `@task.<variant>()`.
+    // `@task.<variant>` or `@task.<variant>()`. `task.sensor` is intentionally
+    // excluded because the sensor decorator hardcodes `multiple_outputs=False`.
     if let Expr::Attribute(ExprAttribute { value, attr, .. }) = expr {
-        let variant = attr.as_str();
-        if !SUPPORTED_VARIANTS.contains(&variant) {
+        if !matches!(
+            attr.as_str(),
+            "python"
+                | "virtualenv"
+                | "external_python"
+                | "branch"
+                | "branch_virtualenv"
+                | "branch_external_python"
+                | "short_circuit"
+                | "docker"
+                | "kubernetes"
+                | "pyspark"
+        ) {
             return false;
         }
         return semantic
@@ -201,18 +197,44 @@ fn annotation_resolves_to_mapping(annotation: &Expr, semantic: &SemanticModel) -
         return true;
     }
 
-    if let Some(qn) = semantic.resolve_qualified_name(head) {
-        return matches!(
+    if let Some(qn) = semantic.resolve_qualified_name(head)
+        && matches!(
             qn.segments(),
             ["collections", "abc", "Mapping" | "MutableMapping"]
                 | [
                     "collections",
                     "OrderedDict" | "defaultdict" | "Counter" | "ChainMap"
                 ]
-        );
+        )
+    {
+        return true;
     }
 
-    false
+    annotation_is_typed_dict_subclass(head, semantic)
+}
+
+/// Returns `true` if `annotation` is a `Name` referencing a class defined in
+/// this module whose base-class chain includes `typing.TypedDict`.
+fn annotation_is_typed_dict_subclass(annotation: &Expr, semantic: &SemanticModel) -> bool {
+    let Expr::Name(name) = annotation else {
+        return false;
+    };
+    let Some(binding_id) = semantic
+        .resolve_name(name)
+        .or_else(|| semantic.lookup_symbol(&name.id))
+    else {
+        return false;
+    };
+    let binding = semantic.binding(binding_id);
+    if !matches!(binding.kind, BindingKind::ClassDefinition(_)) {
+        return false;
+    }
+    let Some(Stmt::ClassDef(class_def)) = binding.statement(semantic) else {
+        return false;
+    };
+    analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
+        semantic.match_typing_qualified_name(&qualified_name, "TypedDict")
+    })
 }
 
 /// Returns `true` if any return statement in the function body returns an
@@ -232,8 +254,8 @@ fn body_has_dict_return(function_def: &StmtFunctionDef, semantic: &SemanticModel
     })
 }
 
-fn build_fix(decorator: &Decorator, inferred: bool, checker: &Checker) -> Fix {
-    let kwarg = if inferred {
+fn build_fix(decorator: &Decorator, annotation_is_mapping: bool, checker: &Checker) -> Fix {
+    let kwarg = if annotation_is_mapping {
         "multiple_outputs=True"
     } else {
         "multiple_outputs=False"

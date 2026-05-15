@@ -123,12 +123,12 @@ AIR202 [*] `@task`-decorated function relies on `multiple_outputs` inference
 50 | def annotated_typed_dict() -> MyTD:  # AIR202
 51 |     return {"x": 1}
    |
-help: Add `multiple_outputs=False`
+help: Add `multiple_outputs=True`
 46 |     x: int
 47 |
 48 |
    - @task
-49 + @task(multiple_outputs=False)
+49 + @task(multiple_outputs=True)
 50 | def annotated_typed_dict() -> MyTD:  # AIR202
 51 |     return {"x": 1}
 52 |
