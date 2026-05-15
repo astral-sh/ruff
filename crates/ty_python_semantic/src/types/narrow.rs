@@ -1104,12 +1104,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    fn evaluate_expr_not_in(
-        &mut self,
-        lhs_ty: Type<'db>,
-        rhs_values: Type<'db>,
-    ) -> Option<Type<'db>> {
+    fn evaluate_expr_not_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         let lhs_ty = lhs_ty.resolve_type_alias(self.db);
+        let rhs_values = self.exact_fixed_length_membership_values(rhs_ty)?;
 
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
             // Exclude the RHS values from the entire (single-valued) LHS domain.
@@ -1154,15 +1151,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    fn evaluate_expr_not_in_from_type(
-        &mut self,
-        lhs_ty: Type<'db>,
-        rhs_ty: Type<'db>,
-    ) -> Option<Type<'db>> {
-        let rhs_values = self.exact_fixed_length_membership_values(rhs_ty)?;
-        self.evaluate_expr_not_in(lhs_ty, rhs_values)
-    }
-
     fn evaluate_expr_compare_op(
         &mut self,
         lhs_ty: Type<'db>,
@@ -1185,7 +1173,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             ast::CmpOp::Eq => self.evaluate_expr_eq(lhs_ty, rhs_ty),
             ast::CmpOp::NotEq => self.evaluate_expr_ne(lhs_ty, rhs_ty),
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
-            ast::CmpOp::NotIn => self.evaluate_expr_not_in_from_type(lhs_ty, rhs_ty),
+            ast::CmpOp::NotIn => self.evaluate_expr_not_in(lhs_ty, rhs_ty),
             _ => None,
         }
     }
