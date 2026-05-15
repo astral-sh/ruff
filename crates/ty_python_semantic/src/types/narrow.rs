@@ -1518,6 +1518,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             && let Some(key) = inference.expression_type(&**left).as_string_literal()
             && let rhs_expr = comparators[0].expression_value()
             && let rhs_type = inference.expression_type(&comparators[0])
+            && is_or_contains_typeddict(self.db, rhs_type)
         {
             let key = key.value(self.db);
             let apply_constraint =
@@ -1547,7 +1548,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
 
             let is_negative_check = is_positive == (ops[0] == ast::CmpOp::NotIn);
-            if is_negative_check && is_or_contains_typeddict(self.db, rhs_type) {
+            if is_negative_check {
                 let requires_key = |td: TypedDictType<'db>| -> bool {
                     td.items(self.db)
                         .get(key)
