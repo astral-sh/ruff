@@ -2479,30 +2479,50 @@ impl<'a> ImportStatement<'a> {
         match *self {
             ImportStatement::Import(Import { ref kind, .. }) => match *kind {
                 ImportKind::Module => {
-                    completions.extend(model.import_completions());
+                    add_import_completions(db, completions, model.import_completions());
                 }
                 ImportKind::Submodule { ref parent } => {
-                    completions.extend(model.import_submodule_completions_for_name(parent));
+                    add_import_completions(
+                        db,
+                        completions,
+                        model.import_submodule_completions_for_name(parent),
+                    );
                 }
             },
             ImportStatement::FromImport(FromImport { ast, ref kind }) => match *kind {
                 FromImportKind::Module => {
-                    completions.extend(model.import_completions());
+                    add_import_completions(db, completions, model.import_completions());
                 }
                 FromImportKind::Submodule { ref parent } => {
-                    completions.extend(model.import_submodule_completions_for_name(parent));
+                    add_import_completions(
+                        db,
+                        completions,
+                        model.import_submodule_completions_for_name(parent),
+                    );
                 }
                 FromImportKind::Relative {
                     ref parent,
                     import_keyword_allowed,
                 } => {
-                    completions.extend(model.import_submodule_completions_for_name(parent));
+                    add_import_completions(
+                        db,
+                        completions,
+                        model.import_submodule_completions_for_name(parent),
+                    );
                     if import_keyword_allowed {
                         completions.add(CompletionBuilder::keyword("import"));
                     }
                 }
                 FromImportKind::Attribute => {
-                    completions.extend(model.from_import_completions(ast));
+                    let module_dependency_kind = model
+                        .resolve_module(ast.module.as_ref().map(ast::Identifier::as_str), ast.level)
+                        .map(|module| ModuleDependencyKind::from_module(db, module));
+                    add_import_completions_with_module_dependency_kind(
+                        db,
+                        completions,
+                        model.from_import_completions(ast),
+                        module_dependency_kind,
+                    );
                 }
             },
             ImportStatement::Incomplete(IncompleteImport::As) => {
@@ -2512,6 +2532,50 @@ impl<'a> ImportStatement<'a> {
                 completions.add(CompletionBuilder::keyword("import"));
             }
         }
+    }
+}
+
+fn add_import_completions_with_module_dependency_kind<'db>(
+    db: &'db dyn Db,
+    completions: &mut Completions<'db>,
+    semantic_completions: impl IntoIterator<Item = SemanticCompletion<'db>>,
+    module_dependency_kind: Option<ModuleDependencyKind>,
+) {
+    add_import_completions_impl(db, completions, semantic_completions, |_| {
+        module_dependency_kind
+    });
+}
+
+fn add_import_completions<'db>(
+    db: &'db dyn Db,
+    completions: &mut Completions<'db>,
+    semantic_completions: impl IntoIterator<Item = SemanticCompletion<'db>>,
+) {
+    add_import_completions_impl(db, completions, semantic_completions, |semantic| {
+        if let Some(Type::ModuleLiteral(module_literal)) = semantic.ty {
+            Some(ModuleDependencyKind::from_module(
+                db,
+                module_literal.module(db),
+            ))
+        } else {
+            None
+        }
+    });
+}
+
+fn add_import_completions_impl<'db>(
+    db: &'db dyn Db,
+    completions: &mut Completions<'db>,
+    semantic_completions: impl IntoIterator<Item = SemanticCompletion<'db>>,
+    module_dependency_kind: impl Fn(&SemanticCompletion<'db>) -> Option<ModuleDependencyKind>,
+) {
+    for semantic in semantic_completions {
+        let module_dependency_kind = module_dependency_kind(&semantic);
+        let mut builder = CompletionBuilder::from_semantic_completion(db, semantic);
+        if let Some(module_dependency_kind) = module_dependency_kind {
+            builder = builder.module_dependency_kind(module_dependency_kind);
+        }
+        completions.add(builder);
     }
 }
 
@@ -6099,6 +6163,36 @@ from <CURSOR>
 ",
         );
         builder.build().contains("collections");
+    }
+
+    #[test]
+    fn import_statement_preserves_name_order_for_unrelated_third_party_module() {
+        let builder = CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", "import path<CURSOR>")
+            .site_packages("patha.py", "")
+            .completion_test_builder()
+            .filter(|c| matches!(c.name.as_str(), "pathlib" | "patha"));
+
+        assert_snapshot!(builder.build().snapshot(), @"
+        patha
+        pathlib
+        ");
+    }
+
+    #[test]
+    fn from_import_preserves_name_order_for_unrelated_namespace_package() {
+        let builder = CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", "from path<CURSOR>")
+            .site_packages("patha/foo.py", "")
+            .completion_test_builder()
+            .filter(|c| matches!(c.name.as_str(), "pathlib" | "patha"));
+
+        assert_snapshot!(builder.build().snapshot(), @"
+        patha
+        pathlib
+        ");
     }
 
     #[test]
