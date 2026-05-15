@@ -2,6 +2,9 @@ version = 1
 revision = 3
 requires-python = ">=3.11"
 
+[options]
+exclude-newer = "2026-05-06T17:15:42Z"
+
 [manifest]
 requirements = [
     { name = "rich" },

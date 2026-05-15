@@ -363,45 +363,6 @@ def foo(v: str | int | None, w: str | str | None, x: str | str):
     reveal_type(x)  # revealed: str
 ```
 
-## PEP-604 in non-type-expression context
-
-### In Python 3.10 and later
-
-```toml
-[environment]
-python-version = "3.10"
-```
-
-```py
-IntOrStr = int | str
-```
-
-### Earlier versions
-
-```toml
-[environment]
-python-version = "3.9"
-```
-
-```py
-# snapshot: unsupported-operator
-IntOrStr = int | str
-```
-
-```snapshot
-error[unsupported-operator]: Unsupported `|` operation
- --> src/mdtest_snippet.py:2:12
-  |
-2 | IntOrStr = int | str
-  |            ---^^^---
-  |            |     |
-  |            |     Has type `<class 'str'>`
-  |            Has type `<class 'int'>`
-  |
-info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
-info: Python 3.9 was assumed when resolving types because it was specified on the command line
-```
-
 ## Attribute expressions in type annotations are understood
 
 ```py

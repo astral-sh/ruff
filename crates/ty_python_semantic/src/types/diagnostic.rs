@@ -41,7 +41,7 @@ use ruff_db::{
 use ruff_diagnostics::{Edit, Fix, IsolationLevel};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parentheses_iterator;
-use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, PythonVersion, StringFlags};
+use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, StringFlags};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
@@ -49,7 +49,7 @@ use std::fmt::{self, Formatter};
 use ty_module_resolver::{KnownModule, Module, ModuleName, file_to_module};
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::{PlaceTable, ScopedPlaceId};
-use ty_python_core::{SemanticIndex, global_scope, place_table, use_def_map};
+use ty_python_core::{global_scope, place_table, use_def_map};
 
 const RUNTIME_CHECKABLE_DOCS_URL: &str =
     "https://docs.python.org/3/library/typing.html#typing.runtime_checkable";
@@ -6236,13 +6236,12 @@ pub(super) fn report_unsupported_augmented_assignment<'db>(
 
 pub(super) fn report_unsupported_binary_operation<'db>(
     context: &InferContext<'db, '_>,
-    index: &SemanticIndex<'db>,
     binary_expression: &ast::ExprBinOp,
     left_ty: Type<'db>,
     right_ty: Type<'db>,
     operator: ast::Operator,
 ) {
-    let Some(mut diagnostic) = report_unsupported_binary_operation_impl(
+    report_unsupported_binary_operation_impl(
         context,
         binary_expression.range(),
         &binary_expression.left,
@@ -6253,30 +6252,7 @@ pub(super) fn report_unsupported_binary_operation<'db>(
             operator,
             is_augmented_assignment: false,
         },
-    ) else {
-        return;
-    };
-    let db = context.db();
-    if operator == ast::Operator::BitOr
-        && (left_ty.is_subtype_of(db, KnownClass::Type.to_instance(db))
-            || right_ty.is_subtype_of(db, KnownClass::Type.to_instance(db)))
-        && Program::get(db).python_version(db) < PythonVersion::PY310
-    {
-        note_py_version_too_old_for_pep_604(db, index, &mut diagnostic);
-    }
-}
-
-pub(super) fn note_py_version_too_old_for_pep_604<'db>(
-    db: &'db dyn Db,
-    index: &SemanticIndex<'db>,
-    diagnostic: &mut Diagnostic,
-) {
-    diagnostic.info("PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted");
-    if index.has_future_annotations() {
-        diagnostic
-            .info("`from __future__ import annotations` has no effect outside type annotations");
-    }
-    add_inferred_python_version_hint_to_diagnostic(db, diagnostic, "resolving types");
+    );
 }
 
 #[derive(Debug, Copy, Clone)]
