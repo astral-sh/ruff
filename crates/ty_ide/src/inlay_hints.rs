@@ -559,12 +559,31 @@ fn arg_matches_name(argument: &Expr, name: &str) -> bool {
             // `x=x[0]` is a match, recurse for it
             Expr::Subscript(expr_subscript) => expr = &expr_subscript.value,
             // `x=x` is a match
-            Expr::Name(expr_name) => return expr_name.id.as_str() == name,
+            Expr::Name(expr_name) => return name_matches_parameter(expr_name.id.as_str(), name),
             // `x=y.x` is a match
-            Expr::Attribute(expr_attribute) => return expr_attribute.attr.as_str() == name,
+            Expr::Attribute(expr_attribute) => {
+                return name_matches_parameter(expr_attribute.attr.as_str(), name);
+            }
             _ => return false,
         }
     }
+}
+
+/// Returns `true` when `argument_name` case-insensitively matches the parameter
+/// name, or has the parameter name as a full underscore-separated prefix or
+/// suffix. The parameter name is accepted in its raw spelling; leading and
+/// trailing underscores are ignored before matching.
+fn name_matches_parameter(argument_name: &str, parameter_name: &str) -> bool {
+    let argument_name = argument_name.to_lowercase();
+    let parameter_name = parameter_name.trim_matches('_').to_lowercase();
+
+    argument_name == parameter_name
+        || argument_name
+            .strip_prefix(parameter_name.as_str())
+            .is_some_and(|suffix| suffix.starts_with('_'))
+        || argument_name
+            .strip_suffix(parameter_name.as_str())
+            .is_some_and(|prefix| prefix.ends_with('_'))
 }
 
 /// Given a function call, check if the expression is the "same name"
@@ -5888,6 +5907,213 @@ Source with applied edits:
         def foo(x: int): pass
         foo(1)
         ");
+    }
+
+    #[test]
+    fn test_function_call_argument_name_suppressed_by_case_insensitive_exact_match() {
+        let mut test = inlay_hint_test(
+            "
+            def foo(test: int, param: int): pass
+            TEST = 1
+            PARAM = 1
+
+            foo(TEST, PARAM)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def foo(test: int, param: int): pass
+        TEST = 1
+        PARAM = 1
+
+        foo(TEST, PARAM)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_argument_name_suppressed_by_normalized_parameter_name() {
+        let mut test = inlay_hint_test(
+            "
+            def trailing(param_: int): pass
+            def leading(_param: int): pass
+            param = 1
+
+            trailing(param)
+            leading(param)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def trailing(param_: int): pass
+        def leading(_param: int): pass
+        param = 1
+
+        trailing(param)
+        leading(param)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_argument_name_suppressed_by_segment_prefix_or_suffix() {
+        let mut test = inlay_hint_test(
+            "
+            def foo(param: int): pass
+            param = 1
+            param_end = 1
+            start_param = 1
+
+            foo(param)
+            foo(param_end)
+            foo(start_param)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def foo(param: int): pass
+        param = 1
+        param_end = 1
+        start_param = 1
+
+        foo(param)
+        foo(param_end)
+        foo(start_param)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_argument_name_shown_for_near_matches() {
+        let mut test = inlay_hint_test(
+            "
+            def foo(param: int): pass
+            param2 = 1
+            my_param2 = 1
+            parameter = 1
+
+            foo(param2)
+            foo(my_param2)
+            foo(parameter)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        def foo(param: int): pass
+        param2 = 1
+        my_param2 = 1
+        parameter = 1
+
+        foo([param=]param2)
+        foo([param=]my_param2)
+        foo([param=]parameter)
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:9
+          |
+        2 | def foo(param: int): pass
+          |         ^^^^^
+          |
+        info: Source
+         --> main2.py:7:6
+          |
+        7 | foo([param=]param2)
+          |      ^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:9
+          |
+        2 | def foo(param: int): pass
+          |         ^^^^^
+          |
+        info: Source
+         --> main2.py:8:6
+          |
+        8 | foo([param=]my_param2)
+          |      ^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:9
+          |
+        2 | def foo(param: int): pass
+          |         ^^^^^
+          |
+        info: Source
+         --> main2.py:9:6
+          |
+        9 | foo([param=]parameter)
+          |      ^^^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        4 | my_param2 = 1
+        5 | parameter = 1
+        6 |
+          - foo(param2)
+          - foo(my_param2)
+          - foo(parameter)
+        7 + foo(param=param2)
+        8 + foo(param=my_param2)
+        9 + foo(param=parameter)
+        "#);
+    }
+
+    #[test]
+    fn test_function_call_argument_name_suppression_matches_full_segment_sequence() {
+        let mut test = inlay_hint_test(
+            "
+            def foo(focus_range: int): pass
+            focus_range = 1
+            FOCUS_RANGE = 1
+            focus_range_end = 1
+            start_focus_range = 1
+            focus_end_range = 1
+
+            foo(focus_range)
+            foo(FOCUS_RANGE)
+            foo(focus_range_end)
+            foo(start_focus_range)
+            foo(focus_end_range)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        def foo(focus_range: int): pass
+        focus_range = 1
+        FOCUS_RANGE = 1
+        focus_range_end = 1
+        start_focus_range = 1
+        focus_end_range = 1
+
+        foo(focus_range)
+        foo(FOCUS_RANGE)
+        foo(focus_range_end)
+        foo(start_focus_range)
+        foo([focus_range=]focus_end_range)
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:9
+          |
+        2 | def foo(focus_range: int): pass
+          |         ^^^^^^^^^^^
+          |
+        info: Source
+          --> main2.py:13:6
+           |
+        13 | foo([focus_range=]focus_end_range)
+           |      ^^^^^^^^^^^
+           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        10 | foo(FOCUS_RANGE)
+        11 | foo(focus_range_end)
+        12 | foo(start_focus_range)
+           - foo(focus_end_range)
+        13 + foo(focus_range=focus_end_range)
+        "#);
     }
 
     #[test]
