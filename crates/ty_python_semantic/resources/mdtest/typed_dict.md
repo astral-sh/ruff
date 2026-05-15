@@ -4586,6 +4586,10 @@ class FooBar(TypedDict):
 
 static_assert(is_assignable_to(FooBar, Foo))
 static_assert(is_assignable_to(FooBar, Bar))
+
+def dictionary_union(u: Foo | dict[Literal["a", "b"], int]):
+    if "c" in u:
+        reveal_type(u["c"])  # revealed: object
 ```
 
 This still accepts guarded key access in the branch, without pretending that an open `TypedDict`

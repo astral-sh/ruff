@@ -1502,8 +1502,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
         }
 
-        // Narrow unions and intersections of `TypedDict` when a key membership test proves that
-        // a key is present or absent:
+        // Narrow types when a key membership test proves that a key is present, and narrow unions
+        // and intersections of `TypedDict` when a key membership test proves that a required key is
+        // absent:
         //
         // class Foo(TypedDict):
         //     foo: int
@@ -1517,7 +1518,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             && let Some(key) = inference.expression_type(&**left).as_string_literal()
             && let rhs_expr = comparators[0].expression_value()
             && let rhs_type = inference.expression_type(&comparators[0])
-            && is_or_contains_typeddict(self.db, rhs_type)
         {
             let key = key.value(self.db);
             let apply_constraint =
@@ -1540,14 +1540,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
             let is_positive_key_membership = is_positive == (ops[0] == ast::CmpOp::In);
             if is_positive_key_membership {
-                let narrowed = self.narrow_with_required_typeddict_key(rhs_type, key);
+                let narrowed = self.narrow_with_present_key(rhs_type, key);
                 if narrowed != rhs_type.resolve_type_alias(self.db) {
                     apply_constraint(&mut constraints, NarrowingConstraint::replacement(narrowed));
                 }
             }
 
             let is_negative_check = is_positive == (ops[0] == ast::CmpOp::NotIn);
-            if is_negative_check {
+            if is_negative_check && is_or_contains_typeddict(self.db, rhs_type) {
                 let requires_key = |td: TypedDictType<'db>| -> bool {
                     td.items(self.db)
                         .get(key)
@@ -2151,47 +2151,27 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         Some((place, NarrowingConstraint::intersection(intersection)))
     }
 
-    fn narrow_with_required_typeddict_key(&self, ty: Type<'db>, key: &str) -> Type<'db> {
+    fn narrow_with_present_key(&self, ty: Type<'db>, key: &str) -> Type<'db> {
         let key_presence_constraint = typeddict_key_getitem_protocol(self.db, key);
 
         let db = self.db;
         let constrain = |ty| IntersectionType::from_two_elements(db, ty, key_presence_constraint);
 
         match ty.resolve_type_alias(self.db) {
-            Type::TypedDict(typed_dict) => {
-                if typed_dict.items(self.db).contains_key(key) {
-                    Type::TypedDict(typed_dict)
+            Type::Union(union) => UnionType::from_elements(
+                self.db,
+                union
+                    .elements(self.db)
+                    .iter()
+                    .map(|element| self.narrow_with_present_key(*element, key)),
+            ),
+            resolved => {
+                if type_guarantees_typeddict_key(self.db, resolved, key) {
+                    resolved
                 } else {
                     constrain(ty)
                 }
             }
-            Type::Intersection(intersection) => {
-                let has_typeddict = intersection
-                    .positive(self.db)
-                    .iter()
-                    .any(|element| is_or_contains_typeddict(self.db, *element));
-                let declares_key = intersection
-                    .positive(self.db)
-                    .iter()
-                    .any(|element| typeddict_declares_key(self.db, *element, key));
-
-                if has_typeddict && !declares_key {
-                    constrain(Type::Intersection(intersection))
-                } else {
-                    Type::Intersection(intersection)
-                }
-            }
-            Type::Union(union) => UnionType::from_elements(
-                self.db,
-                union.elements(self.db).iter().map(|element| {
-                    if is_or_contains_typeddict(self.db, *element) {
-                        self.narrow_with_required_typeddict_key(*element, key)
-                    } else {
-                        *element
-                    }
-                }),
-            ),
-            resolved => resolved,
         }
     }
 
@@ -2320,18 +2300,18 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     }
 }
 
-fn typeddict_declares_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> bool {
+fn type_guarantees_typeddict_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> bool {
     match ty {
         Type::TypedDict(typed_dict) => typed_dict.items(db).contains_key(key),
         Type::Intersection(intersection) => intersection
             .positive(db)
             .iter()
-            .any(|element| typeddict_declares_key(db, *element, key)),
+            .any(|element| type_guarantees_typeddict_key(db, *element, key)),
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .any(|element| typeddict_declares_key(db, *element, key)),
-        Type::TypeAlias(alias) => typeddict_declares_key(db, alias.value_type(db), key),
+            .all(|element| type_guarantees_typeddict_key(db, *element, key)),
+        Type::TypeAlias(alias) => type_guarantees_typeddict_key(db, alias.value_type(db), key),
 
         Type::Dynamic(_)
         | Type::Divergent(_)

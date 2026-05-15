@@ -218,19 +218,19 @@ def mutable_global_rhs(x: str | None, unavailable: set[str | None]) -> None:
         reveal_type(x)  # revealed: str | None
 ```
 
-## No narrowing for the right-hand side (currently)
+## Present-key narrowing for the right-hand side
 
-No narrowing is done for the right-hand side currently, even if the right-hand side is a valid
-"target" (name/attribute/subscript) that could potentially be narrowed. We may change this in the
-future:
+When a string membership test proves that the key is present, we narrow the right-hand side with a
+synthesized key-access protocol:
 
 ```py
 from typing import Literal
 
 def f(x: Literal["abc", "def"]):
     if "a" in x:
-        # `x` could also be validly narrowed to `Literal["abc"]` here:
-        reveal_type(x)  # revealed: Literal["abc", "def"]
+        reveal_type(
+            x
+        )  # revealed: (Literal["abc"] & <Protocol with members '__getitem__'>) | (Literal["def"] & <Protocol with members '__getitem__'>)
     else:
         # `x` could also be validly narrowed to `Literal["def"]` here:
         reveal_type(x)  # revealed: Literal["abc", "def"]
@@ -239,8 +239,9 @@ def f(x: Literal["abc", "def"]):
         # `x` could also be validly narrowed to `Literal["def"]` here:
         reveal_type(x)  # revealed: Literal["abc", "def"]
     else:
-        # `x` could also be validly narrowed to `Literal["abc"]` here:
-        reveal_type(x)  # revealed: Literal["abc", "def"]
+        reveal_type(
+            x
+        )  # revealed: (Literal["abc"] & <Protocol with members '__getitem__'>) | (Literal["def"] & <Protocol with members '__getitem__'>)
 ```
 
 ## bool
