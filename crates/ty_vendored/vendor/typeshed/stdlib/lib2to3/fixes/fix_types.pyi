@@ -15,6 +15,7 @@ There should be another fixer that handles at least the following constants:
    type('') -> str
 
 """
+
 from typing import ClassVar, Literal
 
 from .. import fixer_base

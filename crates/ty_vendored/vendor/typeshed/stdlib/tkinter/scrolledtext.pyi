@@ -10,6 +10,7 @@ the Scrollbar widget.
 Most methods calls are inherited from the Text widget; Pack, Grid and
 Place methods are redirected to the Frame widget however.
 """
+
 from tkinter import Frame, Misc, Scrollbar, Text
 
 __all__ = ["ScrolledText"]

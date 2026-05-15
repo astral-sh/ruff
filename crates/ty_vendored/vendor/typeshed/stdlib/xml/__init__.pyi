@@ -15,6 +15,7 @@ etree -- The ElementTree XML library.  This is a subset of the full
        ElementTree XML release.
 
 """
+
 # At runtime, listing submodules in __all__ without them being imported is
 # valid, and causes them to be included in a star import. See #6523
 import sys

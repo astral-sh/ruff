@@ -16,6 +16,7 @@ It will also support lambdas:
     # The parens are a syntax error in Python 3
     lambda (x): x + y -> lambda x: x + y
 """
+
 from typing import ClassVar, Literal
 
 from .. import fixer_base

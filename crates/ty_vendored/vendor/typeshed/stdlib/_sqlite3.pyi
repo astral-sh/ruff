@@ -219,6 +219,7 @@ if sys.version_info >= (3, 11):
 @overload
 def adapt(obj: Any, proto: Any, /) -> Any:
     """Adapt given object to given protocol."""
+
 @overload
 def adapt(obj: Any, proto: Any, alt: _T, /) -> Any | _T: ...
 def complete_statement(statement: str) -> bool:
@@ -239,14 +240,15 @@ if sys.version_info >= (3, 12):
     ) -> Connection:
         """Open a connection to the SQLite database file 'database'.
 
-You can use ":memory:" to open a database connection to a database that
-resides in RAM instead of on disk.
+        You can use ":memory:" to open a database connection to a database that
+        resides in RAM instead of on disk.
 
-Note: Passing more than 1 positional argument to _sqlite3.connect() is
-deprecated. Parameters 'timeout', 'detect_types', 'isolation_level',
-'check_same_thread', 'factory', 'cached_statements' and 'uri' will
-become keyword-only parameters in Python 3.15.
-"""
+        Note: Passing more than 1 positional argument to _sqlite3.connect() is
+        deprecated. Parameters 'timeout', 'detect_types', 'isolation_level',
+        'check_same_thread', 'factory', 'cached_statements' and 'uri' will
+        become keyword-only parameters in Python 3.15.
+        """
+
     @overload
     def connect(
         database: StrOrBytesPath,
@@ -287,9 +289,10 @@ else:
     ) -> Connection:
         """Opens a connection to the SQLite database file database.
 
-You can use ":memory:" to open a database connection to a database that resides
-in RAM instead of on disk.
-"""
+        You can use ":memory:" to open a database connection to a database that resides
+        in RAM instead of on disk.
+        """
+
     @overload
     def connect(
         database: StrOrBytesPath,
@@ -326,13 +329,14 @@ if sys.version_info < (3, 12):
     def enable_shared_cache(do_enable: int) -> None:  # undocumented
         """Enable or disable shared cache mode for the calling thread.
 
-This method is deprecated and will be removed in Python 3.12.
-Shared cache is strongly discouraged by the SQLite 3 documentation.
-If shared cache must be used, open the database in URI mode using
-the cache=shared query parameter.
-"""
+        This method is deprecated and will be removed in Python 3.12.
+        Shared cache is strongly discouraged by the SQLite 3 documentation.
+        If shared cache must be used, open the database in URI mode using
+        the cache=shared query parameter.
+        """
 
 def register_adapter(type: type[_T], adapter: _Adapter[_T], /) -> None:
     """Register a function to adapt Python objects to SQLite values."""
+
 def register_converter(typename: str, converter: _Converter, /) -> None:
     """Register a function to convert SQLite values to Python objects."""

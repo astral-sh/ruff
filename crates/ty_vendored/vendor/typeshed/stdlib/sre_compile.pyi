@@ -1,4 +1,5 @@
 """Internal support module for sre"""
+
 from re import Pattern
 from sre_constants import *
 from sre_constants import _NamedIntConstant

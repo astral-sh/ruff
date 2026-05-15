@@ -18,9 +18,9 @@ if sys.version_info < (3, 11):
     def coroutine(func: _FunctionT) -> _FunctionT:
         """Decorator to mark coroutines.
 
-    If the coroutine is not yielded from before it is destroyed,
-    an error message is logged.
-    """
+        If the coroutine is not yielded from before it is destroyed,
+        an error message is logged.
+        """
 
 def iscoroutine(obj: object) -> TypeIs[Coroutine[Any, Any, Any]]:
     """Return True if obj is a coroutine object."""
@@ -30,6 +30,7 @@ if sys.version_info >= (3, 11):
     @deprecated("Deprecated since Python 3.14. Use `inspect.iscoroutinefunction()` instead.")
     def iscoroutinefunction(func: Callable[..., Coroutine[Any, Any, Any]]) -> bool:
         """Return True if func is a decorated coroutine function."""
+
     @overload
     @deprecated("Deprecated since Python 3.14. Use `inspect.iscoroutinefunction()` instead.")
     def iscoroutinefunction(func: Callable[_P, Awaitable[_T]]) -> TypeGuard[Callable[_P, Coroutine[Any, Any, _T]]]: ...
@@ -47,6 +48,7 @@ else:
     @overload
     def iscoroutinefunction(func: Callable[..., Coroutine[Any, Any, Any]]) -> bool:
         """Return True if func is a decorated coroutine function."""
+
     @overload
     def iscoroutinefunction(func: Callable[_P, Awaitable[_T]]) -> TypeGuard[Callable[_P, Coroutine[Any, Any, _T]]]: ...
     @overload

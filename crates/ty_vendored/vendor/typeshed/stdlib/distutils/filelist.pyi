@@ -3,6 +3,7 @@
 Provides the FileList class, used for poking about the filesystem
 and building lists of files.
 """
+
 from collections.abc import Iterable
 from re import Pattern
 from typing import Literal, overload
@@ -22,6 +23,7 @@ class FileList:
         complete list of files under consideration (ie. without any
         filtering applied)
     """
+
     allfiles: Iterable[str] | None
     files: list[str]
     def __init__(self, warn: None = None, debug_print: None = None) -> None: ...
@@ -31,6 +33,7 @@ class FileList:
         """Print 'msg' to stdout if the global DEBUG (taken from the
         DISTUTILS_DEBUG environment variable) flag is true.
         """
+
     def append(self, item: str) -> None: ...
     def extend(self, items: Iterable[str]) -> None: ...
     def sort(self) -> None: ...
@@ -64,6 +67,7 @@ class FileList:
 
         Return True if files are found, False otherwise.
         """
+
     @overload
     def include_pattern(self, pattern: str | Pattern[str], *, is_regex: Literal[True, 1]) -> bool: ...
     @overload
@@ -84,6 +88,7 @@ class FileList:
         The list 'self.files' is modified in place.
         Return True if files are found, False otherwise.
         """
+
     @overload
     def exclude_pattern(self, pattern: str | Pattern[str], *, is_regex: Literal[True, 1]) -> bool: ...
     @overload
@@ -100,12 +105,14 @@ def findall(dir: str = ".") -> list[str]:
     Find all files under 'dir' and return the list of full filenames.
     Unless dir is '.', return full filenames with dir prepended.
     """
+
 def glob_to_re(pattern: str) -> str:
     """Translate a shell-like glob pattern to a regular expression; return
     a string containing the regex.  Differs from 'fnmatch.translate()' in
     that '*' does not match "special characters" (which are
     platform-specific).
     """
+
 @overload
 def translate_pattern(
     pattern: str, anchor: bool | Literal[0, 1] = 1, prefix: str | None = None, is_regex: Literal[False, 0] = 0
@@ -115,6 +122,7 @@ def translate_pattern(
     then 'pattern' is directly compiled to a regex (if it's a string)
     or just returned as-is (assumes it's a regex object).
     """
+
 @overload
 def translate_pattern(pattern: str | Pattern[str], *, is_regex: Literal[True, 1]) -> Pattern[str]: ...
 @overload

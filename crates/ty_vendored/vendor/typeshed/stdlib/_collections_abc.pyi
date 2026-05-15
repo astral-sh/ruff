@@ -2,6 +2,7 @@
 
 Unit tests are in test_collections.
 """
+
 import sys
 from abc import abstractmethod
 from types import MappingProxyType
@@ -91,6 +92,7 @@ class dict_keys(KeysView[_KT_co], Generic[_KT_co, _VT_co]):  # undocumented
 class dict_values(ValuesView[_VT_co], Generic[_KT_co, _VT_co]):  # undocumented
     def __reversed__(self) -> Iterator[_VT_co]:
         """Return a reverse iterator over the dict values."""
+
     @property
     def mapping(self) -> MappingProxyType[_KT_co, _VT_co]:
         """dictionary that this view refers to"""
