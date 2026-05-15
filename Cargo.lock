@@ -3278,7 +3278,6 @@ dependencies = [
  "mdtest",
  "ruff_db",
  "ruff_linter",
- "ruff_notebook",
  "ruff_python_ast",
  "ruff_workspace",
  "salsa",

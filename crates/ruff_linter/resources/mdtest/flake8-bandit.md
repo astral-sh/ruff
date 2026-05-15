@@ -18,7 +18,7 @@ Markup(f"unsafe {content}")  # snapshot: unsafe-markup-use
 
 ```snapshot
 error[S704]: Unsafe use of `markupsafe.Markup` detected
- --> mdtest_snippet.py:5:1
+ --> src/mdtest_snippet.py:5:1
   |
 5 | Markup(f"unsafe {content}")  # snapshot: unsafe-markup-use
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^

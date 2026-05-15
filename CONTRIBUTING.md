@@ -271,7 +271,7 @@ import os  # snapshot: module-import-not-at-top-of-file
 
 ```snapshot
 error[E402]: Module level import not at top of file
- --> mdtest_snippet.py:2:1
+ --> src/mdtest_snippet.py:2:1
   |
 2 | import os  # snapshot: module-import-not-at-top-of-file
   | ^^^^^^^^^

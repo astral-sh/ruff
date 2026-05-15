@@ -4,13 +4,12 @@ use camino::Utf8Path;
 use mdtest::{
     Failures, FileFailures, MarkdownEdit, TestFile, TestOutcome, attempt_test, matcher, parser,
 };
-use ruff_db::diagnostic::{FileResolver, Input, UnifiedFile};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::test::test_contents;
-use ruff_notebook::NotebookIndex;
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::options::Options;
 
@@ -97,8 +96,6 @@ fn run_test(
     // Edits for updating changed inline snapshots.
     let mut markdown_edits = vec![];
 
-    let resolver = RuffResolver(db);
-
     let mut panic_info = None;
 
     let failures: Failures = test_files
@@ -120,7 +117,7 @@ fn run_test(
                 test_file,
             );
 
-            let diagnostics = match mdtest_result {
+            let mut diagnostics = match mdtest_result {
                 Ok(diagnostics) => diagnostics,
                 Err(failures) => {
                     if test.should_expect_panic().is_ok() {
@@ -131,11 +128,12 @@ fn run_test(
                     return Some(failures.into_file_failures(db, "run mdtest", None));
                 }
             };
+            normalize_diagnostics(test_file.file, &mut diagnostics);
 
             let failure = match matcher::match_file(db, test_file.file, &diagnostics).and_then(
                 |inline_diagnostics| {
                     mdtest::validate_inline_snapshot(
-                        &resolver,
+                        db,
                         "ruff",
                         test_file,
                         &inline_diagnostics,
@@ -174,30 +172,23 @@ fn run_test(
     }
 }
 
-/// Wrap the db to avoid panicking when provided a Ruff file like the blanket `FileResolver`
-/// implementation.
-struct RuffResolver<'a>(&'a Db);
+/// Replace Ruff-style `SourceFile`s in `diagnostics` with Salsa-backed `File`s for use in `mdtest`.
+fn normalize_diagnostics(file: File, diagnostics: &mut [Diagnostic]) {
+    for diagnostic in diagnostics {
+        for annotation in diagnostic.annotations_mut() {
+            normalize_annotation(file, annotation);
+        }
 
-impl FileResolver for RuffResolver<'_> {
-    fn path(&self, file: File) -> &str {
-        self.0.path(file)
+        for sub_diagnostic in diagnostic.sub_diagnostics_mut() {
+            for annotation in sub_diagnostic.annotations_mut() {
+                normalize_annotation(file, annotation);
+            }
+        }
     }
+}
 
-    fn input(&self, file: File) -> Input {
-        self.0.input(file)
-    }
-
-    fn current_directory(&self) -> &std::path::Path {
-        self.0.current_directory()
-    }
-
-    fn notebook_index(&self, _file: &UnifiedFile) -> Option<NotebookIndex> {
-        None
-    }
-
-    fn is_notebook(&self, _file: &UnifiedFile) -> bool {
-        false
-    }
+fn normalize_annotation(file: File, annotation: &mut Annotation) {
+    annotation.set_span(Span::from(file).with_optional_range(annotation.get_span().range()));
 }
 
 fn parse<'s>(
