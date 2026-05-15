@@ -1,9 +1,12 @@
 use std::collections::BTreeMap;
 use std::fmt;
+use std::hash::Hasher;
 use std::iter;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, LazyLock, Mutex, Weak};
 
 use log::debug;
+use ruff_cache::{CacheKey, CacheKeyHasher};
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
@@ -281,12 +284,24 @@ pub(crate) fn categorize_imports<'a>(
     block_by_type
 }
 
-#[derive(Debug, Clone, Default, CacheKey)]
+type KnownModuleEntries = [(IdentifierPattern, ImportSection)];
+
+static KNOWN_MODULES_INTERNER: LazyLock<Mutex<FxHashMap<u64, Vec<Weak<KnownModuleEntries>>>>> =
+    LazyLock::new(|| Mutex::new(FxHashMap::default()));
+
+#[derive(Debug, Clone, Default)]
 pub struct KnownModules {
     /// A map of known modules to their section.
-    known: Vec<(IdentifierPattern, ImportSection)>,
+    known: Arc<KnownModuleEntries>,
     /// Whether any of the known modules are submodules (e.g., `foo.bar`, as opposed to `foo`).
     has_submodules: bool,
+}
+
+impl CacheKey for KnownModules {
+    fn cache_key(&self, state: &mut CacheKeyHasher) {
+        self.known.as_ref().cache_key(state);
+        self.has_submodules.cache_key(state);
+    }
 }
 
 impl KnownModules {
@@ -343,7 +358,7 @@ impl KnownModules {
             .any(|(module, _)| module.as_str().contains('.'));
 
         Self {
-            known,
+            known: intern_known_modules(known),
             has_submodules,
         }
     }
@@ -398,7 +413,7 @@ impl KnownModules {
     /// Return the list of user-defined modules, indexed by section.
     pub fn user_defined(&self) -> FxHashMap<&str, Vec<&IdentifierPattern>> {
         let mut user_defined: FxHashMap<&str, Vec<&IdentifierPattern>> = FxHashMap::default();
-        for (module, section) in &self.known {
+        for (module, section) in self.known.iter() {
             if let ImportSection::UserDefined(section_name) = section {
                 user_defined
                     .entry(section_name.as_str())
@@ -410,13 +425,35 @@ impl KnownModules {
     }
 }
 
+fn intern_known_modules(known: Vec<(IdentifierPattern, ImportSection)>) -> Arc<KnownModuleEntries> {
+    let mut hasher = CacheKeyHasher::new();
+    known.cache_key(&mut hasher);
+    let key = hasher.finish();
+
+    let mut interner = KNOWN_MODULES_INTERNER.lock().unwrap();
+    let entries = interner.entry(key).or_default();
+    entries.retain(|entry| entry.strong_count() > 0);
+
+    for entry in entries.iter() {
+        if let Some(existing) = entry.upgrade()
+            && existing.as_ref() == known.as_slice()
+        {
+            return existing;
+        }
+    }
+
+    let known = Arc::from(known.into_boxed_slice());
+    entries.push(Arc::downgrade(&known));
+    known
+}
+
 impl fmt::Display for KnownModules {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.known.is_empty() {
             write!(f, "{{}}")?;
         } else {
             writeln!(f, "{{")?;
-            for (pattern, import_section) in &self.known {
+            for (pattern, import_section) in self.known.iter() {
                 writeln!(f, "\t{pattern} => {import_section:?},")?;
             }
             write!(f, "}}")?;
@@ -427,10 +464,12 @@ impl fmt::Display for KnownModules {
 
 #[cfg(test)]
 mod tests {
-    use crate::rules::isort::categorize::match_sources;
+    use crate::rules::isort::categorize::{KnownModules, match_sources};
+    use crate::settings::types::IdentifierPattern;
 
     use std::fs;
     use std::path::{Path, PathBuf};
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     /// Helper function to create a file with parent directories
@@ -445,6 +484,26 @@ mod tests {
     /// Helper function to create a directory and all parent directories
     fn create_dir<P: AsRef<Path>>(path: P) {
         fs::create_dir_all(path).unwrap();
+    }
+
+    #[test]
+    fn known_modules_reuses_matching_interned_entries() {
+        let left = KnownModules::new(
+            vec![IdentifierPattern::new("first_party").unwrap()],
+            vec![IdentifierPattern::new("third_party").unwrap()],
+            vec![IdentifierPattern::new("local_folder").unwrap()],
+            vec![IdentifierPattern::new("stdlib").unwrap()],
+            Default::default(),
+        );
+        let right = KnownModules::new(
+            vec![IdentifierPattern::new("first_party").unwrap()],
+            vec![IdentifierPattern::new("third_party").unwrap()],
+            vec![IdentifierPattern::new("local_folder").unwrap()],
+            vec![IdentifierPattern::new("stdlib").unwrap()],
+            Default::default(),
+        );
+
+        assert!(Arc::ptr_eq(&left.known, &right.known));
     }
 
     /// Tests a traditional Python package layout:
