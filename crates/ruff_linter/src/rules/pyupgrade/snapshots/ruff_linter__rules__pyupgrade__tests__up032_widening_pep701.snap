@@ -1,0 +1,136 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+--- Linter settings ---
+-linter.unresolved_target_version = 3.11
++linter.unresolved_target_version = 3.12
+
+--- Summary ---
+Removed: 0
+Added: 5
+
+--- Added ---
+UP032 [*] Use f-string instead of `format` call
+  --> UP032_widening.py:15:1
+   |
+13 | ###
+14 |
+15 | "Hello {}".format("world")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+16 |
+17 | "Magic wand: {}".format(bag["wand"])
+   |
+help: Convert to f-string
+12 | # Fixable only on Python 3.12+ (PEP 701): same-quote nesting or multi-line interpolation.
+13 | ###
+14 |
+   - "Hello {}".format("world")
+15 + f"Hello {"world"}"
+16 |
+17 | "Magic wand: {}".format(bag["wand"])
+18 |
+
+
+UP032 [*] Use f-string instead of `format` call
+  --> UP032_widening.py:17:1
+   |
+15 | "Hello {}".format("world")
+16 |
+17 | "Magic wand: {}".format(bag["wand"])
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+18 |
+19 | "{}".format(len(l) * "─")
+   |
+help: Convert to f-string
+14 |
+15 | "Hello {}".format("world")
+16 |
+   - "Magic wand: {}".format(bag["wand"])
+17 + f"Magic wand: {bag["wand"]}"
+18 |
+19 | "{}".format(len(l) * "─")
+20 |
+
+
+UP032 [*] Use f-string instead of `format` call
+  --> UP032_widening.py:19:1
+   |
+17 | "Magic wand: {}".format(bag["wand"])
+18 |
+19 | "{}".format(len(l) * "─")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+20 |
+21 | "{}".format(
+   |
+help: Convert to f-string
+16 |
+17 | "Magic wand: {}".format(bag["wand"])
+18 |
+   - "{}".format(len(l) * "─")
+19 + f"{len(l) * "─"}"
+20 |
+21 | "{}".format(
+22 |     [
+
+
+UP032 [*] Use f-string instead of `format` call
+  --> UP032_widening.py:21:1
+   |
+19 |   "{}".format(len(l) * "─")
+20 |
+21 | / "{}".format(
+22 | |     [
+23 | |         1,
+24 | |         2,
+25 | |         3,
+26 | |     ]
+27 | | )
+   | |_^
+28 |
+29 |   "{a}".format(
+   |
+help: Convert to f-string
+18 |
+19 | "{}".format(len(l) * "─")
+20 |
+   - "{}".format(
+   -     [
+21 + f"{[
+22 |         1,
+23 |         2,
+24 |         3,
+   -     ]
+   - )
+25 +     ]}"
+26 |
+27 | "{a}".format(
+28 |     a=[
+
+
+UP032 [*] Use f-string instead of `format` call
+  --> UP032_widening.py:29:1
+   |
+27 |   )
+28 |
+29 | / "{a}".format(
+30 | |     a=[
+31 | |         1,
+32 | |         2,
+33 | |         3,
+34 | |     ]
+35 | | )
+   | |_^
+   |
+help: Convert to f-string
+26 |     ]
+27 | )
+28 |
+   - "{a}".format(
+   -     a=[
+29 + f"{[
+30 |         1,
+31 |         2,
+32 |         3,
+   -     ]
+   - )
+33 +     ]}"

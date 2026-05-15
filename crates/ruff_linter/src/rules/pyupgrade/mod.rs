@@ -537,28 +537,18 @@ mod tests {
     }
 
     #[test]
-    fn up032_pep701_py312() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pyupgrade/UP032_pep701.py"),
-            &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY312.into(),
-                ..settings::LinterSettings::for_rule(Rule::FString)
-            },
-        )?;
-        assert_diagnostics!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn up032_quote_aware_py311() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pyupgrade/UP032_quote_aware.py"),
+    fn up032_widening_pep701() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("pyupgrade/UP032_widening.py"),
             &settings::LinterSettings {
                 unresolved_target_version: PythonVersion::PY311.into(),
                 ..settings::LinterSettings::for_rule(Rule::FString)
             },
-        )?;
-        assert_diagnostics!(diagnostics);
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY312.into(),
+                ..settings::LinterSettings::for_rule(Rule::FString)
+            },
+        );
         Ok(())
     }
 }
