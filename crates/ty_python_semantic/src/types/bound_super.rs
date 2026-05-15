@@ -738,8 +738,8 @@ impl<'db> BoundSuperType<'db> {
                 }
                 return Ok(builder.build());
             }
-            Type::TypeAlias(alias) => {
-                return delegate_to(alias.value_type(db));
+            Type::TypeAlias(_) => {
+                return owner_type.visit_type_alias_value(db, || Ok(Type::unknown()), delegate_to);
             }
             Type::TypeVar(bound_typevar) => {
                 let typevar = bound_typevar.typevar(db);

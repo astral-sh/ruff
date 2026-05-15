@@ -44,6 +44,7 @@ use crate::types::callable::CallableTypeKind;
 use crate::types::class::{ClassLiteral, CodeGeneratorKind, MethodDecorator};
 use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::context::InferContext;
+use crate::types::cyclic::TypeAliasRecursionVisitor;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_TYPE_ALIAS_DEFINITION,
     GeneratorMismatchKind, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT,
@@ -2311,6 +2312,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
         emit_diagnostics: bool,
     ) -> bool {
+        // Attribute assignment validation can infer the RHS while validating the LHS target type.
+        // For example:
+        //
+        //   type Entry = ConfigEntry[RuntimeData]
+        //   def f(entry: Entry):
+        //       entry.runtime_data = RuntimeData(entry.data["key"])
+        //
+        // While validating `entry.runtime_data`, we expand `Entry`. If that expansion uses the
+        // shared thread-local alias guard, then RHS inference of `entry.data` also sees `Entry` as
+        // active and incorrectly treats the member lookup as a recursive alias cycle. Keep alias
+        // recursion state scoped to this LHS validation traversal so unrelated RHS inference gets
+        // its own alias state.
+        self.validate_attribute_assignment_impl(
+            target,
+            object_ty,
+            attribute,
+            infer_value_ty,
+            emit_diagnostics,
+            &TypeAliasRecursionVisitor::default(),
+        )
+    }
+
+    fn validate_attribute_assignment_impl(
+        &mut self,
+        target: &ast::ExprAttribute,
+        object_ty: Type<'db>,
+        attribute: &str,
+        infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
+        emit_diagnostics: bool,
+        alias_visitor: &TypeAliasRecursionVisitor,
+    ) -> bool {
         let db = self.db();
 
         // This closure should only be called if `value_ty` was inferred with `attr_ty` as type context.
@@ -2353,12 +2385,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let value_ty = infer_value_ty.infer_loud(self, TypeContext::default());
 
                 if union.elements(self.db()).iter().all(|elem| {
-                    self.validate_attribute_assignment(
+                    self.validate_attribute_assignment_impl(
                         target,
                         *elem,
                         attribute,
                         &mut |builder, tcx| infer_value_ty.infer_silent(builder, tcx),
                         false,
+                        alias_visitor,
                     )
                 }) {
                     if emit_diagnostics {
@@ -2388,12 +2421,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // TODO: Handle negative intersection elements
                 if intersection.positive(db).iter().any(|elem| {
-                    self.validate_attribute_assignment(
+                    self.validate_attribute_assignment_impl(
                         target,
                         *elem,
                         attribute,
                         &mut |builder, tcx| infer_value_ty.infer_silent(builder, tcx),
                         false,
+                        alias_visitor,
                     )
                 }) {
                     // Perform loud inference using the narrowed type context.
@@ -2423,12 +2457,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            Type::TypeAlias(alias) => self.validate_attribute_assignment(
-                target,
-                alias.value_type(self.db()),
-                attribute,
-                infer_value_ty,
-                emit_diagnostics,
+            Type::TypeAlias(alias) => alias.visit_value_with_recursion_visitor(
+                db,
+                alias_visitor,
+                || true,
+                |value_ty| {
+                    self.validate_attribute_assignment_impl(
+                        target,
+                        value_ty,
+                        attribute,
+                        infer_value_ty,
+                        emit_diagnostics,
+                        alias_visitor,
+                    )
+                },
             ),
 
             // Super instances do not allow attribute assignment
@@ -3066,12 +3108,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Type aliases need their own arm so aliased unions and intersections reuse the
             // specialized handling above. `NewType` instances don't: dunder lookup and attribute
             // fallback already delegate through the concrete base type when needed.
-            Type::TypeAlias(alias) => self.validate_attribute_deletion(
-                target,
-                alias.value_type(db),
-                attribute,
-                emit_diagnostics,
-            ),
+            Type::TypeAlias(_) => {
+                object_ty.visit_type_alias_value_or_assume_valid(db, |value_ty| {
+                    self.validate_attribute_deletion(target, value_ty, attribute, emit_diagnostics)
+                })
+            }
 
             Type::NominalInstance(..)
             | Type::ProtocolInstance(_)
@@ -4984,7 +5025,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::Union(union) => {
                     union.try_map(db, |element| propagate_callable_kind(db, *element, kind))
                 }
-                Type::TypeAlias(alias) => propagate_callable_kind(db, alias.value_type(db), kind),
+                Type::TypeAlias(_) => ty.visit_type_alias_value(
+                    db,
+                    || Some(Type::unknown()),
+                    |value_ty| propagate_callable_kind(db, value_ty, kind),
+                ),
                 // Intersections are currently not handled here because that would require
                 // the decorator to be explicitly annotated as returning an intersection.
                 Type::Intersection(_) => None,
@@ -8680,11 +8725,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             attr_name: &str,
             missing_types: &mut FxIndexSet<Type<'db>>,
         ) {
-            if let Some(union) = ty.as_union_like(db) {
-                for element in union.elements(db) {
-                    union_elements_missing_attribute(db, *element, attr_name, missing_types);
-                }
-            } else if ty.member(db, attr_name).place.is_undefined() {
+            if ty.visit_union_like_elements(db, &mut |element| {
+                union_elements_missing_attribute(db, element, attr_name, missing_types);
+            }) {
+                return;
+            }
+
+            if ty.member(db, attr_name).place.is_undefined() {
                 missing_types.insert(ty);
             }
         }
@@ -8914,19 +8961,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     //
                     // On the other hand, we could be looking at a union where some elements have
                     // the attribute but others definitely don't. That's a very different case, and
-                    // we want it to be an error. Use `as_union_like` here to handle type aliases
-                    // of unions and `NewType`s of float/complex in addition to explicit unions.
-                    if let Some(union) = value_type.as_union_like(db) {
-                        let mut elements_missing_the_attribute = FxIndexSet::default();
-                        for element in union.elements(db) {
-                            union_elements_missing_attribute(
-                                db,
-                                *element,
-                                attr_name,
-                                &mut elements_missing_the_attribute,
-                            );
-                        }
-
+                    // we want it to be an error. Use `visit_union_like_elements` here to handle
+                    // type aliases of unions and `NewType`s of float/complex in addition to
+                    // explicit unions.
+                    let mut elements_missing_the_attribute = FxIndexSet::default();
+                    if value_type.visit_union_like_elements(db, &mut |element| {
+                        union_elements_missing_attribute(
+                            db,
+                            element,
+                            attr_name,
+                            &mut elements_missing_the_attribute,
+                        );
+                    }) {
                         if !elements_missing_the_attribute.is_empty() {
                             if let Some(builder) =
                                 self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
@@ -9084,7 +9130,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (_, Type::Never) => Type::Never,
 
             (_, Type::TypeAlias(alias)) => {
-                self.infer_unary_expression_type(op, alias.value_type(self.db()), unary)
+                let db = self.db();
+                alias.visit_value(db, Type::unknown, |value_ty| {
+                    self.infer_unary_expression_type(op, value_ty, unary)
+                })
             }
 
             (ast::UnaryOp::UAdd, Type::LiteralValue(literal)) => match literal.kind() {

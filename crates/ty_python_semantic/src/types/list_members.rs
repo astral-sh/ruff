@@ -292,7 +292,14 @@ impl<'db> AllMembers<'db> {
                 self.extend_with_type(db, Type::object());
             }
 
-            Type::TypeAlias(alias) => self.extend_with_type(db, alias.value_type(db)),
+            Type::TypeAlias(_) => {
+                let members = ty.visit_type_alias_value(
+                    db,
+                    || AllMembers::of(db, Type::unknown()).members,
+                    |value_ty| AllMembers::of(db, value_ty).members,
+                );
+                self.members.extend(members);
+            }
 
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {

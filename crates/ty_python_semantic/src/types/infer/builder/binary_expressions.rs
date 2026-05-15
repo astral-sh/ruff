@@ -92,17 +92,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // `TypeAlias`, which uses `X | Y` syntax, where the returned type is not actually a union.
         // And attempting to enforce this more tightly showed a lot of potential false positives in
         // the ecosystem.
-        if left_ty.is_equivalent_to(db, right_ty) {
-            left_ty
-        } else {
-            UnionTypeInstance::from_value_expression_types(
-                db,
-                [left_ty, right_ty],
-                self.scope(),
-                self.typevar_binding_context,
-                self.inference_flags(),
-            )
-        }
+        UnionTypeInstance::from_value_expression_types(
+            db,
+            [left_ty, right_ty],
+            self.scope(),
+            self.typevar_binding_context,
+            self.inference_flags(),
+        )
     }
 
     /// Returns a `TypedDict` result when a PEP 584 special case succeeds, otherwise the inferred
@@ -362,25 +358,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
             }),
 
-            (Type::TypeAlias(alias), rhs, _) => visitor.visit((left_ty, op, right_ty), || {
-                self.infer_binary_expression_type_impl(
-                    node,
-                    emitted_division_by_zero_diagnostic,
-                    alias.value_type(db),
-                    rhs,
-                    op,
-                    visitor,
+            (Type::TypeAlias(_), rhs, _) => visitor.visit((left_ty, op, right_ty), || {
+                left_ty.visit_type_alias_value(
+                    db,
+                    || Some(Type::Never),
+                    |value_ty| {
+                        self.infer_binary_expression_type_impl(
+                            node,
+                            emitted_division_by_zero_diagnostic,
+                            value_ty,
+                            rhs,
+                            op,
+                            visitor,
+                        )
+                    },
                 )
             }),
 
-            (lhs, Type::TypeAlias(alias), _) => visitor.visit((left_ty, op, right_ty), || {
-                self.infer_binary_expression_type_impl(
-                    node,
-                    emitted_division_by_zero_diagnostic,
-                    lhs,
-                    alias.value_type(db),
-                    op,
-                    visitor,
+            (lhs, Type::TypeAlias(_), _) => visitor.visit((left_ty, op, right_ty), || {
+                right_ty.visit_type_alias_value(
+                    db,
+                    || Some(Type::Never),
+                    |value_ty| {
+                        self.infer_binary_expression_type_impl(
+                            node,
+                            emitted_division_by_zero_diagnostic,
+                            lhs,
+                            value_ty,
+                            op,
+                            visitor,
+                        )
+                    },
                 )
             }),
 

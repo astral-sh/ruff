@@ -156,9 +156,9 @@ impl ClassInfoConstraintFunction {
         };
 
         match classinfo {
-            Type::TypeAlias(alias) => {
-                self.generate_constraint(db, alias.value_type(db), is_positive)
-            }
+            Type::TypeAlias(_) => classinfo.visit_type_alias_value_or_default(db, |value_ty| {
+                self.generate_constraint(db, value_ty, is_positive)
+            }),
             Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => {
                 // We can't narrow negatively from a `SubclassOf` type. `if !isinstance(x, y)`
@@ -1211,7 +1211,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     }
                 }
                 Type::TypeVar(tvar) => find_underlying_class(db, tvar.typevar(db).upper_bound(db)?),
-                Type::TypeAlias(alias) => find_underlying_class(db, alias.value_type(db)),
+                Type::TypeAlias(_) => ty.visit_type_alias_value_or_default(db, |value_ty| {
+                    find_underlying_class(db, value_ty)
+                }),
                 _ => None,
             }
         }
@@ -2107,7 +2109,9 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
             .elements(db)
             .iter()
             .any(|union_member_ty| is_or_contains_typeddict(db, *union_member_ty)),
-        Type::TypeAlias(alias) => is_or_contains_typeddict(db, alias.value_type(db)),
+        Type::TypeAlias(_) => ty.visit_type_alias_value_or_default(db, |value_ty| {
+            is_or_contains_typeddict(db, value_ty)
+        }),
 
         Type::Dynamic(_)
         | Type::Divergent(_)
@@ -2179,9 +2183,9 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
                     field_name,
                 )
         }),
-        Type::TypeAlias(alias) => {
-            all_matching_typeddict_fields_have_literal_types(db, alias.value_type(db), field_name)
-        }
+        Type::TypeAlias(_) => ty.visit_type_alias_value_or_default(db, |value_ty| {
+            all_matching_typeddict_fields_have_literal_types(db, value_ty, field_name)
+        }),
         Type::Intersection(intersection) => {
             intersection
                 .positive(db)

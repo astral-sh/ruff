@@ -156,6 +156,33 @@ class Cyclic:
 reveal_type(Cyclic("").data)
 ```
 
+## Meta-type lookups through recursive aliases
+
+Recursive aliases can show up in class-body annotations and in operations that need the meta type,
+such as `__class__` lookup. These should not recurse indefinitely.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import reveal_type
+
+class G:
+    pass
+
+type RecursiveAlias = G | RecursiveAlias
+
+class C:
+    x: RecursiveAlias
+
+reveal_type(C.x)  # revealed: G
+
+def f(x: RecursiveAlias):
+    reveal_type(x.__class__)  # revealed: type[G]
+```
+
 ## Lazy cached property behind `hasattr`
 
 This pattern used to panic with "too many cycle iterations".

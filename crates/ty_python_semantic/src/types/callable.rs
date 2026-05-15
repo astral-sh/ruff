@@ -216,9 +216,13 @@ impl<'db> Type<'db> {
                 _ => None,
             },
 
-            Type::TypeAlias(alias) => alias
-                .value_type(db)
-                .try_upcast_to_callable_with_policy_and_context(db, policy, context),
+            Type::TypeAlias(_) => self.visit_type_alias_value(
+                db,
+                || Some(CallableTypes::one(CallableType::unknown(db))),
+                |value_ty| {
+                    value_ty.try_upcast_to_callable_with_policy_and_context(db, policy, context)
+                },
+            ),
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function))
                 if context.is_recursive_reference(db, function) =>

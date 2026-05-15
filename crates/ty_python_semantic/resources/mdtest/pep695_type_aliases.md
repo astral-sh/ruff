@@ -161,6 +161,22 @@ def f(x: Foo[int]):
     reveal_type(x.foo())  # revealed: int
 ```
 
+## Attribute assignment through generic aliases
+
+```py
+class ConfigEntry[T]:
+    data: dict[str, object]
+    runtime_data: T
+
+class RuntimeData:
+    def __init__(self, value: object): ...
+
+type RuntimeDataConfigEntry = ConfigEntry[RuntimeData]
+
+def f(entry: RuntimeDataConfigEntry):
+    entry.runtime_data = RuntimeData(entry.data["key"])
+```
+
 ## Stringified values
 
 Stringifying the right-hand side of a type alias is redundant, but allowed:
@@ -439,6 +455,265 @@ def _(x: Bar[int]):
     reveal_type(x)  # revealed: int | list[int]
 ```
 
+### Recursive aliases in operations
+
+```py
+from typing import Callable, Concatenate, Iterator, Literal, TypedDict, overload
+from ty_extensions import Intersection, Not, all_members, has_member
+
+class RecursiveItem: ...
+
+type RecursiveUnion = RecursiveItem | RecursiveUnion
+
+def subscript_recursive_alias(x: RecursiveUnion):
+    # error: [not-subscriptable] "Cannot subscript object of type `RecursiveItem` with no `__getitem__` method"
+    reveal_type(x[0])  # revealed: Unknown
+
+class RecursiveIterableItem:
+    def __iter__(self) -> Iterator["RecursiveIterable"]:
+        return iter([self])
+
+type RecursiveIterable = RecursiveIterableItem | RecursiveIterable
+
+def iterate_recursive_alias(x: RecursiveIterable):
+    for y in x:
+        reveal_type(y)  # revealed: RecursiveIterableItem | Unknown
+
+def star_recursive_alias(x: RecursiveIterable):
+    def g(*args: object): ...
+
+    g(*x)
+
+class RecursiveCallable:
+    def __call__(self) -> "DunderRecursive":
+        return self
+
+type DunderRecursive = RecursiveCallable | DunderRecursive
+
+class HasRecursiveLen:
+    __len__: DunderRecursive = RecursiveCallable()
+
+def len_recursive_alias(x: HasRecursiveLen):
+    # error: [invalid-argument-type] "Argument to function `len` is incorrect: Expected `Sized`, found `HasRecursiveLen`"
+    reveal_type(len(x))  # revealed: int
+
+class RecursiveMembers:
+    attr: int
+
+type RecursiveMembersAlias = RecursiveMembers | RecursiveMembersAlias
+
+def list_recursive_alias_members(x: RecursiveMembersAlias):
+    all_members(x)
+    reveal_type(has_member(x, "attr"))  # revealed: Literal[False]
+
+class RecursiveAttribute:
+    attr: int
+
+type RecursiveAttributeAlias = RecursiveAttribute | RecursiveAttributeAlias
+
+def assign_recursive_alias_attribute(x: RecursiveAttributeAlias):
+    x.attr = 1
+
+def delete_recursive_alias_attribute(x: RecursiveAttributeAlias):
+    del x.attr
+
+class RecursiveMissingAttribute: ...
+
+type RecursiveMissingAttributeAlias = RecursiveMissingAttribute | RecursiveMissingAttributeAlias
+
+def load_missing_recursive_alias_attribute(x: RecursiveMissingAttributeAlias):
+    # error: [unresolved-attribute] "Attribute `missing` is not defined on `RecursiveMissingAttribute` in union `RecursiveMissingAttributeAlias`"
+    reveal_type(x.missing)  # revealed: Divergent
+
+def delete_missing_recursive_alias_attribute(x: RecursiveMissingAttributeAlias):
+    # error: [unresolved-attribute] "Attribute `missing` is not defined on `RecursiveMissingAttribute` in union `RecursiveMissingAttributeAlias`"
+    del x.missing
+
+type RecursiveIntAttributeAlias = int | RecursiveIntAttributeAlias
+
+def load_missing_recursive_int_alias_attribute(x: RecursiveIntAttributeAlias):
+    # error: [unresolved-attribute] "Attribute `missing` is not defined on `int` in union `RecursiveIntAttributeAlias`"
+    reveal_type(x.missing)  # revealed: Divergent
+
+class RecursiveKwargs(TypedDict):
+    kind: Literal["a"]
+    a: int
+
+type RecursiveKwargsAlias = RecursiveKwargs | RecursiveKwargsAlias
+
+def call_with_recursive_kwargs_alias(x: RecursiveKwargsAlias):
+    def g(a: int): ...
+
+    g(**x)
+
+def narrow_recursive_typed_dict_alias(x: RecursiveKwargsAlias):
+    if x["kind"] == "a":
+        reveal_type(x)  # revealed: RecursiveKwargs
+
+type RecursiveDecoratorReturn = Callable[[int], int] | RecursiveDecoratorReturn
+
+def recursive_decorator_return(fn: Callable[[int], int]) -> RecursiveDecoratorReturn: ...
+@recursive_decorator_return
+def decorated(x: int) -> int:
+    return x
+
+reveal_type(decorated)  # revealed: ((int, /) -> int) | Unknown
+
+type RecursiveCallableSpecialization[T] = Callable[[], RecursiveCallableSpecialization[list[T]]]
+
+def reveal_recursive_callable_specialization(x: RecursiveCallableSpecialization[int]):
+    reveal_type(x)  # revealed: () -> RecursiveCallableSpecialization[list[int]]
+
+type RecursiveConcatenateCallable[**P] = Callable[[], RecursiveConcatenateCallable[Concatenate[int, P]]]
+
+def reveal_recursive_concatenate_callable(x: RecursiveConcatenateCallable):
+    reveal_type(x)  # revealed: () -> RecursiveConcatenateCallable[(int, /, *args: Unknown, **kwargs: Unknown)]
+
+type RecursiveParamspecCallable[**P] = Callable[P, RecursiveParamspecCallable[Concatenate[int, P]]]
+
+def reveal_recursive_paramspec_callable(x: RecursiveParamspecCallable):
+    reveal_type(x)  # revealed: (...) -> RecursiveParamspecCallable[(int, /, *args: Unknown, **kwargs: Unknown)]
+
+type RecursiveUnionCallable[T] = Callable[[RecursiveUnionCallable[T]], RecursiveUnionCallable[T | RecursiveUnionCallable[T]]]
+
+def reveal_recursive_union_callable(x: RecursiveUnionCallable[int]):
+    reveal_type(x)  # revealed: (RecursiveUnionCallable[int], /) -> RecursiveUnionCallable[int | RecursiveUnionCallable[int]]
+
+type RecursiveTruthinessSpecialization[T] = int | RecursiveTruthinessSpecialization[list[T]]
+
+def reveal_recursive_truthiness_specialization(x: RecursiveTruthinessSpecialization[int]):
+    reveal_type(x)  # revealed: int
+
+def positive_intersection_recursive_truthiness_specialization(
+    x: Intersection[RecursiveTruthinessSpecialization[int], object],
+):
+    reveal_type(x)  # revealed: int
+
+def negative_recursive_truthiness_specialization(
+    x: Not[RecursiveTruthinessSpecialization[int]],
+):
+    reveal_type(x)  # revealed: ~int & ~RecursiveTruthinessSpecialization[list[int]]
+
+def negative_intersection_recursive_truthiness_specialization(
+    x: Intersection[object, Not[RecursiveTruthinessSpecialization[int]]],
+):
+    reveal_type(x)  # revealed: ~int & ~RecursiveTruthinessSpecialization[list[list[int]]]
+
+def bool_recursive_specialization(x: RecursiveTruthinessSpecialization[int]):
+    if x:
+        pass
+
+def infer_recursive_truthiness_specialization[T](x: RecursiveTruthinessSpecialization[T]) -> T:
+    raise NotImplementedError
+
+def call_infer_recursive_truthiness_specialization(x: RecursiveTruthinessSpecialization[int]):
+    infer_recursive_truthiness_specialization(x)
+
+def accept_negative_recursive_truthiness_specialization[T](x: T) -> None:
+    pass
+
+def call_accept_negative_recursive_truthiness_specialization(
+    x: Not[RecursiveTruthinessSpecialization[int]],
+):
+    accept_negative_recursive_truthiness_specialization(x)
+
+def compare_recursive_specialization(x: RecursiveTruthinessSpecialization[int]):
+    reveal_type(x == 1)  # revealed: bool
+
+def binary_recursive_specialization(x: RecursiveTruthinessSpecialization[int]):
+    reveal_type(x + 1)  # revealed: int
+
+type RecursiveSubscriptSpecialization[T] = list[RecursiveSubscriptSpecialization[list[T]]]
+
+def head_recursive_subscript_specialization[T](x: RecursiveSubscriptSpecialization[T]) -> T:
+    raise NotImplementedError
+
+def call_head_recursive_subscript_specialization(x: RecursiveSubscriptSpecialization[int]):
+    reveal_type(head_recursive_subscript_specialization(x))  # revealed: int
+
+def subscript_recursive_specialization(x: RecursiveSubscriptSpecialization[int]):
+    reveal_type(x[0])  # revealed: list[RecursiveSubscriptSpecialization[list[list[int]]]]
+
+type RecursiveClassInfoSpecialization[T] = type[int] | RecursiveClassInfoSpecialization[list[T]]
+
+def isinstance_recursive_specialization(obj: object, classinfo: RecursiveClassInfoSpecialization[int]):
+    if isinstance(obj, classinfo):
+        reveal_type(obj)  # revealed: object
+
+def issubclass_recursive_specialization(obj: type[object], classinfo: RecursiveClassInfoSpecialization[int]):
+    if issubclass(obj, classinfo):
+        reveal_type(obj)  # revealed: type
+
+def match_recursive_classinfo_specialization(obj: object, classinfo: RecursiveClassInfoSpecialization[int]):
+    match obj:
+        case classinfo():
+            reveal_type(obj)  # revealed: object
+
+class BaseWithMethod:
+    def method(self) -> None: ...
+
+class RecursiveSuperOwner(BaseWithMethod): ...
+
+type RecursiveSuperOwnerAlias = RecursiveSuperOwner | RecursiveSuperOwnerAlias
+
+def recursive_super_owner(x: RecursiveSuperOwnerAlias):
+    super(RecursiveSuperOwner, x).method()
+
+type RecursiveTuple = tuple[RecursiveTuple]
+
+@overload
+def overloaded_recursive_tuple(x: int) -> int: ...
+@overload
+def overloaded_recursive_tuple(x: str) -> str: ...
+def overloaded_recursive_tuple(x: object) -> object:
+    return x
+
+def expand_recursive_tuple_argument(x: RecursiveTuple):
+    # error: [no-matching-overload] "No overload of function `overloaded_recursive_tuple` matches arguments"
+    reveal_type(overloaded_recursive_tuple(x))  # revealed: Unknown
+
+@overload
+def overloaded_recursive_tuple_variadic(x: int) -> int: ...
+@overload
+def overloaded_recursive_tuple_variadic(x: int, y: int) -> str: ...
+def overloaded_recursive_tuple_variadic(*args: object, **kwargs: object) -> object:
+    return args
+
+def expand_recursive_variadic_tuple_argument(x: RecursiveTuple):
+    # error: [invalid-argument-type] "Argument to function `overloaded_recursive_tuple_variadic` is incorrect: Expected `int`, found `RecursiveTuple`"
+    reveal_type(overloaded_recursive_tuple_variadic(*x))  # revealed: Unknown
+
+type RecursiveClassInfo = type[int] | RecursiveClassInfo
+
+def narrow_recursive_classinfo(x: object, y: RecursiveClassInfo):
+    if isinstance(x, y):
+        reveal_type(x)  # revealed: object
+
+def narrow_recursive_subclassinfo(x: type[object], y: RecursiveClassInfo):
+    if issubclass(x, y):
+        reveal_type(x)  # revealed: type
+
+type RecursiveSingleValuedTuple = tuple[None, RecursiveSingleValuedTuple]
+
+def narrow_recursive_single_valued_tuple(x: object, y: RecursiveSingleValuedTuple):
+    if x == y:
+        reveal_type(x)  # revealed: object
+```
+
+### Parser-recovery operation regressions
+
+```py
+# error: [invalid-syntax] "Expected an expression"
+type CrashyOperation = | CrashyOperation
+
+def subscript_recovered_alias(x: CrashyOperation):
+    reveal_type(x[0])  # revealed: Unknown
+
+def iterate_recovered_alias(x: CrashyOperation):
+    for y in x:
+        reveal_type(y)  # revealed: Unknown
+```
+
 ### With legacy generic
 
 ```py
@@ -661,6 +936,26 @@ type CallableGuard = TypeGuard[Callable[[], CallableGuard]]
 
 reveal_type(CallableIs)  # revealed: TypeAliasType
 reveal_type(CallableGuard)  # revealed: TypeAliasType
+```
+
+### Recursive generic aliases in special forms don't stack overflow
+
+```py
+from typing import Literal, reveal_type
+from typing_extensions import TypeIs
+
+type RecursiveLiteralSpecialization[T] = Literal[1] | RecursiveLiteralSpecialization[list[T]]
+type RecursiveIsSpecialization[T] = int | RecursiveIsSpecialization[list[T]]
+type RecursiveDuplicateSpecialization[T] = RecursiveIsSpecialization[T] | RecursiveIsSpecialization[T]
+
+def is_recursive(x: object) -> TypeIs[RecursiveIsSpecialization[int]]:
+    return True
+
+reveal_type(RecursiveLiteralSpecialization)  # revealed: TypeAliasType
+reveal_type(RecursiveDuplicateSpecialization)  # revealed: TypeAliasType
+
+# error: [invalid-type-form] "Type arguments for `Literal` must be `None`, a literal value (int, bool, str, or bytes), or an enum member"
+x: Literal[RecursiveLiteralSpecialization[int]]
 ```
 
 ### Recursive alias in binary operators doesn't stack overflow

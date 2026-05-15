@@ -566,7 +566,10 @@ fn constructor_returns_instance<'db>(
     class_literal: ClassLiteral<'db>,
     return_ty: Type<'db>,
 ) -> bool {
-    match return_ty.resolve_type_alias(db) {
+    match return_ty {
+        Type::TypeAlias(_) => return_ty.visit_type_alias_value_or_assume_valid(db, |value_ty| {
+            constructor_returns_instance(db, class_literal, value_ty)
+        }),
         Type::Union(union) => union
             .elements(db)
             .iter()

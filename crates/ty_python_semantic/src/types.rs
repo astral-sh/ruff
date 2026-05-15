@@ -18,6 +18,7 @@ use ruff_db::files::File;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
+use salsa::plumbing::AsId;
 use smallvec::smallvec_inline;
 use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
@@ -241,8 +242,12 @@ fn definition_expression_type<'db>(
 }
 
 struct ApplyDefaultTypeMapping;
+struct ApplyPromoteOnTypeMapping;
+struct ApplyPromoteOffTypeMapping;
 struct ApplyTopMaterialization;
 struct ApplyBottomMaterialization;
+struct ApplySpecializationWithTopMaterialization;
+struct ApplySpecializationWithBottomMaterialization;
 struct ApplyMaterializationEquivalence;
 
 type MaterializationEquivalenceVisitor<'db> =
@@ -250,13 +255,19 @@ type MaterializationEquivalenceVisitor<'db> =
 
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
-/// Materialization is the only mapping mode that needs to visit the same type under two different
-/// mappings within a single recursive call chain (`Top` and `Bottom`). Keep separate cycle caches
-/// for those modes so invariant checks can safely reuse one visitor.
+/// Promotion and materialization can visit the same type under two different mappings within a
+/// single recursive call chain. Keep separate cycle caches for those modes so invariant checks,
+/// materialized specialization, and callable promotion can safely reuse one visitor.
 pub(crate) struct ApplyTypeMappingVisitor<'db> {
     default: OnceCell<TypeTransformer<'db, ApplyDefaultTypeMapping>>,
+    promote_on: OnceCell<TypeTransformer<'db, ApplyPromoteOnTypeMapping>>,
+    promote_off: OnceCell<TypeTransformer<'db, ApplyPromoteOffTypeMapping>>,
     top_materialization: OnceCell<TypeTransformer<'db, ApplyTopMaterialization>>,
     bottom_materialization: OnceCell<TypeTransformer<'db, ApplyBottomMaterialization>>,
+    specialization_top_materialization:
+        OnceCell<TypeTransformer<'db, ApplySpecializationWithTopMaterialization>>,
+    specialization_bottom_materialization:
+        OnceCell<TypeTransformer<'db, ApplySpecializationWithBottomMaterialization>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
 }
 
@@ -274,12 +285,34 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
         func: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
         match type_mapping {
+            TypeMapping::Promote(PromotionMode::On, _) => self
+                .promote_on
+                .get_or_init(TypeTransformer::default)
+                .visit_type(db, ty, func),
+            TypeMapping::Promote(PromotionMode::Off, _) => self
+                .promote_off
+                .get_or_init(TypeTransformer::default)
+                .visit_type(db, ty, func),
             TypeMapping::Materialize(MaterializationKind::Top) => self
                 .top_materialization
                 .get_or_init(TypeTransformer::default)
                 .visit_type(db, ty, func),
             TypeMapping::Materialize(MaterializationKind::Bottom) => self
                 .bottom_materialization
+                .get_or_init(TypeTransformer::default)
+                .visit_type(db, ty, func),
+            TypeMapping::ApplySpecializationWithMaterialization {
+                materialization_kind: MaterializationKind::Top,
+                ..
+            } => self
+                .specialization_top_materialization
+                .get_or_init(TypeTransformer::default)
+                .visit_type(db, ty, func),
+            TypeMapping::ApplySpecializationWithMaterialization {
+                materialization_kind: MaterializationKind::Bottom,
+                ..
+            } => self
+                .specialization_bottom_materialization
                 .get_or_init(TypeTransformer::default)
                 .visit_type(db, ty, func),
             _ => self
@@ -308,8 +341,12 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
 
         Self {
             default: OnceCell::new(),
+            promote_on: OnceCell::new(),
+            promote_off: OnceCell::new(),
             top_materialization: OnceCell::new(),
             bottom_materialization: OnceCell::new(),
+            specialization_top_materialization: OnceCell::new(),
+            specialization_bottom_materialization: OnceCell::new(),
             materialization_equivalence,
         }
     }
@@ -319,8 +356,12 @@ impl Default for ApplyTypeMappingVisitor<'_> {
     fn default() -> Self {
         Self {
             default: OnceCell::new(),
+            promote_on: OnceCell::new(),
+            promote_off: OnceCell::new(),
             top_materialization: OnceCell::new(),
             bottom_materialization: OnceCell::new(),
+            specialization_top_materialization: OnceCell::new(),
+            specialization_bottom_materialization: OnceCell::new(),
             materialization_equivalence: OnceCell::new(),
         }
     }
@@ -1218,7 +1259,9 @@ impl<'db> Type<'db> {
         match self {
             Type::NominalInstance(instance) => Some(instance.class(db)),
             Type::ProtocolInstance(instance) => instance.to_nominal_instance().map(|i| i.class(db)),
-            Type::TypeAlias(alias) => alias.value_type(db).nominal_class(db),
+            Type::TypeAlias(_) => {
+                self.visit_type_alias_value_or_default(db, |value_ty| value_ty.nominal_class(db))
+            }
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).nominal_class(db),
             Type::TypeVar(typevar) => {
                 let TypeVarBoundOrConstraints::UpperBound(bound) =
@@ -1368,11 +1411,54 @@ impl<'db> Type<'db> {
     /// If this type is a `Type::TypeAlias`, recursively resolves it to its
     /// underlying value type. Otherwise, returns `self` unchanged.
     pub(crate) fn resolve_type_alias(self, db: &'db dyn Db) -> Type<'db> {
-        let mut ty = self;
-        while let Type::TypeAlias(alias) = ty {
-            ty = alias.value_type(db);
+        match self {
+            Type::TypeAlias(alias) => {
+                alias.visit_value(db, || self, |value_ty| value_ty.resolve_type_alias(db))
+            }
+            _ => self,
         }
-        ty
+    }
+
+    /// If this type is a type alias, visit its value type with active-recursion tracking.
+    ///
+    /// The caller owns the fallback result because different operations need different conservative
+    /// answers when a recursive alias points back to itself.
+    pub(crate) fn visit_type_alias_value<R>(
+        self,
+        db: &'db dyn Db,
+        on_cycle: impl FnOnce() -> R,
+        visit_value: impl FnOnce(Type<'db>) -> R,
+    ) -> R {
+        if let Type::TypeAlias(alias) = self {
+            alias.visit_value(db, on_cycle, visit_value)
+        } else {
+            visit_value(self)
+        }
+    }
+
+    /// If this type is a type alias, visit its value type with active-recursion tracking.
+    ///
+    /// This variant returns `R::default()` when a recursive alias points back to itself. Use this
+    /// for predicate and extraction operations where "not available" is the conservative answer.
+    pub(crate) fn visit_type_alias_value_or_default<R: Default>(
+        self,
+        db: &'db dyn Db,
+        visit_value: impl FnOnce(Type<'db>) -> R,
+    ) -> R {
+        self.visit_type_alias_value(db, R::default, visit_value)
+    }
+
+    /// If this type is a type alias, visit its value type with active-recursion tracking.
+    ///
+    /// This variant returns `true` when a recursive alias points back to itself. Use this for
+    /// validation operations where emitting an error from an unexpanded recursive component would
+    /// be less accurate than accepting the operation.
+    pub(crate) fn visit_type_alias_value_or_assume_valid(
+        self,
+        db: &'db dyn Db,
+        visit_value: impl FnOnce(Type<'db>) -> bool,
+    ) -> bool {
+        self.visit_type_alias_value(db, || true, visit_value)
     }
 
     /// Returns `Some(UnionType)` if this type behaves like a union. Apart from explicit unions,
@@ -1382,6 +1468,34 @@ impl<'db> Type<'db> {
             Type::Union(union) => Some(union),
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).as_union_like(db),
             _ => None,
+        }
+    }
+
+    /// Visits each element if this type behaves like a union.
+    ///
+    /// Unlike [`Type::as_union_like`], this keeps active type-alias recursion state alive while
+    /// visiting the elements. Use this for recursive walks over alias-backed unions.
+    pub(crate) fn visit_union_like_elements(
+        self,
+        db: &'db dyn Db,
+        visit_element: &mut impl FnMut(Type<'db>),
+    ) -> bool {
+        match self {
+            Type::Union(union) => {
+                for element in union.elements(db) {
+                    visit_element(*element);
+                }
+                true
+            }
+            Type::TypeAlias(_) => self.visit_type_alias_value(
+                db,
+                || true,
+                |value_ty| value_ty.visit_union_like_elements(db, visit_element),
+            ),
+            Type::NewTypeInstance(newtype) => newtype
+                .concrete_base_type(db)
+                .visit_union_like_elements(db, visit_element),
+            _ => false,
         }
     }
 
@@ -1740,14 +1854,13 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::Callable(_)
             | Type::WrapperDescriptor(_)
-            | Type::TypeAlias(_)
             | Type::BoundMethod(_) => Type::Intersection(IntersectionType::new(
                 db,
                 FxOrderSet::default(),
                 NegativeIntersectionElements::Single(*self),
             )),
 
-            Type::Union(_) | Type::Intersection(_) => {
+            Type::Union(_) | Type::Intersection(_) | Type::TypeAlias(_) => {
                 IntersectionBuilder::new(db).add_negative(*self).build()
             }
         }
@@ -2106,6 +2219,17 @@ impl<'db> Type<'db> {
         f: &mut dyn FnMut(Type<'db>, TypeVarVariance),
         visitor: &SpecializationVisitor<'db>,
     ) {
+        if let Type::TypeAlias(_) = self {
+            self.visit_type_alias_value(
+                db,
+                || (),
+                |value_ty| {
+                    value_ty.visit_specialization_impl(db, polarity, f, visitor);
+                },
+            );
+            return;
+        }
+
         let Some(specialization) = self.class_specialization(db) else {
             match self {
                 Type::Union(union) => {
@@ -2118,11 +2242,6 @@ impl<'db> Type<'db> {
                         element.visit_specialization_impl(db, polarity, f, visitor);
                     }
                 }
-                Type::TypeAlias(alias) => visitor.visit(self, || {
-                    alias
-                        .value_type(db)
-                        .visit_specialization_impl(db, polarity, f, visitor);
-                }),
                 Type::Callable(callable) => {
                     for signature in callable.signatures(db) {
                         for parameter in signature.parameters() {
@@ -2286,7 +2405,9 @@ impl<'db> Type<'db> {
             Type::TypeIs(type_is) => type_is.is_bound(db),
             Type::TypeGuard(type_guard) => type_guard.is_bound(db),
             Type::TypedDict(_) => false,
-            Type::TypeAlias(alias) => alias.value_type(db).is_singleton(db),
+            Type::TypeAlias(_) => {
+                self.visit_type_alias_value_or_default(db, |value_ty| value_ty.is_singleton(db))
+            }
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_singleton(db),
         }
     }
@@ -2360,7 +2481,9 @@ impl<'db> Type<'db> {
             Type::TypeIs(type_is) => type_is.is_bound(db),
             Type::TypeGuard(type_guard) => type_guard.is_bound(db),
 
-            Type::TypeAlias(alias) => alias.value_type(db).is_single_valued(db),
+            Type::TypeAlias(_) => {
+                self.visit_type_alias_value_or_default(db, |value_ty| value_ty.is_single_valued(db))
+            }
 
             Type::Dynamic(_)
             | Type::Divergent(_)
@@ -2488,9 +2611,14 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::TypeAlias(alias) => alias
-                .value_type(db)
-                .find_name_in_mro_with_policy(db, name, policy),
+            Type::TypeAlias(alias) => alias.visit_value(
+                db,
+                || {
+                    Type::divergent(alias.definition(db).as_id())
+                        .find_name_in_mro_with_policy(db, name, policy)
+                },
+                |value_ty| value_ty.find_name_in_mro_with_policy(db, name, policy),
+            ),
 
             Type::FunctionLiteral(_)
             | Type::Callable(_)
@@ -2699,7 +2827,11 @@ impl<'db> Type<'db> {
 
             Type::TypedDict(_) => Place::Undefined.into(),
 
-            Type::TypeAlias(alias) => alias.value_type(db).instance_member(db, name),
+            Type::TypeAlias(alias) => alias.visit_value(
+                db,
+                || Type::divergent(alias.definition(db).as_id()).instance_member(db, name),
+                |value_ty| value_ty.instance_member(db, name),
+            ),
         }
     }
 
@@ -3418,9 +3550,11 @@ impl<'db> Type<'db> {
                     .member_lookup_with_policy(db, name, policy)
             }
 
-            Type::TypeAlias(alias) => alias
-                .value_type(db)
-                .member_lookup_with_policy(db, name, policy),
+            Type::TypeAlias(_) => self.visit_type_alias_value(
+                db,
+                || Place::Undefined.into(),
+                |value_ty| value_ty.member_lookup_with_policy(db, name, policy),
+            ),
 
             _ if policy.no_instance_fallback() => self.invoke_descriptor_protocol(
                 db,
@@ -3664,7 +3798,7 @@ impl<'db> Type<'db> {
     /// In the second case, the return type of `len()` in `typeshed` (`int`)
     /// is used as a fallback.
     fn len(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        fn non_negative_int_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+        fn non_negative_int_literal_impl<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
             match ty {
                 // TODO: Emit diagnostic for non-integers and negative integers
                 Type::LiteralValue(literal) => match literal.kind() {
@@ -3673,8 +3807,11 @@ impl<'db> Type<'db> {
                     _ => None,
                 },
                 Type::Union(union) => {
-                    union.try_map(db, |element| non_negative_int_literal(db, *element))
+                    union.try_map(db, |element| non_negative_int_literal_impl(db, *element))
                 }
+                Type::TypeAlias(_) => ty.visit_type_alias_value_or_default(db, |value_ty| {
+                    non_negative_int_literal_impl(db, value_ty)
+                }),
                 _ => None,
             }
         }
@@ -3703,7 +3840,7 @@ impl<'db> Type<'db> {
             Err(CallDunderError::CallError(_, bindings)) => bindings.return_type(db),
         };
 
-        non_negative_int_literal(db, return_ty)
+        non_negative_int_literal_impl(db, return_ty)
     }
 
     /// If this type is a `ParamSpec` type variable, returns it. Otherwise, returns `None`.
@@ -3809,7 +3946,10 @@ impl<'db> Type<'db> {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         Bindings::from_union(
                             self,
-                            constraints.elements(db).iter().map(|ty| ty.bindings(db)),
+                            constraints
+                                .elements(db)
+                                .iter()
+                                .map(|constraint| constraint.bindings(db)),
                         )
                     }
                 }
@@ -4054,7 +4194,7 @@ impl<'db> Type<'db> {
                                 constraints
                                     .elements(db)
                                     .iter()
-                                    .map(|ty| ty.to_meta_type(db).bindings(db)),
+                                    .map(|constraint| constraint.to_meta_type(db).bindings(db)),
                             )
                         }
                     };
@@ -4185,7 +4325,11 @@ impl<'db> Type<'db> {
                 known_instance.instance_fallback(db).bindings(db)
             }
 
-            Type::TypeAlias(alias) => alias.value_type(db).bindings(db),
+            Type::TypeAlias(_) => {
+                self.visit_type_alias_value(db, Self::unknown_bindings, |value_ty| {
+                    value_ty.bindings(db)
+                })
+            }
 
             Type::PropertyInstance(_)
             | Type::AlwaysFalsy
@@ -4196,6 +4340,12 @@ impl<'db> Type<'db> {
             | Type::TypeGuard(_)
             | Type::TypedDict(_) => CallableBinding::not_callable(self).into(),
         }
+    }
+
+    /// Returns dynamic call bindings used as the conservative fallback for recursive callability.
+    fn unknown_bindings() -> Bindings<'db> {
+        let unknown = Type::unknown();
+        Binding::single(unknown, Signature::dynamic(unknown)).into()
     }
 
     fn known_class_literal_bindings(
@@ -5236,7 +5386,9 @@ impl<'db> Type<'db> {
             // has no instance type. Otherwise, synthesize a typevar with bound or constraints
             // mapped through `to_instance`.
             Type::TypeVar(bound_typevar) => Some(Type::TypeVar(bound_typevar.to_instance(db)?)),
-            Type::TypeAlias(alias) => alias.value_type(db).to_instance(db),
+            Type::TypeAlias(_) => {
+                self.visit_type_alias_value(db, || Some(self), |value_ty| value_ty.to_instance(db))
+            }
             Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance")),
             // An instance of class `C` may itself have instances if `C` is a subclass of `type`.
             Type::NominalInstance(instance)
@@ -5485,11 +5637,17 @@ impl<'db> Type<'db> {
 
             Type::Intersection(_) => Ok(todo_type!("Type::Intersection.in_type_expression")),
 
-            Type::TypeAlias(alias) => alias.value_type(db).in_type_expression(
+            Type::TypeAlias(_) => (*self).visit_type_alias_value(
                 db,
-                scope_id,
-                typevar_binding_context,
-                inference_flags,
+                || Ok(*self),
+                |value_ty| {
+                    value_ty.in_type_expression(
+                        db,
+                        scope_id,
+                        typevar_binding_context,
+                        inference_flags,
+                    )
+                },
             ),
 
             Type::NewTypeInstance(_) => Err(InvalidTypeExpressionError {
@@ -5519,7 +5677,7 @@ impl<'db> Type<'db> {
             Type::KnownInstance(known_instance) => known_instance.to_meta_type(db),
             Type::SpecialForm(special_form) => special_form.to_meta_type(db),
             Type::PropertyInstance(_) => KnownClass::Property.to_class_literal(db),
-            Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
+            Type::Union(union) => union.map(db, |element| element.to_meta_type(db)),
             Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_class_literal(db),
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_class_literal(db),
@@ -5567,7 +5725,12 @@ impl<'db> Type<'db> {
                     todo_type!("TypedDict synthesized meta-type").expect_dynamic(),
                 ),
             },
-            Type::TypeAlias(alias) => alias.value_type(db).to_meta_type(db),
+            Type::TypeAlias(alias) => {
+                let divergent = Type::divergent(alias.definition(db).as_id());
+                self.visit_type_alias_value(db, || divergent, |value_ty| value_ty.to_meta_type(db))
+                    .recursive_type_normalized_impl(db, divergent, false)
+                    .unwrap_or(divergent)
+            }
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).to_meta_type(db),
         }
     }
@@ -5788,21 +5951,52 @@ impl<'db> Type<'db> {
                 element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }),
             Type::Intersection(intersection) => {
-                let mut builder = IntersectionBuilder::new(db);
-                for positive in intersection.positive(db) {
-                    builder =
-                        builder.add_positive(positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
-                }
-                // Promotion should remove negative contributions from intersections,
-                // so we don't preserve them here when promotion is enabled.
-                if !matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, _)) {
-                    for negative in intersection.negative(db) {
-                        builder = builder.add_negative(
-                            negative.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
-                        );
+                visitor.visit(db, self, type_mapping, || {
+                    let drop_negative =
+                        matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, _));
+                    let positive = intersection.positive(db);
+                    let negative = intersection.negative(db);
+                    let mut mapped_positive = Vec::with_capacity(positive.len());
+                    let mut mapped_negative = Vec::with_capacity(negative.len());
+                    let mut changed = drop_negative && !negative.is_empty();
+
+                    for positive in positive {
+                        let mapped =
+                            positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                        changed |= mapped != *positive;
+                        mapped_positive.push(mapped);
                     }
-                }
-                builder.build()
+
+                    if !drop_negative {
+                        for negative in negative {
+                            let mapped = negative.apply_type_mapping_impl(
+                                db,
+                                &type_mapping.flip(),
+                                tcx,
+                                visitor,
+                            );
+                            changed |= mapped != *negative;
+                            mapped_negative.push(mapped);
+                        }
+                    }
+
+                    if !changed {
+                        return self;
+                    }
+
+                    let mut builder = IntersectionBuilder::new(db);
+                    for positive in mapped_positive {
+                        builder = builder.add_positive(positive);
+                    }
+                    // Promotion should remove negative contributions from intersections,
+                    // so we don't preserve them here when promotion is enabled.
+                    if !drop_negative {
+                        for negative in mapped_negative {
+                            builder = builder.add_negative(negative);
+                        }
+                    }
+                    builder.build()
+                })
             }
 
             Type::TypeIs(type_is) => visitor.visit(db, self, type_mapping, || {
@@ -5825,12 +6019,18 @@ impl<'db> Type<'db> {
 
             Type::TypeAlias(alias) => {
                 match type_mapping {
-                    // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
-                    // detection rather than the visitor's cycle detection, because the visitor tracks
-                    // Type values and `RecursiveList` is different from `RecursiveList[T]`.
+                    // For EagerExpansion, expand the raw value type. Use active alias tracking in
+                    // addition to Salsa cycle detection because recursive generic aliases can
+                    // change specialization on every expansion.
                     TypeMapping::EagerExpansion => {
-                        alias.raw_value_type(db).expand_eagerly(db)
-                    },
+                        let divergent = Type::divergent(alias.definition(db).as_id());
+                        alias
+                            .visit_raw_value(db, || divergent, |value_ty| {
+                                value_ty.expand_eagerly(db)
+                            })
+                            .recursive_type_normalized_impl(db, divergent, false)
+                            .unwrap_or(divergent)
+                    }
                     // When specializing a generic type alias, instead of specializing the expanded type, the type alias itself is specialized.
                     // Without this special handling, recursive type aliases would result in cycles, returning an unspecialized fallback type.
                     TypeMapping::ApplySpecialization(specialization)
@@ -5862,21 +6062,31 @@ impl<'db> Type<'db> {
                         ))
                     }
                     _ => {
-                        // Do not call `value_type` here. `value_type` does the specialization internally, so `apply_type_mapping` is
-                        // performed without `visitor` inheritance. In the case of recursive type aliases, this leads to infinite recursion.
-                        // Instead, call `raw_value_type` and perform the specialization after the `visitor` cache has been created.
-                        //
-                        // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
-                        // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
-                        // will detect the cycle and return the fallback value.
                         let mapped = visitor.visit(db, self, type_mapping, || {
-                            let value_type = alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-                            alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                            // Do not call `value_type` here. `value_type` applies specialization
+                            // without this visitor. Keep the raw expansion, specialization, and
+                            // outer mapping in one visitor call, and use active alias tracking for
+                            // generic aliases whose specialization changes at each recursive step.
+                            alias.visit_raw_value(
+                                db,
+                                || self,
+                                |raw_value_type| {
+                                    let value_type = raw_value_type.apply_type_mapping_impl(
+                                        db,
+                                        type_mapping,
+                                        tcx,
+                                        visitor,
+                                    );
+                                    alias
+                                        .apply_function_specialization(db, value_type)
+                                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                                },
+                            )
                         });
 
-                        // If the type mapping does not result in any change to this type alias, keep the
-                        // alias node instead of eagerly expanding it.
-                        if alias.value_type(db) == mapped {
+                        // If the type mapping does not result in any change to this type alias, do
+                        // not expand it.
+                        if alias.visit_value(db, || false, |value_type| value_type == mapped) {
                             self
                         } else {
                             mapped
@@ -6099,15 +6309,14 @@ impl<'db> Type<'db> {
                 );
             }
 
-            Type::TypeAlias(alias) => {
-                visitor.visit(self, || {
-                    alias.value_type(db).find_legacy_typevars_impl(
-                        db,
-                        binding_context,
-                        typevars,
-                        visitor,
-                    );
-                });
+            Type::TypeAlias(_) => {
+                self.visit_type_alias_value(
+                    db,
+                    || (),
+                    |value_ty| {
+                        value_ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                    },
+                );
             }
 
             Type::KnownInstance(known_instance) => match known_instance {
@@ -6327,7 +6536,9 @@ impl<'db> Type<'db> {
                 )),
             },
 
-            Self::TypeAlias(alias) => alias.value_type(db).definition(db),
+            Self::TypeAlias(alias) => {
+                alias.visit_value(db, || None, |value_ty| value_ty.definition(db))
+            }
             Self::NewTypeInstance(newtype) => Some(TypeDefinition::NewType(newtype.definition(db))),
 
             Self::PropertyInstance(property) => property

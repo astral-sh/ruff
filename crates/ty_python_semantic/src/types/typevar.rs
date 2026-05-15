@@ -379,7 +379,11 @@ impl<'db> TypeVarInstance<'db> {
                 return false;
             }
 
-            type_is_self_referential_impl(state, type_alias.raw_value_type(state.db), self_identity)
+            type_alias.visit_raw_value(
+                state.db,
+                || false,
+                |value_ty| type_is_self_referential_impl(state, value_ty, self_identity),
+            )
         }
 
         fn type_is_self_referential_impl<'db>(

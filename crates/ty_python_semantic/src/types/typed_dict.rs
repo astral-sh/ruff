@@ -983,9 +983,9 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
 
             Some(result)
         }
-        Type::TypeAlias(alias) => {
-            extract_unpacked_typed_dict_keys_from_value_type(db, alias.value_type(db))
-        }
+        Type::TypeAlias(_) => ty.visit_type_alias_value_or_default(db, |value_ty| {
+            extract_unpacked_typed_dict_keys_from_value_type(db, value_ty)
+        }),
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)
         | Type::Divergent(_)

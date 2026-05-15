@@ -106,7 +106,9 @@ impl<'db> Type<'db> {
 
             match ty {
                 Type::NominalInstance(nominal) => nominal.tuple_spec(db),
-                Type::NewTypeInstance(newtype) => non_async_special_case(db, newtype.concrete_base_type(db)),
+                Type::NewTypeInstance(newtype) => {
+                    non_async_special_case(db, newtype.concrete_base_type(db))
+                }
                 Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
                     Some(Cow::Owned(TupleSpec::homogeneous(todo_type!(
                         "*tuple[] annotations"
@@ -153,23 +155,33 @@ impl<'db> Type<'db> {
                     // diagnostic in unreachable code.
                     Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
                 }
-                Type::TypeAlias(alias) => {
-                    non_async_special_case(db, alias.value_type(db))
-                }
+                Type::TypeAlias(_) => ty.visit_type_alias_value(
+                    db,
+                    || Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown()))),
+                    |value_ty| non_async_special_case(db, value_ty),
+                ),
                 Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
                         non_async_special_case(db, bound)
                     }
-                    TypeVarBoundOrConstraints::Constraints(constraints) => non_async_special_case(db, constraints.as_type(db)),
+                    TypeVarBoundOrConstraints::Constraints(constraints) => {
+                        non_async_special_case(db, constraints.as_type(db))
+                    }
                 },
                 Type::Union(union) => {
                     let elements = union.elements(db);
                     if elements.len() < MAX_TUPLE_LENGTH {
                         let mut elements_iter = elements.iter();
-                        let first_element_spec = elements_iter.next()?.try_iterate_with_mode(db, EvaluationMode::Sync).ok()?;
+                        let first_element_spec = elements_iter
+                            .next()?
+                            .try_iterate_with_mode(db, EvaluationMode::Sync)
+                            .ok()?;
                         let mut builder = TupleSpecBuilder::from(&*first_element_spec);
                         for element in elements_iter {
-                            builder = builder.union(db, &*element.try_iterate_with_mode(db, EvaluationMode::Sync).ok()?);
+                            builder = builder.union(
+                                db,
+                                &*element.try_iterate_with_mode(db, EvaluationMode::Sync).ok()?,
+                            );
                         }
                         Some(Cow::Owned(builder.build()))
                     } else {
@@ -195,7 +207,9 @@ impl<'db> Type<'db> {
                     // If flattening didn't change anything, iterate the intersection directly.
                     if flattened == ty {
                         let mut specs_iter = intersection.positive_elements_or_object(db).filter_map(
-                            |element| element.try_iterate_with_mode(db, EvaluationMode::Sync).ok(),
+                            |element| {
+                                element.try_iterate_with_mode(db, EvaluationMode::Sync).ok()
+                            },
                         );
                         let first_spec = specs_iter.next()?;
                         let mut builder = TupleSpecBuilder::from(&*first_spec);
@@ -212,7 +226,7 @@ impl<'db> Type<'db> {
                     }
 
                     // Flattening changed the type; recursively iterate the flattened result.
-                    flattened.try_iterate(db).ok()
+                    flattened.try_iterate_with_mode(db, EvaluationMode::Sync).ok()
                 }
                 // N.B. This special case isn't strictly necessary, it's just an obvious optimization
                 Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),

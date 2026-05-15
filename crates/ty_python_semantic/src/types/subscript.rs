@@ -233,8 +233,11 @@ impl<'db> SubscriptErrorKind<'db> {
                         "Cannot subscript non-generic type alias `{}`",
                         alias.name(db)
                     ));
-                    let value_type = alias.raw_value_type(db);
-                    if value_type.is_specialized_generic(db) {
+                    if let Some(value_type) = alias.visit_raw_value(
+                        db,
+                        || None,
+                        |value_type| value_type.is_specialized_generic(db).then_some(value_type),
+                    ) {
                         diagnostic.annotate(context.secondary(&*subscript.value).message(
                             format_args!(
                                 "Alias to `{}`, which is already specialized",
@@ -526,13 +529,17 @@ impl<'db> Type<'db> {
         let inferred = match (value_ty, slice_ty) {
             (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
 
-            (Type::TypeAlias(alias), _) => {
-                Some(alias.value_type(db).subscript(db, slice_ty, expr_context))
-            }
+            (Type::TypeAlias(_), _) => Some(value_ty.visit_type_alias_value(
+                db,
+                || Ok(Type::unknown()),
+                |expanded| expanded.subscript(db, slice_ty, expr_context),
+            )),
 
-            (_, Type::TypeAlias(alias)) => {
-                Some(value_ty.subscript(db, alias.value_type(db), expr_context))
-            }
+            (_, Type::TypeAlias(_)) => Some(slice_ty.visit_type_alias_value(
+                db,
+                || Ok(Type::unknown()),
+                |expanded| value_ty.subscript(db, expanded, expr_context),
+            )),
 
             (Type::Union(union), _) => Some(map_union_subscript(db, union, |element| {
                 element.subscript(db, slice_ty, expr_context)
