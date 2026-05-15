@@ -2517,7 +2517,7 @@ impl<'db> Type<'db> {
     }
 
     fn lookup_dunder_new(self, db: &'db dyn Db) -> Option<PlaceAndQualifiers<'db>> {
-        #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(cycle_initial=|_, _, _, ()| None, heap_size=ruff_memory_usage::heap_size)]
         fn lookup_dunder_new_inner<'db>(
             db: &'db dyn Db,
             ty: Type<'db>,
