@@ -4,9 +4,8 @@ use camino::Utf8Path;
 use mdtest::{
     Failures, FileFailures, MarkdownEdit, TestFile, TestOutcome, attempt_test, matcher, parser,
 };
-use ruff_db::Db as _;
 use ruff_db::diagnostic::{FileResolver, Input, UnifiedFile};
-use ruff_db::files::{File, FileRootKind, system_path_to_file};
+use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
 use ruff_linter::source_kind::SourceKind;
@@ -58,8 +57,6 @@ fn run_test(
     let project_root = SystemPathBuf::from("/src");
     db.create_directory_all(&project_root)
         .expect("Creating the project root to succeed");
-    db.files()
-        .try_add_root(db, &project_root, FileRootKind::Project);
 
     let test_files: Vec<_> = test
         .files()
