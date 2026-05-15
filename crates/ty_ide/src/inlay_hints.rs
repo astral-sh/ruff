@@ -569,10 +569,10 @@ fn arg_matches_name(argument: &Expr, name: &str) -> bool {
     }
 }
 
-/// Returns `true` when `argument_name` is either the parameter name, or has the
-/// parameter name as a full underscore-separated prefix or suffix. The parameter
-/// name is accepted in its raw spelling; leading and trailing underscores are
-/// ignored before matching.
+/// Returns `true` when `argument_name` case-insensitively matches the parameter
+/// name, or has the parameter name as a full underscore-separated prefix or
+/// suffix. The parameter name is accepted in its raw spelling; leading and
+/// trailing underscores are ignored before matching.
 fn name_matches_parameter(argument_name: &str, parameter_name: &str) -> bool {
     let argument_name = argument_name.to_lowercase();
     let parameter_name = parameter_name.trim_matches('_').to_lowercase();
