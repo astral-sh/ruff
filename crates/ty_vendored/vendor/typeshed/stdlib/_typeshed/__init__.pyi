@@ -6,7 +6,7 @@ import sys
 from collections.abc import Awaitable, Callable, Iterable, Iterator, Sequence, Set as AbstractSet, Sized
 from dataclasses import Field
 from os import PathLike
-from types import FrameType, TracebackType
+from types import FrameType, NoneType as NoneType, TracebackType
 from typing import (
     Any,
     AnyStr,
@@ -18,11 +18,11 @@ from typing import (
     SupportsFloat,
     SupportsIndex,
     SupportsInt,
+    TypeAlias,
     TypeVar,
-    final,
     overload,
 )
-from typing_extensions import Buffer, LiteralString, Self as _Self, TypeAlias
+from typing_extensions import Buffer, LiteralString, Self as _Self
 
 _KT = TypeVar("_KT")
 _KT_co = TypeVar("_KT_co", covariant=True)
@@ -322,15 +322,6 @@ class SizedBuffer(Sized, Buffer, Protocol): ...
 
 ExcInfo: TypeAlias = tuple[type[BaseException], BaseException, TracebackType]
 OptExcInfo: TypeAlias = ExcInfo | tuple[None, None, None]
-
-# stable
-if sys.version_info >= (3, 10):
-    from types import NoneType as NoneType
-else:
-    # Used by type checkers for checks involving None (does not exist at runtime)
-    @final
-    class NoneType:
-        def __bool__(self) -> Literal[False]: ...
 
 # This is an internal CPython type that is like, but subtly different from, a NamedTuple
 # Subclasses of this type are found in multiple modules.

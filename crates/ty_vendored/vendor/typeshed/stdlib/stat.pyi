@@ -1,8 +1,3 @@
-"""Constants/functions for interpreting results of os.stat() and os.lstat().
-
-Suggested usage: from stat import *
-"""
-
 import sys
 from _stat import (
     S_ENFMT as S_ENFMT,
@@ -117,3 +112,15 @@ FILE_ATTRIBUTE_VIRTUAL: Final = 65536
 if sys.version_info >= (3, 13):
     # https://github.com/python/cpython/issues/114081#issuecomment-2119017790
     SF_RESTRICTED: Final = 0x00080000
+
+if sys.version_info >= (3, 15):
+    STATX_ATTR_COMPRESSED: Final = 0x00000004
+    STATX_ATTR_IMMUTABLE: Final = 0x00000010
+    STATX_ATTR_APPEND: Final = 0x00000020
+    STATX_ATTR_NODUMP: Final = 0x00000040
+    STATX_ATTR_ENCRYPTED: Final = 0x00000800
+    STATX_ATTR_AUTOMOUNT: Final = 0x00001000
+    STATX_ATTR_MOUNT_ROOT: Final = 0x00002000
+    STATX_ATTR_VERITY: Final = 0x00100000
+    STATX_ATTR_DAX: Final = 0x00200000
+    STATX_ATTR_WRITE_ATOMIC: Final = 0x00400000

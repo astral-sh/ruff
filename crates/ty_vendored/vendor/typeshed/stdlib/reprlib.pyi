@@ -1,18 +1,14 @@
-"""Redo the builtin repr() (representation) but with limits on most sizes."""
-
 import sys
 from array import array
 from collections import deque
 from collections.abc import Callable
-from typing import Any
-from typing_extensions import TypeAlias
+from typing import Any, TypeAlias
 
 __all__ = ["Repr", "repr", "recursive_repr"]
 
 _ReprFunc: TypeAlias = Callable[[Any], str]
 
-def recursive_repr(fillvalue: str = "...") -> Callable[[_ReprFunc], _ReprFunc]:
-    """Decorator to make a repr function return fillvalue for a recursive call"""
+def recursive_repr(fillvalue: str = "...") -> Callable[[_ReprFunc], _ReprFunc]: ...
 
 class Repr:
     maxlevel: int

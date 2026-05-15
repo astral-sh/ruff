@@ -1,7 +1,3 @@
-"""Implementation module for SSL socket operations.  See the socket module
-for documentation.
-"""
-
 import sys
 from _typeshed import ReadableBuffer, StrOrBytesPath
 from collections.abc import Callable
@@ -16,8 +12,8 @@ from ssl import (
     SSLWantWriteError as SSLWantWriteError,
     SSLZeroReturnError as SSLZeroReturnError,
 )
-from typing import Any, ClassVar, Final, Literal, TypedDict, final, overload, type_check_only
-from typing_extensions import NotRequired, Self, TypeAlias, deprecated, disjoint_base
+from typing import Any, ClassVar, Final, Literal, TypeAlias, TypedDict, final, overload, type_check_only
+from typing_extensions import NotRequired, Self, deprecated, disjoint_base
 
 _PasswordType: TypeAlias = Callable[[], str | bytes | bytearray] | str | bytes | bytearray
 _PCTRTT: TypeAlias = tuple[tuple[str, str], ...]
@@ -51,73 +47,26 @@ class _CertInfo(TypedDict):
     caIssuers: NotRequired[tuple[str, ...] | None]
     crlDistributionPoints: NotRequired[tuple[str, ...] | None]
 
-def RAND_add(string: str | ReadableBuffer, entropy: float, /) -> None:
-    """Mix string into the OpenSSL PRNG state.
-
-    entropy (a float) is a lower bound on the entropy contained in
-    string.  See RFC 4086.
-    """
-
-def RAND_bytes(n: int, /) -> bytes:
-    """Generate n cryptographically strong pseudo-random bytes."""
+def RAND_add(string: str | ReadableBuffer, entropy: float, /) -> None: ...
+def RAND_bytes(n: int, /) -> bytes: ...
 
 if sys.version_info < (3, 12):
     @deprecated("Deprecated since Python 3.6; removed in Python 3.12. Use `ssl.RAND_bytes()` instead.")
-    def RAND_pseudo_bytes(n: int, /) -> tuple[bytes, bool]:
-        """Generate n pseudo-random bytes.
+    def RAND_pseudo_bytes(n: int, /) -> tuple[bytes, bool]: ...
 
-        Return a pair (bytes, is_cryptographic).  is_cryptographic is True
-        if the bytes generated are cryptographically strong.
-        """
+def RAND_status() -> bool: ...
+def get_default_verify_paths() -> tuple[str, str, str, str]: ...
 
-if sys.version_info < (3, 10):
-    @deprecated("Unsupported by OpenSSL since 1.1.1; removed in Python 3.10.")
-    def RAND_egd(path: str) -> None: ...
-
-def RAND_status() -> bool:
-    """Returns True if the OpenSSL PRNG has been seeded with enough data and False if not.
-
-    It is necessary to seed the PRNG with RAND_add() on some platforms before
-    using the ssl() function.
-    """
-
-def get_default_verify_paths() -> tuple[str, str, str, str]:
-    """Return search paths and environment vars that are used by SSLContext's set_default_verify_paths() to load default CAs.
-
-    The values are 'cert_file_env', 'cert_file', 'cert_dir_env', 'cert_dir'.
-    """
+if sys.version_info >= (3, 15):
+    def get_sigalgs() -> list[str]: ...
 
 if sys.platform == "win32":
     _EnumRetType: TypeAlias = list[tuple[bytes, str, set[str] | bool]]
-    def enum_certificates(store_name: str) -> _EnumRetType:
-        """Retrieve certificates from Windows' cert store.
+    def enum_certificates(store_name: str) -> _EnumRetType: ...
+    def enum_crls(store_name: str) -> _EnumRetType: ...
 
-        store_name may be one of 'CA', 'ROOT' or 'MY'.  The system may provide
-        more cert storages, too.  The function returns a list of (bytes,
-        encoding_type, trust) tuples.  The encoding_type flag can be interpreted
-        with X509_ASN_ENCODING or PKCS_7_ASN_ENCODING. The trust setting is either
-        a set of OIDs or the boolean True.
-        """
-
-    def enum_crls(store_name: str) -> _EnumRetType:
-        """Retrieve CRLs from Windows' cert store.
-
-        store_name may be one of 'CA', 'ROOT' or 'MY'.  The system may provide
-        more cert storages, too.  The function returns a list of (bytes,
-        encoding_type) tuples.  The encoding_type flag can be interpreted with
-        X509_ASN_ENCODING or PKCS_7_ASN_ENCODING.
-        """
-
-def txt2obj(txt: str, name: bool = False) -> tuple[int, str, str, str]:
-    """Lookup NID, short name, long name and OID of an ASN1_OBJECT.
-
-    By default objects are looked up by OID. With name=True short and
-    long name are also matched.
-    """
-
-def nid2obj(nid: int, /) -> tuple[int, str, str, str]:
-    """Lookup NID, short name, long name and OID of an ASN1_OBJECT by NID."""
-
+def txt2obj(txt: str, name: bool = False) -> tuple[int, str, str, str]: ...
+def nid2obj(nid: int, /) -> tuple[int, str, str, str]: ...
 @disjoint_base
 class _SSLContext:
     check_hostname: bool
@@ -125,48 +74,17 @@ class _SSLContext:
     maximum_version: int
     minimum_version: int
     num_tickets: int
-    """Control the number of TLSv1.3 session tickets."""
-
     options: int
     post_handshake_auth: bool
     protocol: int
-    if sys.version_info >= (3, 10):
-        security_level: int
-        """The current security level."""
-
+    security_level: int
     sni_callback: Callable[[SSLObject, str, SSLContext], None | int] | None
-    """Set a callback that will be called when a server name is provided by the SSL/TLS client in the SNI extension.
-
-    If the argument is None then the callback is disabled. The method is called
-    with the SSLSocket, the server name as a string, and the SSLContext object.
-
-    See RFC 6066 for details of the SNI extension.
-    """
-
     verify_flags: int
     verify_mode: int
     def __new__(cls, protocol: int, /) -> Self: ...
-    def cert_store_stats(self) -> dict[str, int]:
-        """Returns quantities of loaded X.509 certificates.
-
-        X.509 certificates with a CA extension and certificate revocation lists
-        inside the context's cert store.
-
-        NOTE: Certificates in a capath directory aren't loaded unless they have
-        been used at least once.
-        """
-
+    def cert_store_stats(self) -> dict[str, int]: ...
     @overload
-    def get_ca_certs(self, binary_form: Literal[False] = False) -> list[_PeerCertRetDictType]:
-        """Returns a list of dicts with information of loaded CA certs.
-
-        If the optional argument is True, returns a DER-encoded copy of the CA
-        certificate.
-
-        NOTE: Certificates in a capath directory aren't loaded unless they have
-        been used at least once.
-        """
-
+    def get_ca_certs(self, binary_form: Literal[False] = False) -> list[_PeerCertRetDictType]: ...
     @overload
     def get_ca_certs(self, binary_form: Literal[True]) -> list[bytes]: ...
     @overload
@@ -186,6 +104,12 @@ class _SSLContext:
     def set_ciphers(self, cipherlist: str, /) -> None: ...
     def set_default_verify_paths(self) -> None: ...
     def set_ecdh_curve(self, name: str, /) -> None: ...
+    if sys.version_info >= (3, 15):
+        def get_groups(self, *, include_aliases: bool = False) -> list[str]: ...
+        def set_ciphersuites(self, ciphersuites: str, /) -> None: ...
+        def set_client_sigalgs(self, sigalgslist: str, /) -> None: ...
+        def set_groups(self, grouplist: str, /) -> None: ...
+        def set_server_sigalgs(self, sigalgslist: str, /) -> None: ...
     if sys.version_info >= (3, 13):
         def set_psk_client_callback(self, callback: Callable[[str | None], tuple[str | None, bytes]] | None) -> None: ...
         def set_psk_server_callback(
@@ -195,55 +119,25 @@ class _SSLContext:
 @final
 class MemoryBIO:
     eof: bool
-    """Whether the memory BIO is at EOF."""
-
     pending: int
-    """The number of bytes pending in the memory BIO."""
-
     def __new__(self) -> Self: ...
-    def read(self, size: int = -1, /) -> bytes:
-        """Read up to size bytes from the memory BIO.
-
-        If size is not specified, read the entire buffer.
-        If the return value is an empty bytes instance, this means either
-        EOF or that no data is available. Use the "eof" property to
-        distinguish between the two.
-        """
-
-    def write(self, b: ReadableBuffer, /) -> int:
-        """Writes the bytes b into the memory BIO.
-
-        Returns the number of bytes written.
-        """
-
-    def write_eof(self) -> None:
-        """Write an EOF marker to the memory BIO.
-
-        When all data has been read, the "eof" property will be True.
-        """
+    def read(self, size: int = -1, /) -> bytes: ...
+    def write(self, b: ReadableBuffer, /) -> int: ...
+    def write_eof(self) -> None: ...
 
 @final
 class SSLSession:
     __hash__: ClassVar[None]  # type: ignore[assignment]
     @property
-    def has_ticket(self) -> bool:
-        """Does the session contain a ticket?"""
-
+    def has_ticket(self) -> bool: ...
     @property
-    def id(self) -> bytes:
-        """Session ID."""
-
+    def id(self) -> bytes: ...
     @property
-    def ticket_lifetime_hint(self) -> int:
-        """Ticket life time hint."""
-
+    def ticket_lifetime_hint(self) -> int: ...
     @property
-    def time(self) -> int:
-        """Session creation time (seconds since epoch)."""
-
+    def time(self) -> int: ...
     @property
-    def timeout(self) -> int:
-        """Session timeout (delta in seconds)."""
+    def timeout(self) -> int: ...
 
 # _ssl.Certificate is weird: it can't be instantiated or subclassed.
 # Instances can only be created via methods of the private _ssl._SSLSocket class,
@@ -255,18 +149,17 @@ class SSLSession:
 #
 # You can find a _ssl._SSLSocket object as the _sslobj attribute of a ssl.SSLSocket object
 
-if sys.version_info >= (3, 10):
-    @final
-    class Certificate:
-        def get_info(self) -> _CertInfo: ...
-        @overload
-        def public_bytes(self) -> str: ...
-        @overload
-        def public_bytes(self, format: Literal[1] = 1, /) -> str: ...  # ENCODING_PEM
-        @overload
-        def public_bytes(self, format: Literal[2], /) -> bytes: ...  # ENCODING_DER
-        @overload
-        def public_bytes(self, format: int, /) -> str | bytes: ...
+@final
+class Certificate:
+    def get_info(self) -> _CertInfo: ...
+    @overload
+    def public_bytes(self) -> str: ...
+    @overload
+    def public_bytes(self, format: Literal[1] = 1, /) -> str: ...  # ENCODING_PEM
+    @overload
+    def public_bytes(self, format: Literal[2], /) -> bytes: ...  # ENCODING_DER
+    @overload
+    def public_bytes(self, format: int, /) -> str | bytes: ...
 
 if sys.version_info < (3, 12):
     err_codes_to_names: dict[tuple[int, int], str]
@@ -297,9 +190,8 @@ VERIFY_CRL_CHECK_LEAF: Final = 0x04
 VERIFY_CRL_CHECK_CHAIN: Final = 0x0C
 VERIFY_X509_STRICT: Final = 0x20
 VERIFY_X509_TRUSTED_FIRST: Final = 0x8000
-if sys.version_info >= (3, 10):
-    VERIFY_ALLOW_PROXY_CERTS: Final = 0x40
-    VERIFY_X509_PARTIAL_CHAIN: Final = 0x80000
+VERIFY_ALLOW_PROXY_CERTS: Final = 0x40
+VERIFY_X509_PARTIAL_CHAIN: Final = 0x80000
 
 # alert descriptions
 ALERT_DESCRIPTION_CLOSE_NOTIFY: Final = 0
@@ -368,10 +260,9 @@ HOSTFLAG_NO_PARTIAL_WILDCARDS: Final = 0x4
 HOSTFLAG_MULTI_LABEL_WILDCARDS: Final = 0x8
 HOSTFLAG_SINGLE_LABEL_SUBDOMAINS: Final = 0x10
 
-if sys.version_info >= (3, 10):
-    # certificate file types
-    ENCODING_PEM: Final = 1
-    ENCODING_DER: Final = 2
+# certificate file types
+ENCODING_PEM: Final = 1
+ENCODING_DER: Final = 2
 
 # protocol versions
 PROTO_MINIMUM_SUPPORTED: Final = -2
@@ -389,6 +280,8 @@ HAS_ECDH: Final[bool]
 HAS_NPN: Final[bool]
 if sys.version_info >= (3, 13):
     HAS_PSK: Final[bool]
+if sys.version_info >= (3, 15):
+    HAS_PSK_TLS13: Final[bool]
 HAS_ALPN: Final[bool]
 HAS_SSLv2: Final[bool]
 HAS_SSLv3: Final[bool]

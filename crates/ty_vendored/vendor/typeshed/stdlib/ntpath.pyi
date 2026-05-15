@@ -1,9 +1,3 @@
-"""Common pathname manipulations, WindowsNT/95 version.
-
-Instead of importing this module directly, import os and refer to this
-module as os.path.
-"""
-
 import sys
 from _typeshed import BytesPath, StrOrBytesPath, StrPath
 from genericpath import (
@@ -57,6 +51,8 @@ if sys.version_info >= (3, 12):
     from posixpath import isjunction as isjunction, splitroot as splitroot
 if sys.version_info >= (3, 13):
     from genericpath import isdevdrive as isdevdrive
+if sys.version_info >= (3, 15):
+    from genericpath import ALL_BUT_LAST as ALL_BUT_LAST
 
 __all__ = [
     "normcase",
@@ -103,6 +99,8 @@ if sys.version_info >= (3, 12):
     __all__ += ["isjunction", "splitroot"]
 if sys.version_info >= (3, 13):
     __all__ += ["isdevdrive", "isreserved"]
+if sys.version_info >= (3, 15):
+    __all__ += ["ALL_BUT_LAST"]
 
 altsep: LiteralString
 
@@ -116,15 +114,21 @@ def join(path: StrPath, /, *paths: StrPath) -> str: ...
 @overload
 def join(path: BytesPath, /, *paths: BytesPath) -> bytes: ...
 
-if sys.platform == "win32":
+if sys.version_info >= (3, 15):
     @overload
-    def realpath(path: PathLike[AnyStr], *, strict: bool | _AllowMissingType = False) -> AnyStr: ...
+    def realpath(path: PathLike[AnyStr], /, *, strict: bool | _AllowMissingType = False) -> AnyStr: ...
     @overload
-    def realpath(path: AnyStr, *, strict: bool | _AllowMissingType = False) -> AnyStr: ...
+    def realpath(path: AnyStr, /, *, strict: bool | _AllowMissingType = False) -> AnyStr: ...
 
 else:
-    realpath = abspath
+    if sys.platform == "win32":
+        @overload
+        def realpath(path: PathLike[AnyStr], *, strict: bool | _AllowMissingType = False) -> AnyStr: ...
+        @overload
+        def realpath(path: AnyStr, *, strict: bool | _AllowMissingType = False) -> AnyStr: ...
+
+    else:
+        realpath = abspath
 
 if sys.version_info >= (3, 13):
-    def isreserved(path: StrOrBytesPath) -> bool:
-        """Return true if the pathname is reserved by the system."""
+    def isreserved(path: StrOrBytesPath) -> bool: ...

@@ -1,8 +1,8 @@
 import sys
 from _typeshed import ReadOnlyBuffer, StrOrBytesPath
 from types import TracebackType
-from typing import Final, TypeVar, final, overload, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing import Final, TypeAlias, TypeVar, final, overload, type_check_only
+from typing_extensions import Self
 
 if sys.platform != "win32":
     _T = TypeVar("_T")
@@ -39,26 +39,6 @@ if sys.platform != "win32":
         __init__: None  # type: ignore[assignment]
 
     if sys.version_info >= (3, 11):
-        def open(filename: StrOrBytesPath, flags: str = "r", mode: int = 0o666, /) -> _dbm:
-            """Return a database object.
-
-            filename
-              The filename to open.
-            flags
-              How to open the file.  "r" for reading, "w" for writing, etc.
-            mode
-              If creating a new file, the mode bits for the new file
-              (e.g. os.O_RDWR).
-            """
+        def open(filename: StrOrBytesPath, flags: str = "r", mode: int = 0o666, /) -> _dbm: ...
     else:
-        def open(filename: str, flags: str = "r", mode: int = 0o666, /) -> _dbm:
-            """Return a database object.
-
-            filename
-              The filename to open.
-            flags
-              How to open the file.  "r" for reading, "w" for writing, etc.
-            mode
-              If creating a new file, the mode bits for the new file
-              (e.g. os.O_RDWR).
-            """
+        def open(filename: str, flags: str = "r", mode: int = 0o666, /) -> _dbm: ...

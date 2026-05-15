@@ -1,10 +1,8 @@
-"""
-opcode module - potentially shared between dis and other modules which
-operate on bytecodes (e.g. peephole optimizers).
-"""
-
 import sys
 from typing import Final, Literal
+
+if sys.version_info >= (3, 15):
+    from builtins import frozendict
 
 __all__ = [
     "cmp_op",
@@ -45,9 +43,11 @@ if sys.version_info >= (3, 13):
     hasjump: Final[list[int]]
 opname: Final[list[str]]
 
-opmap: Final[dict[str, int]]
+if sys.version_info >= (3, 15):
+    opmap: Final[frozendict[str, int]]
+else:
+    opmap: Final[dict[str, int]]
 HAVE_ARGUMENT: Final[int]
 EXTENDED_ARG: Final[int]
 
-def stack_effect(opcode: int, oparg: int | None = None, /, *, jump: bool | None = None) -> int:
-    """Compute the stack effect of the opcode."""
+def stack_effect(opcode: int, oparg: int | None = None, /, *, jump: bool | None = None) -> int: ...

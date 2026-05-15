@@ -1,8 +1,7 @@
 import sys
 from asyncio.events import AbstractEventLoop
 from collections.abc import Awaitable, Callable
-from typing import TypeVar
-from typing_extensions import ParamSpec
+from typing import ParamSpec, TypeVar
 
 from .case import TestCase
 
@@ -20,11 +19,6 @@ class IsolatedAsyncioTestCase(TestCase):
     async def asyncTearDown(self) -> None: ...
     def addAsyncCleanup(self, func: Callable[_P, Awaitable[object]], /, *args: _P.args, **kwargs: _P.kwargs) -> None: ...
     if sys.version_info >= (3, 11):
-        async def enterAsyncContext(self, cm: AbstractAsyncContextManager[_T]) -> _T:
-            """Enters the supplied asynchronous context manager.
-
-            If successful, also adds its __aexit__ method as a cleanup
-            function and returns the result of the __aenter__ method.
-            """
+        async def enterAsyncContext(self, cm: AbstractAsyncContextManager[_T]) -> _T: ...
 
     def __del__(self) -> None: ...

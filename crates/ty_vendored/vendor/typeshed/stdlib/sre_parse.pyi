@@ -1,12 +1,9 @@
-"""Internal support module for sre"""
-
 import sys
 from collections.abc import Iterable
 from re import Match, Pattern as _Pattern
 from sre_constants import *
 from sre_constants import _NamedIntConstant as _NIC, error as _Error
-from typing import Any, Final, overload
-from typing_extensions import TypeAlias
+from typing import Any, Final, TypeAlias, overload
 
 SPECIAL_CHARS: Final = ".\\[{()*+?^$|"
 REPEAT_CHARS: Final = "*+?{"

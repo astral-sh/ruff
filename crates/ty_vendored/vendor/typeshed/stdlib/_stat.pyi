@@ -1,74 +1,3 @@
-"""S_IFMT_: file type bits
-S_IFDIR: directory
-S_IFCHR: character device
-S_IFBLK: block device
-S_IFREG: regular file
-S_IFIFO: fifo (named pipe)
-S_IFLNK: symbolic link
-S_IFSOCK: socket file
-S_IFDOOR: door
-S_IFPORT: event port
-S_IFWHT: whiteout
-
-S_ISUID: set UID bit
-S_ISGID: set GID bit
-S_ENFMT: file locking enforcement
-S_ISVTX: sticky bit
-S_IREAD: Unix V7 synonym for S_IRUSR
-S_IWRITE: Unix V7 synonym for S_IWUSR
-S_IEXEC: Unix V7 synonym for S_IXUSR
-S_IRWXU: mask for owner permissions
-S_IRUSR: read by owner
-S_IWUSR: write by owner
-S_IXUSR: execute by owner
-S_IRWXG: mask for group permissions
-S_IRGRP: read by group
-S_IWGRP: write by group
-S_IXGRP: execute by group
-S_IRWXO: mask for others (not in group) permissions
-S_IROTH: read by others
-S_IWOTH: write by others
-S_IXOTH: execute by others
-
-UF_SETTABLE: mask of owner changeable flags
-UF_NODUMP: do not dump file
-UF_IMMUTABLE: file may not be changed
-UF_APPEND: file may only be appended to
-UF_OPAQUE: directory is opaque when viewed through a union stack
-UF_NOUNLINK: file may not be renamed or deleted
-UF_COMPRESSED: macOS: file is hfs-compressed
-UF_TRACKED: used for dealing with document IDs
-UF_DATAVAULT: entitlement required for reading and writing
-UF_HIDDEN: macOS: file should not be displayed
-SF_SETTABLE: mask of super user changeable flags
-SF_ARCHIVED: file may be archived
-SF_IMMUTABLE: file may not be changed
-SF_APPEND: file may only be appended to
-SF_RESTRICTED: entitlement required for writing
-SF_NOUNLINK: file may not be renamed or deleted
-SF_SNAPSHOT: file is a snapshot file
-SF_FIRMLINK: file is a firmlink
-SF_DATALESS: file is a dataless object
-
-On macOS:
-SF_SUPPORTED: mask of super user supported flags
-SF_SYNTHETIC: mask of read-only synthetic flags
-
-ST_MODE
-ST_INO
-ST_DEV
-ST_NLINK
-ST_UID
-ST_GID
-ST_SIZE
-ST_ATIME
-ST_MTIME
-ST_CTIME
-
-FILE_ATTRIBUTE_*: Windows file attribute constants
-                   (only present on Windows)
-"""
-
 import sys
 from typing import Final
 
@@ -135,74 +64,19 @@ UF_NODUMP: Final = 0x00000001
 UF_NOUNLINK: Final = 0x00000010
 UF_OPAQUE: Final = 0x00000008
 
-def S_IMODE(mode: int, /) -> int:
-    """Return the portion of the file's mode that can be set by os.chmod()."""
-
-def S_IFMT(mode: int, /) -> int:
-    """Return the portion of the file's mode that describes the file type."""
-
-def S_ISBLK(mode: int, /) -> bool:
-    """S_ISBLK(mode) -> bool
-
-    Return True if mode is from a block special device file.
-    """
-
-def S_ISCHR(mode: int, /) -> bool:
-    """S_ISCHR(mode) -> bool
-
-    Return True if mode is from a character special device file.
-    """
-
-def S_ISDIR(mode: int, /) -> bool:
-    """S_ISDIR(mode) -> bool
-
-    Return True if mode is from a directory.
-    """
-
-def S_ISDOOR(mode: int, /) -> bool:
-    """S_ISDOOR(mode) -> bool
-
-    Return True if mode is from a door.
-    """
-
-def S_ISFIFO(mode: int, /) -> bool:
-    """S_ISFIFO(mode) -> bool
-
-    Return True if mode is from a FIFO (named pipe).
-    """
-
-def S_ISLNK(mode: int, /) -> bool:
-    """S_ISLNK(mode) -> bool
-
-    Return True if mode is from a symbolic link.
-    """
-
-def S_ISPORT(mode: int, /) -> bool:
-    """S_ISPORT(mode) -> bool
-
-    Return True if mode is from an event port.
-    """
-
-def S_ISREG(mode: int, /) -> bool:
-    """S_ISREG(mode) -> bool
-
-    Return True if mode is from a regular file.
-    """
-
-def S_ISSOCK(mode: int, /) -> bool:
-    """S_ISSOCK(mode) -> bool
-
-    Return True if mode is from a socket.
-    """
-
-def S_ISWHT(mode: int, /) -> bool:
-    """S_ISWHT(mode) -> bool
-
-    Return True if mode is from a whiteout.
-    """
-
-def filemode(mode: int, /) -> str:
-    """Convert a file's mode to a string of the form '-rwxrwxrwx'"""
+def S_IMODE(mode: int, /) -> int: ...
+def S_IFMT(mode: int, /) -> int: ...
+def S_ISBLK(mode: int, /) -> bool: ...
+def S_ISCHR(mode: int, /) -> bool: ...
+def S_ISDIR(mode: int, /) -> bool: ...
+def S_ISDOOR(mode: int, /) -> bool: ...
+def S_ISFIFO(mode: int, /) -> bool: ...
+def S_ISLNK(mode: int, /) -> bool: ...
+def S_ISPORT(mode: int, /) -> bool: ...
+def S_ISREG(mode: int, /) -> bool: ...
+def S_ISSOCK(mode: int, /) -> bool: ...
+def S_ISWHT(mode: int, /) -> bool: ...
+def filemode(mode: int, /) -> str: ...
 
 if sys.platform == "win32":
     IO_REPARSE_TAG_SYMLINK: Final = 0xA000000C
