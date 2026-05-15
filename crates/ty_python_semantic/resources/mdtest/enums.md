@@ -620,6 +620,46 @@ class Child(Base):
     GITHUB = "github"  # error: [invalid-assignment]
 ```
 
+### Custom enum metaclass member transformation
+
+A custom `EnumMeta` metaclass can rewrite member values before the stdlib enum constructor validates
+and forwards them to `__new__` / `__init__`. We therefore avoid validating the raw right-hand side
+of member declarations in this case:
+
+```py
+from enum import EnumMeta, IntEnum
+
+class ChoicesType(EnumMeta):
+    def __new__(metacls, classname, bases, classdict, **kwds): ...
+
+class IntegerChoices(IntEnum, metaclass=ChoicesType):
+    pass
+
+class MyModelChoices(IntegerChoices):
+    GOOD = 1, "I like this"
+
+reveal_type(MyModelChoices.GOOD.value)  # revealed: Any
+```
+
+An explicit `_value_` annotation on the transformed enum class still takes precedence:
+
+```py
+from enum import EnumMeta, IntEnum
+
+class ChoicesType(EnumMeta):
+    def __new__(metacls, classname, bases, classdict, **kwds): ...
+
+class IntegerChoices(IntEnum, metaclass=ChoicesType):
+    pass
+
+class AnnotatedChoices(IntegerChoices):
+    _value_: int
+
+    GOOD = 1, "I like this"
+
+reveal_type(AnnotatedChoices.GOOD.value)  # revealed: int
+```
+
 ### Non-member attributes with disallowed type
 
 Methods, callables, descriptors (including properties), and nested classes that are defined in the
