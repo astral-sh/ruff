@@ -306,6 +306,18 @@ Empty({}, {})
 Person({}, {})
 ```
 
+Variadic positional arguments should not panic during `TypedDict` constructor preparation:
+
+```py
+class Empty(TypedDict):
+    pass
+
+args = []
+
+Empty(*args)
+Empty(*)  # error: [invalid-syntax] "Expected an expression"
+```
+
 Also, the value types ​​declared in a `TypedDict` affect generic call inference:
 
 ```py
