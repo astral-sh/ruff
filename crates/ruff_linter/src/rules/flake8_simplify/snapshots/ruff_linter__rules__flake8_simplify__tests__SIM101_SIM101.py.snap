@@ -269,7 +269,7 @@ help: Merge `isinstance` calls
 66 | types = (int,)
 note: This is an unsafe fix and may change runtime behavior
 
-SIM101 Multiple `isinstance` calls for `x`, merge into a single call
+SIM101 [*] Multiple `isinstance` calls for `x`, merge into a single call
   --> SIM101.py:67:1
    |
 65 | # Regression test for: https://github.com/astral-sh/ruff/pull/25061
@@ -280,8 +280,17 @@ SIM101 Multiple `isinstance` calls for `x`, merge into a single call
 69 | isinstance(x, ()) or isinstance(x, ()) or isinstance(x, (*types,))
    |
 help: Merge `isinstance` calls for `x`
+64 |
+65 | # Regression test for: https://github.com/astral-sh/ruff/pull/25061
+66 | types = (int,)
+   - isinstance(x, (*types,)) or isinstance(x, ())
+67 + isinstance(x, (*types,))
+68 | isinstance(x, ()) or isinstance(x, (*types,))
+69 | isinstance(x, ()) or isinstance(x, ()) or isinstance(x, (*types,))
+70 | isinstance(x, (*types,)) or isinstance(x, (*types,))
+note: This is an unsafe fix and may change runtime behavior
 
-SIM101 Multiple `isinstance` calls for `x`, merge into a single call
+SIM101 [*] Multiple `isinstance` calls for `x`, merge into a single call
   --> SIM101.py:68:1
    |
 66 | types = (int,)
@@ -292,8 +301,17 @@ SIM101 Multiple `isinstance` calls for `x`, merge into a single call
 70 | isinstance(x, (*types,)) or isinstance(x, (*types,))
    |
 help: Merge `isinstance` calls for `x`
+65 | # Regression test for: https://github.com/astral-sh/ruff/pull/25061
+66 | types = (int,)
+67 | isinstance(x, (*types,)) or isinstance(x, ())
+   - isinstance(x, ()) or isinstance(x, (*types,))
+68 + isinstance(x, (*types,))
+69 | isinstance(x, ()) or isinstance(x, ()) or isinstance(x, (*types,))
+70 | isinstance(x, (*types,)) or isinstance(x, (*types,))
+71 | isinstance(x, (*types,)) or isinstance(x, int)
+note: This is an unsafe fix and may change runtime behavior
 
-SIM101 Multiple `isinstance` calls for `x`, merge into a single call
+SIM101 [*] Multiple `isinstance` calls for `x`, merge into a single call
   --> SIM101.py:69:1
    |
 67 | isinstance(x, (*types,)) or isinstance(x, ())
@@ -304,6 +322,15 @@ SIM101 Multiple `isinstance` calls for `x`, merge into a single call
 71 | isinstance(x, (*types,)) or isinstance(x, int)
    |
 help: Merge `isinstance` calls for `x`
+66 | types = (int,)
+67 | isinstance(x, (*types,)) or isinstance(x, ())
+68 | isinstance(x, ()) or isinstance(x, (*types,))
+   - isinstance(x, ()) or isinstance(x, ()) or isinstance(x, (*types,))
+69 + isinstance(x, (*types,))
+70 | isinstance(x, (*types,)) or isinstance(x, (*types,))
+71 | isinstance(x, (*types,)) or isinstance(x, int)
+72 | isinstance(x, ()) or isinstance(x, int)
+note: This is an unsafe fix and may change runtime behavior
 
 SIM101 [*] Multiple `isinstance` calls for `x`, merge into a single call
   --> SIM101.py:70:1
