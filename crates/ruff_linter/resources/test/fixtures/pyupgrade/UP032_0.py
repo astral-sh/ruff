@@ -146,6 +146,9 @@ async def c():
 # Multi-field with accessor and a side-effecting argument.
 "{0.attr} {1}".format(obj, side_effect())
 
+# Unreferenced argument is a binary/unary op or subscript that may raise.
+"1".format(1 / 0)
+
 # `**locals()` splat — keyword fields resolve to surrounding-scope names.
 "reading {filename}".format(**locals())
 
@@ -160,6 +163,33 @@ async def c():
 
 # `**vars(target)` with a non-trivial target.
 "{foo}".format(**vars(self.obj))
+
+###
+# Soundness — should NOT be flagged at all (would change behavior or be invalid).
+# Refer: https://github.com/astral-sh/ruff/issues/15874
+###
+
+# Field name is `+0`; Python rejects with `KeyError`, the rule used to accept it.
+"{+0}".format(0)
+
+# Attribute name with a leading space; `getattr(x, " a")` not `x.a`.
+"{. a}".format(x)
+
+# Format-time `StringIndex` whose quote collides with the only available choice.
+"{[']}".format(x)
+
+# Unknown conversion specifier; Python raises `ValueError` at runtime.
+"{!?}".format(0)
+
+###
+# Soundness — must wrap argument in parens, otherwise output is malformed.
+###
+
+# Lambda's colon would be misread as the format-spec separator.
+"{}".format(lambda: 1)
+
+# Leading `{` would be confused with an escaped brace inside the f-string.
+"{}".format({} | {})
 
 ###
 # Non-errors

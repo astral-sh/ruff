@@ -11,6 +11,8 @@ use ruff_python_ast::{self as ast, Expr, Keyword, PythonVersion, StringFlags};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
+use ruff_python_semantic::SemanticModel;
+use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -65,20 +67,15 @@ struct FormatSummaryValues<'a> {
     args: Vec<&'a Expr>,
     kwargs: FxHashMap<&'a str, &'a Expr>,
     auto_index: usize,
-    /// Reference counts, used to detect arguments whose evaluation would be
-    /// silently dropped by conversion to an f-string.
+    /// Reference counts, used to detect dropped arguments.
     args_used: Vec<u32>,
     kwargs_used: FxHashMap<&'a str, u32>,
-    /// `true` if any format field uses a post-argument accessor (`{x.y}`, `{x[k]}`),
-    /// which evaluates at format time and may mutate state another argument reads.
+    /// `true` if any field uses a post-argument accessor like `{x.y}` or `{x[k]}`.
     field_has_accessors: bool,
-    /// Set when the call ends in `**locals()`, `**vars()`, or `**vars(<target>)`;
-    /// unknown keyword fields then resolve to a name in the surrounding scope or
-    /// to an attribute of `<target>`.
+    /// `**locals()` / `**vars()` / `**vars(<target>)` trailing the call.
     splat: Option<Splat<'a>>,
 }
 
-/// The kind of `**...` splat trailing a `.format` call.
 #[derive(Debug, Clone, Copy)]
 enum Splat<'a> {
     /// `**locals()` or `**vars()` — keyword fields resolve to bare names.
@@ -91,11 +88,11 @@ impl<'a> FormatSummaryValues<'a> {
     fn try_from_call(
         call: &'a ast::ExprCall,
         locator: &'a Locator,
+        semantic: &SemanticModel,
         target_version: PythonVersion,
         outer_quotes: &[char],
     ) -> Option<Self> {
-        // Pre-PEP 701 (Python 3.12), an f-string interpolation can't reuse its outer
-        // quote or span multiple lines, so inlining such args would be a `SyntaxError`.
+        // Pre-PEP 701, interpolations can't reuse the outer quote or span multiple lines.
         let supports_pep_701 = target_version.supports_pep_701();
         let reject = |slice: &str, range: TextRange| -> bool {
             if supports_pep_701 {
@@ -128,7 +125,7 @@ impl<'a> FormatSummaryValues<'a> {
                     return None;
                 }
                 extracted_kwargs.insert(key, value);
-            } else if let Some(kind) = splat_kind(value) {
+            } else if let Some(kind) = splat_kind(value, semantic) {
                 splat = Some(kind);
             } else {
                 // Other `**mapping` — can't be inlined in general.
@@ -192,22 +189,25 @@ impl<'a> FormatSummaryValues<'a> {
     }
 }
 
-/// Classify a `**...` splat value as `locals()`, `vars()`, or `vars(<target>)`.
-fn splat_kind(expr: &Expr) -> Option<Splat<'_>> {
+fn splat_kind<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<Splat<'a>> {
     let Expr::Call(call) = expr else {
-        return None;
-    };
-    let Expr::Name(name) = call.func.as_ref() else {
         return None;
     };
     if !call.arguments.keywords.is_empty() {
         return None;
     }
-    match (name.id.as_str(), call.arguments.args.as_ref()) {
-        ("locals" | "vars", []) => Some(Splat::Scope),
-        ("vars", [target]) => Some(Splat::Vars(target)),
-        _ => None,
+    let args = call.arguments.args.as_ref();
+    if semantic.match_builtin_expr(&call.func, "locals") && args.is_empty() {
+        return Some(Splat::Scope);
     }
+    if semantic.match_builtin_expr(&call.func, "vars") {
+        return match args {
+            [] => Some(Splat::Scope),
+            [target] => Some(Splat::Vars(target)),
+            _ => None,
+        };
+    }
+    None
 }
 
 enum FormatContext {
@@ -220,6 +220,11 @@ enum FormatContext {
 
 /// Returns `true` if the expression should be parenthesized when used in an f-string.
 fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
+    // A leading `{` would be read as an escaped brace; a top-level colon (lambda)
+    // would be read as the format-spec separator.
+    if text.starts_with('{') || matches!(expr, Expr::Lambda(_)) {
+        return true;
+    }
     match (context, expr) {
         // E.g., `x + y` should be parenthesized in `f"{(x + y)[0]}"`.
         (
@@ -229,7 +234,6 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
             | Expr::BoolOp(_)
             | Expr::Compare(_)
             | Expr::If(_)
-            | Expr::Lambda(_)
             | Expr::Await(_)
             | Expr::Yield(_)
             | Expr::YieldFrom(_)
@@ -322,15 +326,12 @@ enum IndexOrKeyword {
     Keyword(String),
 }
 
-/// How a format field's argument was resolved.
 enum Resolved<'a> {
     /// A regular positional or keyword argument.
     Expr(&'a Expr),
-    /// A keyword field satisfied by `**locals()` / `**vars()`; the interpolation
-    /// is the bare name from the format string.
+    /// Field satisfied by `**locals()`/`**vars()`; interpolate the bare name.
     SplatScope(String),
-    /// A keyword field satisfied by `**vars(<target>)`; the interpolation is
-    /// `<target>.<name>`.
+    /// Field satisfied by `**vars(<target>)`; interpolate `<target>.<name>`.
     SplatVars(String, &'a Expr),
 }
 
@@ -396,9 +397,23 @@ impl FStringConversion {
 
                     let field = FieldName::parse(&field_name)?;
 
-                    // Record format-time accessors (`{x.y}`, `{x[k]}`) before borrowing
-                    // `summary` for the argument lookup, since those accessors evaluate
-                    // at format time and can mutate state that other arguments read.
+                    // Python rejects `"{+0}"` with `KeyError`; `usize::from_str` accepts `+`.
+                    if matches!(field.field_type, FieldType::Index(_))
+                        && field_name.starts_with(['+', '-'])
+                    {
+                        return Err(anyhow::anyhow!("signed field-name index"));
+                    }
+
+                    // `"{. a}"` resolves via `getattr(x, " a")`, but `f"{x. a}"` reads `x.a`.
+                    for part in &field.parts {
+                        if let FieldNamePart::Attribute(name) = part
+                            && !is_identifier(name)
+                        {
+                            return Err(anyhow::anyhow!("non-identifier attribute name"));
+                        }
+                    }
+
+                    // Set the flag before borrowing `summary` mutably for the arg lookup.
                     if !field.parts.is_empty() {
                         summary.field_has_accessors = true;
                     }
@@ -482,6 +497,12 @@ impl FStringConversion {
                                     "\"" => '\'',
                                     _ => unreachable!("invalid trailing quote"),
                                 };
+                                // E.g. `"{[']}"` with inner `'` would produce invalid output.
+                                if index.contains(quote) {
+                                    return Err(anyhow::anyhow!(
+                                        "string index conflicts with available quote"
+                                    ));
+                                }
                                 converted.push('[');
                                 converted.push(quote);
                                 converted.push_str(&index);
@@ -492,6 +513,12 @@ impl FStringConversion {
                     }
 
                     if let Some(conversion_spec) = conversion_spec {
+                        // Anything other than `s`/`r`/`a` raises `ValueError` at runtime.
+                        if !matches!(conversion_spec, 's' | 'r' | 'a') {
+                            return Err(anyhow::anyhow!(
+                                "unknown conversion specifier {conversion_spec:?}"
+                            ));
+                        }
                         converted.push('!');
                         converted.push(conversion_spec);
                     }
@@ -547,6 +574,7 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
     let Some(mut summary) = FormatSummaryValues::try_from_call(
         call,
         checker.locator(),
+        checker.semantic(),
         checker.target_version(),
         &outer_quotes,
     ) else {
@@ -596,9 +624,7 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
 
     let mut contents = String::with_capacity(checker.locator().slice(call).len());
     let mut prev_end = call.start();
-    // Suppress inter-token whitespace after a dropped leading empty-literal patch
-    // (e.g., `"" "{x}".format(x)`), but preserve the leading slice for the first
-    // patch when no empty literal preceded it (e.g., `(` before `("{a}" "{b}")`).
+    // Drop orphan whitespace after a leading empty-literal (`"" "{x}".format(x)`).
     let mut emitted_real_content = false;
     for (range, conversion) in patches {
         let fstring = match conversion {
@@ -669,14 +695,17 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
     if !has_comments {
         let is_builtin = |id: &str| checker.semantic().has_builtin_binding(id);
 
-        // Downgrade to an unsafe fix when conversion may change runtime behavior.
-        // Refer: https://github.com/astral-sh/ruff/issues/15874
+        // Downgrade to unsafe when behavior may change. Refer: https://github.com/astral-sh/ruff/issues/15874
         let walrus_dropped = summary
             .unreferenced_args()
             .any(|arg| matches!(arg, Expr::Named(_)));
-        let dropped_side_effect = summary
-            .unreferenced_args()
-            .any(|arg| contains_effect(arg, is_builtin));
+        // `BinOp`/`UnaryOp` on literals are statically `Absent` but can raise (e.g., `1 / 0`).
+        let dropped_side_effect = summary.unreferenced_args().any(|arg| {
+            contains_effect(arg, is_builtin)
+                || any_over_expr(arg, &|e: &Expr| {
+                    matches!(e, Expr::BinOp(_) | Expr::UnaryOp(_))
+                })
+        });
         let total_references =
             summary.args_used.iter().sum::<u32>() + summary.kwargs_used.values().sum::<u32>();
         let accessor_eval_order = summary.field_has_accessors

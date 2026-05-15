@@ -969,7 +969,7 @@ UP032 [*] Use f-string instead of `format` call
 147 | "{0.attr} {1}".format(obj, side_effect())
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 148 |
-149 | # `**locals()` splat — keyword fields resolve to surrounding-scope names.
+149 | # Unreferenced argument is a binary/unary op or subscript that may raise.
     |
 help: Convert to f-string
 144 | "{[x]} {}".format(d, len(d))
@@ -978,221 +978,279 @@ help: Convert to f-string
     - "{0.attr} {1}".format(obj, side_effect())
 147 + f"{obj.attr} {side_effect()}"
 148 |
-149 | # `**locals()` splat — keyword fields resolve to surrounding-scope names.
-150 | "reading {filename}".format(**locals())
+149 | # Unreferenced argument is a binary/unary op or subscript that may raise.
+150 | "1".format(1 / 0)
 note: This is an unsafe fix and may change runtime behavior
 
 UP032 [*] Use f-string instead of `format` call
    --> UP032_0.py:150:1
     |
-149 | # `**locals()` splat — keyword fields resolve to surrounding-scope names.
-150 | "reading {filename}".format(**locals())
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+149 | # Unreferenced argument is a binary/unary op or subscript that may raise.
+150 | "1".format(1 / 0)
+    | ^^^^^^^^^^^^^^^^^
 151 |
-152 | # `**locals()` mixed with explicit keyword arguments.
+152 | # `**locals()` splat — keyword fields resolve to surrounding-scope names.
     |
 help: Convert to f-string
 147 | "{0.attr} {1}".format(obj, side_effect())
 148 |
-149 | # `**locals()` splat — keyword fields resolve to surrounding-scope names.
-    - "reading {filename}".format(**locals())
-150 + f"reading {filename}"
+149 | # Unreferenced argument is a binary/unary op or subscript that may raise.
+    - "1".format(1 / 0)
+150 + "1"
 151 |
-152 | # `**locals()` mixed with explicit keyword arguments.
-153 | "{prefix}: {filename}".format(prefix="info", **locals())
+152 | # `**locals()` splat — keyword fields resolve to surrounding-scope names.
+153 | "reading {filename}".format(**locals())
 note: This is an unsafe fix and may change runtime behavior
 
 UP032 [*] Use f-string instead of `format` call
    --> UP032_0.py:153:1
     |
-152 | # `**locals()` mixed with explicit keyword arguments.
-153 | "{prefix}: {filename}".format(prefix="info", **locals())
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+152 | # `**locals()` splat — keyword fields resolve to surrounding-scope names.
+153 | "reading {filename}".format(**locals())
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 154 |
-155 | # `**vars()` is equivalent to `**locals()`.
+155 | # `**locals()` mixed with explicit keyword arguments.
     |
 help: Convert to f-string
-150 | "reading {filename}".format(**locals())
+150 | "1".format(1 / 0)
 151 |
-152 | # `**locals()` mixed with explicit keyword arguments.
-    - "{prefix}: {filename}".format(prefix="info", **locals())
-153 + f"{"info"}: {filename}"
+152 | # `**locals()` splat — keyword fields resolve to surrounding-scope names.
+    - "reading {filename}".format(**locals())
+153 + f"reading {filename}"
 154 |
-155 | # `**vars()` is equivalent to `**locals()`.
-156 | "reading {filename}".format(**vars())
+155 | # `**locals()` mixed with explicit keyword arguments.
+156 | "{prefix}: {filename}".format(prefix="info", **locals())
 note: This is an unsafe fix and may change runtime behavior
 
 UP032 [*] Use f-string instead of `format` call
    --> UP032_0.py:156:1
     |
-155 | # `**vars()` is equivalent to `**locals()`.
-156 | "reading {filename}".format(**vars())
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+155 | # `**locals()` mixed with explicit keyword arguments.
+156 | "{prefix}: {filename}".format(prefix="info", **locals())
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 157 |
-158 | # `**vars(target)` — keyword fields resolve to `target.<name>`.
+158 | # `**vars()` is equivalent to `**locals()`.
     |
 help: Convert to f-string
-153 | "{prefix}: {filename}".format(prefix="info", **locals())
+153 | "reading {filename}".format(**locals())
 154 |
-155 | # `**vars()` is equivalent to `**locals()`.
-    - "reading {filename}".format(**vars())
-156 + f"reading {filename}"
+155 | # `**locals()` mixed with explicit keyword arguments.
+    - "{prefix}: {filename}".format(prefix="info", **locals())
+156 + f"{"info"}: {filename}"
 157 |
-158 | # `**vars(target)` — keyword fields resolve to `target.<name>`.
-159 | "{foo}:{bar}".format(**vars(x))
+158 | # `**vars()` is equivalent to `**locals()`.
+159 | "reading {filename}".format(**vars())
 note: This is an unsafe fix and may change runtime behavior
 
 UP032 [*] Use f-string instead of `format` call
    --> UP032_0.py:159:1
     |
-158 | # `**vars(target)` — keyword fields resolve to `target.<name>`.
-159 | "{foo}:{bar}".format(**vars(x))
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+158 | # `**vars()` is equivalent to `**locals()`.
+159 | "reading {filename}".format(**vars())
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 160 |
-161 | # `**vars(target)` with a non-trivial target.
+161 | # `**vars(target)` — keyword fields resolve to `target.<name>`.
     |
 help: Convert to f-string
-156 | "reading {filename}".format(**vars())
+156 | "{prefix}: {filename}".format(prefix="info", **locals())
 157 |
-158 | # `**vars(target)` — keyword fields resolve to `target.<name>`.
-    - "{foo}:{bar}".format(**vars(x))
-159 + f"{x.foo}:{x.bar}"
+158 | # `**vars()` is equivalent to `**locals()`.
+    - "reading {filename}".format(**vars())
+159 + f"reading {filename}"
 160 |
-161 | # `**vars(target)` with a non-trivial target.
-162 | "{foo}".format(**vars(self.obj))
+161 | # `**vars(target)` — keyword fields resolve to `target.<name>`.
+162 | "{foo}:{bar}".format(**vars(x))
 note: This is an unsafe fix and may change runtime behavior
 
 UP032 [*] Use f-string instead of `format` call
    --> UP032_0.py:162:1
     |
-161 | # `**vars(target)` with a non-trivial target.
-162 | "{foo}".format(**vars(self.obj))
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+161 | # `**vars(target)` — keyword fields resolve to `target.<name>`.
+162 | "{foo}:{bar}".format(**vars(x))
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 163 |
-164 | ###
+164 | # `**vars(target)` with a non-trivial target.
     |
 help: Convert to f-string
-159 | "{foo}:{bar}".format(**vars(x))
+159 | "reading {filename}".format(**vars())
 160 |
-161 | # `**vars(target)` with a non-trivial target.
-    - "{foo}".format(**vars(self.obj))
-162 + f"{self.obj.foo}"
+161 | # `**vars(target)` — keyword fields resolve to `target.<name>`.
+    - "{foo}:{bar}".format(**vars(x))
+162 + f"{x.foo}:{x.bar}"
 163 |
-164 | ###
-165 | # Non-errors
+164 | # `**vars(target)` with a non-trivial target.
+165 | "{foo}".format(**vars(self.obj))
 note: This is an unsafe fix and may change runtime behavior
 
 UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:168:1
+   --> UP032_0.py:165:1
     |
-166 | ###
-167 |
-168 | "\N{snowman} {}".format(a)
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
-169 |
-170 | "{".format(a)
+164 | # `**vars(target)` with a non-trivial target.
+165 | "{foo}".format(**vars(self.obj))
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+166 |
+167 | ###
     |
 help: Convert to f-string
-165 | # Non-errors
-166 | ###
-167 |
-    - "\N{snowman} {}".format(a)
-168 + f"\N{snowman} {a}"
-169 |
-170 | "{".format(a)
-171 |
+162 | "{foo}:{bar}".format(**vars(x))
+163 |
+164 | # `**vars(target)` with a non-trivial target.
+    - "{foo}".format(**vars(self.obj))
+165 + f"{self.obj.foo}"
+166 |
+167 | ###
+168 | # Soundness — should NOT be flagged at all (would change behavior or be invalid).
+note: This is an unsafe fix and may change runtime behavior
 
 UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:186:1
+   --> UP032_0.py:189:1
     |
-184 | "{}{}".format(a)
-185 |
-186 | "" "{}".format(a["\\"])
-    | ^^^^^^^^^^^^^^^^^^^^^^^
-187 |
-188 | "{}".format(a["b"])
-    |
-help: Convert to f-string
-183 |
-184 | "{}{}".format(a)
-185 |
-    - "" "{}".format(a["\\"])
-186 + f"{a["\\"]}"
-187 |
-188 | "{}".format(a["b"])
-189 |
-
-UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:188:1
-    |
-186 | "" "{}".format(a["\\"])
-187 |
-188 | "{}".format(a["b"])
-    | ^^^^^^^^^^^^^^^^^^^
-189 |
-190 | r'"\N{snowman} {}".format(a)'
+188 | # Lambda's colon would be misread as the format-spec separator.
+189 | "{}".format(lambda: 1)
+    | ^^^^^^^^^^^^^^^^^^^^^^
+190 |
+191 | # Leading `{` would be confused with an escaped brace inside the f-string.
     |
 help: Convert to f-string
-185 |
-186 | "" "{}".format(a["\\"])
+186 | ###
 187 |
-    - "{}".format(a["b"])
-188 + f"{a["b"]}"
-189 |
-190 | r'"\N{snowman} {}".format(a)'
-191 |
+188 | # Lambda's colon would be misread as the format-spec separator.
+    - "{}".format(lambda: 1)
+189 + f"{(lambda: 1)}"
+190 |
+191 | # Leading `{` would be confused with an escaped brace inside the f-string.
+192 | "{}".format({} | {})
 
 UP032 [*] Use f-string instead of `format` call
    --> UP032_0.py:192:1
     |
-190 |   r'"\N{snowman} {}".format(a)'
-191 |
-192 | / "123456789 {}".format(
-193 | |     11111111111111111111111111111111111111111111111111111111111111111111111111,
-194 | | )
-    | |_^
-195 |
-196 |   """
+191 | # Leading `{` would be confused with an escaped brace inside the f-string.
+192 | "{}".format({} | {})
+    | ^^^^^^^^^^^^^^^^^^^^
+193 |
+194 | ###
     |
 help: Convert to f-string
-189 |
-190 | r'"\N{snowman} {}".format(a)'
-191 |
+189 | "{}".format(lambda: 1)
+190 |
+191 | # Leading `{` would be confused with an escaped brace inside the f-string.
+    - "{}".format({} | {})
+192 + f"{({} | {})}"
+193 |
+194 | ###
+195 | # Non-errors
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:198:1
+    |
+196 | ###
+197 |
+198 | "\N{snowman} {}".format(a)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+199 |
+200 | "{".format(a)
+    |
+help: Convert to f-string
+195 | # Non-errors
+196 | ###
+197 |
+    - "\N{snowman} {}".format(a)
+198 + f"\N{snowman} {a}"
+199 |
+200 | "{".format(a)
+201 |
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:216:1
+    |
+214 | "{}{}".format(a)
+215 |
+216 | "" "{}".format(a["\\"])
+    | ^^^^^^^^^^^^^^^^^^^^^^^
+217 |
+218 | "{}".format(a["b"])
+    |
+help: Convert to f-string
+213 |
+214 | "{}{}".format(a)
+215 |
+    - "" "{}".format(a["\\"])
+216 + f"{a["\\"]}"
+217 |
+218 | "{}".format(a["b"])
+219 |
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:218:1
+    |
+216 | "" "{}".format(a["\\"])
+217 |
+218 | "{}".format(a["b"])
+    | ^^^^^^^^^^^^^^^^^^^
+219 |
+220 | r'"\N{snowman} {}".format(a)'
+    |
+help: Convert to f-string
+215 |
+216 | "" "{}".format(a["\\"])
+217 |
+    - "{}".format(a["b"])
+218 + f"{a["b"]}"
+219 |
+220 | r'"\N{snowman} {}".format(a)'
+221 |
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:222:1
+    |
+220 |   r'"\N{snowman} {}".format(a)'
+221 |
+222 | / "123456789 {}".format(
+223 | |     11111111111111111111111111111111111111111111111111111111111111111111111111,
+224 | | )
+    | |_^
+225 |
+226 |   """
+    |
+help: Convert to f-string
+219 |
+220 | r'"\N{snowman} {}".format(a)'
+221 |
     - "123456789 {}".format(
     -     11111111111111111111111111111111111111111111111111111111111111111111111111,
     - )
-192 + f"123456789 {11111111111111111111111111111111111111111111111111111111111111111111111111}"
-193 |
-194 | """
-195 | {}
+222 + f"123456789 {11111111111111111111111111111111111111111111111111111111111111111111111111}"
+223 |
+224 | """
+225 | {}
 
 UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:196:1
+   --> UP032_0.py:226:1
     |
-194 |   )
-195 |
-196 | / """
-197 | | {}
-198 | | {}
-199 | | {}
-200 | | """.format(
-201 | | 1,
-202 | | 2,
-203 | | 111111111111111111111111111111111111111111111111111111111111111111111111111111111111111,
-204 | | )
+224 |   )
+225 |
+226 | / """
+227 | | {}
+228 | | {}
+229 | | {}
+230 | | """.format(
+231 | | 1,
+232 | | 2,
+233 | | 111111111111111111111111111111111111111111111111111111111111111111111111111111111111111,
+234 | | )
     | |_^
-205 |
-206 |   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """{}
+235 |
+236 |   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """{}
     |
 help: Convert to f-string
-193 |     11111111111111111111111111111111111111111111111111111111111111111111111111,
-194 | )
-195 |
-196 + f"""
-197 + {1}
-198 + {2}
-199 + {111111111111111111111111111111111111111111111111111111111111111111111111111111111111111}
-200 | """
+223 |     11111111111111111111111111111111111111111111111111111111111111111111111111,
+224 | )
+225 |
+226 + f"""
+227 + {1}
+228 + {2}
+229 + {111111111111111111111111111111111111111111111111111111111111111111111111111111111111111}
+230 | """
     - {}
     - {}
     - {}
@@ -1201,493 +1259,493 @@ help: Convert to f-string
     - 2,
     - 111111111111111111111111111111111111111111111111111111111111111111111111111111111111111,
     - )
-201 |
-202 | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """{}
-203 | """.format(
+231 |
+232 | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """{}
+233 | """.format(
 
 UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:206:84
+   --> UP032_0.py:236:84
     |
-204 |   )
-205 |
-206 |   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """{}
+234 |   )
+235 |
+236 |   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """{}
     |  ____________________________________________________________________________________^
-207 | | """.format(
-208 | |     111111
-209 | | )
+237 | | """.format(
+238 | |     111111
+239 | | )
     | |_^
-210 |
-211 |   "{}".format(
+240 |
+241 |   "{}".format(
     |
 help: Convert to f-string
-203 | 111111111111111111111111111111111111111111111111111111111111111111111111111111111111111,
-204 | )
-205 |
+233 | 111111111111111111111111111111111111111111111111111111111111111111111111111111111111111,
+234 | )
+235 |
     - aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """{}
     - """.format(
     -     111111
     - )
-206 + aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = f"""{111111}
-207 + """
-208 |
-209 | "{}".format(
-210 |     [
-
-UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:211:1
-    |
-209 |   )
-210 |
-211 | / "{}".format(
-212 | |     [
-213 | |         1,
-214 | |         2,
-215 | |         3,
-216 | |     ]
-217 | | )
-    | |_^
-218 |
-219 |   "{a}".format(
-    |
-help: Convert to f-string
-208 |     111111
-209 | )
-210 |
-    - "{}".format(
-    -     [
-211 + f"{[
-212 |         1,
-213 |         2,
-214 |         3,
-    -     ]
-    - )
-215 +     ]}"
-216 |
-217 | "{a}".format(
-218 |     a=[
-
-UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:219:1
-    |
-217 |   )
-218 |
-219 | / "{a}".format(
-220 | |     a=[
-221 | |         1,
-222 | |         2,
-223 | |         3,
-224 | |     ]
-225 | | )
-    | |_^
-226 |
-227 |   (
-    |
-help: Convert to f-string
-216 |     ]
-217 | )
-218 |
-    - "{a}".format(
-    -     a=[
-219 + f"{[
-220 |         1,
-221 |         2,
-222 |         3,
-    -     ]
-    - )
-223 +     ]}"
-224 |
-225 | (
-226 |     "{a}"
-
-UP032 Use f-string instead of `format` call
-   --> UP032_0.py:234:1
-    |
-232 |   "{}".format(**c)
-233 |
-234 | / "{}".format(
-235 | |     1  # comment
-236 | | )
-    | |_^
-    |
-help: Convert to f-string
+236 + aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = f"""{111111}
+237 + """
+238 |
+239 | "{}".format(
+240 |     [
 
 UP032 [*] Use f-string instead of `format` call
    --> UP032_0.py:241:1
     |
-239 | # The fixed string will exceed the line length, but it's still smaller than the
-240 | # existing line length, so it's fine.
-241 | "<Customer: {}, {}, {}, {}, {}>".format(self.internal_ids, self.external_ids, self.properties, self.tags, self.others)
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-242 |
-243 | # When fixing, trim the trailing empty string.
+239 |   )
+240 |
+241 | / "{}".format(
+242 | |     [
+243 | |         1,
+244 | |         2,
+245 | |         3,
+246 | |     ]
+247 | | )
+    | |_^
+248 |
+249 |   "{a}".format(
     |
 help: Convert to f-string
-238 |
-239 | # The fixed string will exceed the line length, but it's still smaller than the
-240 | # existing line length, so it's fine.
-    - "<Customer: {}, {}, {}, {}, {}>".format(self.internal_ids, self.external_ids, self.properties, self.tags, self.others)
-241 + f"<Customer: {self.internal_ids}, {self.external_ids}, {self.properties}, {self.tags}, {self.others}>"
-242 |
-243 | # When fixing, trim the trailing empty string.
-244 | raise ValueError("Conflicting configuration dicts: {!r} {!r}"
+238 |     111111
+239 | )
+240 |
+    - "{}".format(
+    -     [
+241 + f"{[
+242 |         1,
+243 |         2,
+244 |         3,
+    -     ]
+    - )
+245 +     ]}"
+246 |
+247 | "{a}".format(
+248 |     a=[
 
 UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:244:18
+   --> UP032_0.py:249:1
     |
-243 |   # When fixing, trim the trailing empty string.
-244 |   raise ValueError("Conflicting configuration dicts: {!r} {!r}"
-    |  __________________^
-245 | |                  "".format(new_dict, d))
-    | |_______________________________________^
-246 |
-247 |   # When fixing, trim the trailing empty string.
+247 |   )
+248 |
+249 | / "{a}".format(
+250 | |     a=[
+251 | |         1,
+252 | |         2,
+253 | |         3,
+254 | |     ]
+255 | | )
+    | |_^
+256 |
+257 |   (
     |
 help: Convert to f-string
-241 | "<Customer: {}, {}, {}, {}, {}>".format(self.internal_ids, self.external_ids, self.properties, self.tags, self.others)
-242 |
-243 | # When fixing, trim the trailing empty string.
+246 |     ]
+247 | )
+248 |
+    - "{a}".format(
+    -     a=[
+249 + f"{[
+250 |         1,
+251 |         2,
+252 |         3,
+    -     ]
+    - )
+253 +     ]}"
+254 |
+255 | (
+256 |     "{a}"
+
+UP032 Use f-string instead of `format` call
+   --> UP032_0.py:264:1
+    |
+262 |   "{}".format(**c)
+263 |
+264 | / "{}".format(
+265 | |     1  # comment
+266 | | )
+    | |_^
+    |
+help: Convert to f-string
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:271:1
+    |
+269 | # The fixed string will exceed the line length, but it's still smaller than the
+270 | # existing line length, so it's fine.
+271 | "<Customer: {}, {}, {}, {}, {}>".format(self.internal_ids, self.external_ids, self.properties, self.tags, self.others)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+272 |
+273 | # When fixing, trim the trailing empty string.
+    |
+help: Convert to f-string
+268 |
+269 | # The fixed string will exceed the line length, but it's still smaller than the
+270 | # existing line length, so it's fine.
+    - "<Customer: {}, {}, {}, {}, {}>".format(self.internal_ids, self.external_ids, self.properties, self.tags, self.others)
+271 + f"<Customer: {self.internal_ids}, {self.external_ids}, {self.properties}, {self.tags}, {self.others}>"
+272 |
+273 | # When fixing, trim the trailing empty string.
+274 | raise ValueError("Conflicting configuration dicts: {!r} {!r}"
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:274:18
+    |
+273 |   # When fixing, trim the trailing empty string.
+274 |   raise ValueError("Conflicting configuration dicts: {!r} {!r}"
+    |  __________________^
+275 | |                  "".format(new_dict, d))
+    | |_______________________________________^
+276 |
+277 |   # When fixing, trim the trailing empty string.
+    |
+help: Convert to f-string
+271 | "<Customer: {}, {}, {}, {}, {}>".format(self.internal_ids, self.external_ids, self.properties, self.tags, self.others)
+272 |
+273 | # When fixing, trim the trailing empty string.
     - raise ValueError("Conflicting configuration dicts: {!r} {!r}"
     -                  "".format(new_dict, d))
-244 + raise ValueError(f"Conflicting configuration dicts: {new_dict!r} {d!r}")
-245 |
-246 | # When fixing, trim the trailing empty string.
-247 | raise ValueError("Conflicting configuration dicts: {!r} {!r}"
+274 + raise ValueError(f"Conflicting configuration dicts: {new_dict!r} {d!r}")
+275 |
+276 | # When fixing, trim the trailing empty string.
+277 | raise ValueError("Conflicting configuration dicts: {!r} {!r}"
 
 UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:248:18
+   --> UP032_0.py:278:18
     |
-247 |   # When fixing, trim the trailing empty string.
-248 |   raise ValueError("Conflicting configuration dicts: {!r} {!r}"
+277 |   # When fixing, trim the trailing empty string.
+278 |   raise ValueError("Conflicting configuration dicts: {!r} {!r}"
     |  __________________^
-249 | |                  .format(new_dict, d))
+279 | |                  .format(new_dict, d))
     | |_____________________________________^
-250 |
-251 |   raise ValueError(
+280 |
+281 |   raise ValueError(
     |
 help: Convert to f-string
-245 |                  "".format(new_dict, d))
-246 |
-247 | # When fixing, trim the trailing empty string.
+275 |                  "".format(new_dict, d))
+276 |
+277 | # When fixing, trim the trailing empty string.
     - raise ValueError("Conflicting configuration dicts: {!r} {!r}"
     -                  .format(new_dict, d))
-248 + raise ValueError(f"Conflicting configuration dicts: {new_dict!r} {d!r}"
-249 +                  )
-250 |
-251 | raise ValueError(
-252 |     "Conflicting configuration dicts: {!r} {!r}"
+278 + raise ValueError(f"Conflicting configuration dicts: {new_dict!r} {d!r}"
+279 +                  )
+280 |
+281 | raise ValueError(
+282 |     "Conflicting configuration dicts: {!r} {!r}"
 
 UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:252:5
+   --> UP032_0.py:282:5
     |
-251 |   raise ValueError(
-252 | /     "Conflicting configuration dicts: {!r} {!r}"
-253 | |     "".format(new_dict, d)
+281 |   raise ValueError(
+282 | /     "Conflicting configuration dicts: {!r} {!r}"
+283 | |     "".format(new_dict, d)
     | |__________________________^
-254 |   )
+284 |   )
     |
 help: Convert to f-string
-249 |                  .format(new_dict, d))
-250 |
-251 | raise ValueError(
+279 |                  .format(new_dict, d))
+280 |
+281 | raise ValueError(
     -     "Conflicting configuration dicts: {!r} {!r}"
     -     "".format(new_dict, d)
-252 +     f"Conflicting configuration dicts: {new_dict!r} {d!r}"
-253 | )
-254 |
-255 | raise ValueError(
+282 +     f"Conflicting configuration dicts: {new_dict!r} {d!r}"
+283 | )
+284 |
+285 | raise ValueError(
 
 UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:257:5
+   --> UP032_0.py:287:5
     |
-256 |   raise ValueError(
-257 | /     "Conflicting configuration dicts: {!r} {!r}"
-258 | |     "".format(new_dict, d)
+286 |   raise ValueError(
+287 | /     "Conflicting configuration dicts: {!r} {!r}"
+288 | |     "".format(new_dict, d)
     | |__________________________^
-259 |
-260 |   )
+289 |
+290 |   )
     |
 help: Convert to f-string
-254 | )
-255 |
-256 | raise ValueError(
+284 | )
+285 |
+286 | raise ValueError(
     -     "Conflicting configuration dicts: {!r} {!r}"
     -     "".format(new_dict, d)
-257 +     f"Conflicting configuration dicts: {new_dict!r} {d!r}"
-258 |
-259 | )
-260 |
-
-UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:263:1
-    |
-262 |   # The first string will be converted to an f-string and the curly braces in the second should be converted to be unescaped
-263 | / (
-264 | |     "{}"
-265 | |     "{{}}"
-266 | | ).format(a)
-    | |___________^
-267 |
-268 |   ("{}" "{{}}").format(a)
-    |
-help: Convert to f-string
-261 |
-262 | # The first string will be converted to an f-string and the curly braces in the second should be converted to be unescaped
-263 | (
-264 +     f"{a}"
-265 |     "{}"
-    -     "{{}}"
-    - ).format(a)
-266 + )
-267 |
-268 | ("{}" "{{}}").format(a)
-269 |
-
-UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:268:1
-    |
-266 | ).format(a)
-267 |
-268 | ("{}" "{{}}").format(a)
-    | ^^^^^^^^^^^^^^^^^^^^^^^
-    |
-help: Convert to f-string
-265 |     "{{}}"
-266 | ).format(a)
-267 |
-    - ("{}" "{{}}").format(a)
-268 + (f"{a}" "{}")
-269 |
-270 |
-271 | # Both strings will be converted to an f-string and the curly braces in the second should left escaped
-
-UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:272:1
-    |
-271 |   # Both strings will be converted to an f-string and the curly braces in the second should left escaped
-272 | / (
-273 | |     "{}"
-274 | |     "{{{}}}"
-275 | | ).format(a, b)
-    | |______________^
-276 |
-277 |   ("{}" "{{{}}}").format(a, b)
-    |
-help: Convert to f-string
-270 |
-271 | # Both strings will be converted to an f-string and the curly braces in the second should left escaped
-272 | (
-    -     "{}"
-    -     "{{{}}}"
-    - ).format(a, b)
-273 +     f"{a}"
-274 +     f"{{{b}}}"
-275 + )
-276 |
-277 | ("{}" "{{{}}}").format(a, b)
-278 |
-
-UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:277:1
-    |
-275 | ).format(a, b)
-276 |
-277 | ("{}" "{{{}}}").format(a, b)
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-278 |
-279 | # The dictionary should be parenthesized.
-    |
-help: Convert to f-string
-274 |     "{{{}}}"
-275 | ).format(a, b)
-276 |
-    - ("{}" "{{{}}}").format(a, b)
-277 + (f"{a}" f"{{{b}}}")
-278 |
-279 | # The dictionary should be parenthesized.
-280 | "{}".format({0: 1}[0])
-
-UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:280:1
-    |
-279 | # The dictionary should be parenthesized.
-280 | "{}".format({0: 1}[0])
-    | ^^^^^^^^^^^^^^^^^^^^^^
-281 |
-282 | # The dictionary should be parenthesized.
-    |
-help: Convert to f-string
-277 | ("{}" "{{{}}}").format(a, b)
-278 |
-279 | # The dictionary should be parenthesized.
-    - "{}".format({0: 1}[0])
-280 + f"{({0: 1}[0])}"
-281 |
-282 | # The dictionary should be parenthesized.
-283 | "{}".format({0: 1}.bar)
-
-UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:283:1
-    |
-282 | # The dictionary should be parenthesized.
-283 | "{}".format({0: 1}.bar)
-    | ^^^^^^^^^^^^^^^^^^^^^^^
-284 |
-285 | # The dictionary should be parenthesized.
-    |
-help: Convert to f-string
-280 | "{}".format({0: 1}[0])
-281 |
-282 | # The dictionary should be parenthesized.
-    - "{}".format({0: 1}.bar)
-283 + f"{({0: 1}.bar)}"
-284 |
-285 | # The dictionary should be parenthesized.
-286 | "{}".format({0: 1}())
-
-UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:286:1
-    |
-285 | # The dictionary should be parenthesized.
-286 | "{}".format({0: 1}())
-    | ^^^^^^^^^^^^^^^^^^^^^
-287 |
-288 | # The string shouldn't be converted, since it would require repeating the function call.
-    |
-help: Convert to f-string
-283 | "{}".format({0: 1}.bar)
-284 |
-285 | # The dictionary should be parenthesized.
-    - "{}".format({0: 1}())
-286 + f"{({0: 1}())}"
-287 |
-288 | # The string shouldn't be converted, since it would require repeating the function call.
-289 | "{x} {x}".format(x=foo())
+287 +     f"Conflicting configuration dicts: {new_dict!r} {d!r}"
+288 |
+289 | )
+290 |
 
 UP032 [*] Use f-string instead of `format` call
    --> UP032_0.py:293:1
     |
-292 | # The string _should_ be converted, since the function call is repeated in the arguments.
-293 | "{0} {1}".format(foo(), foo())
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-294 |
-295 | # The call should be removed, but the string itself should remain.
+292 |   # The first string will be converted to an f-string and the curly braces in the second should be converted to be unescaped
+293 | / (
+294 | |     "{}"
+295 | |     "{{}}"
+296 | | ).format(a)
+    | |___________^
+297 |
+298 |   ("{}" "{{}}").format(a)
     |
 help: Convert to f-string
-290 | "{0} {0}".format(foo())
 291 |
-292 | # The string _should_ be converted, since the function call is repeated in the arguments.
-    - "{0} {1}".format(foo(), foo())
-293 + f"{foo()} {foo()}"
-294 |
-295 | # The call should be removed, but the string itself should remain.
-296 | ''.format(self.project)
+292 | # The first string will be converted to an f-string and the curly braces in the second should be converted to be unescaped
+293 | (
+294 +     f"{a}"
+295 |     "{}"
+    -     "{{}}"
+    - ).format(a)
+296 + )
+297 |
+298 | ("{}" "{{}}").format(a)
+299 |
 
 UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:296:1
+   --> UP032_0.py:298:1
     |
-295 | # The call should be removed, but the string itself should remain.
-296 | ''.format(self.project)
+296 | ).format(a)
+297 |
+298 | ("{}" "{{}}").format(a)
     | ^^^^^^^^^^^^^^^^^^^^^^^
-297 |
-298 | # The call should be removed, but the string itself should remain.
     |
 help: Convert to f-string
-293 | "{0} {1}".format(foo(), foo())
-294 |
-295 | # The call should be removed, but the string itself should remain.
-    - ''.format(self.project)
-296 + ''
+295 |     "{{}}"
+296 | ).format(a)
 297 |
-298 | # The call should be removed, but the string itself should remain.
-299 | "".format(self.project)
+    - ("{}" "{{}}").format(a)
+298 + (f"{a}" "{}")
+299 |
+300 |
+301 | # Both strings will be converted to an f-string and the curly braces in the second should left escaped
 
 UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:299:1
+   --> UP032_0.py:302:1
     |
-298 | # The call should be removed, but the string itself should remain.
-299 | "".format(self.project)
-    | ^^^^^^^^^^^^^^^^^^^^^^^
-300 |
-301 | # Not a valid type annotation but this test shouldn't result in a panic.
-    |
-help: Convert to f-string
-296 | ''.format(self.project)
-297 |
-298 | # The call should be removed, but the string itself should remain.
-    - "".format(self.project)
-299 + ""
-300 |
-301 | # Not a valid type annotation but this test shouldn't result in a panic.
-302 | # Refer: https://github.com/astral-sh/ruff/issues/11736
-
-UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:303:5
-    |
-301 | # Not a valid type annotation but this test shouldn't result in a panic.
-302 | # Refer: https://github.com/astral-sh/ruff/issues/11736
-303 | x: "'{} + {}'.format(x, y)"
-    |     ^^^^^^^^^^^^^^^^^^^^^^
-304 |
-305 | # Regression https://github.com/astral-sh/ruff/issues/21000
+301 |   # Both strings will be converted to an f-string and the curly braces in the second should left escaped
+302 | / (
+303 | |     "{}"
+304 | |     "{{{}}}"
+305 | | ).format(a, b)
+    | |______________^
+306 |
+307 |   ("{}" "{{{}}}").format(a, b)
     |
 help: Convert to f-string
 300 |
-301 | # Not a valid type annotation but this test shouldn't result in a panic.
-302 | # Refer: https://github.com/astral-sh/ruff/issues/11736
-    - x: "'{} + {}'.format(x, y)"
-303 + x: "f'{x} + {y}'"
-304 |
-305 | # Regression https://github.com/astral-sh/ruff/issues/21000
-306 | # Fix should parenthesize walrus
+301 | # Both strings will be converted to an f-string and the curly braces in the second should left escaped
+302 | (
+    -     "{}"
+    -     "{{{}}}"
+    - ).format(a, b)
+303 +     f"{a}"
+304 +     f"{{{b}}}"
+305 + )
+306 |
+307 | ("{}" "{{{}}}").format(a, b)
+308 |
 
 UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:309:14
+   --> UP032_0.py:307:1
     |
-307 | if __name__ == "__main__":
-308 |     number = 0
-309 |     string = "{}".format(number := number + 1)
-    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-310 |     print(string)
+305 | ).format(a, b)
+306 |
+307 | ("{}" "{{{}}}").format(a, b)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+308 |
+309 | # The dictionary should be parenthesized.
     |
 help: Convert to f-string
-306 | # Fix should parenthesize walrus
-307 | if __name__ == "__main__":
-308 |     number = 0
-    -     string = "{}".format(number := number + 1)
-309 +     string = f"{(number := number + 1)}"
-310 |     print(string)
+304 |     "{{{}}}"
+305 | ).format(a, b)
+306 |
+    - ("{}" "{{{}}}").format(a, b)
+307 + (f"{a}" f"{{{b}}}")
+308 |
+309 | # The dictionary should be parenthesized.
+310 | "{}".format({0: 1}[0])
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:310:1
+    |
+309 | # The dictionary should be parenthesized.
+310 | "{}".format({0: 1}[0])
+    | ^^^^^^^^^^^^^^^^^^^^^^
 311 |
-312 | # Unicode escape
+312 | # The dictionary should be parenthesized.
+    |
+help: Convert to f-string
+307 | ("{}" "{{{}}}").format(a, b)
+308 |
+309 | # The dictionary should be parenthesized.
+    - "{}".format({0: 1}[0])
+310 + f"{({0: 1}[0])}"
+311 |
+312 | # The dictionary should be parenthesized.
+313 | "{}".format({0: 1}.bar)
 
 UP032 [*] Use f-string instead of `format` call
    --> UP032_0.py:313:1
     |
-312 | # Unicode escape
-313 | "\N{angle}AOB = {angle}°".format(angle=180)
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+312 | # The dictionary should be parenthesized.
+313 | "{}".format({0: 1}.bar)
+    | ^^^^^^^^^^^^^^^^^^^^^^^
 314 |
-315 | # Raw string with \N{...}
+315 | # The dictionary should be parenthesized.
     |
 help: Convert to f-string
-310 |     print(string)
+310 | "{}".format({0: 1}[0])
 311 |
-312 | # Unicode escape
-    - "\N{angle}AOB = {angle}°".format(angle=180)
-313 + f"\N{angle}AOB = {180}°"
+312 | # The dictionary should be parenthesized.
+    - "{}".format({0: 1}.bar)
+313 + f"{({0: 1}.bar)}"
 314 |
-315 | # Raw string with \N{...}
-316 | r"\N{angle}AOB = {angle}°".format(angle=180)
+315 | # The dictionary should be parenthesized.
+316 | "{}".format({0: 1}())
 
 UP032 [*] Use f-string instead of `format` call
    --> UP032_0.py:316:1
     |
-315 | # Raw string with \N{...}
-316 | r"\N{angle}AOB = {angle}°".format(angle=180)
+315 | # The dictionary should be parenthesized.
+316 | "{}".format({0: 1}())
+    | ^^^^^^^^^^^^^^^^^^^^^
+317 |
+318 | # The string shouldn't be converted, since it would require repeating the function call.
+    |
+help: Convert to f-string
+313 | "{}".format({0: 1}.bar)
+314 |
+315 | # The dictionary should be parenthesized.
+    - "{}".format({0: 1}())
+316 + f"{({0: 1}())}"
+317 |
+318 | # The string shouldn't be converted, since it would require repeating the function call.
+319 | "{x} {x}".format(x=foo())
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:323:1
+    |
+322 | # The string _should_ be converted, since the function call is repeated in the arguments.
+323 | "{0} {1}".format(foo(), foo())
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+324 |
+325 | # The call should be removed, but the string itself should remain.
+    |
+help: Convert to f-string
+320 | "{0} {0}".format(foo())
+321 |
+322 | # The string _should_ be converted, since the function call is repeated in the arguments.
+    - "{0} {1}".format(foo(), foo())
+323 + f"{foo()} {foo()}"
+324 |
+325 | # The call should be removed, but the string itself should remain.
+326 | ''.format(self.project)
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:326:1
+    |
+325 | # The call should be removed, but the string itself should remain.
+326 | ''.format(self.project)
+    | ^^^^^^^^^^^^^^^^^^^^^^^
+327 |
+328 | # The call should be removed, but the string itself should remain.
+    |
+help: Convert to f-string
+323 | "{0} {1}".format(foo(), foo())
+324 |
+325 | # The call should be removed, but the string itself should remain.
+    - ''.format(self.project)
+326 + ''
+327 |
+328 | # The call should be removed, but the string itself should remain.
+329 | "".format(self.project)
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:329:1
+    |
+328 | # The call should be removed, but the string itself should remain.
+329 | "".format(self.project)
+    | ^^^^^^^^^^^^^^^^^^^^^^^
+330 |
+331 | # Not a valid type annotation but this test shouldn't result in a panic.
+    |
+help: Convert to f-string
+326 | ''.format(self.project)
+327 |
+328 | # The call should be removed, but the string itself should remain.
+    - "".format(self.project)
+329 + ""
+330 |
+331 | # Not a valid type annotation but this test shouldn't result in a panic.
+332 | # Refer: https://github.com/astral-sh/ruff/issues/11736
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:333:5
+    |
+331 | # Not a valid type annotation but this test shouldn't result in a panic.
+332 | # Refer: https://github.com/astral-sh/ruff/issues/11736
+333 | x: "'{} + {}'.format(x, y)"
+    |     ^^^^^^^^^^^^^^^^^^^^^^
+334 |
+335 | # Regression https://github.com/astral-sh/ruff/issues/21000
+    |
+help: Convert to f-string
+330 |
+331 | # Not a valid type annotation but this test shouldn't result in a panic.
+332 | # Refer: https://github.com/astral-sh/ruff/issues/11736
+    - x: "'{} + {}'.format(x, y)"
+333 + x: "f'{x} + {y}'"
+334 |
+335 | # Regression https://github.com/astral-sh/ruff/issues/21000
+336 | # Fix should parenthesize walrus
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:339:14
+    |
+337 | if __name__ == "__main__":
+338 |     number = 0
+339 |     string = "{}".format(number := number + 1)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+340 |     print(string)
+    |
+help: Convert to f-string
+336 | # Fix should parenthesize walrus
+337 | if __name__ == "__main__":
+338 |     number = 0
+    -     string = "{}".format(number := number + 1)
+339 +     string = f"{(number := number + 1)}"
+340 |     print(string)
+341 |
+342 | # Unicode escape
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:343:1
+    |
+342 | # Unicode escape
+343 | "\N{angle}AOB = {angle}°".format(angle=180)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+344 |
+345 | # Raw string with \N{...}
+    |
+help: Convert to f-string
+340 |     print(string)
+341 |
+342 | # Unicode escape
+    - "\N{angle}AOB = {angle}°".format(angle=180)
+343 + f"\N{angle}AOB = {180}°"
+344 |
+345 | # Raw string with \N{...}
+346 | r"\N{angle}AOB = {angle}°".format(angle=180)
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:346:1
+    |
+345 | # Raw string with \N{...}
+346 | r"\N{angle}AOB = {angle}°".format(angle=180)
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Convert to f-string
-313 | "\N{angle}AOB = {angle}°".format(angle=180)
-314 |
-315 | # Raw string with \N{...}
+343 | "\N{angle}AOB = {angle}°".format(angle=180)
+344 |
+345 | # Raw string with \N{...}
     - r"\N{angle}AOB = {angle}°".format(angle=180)
-316 + rf"\N{180}AOB = {180}°"
+346 + rf"\N{180}AOB = {180}°"
