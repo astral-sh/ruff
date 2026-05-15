@@ -827,16 +827,25 @@ def overloaded_put_object(*, TagSet: object, func: object = None) -> None: ...
 to_thread_like_keyword(TagSet=reveal_type([{"Key": "k", "Value": "v"}]), func=overloaded_put_object)  # revealed: list[Tag]
 ```
 
-ParamSpec forwarding should not use raw unspecialized type variables from a wrapped generic callable
-as argument context, since that can hide errors between forwarded arguments.
+ParamSpec forwarding should not use raw unspecialized parameter types from a wrapped generic
+callable as argument context. The forwarded list literals should be inferred the same way as in the
+equivalent direct generic call, not with a raw `list[T]` context from the wrapped callable.
 
 ```py
 from typing import Callable
 
 def generic_pair[T](x: list[T], y: list[T], /) -> None: ...
 def generic_pair_with_container[T](x: T, y: list[T], /) -> None: ...
+def generic_identity_list[T](x: list[T], /) -> list[T]:
+    raise NotImplementedError
+
 def to_thread_like[**P, R](func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
     return func(*args, **kwargs)
+
+# TODO: This should not error once the call-expression type context specializes the generic
+# wrapped callable before we infer forwarded `ParamSpec` arguments.
+# error: [invalid-assignment]
+union_list_result: list[int | str] = to_thread_like(generic_identity_list, reveal_type([1]))  # revealed: list[int]
 
 # error: [invalid-argument-type]
 # error: [invalid-argument-type]

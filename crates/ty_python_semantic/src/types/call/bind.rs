@@ -5354,31 +5354,71 @@ impl<'db> MatchedArgument<'db> {
     }
 }
 
-/// The declared type context to use when inferring a call-site argument.
+/// The type context to use when inferring a call-site argument.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct ArgumentTypeContext<'db> {
-    /// The lookup key for the inferred argument type.
-    pub(crate) declared_type: Type<'db>,
-    /// The unspecialized parameter annotation that later type checking may still request.
-    original_declared_type: Type<'db>,
-    /// The concrete type context to use while inferring the argument expression.
-    pub(crate) type_context: TypeContext<'db>,
+pub(crate) enum ArgumentTypeContext<'db> {
+    Standard {
+        /// The raw parameter type from the overload signature.
+        raw_parameter_type: Type<'db>,
+        /// The parameter type to use as context, possibly specialized from the call expression's
+        /// declared type.
+        parameter_type: Type<'db>,
+    },
+    ParamSpec {
+        /// The `P.args` or `P.kwargs` parameter that this argument is bound to.
+        paramspec_parameter_type: Type<'db>,
+        /// The declared type of this argument on the callable stored in the `ParamSpec`.
+        declared_type: Type<'db>,
+    },
 }
 
 impl<'db> ArgumentTypeContext<'db> {
-    /// Creates an argument type context.
+    /// Creates a context for ordinary parameter annotations.
     ///
-    /// `declared_type` is the lookup key for the inferred argument type. `original_declared_type`
-    /// is the unspecialized parameter annotation that later type checking may still request.
-    fn new(
-        declared_type: Type<'db>,
-        original_declared_type: Type<'db>,
-        type_context: Type<'db>,
-    ) -> Self {
-        Self {
+    /// `raw_parameter_type` is the lookup key used by later type checking. `parameter_type` is the
+    /// possibly-specialized context used to infer the argument expression.
+    fn standard(raw_parameter_type: Type<'db>, parameter_type: Type<'db>) -> Self {
+        Self::Standard {
+            raw_parameter_type,
+            parameter_type,
+        }
+    }
+
+    /// Creates a context for an argument forwarded through a `ParamSpec` component.
+    ///
+    /// `paramspec_parameter_type` is the original `P.args` or `P.kwargs` lookup key on the wrapper
+    /// call. `declared_type` is the concrete parameter type on the callable stored in the
+    /// `ParamSpec`.
+    fn paramspec(paramspec_parameter_type: Type<'db>, declared_type: Type<'db>) -> Self {
+        Self::ParamSpec {
+            paramspec_parameter_type,
             declared_type,
-            original_declared_type,
-            type_context: TypeContext::new(Some(type_context)),
+        }
+    }
+
+    /// Returns the type context used for inferring the argument expression.
+    pub(crate) fn type_context(self) -> TypeContext<'db> {
+        match self {
+            Self::Standard { parameter_type, .. }
+            | Self::ParamSpec {
+                declared_type: parameter_type,
+                ..
+            } => TypeContext::new(Some(parameter_type)),
+        }
+    }
+
+    /// Returns the key used to deduplicate speculative inference attempts.
+    ///
+    /// Standard parameters are cached by their raw parameter type, since later type checking asks
+    /// for that type. `ParamSpec` arguments are cached by the concrete forwarded parameter type,
+    /// but still inserted through their full context so the original `P.args` or `P.kwargs` lookup
+    /// key is populated too.
+    pub(crate) fn inference_cache_key(self) -> Type<'db> {
+        match self {
+            Self::Standard {
+                raw_parameter_type, ..
+            } => raw_parameter_type,
+            Self::ParamSpec { declared_type, .. } => declared_type,
         }
     }
 
@@ -5393,9 +5433,25 @@ impl<'db> ArgumentTypeContext<'db> {
         argument_index: usize,
         inferred_ty: Type<'db>,
     ) {
-        arguments_types.insert_type(argument_index, self.declared_type, inferred_ty);
-        if self.declared_type != self.original_declared_type {
-            arguments_types.insert_type(argument_index, self.original_declared_type, inferred_ty);
+        match self {
+            Self::Standard {
+                raw_parameter_type, ..
+            } => {
+                arguments_types.insert_type(argument_index, raw_parameter_type, inferred_ty);
+            }
+            Self::ParamSpec {
+                paramspec_parameter_type,
+                declared_type,
+            } => {
+                arguments_types.insert_type(argument_index, declared_type, inferred_ty);
+                if declared_type != paramspec_parameter_type {
+                    arguments_types.insert_type(
+                        argument_index,
+                        paramspec_parameter_type,
+                        inferred_ty,
+                    );
+                }
+            }
         }
     }
 }
@@ -5726,8 +5782,7 @@ impl<'db> Binding<'db> {
             && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
                 typevar.typevar(db).bound_or_constraints(db)
         {
-            return Some(ArgumentTypeContext::new(
-                original_parameter_type,
+            return Some(ArgumentTypeContext::standard(
                 original_parameter_type,
                 bound,
             ));
@@ -5795,8 +5850,7 @@ impl<'db> Binding<'db> {
                         call_expression_tcx,
                     })
             {
-                return Some(ArgumentTypeContext::new(
-                    specialized_parameter_type,
+                return Some(ArgumentTypeContext::paramspec(
                     original_parameter_type,
                     specialized_parameter_type,
                 ));
@@ -5805,8 +5859,7 @@ impl<'db> Binding<'db> {
             parameter_type = parameter_type.apply_specialization(db, specialization);
         }
 
-        Some(ArgumentTypeContext::new(
-            original_parameter_type,
+        Some(ArgumentTypeContext::standard(
             original_parameter_type,
             parameter_type,
         ))

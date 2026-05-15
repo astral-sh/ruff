@@ -207,11 +207,6 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         self.items.get(index).map(|item| &item.types)
     }
 
-    /// Insert an inferred type for the argument at `index` under the given type context.
-    ///
-    /// This is useful when argument inference is driven from outside the argument iterator, for
-    /// example when a wrapper call first infers a context for an earlier ParamSpec-binding
-    /// argument and then stores that result back on the original call argument.
     pub(crate) fn insert_type(
         &mut self,
         index: usize,

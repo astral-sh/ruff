@@ -5424,7 +5424,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(parameter_context) = parameter_context {
                     let inferred_ty = infer_argument_ty(
                         self,
-                        (argument_index, ast_argument, parameter_context.type_context),
+                        (
+                            argument_index,
+                            ast_argument,
+                            parameter_context.type_context(),
+                        ),
                     );
                     parameter_context.insert_inferred_type(
                         arguments_types,
@@ -5455,7 +5459,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     infer_argument_ty(self, (argument_index, ast_argument, TypeContext::default()));
                 arguments_types.insert_type(argument_index, TypeContext::default(), default_ty);
 
-                let mut inferred_by_declared_type = FxHashMap::default();
+                let mut inferred_by_cache_key = FxHashMap::default();
 
                 // Cache expressions inferred across speculative inference attempts.
                 //
@@ -5464,10 +5468,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let teardown = self.setup_expression_cache();
 
                 for parameter_context in parameter_types {
-                    let declared_type = parameter_context.declared_type;
+                    let inference_cache_key = parameter_context.inference_cache_key();
                     if let Some(inferred_ty) =
-                        inferred_by_declared_type.get(&declared_type).copied()
+                        inferred_by_cache_key.get(&inference_cache_key).copied()
                     {
+                        // Even when the inference cache key is identical, this overload may later
+                        // look up the inferred type through a different original `ParamSpec`
+                        // annotation, so insert through its own context.
                         parameter_context.insert_inferred_type(
                             arguments_types,
                             argument_index,
@@ -5482,9 +5489,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let mut speculative_builder = self.speculate();
                     let inferred_ty = infer_argument_ty(
                         &mut speculative_builder,
-                        (argument_index, ast_argument, parameter_context.type_context),
+                        (
+                            argument_index,
+                            ast_argument,
+                            parameter_context.type_context(),
+                        ),
                     );
-                    inferred_by_declared_type.insert(declared_type, inferred_ty);
+                    inferred_by_cache_key.insert(inference_cache_key, inferred_ty);
                     self.union_expected_types(&speculative_builder.expected_types);
                     parameter_context.insert_inferred_type(
                         arguments_types,
