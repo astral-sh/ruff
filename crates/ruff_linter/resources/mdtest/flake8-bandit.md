@@ -68,8 +68,6 @@ Markup(f"unsafe {content}")  # error: [unsafe-markup-use]
 literal(f"unsafe {content}")  # error: [unsafe-markup-use]
 ```
 
-
-
 This test case exists to make sure our optimization doesn't cause
 additional markup names to be skipped if we don't import either
 `markupsafe` or `flask` first.
