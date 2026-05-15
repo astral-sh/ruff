@@ -76,9 +76,9 @@ mod tests {
           | ^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/typing.pyi:487:1
+           --> stdlib/typing.pyi:492:1
             |
-        487 | Literal: _SpecialForm
+        492 | Literal: _SpecialForm
             | -------
             |
         ");
@@ -104,9 +104,9 @@ mod tests {
           | ^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/typing.pyi:166:7
+           --> stdlib/typing.pyi:172:7
             |
-        166 | class Any:
+        172 | class Any:
             |       ---
             |
         ");
@@ -131,9 +131,9 @@ mod tests {
           | ^^ Clicking here
           |
         info: Found 1 type definition
-            --> stdlib/typing.pyi:1268:1
+            --> stdlib/typing.pyi:1261:1
              |
-        1268 | Generic: type[_Generic]
+        1261 | Generic: type[_Generic]
              | -------
              |
         ");
@@ -567,9 +567,9 @@ mod tests {
           | ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
+           --> stdlib/builtins.pyi:904:7
             |
-        915 | class str(Sequence[str]):
+        904 | class str(Sequence[str]):
             |       ---
             |
         ");
@@ -590,9 +590,9 @@ mod tests {
           |          ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
+           --> stdlib/builtins.pyi:904:7
             |
-        915 | class str(Sequence[str]):
+        904 | class str(Sequence[str]):
             |       ---
             |
         "#);
@@ -766,10 +766,10 @@ mod tests {
           4 | class MyClass:
             |       -------
             |
-           ::: stdlib/types.pyi:969:11
+           ::: stdlib/types.pyi:959:7
             |
-        969 |     class NoneType:
-            |           --------
+        959 | class NoneType:
+            |       --------
             |
         "#);
     }
@@ -825,10 +825,10 @@ mod tests {
           4 | class MyClass:
             |       -------
             |
-           ::: stdlib/types.pyi:969:11
+           ::: stdlib/types.pyi:959:7
             |
-        969 |     class NoneType:
-            |           --------
+        959 | class NoneType:
+            |       --------
             |
         "#);
     }
@@ -1440,9 +1440,9 @@ mod tests {
           |      ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
+           --> stdlib/builtins.pyi:904:7
             |
-        915 | class str(Sequence[str]):
+        904 | class str(Sequence[str]):
             |       ---
             |
         "#);
@@ -1469,9 +1469,9 @@ mod tests {
           |      ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:337:7
             |
-        348 | class int:
+        337 | class int:
             |       ---
             |
         ");
@@ -1497,9 +1497,9 @@ f(**kwargs<CURSOR>)
           |     ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-            --> stdlib/builtins.pyi:2947:7
+            --> stdlib/builtins.pyi:2960:7
              |
-        2947 | class dict(MutableMapping[_KT, _VT]):
+        2960 | class dict(MutableMapping[_KT, _VT]):
              |       ----
              |
         ");
@@ -1530,9 +1530,9 @@ def outer():
           |                ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
+           --> stdlib/builtins.pyi:904:7
             |
-        915 | class str(Sequence[str]):
+        904 | class str(Sequence[str]):
             |       ---
             |
         ");
@@ -1580,9 +1580,9 @@ def function():
           |            ^^^^^^^^^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
+           --> stdlib/builtins.pyi:904:7
             |
-        915 | class str(Sequence[str]):
+        904 | class str(Sequence[str]):
             |       ---
             |
         ");
@@ -1622,9 +1622,9 @@ def function():
           |     ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
+           --> stdlib/builtins.pyi:904:7
             |
-        915 | class str(Sequence[str]):
+        904 | class str(Sequence[str]):
             |       ---
             |
         ");
@@ -1703,9 +1703,9 @@ def function():
           |               ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
+           --> stdlib/builtins.pyi:904:7
             |
-        915 | class str(Sequence[str]):
+        904 | class str(Sequence[str]):
             |       ---
             |
         ");
@@ -1728,15 +1728,15 @@ def function():
           |     ^ Clicking here
           |
         info: Found 2 type definitions
-           --> stdlib/builtins.pyi:915:7
+           --> stdlib/builtins.pyi:904:7
             |
-        915 | class str(Sequence[str]):
+        904 | class str(Sequence[str]):
             |       ---
             |
-           ::: stdlib/types.pyi:969:11
+           ::: stdlib/types.pyi:959:7
             |
-        969 |     class NoneType:
-            |           --------
+        959 | class NoneType:
+            |       --------
             |
         ");
     }
@@ -1951,9 +1951,9 @@ def function():
           |                     ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:337:7
             |
-        348 | class int:
+        337 | class int:
             |       ---
             |
         ");
@@ -1987,9 +1987,9 @@ def function():
           |     ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:337:7
             |
-        348 | class int:
+        337 | class int:
             |       ---
             |
         ");
