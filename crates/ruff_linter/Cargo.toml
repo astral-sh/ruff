@@ -72,7 +72,7 @@ unicode_names2 = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]
-ruff_test = { workspace = true }
+ruff_mdtest = { workspace = true }
 
 camino = { workspace = true }
 # Disable colored output in tests

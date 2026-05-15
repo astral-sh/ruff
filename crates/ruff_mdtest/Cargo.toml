@@ -1,5 +1,5 @@
 [package]
-name = "ruff_test"
+name = "ruff_mdtest"
 version = "0.0.0"
 publish = false
 edition.workspace = true

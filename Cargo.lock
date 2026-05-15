@@ -3211,6 +3211,7 @@ dependencies = [
  "ruff_db",
  "ruff_diagnostics",
  "ruff_macros",
+ "ruff_mdtest",
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_codegen",
@@ -3222,7 +3223,6 @@ dependencies = [
  "ruff_python_stdlib",
  "ruff_python_trivia",
  "ruff_source_file",
- "ruff_test",
  "ruff_text_size",
  "rustc-hash",
  "schemars",
@@ -3269,6 +3269,21 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "ruff_workspace",
+]
+
+[[package]]
+name = "ruff_mdtest"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "camino",
+ "mdtest",
+ "ruff_db",
+ "ruff_linter",
+ "ruff_notebook",
+ "ruff_python_ast",
+ "ruff_workspace",
+ "salsa",
 ]
 
 [[package]]
@@ -3544,21 +3559,6 @@ dependencies = [
  "memchr",
  "ruff_text_size",
  "serde",
-]
-
-[[package]]
-name = "ruff_test"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "camino",
- "mdtest",
- "ruff_db",
- "ruff_linter",
- "ruff_notebook",
- "ruff_python_ast",
- "ruff_workspace",
- "salsa",
 ]
 
 [[package]]

@@ -19,7 +19,7 @@ fn mdtest(fixture_path: &Utf8Path, content: String) -> datatest_stable::Result<(
         .unwrap_or(fixture_path)
         .as_str();
 
-    ruff_test::run(
+    ruff_mdtest::run(
         &absolute_fixture_path,
         &workspace_relative_fixture_path,
         &content,
