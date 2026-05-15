@@ -36,6 +36,8 @@ pub(super) enum TypedDictConstructorForm<'expr> {
     MixedLiteralAndKeywords(&'expr ast::ExprDict),
     /// // Ex) `TD(other, y=2)`
     MixedPositionalAndKeywords,
+    /// // Ex) `TD(*args)` or `TD(*args, y=2)`
+    VariadicPositional,
     /// // Ex) `TD(arg1, arg2)`
     MultiplePositionalArguments,
 }
@@ -52,6 +54,7 @@ impl<'expr> TypedDictConstructorForm<'expr> {
         };
 
         match (argument, arguments.keywords.is_empty()) {
+            (argument, _) if argument.is_starred_expr() => Self::VariadicPositional,
             (ast::Expr::Dict(_), true) => Self::LiteralOnly(argument),
             (ast::Expr::Dict(dict_expr), false) => Self::MixedLiteralAndKeywords(dict_expr),
             (_, true) => Self::SinglePositional(argument),
@@ -393,6 +396,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.store_expression_type(&arguments.args[0], Type::unknown());
             }
             TypedDictConstructorForm::KeywordOnly
+            | TypedDictConstructorForm::VariadicPositional
             | TypedDictConstructorForm::MultiplePositionalArguments => {}
         }
 
