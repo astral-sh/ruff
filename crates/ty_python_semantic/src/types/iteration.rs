@@ -247,6 +247,13 @@ impl<'db> Type<'db> {
         }
 
         if mode.is_async() {
+            if let Type::Intersection(_) = self {
+                let flattened = self.flatten_typevars(db);
+                if flattened != self {
+                    return flattened.try_iterate_with_mode(db, mode);
+                }
+            }
+
             let try_call_dunder_anext_on_iterator = |iterator: Type<'db>| -> Result<
                 Result<Type<'db>, AwaitError<'db>>,
                 CallDunderError<'db>,
