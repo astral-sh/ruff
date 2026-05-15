@@ -1268,6 +1268,7 @@ mod resolve_definition {
     use ruff_db::vendored::VendoredPathBuf;
     use ruff_python_ast as ast;
     use ruff_python_stdlib::sys::is_builtin_module;
+    use ruff_text_size::TextRange;
     use rustc_hash::FxHashSet;
     use tracing::trace;
     use ty_module_resolver::{ModuleName, file_to_module, resolve_module, resolve_real_module};
@@ -1275,7 +1276,7 @@ mod resolve_definition {
     use crate::Db;
     use crate::module_docstring;
     use crate::types::binding_type;
-    use ty_python_core::definition::{Definition, DefinitionKind};
+    use ty_python_core::definition::{Definition, DefinitionCategory, DefinitionKind};
     use ty_python_core::scope::{NodeWithScopeKind, ScopeId};
     use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
 
@@ -1295,6 +1296,31 @@ mod resolve_definition {
     }
 
     impl<'db> ResolvedDefinition<'db> {
+        pub fn focus_range(&self, db: &dyn Db) -> FileRange {
+            match self {
+                ResolvedDefinition::Definition(definition) => {
+                    let parsed = parsed_module(db, definition.file(db)).load(db);
+                    definition.focus_range(db, &parsed)
+                }
+                // For modules, navigate to the start of the file
+                ResolvedDefinition::Module(module) => FileRange::new(*module, TextRange::default()),
+                ResolvedDefinition::FileWithRange(file_range) => *file_range,
+            }
+        }
+
+        pub fn category(&self, db: &dyn Db) -> DefinitionCategory {
+            match self {
+                ResolvedDefinition::Definition(definition) => {
+                    let file = definition.file(db);
+                    let parsed = parsed_module(db, file).load(db);
+                    definition.kind(db).category(file.is_stub(db), &parsed)
+                }
+                ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => {
+                    DefinitionCategory::DeclarationAndBinding
+                }
+            }
+        }
+
         pub fn definition(&self) -> Option<Definition<'db>> {
             match self {
                 ResolvedDefinition::Definition(definition) => Some(*definition),

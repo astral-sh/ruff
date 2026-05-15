@@ -1972,4 +1972,224 @@ func<CURSOR>_alias()
           |
         "#);
     }
+
+    #[test]
+    fn without_declaration_excludes_initial_assignment() {
+        let test = cursor_test(
+            "
+x<CURSOR> = 1
+print(x)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 1 references
+         --> main.py:3:7
+          |
+        3 | print(x)
+          |       -
+          |
+        ");
+    }
+
+    #[test]
+    fn without_declaration_keeps_reassignment_without_declaration() {
+        let test = cursor_test(
+            "
+x = 1
+x = 2
+print(x<CURSOR>)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 2 references
+         --> main.py:3:1
+          |
+        3 | x = 2
+          | -
+        4 | print(x)
+          |       -
+          |
+        ");
+    }
+
+    #[test]
+    fn without_declaration_keeps_assignment_after_annotation() {
+        let test = cursor_test(
+            "
+x<CURSOR>: int
+x = 1
+print(x)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 2 references
+         --> main.py:3:1
+          |
+        3 | x = 1
+          | -
+        4 | print(x)
+          |       -
+          |
+        ");
+    }
+
+    #[test]
+    fn without_declaration_excludes_repeated_annotation() {
+        let test = cursor_test(
+            "
+x<CURSOR>: int
+x: str
+print(x)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 1 references
+         --> main.py:4:7
+          |
+        4 | print(x)
+          |       -
+          |
+        ");
+    }
+
+    #[test]
+    fn without_declaration_excludes_type_alias_name() {
+        let test = cursor_test(
+            "
+type Box<CURSOR> = int | None
+value: Box
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 1 references
+         --> main.py:3:8
+          |
+        3 | value: Box
+          |        ---
+          |
+        ");
+    }
+
+    #[test]
+    fn without_declaration_control_flow() {
+        let test = cursor_test(
+            "
+def test(flag: bool):
+    if flag:
+        x: int = 1
+        return
+
+    x = 2
+    print(x<CURSOR>)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 1 references
+         --> main.py:8:11
+          |
+        8 |     print(x)
+          |           -
+          |
+        ");
+    }
+
+    #[test]
+    fn without_declaration_keeps_binding_when_declaration_is_partial() {
+        let test = cursor_test(
+            "
+def f(flag: bool):
+    if flag:
+        x: int
+    x = 1
+    print(x<CURSOR>)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 2 references
+         --> main.py:5:5
+          |
+        5 |     x = 1
+          |     -
+        6 |     print(x)
+          |           -
+          |
+        ");
+    }
+
+    #[test]
+    fn without_declaration_excludes_live_conditional_assignments() {
+        let test = cursor_test(
+            "
+if flag:
+    x = 1
+else:
+    x = 2
+print(x<CURSOR>)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 1 references
+         --> main.py:6:7
+          |
+        6 | print(x)
+          |       -
+          |
+        ");
+    }
+
+    #[test]
+    fn without_declaration_excludes_initial_attribute_assignment() {
+        let test = cursor_test(
+            "
+class C:
+    def __init__(self):
+        self.x<CURSOR> = 1
+
+    def f(self):
+        print(self.x)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 1 references
+         --> main.py:7:20
+          |
+        7 |         print(self.x)
+          |                    -
+          |
+        ");
+    }
+
+    #[test]
+    fn without_declaration_excludes_attribute_assignment_after_base_rebind() {
+        let test = cursor_test(
+            "
+class C:
+    def f(self, flag: bool):
+        if flag:
+            self.x = 1
+        else:
+            self = C()
+        self.x<CURSOR> = 2
+        print(self.x)
+",
+        );
+
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 1 references
+         --> main.py:9:20
+          |
+        9 |         print(self.x)
+          |                    -
+          |
+        ");
+    }
 }

@@ -46,7 +46,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// member, since removing `lazy` from a multi-member import would make every
 /// imported member eager, including names that may not be resolved immediately.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "0.15.13")]
 pub(crate) struct LazyImportImmediatelyResolved {
     name: String,
     fixable: bool,

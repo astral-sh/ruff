@@ -927,6 +927,23 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_use_def_map().snapshot()
     }
 
+    fn bool_op_snapshots_for_condition(&self, expr: &ast::Expr) -> Option<BoolOpSnapshots> {
+        match expr {
+            ast::Expr::BoolOp(_) => self
+                .bool_op_snapshots_by_node
+                .get(&ExpressionNodeKey::from(expr))
+                .cloned(),
+            ast::Expr::UnaryOp(unary_op) if unary_op.op == ast::UnaryOp::Not => {
+                let snapshots = self.bool_op_snapshots_for_condition(&unary_op.operand)?;
+                Some(BoolOpSnapshots {
+                    truthy: snapshots.falsy,
+                    falsy: snapshots.truthy,
+                })
+            }
+            _ => None,
+        }
+    }
+
     fn flow_restore(&mut self, state: FlowSnapshot) {
         self.current_use_def_map_mut().restore(state);
     }
@@ -2707,12 +2724,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Stmt::If(node) => {
                 let flow_snapshot = |builder: &Self, test: &'ast ast::Expr| {
                     let no_branch_taken = builder.flow_snapshot();
-                    let bool_op_snapshots = builder
-                        .bool_op_snapshots_by_node
-                        .get(&ExpressionNodeKey::from(test));
                     BoolOpSnapshot {
                         before: no_branch_taken,
-                        after: bool_op_snapshots.cloned(),
+                        after: builder.bool_op_snapshots_for_condition(test),
                     }
                 };
 

@@ -7027,6 +7027,61 @@ take({"<CURSOR>": 1})
     }
 
     #[test]
+    fn string_literal_completions_in_incomplete_typed_dict_literal_key() {
+        let builder = completion_test_builder(
+            r#"
+from typing import TypedDict
+
+class Box(TypedDict):
+    x: float
+    y: float
+    z: float
+
+def take(box: Box): ...
+
+take({"<CURSOR>"})
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        x :: Literal["x"]
+        y :: Literal["y"]
+        z :: Literal["z"]
+        "#,
+        );
+    }
+
+    #[test]
+    fn string_literal_completions_in_incomplete_typed_dict_literal_key_combines_set_context() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Literal, TypedDict
+
+class Box(TypedDict):
+    x: float
+    y: float
+    z: float
+
+def take(value: Box | set[Literal["item"]]): ...
+
+take({"<CURSOR>"})
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        item :: Literal["item"]
+        x :: Literal["x"]
+        y :: Literal["y"]
+        z :: Literal["z"]
+        "#,
+        );
+    }
+
+    #[test]
     fn string_literal_completions_typed_dict_constructor_mixed_literal_keys() {
         let builder = completion_test_builder(
             r#"
