@@ -2165,13 +2165,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .iter()
                     .map(|element| self.narrow_with_present_key(*element, key)),
             ),
-            resolved => {
-                if type_guarantees_typeddict_key(self.db, resolved, key) {
-                    resolved
-                } else {
-                    constrain(ty)
-                }
-            }
+            _ => constrain(ty),
         }
     }
 
@@ -2296,49 +2290,6 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         | Type::TypeIs(_)
         | Type::TypeGuard(_)
         | Type::TypeForm(_)
-        | Type::NewTypeInstance(_) => false,
-    }
-}
-
-fn type_guarantees_typeddict_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> bool {
-    match ty {
-        Type::TypedDict(typed_dict) => typed_dict.items(db).contains_key(key),
-        Type::Intersection(intersection) => intersection
-            .positive(db)
-            .iter()
-            .any(|element| type_guarantees_typeddict_key(db, *element, key)),
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .all(|element| type_guarantees_typeddict_key(db, *element, key)),
-        Type::TypeAlias(alias) => type_guarantees_typeddict_key(db, alias.value_type(db), key),
-
-        Type::Dynamic(_)
-        | Type::Divergent(_)
-        | Type::Never
-        | Type::FunctionLiteral(_)
-        | Type::BoundMethod(_)
-        | Type::KnownBoundMethod(_)
-        | Type::WrapperDescriptor(_)
-        | Type::DataclassDecorator(_)
-        | Type::DataclassTransformer(_)
-        | Type::Callable(_)
-        | Type::ModuleLiteral(_)
-        | Type::ClassLiteral(_)
-        | Type::GenericAlias(_)
-        | Type::SubclassOf(_)
-        | Type::NominalInstance(_)
-        | Type::ProtocolInstance(_)
-        | Type::SpecialForm(_)
-        | Type::KnownInstance(_)
-        | Type::PropertyInstance(_)
-        | Type::AlwaysTruthy
-        | Type::AlwaysFalsy
-        | Type::LiteralValue(_)
-        | Type::TypeVar(_)
-        | Type::BoundSuper(_)
-        | Type::TypeIs(_)
-        | Type::TypeGuard(_)
         | Type::NewTypeInstance(_) => false,
     }
 }

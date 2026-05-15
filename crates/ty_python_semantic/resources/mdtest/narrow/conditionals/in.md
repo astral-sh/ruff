@@ -228,9 +228,9 @@ from typing import Literal
 
 def f(x: Literal["abc", "def"]):
     if "a" in x:
-        reveal_type(
-            x
-        )  # revealed: (Literal["abc"] & <Protocol with members '__getitem__'>) | (Literal["def"] & <Protocol with members '__getitem__'>)
+        # `x` could also be validly narrowed to `Literal["abc"]` here:
+        # revealed: (Literal["abc"] & <Protocol with members '__getitem__'>) | (Literal["def"] & <Protocol with members '__getitem__'>)
+        reveal_type(x)
     else:
         # `x` could also be validly narrowed to `Literal["def"]` here:
         reveal_type(x)  # revealed: Literal["abc", "def"]
@@ -239,9 +239,9 @@ def f(x: Literal["abc", "def"]):
         # `x` could also be validly narrowed to `Literal["def"]` here:
         reveal_type(x)  # revealed: Literal["abc", "def"]
     else:
-        reveal_type(
-            x
-        )  # revealed: (Literal["abc"] & <Protocol with members '__getitem__'>) | (Literal["def"] & <Protocol with members '__getitem__'>)
+        # `x` could also be validly narrowed to `Literal["abc"]` here:
+        # revealed: (Literal["abc"] & <Protocol with members '__getitem__'>) | (Literal["def"] & <Protocol with members '__getitem__'>)
+        reveal_type(x)
 ```
 
 ## bool

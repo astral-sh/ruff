@@ -4631,6 +4631,8 @@ def _(t: Bar, u: Foo | Intersection[Bar, Any], v: Intersection[Bar, Any], w: Lit
     if "bar" not in u:
         reveal_type(u)  # revealed: Foo
     else:
+        # TODO: This should simplify to `Foo | (Bar & Any)`, since `Foo` is a
+        # subtype of the synthesized protocol.
         reveal_type(u)  # revealed: (Foo & <Protocol with members '__getitem__'>) | (Bar & Any)
 
     if "bar" not in v:
