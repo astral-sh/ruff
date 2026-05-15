@@ -12,12 +12,14 @@ use ruff_db::system::{
 };
 use ruff_python_ast::PythonVersion;
 use ty_module_resolver::{Module, ModuleName, resolve_module_confident};
-use ty_project::metadata::options::{EnvironmentOptions, Options, ProjectOptionsOverrides};
+use ty_project::metadata::options::{
+    EnvironmentOptions, Options, ProjectOptionsOverrides, SrcOptions,
+};
 use ty_project::metadata::pyproject::{PyProject, Tool};
 use ty_project::metadata::python_version::SupportedPythonVersion;
-use ty_project::metadata::value::{RangedValue, RelativePathBuf};
+use ty_project::metadata::value::{RangedValue, RelativeGlobPattern, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
-use ty_project::{Db, ProjectDatabase, ProjectMetadata};
+use ty_project::{ChangeResult, Db, ProjectDatabase, ProjectMetadata};
 use ty_python_core::platform::PythonPlatform;
 use ty_static::EnvVars;
 
@@ -181,8 +183,8 @@ impl TestCase {
         &mut self,
         changes: &[ChangeEvent],
         project_options_overrides: Option<&ProjectOptionsOverrides>,
-    ) {
-        self.db.apply_changes(changes, project_options_overrides);
+    ) -> ChangeResult {
+        self.db.apply_changes(changes, project_options_overrides)
     }
 
     fn update_options(&mut self, options: Options) -> anyhow::Result<()> {
@@ -570,6 +572,53 @@ fn new_ignored_file() -> anyhow::Result<()> {
 
     assert!(case.system_file(&foo_path).is_ok());
     case.assert_indexed_project_files([bar_file]);
+
+    Ok(())
+}
+
+#[test]
+fn ignore_file_change_reloads_files_not_project_metadata() -> anyhow::Result<()> {
+    let mut case = setup([("bar.py", ""), ("foo.py", ""), (".ignore", "foo.py")])?;
+    let bar = case.system_file(case.project_path("bar.py"))?;
+    let foo = case.system_file(case.project_path("foo.py"))?;
+
+    case.assert_indexed_project_files([bar]);
+
+    update_file(case.project_path(".ignore"), "")?;
+
+    let changes = case.stop_watch(event_for_file(".ignore"));
+    let result = case.apply_changes(&changes, None);
+
+    assert!(!result.project_changed());
+    case.assert_indexed_project_files([bar, foo]);
+
+    Ok(())
+}
+
+#[test]
+fn src_file_filter_change_reloads_project_files() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_project_file("bar.py", "")?;
+        context.write_project_file("foo.py", "")?;
+        context.set_options(Options {
+            src: Some(SrcOptions {
+                exclude: Some(RangedValue::cli(vec![RelativeGlobPattern::cli("foo.py")])),
+                ..SrcOptions::default()
+            }),
+            ..Options::default()
+        });
+
+        Ok(())
+    })?;
+
+    let bar = case.system_file(case.project_path("bar.py"))?;
+    let foo = case.system_file(case.project_path("foo.py"))?;
+
+    case.assert_indexed_project_files([bar]);
+
+    case.update_options(Options::default())?;
+
+    case.assert_indexed_project_files([bar, foo]);
 
     Ok(())
 }
@@ -1022,7 +1071,8 @@ fn directory_deleted() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("sub"));
 
-    case.apply_changes(&changes, None);
+    let result = case.apply_changes(&changes, None);
+    assert!(!result.project_changed());
 
     // `import sub.a` should no longer resolve
     assert!(
@@ -1761,6 +1811,47 @@ mod unix {
 
         Ok(())
     }
+}
+
+#[test]
+fn active_project_config_change_reloads_project() -> anyhow::Result<()> {
+    let mut case = setup([("foo.py", "")])?;
+
+    std::fs::write(
+        case.project_path("pyproject.toml").as_std_path(),
+        r#"
+        [tool.ty.rules]
+        division-by-zero = "warn"
+        "#,
+    )?;
+
+    let changes = case.stop_watch(event_for_file("pyproject.toml"));
+    let result = case.apply_changes(&changes, None);
+
+    assert!(result.project_changed());
+
+    Ok(())
+}
+
+#[test]
+fn nested_project_config_change_is_cheap_if_active_project_unchanged() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_project_file("foo.py", "")?;
+        std::fs::create_dir(context.join_project_path("pkg").as_std_path())?;
+        Ok(())
+    })?;
+    let project_root = case.db().project().root(case.db()).to_path_buf();
+    let nested_pyproject = case.project_path("pkg/pyproject.toml");
+
+    std::fs::write(nested_pyproject.as_std_path(), "[tool.ty]\n")?;
+
+    let changes = case.stop_watch(event_for_file("pyproject.toml"));
+    let result = case.apply_changes(&changes, None);
+
+    assert!(!result.project_changed());
+    assert_eq!(case.db().project().root(case.db()), &*project_root);
+
+    Ok(())
 }
 
 #[test]

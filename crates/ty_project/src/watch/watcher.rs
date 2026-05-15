@@ -8,7 +8,7 @@ use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher as _, recomme
 
 use ruff_db::system::{SystemPath, SystemPathBuf};
 
-use crate::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
+use crate::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind, ExistingPathKind};
 
 /// Creates a new watcher observing file system changes.
 ///
@@ -268,9 +268,9 @@ impl Debouncer {
                 let kind = match create {
                     CreateKind::File => CreatedKind::File,
                     CreateKind::Folder => CreatedKind::Directory,
-                    CreateKind::Any | CreateKind::Other => {
-                        CreatedKind::from(FileType::from_path(&path))
-                    }
+                    CreateKind::Any | CreateKind::Other => CreatedKind::from(
+                        ExistingPathKind::from_io_metadata(&path.as_std_path().metadata()),
+                    ),
                 };
 
                 ChangeEvent::Created { path, kind }
@@ -278,7 +278,9 @@ impl Debouncer {
 
             EventKind::Modify(modify) => match modify {
                 ModifyKind::Metadata(metadata) => {
-                    if FileType::from_path(&path) != FileType::File {
+                    if ExistingPathKind::from_io_metadata(&path.as_std_path().metadata())
+                        != ExistingPathKind::File
+                    {
                         // Only interested in file metadata events.
                         return;
                     }
@@ -320,7 +322,9 @@ impl Debouncer {
                     }
 
                     RenameMode::To => ChangeEvent::Created {
-                        kind: CreatedKind::from(FileType::from_path(&path)),
+                        kind: CreatedKind::from(ExistingPathKind::from_io_metadata(
+                            &path.as_std_path().metadata(),
+                        )),
                         path,
                     },
 
@@ -340,7 +344,8 @@ impl Debouncer {
                     RenameMode::Any => {
                         // Guess the action based on the current file system state
                         if path.as_std_path().exists() {
-                            let file_type = FileType::from_path(&path);
+                            let file_type =
+                                ExistingPathKind::from_io_metadata(&path.as_std_path().metadata());
 
                             ChangeEvent::Created {
                                 kind: file_type.into(),
@@ -359,7 +364,8 @@ impl Debouncer {
                     return;
                 }
                 ModifyKind::Any => {
-                    if !path.as_std_path().is_file() {
+                    if !ExistingPathKind::from_io_metadata(&path.as_std_path().metadata()).is_file()
+                    {
                         return;
                     }
 
@@ -419,37 +425,5 @@ where
     fn handle(&self, changes: Vec<ChangeEvent>) {
         let f = self;
         f(changes);
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-enum FileType {
-    /// The event is related to a directory.
-    File,
-
-    /// The event is related to a directory.
-    Directory,
-
-    /// It's unknown whether the event is related to a file or a directory or if it is any other file type.
-    Any,
-}
-
-impl FileType {
-    fn from_path(path: &SystemPath) -> FileType {
-        match path.as_std_path().metadata() {
-            Ok(metadata) if metadata.is_file() => FileType::File,
-            Ok(metadata) if metadata.is_dir() => FileType::Directory,
-            Ok(_) | Err(_) => FileType::Any,
-        }
-    }
-}
-
-impl From<FileType> for CreatedKind {
-    fn from(value: FileType) -> Self {
-        match value {
-            FileType::File => Self::File,
-            FileType::Directory => Self::Directory,
-            FileType::Any => Self::Any,
-        }
     }
 }

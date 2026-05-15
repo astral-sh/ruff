@@ -253,7 +253,7 @@ impl Project {
         settings: Option<Settings>,
         settings_diagnostics: Vec<OptionDiagnostic>,
         program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
-    ) {
+    ) -> ProjectReloadResult {
         tracing::debug!("Reloading project");
         let metadata_changed = &metadata != self.metadata(db);
         let settings_diagnostics = Self::settings_diagnostics_with_program_diagnostics(
@@ -262,24 +262,39 @@ impl Project {
             program_settings_diagnostics,
         );
 
-        self.reload_files(db);
-
-        if let Some(settings) = settings
+        let root_changed = metadata.root() != self.root(db);
+        let (settings_changed, files_changed) = if let Some(settings) = settings
             && self.settings(db) != &settings
         {
+            let files_changed = root_changed || settings.src() != self.settings(db).src();
             self.set_settings(db).to(Box::new(settings));
-        }
+            (true, files_changed)
+        } else {
+            (false, root_changed)
+        };
 
         if self.settings_diagnostics(db) != settings_diagnostics {
             self.set_settings_diagnostics(db).to(settings_diagnostics);
         }
 
-        if !metadata_changed {
-            return;
+        if files_changed {
+            // The project file set only depends on the project root, explicit check paths,
+            // force-exclude, and `src` settings. Check paths and force-exclude are updated
+            // through their own setters, so a config reload only needs to reindex when the
+            // root or resolved `src` settings changed.
+            self.reload_files(db);
         }
 
-        self.set_metadata(db).to(Box::new(metadata));
-        self.try_add_file_root(db);
+        if metadata_changed {
+            self.set_metadata(db).to(Box::new(metadata));
+            self.try_add_file_root(db);
+        }
+
+        if metadata_changed || settings_changed {
+            ProjectReloadResult::Changed { files_changed }
+        } else {
+            ProjectReloadResult::Unchanged
+        }
     }
 
     /// Replace stored settings diagnostics after recomputing program settings.
@@ -578,6 +593,43 @@ impl Project {
         index.remove(file);
     }
 
+    /// Removes all indexed project files under `path`.
+    ///
+    /// This is a no-op if the project files are still lazily indexed.
+    #[tracing::instrument(level = "debug", skip(self, db))]
+    pub(crate) fn remove_files_under(self, db: &mut dyn Db, path: &SystemPath) {
+        let path = SystemPath::absolute(path, db.system().current_directory());
+
+        if self.file_set(db).is_lazy() {
+            return;
+        }
+
+        let files_to_remove = {
+            let files = self.files(db);
+            files
+                .iter()
+                .copied()
+                .filter(|file| {
+                    file.path(db)
+                        .as_system_path()
+                        .is_some_and(|file_path| file_path.starts_with(&path))
+                })
+                .collect::<Vec<_>>()
+        };
+
+        if files_to_remove.is_empty() {
+            return;
+        }
+
+        let Some(mut index) = IndexedFiles::indexed_mut(db, self) else {
+            return;
+        };
+
+        for file in files_to_remove {
+            index.remove(file);
+        }
+    }
+
     pub fn add_file(self, db: &mut dyn Db, file: File) {
         tracing::debug!(
             "Adding file `{}` to project `{}`",
@@ -644,6 +696,17 @@ impl Project {
             .map(OptionDiagnostic::to_diagnostic)
             .collect()
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProjectReloadResult {
+    /// Neither project metadata nor settings changed.
+    Unchanged,
+    /// Project metadata or settings changed.
+    Changed {
+        /// Whether the indexed project files changed.
+        files_changed: bool,
+    },
 }
 
 #[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]

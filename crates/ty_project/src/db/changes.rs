@@ -1,14 +1,14 @@
-use crate::ProjectMetadata;
 use crate::db::{Db, ProjectDatabase};
 use crate::metadata::options::ProjectOptionsOverrides;
 use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
+use crate::{ProjectMetadata, ProjectReloadResult};
 use std::collections::BTreeSet;
 
 use crate::walk::ProjectFilesWalker;
 use ruff_db::Db as _;
 use ruff_db::file_revision::FileRevision;
 use ruff_db::files::{File, FileRootKind, Files};
-use ruff_db::system::SystemPath;
+use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
 use salsa::Setter;
 use ty_python_core::program::{FallibleStrategy, Program};
@@ -42,6 +42,7 @@ impl ProjectDatabase {
         let project_root = project.root(self).to_path_buf();
         let config_file_override =
             project_options_overrides.and_then(|options| options.config_file_override.clone());
+        let extra_configuration_paths = project.metadata(self).extra_configuration_paths().to_vec();
         let program = Program::get(self);
         let custom_stdlib_versions_path = program
             .custom_stdlib_search_path(self)
@@ -57,27 +58,31 @@ impl ProjectDatabase {
         // Deduplicate the `sync` calls. Many file watchers emit multiple events for the same path.
         let mut synced_files = FxHashSet::default();
         let mut sync_recursively = BTreeSet::default();
+        // A non-file delete may be a deleted directory or an ambiguous LSP delete for a path
+        // that no longer exists. Handle it recursively to keep Salsa's file state in sync.
+        let mut removed_paths = BTreeSet::default();
+        let mut reload_project = false;
+        let mut reload_project_files = false;
 
         for change in changes {
             tracing::debug!("Handling file watcher change event: {:?}", change);
 
             if let Some(path) = change.system_path() {
-                if let Some(config_file) = &config_file_override {
-                    if config_file.as_path() == path {
-                        File::sync_path(self, path);
-                        result.project_changed = true;
-
-                        continue;
-                    }
-                }
-
-                if matches!(
-                    path.file_name(),
-                    Some(".gitignore" | ".ignore" | "ty.toml" | "pyproject.toml")
+                if is_project_configuration_path(
+                    path,
+                    &project_root,
+                    config_file_override.as_ref(),
+                    &extra_configuration_paths,
                 ) {
                     File::sync_path(self, path);
-                    // Changes to ignore files or settings can change the project structure or add/remove files.
-                    result.project_changed = true;
+                    reload_project = true;
+
+                    continue;
+                }
+
+                if is_ignore_file(path) {
+                    File::sync_path(self, path);
+                    reload_project_files = true;
 
                     continue;
                 }
@@ -90,10 +95,8 @@ impl ProjectDatabase {
             match change {
                 ChangeEvent::Changed { path, kind: _ } | ChangeEvent::Opened(path) => {
                     if synced_files.insert(path.to_path_buf()) {
-                        let absolute =
-                            SystemPath::absolute(path, self.system().current_directory());
-                        File::sync_path_only(self, &absolute);
-                        if let Some(root) = self.files().root(self, &absolute) {
+                        File::sync_path_only(self, path);
+                        if let Some(root) = self.files().root(self, path) {
                             match root.kind_at_time_of_creation(self) {
                                 // When a file inside the root of
                                 // the project is changed, we don't
@@ -146,7 +149,6 @@ impl ProjectDatabase {
                     // should be included in the project. We can skip this check for
                     // paths that aren't part of the project or shouldn't be included
                     // when checking the project.
-
                     if self.system().is_file(path) {
                         if project.is_file_included(self, path) {
                             // Add the parent directory because `walkdir`
@@ -162,10 +164,7 @@ impl ProjectDatabase {
                 ChangeEvent::Deleted { kind, path } => {
                     let is_file = match kind {
                         DeletedKind::File => true,
-                        DeletedKind::Directory => {
-                            // file watchers emit an event for every deleted file. No need to scan the entire dir.
-                            continue;
-                        }
+                        DeletedKind::Directory => false,
                         DeletedKind::Any => self
                             .files
                             .try_system(self, path)
@@ -182,6 +181,7 @@ impl ProjectDatabase {
                         }
                     } else {
                         sync_recursively.insert(path.clone());
+                        removed_paths.insert(path.clone());
 
                         if custom_stdlib_versions_path
                             .as_ref()
@@ -190,24 +190,16 @@ impl ProjectDatabase {
                             result.custom_stdlib_changed = true;
                         }
 
-                        let directory_included = project.is_directory_included(self, path);
-
-                        if directory_included || path == &project_root {
-                            // TODO: Shouldn't it be enough to simply traverse the project files and remove all
-                            // that start with the given path?
+                        if directory_may_contain_project_configuration(
+                            path,
+                            &project_root,
+                            config_file_override.as_ref(),
+                            &extra_configuration_paths,
+                        ) {
                             tracing::debug!(
-                                "Reload project because of a path that could have been a directory."
+                                "Reload project because a configuration file may have been deleted."
                             );
-
-                            // Perform a full-reload in case the deleted directory contained the pyproject.toml.
-                            // We may want to make this more clever in the future, to e.g. iterate over the
-                            // indexed files and remove the once that start with the same path, unless
-                            // the deleted path is the project configuration.
-                            result.project_changed = true;
-                        } else if !directory_included {
-                            tracing::debug!(
-                                "Skipping reload because directory '{path}' isn't included in the project"
-                            );
+                            reload_project = true;
                         }
                     }
                 }
@@ -223,35 +215,30 @@ impl ProjectDatabase {
                 }
 
                 ChangeEvent::Rescan => {
-                    result.project_changed = true;
+                    reload_project = true;
+                    reload_project_files = true;
                     Files::sync_all(self);
                     sync_recursively.clear();
+                    removed_paths.clear();
                     break;
                 }
             }
         }
 
-        let sync_recursively = sync_recursively.into_iter();
-        let mut last = None;
+        Files::sync_all_recursive(self, deduplicate_nested_paths(sync_recursively));
 
-        for path in sync_recursively {
-            // Avoid re-syncing paths that are sub-paths of each other.
-            if let Some(last) = &last {
-                if path.starts_with(last) {
-                    continue;
-                }
-            }
-
-            Files::sync_recursively(self, &path);
-            last = Some(path);
-        }
-
-        if result.project_changed {
+        if reload_project {
+            // The active project root may have been deleted. Start rediscovery from
+            // the closest existing ancestor so ty can fall back to an enclosing project.
+            let rediscovery_path = project_root
+                .ancestors()
+                .find(|path| self.system().is_directory(path))
+                .unwrap_or(&project_root);
             let new_project_metadata = match config_file_override {
                 Some(config_file) => {
                     ProjectMetadata::from_config_file(config_file, &project_root, self.system())
                 }
-                None => ProjectMetadata::discover(&project_root, self.system()),
+                None => ProjectMetadata::discover(rediscovery_path, self.system()),
             };
             match new_project_metadata {
                 Ok(mut metadata) => {
@@ -298,23 +285,44 @@ impl ProjectDatabase {
                     };
 
                     tracing::debug!("Reloading project after structural change");
-                    project.reload(
+                    match project.reload(
                         self,
                         metadata,
                         settings,
                         settings_diagnostics,
                         program_settings_diagnostics,
-                    );
+                    ) {
+                        ProjectReloadResult::Unchanged => {}
+                        ProjectReloadResult::Changed { files_changed } => {
+                            result.project_changed = true;
+                            if files_changed {
+                                // The project file set has already been rebuilt; continuing would
+                                // run incremental discovery from paths collected before the reload.
+                                return result;
+                            }
+                        }
+                    }
                 }
                 Err(error) => {
                     tracing::error!(
                         "Failed to load project, keeping old project configuration: {error}"
                     );
+                    if reload_project_files {
+                        project.reload_files(self);
+                        return result;
+                    }
                 }
             }
+        }
 
-            return result;
-        } else if result.custom_stdlib_changed {
+        if reload_project_files {
+            project.reload_files(self);
+            // A full project-file reload supersedes incremental project-file updates.
+            added_paths.clear();
+            removed_paths.clear();
+        }
+
+        if result.custom_stdlib_changed {
             match project.metadata(self).to_program_settings(
                 self.system(),
                 self.vendored(),
@@ -342,6 +350,10 @@ impl ProjectDatabase {
             }
         }
 
+        for path in deduplicate_nested_paths(removed_paths) {
+            project.remove_files_under(self, &path);
+        }
+
         let diagnostics = if let Some(walker) = ProjectFilesWalker::incremental(self, added_paths) {
             // Use directory walking to discover newly added files.
             let (files, diagnostics) = walker.collect_vec(self);
@@ -364,4 +376,56 @@ impl ProjectDatabase {
 
         result
     }
+}
+
+fn is_project_configuration_path(
+    path: &SystemPath,
+    project_root: &SystemPath,
+    config_file_override: Option<&SystemPathBuf>,
+    extra_configuration_paths: &[SystemPathBuf],
+) -> bool {
+    if extra_configuration_paths
+        .iter()
+        .any(|config_path| config_path.as_path() == path)
+    {
+        return true;
+    }
+
+    if let Some(config_path) = config_file_override {
+        config_path.as_path() == path
+    } else {
+        path.parent()
+            .is_some_and(|parent| project_root.starts_with(parent))
+            && is_project_config_file(path)
+    }
+}
+
+fn directory_may_contain_project_configuration(
+    directory: &SystemPath,
+    project_root: &SystemPath,
+    config_file_override: Option<&SystemPathBuf>,
+    extra_configuration_paths: &[SystemPathBuf],
+) -> bool {
+    if extra_configuration_paths
+        .iter()
+        .any(|config_path| config_path.starts_with(directory))
+    {
+        return true;
+    }
+
+    if let Some(config_path) = config_file_override {
+        config_path.starts_with(directory)
+    } else {
+        // Deleting the project root or one of its ancestors can change rediscovery:
+        // ty may need to fall back to an enclosing configuration.
+        project_root.starts_with(directory)
+    }
+}
+
+fn is_ignore_file(path: &SystemPath) -> bool {
+    matches!(path.file_name(), Some(".gitignore" | ".ignore"))
+}
+
+fn is_project_config_file(path: &SystemPath) -> bool {
+    matches!(path.file_name(), Some("ty.toml" | "pyproject.toml"))
 }
