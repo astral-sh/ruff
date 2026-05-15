@@ -231,8 +231,6 @@ impl Files {
     /// Refreshing the state of files recursively is expensive. It requires iterating over all known files
     /// and making system calls to get the latest status of matching files.
     /// That's why [`File::sync_path`] is preferred if it is known that the path is a file.
-    ///
-    /// Callers are responsible for removing nested paths that would be redundant to sync.
     pub fn sync_all_recursive<P, I>(db: &mut dyn Db, paths: I)
     where
         P: AsRef<SystemPath>,

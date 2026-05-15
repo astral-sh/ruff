@@ -216,6 +216,7 @@ impl ProjectDatabase {
 
                 ChangeEvent::Rescan => {
                     reload_project = true;
+                    reload_project_files = true;
                     Files::sync_all(self);
                     sync_recursively.clear();
                     removed_paths.clear();
@@ -224,8 +225,7 @@ impl ProjectDatabase {
             }
         }
 
-        let sync_recursively = deduplicate_nested_paths(sync_recursively).collect::<Vec<_>>();
-        Files::sync_all_recursive(self, &sync_recursively);
+        Files::sync_all_recursive(self, deduplicate_nested_paths(sync_recursively));
 
         if reload_project {
             // The active project root may have been deleted. Start rediscovery from
