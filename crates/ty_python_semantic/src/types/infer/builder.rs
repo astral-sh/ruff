@@ -5328,6 +5328,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             add_overloads_from_binding(&mut overloads_with_binding, binding);
         });
 
+        let single_overload_with_binding =
+            overloads_with_binding.iter().copied().exactly_one().ok();
+        let mut inferred_paramspec_binder_arguments = FxHashSet::default();
+
         // A keyword argument matched to `**P.kwargs` can appear before the keyword argument that
         // binds `P`, e.g. `wrapper(TagSet=[...], func=put_object)`. Seed those binder argument
         // types first so the normal ParamSpec context path below is not source-order dependent.
@@ -5347,6 +5351,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
 
             if matches!(argument_form, Some(ParameterForm::Type)) {
+                continue;
+            }
+
+            if let Some((overload, binding)) = single_overload_with_binding
+                && overload
+                    .paramspec_binder_parameter_type(db, binding, argument_index)
+                    .is_some()
+                && let Some(parameter_context) = overload.argument_type_context(
+                    db,
+                    &constraints,
+                    binding,
+                    arguments_types,
+                    argument_index,
+                    call_expression_tcx,
+                )
+            {
+                let inferred_ty = infer_argument_ty(
+                    self,
+                    (
+                        argument_index,
+                        ast_argument,
+                        parameter_context.type_context(),
+                    ),
+                );
+                parameter_context.insert_inferred_type(
+                    arguments_types,
+                    argument_index,
+                    inferred_ty,
+                );
+                inferred_paramspec_binder_arguments.insert(argument_index);
                 continue;
             }
 
@@ -5393,6 +5427,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. }) => value,
             };
 
+            if inferred_paramspec_binder_arguments.contains(&argument_index) {
+                continue;
+            }
+
             // Type-form arguments are inferred without type context, so we can infer the argument type directly.
             if let Some(ParameterForm::Type) = argument_form {
                 arguments_types.insert_type(
@@ -5418,7 +5456,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // If there is only a single binding and overload, we can infer the argument directly with
             // the unique parameter type annotation.
-            if let Ok((overload, binding)) = overloads_with_binding.iter().exactly_one() {
+            if let Some((overload, binding)) = single_overload_with_binding {
                 let parameter_context = parameter_tcx(overload, binding);
 
                 if let Some(parameter_context) = parameter_context {
@@ -5448,7 +5486,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             } else {
                 // Infer the type of each argument once with each distinct parameter type as type context.
-                let parameter_types: Vec<_> = overloads_with_binding
+                let parameter_contexts: Vec<_> = overloads_with_binding
                     .iter()
                     .filter_map(|(overload, binding)| parameter_tcx(overload, binding))
                     .collect();
@@ -5467,7 +5505,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // as inner expressions are repeatedly inferred with the same type context.
                 let teardown = self.setup_expression_cache();
 
-                for parameter_context in parameter_types {
+                for parameter_context in parameter_contexts {
                     let inference_cache_key = parameter_context.inference_cache_key();
                     if let Some(inferred_ty) =
                         inferred_by_cache_key.get(&inference_cache_key).copied()
