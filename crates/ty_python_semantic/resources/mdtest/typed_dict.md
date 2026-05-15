@@ -4550,10 +4550,10 @@ def _(u: Foo | Bar | NotADict):
         reveal_type(u)  # revealed: Bar | NotADict
 ```
 
-It would be nice if we could also narrow `TypedDict` unions by checking whether a key (which only
-shows up in a subset of the union members) is present, but that isn't generally correct, because
-"extra items" are allowed by default. For example, even though `Bar` here doesn't define a `"foo"`
-field, it could be _assigned to_ with another `TypedDict` that does:
+We can also narrow `TypedDict` unions by checking whether a key (which only shows up in a subset of
+the union members) is present. We can't filter the union down to just the `TypedDict`s that declare
+the key, because "extra items" are allowed by default. For example, even though `Bar` here doesn't
+define a `"foo"` field, it could be _assigned to_ with another `TypedDict` that does:
 
 ```py
 from typing_extensions import Literal
@@ -4566,14 +4566,16 @@ class Bar(TypedDict):
 
 def disappointment(u: Foo | Bar, v: Literal["foo"]):
     if "foo" in u:
-        # We can't narrow the union here...
-        reveal_type(u)  # revealed: Foo | Bar
+        # We don't narrow to just `Foo` here...
+        reveal_type(u)  # revealed: Foo | (Bar & <TypedDict with items 'foo'>)
+        reveal_type(u["foo"])  # revealed: object
     else:
         # ...(even though we *can* narrow it here)...
         reveal_type(u)  # revealed: Bar
 
     if v in u:
-        reveal_type(u)  # revealed: Foo | Bar
+        reveal_type(u)  # revealed: Foo | (Bar & <TypedDict with items 'foo'>)
+        reveal_type(u["foo"])  # revealed: object
     else:
         reveal_type(u)  # revealed: Bar
 
@@ -4584,6 +4586,25 @@ class FooBar(TypedDict):
 
 static_assert(is_assignable_to(FooBar, Foo))
 static_assert(is_assignable_to(FooBar, Bar))
+```
+
+This still accepts guarded key access in the branch, without pretending that an open `TypedDict`
+must be one of the union members that explicitly declares the key:
+
+```py
+from typing import TypedDict
+
+class FileWithBytes(TypedDict):
+    bytes: bytes
+
+class FileWithUri(TypedDict):
+    uri: str
+
+def get_bytes(file_content: FileWithBytes | FileWithUri) -> object:
+    if "bytes" in file_content:
+        reveal_type(file_content["bytes"])  # revealed: object
+        return file_content["bytes"]
+    raise ValueError
 ```
 
 `not in` works in the opposite way to `in`: we can narrow in the positive case, but we cannot narrow
@@ -4606,7 +4627,7 @@ def _(t: Bar, u: Foo | Intersection[Bar, Any], v: Intersection[Bar, Any], w: Lit
     if "bar" not in u:
         reveal_type(u)  # revealed: Foo
     else:
-        reveal_type(u)  # revealed: Foo | (Bar & Any)
+        reveal_type(u)  # revealed: (Foo & <TypedDict with items 'bar'>) | (Bar & Any)
 
     if "bar" not in v:
         reveal_type(v)  # revealed: Never
@@ -4616,12 +4637,12 @@ def _(t: Bar, u: Foo | Intersection[Bar, Any], v: Intersection[Bar, Any], w: Lit
     if w not in u:
         reveal_type(u)  # revealed: Foo
     else:
-        reveal_type(u)  # revealed: Foo | (Bar & Any)
+        reveal_type(u)  # revealed: (Foo & <TypedDict with items 'bar'>) | (Bar & Any)
 
     if "bar" not in (u2 := u):
         reveal_type(u2)  # revealed: Foo
     else:
-        reveal_type(u2)  # revealed: Foo | (Bar & Any)
+        reveal_type(u2)  # revealed: (Foo & <TypedDict with items 'bar'>) | (Bar & Any)
 ```
 
 With `closed=True`, the narrowing that we couldn't do above becomes possible, because a [closed]
@@ -4639,13 +4660,13 @@ class ClosedBar(TypedDict, closed=True):
 def _(u: ClosedFoo | ClosedBar, v: Literal["foo"]):
     if "foo" in u:
         # TODO: should be `ClosedFoo`
-        reveal_type(u)  # revealed: ClosedFoo | ClosedBar
+        reveal_type(u)  # revealed: ClosedFoo | (ClosedBar & <TypedDict with items 'foo'>)
     else:
         reveal_type(u)  # revealed: ClosedBar
 
     if v in u:
         # TODO: should be `ClosedFoo`
-        reveal_type(u)  # revealed: ClosedFoo | ClosedBar
+        reveal_type(u)  # revealed: ClosedFoo | (ClosedBar & <TypedDict with items 'foo'>)
     else:
         reveal_type(u)  # revealed: ClosedBar
 ```
@@ -4666,7 +4687,7 @@ def _(
         reveal_type(u)  # revealed: ClosedFoo
     else:
         # TODO: should be `ClosedBar & Any`
-        reveal_type(u)  # revealed: ClosedFoo | (ClosedBar & Any)
+        reveal_type(u)  # revealed: (ClosedFoo & <TypedDict with items 'bar'>) | (ClosedBar & Any)
 
     if "bar" not in v:
         reveal_type(v)  # revealed: Never
@@ -4677,7 +4698,7 @@ def _(
         reveal_type(u)  # revealed: ClosedFoo
     else:
         # TODO: should be `ClosedBar & Any`
-        reveal_type(u)  # revealed: ClosedFoo | (ClosedBar & Any)
+        reveal_type(u)  # revealed: (ClosedFoo & <TypedDict with items 'bar'>) | (ClosedBar & Any)
 ```
 
 ## Narrowing tagged unions of `TypedDict`s with `match` statements
@@ -4833,7 +4854,7 @@ def test_in(x: ThingWithBaz):
     if "baz" not in x:
         reveal_type(x)  # revealed: Foo
     else:
-        reveal_type(x)  # revealed: Foo | Baz
+        reveal_type(x)  # revealed: (Foo & <TypedDict with items 'baz'>) | Baz
 ```
 
 Nested PEP 695 type aliases (an alias referring to another alias) also work:
@@ -4862,7 +4883,7 @@ def test_nested_in(x: OuterWithBaz):
     if "baz" not in x:
         reveal_type(x)  # revealed: Foo
     else:
-        reveal_type(x)  # revealed: Foo | Baz
+        reveal_type(x)  # revealed: (Foo & <TypedDict with items 'baz'>) | Baz
 ```
 
 ## Only annotated declarations are allowed in the class body
