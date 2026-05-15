@@ -3525,6 +3525,14 @@ pub struct PylintOptions {
     #[option(default = r"50", value_type = "int", example = r"max-statements = 75")]
     pub max_statements: Option<usize>,
 
+    /// Maximum number of statements allowed for a try clause body (see `W0717`).
+    #[option(
+        default = r"5",
+        value_type = "int",
+        example = r"max-statements-in-try = 10"
+    )]
+    pub max_statements_in_try: Option<usize>,
+
     /// Maximum number of public methods allowed for a class (see `PLR0904`).
     #[option(
         default = r"20",
@@ -3565,6 +3573,9 @@ impl PylintOptions {
             max_returns: self.max_returns.unwrap_or(defaults.max_returns),
             max_branches: self.max_branches.unwrap_or(defaults.max_branches),
             max_statements: self.max_statements.unwrap_or(defaults.max_statements),
+            max_statements_in_try: self
+                .max_statements_in_try
+                .unwrap_or(defaults.max_statements_in_try),
             max_public_methods: self
                 .max_public_methods
                 .unwrap_or(defaults.max_public_methods),

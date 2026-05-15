@@ -1329,6 +1329,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::TooManyNestedBlocks) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
             }
+            if checker.is_rule_enabled(Rule::TooManyStatementsInTryClause) {
+                pylint::rules::too_many_try_statements(
+                    checker,
+                    stmt,
+                    body,
+                    checker.settings().pylint.max_statements_in_try,
+                );
+            }
             if checker.is_rule_enabled(Rule::JumpStatementInFinally) {
                 flake8_bugbear::rules::jump_statement_in_finally(checker, finalbody);
             }
