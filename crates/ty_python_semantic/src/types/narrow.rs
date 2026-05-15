@@ -9,8 +9,9 @@ use crate::types::typed_dict::{
 };
 use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
-    KnownInstanceType, LiteralValueTypeKind, SpecialFormType, SubclassOfInner, SubclassOfType,
-    Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
+    KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature, SpecialFormType,
+    SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints,
+    UnionBuilder, infer_expression_types,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
@@ -2151,8 +2152,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 
     fn narrow_with_required_typeddict_key(&self, ty: Type<'db>, key: &str) -> Type<'db> {
-        let key_presence_constraint =
-            Type::TypedDict(required_typeddict_key(self.db, key, Type::object()));
+        let key_presence_constraint = typeddict_key_getitem_protocol(self.db, key);
 
         let constrain = |ty| {
             IntersectionBuilder::new(self.db)
@@ -2367,17 +2367,23 @@ fn typeddict_declares_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> boo
     }
 }
 
-fn required_typeddict_key<'db>(
-    db: &'db dyn Db,
-    key: &str,
-    value_ty: Type<'db>,
-) -> TypedDictType<'db> {
-    let field = TypedDictFieldBuilder::new(value_ty)
-        .required(true)
-        .read_only(true)
-        .build();
-    let schema = TypedDictSchema::from_iter([(Name::from(key), field)]);
-    TypedDictType::from_schema_items(db, schema)
+fn typeddict_key_getitem_protocol<'db>(db: &'db dyn Db, key: &str) -> Type<'db> {
+    let signature = Signature::new(
+        Parameters::new(
+            db,
+            [
+                Parameter::positional_only(Some(Name::new_static("self"))),
+                Parameter::positional_only(Some(Name::new_static("key")))
+                    .with_annotated_type(Type::string_literal(db, key)),
+            ],
+        ),
+        Type::object(),
+    );
+
+    Type::protocol_with_methods(
+        db,
+        [("__getitem__", CallableType::function_like(db, signature))],
+    )
 }
 
 fn is_supported_tag_literal(ty: Type) -> bool {
