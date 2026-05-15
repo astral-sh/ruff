@@ -1468,7 +1468,7 @@ fn place_from_bindings_impl<'db>(
                 // `Never` will be eliminated automatically.
 
                 if unbound_visibility().is_none_or(Truthiness::is_always_false) {
-                    return Some(Type::Never);
+                    return Some((Type::Never, static_reachability));
                 }
                 return None;
             }
@@ -1492,18 +1492,21 @@ fn place_from_bindings_impl<'db>(
 
             first_definition.get_or_insert(binding);
             let binding_ty = binding_type(db, binding);
-            Some(narrowing_constraint.narrow(db, binding_ty, binding.place(db)))
+            Some((
+                narrowing_constraint.narrow(db, binding_ty, binding.place(db)),
+                static_reachability,
+            ))
         },
     );
 
-    let place = if let Some(first) = types.next() {
-        let ty = if let Some(second) = types.next() {
+    let place = if let Some((first, first_reachability)) = types.next() {
+        let ty = if let Some((second, second_reachability)) = types.next() {
             let mut builder = PublicTypeBuilder::new(db);
-            builder.add(first);
-            builder.add(second);
+            builder.add(first, first_reachability);
+            builder.add(second, second_reachability);
 
-            for ty in types {
-                builder.add(ty);
+            for (ty, reachability) in types {
+                builder.add(ty, reachability);
             }
 
             builder.build()
@@ -1557,7 +1560,7 @@ pub(super) struct PlaceWithDefinition<'db> {
 /// Accumulates types from multiple bindings or declarations, and eventually builds a
 /// union type from them.
 ///
-/// `@overload`ed function literal types are discarded if they are immediately followed
+/// `@overload`ed function literal types are discarded if they are definitely followed
 /// by their implementation. This is to ensure that we do not merge all of them into the
 /// union type. The last one will include the other overloads already.
 struct PublicTypeBuilder<'db> {
@@ -1585,18 +1588,42 @@ impl<'db> PublicTypeBuilder<'db> {
         }
     }
 
-    fn add(&mut self, element: Type<'db>) -> bool {
+    fn add(&mut self, element: Type<'db>, reachability: Truthiness) -> bool {
         match element {
             Type::FunctionLiteral(function) => {
-                if function
-                    .literal(self.db)
-                    .last_definition
-                    .is_overload(self.db)
-                {
+                let last_definition = function.literal(self.db).last_definition;
+                if last_definition.is_overload(self.db) {
+                    // Distinct overloaded function values can be assigned to the same public
+                    // symbol in separate branches. Preserve the queued value unless the next
+                    // overload belongs to the same place.
+                    if !self.queue.is_some_and(|queued| {
+                        let Type::FunctionLiteral(queued_function) = queued else {
+                            return false;
+                        };
+                        function.has_same_place_as(self.db, queued_function)
+                    }) {
+                        self.drain_queue();
+                    }
+
                     self.queue = Some(element);
                     false
                 } else {
-                    self.queue = None;
+                    // An unconditional implementation shadows preceding overload definitions. A
+                    // conditional definition, however, can be only one public possibility among
+                    // several, so keep any unrelated queued overloaded function in the union.
+                    if reachability.is_always_true()
+                        || self.queue.is_some_and(|queued| {
+                            let Type::FunctionLiteral(queued_function) = queued else {
+                                return false;
+                            };
+                            let queued_definition = queued_function.last_definition(self.db);
+                            function.contains_definition(self.db, queued_definition)
+                        })
+                    {
+                        self.queue = None;
+                    } else {
+                        self.drain_queue();
+                    }
                     self.add_to_union(element);
                     true
                 }
@@ -1634,10 +1661,10 @@ impl<'db> DeclaredTypeBuilder<'db> {
         }
     }
 
-    fn add(&mut self, element: TypeAndQualifiers<'db>) {
+    fn add(&mut self, element: TypeAndQualifiers<'db>, reachability: Truthiness) {
         let element_ty = element.inner_type();
 
-        if self.inner.add(element_ty) {
+        if self.inner.add(element_ty, reachability) {
             if let Some(first_ty) = self.first_type {
                 if !first_ty.is_equivalent_to(self.inner.db, element_ty) {
                     self.conflicting_types.insert(element_ty);
@@ -1730,17 +1757,17 @@ fn place_from_declarations_impl<'db>(
             all_declarations_definitely_reachable =
                 all_declarations_definitely_reachable && static_reachability.is_always_true();
 
-            Some(declaration_type(db, declaration))
+            Some((declaration_type(db, declaration), static_reachability))
         }
     });
 
-    if let Some(first) = types.next() {
-        let (declared, conflicting) = if let Some(second) = types.next() {
+    if let Some((first, first_reachability)) = types.next() {
+        let (declared, conflicting) = if let Some((second, second_reachability)) = types.next() {
             let mut builder = DeclaredTypeBuilder::new(db);
-            builder.add(first);
-            builder.add(second);
-            for element in types {
-                builder.add(element);
+            builder.add(first, first_reachability);
+            builder.add(second, second_reachability);
+            for (element, reachability) in types {
+                builder.add(element, reachability);
             }
             builder.build()
         } else {

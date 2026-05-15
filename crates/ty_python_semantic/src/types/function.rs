@@ -1151,6 +1151,16 @@ impl<'db> FunctionType<'db> {
         self.literal(db).definition(db)
     }
 
+    /// Returns `true` if this function's last definition uses the same place as `other`.
+    pub(crate) fn has_same_place_as(self, db: &'db dyn Db, other: FunctionType<'db>) -> bool {
+        self.last_definition(db).place(db) == other.last_definition(db).place(db)
+    }
+
+    /// Returns the [`Definition`] for the last overload or implementation in this function.
+    pub(crate) fn last_definition(self, db: &'db dyn Db) -> Definition<'db> {
+        self.literal(db).last_definition.definition(db)
+    }
+
     /// Returns `true` if this function includes `definition` as one of its overload signatures or
     /// implementation.
     pub(crate) fn contains_definition(self, db: &'db dyn Db, definition: Definition<'db>) -> bool {
