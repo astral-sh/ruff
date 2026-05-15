@@ -19,30 +19,38 @@ use crate::checkers::ast::Checker;
 /// Functions with a high complexity are hard to understand and maintain.
 ///
 /// ## Example
+/// Given a maximum complexity of 5, this function is too complex:
+///
 /// ```python
-/// def foo(a, b, c):
-///     if a:
-///         if b:
-///             if c:
-///                 return 1
-///             else:
-///                 return 2
-///         else:
-///             return 3
-///     else:
-///         return 4
+/// def normalize_status(status):
+///     if status == "new":
+///         return "queued"
+///     if status == "queued":
+///         return "running"
+///     if status == "running":
+///         return "done"
+///     if status == "failed":
+///         return "retry"
+///     if status == "cancelled":
+///         return "closed"
+///     return "unknown"
 /// ```
 ///
-/// Use instead:
+/// Use a lookup table to keep the decision table as data instead of branching
+/// control flow:
+///
 /// ```python
-/// def foo(a, b, c):
-///     if not a:
-///         return 4
-///     if not b:
-///         return 3
-///     if not c:
-///         return 2
-///     return 1
+/// STATUS_TRANSITIONS = {
+///     "new": "queued",
+///     "queued": "running",
+///     "running": "done",
+///     "failed": "retry",
+///     "cancelled": "closed",
+/// }
+///
+///
+/// def normalize_status(status):
+///     return STATUS_TRANSITIONS.get(status, "unknown")
 /// ```
 ///
 /// ## Options
