@@ -241,10 +241,12 @@ together.
 
 You can see [the ty_test
 README](https://github.com/astral-sh/ruff/blob/main/crates/ty_test/README.md) for a full description
-of the options supported by mdtest, but in general, you should use `# snapshot` comments to assert
-that a particular rule fires on a given line and also generate an inline snapshot of the resulting
-diagnostic. You can automatically accept these snapshot changes by setting the
-`MDTEST_UPDATE_SNAPSHOTS=1` environment variable when running your tests.
+of the options supported by mdtest, but in general, you should use `# error` comments to assert that
+a particular rule fires on a given line. You can instead use `# snapshot` comments to also generate
+an inline snapshot of the resulting diagnostic. You can automatically accept these snapshot changes
+by setting the `MDTEST_UPDATE_SNAPSHOTS=1` environment variable when running your tests. Prefer
+using `# error` for the bulk of your assertions because it helps to keep the tests short, but
+`# snapshot` can be used to capture details of the diagnostic or suggested fix, when applicable.
 
 For example, a minimal mdtest for `module-import-not-at-top-of-file` (`E402`) would look something
 like this:
@@ -274,6 +276,13 @@ error[E402]: Module level import not at top of file
 2 | import os  # snapshot: module-import-not-at-top-of-file
   | ^^^^^^^^^
   |
+```
+
+Additional cases can just use `# error` since the diagnostics should look the same:
+
+```py
+b = 2
+import something_else  # error: [module-import-not-at-top-of-file]
 ```
 
 ## More complicated configuration
