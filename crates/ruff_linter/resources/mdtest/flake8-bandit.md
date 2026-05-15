@@ -50,8 +50,6 @@ Markup("*" * 8)  # error: [unsafe-markup-use]
 flask.Markup("hello {}".format("world"))  # error: [unsafe-markup-use]
 ```
 
-
-
 ## `extend-markup-names`
 
 ```toml
@@ -97,5 +95,3 @@ Markup(clean(content))
 cleaned = clean(content)
 Markup(cleaned)  # error: [unsafe-markup-use]
 ```
-
-
