@@ -146,6 +146,21 @@ async def c():
 # Multi-field with accessor and a side-effecting argument.
 "{0.attr} {1}".format(obj, side_effect())
 
+# `**locals()` splat — keyword fields resolve to surrounding-scope names.
+"reading {filename}".format(**locals())
+
+# `**locals()` mixed with explicit keyword arguments.
+"{prefix}: {filename}".format(prefix="info", **locals())
+
+# `**vars()` is equivalent to `**locals()`.
+"reading {filename}".format(**vars())
+
+# `**vars(target)` — keyword fields resolve to `target.<name>`.
+"{foo}:{bar}".format(**vars(x))
+
+# `**vars(target)` with a non-trivial target.
+"{foo}".format(**vars(self.obj))
+
 ###
 # Non-errors
 ###

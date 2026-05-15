@@ -169,3 +169,10 @@ print("%02X" % 1)
 "%(1)s" % {1: 2, "1": 2}
 
 "%(and)s" % {"and": 2}
+
+# https://github.com/astral-sh/ruff/issues/2031 — BinOp on the right side now produces an unsafe fix.
+"├─%s─" % (len(l) * "─")
+
+"%s" % ("a" + "b")
+
+"%s" % (-x)

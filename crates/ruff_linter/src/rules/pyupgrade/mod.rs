@@ -548,4 +548,17 @@ mod tests {
         assert_diagnostics!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn up032_quote_aware_py311() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP032_quote_aware.py"),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY311.into(),
+                ..settings::LinterSettings::for_rule(Rule::FString)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
 }

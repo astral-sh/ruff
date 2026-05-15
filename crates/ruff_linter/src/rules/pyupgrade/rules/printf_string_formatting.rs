@@ -425,7 +425,22 @@ pub(crate) fn printf_string_formatting(
         | Expr::NoneLiteral(_)
         | Expr::EllipsisLiteral(_)
         | Expr::FString(_) => Cow::Owned(format!("({})", checker.locator().slice(right))),
-        Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_) => {
+        Expr::Name(_)
+        | Expr::Attribute(_)
+        | Expr::Subscript(_)
+        | Expr::Call(_)
+        | Expr::BinOp(_)
+        | Expr::UnaryOp(_)
+        | Expr::BoolOp(_)
+        | Expr::Compare(_)
+        | Expr::If(_)
+        | Expr::Lambda(_)
+        | Expr::Await(_)
+        | Expr::Generator(_)
+        | Expr::ListComp(_)
+        | Expr::SetComp(_)
+        | Expr::DictComp(_)
+        | Expr::Named(_) => {
             if num_keyword_arguments > 0 {
                 // If we have _any_ named fields, assume the right-hand side is a mapping.
                 Cow::Owned(format!("(**{})", checker.locator().slice(right)))

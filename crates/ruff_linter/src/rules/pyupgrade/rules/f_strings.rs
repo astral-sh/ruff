@@ -72,6 +72,19 @@ struct FormatSummaryValues<'a> {
     /// `true` if any format field uses a post-argument accessor (`{x.y}`, `{x[k]}`),
     /// which evaluates at format time and may mutate state another argument reads.
     field_has_accessors: bool,
+    /// Set when the call ends in `**locals()`, `**vars()`, or `**vars(<target>)`;
+    /// unknown keyword fields then resolve to a name in the surrounding scope or
+    /// to an attribute of `<target>`.
+    splat: Option<Splat<'a>>,
+}
+
+/// The kind of `**...` splat trailing a `.format` call.
+#[derive(Debug, Clone, Copy)]
+enum Splat<'a> {
+    /// `**locals()` or `**vars()` — keyword fields resolve to bare names.
+    Scope,
+    /// `**vars(<target>)` — keyword fields resolve to `<target>.<name>`.
+    Vars(&'a Expr),
 }
 
 impl<'a> FormatSummaryValues<'a> {
@@ -79,20 +92,26 @@ impl<'a> FormatSummaryValues<'a> {
         call: &'a ast::ExprCall,
         locator: &'a Locator,
         target_version: PythonVersion,
+        outer_quotes: &[char],
     ) -> Option<Self> {
-        // Pre-PEP 701 (Python 3.12), an f-string interpolation can't reuse the outer
+        // Pre-PEP 701 (Python 3.12), an f-string interpolation can't reuse its outer
         // quote or span multiple lines, so inlining such args would be a `SyntaxError`.
         let supports_pep_701 = target_version.supports_pep_701();
+        let reject = |slice: &str, range: TextRange| -> bool {
+            if supports_pep_701 {
+                return false;
+            }
+            slice.chars().any(|c| outer_quotes.contains(&c)) || locator.contains_line_break(range)
+        };
         let mut extracted_args: Vec<&Expr> = Vec::new();
         let mut extracted_kwargs: FxHashMap<&str, &Expr> = FxHashMap::default();
+        let mut splat: Option<Splat> = None;
 
         for arg in &*call.arguments.args {
             if matches!(arg, Expr::Starred(..)) {
                 return None;
             }
-            if !supports_pep_701
-                && (contains_quotes(locator.slice(arg)) || locator.contains_line_break(arg.range()))
-            {
+            if reject(locator.slice(arg), arg.range()) {
                 return None;
             }
             extracted_args.push(arg);
@@ -104,17 +123,20 @@ impl<'a> FormatSummaryValues<'a> {
                 range: _,
                 node_index: _,
             } = keyword;
-            let key = arg.as_ref()?;
-            if !supports_pep_701
-                && (contains_quotes(locator.slice(value))
-                    || locator.contains_line_break(value.range()))
-            {
+            if let Some(key) = arg.as_ref() {
+                if reject(locator.slice(value), value.range()) {
+                    return None;
+                }
+                extracted_kwargs.insert(key, value);
+            } else if let Some(kind) = splat_kind(value) {
+                splat = Some(kind);
+            } else {
+                // Other `**mapping` — can't be inlined in general.
                 return None;
             }
-            extracted_kwargs.insert(key, value);
         }
 
-        if extracted_args.is_empty() && extracted_kwargs.is_empty() {
+        if extracted_args.is_empty() && extracted_kwargs.is_empty() && splat.is_none() {
             return None;
         }
 
@@ -128,6 +150,7 @@ impl<'a> FormatSummaryValues<'a> {
             args_used,
             kwargs_used,
             field_has_accessors: false,
+            splat,
         })
     }
 
@@ -169,9 +192,22 @@ impl<'a> FormatSummaryValues<'a> {
     }
 }
 
-/// Return `true` if the string contains quotes.
-fn contains_quotes(string: &str) -> bool {
-    string.contains(['\'', '"'])
+/// Classify a `**...` splat value as `locals()`, `vars()`, or `vars(<target>)`.
+fn splat_kind(expr: &Expr) -> Option<Splat<'_>> {
+    let Expr::Call(call) = expr else {
+        return None;
+    };
+    let Expr::Name(name) = call.func.as_ref() else {
+        return None;
+    };
+    if !call.arguments.keywords.is_empty() {
+        return None;
+    }
+    match (name.id.as_str(), call.arguments.args.as_ref()) {
+        ("locals" | "vars", []) => Some(Splat::Scope),
+        ("vars", [target]) => Some(Splat::Vars(target)),
+        _ => None,
+    }
 }
 
 enum FormatContext {
@@ -286,6 +322,18 @@ enum IndexOrKeyword {
     Keyword(String),
 }
 
+/// How a format field's argument was resolved.
+enum Resolved<'a> {
+    /// A regular positional or keyword argument.
+    Expr(&'a Expr),
+    /// A keyword field satisfied by `**locals()` / `**vars()`; the interpolation
+    /// is the bare name from the format string.
+    SplatScope(String),
+    /// A keyword field satisfied by `**vars(<target>)`; the interpolation is
+    /// `<target>.<name>`.
+    SplatVars(String, &'a Expr),
+}
+
 impl FStringConversion {
     /// Convert a string `.format` call to an f-string.
     fn try_convert(
@@ -362,16 +410,28 @@ impl FStringConversion {
                         FieldType::Keyword(name) => IndexOrKeyword::Keyword(name),
                     };
 
-                    let arg = match &specifier {
+                    let resolved = match &specifier {
                         IndexOrKeyword::Index(index) => {
-                            summary.arg_positional(*index).ok_or_else(|| {
+                            Resolved::Expr(summary.arg_positional(*index).ok_or_else(|| {
                                 anyhow::anyhow!("Positional argument {index} is missing")
-                            })?
+                            })?)
                         }
                         IndexOrKeyword::Keyword(name) => {
-                            summary.arg_keyword(name).ok_or_else(|| {
-                                anyhow::anyhow!("Keyword argument '{name}' is missing")
-                            })?
+                            if let Some(arg) = summary.arg_keyword(name) {
+                                Resolved::Expr(arg)
+                            } else {
+                                match summary.splat {
+                                    Some(Splat::Scope) => Resolved::SplatScope(name.clone()),
+                                    Some(Splat::Vars(target)) => {
+                                        Resolved::SplatVars(name.clone(), target)
+                                    }
+                                    None => {
+                                        return Err(anyhow::anyhow!(
+                                            "Keyword argument '{name}' is missing"
+                                        ));
+                                    }
+                                }
+                            }
                         }
                     };
 
@@ -379,21 +439,31 @@ impl FStringConversion {
                     // string, we can't convert the format string to an f-string. For example,
                     // converting `"{x} {x}".format(x=foo())` would result in `f"{foo()} {foo()}"`,
                     // which would call `foo()` twice.
-                    if !seen.insert(specifier) {
-                        if any_over_expr(arg, &Expr::is_call_expr) {
-                            return Ok(Self::SideEffects);
-                        }
+                    let already_seen = !seen.insert(specifier);
+                    if let Resolved::Expr(arg) = &resolved
+                        && already_seen
+                        && any_over_expr(arg, &Expr::is_call_expr)
+                    {
+                        return Ok(Self::SideEffects);
                     }
 
-                    converted.push_str(&formatted_expr(
-                        arg,
-                        if field.parts.is_empty() {
-                            FormatContext::Bare
-                        } else {
-                            FormatContext::Accessed
-                        },
-                        locator,
-                    ));
+                    match &resolved {
+                        Resolved::Expr(arg) => converted.push_str(&formatted_expr(
+                            arg,
+                            if field.parts.is_empty() {
+                                FormatContext::Bare
+                            } else {
+                                FormatContext::Accessed
+                            },
+                            locator,
+                        )),
+                        Resolved::SplatScope(name) => converted.push_str(name),
+                        Resolved::SplatVars(name, target) => {
+                            converted.push_str(locator.slice(*target));
+                            converted.push('.');
+                            converted.push_str(name);
+                        }
+                    }
 
                     for part in field.parts {
                         match part {
@@ -466,9 +536,20 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
         return;
     };
 
-    let Some(mut summary) =
-        FormatSummaryValues::try_from_call(call, checker.locator(), checker.target_version())
-    else {
+    let mut outer_quotes: Vec<char> = literal
+        .value
+        .iter()
+        .map(|part| part.flags.quote_style().as_char())
+        .collect();
+    outer_quotes.sort_unstable();
+    outer_quotes.dedup();
+
+    let Some(mut summary) = FormatSummaryValues::try_from_call(
+        call,
+        checker.locator(),
+        checker.target_version(),
+        &outer_quotes,
+    ) else {
         return;
     };
 
@@ -613,7 +694,11 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
             Edit::range_replacement(contents, call.range())
         };
 
-        let fix = if walrus_dropped || dropped_side_effect || accessor_eval_order {
+        let fix = if walrus_dropped
+            || dropped_side_effect
+            || accessor_eval_order
+            || summary.splat.is_some()
+        {
             Fix::unsafe_edit(edit)
         } else {
             Fix::safe_edit(edit)

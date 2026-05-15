@@ -1,0 +1,59 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP032 [*] Use f-string instead of `format` call
+  --> UP032_quote_aware.py:8:1
+   |
+ 7 | # Outer single quote, inner double quote — no collision.
+ 8 | 'Magic wand: {}'.format(bag["wand"])
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 9 |
+10 | # `BinOp` containing a string literal whose quote does not collide.
+   |
+help: Convert to f-string
+5  | ###
+6  |
+7  | # Outer single quote, inner double quote — no collision.
+   - 'Magic wand: {}'.format(bag["wand"])
+8  + f'Magic wand: {bag["wand"]}'
+9  |
+10 | # `BinOp` containing a string literal whose quote does not collide.
+11 | '{}'.format(len(l) * "─")
+
+UP032 [*] Use f-string instead of `format` call
+  --> UP032_quote_aware.py:11:1
+   |
+10 | # `BinOp` containing a string literal whose quote does not collide.
+11 | '{}'.format(len(l) * "─")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+12 |
+13 | # String-literal argument with non-colliding quote.
+   |
+help: Convert to f-string
+8  | 'Magic wand: {}'.format(bag["wand"])
+9  |
+10 | # `BinOp` containing a string literal whose quote does not collide.
+   - '{}'.format(len(l) * "─")
+11 + f'{len(l) * "─"}'
+12 |
+13 | # String-literal argument with non-colliding quote.
+14 | 'Hello {}'.format("world")
+
+UP032 [*] Use f-string instead of `format` call
+  --> UP032_quote_aware.py:14:1
+   |
+13 | # String-literal argument with non-colliding quote.
+14 | 'Hello {}'.format("world")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+15 |
+16 | ###
+   |
+help: Convert to f-string
+11 | '{}'.format(len(l) * "─")
+12 |
+13 | # String-literal argument with non-colliding quote.
+   - 'Hello {}'.format("world")
+14 + f'Hello {"world"}'
+15 |
+16 | ###
+17 | # Non-errors on this target — the inner quote would collide with the outer.

@@ -1322,5 +1322,63 @@ UP031 Use format specifiers instead of percent format
 170 |
 171 | "%(and)s" % {"and": 2}
     | ^^^^^^^^^
+172 |
+173 | # https://github.com/astral-sh/ruff/issues/2031 — BinOp on the right side now produces an unsafe fix.
     |
 help: Replace with format specifiers
+
+UP031 [*] Use format specifiers instead of percent format
+   --> UP031_0.py:174:1
+    |
+173 | # https://github.com/astral-sh/ruff/issues/2031 — BinOp on the right side now produces an unsafe fix.
+174 | "├─%s─" % (len(l) * "─")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^
+175 |
+176 | "%s" % ("a" + "b")
+    |
+help: Replace with format specifiers
+171 | "%(and)s" % {"and": 2}
+172 |
+173 | # https://github.com/astral-sh/ruff/issues/2031 — BinOp on the right side now produces an unsafe fix.
+    - "├─%s─" % (len(l) * "─")
+174 + "├─{}─".format(len(l) * "─")
+175 |
+176 | "%s" % ("a" + "b")
+177 |
+note: This is an unsafe fix and may change runtime behavior
+
+UP031 [*] Use format specifiers instead of percent format
+   --> UP031_0.py:176:1
+    |
+174 | "├─%s─" % (len(l) * "─")
+175 |
+176 | "%s" % ("a" + "b")
+    | ^^^^^^^^^^^^^^^^^^
+177 |
+178 | "%s" % (-x)
+    |
+help: Replace with format specifiers
+173 | # https://github.com/astral-sh/ruff/issues/2031 — BinOp on the right side now produces an unsafe fix.
+174 | "├─%s─" % (len(l) * "─")
+175 |
+    - "%s" % ("a" + "b")
+176 + "{}".format("a" + "b")
+177 |
+178 | "%s" % (-x)
+note: This is an unsafe fix and may change runtime behavior
+
+UP031 [*] Use format specifiers instead of percent format
+   --> UP031_0.py:178:1
+    |
+176 | "%s" % ("a" + "b")
+177 |
+178 | "%s" % (-x)
+    | ^^^^^^^^^^^
+    |
+help: Replace with format specifiers
+175 |
+176 | "%s" % ("a" + "b")
+177 |
+    - "%s" % (-x)
+178 + "{}".format(-x)
+note: This is an unsafe fix and may change runtime behavior
