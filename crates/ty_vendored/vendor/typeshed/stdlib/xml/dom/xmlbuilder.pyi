@@ -1,3 +1,4 @@
+"""Implementation of the DOM Level 3 'LS-Load' feature."""
 from _typeshed import SupportsRead
 from typing import Any, Final, Literal, NoReturn
 from xml.dom.minidom import Document, Node, _DOMErrorHandler
@@ -5,6 +6,11 @@ from xml.dom.minidom import Document, Node, _DOMErrorHandler
 __all__ = ["DOMBuilder", "DOMEntityResolver", "DOMInputSource"]
 
 class Options:
+    """Features object that has variables set for each DOMBuilder feature.
+
+The DOMBuilder class uses an instance of this class to pass settings to
+the ExpatBuilder class.
+"""
     namespaces: int
     namespace_declarations: bool
     validation: bool
@@ -58,6 +64,9 @@ class DOMInputSource:
     baseURI: str | None
 
 class DOMBuilderFilter:
+    """Element filter which can be used to tailor construction of
+a DOM instance.
+"""
     FILTER_ACCEPT: Final = 1
     FILTER_REJECT: Final = 2
     FILTER_SKIP: Final = 3
@@ -67,6 +76,7 @@ class DOMBuilderFilter:
     def startContainer(self, element: Node) -> Literal[1, 2, 3, 4]: ...
 
 class DocumentLS:
+    """Mixin to create documents that conform to the load/save spec."""
     async_: bool
     def abort(self) -> NoReturn: ...
     def load(self, uri: str) -> NoReturn: ...
