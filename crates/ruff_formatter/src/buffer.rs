@@ -383,7 +383,8 @@ fn clean_interned(
     } else {
         let mut state = RemoveSoftLineBreaksState::default();
 
-        // Find the first soft line break element or interned element that must be changed
+        // Find the first soft line break element, interned element, or best-fitting element that
+        // must be changed
         let result = interned
             .iter()
             .enumerate()
