@@ -4571,9 +4571,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         })
     }
 
-    /// Returns argument-index mappings for arguments matched to the expanded `ParamSpec` component.
+    /// Returns argument-index mappings for arguments matched to the `ParamSpec` component.
     ///
-    /// `prefix_len` is the number of non-ParamSpec prefix parameters in a callable like
+    /// `prefix_len` is the number of parameters before the `ParamSpec` components in a callable like
     /// `Concatenate[Prefix, P]`. Any argument matched to a later parameter belongs to `P`. The
     /// first item is the matched-argument index; the second is the source argument index, or `None`
     /// for synthetic arguments such as bound `self` or `cls`.
@@ -4967,33 +4967,35 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let paramspec = self.signature.parameters().as_paramspec_with_prefix();
         let paramspec_component_start = paramspec.and_then(|(prefix, paramspec)| {
             let prefix_len = prefix.len();
-            let paramspec_arguments = self.paramspec_argument_indices(prefix_len);
-            if paramspec_arguments.is_empty() {
+            let paramspec_argument_indices = self.paramspec_argument_indices(prefix_len);
+            if paramspec_argument_indices.is_empty() {
                 self.evaluate_paramspec_sub_call(constraints, None, paramspec);
                 return None;
             }
 
             let has_paramspec_component_argument =
-                paramspec_arguments.iter().any(|(argument_index, _)| {
-                    let [parameter_index] =
-                        self.argument_matches[*argument_index].parameters.as_slice()
-                    else {
-                        return false;
-                    };
+                paramspec_argument_indices
+                    .iter()
+                    .any(|(argument_index, _)| {
+                        let [parameter_index] =
+                            self.argument_matches[*argument_index].parameters.as_slice()
+                        else {
+                            return false;
+                        };
 
-                    let Type::TypeVar(typevar) =
-                        self.signature.parameters()[*parameter_index].annotated_type()
-                    else {
-                        return false;
-                    };
+                        let Type::TypeVar(typevar) =
+                            self.signature.parameters()[*parameter_index].annotated_type()
+                        else {
+                            return false;
+                        };
 
-                    typevar.is_paramspec(self.db)
-                });
+                        typevar.is_paramspec(self.db)
+                    });
 
             if has_paramspec_component_argument
                 && self.evaluate_paramspec_sub_call(
                     constraints,
-                    Some(&paramspec_arguments),
+                    Some(&paramspec_argument_indices),
                     paramspec,
                 )
             {
@@ -5004,16 +5006,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         });
 
+        let is_paramspec_component_parameter = |parameter_index: usize| {
+            paramspec_component_start.is_some_and(|start| parameter_index >= start)
+        };
+
         for (argument_index, adjusted_argument_index, argument, argument_types) in
             self.enumerate_argument_types()
         {
-            let is_paramspec_component_parameter = |parameter_index: usize| {
-                paramspec_component_start.is_some_and(|start| parameter_index >= start)
-            };
-
             let matched_parameters = &self.argument_matches[argument_index].parameters;
-            if paramspec_component_start.is_some()
-                && !matched_parameters.is_empty()
+            if !matched_parameters.is_empty()
                 && matched_parameters
                     .iter()
                     .all(|parameter_index| is_paramspec_component_parameter(*parameter_index))
@@ -5486,7 +5487,7 @@ impl<'db> Binding<'db> {
             .get(argument_index + usize::from(binding.bound_type.is_some()))
     }
 
-    /// Returns source argument indices whose matched parameters satisfy `matches_parameter`.
+    /// Returns source argument indices matched to the `ParamSpec` component.
     ///
     /// The returned indices are relative to the original call site, excluding any synthetic bound
     /// receiver. For example, this can select all arguments forwarded through `P.args` and
@@ -5496,10 +5497,10 @@ impl<'db> Binding<'db> {
     /// def wrapper[**P, R](func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R: ...
     /// wrapper(f, 1, y="x")  # can select `1` and `y="x"` without including `func`
     /// ```
-    fn call_argument_indices_matching_parameters(
+    fn paramspec_call_argument_indices(
         &self,
         binding: &CallableBinding<'db>,
-        mut matches_parameter: impl FnMut(usize) -> bool,
+        prefix_len: usize,
     ) -> Vec<usize> {
         let bound_argument_offset = usize::from(binding.bound_type.is_some());
 
@@ -5514,7 +5515,7 @@ impl<'db> Binding<'db> {
                 argument_matches
                     .parameters
                     .iter()
-                    .any(|parameter_index| matches_parameter(*parameter_index))
+                    .any(|parameter_index| *parameter_index >= prefix_len)
                     .then_some(matched_argument_index - bound_argument_offset)
             })
             .collect()
@@ -5596,10 +5597,8 @@ impl<'db> Binding<'db> {
             call_expression_tcx,
         } = context;
         let (prefix, _) = self.signature.parameters().as_paramspec_with_prefix()?;
-        let paramspec_argument_indices = self
-            .call_argument_indices_matching_parameters(binding, |parameter_index| {
-                parameter_index >= prefix.len()
-            });
+        let paramspec_argument_indices =
+            self.paramspec_call_argument_indices(binding, prefix.len());
         let sub_argument_index = paramspec_argument_indices
             .iter()
             .position(|paramspec_argument_index| *paramspec_argument_index == argument_index)?;
