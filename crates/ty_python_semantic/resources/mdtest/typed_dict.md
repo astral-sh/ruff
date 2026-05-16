@@ -4589,16 +4589,20 @@ static_assert(is_assignable_to(FooBar, Bar))
 
 def dictionary_union(u: Foo | dict[Literal["a", "b"], int]):
     if "c" in u:
+        # TODO: This should stop erroring if we prove that the `dict` arm cannot contain `"c"`.
+        # error: [invalid-argument-type]
         reveal_type(u["c"])  # revealed: object
 
 def literal_union(u: Foo | Literal["abc"]):
     if "a" in u:
-        # revealed: (Foo & <Protocol with members '__getitem__'>) | (Literal["abc"] & <Protocol with members '__getitem__'>)
+        # revealed: (Foo & <Protocol with members '__getitem__'>) | (Literal["abc"] & <Protocol with members '__contains__'>)
         reveal_type(u)
 
 def literal_union_key_access(obj: Foo | Literal["a"]):
-    if "c" in obj:
-        reveal_type(obj["c"])  # revealed: object
+    if "a" in obj:
+        # Membership in a string does not imply that the string supports subscripting with that key.
+        # error: [invalid-argument-type]
+        reveal_type(obj["a"])  # revealed: object
 ```
 
 This still accepts guarded key access in the branch, without pretending that an open `TypedDict`

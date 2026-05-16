@@ -2153,10 +2153,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 
     fn narrow_with_present_key(&self, ty: Type<'db>, key: &str) -> Type<'db> {
-        let key_presence_constraint = typeddict_key_getitem_protocol(self.db, key);
-
         let db = self.db;
-        let constrain = |ty| IntersectionType::from_two_elements(db, ty, key_presence_constraint);
+        let constrain = |ty, key_presence_constraint| {
+            IntersectionType::from_two_elements(db, ty, key_presence_constraint)
+        };
 
         match ty.resolve_type_alias(self.db) {
             Type::Union(union) => UnionType::from_elements(
@@ -2166,7 +2166,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .iter()
                     .map(|element| self.narrow_with_present_key(*element, key)),
             ),
-            _ => constrain(ty),
+            resolved if is_or_contains_typeddict(self.db, resolved) => {
+                constrain(ty, typeddict_key_getitem_protocol(self.db, key))
+            }
+            _ => constrain(ty, key_membership_contains_protocol(self.db, key)),
         }
     }
 
@@ -2295,6 +2298,24 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     }
 }
 
+/// Return a synthesized protocol that represents safe subscript access for a present key on a
+/// `TypedDict`-containing type.
+///
+/// For `TypedDict`s, a positive key-membership test proves more than containment: it also makes
+/// string-literal subscript access with that key valid. In the `if` branch below, the `Bar` arm
+/// keeps its original shape but is intersected with this protocol so `u["foo"]` is accepted:
+///
+/// ```python
+/// class Foo(TypedDict):
+///     foo: int
+///
+/// class Bar(TypedDict):
+///     bar: int
+///
+/// def f(u: Foo | Bar):
+///     if "foo" in u:
+///         reveal_type(u["foo"])  # object
+/// ```
 fn typeddict_key_getitem_protocol<'db>(db: &'db dyn Db, key: &str) -> Type<'db> {
     let signature = Signature::new(
         Parameters::new(
@@ -2311,6 +2332,39 @@ fn typeddict_key_getitem_protocol<'db>(db: &'db dyn Db, key: &str) -> Type<'db> 
     Type::protocol_with_methods(
         db,
         [("__getitem__", CallableType::function_like(db, signature))],
+    )
+}
+
+/// Return a synthesized protocol that records a true key-membership test without implying
+/// subscript access.
+///
+/// For non-`TypedDict` types, `"key" in value` only proves that membership is true. It does not
+/// prove that `value["key"]` is valid:
+///
+/// ```python
+/// def f(s: Literal["abc"]):
+///     if "a" in s:
+///         s["a"]  # Runtime `TypeError`
+/// ```
+///
+/// Non-`TypedDict` union arms therefore receive this `__contains__` protocol instead of the
+/// `__getitem__` protocol used for `TypedDict` arms.
+fn key_membership_contains_protocol<'db>(db: &'db dyn Db, key: &str) -> Type<'db> {
+    let signature = Signature::new(
+        Parameters::new(
+            db,
+            [
+                Parameter::positional_only(Some(Name::new_static("self"))),
+                Parameter::positional_only(Some(Name::new_static("key")))
+                    .with_annotated_type(Type::string_literal(db, key)),
+            ],
+        ),
+        Type::bool_literal(true),
+    );
+
+    Type::protocol_with_methods(
+        db,
+        [("__contains__", CallableType::function_like(db, signature))],
     )
 }
 
