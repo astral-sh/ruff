@@ -229,16 +229,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 );
                 let decorated_ty =
                     class_decorator_return_type(db, decorator_ty, current_original_class_ty);
-                let decorator_call_ty = match &decorator.expression {
-                    ast::Expr::Call(call) => Some(self.expression_type(&call.func)),
-                    _ => None,
-                };
-                let metadata_still_applies_to_original_class =
-                    if is_unknown_decorator_result(db, decorated_ty) {
-                        preserve_binding_for_unknown_result(db, decorator_ty, decorator_call_ty)
-                    } else {
-                        type_retains_original_class(db, current_original_class_ty, decorated_ty)
+                let decorated_ty_is_unknown = is_unknown_decorator_result(db, decorated_ty);
+                let metadata_still_applies_to_original_class = if decorated_ty_is_unknown {
+                    let decorator_call_ty = match &decorator.expression {
+                        ast::Expr::Call(call) => Some(self.expression_type(&call.func)),
+                        _ => None,
                     };
+                    preserve_binding_for_unknown_result(db, decorator_ty, decorator_call_ty)
+                } else {
+                    type_retains_original_class(db, current_original_class_ty, decorated_ty)
+                };
                 if !metadata_still_applies_to_original_class {
                     metadata_applies_to_original_class = false;
                 }
@@ -265,12 +265,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
             // If a class decorator application loses all precision, preserve the original class
             // binding when the decorator is known to preserve unknown results.
-            let decorator_call_ty = match &decorator_node.expression {
-                ast::Expr::Call(call) => Some(self.expression_type(&call.func)),
-                _ => None,
-            };
-            let should_preserve_binding = is_unknown_decorator_result(db, decorated_ty)
-                && preserve_binding_for_unknown_result(db, decorator_ty, decorator_call_ty);
+            let decorated_ty_is_unknown = is_unknown_decorator_result(db, decorated_ty);
+            let should_preserve_binding = decorated_ty_is_unknown
+                && preserve_binding_for_unknown_result(
+                    db,
+                    decorator_ty,
+                    match &decorator_node.expression {
+                        ast::Expr::Call(call) => Some(self.expression_type(&call.func)),
+                        _ => None,
+                    },
+                );
             inferred_ty = if should_preserve_binding {
                 inferred_ty
             } else if class_decorator_preserves_class_binding(db, original_class_ty, decorated_ty) {
@@ -519,20 +523,13 @@ impl ClassDecoratorUnknownResultPolicy {
     ///
     /// Unannotated function and method decorators are treated as class-preserving when their
     /// application result is unknown. Explicit return annotations are trusted as replacement
-    /// intent. For opaque callable types, we preserve the binding only because the decorator
-    /// application already failed to produce a more precise replacement type.
+    /// intent.
     fn from_decorator<'db>(db: &'db dyn crate::Db, decorator_ty: Type<'db>) -> Self {
         if decorator_ty.is_unknown() {
             return Self::ReplaceBinding;
         }
 
-        Self::known_from_decorator(db, decorator_ty).unwrap_or_else(|| {
-            if decorator_ty.try_upcast_to_callable(db).is_some() {
-                Self::PreserveBinding
-            } else {
-                Self::ReplaceBinding
-            }
-        })
+        Self::known_from_decorator(db, decorator_ty).unwrap_or(Self::ReplaceBinding)
     }
 
     /// Return the known preservation policy for a class decorator, if one can be read statically.
@@ -598,12 +595,7 @@ impl ClassDecoratorUnknownResultPolicy {
                 Self::known_from_decorator(db, alias.value_type(db))
                     .unwrap_or(Self::ReplaceBinding),
             ),
-            Type::Callable(_) => {
-                // A `Callable` type is already a static callable interface. If applying it still
-                // produces an unknown result, we do not have a trustworthy replacement type, so we
-                // preserve the current class binding.
-                Some(Self::PreserveBinding)
-            }
+            Type::Callable(_) => Some(Self::PreserveBinding),
             _ => None,
         }
     }
