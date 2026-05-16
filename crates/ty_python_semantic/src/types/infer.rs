@@ -690,7 +690,7 @@ pub(crate) fn original_class_type<'db>(
     let inference = infer_definition_types(db, definition);
     inference
         .undecorated_type()
-        .unwrap_or_else(|| inference.declaration_type(definition).inner_type())
+        .unwrap_or_else(|| inference.binding_type(definition))
         .as_class_literal()
 }
 

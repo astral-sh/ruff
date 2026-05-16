@@ -3,6 +3,7 @@ use crate::{
     types::{
         CallArguments, DataclassParams, KnownClass, KnownInstanceType, MemberLookupPolicy,
         SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext,
+        call::CallError,
         function::KnownFunction,
         infer::{
             TypeInferenceBuilder,
@@ -227,8 +228,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     dataclass_transformer_params,
                     total_ordering,
                 );
-                let decorated_ty =
-                    class_decorator_return_type(db, decorator_ty, current_original_class_ty);
+                let decorator_result =
+                    ClassDecoratorApplication::apply(db, decorator_ty, current_original_class_ty);
+                let decorated_ty = decorator_result.return_type(db);
                 let decorated_ty_is_unknown = is_unknown_decorator_result(db, decorated_ty);
                 let metadata_still_applies_to_original_class = if decorated_ty_is_unknown {
                     let decorator_call_ty = match &decorator.expression {
@@ -242,9 +244,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if !metadata_still_applies_to_original_class {
                     metadata_applies_to_original_class = false;
                 }
+
+                decorators_to_apply.push((
+                    decorator_ty,
+                    decorator,
+                    Some((current_original_class_ty, decorator_result)),
+                ));
+                continue;
             }
 
-            decorators_to_apply.push((decorator_ty, decorator));
+            decorators_to_apply.push((decorator_ty, decorator, None));
         }
 
         let mut inferred_ty = original_class_ty(
@@ -257,9 +266,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let original_class_ty = inferred_ty;
         let mut undecorated_ty = None;
-        for (decorator_ty, decorator_node) in decorators_to_apply {
-            let decorated_ty = match self.apply_decorator(decorator_ty, inferred_ty, decorator_node)
-            {
+        for (decorator_ty, decorator_node, precomputed_result) in decorators_to_apply {
+            let decorated_ty = match precomputed_result {
+                Some((precomputed_input_ty, decorator_result))
+                    if precomputed_input_ty == inferred_ty =>
+                {
+                    decorator_result.return_type_and_report_diagnostics(self, db, decorator_node)
+                }
+                _ => ClassDecoratorApplication::apply(db, decorator_ty, inferred_ty)
+                    .return_type_and_report_diagnostics(self, db, decorator_node),
+            };
+            let decorated_ty = match decorated_ty {
                 Type::DataclassDecorator(_) | Type::DataclassTransformer(_) => Type::unknown(),
                 decorated_ty => decorated_ty,
             };
@@ -370,6 +387,43 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 );
             } else {
                 self.infer_expression(&extra_items_keyword.value, TypeContext::default());
+            }
+        }
+    }
+}
+
+enum ClassDecoratorApplication<'db> {
+    Ok(Type<'db>),
+    Err(CallError<'db>),
+}
+
+impl<'db> ClassDecoratorApplication<'db> {
+    fn apply(db: &'db dyn crate::Db, decorator_ty: Type<'db>, decorated_ty: Type<'db>) -> Self {
+        let call_arguments = CallArguments::positional([decorated_ty]);
+        match decorator_ty.try_call(db, &call_arguments) {
+            Ok(bindings) => Self::Ok(bindings.return_type(db)),
+            Err(error) => Self::Err(error),
+        }
+    }
+
+    fn return_type(&self, db: &'db dyn crate::Db) -> Type<'db> {
+        match self {
+            Self::Ok(return_ty) => *return_ty,
+            Self::Err(error) => error.return_type(db),
+        }
+    }
+
+    fn return_type_and_report_diagnostics(
+        self,
+        builder: &mut TypeInferenceBuilder<'db, '_>,
+        db: &'db dyn crate::Db,
+        decorator_node: &ast::Decorator,
+    ) -> Type<'db> {
+        match self {
+            Self::Ok(return_ty) => return_ty,
+            Self::Err(CallError(_, bindings)) => {
+                bindings.report_diagnostics(&builder.context, decorator_node.into());
+                bindings.return_type(db)
             }
         }
     }
@@ -619,36 +673,5 @@ fn merge_class_preserving_decorator_result<'db>(
             .as_class_literal()
             .map(Type::ClassLiteral)
             .unwrap_or(original_class)
-    }
-}
-
-/// Return the value type produced by applying a class decorator.
-///
-/// Synthetic dataclass-transform marker types are metadata for class construction, not real values
-/// that should replace the class binding. For example, the result of calling `model` should not be
-/// recorded as the public type of `C` merely because `model` carries dataclass-transform metadata:
-/// ```python
-/// from typing import dataclass_transform
-///
-/// @dataclass_transform()
-/// def model(cls): ...
-///
-/// @model
-/// class C: ...
-/// ```
-fn class_decorator_return_type<'db>(
-    db: &'db dyn crate::Db,
-    decorator_ty: Type<'db>,
-    decorated_ty: Type<'db>,
-) -> Type<'db> {
-    let call_arguments = CallArguments::positional([decorated_ty]);
-    let return_ty = decorator_ty.try_call(db, &call_arguments).map_or_else(
-        |error| error.return_type(db),
-        |bindings| bindings.return_type(db),
-    );
-
-    match return_ty {
-        Type::DataclassDecorator(_) | Type::DataclassTransformer(_) => Type::unknown(),
-        return_ty => return_ty,
     }
 }
