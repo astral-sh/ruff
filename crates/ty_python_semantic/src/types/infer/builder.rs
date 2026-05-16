@@ -6688,7 +6688,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let scope = scope_id.to_scope_id(self.db(), self.file());
         let inference = infer_scope_types(self.db(), scope, yield_tcx);
         self.extend_scope(inference);
-        let yield_type = inference.expression_type(elt.as_ref());
+        let yield_type = self.comprehension_element_type(elt, inference);
 
         if evaluation_mode.is_async() {
             KnownClass::AsyncGeneratorType
@@ -6698,6 +6698,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.db(),
                 &[yield_type, Type::none(self.db()), Type::none(self.db())],
             )
+        }
+    }
+
+    fn comprehension_element_type(
+        &self,
+        element: &ast::Expr,
+        inference: &ScopeInference<'db>,
+    ) -> Type<'db> {
+        let element_type = inference.expression_type(element);
+        if element.is_starred_expr() {
+            element_type
+                .iterate(self.db())
+                .homogeneous_element_type(self.db())
+        } else {
+            element_type
         }
     }
 
@@ -6803,7 +6818,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_comprehension_specialization(
             KnownClass::Dict,
-            [Some(key), Some(value)],
+            [key.as_deref(), Some(value)],
             inference,
             tcx,
         )
@@ -6825,7 +6840,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parenthesized: _,
         } = generator;
 
-        self.infer_expression(elt, tcx);
+        let elt_tcx = if elt.is_starred_expr() {
+            tcx.map(|yield_ty| KnownClass::Iterable.to_specialized_instance(self.db(), &[yield_ty]))
+        } else {
+            tcx
+        };
+        self.infer_expression(elt, elt_tcx);
         self.infer_comprehensions(generators);
     }
 
@@ -6884,11 +6904,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             generators,
         } = dictcomp;
 
-        // Infer the key and value types using the outer type context.
-        let elts = [[Some(key.as_ref()), Some(value.as_ref())]];
-        let mut infer_elt_ty =
-            |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
-        self.infer_collection_literal(KnownClass::Dict, &elts, &mut infer_elt_ty, tcx);
+        if key.is_some() {
+            // Infer the key and value types using the outer type context.
+            let elts = [[key.as_deref(), Some(value.as_ref())]];
+            let mut infer_elt_ty =
+                |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
+            self.infer_collection_literal(KnownClass::Dict, &elts, &mut infer_elt_ty, tcx);
+        } else {
+            // Dict-unpack comprehensions are typed by the outer expression inference. Inferring
+            // them through the collection-literal helper here would report the same invalid
+            // mapping diagnostic twice.
+            self.infer_expression(value, TypeContext::default());
+        }
 
         self.infer_comprehensions(generators);
     }

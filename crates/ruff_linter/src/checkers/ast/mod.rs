@@ -1769,7 +1769,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 node_index: _,
             }) => {
                 self.visit_generators(GeneratorKind::DictComprehension, generators);
-                self.visit_expr(key);
+                if let Some(key) = key {
+                    self.visit_expr(key);
+                }
                 self.visit_expr(value);
             }
             Expr::Lambda(

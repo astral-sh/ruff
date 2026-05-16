@@ -3722,7 +3722,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     NodeWithScopeRef::DictComprehension(dict_comprehension),
                     generators,
                     |builder| {
-                        builder.visit_expr(key);
+                        if let Some(key) = key {
+                            builder.visit_expr(key);
+                        }
                         builder.visit_expr(value);
                     },
                 );
