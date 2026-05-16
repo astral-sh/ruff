@@ -1218,3 +1218,25 @@ help: Remove duplicate union member `typing.Literal[f"{x}"]`
 156 + field54: typing.Literal[f"{x}"]  # Error (true duplicate)
 157 | field55: typing.Literal[f"{x =}"] | typing.Literal[f"{x=}"]  # OK (different debug text due to spaces)
 158 | field56: typing.Literal[f"{0x0=}"] | typing.Literal[f"{0o0=}"]  # OK (different source text: "0x0" vs "0o0")
+159 |
+
+PYI016 Duplicate union member `typing.Annotated[int, t"{0=}"]`
+   --> PYI016.py:163:45
+    |
+161 | # t-string interpolations preserve the interpolation expression text at runtime.
+162 | field57: typing.Annotated[int, t"{00}"] | typing.Annotated[int, t"{000}"]  # OK (different expression text)
+163 | field58: typing.Annotated[int, t"{0x0=}"] | typing.Annotated[int, t"{0x0=}"]  # Error (true duplicate)
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+164 | field59: typing.Annotated[int,t"{0}"] | typing.Annotated[int, t"{0}"]  # Error (same expression text)
+    |
+help: Remove duplicate union member `typing.Annotated[int, t"{0=}"]`
+
+PYI016 Duplicate union member `typing.Annotated[int, t"{0}"]`
+   --> PYI016.py:164:41
+    |
+162 | field57: typing.Annotated[int, t"{00}"] | typing.Annotated[int, t"{000}"]  # OK (different expression text)
+163 | field58: typing.Annotated[int, t"{0x0=}"] | typing.Annotated[int, t"{0x0=}"]  # Error (true duplicate)
+164 | field59: typing.Annotated[int,t"{0}"] | typing.Annotated[int, t"{0}"]  # Error (same expression text)
+    |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Remove duplicate union member `typing.Annotated[int, t"{0}"]`

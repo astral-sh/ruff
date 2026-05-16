@@ -3,12 +3,17 @@ use std::collections::HashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::{AtomicNodeIndex, Expr, ExprBinOp, ExprNoneLiteral, Operator, PythonVersion};
+use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::{
+    AtomicNodeIndex, Expr, ExprBinOp, ExprNoneLiteral, InterpolatedStringElement, Operator,
+    PythonVersion,
+};
 use ruff_python_semantic::analyze::typing::traverse_union_and_optional;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use super::generate_union_fix;
 use crate::checkers::ast::Checker;
+use crate::locator::Locator;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -59,7 +64,7 @@ impl Violation for DuplicateUnionMember {
 
 /// PYI016
 pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
-    let mut seen_nodes: HashSet<ComparableExpr<'_>, _> = FxHashSet::default();
+    let mut seen_nodes: HashSet<UnionMemberKey<'_>, _> = FxHashSet::default();
     let mut unique_nodes: Vec<&Expr> = Vec::new();
     let mut diagnostics = Vec::new();
 
@@ -79,8 +84,10 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
             expr
         };
 
+        let key = UnionMemberKey::from_expr(virtual_expr, checker.locator());
+
         // If we've already seen this union member, raise a violation.
-        if seen_nodes.insert(virtual_expr.into()) {
+        if seen_nodes.insert(key) {
             unique_nodes.push(virtual_expr);
         } else {
             diagnostics.push(checker.report_diagnostic(
@@ -114,8 +121,12 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
         Applicability::Safe
     };
 
-    // Generate the flattened fix once.
-    let fix = if let &[edit_expr] = unique_nodes.as_slice() {
+    // T-string interpolation expression text is runtime-visible. Avoid generating
+    // fixes for unions containing t-strings because code generation can normalize
+    // the expression text, changing the resulting `Template` object.
+    let fix = if unique_nodes.iter().any(|expr| contains_tstring(expr)) {
+        None
+    } else if let &[edit_expr] = unique_nodes.as_slice() {
         // Generate a [`Fix`] for a single type expression, e.g. `int`.
         Some(Fix::applicable_edit(
             Edit::range_replacement(checker.generator().expr(edit_expr), expr.range()),
@@ -153,6 +164,45 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
             diagnostic.set_fix(fix.clone());
         }
     }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+struct UnionMemberKey<'a> {
+    comparable: ComparableExpr<'a>,
+    // T-string interpolation expression text is runtime-visible.
+    // `ComparableExpr` intentionally ignores trivia, so preserve just the
+    // interpolation expression source text to avoid treating `t"{00}"` and
+    // `t"{000}"` as equal without making whitespace outside the t-string
+    // significant for the whole union member.
+    tstring_expressions: Vec<String>,
+}
+
+impl<'a> UnionMemberKey<'a> {
+    fn from_expr(expr: &'a Expr, locator: &Locator) -> Self {
+        let mut tstring_expressions = Vec::new();
+
+        any_over_expr(expr, |expr| {
+            if let Expr::TString(tstring) = expr {
+                tstring_expressions.extend(tstring.value.elements().filter_map(|element| {
+                    let InterpolatedStringElement::Interpolation(element) = element else {
+                        return None;
+                    };
+                    Some(locator.slice(element.expression.as_ref()).to_string())
+                }));
+            }
+
+            false
+        });
+
+        Self {
+            comparable: expr.into(),
+            tstring_expressions,
+        }
+    }
+}
+
+fn contains_tstring(expr: &Expr) -> bool {
+    any_over_expr(expr, |expr| matches!(expr, Expr::TString(_)))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
