@@ -41,12 +41,16 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Example
 /// ```python
+/// from collections import defaultdict
+///
 /// defaultdict(default_factory=int)
 /// defaultdict(default_factory=list)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from collections import defaultdict
+///
 /// defaultdict(int)
 /// defaultdict(list)
 /// ```
