@@ -292,38 +292,33 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
 
         let specialization = self.specialization(db);
 
-        // if the class is the thing defining the variable, then it can
-        // reference it without it being applied to the specialization
-        std::iter::once(origin.variance_of(db, typevar))
-            .chain(
-                specialization
-                    .generic_context(db)
-                    .variables(db)
-                    .zip(specialization.types(db))
-                    .map(|(generic_typevar, ty)| {
-                        if let Some(explicit_variance) =
-                            generic_typevar.typevar(db).explicit_variance(db)
-                        {
-                            ty.with_polarity(explicit_variance).variance_of(db, typevar)
-                        } else {
-                            // `with_polarity` composes the passed variance with the
-                            // inferred one. The inference is done lazily, as we can
-                            // sometimes determine the result just from the passed
-                            // variance. This operation is commutative, so we could
-                            // infer either first.  We choose to make the `StaticClassLiteral`
-                            // variance lazy, as it is known to be expensive, requiring
-                            // that we traverse all members.
-                            //
-                            // If salsa let us look at the cache, we could check first
-                            // to see if the class literal query was already run.
+        // Note that we only care about the variance of the specialized generic alias with respect
+        // to the given type variable, not the unspecialized class literal origin.
+        specialization
+            .generic_context(db)
+            .variables(db)
+            .zip(specialization.types(db))
+            .map(|(generic_typevar, ty)| {
+                if let Some(explicit_variance) = generic_typevar.typevar(db).explicit_variance(db) {
+                    ty.with_polarity(explicit_variance).variance_of(db, typevar)
+                } else {
+                    // `with_polarity` composes the passed variance with the
+                    // inferred one. The inference is done lazily, as we can
+                    // sometimes determine the result just from the passed
+                    // variance. This operation is commutative, so we could
+                    // infer either first.  We choose to make the `StaticClassLiteral`
+                    // variance lazy, as it is known to be expensive, requiring
+                    // that we traverse all members.
+                    //
+                    // If salsa let us look at the cache, we could check first
+                    // to see if the class literal query was already run.
 
-                            let typevar_variance_in_substituted_type = ty.variance_of(db, typevar);
-                            origin
-                                .with_polarity(typevar_variance_in_substituted_type)
-                                .variance_of(db, generic_typevar)
-                        }
-                    }),
-            )
+                    let typevar_variance_in_substituted_type = ty.variance_of(db, typevar);
+                    origin
+                        .with_polarity(typevar_variance_in_substituted_type)
+                        .variance_of(db, generic_typevar)
+                }
+            })
             .collect()
     }
 }
