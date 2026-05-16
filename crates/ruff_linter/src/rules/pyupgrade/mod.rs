@@ -537,9 +537,9 @@ mod tests {
     }
 
     #[test]
-    fn up032_widening_pep701() -> Result<()> {
+    fn up032_pep701_boundary() -> Result<()> {
         assert_diagnostics_diff!(
-            Path::new("pyupgrade/UP032_widening.py"),
+            Path::new("pyupgrade/UP032_0.py"),
             &settings::LinterSettings {
                 unresolved_target_version: PythonVersion::PY311.into(),
                 ..settings::LinterSettings::for_rule(Rule::FString)

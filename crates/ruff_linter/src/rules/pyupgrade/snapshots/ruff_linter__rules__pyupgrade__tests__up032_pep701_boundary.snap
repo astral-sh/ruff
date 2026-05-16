@@ -1,0 +1,267 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+--- Linter settings ---
+-linter.unresolved_target_version = 3.11
++linter.unresolved_target_version = 3.12
+
+--- Summary ---
+Removed: 0
+Added: 10
+
+--- Added ---
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:153:1
+    |
+151 | "{}{}".format(a)
+152 |
+153 | "" "{}".format(a["\\"])
+    | ^^^^^^^^^^^^^^^^^^^^^^^
+154 |
+155 | "{}".format(a["b"])
+    |
+help: Convert to f-string
+150 |
+151 | "{}{}".format(a)
+152 |
+    - "" "{}".format(a["\\"])
+153 + f"{a["\\"]}"
+154 |
+155 | "{}".format(a["b"])
+156 |
+
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:155:1
+    |
+153 | "" "{}".format(a["\\"])
+154 |
+155 | "{}".format(a["b"])
+    | ^^^^^^^^^^^^^^^^^^^
+156 |
+157 | r'"\N{snowman} {}".format(a)'
+    |
+help: Convert to f-string
+152 |
+153 | "" "{}".format(a["\\"])
+154 |
+    - "{}".format(a["b"])
+155 + f"{a["b"]}"
+156 |
+157 | r'"\N{snowman} {}".format(a)'
+158 |
+
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:178:1
+    |
+176 |   )
+177 |
+178 | / "{}".format(
+179 | |     [
+180 | |         1,
+181 | |         2,
+182 | |         3,
+183 | |     ]
+184 | | )
+    | |_^
+185 |
+186 |   "{a}".format(
+    |
+help: Convert to f-string
+175 |     111111
+176 | )
+177 |
+    - "{}".format(
+    -     [
+178 + f"{[
+179 |         1,
+180 |         2,
+181 |         3,
+    -     ]
+    - )
+182 +     ]}"
+183 |
+184 | "{a}".format(
+185 |     a=[
+
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:186:1
+    |
+184 |   )
+185 |
+186 | / "{a}".format(
+187 | |     a=[
+188 | |         1,
+189 | |         2,
+190 | |         3,
+191 | |     ]
+192 | | )
+    | |_^
+193 |
+194 |   (
+    |
+help: Convert to f-string
+183 |     ]
+184 | )
+185 |
+    - "{a}".format(
+    -     a=[
+186 + f"{[
+187 |         1,
+188 |         2,
+189 |         3,
+    -     ]
+    - )
+190 +     ]}"
+191 |
+192 | (
+193 |     "{a}"
+
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:310:1
+    |
+309 | # `**locals()` mixed with explicit keyword arguments.
+310 | "{prefix}: {filename}".format(prefix="info", **locals())
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+311 |
+312 | # `**vars()` is equivalent to `**locals()`.
+    |
+help: Convert to f-string
+307 | "reading {filename}".format(**locals())
+308 |
+309 | # `**locals()` mixed with explicit keyword arguments.
+    - "{prefix}: {filename}".format(prefix="info", **locals())
+310 + f"{"info"}: {filename}"
+311 |
+312 | # `**vars()` is equivalent to `**locals()`.
+313 | "reading {filename}".format(**vars())
+note: This is an unsafe fix and may change runtime behavior
+
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:363:1
+    |
+361 | ###
+362 |
+363 | "Hello {}".format("world")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+364 |
+365 | "Magic wand: {}".format(bag["wand"])
+    |
+help: Convert to f-string
+360 | # multi-line interpolations).
+361 | ###
+362 |
+    - "Hello {}".format("world")
+363 + f"Hello {"world"}"
+364 |
+365 | "Magic wand: {}".format(bag["wand"])
+366 |
+
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:365:1
+    |
+363 | "Hello {}".format("world")
+364 |
+365 | "Magic wand: {}".format(bag["wand"])
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+366 |
+367 | "{}".format(len(l) * "─")
+    |
+help: Convert to f-string
+362 |
+363 | "Hello {}".format("world")
+364 |
+    - "Magic wand: {}".format(bag["wand"])
+365 + f"Magic wand: {bag["wand"]}"
+366 |
+367 | "{}".format(len(l) * "─")
+368 |
+
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:367:1
+    |
+365 | "Magic wand: {}".format(bag["wand"])
+366 |
+367 | "{}".format(len(l) * "─")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^
+368 |
+369 | "{}".format(
+    |
+help: Convert to f-string
+364 |
+365 | "Magic wand: {}".format(bag["wand"])
+366 |
+    - "{}".format(len(l) * "─")
+367 + f"{len(l) * "─"}"
+368 |
+369 | "{}".format(
+370 |     [
+
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:369:1
+    |
+367 |   "{}".format(len(l) * "─")
+368 |
+369 | / "{}".format(
+370 | |     [
+371 | |         1,
+372 | |         2,
+373 | |         3,
+374 | |     ]
+375 | | )
+    | |_^
+376 |
+377 |   "{a}".format(
+    |
+help: Convert to f-string
+366 |
+367 | "{}".format(len(l) * "─")
+368 |
+    - "{}".format(
+    -     [
+369 + f"{[
+370 |         1,
+371 |         2,
+372 |         3,
+    -     ]
+    - )
+373 +     ]}"
+374 |
+375 | "{a}".format(
+376 |     a=[
+
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:377:1
+    |
+375 |   )
+376 |
+377 | / "{a}".format(
+378 | |     a=[
+379 | |         1,
+380 | |         2,
+381 | |         3,
+382 | |     ]
+383 | | )
+    | |_^
+    |
+help: Convert to f-string
+374 |     ]
+375 | )
+376 |
+    - "{a}".format(
+    -     a=[
+377 + f"{[
+378 |         1,
+379 |         2,
+380 |         3,
+    -     ]
+    - )
+381 +     ]}"

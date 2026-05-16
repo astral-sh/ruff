@@ -343,3 +343,41 @@ r"\N{angle}AOB = {angle}°".format(angle=180)
 
 # Leading `{` would be confused with an escaped brace inside the f-string.
 "{}".format({} | {})
+
+###
+# Widening — fixable on Python 3.11+ (argument's quote doesn't collide with outer).
+# Refer: https://github.com/astral-sh/ruff/issues/2031
+###
+
+'Magic wand: {}'.format(bag["wand"])
+
+'{}'.format(len(l) * "─")
+
+'Hello {}'.format("world")
+
+###
+# Widening — fixable only on Python 3.12+ thanks to PEP 701 (same-quote nesting,
+# multi-line interpolations).
+###
+
+"Hello {}".format("world")
+
+"Magic wand: {}".format(bag["wand"])
+
+"{}".format(len(l) * "─")
+
+"{}".format(
+    [
+        1,
+        2,
+        3,
+    ]
+)
+
+"{a}".format(
+    a=[
+        1,
+        2,
+        3,
+    ]
+)

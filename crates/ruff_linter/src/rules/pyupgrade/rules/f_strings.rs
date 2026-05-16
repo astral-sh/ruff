@@ -39,6 +39,20 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// f"{foo}"
 /// ```
 ///
+/// ## Fix safety
+/// The fix is marked as unsafe whenever conversion may change runtime behavior:
+///
+/// - A walrus binding referenced only by the dropped argument
+///   (`"{1}".format(x := 1, x)` → `f"{x}"` raises `NameError`).
+/// - An unreferenced argument with side effects, including calls and arithmetic
+///   operations that may raise (`"a".format(foo())`, `"1".format(1 / 0)`).
+/// - A format-time accessor (`{[k]}`, `{.attr}`) combined with a side-effecting
+///   argument elsewhere, because `str.format` evaluates all arguments before any
+///   formatting while f-strings interleave the two
+///   (`"{[x]} {}".format(d, len(d))` on a `defaultdict`).
+/// - A `**locals()`, `**vars()`, or `**vars(<target>)` splat, since names are
+///   resolved syntactically without a guarantee they are bound at runtime.
+///
 /// ## References
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[derive(ViolationMetadata)]

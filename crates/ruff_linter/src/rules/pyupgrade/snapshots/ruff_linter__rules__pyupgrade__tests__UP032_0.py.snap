@@ -1742,6 +1742,8 @@ UP032 [*] Use f-string instead of `format` call
 344 | # Leading `{` would be confused with an escaped brace inside the f-string.
 345 | "{}".format({} | {})
     | ^^^^^^^^^^^^^^^^^^^^
+346 |
+347 | ###
     |
 help: Convert to f-string
 342 | "{}".format(lambda: 1)
@@ -1749,3 +1751,187 @@ help: Convert to f-string
 344 | # Leading `{` would be confused with an escaped brace inside the f-string.
     - "{}".format({} | {})
 345 + f"{({} | {})}"
+346 |
+347 | ###
+348 | # Widening — fixable on Python 3.11+ (argument's quote doesn't collide with outer).
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:352:1
+    |
+350 | ###
+351 |
+352 | 'Magic wand: {}'.format(bag["wand"])
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+353 |
+354 | '{}'.format(len(l) * "─")
+    |
+help: Convert to f-string
+349 | # Refer: https://github.com/astral-sh/ruff/issues/2031
+350 | ###
+351 |
+    - 'Magic wand: {}'.format(bag["wand"])
+352 + f'Magic wand: {bag["wand"]}'
+353 |
+354 | '{}'.format(len(l) * "─")
+355 |
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:354:1
+    |
+352 | 'Magic wand: {}'.format(bag["wand"])
+353 |
+354 | '{}'.format(len(l) * "─")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^
+355 |
+356 | 'Hello {}'.format("world")
+    |
+help: Convert to f-string
+351 |
+352 | 'Magic wand: {}'.format(bag["wand"])
+353 |
+    - '{}'.format(len(l) * "─")
+354 + f'{len(l) * "─"}'
+355 |
+356 | 'Hello {}'.format("world")
+357 |
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:356:1
+    |
+354 | '{}'.format(len(l) * "─")
+355 |
+356 | 'Hello {}'.format("world")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+357 |
+358 | ###
+    |
+help: Convert to f-string
+353 |
+354 | '{}'.format(len(l) * "─")
+355 |
+    - 'Hello {}'.format("world")
+356 + f'Hello {"world"}'
+357 |
+358 | ###
+359 | # Widening — fixable only on Python 3.12+ thanks to PEP 701 (same-quote nesting,
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:363:1
+    |
+361 | ###
+362 |
+363 | "Hello {}".format("world")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+364 |
+365 | "Magic wand: {}".format(bag["wand"])
+    |
+help: Convert to f-string
+360 | # multi-line interpolations).
+361 | ###
+362 |
+    - "Hello {}".format("world")
+363 + f"Hello {"world"}"
+364 |
+365 | "Magic wand: {}".format(bag["wand"])
+366 |
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:365:1
+    |
+363 | "Hello {}".format("world")
+364 |
+365 | "Magic wand: {}".format(bag["wand"])
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+366 |
+367 | "{}".format(len(l) * "─")
+    |
+help: Convert to f-string
+362 |
+363 | "Hello {}".format("world")
+364 |
+    - "Magic wand: {}".format(bag["wand"])
+365 + f"Magic wand: {bag["wand"]}"
+366 |
+367 | "{}".format(len(l) * "─")
+368 |
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:367:1
+    |
+365 | "Magic wand: {}".format(bag["wand"])
+366 |
+367 | "{}".format(len(l) * "─")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^
+368 |
+369 | "{}".format(
+    |
+help: Convert to f-string
+364 |
+365 | "Magic wand: {}".format(bag["wand"])
+366 |
+    - "{}".format(len(l) * "─")
+367 + f"{len(l) * "─"}"
+368 |
+369 | "{}".format(
+370 |     [
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:369:1
+    |
+367 |   "{}".format(len(l) * "─")
+368 |
+369 | / "{}".format(
+370 | |     [
+371 | |         1,
+372 | |         2,
+373 | |         3,
+374 | |     ]
+375 | | )
+    | |_^
+376 |
+377 |   "{a}".format(
+    |
+help: Convert to f-string
+366 |
+367 | "{}".format(len(l) * "─")
+368 |
+    - "{}".format(
+    -     [
+369 + f"{[
+370 |         1,
+371 |         2,
+372 |         3,
+    -     ]
+    - )
+373 +     ]}"
+374 |
+375 | "{a}".format(
+376 |     a=[
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:377:1
+    |
+375 |   )
+376 |
+377 | / "{a}".format(
+378 | |     a=[
+379 | |         1,
+380 | |         2,
+381 | |         3,
+382 | |     ]
+383 | | )
+    | |_^
+    |
+help: Convert to f-string
+374 |     ]
+375 | )
+376 |
+    - "{a}".format(
+    -     a=[
+377 + f"{[
+378 |         1,
+379 |         2,
+380 |         3,
+    -     ]
+    - )
+381 +     ]}"
