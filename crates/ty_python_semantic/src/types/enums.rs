@@ -38,6 +38,10 @@ pub(crate) struct EnumMetadata<'db> {
     /// value exposed through `.value`; the method can assign `_value_`
     /// independently.
     pub(crate) new_function: Option<FunctionType<'db>>,
+
+    /// Whether the enum metaclass may transform member values before they are
+    /// passed to enum construction hooks.
+    pub(crate) custom_enum_metaclass_new: bool,
 }
 
 impl get_size2::GetSize for EnumMetadata<'_> {}
@@ -51,20 +55,25 @@ impl<'db> EnumMetadata<'db> {
             value_annotation: None,
             init_function: None,
             new_function: None,
+            custom_enum_metaclass_new: false,
         }
     }
 
     /// Returns the type of `.value`/`._value_` for a given enum member.
     ///
-    /// Priority: explicit `_value_` annotation, then custom construction hooks → `Any`,
-    /// then the inferred member value type.
+    /// Priority: explicit `_value_` annotation, then custom construction hooks
+    /// or metaclass value transformation → `Any`, then the inferred member
+    /// value type.
     pub(crate) fn value_type(&self, member_name: &Name) -> Option<Type<'db>> {
         if !self.members.contains_key(member_name) {
             return None;
         }
         if let Some(annotation) = self.value_annotation {
             Some(annotation)
-        } else if self.init_function.is_some() || self.new_function.is_some() {
+        } else if self.init_function.is_some()
+            || self.new_function.is_some()
+            || self.custom_enum_metaclass_new
+        {
             Some(Type::Dynamic(DynamicType::Any))
         } else {
             self.members.get(member_name).copied()
@@ -84,7 +93,8 @@ impl<'db> EnumMetadata<'db> {
     /// narrowed to a specific member (e.g. `x: MyEnum` where `MyEnum` has multiple members).
     ///
     /// If there is an explicit `_value_` annotation, returns that.
-    /// If there is a custom `__init__` or `__new__`, returns `Any`.
+    /// If there is a custom `__init__` or `__new__` or a custom enum
+    /// metaclass may transform member values, returns `Any`.
     /// Otherwise, returns the union of all member value types.
     pub(crate) fn instance_value_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         if self.members.is_empty() {
@@ -92,7 +102,10 @@ impl<'db> EnumMetadata<'db> {
         }
         if let Some(annotation) = self.value_annotation {
             Some(annotation)
-        } else if self.init_function.is_some() || self.new_function.is_some() {
+        } else if self.init_function.is_some()
+            || self.new_function.is_some()
+            || self.custom_enum_metaclass_new
+        {
             Some(Type::Dynamic(DynamicType::Any))
         } else {
             let union = self
@@ -230,6 +243,7 @@ pub(crate) fn enum_metadata<'db>(
                 value_annotation: None,
                 init_function: None,
                 new_function: None,
+                custom_enum_metaclass_new: false,
             });
         }
     };
@@ -435,14 +449,18 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
-    // Look up an explicit `_value_` annotation, if present. Falls back to
-    // checking parent enum classes in the MRO.
-    let value_annotation =
-        custom_value_annotation(db, scope_id).or_else(|| inherited_value_annotation(db, class));
-
     // Look up custom construction hooks, falling back to parent enum classes.
     let init_function = custom_init(db, scope_id).or_else(|| inherited_init(db, class));
     let new_function = custom_new(db, scope_id).or_else(|| inherited_new(db, class));
+    let custom_enum_metaclass_new = custom_enum_metaclass_new(db, class);
+    let custom_value_annotation = custom_value_annotation(db, scope_id);
+    let value_annotation = custom_value_annotation.or_else(|| {
+        if custom_enum_metaclass_new {
+            inherited_user_defined_value_annotation(db, class)
+        } else {
+            inherited_value_annotation(db, class)
+        }
+    });
 
     Some(EnumMetadata {
         members,
@@ -451,12 +469,32 @@ pub(crate) fn enum_metadata<'db>(
         value_annotation,
         init_function,
         new_function,
+        custom_enum_metaclass_new,
     })
+}
+
+/// Returns whether an enum's metaclass has a custom `__new__` before the stdlib
+/// `EnumType`/`EnumMeta` implementation.
+///
+/// Such a metaclass can rewrite the class dictionary's member values before the
+/// stdlib enum constructor validates and forwards them to `__new__`/`__init__`.
+fn custom_enum_metaclass_new<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
+    let Some(metaclass) = class.metaclass(db).to_class_type(db) else {
+        return false;
+    };
+
+    metaclass
+        .class_literal(db)
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .filter_map(|base| base.class_literal(db).as_static())
+        .take_while(|base| base.known(db) != Some(KnownClass::EnumType))
+        .any(|base| custom_new(db, base.body_scope(db)).is_some())
 }
 
 /// Iterates over parent enum classes in the MRO, skipping known enum
 /// infrastructure classes but including `IntEnum`, `Flag`, and `IntFlag`
-/// which declare `_value_` annotations that should be inherited.
+/// which declare `_value_` annotations that normally should be inherited.
 fn iter_parent_enum_classes<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
@@ -492,6 +530,16 @@ fn inherited_value_annotation<'db>(
     class: StaticClassLiteral<'db>,
 ) -> Option<Type<'db>> {
     iter_parent_enum_classes(db, class)
+        .find_map(|base| custom_value_annotation(db, base.body_scope(db)))
+}
+
+/// Looks up an inherited `_value_` annotation from user-defined parent enum classes in the MRO.
+fn inherited_user_defined_value_annotation<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<Type<'db>> {
+    iter_parent_enum_classes(db, class)
+        .filter(|base| base.known(db).is_none())
         .find_map(|base| custom_value_annotation(db, base.body_scope(db)))
 }
 

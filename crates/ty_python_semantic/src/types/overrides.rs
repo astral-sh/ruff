@@ -250,7 +250,9 @@ fn check_class_declaration<'db>(
             // `auto()` values are computed at runtime by the enum metaclass,
             // so we can't validate them against _value_ or __init__ at the type level.
             let is_auto = enum_info.auto_members.contains(&member.name);
-            let skip_type_check = (context.in_stub() && is_ellipsis) || is_auto;
+            let skip_type_check = (context.in_stub() && is_ellipsis)
+                || is_auto
+                || enum_info.custom_enum_metaclass_new;
 
             if !skip_type_check {
                 if let Some(new_function) = enum_info.new_function {
