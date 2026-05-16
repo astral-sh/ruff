@@ -347,10 +347,6 @@ impl Configuration {
                 logger_objects: lint.logger_objects.unwrap_or_default(),
                 typing_modules: lint.typing_modules.unwrap_or_default(),
                 // Plugins
-                flake8_annotation_complexity: lint
-                    .flake8_annotation_complexity
-                    .map(Flake8AnnotationComplexityOptions::into_settings)
-                    .unwrap_or_default(),
                 flake8_annotations: lint
                     .flake8_annotations
                     .map(Flake8AnnotationsOptions::into_settings)

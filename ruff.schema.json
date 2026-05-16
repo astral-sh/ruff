@@ -933,7 +933,8 @@
             "integer",
             "null"
           ],
-          "format": "int"
+          "format": "uint",
+          "minimum": 0
         }
       },
       "additionalProperties": false
@@ -3095,6 +3096,15 @@
             "type": "string"
           }
         },
+        "max-annotation-complexity": {
+          "description": "Maximum annotation complexity",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
         "parenthesize-tuple-in-subscript": {
           "description": "Whether to prefer accessing items keyed by tuples with\nparentheses around the tuple (see `RUF031`).",
           "type": [
@@ -4244,6 +4254,7 @@
         "RUF07",
         "RUF070",
         "RUF071",
+        "RUF072",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -4408,10 +4419,6 @@
         "T20",
         "T201",
         "T203",
-        "TAE",
-        "TAE0",
-        "TAE00",
-        "TAE002",
         "TC",
         "TC0",
         "TC00",

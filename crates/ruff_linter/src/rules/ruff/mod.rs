@@ -809,4 +809,36 @@ mod tests {
         );
         Ok(())
     }
+
+    #[test]
+    fn complex_annotation_yields_errors() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF072.py"),
+            &LinterSettings {
+                ruff: super::settings::Settings {
+                    max_annotation_complexity: 3,
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::ComplexAnnotation)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn complex_annotation_no_errors_when_high_max_annotation_complexity() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF072.py"),
+            &LinterSettings {
+                ruff: super::settings::Settings {
+                    max_annotation_complexity: 100,
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::ComplexAnnotation)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
 }

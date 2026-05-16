@@ -485,9 +485,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Annotations, "206") => rules::flake8_annotations::rules::MissingReturnTypeClassMethod,
         (Flake8Annotations, "401") => rules::flake8_annotations::rules::AnyType,
 
-        // flake8-annotation-complexity
-        (Flake8AnnotationComplexity, "002") => rules::flake8_annotation_complexity::rules::ComplexAnnotation,
-
         // flake8-future-annotations
         (Flake8FutureAnnotations, "100") => rules::flake8_future_annotations::rules::FutureRewritableTypeAnnotation,
         (Flake8FutureAnnotations, "102") => rules::flake8_future_annotations::rules::FutureRequiredTypeAnnotation,
@@ -1072,6 +1069,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "069") => rules::ruff::rules::FloatEqualityComparison,
         (Ruff, "070") => rules::ruff::rules::UnnecessaryAssignBeforeYield,
         (Ruff, "071") => rules::ruff::rules::OsPathCommonprefix,
+        (Ruff, "072") => rules::ruff::rules::ComplexAnnotation,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,

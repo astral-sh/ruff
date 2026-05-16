@@ -68,12 +68,9 @@ impl Violation for ComplexAnnotation {
     }
 }
 
-/// TAE002 (on function)
+/// RUF072 (on function)
 pub(crate) fn complex_annotation_function(checker: &Checker, function_def: &StmtFunctionDef) {
-    let max_complexity = checker
-        .settings()
-        .flake8_annotation_complexity
-        .max_annotation_complexity;
+    let max_complexity = checker.settings().ruff.max_annotation_complexity;
 
     let annotation_resolver = CheckerAnnotationResolver { checker };
 
@@ -110,12 +107,9 @@ pub(crate) fn complex_annotation_function(checker: &Checker, function_def: &Stmt
     }
 }
 
-/// TAE002 (on assignment)
+/// RUF072 (on assignment)
 pub(crate) fn complex_annotation_assignment(checker: &Checker, assign_stmt: &StmtAnnAssign) {
-    let max_complexity = checker
-        .settings()
-        .flake8_annotation_complexity
-        .max_annotation_complexity;
+    let max_complexity = checker.settings().ruff.max_annotation_complexity;
 
     let annotation_resolver = CheckerAnnotationResolver { checker };
 

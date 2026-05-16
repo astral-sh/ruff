@@ -274,6 +274,7 @@ linter.pylint.max_nested_blocks = 5
 linter.pyupgrade.keep_runtime_typing = false
 linter.ruff.parenthesize_tuple_in_subscript = false
 linter.ruff.strictly_empty_init_modules = false
+linter.ruff.max_annotation_complexity = 2
 
 # Formatter Settings
 formatter.exclude = []

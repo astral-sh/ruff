@@ -28,10 +28,10 @@ use ruff_linter::rules::pep8_naming::settings::IgnoreNames;
 use ruff_linter::rules::pydocstyle::settings::Convention;
 use ruff_linter::rules::pylint::settings::ConstantType;
 use ruff_linter::rules::{
-    flake8_annotation_complexity, flake8_copyright, flake8_errmsg, flake8_gettext,
-    flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
-    flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe,
-    pep8_naming, pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
+    flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
+    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
+    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
+    pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use ruff_linter::settings::types::{
     IdentifierPattern, Language, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
@@ -1060,18 +1060,6 @@ pub struct Flake8AnnotationComplexityOptions {
         example = "max_annotation_complexity = 4"
     )]
     max_annotation_complexity: Option<usize>,
-}
-
-impl Flake8AnnotationComplexityOptions {
-    pub fn into_settings(
-        self,
-    ) -> ruff_linter::rules::flake8_annotation_complexity::settings::Settings {
-        ruff_linter::rules::flake8_annotation_complexity::settings::Settings {
-            max_annotation_complexity: self.max_annotation_complexity.unwrap_or(
-                flake8_annotation_complexity::settings::DEFAULT_MAX_ANNOTATION_COMPLEXITY,
-            ),
-        }
-    }
 }
 
 /// Options for the `flake8-annotations` plugin.
@@ -3672,6 +3660,14 @@ pub struct RuffOptions {
     )]
     pub extend_markup_names: Option<Vec<String>>,
 
+    /// Maximum annotation complexity
+    #[option(
+        default = "2",
+        value_type = "int",
+        example = "max_annotation_complexity = 4"
+    )]
+    max_annotation_complexity: Option<usize>,
+
     /// A list of callable names, whose result may be safely passed into
     /// [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).
     ///
@@ -3727,6 +3723,7 @@ impl RuffOptions {
                 .parenthesize_tuple_in_subscript
                 .unwrap_or_default(),
             strictly_empty_init_modules: self.strictly_empty_init_modules.unwrap_or_default(),
+            max_annotation_complexity: self.max_annotation_complexity.unwrap_or_default(),
         }
     }
 }

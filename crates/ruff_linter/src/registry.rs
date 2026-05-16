@@ -47,9 +47,6 @@ pub enum Linter {
     #[prefix = "YTT"]
     Flake82020,
     /// [flake8-annotation-complexity](https://pypi.org/project/flake8-annotations-complexity/)
-    #[prefix = "TAE"]
-    Flake8AnnotationComplexity,
-    /// [flake8-annotations](https://pypi.org/project/flake8-annotations/)
     #[prefix = "ANN"]
     Flake8Annotations,
     /// [flake8-async](https://pypi.org/project/flake8-async/)

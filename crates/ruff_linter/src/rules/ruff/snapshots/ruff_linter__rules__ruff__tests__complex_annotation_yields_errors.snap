@@ -1,8 +1,8 @@
 ---
-source: crates/ruff_linter/src/rules/flake8_annotation_complexity/mod.rs
+source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-TAE002 Type annotation for `d` is too complex (4 > 3)
-  --> TAE002.py:13:45
+RUF072 Type annotation for `d` is too complex (4 > 3)
+  --> RUF072.py:13:45
    |
 11 | # Error
 12 | def complex_argument(
@@ -12,8 +12,8 @@ TAE002 Type annotation for `d` is too complex (4 > 3)
    |
 help: consider using a type alias or refactoring into a `dataclass`
 
-TAE002 Type annotation for `return type` is too complex (4 > 3)
-  --> TAE002.py:18:31
+RUF072 Type annotation for `return type` is too complex (4 > 3)
+  --> RUF072.py:18:31
    |
 17 | # Error
 18 | def complex_return(a: int) -> dict[str, list[dict[str, int | None]]]: ...
@@ -23,8 +23,8 @@ TAE002 Type annotation for `return type` is too complex (4 > 3)
    |
 help: consider using a type alias or refactoring into a `dataclass`
 
-TAE002 Type annotation for `variable_with_complex_ann` is too complex (4 > 3)
-  --> TAE002.py:21:28
+RUF072 Type annotation for `variable_with_complex_ann` is too complex (4 > 3)
+  --> RUF072.py:21:28
    |
 20 | # Error
 21 | variable_with_complex_ann: dict[str, dict[str, dict[str, dict[str, str]]]] = {}
@@ -34,8 +34,8 @@ TAE002 Type annotation for `variable_with_complex_ann` is too complex (4 > 3)
    |
 help: consider using a type alias or refactoring into a `dataclass`
 
-TAE002 Type annotation for `var` is too complex (4 > 3)
-  --> TAE002.py:24:10
+RUF072 Type annotation for `var` is too complex (4 > 3)
+  --> RUF072.py:24:10
    |
 23 | def variable_with_complex_ann_in_fn() -> None:
 24 |     var: dict[str, dict[str, dict[str, dict[str, str]]]] = {}
@@ -44,8 +44,8 @@ TAE002 Type annotation for `var` is too complex (4 > 3)
    |
 help: consider using a type alias or refactoring into a `dataclass`
 
-TAE002 Type annotation for `bad_arg` is too complex (4 > 3)
-  --> TAE002.py:29:33
+RUF072 Type annotation for `bad_arg` is too complex (4 > 3)
+  --> RUF072.py:29:33
    |
 28 | class ClassWithComplexMemberFunction:
 29 |     def __init__(self, bad_arg: dict[str, dict[str, dict[str, dict[str, str]]]]) -> None: ...
@@ -55,8 +55,8 @@ TAE002 Type annotation for `bad_arg` is too complex (4 > 3)
    |
 help: consider using a type alias or refactoring into a `dataclass`
 
-TAE002 Type annotation for `bad_arg` is too complex (4 > 3)
-  --> TAE002.py:33:33
+RUF072 Type annotation for `bad_arg` is too complex (4 > 3)
+  --> RUF072.py:33:33
    |
 31 | # Quoted case
 32 | class ClassWithComplexMemberFunction:
