@@ -68,24 +68,23 @@ impl<'db> EnumMetadata<'db> {
     /// Returns the type of `.value`/`._value_` for a given enum member.
     ///
     /// Priority: explicit `_value_` annotation, then custom construction hooks
-    /// or metaclass value transformation → `Any`, then the inferred member
-    /// value type.
+    /// or metaclass value transformation → `Any`, then `_generate_next_value_`
+    /// return type for `auto()` members, then the inferred member value type.
     pub(crate) fn value_type(&self, db: &'db dyn Db, member_name: &Name) -> Option<Type<'db>> {
         if !self.members.contains_key(member_name) {
             return None;
         }
-        if let Some(func_ty) = self.generate_next_value_function
-            && self.auto_members.contains(member_name)
-        {
-            let return_ty = func_ty.signature(db).overload_return_type_or_unknown(db);
-            Some(return_ty)
-        } else if let Some(annotation) = self.value_annotation {
+        if let Some(annotation) = self.value_annotation {
             Some(annotation)
         } else if self.init_function.is_some()
             || self.new_function.is_some()
             || self.custom_enum_metaclass_new
         {
             Some(Type::Dynamic(DynamicType::Any))
+        } else if let Some(func_ty) = self.generate_next_value_function
+            && self.auto_members.contains(member_name)
+        {
+            Some(func_ty.signature(db).overload_return_type_or_unknown(db))
         } else {
             self.members.get(member_name).copied()
         }
@@ -106,15 +105,13 @@ impl<'db> EnumMetadata<'db> {
     /// If there is an explicit `_value_` annotation, returns that.
     /// If there is a custom `__init__` or `__new__` or a custom enum
     /// metaclass may transform member values, returns `Any`.
-    /// Otherwise, returns the union of all member value types.
+    /// Otherwise, returns the union of each member's `value_type`, which
+    /// applies `_generate_next_value_`'s return type to `auto()` members.
     pub(crate) fn instance_value_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         if self.members.is_empty() {
             return None;
         }
-        if let Some(func_ty) = self.generate_next_value_function {
-            let return_ty = func_ty.signature(db).overload_return_type_or_unknown(db);
-            Some(return_ty)
-        } else if let Some(annotation) = self.value_annotation {
+        if let Some(annotation) = self.value_annotation {
             Some(annotation)
         } else if self.init_function.is_some()
             || self.new_function.is_some()
@@ -124,8 +121,8 @@ impl<'db> EnumMetadata<'db> {
         } else {
             let union = self
                 .members
-                .values()
-                .copied()
+                .keys()
+                .filter_map(|name| self.value_type(db, name))
                 .fold(UnionBuilder::new(db), UnionBuilder::add)
                 .build();
             Some(union)
