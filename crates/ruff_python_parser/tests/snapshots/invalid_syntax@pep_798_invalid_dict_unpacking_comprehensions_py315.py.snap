@@ -341,7 +341,7 @@ Module(
 2 | {*k: v for k, v in items}
 3 | {k: *v for k, v in items}
 4 | {**k: v for k, v in items}
-  | ^^^^ Syntax Error: Starred expression cannot be used here
+  |  ^^^ Syntax Error: Starred expression cannot be used here
 5 | {k: **v for k, v in items}
   |
 

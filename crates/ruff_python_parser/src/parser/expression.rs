@@ -2111,11 +2111,13 @@ impl<'src> Parser<'src> {
             });
         }
 
+        let after_brace = self.node_start();
+
         if self.eat(TokenKind::DoubleStar) {
             // Handle dictionary unpacking. Here, the grammar is `'**' bitwise_or`
             // which requires limiting the expression.
             let value = self.parse_expression_with_bitwise_or_precedence();
-            let unpack_range = TextRange::new(start, value.range().end());
+            let unpack_range = TextRange::new(after_brace, value.range().end());
 
             if matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
                 self.add_unsupported_syntax_error(

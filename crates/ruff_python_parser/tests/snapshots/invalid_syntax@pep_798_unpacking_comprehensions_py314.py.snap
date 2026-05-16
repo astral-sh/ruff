@@ -311,7 +311,7 @@ Module(
 2 | [*x for x in y]
 3 | {*x for x in y}
 4 | {**x for x in y}
-  | ^^^^ Syntax Error: Cannot use dictionary unpacking in a dict comprehension on Python 3.14 (syntax was added in Python 3.15)
+  |  ^^^ Syntax Error: Cannot use dictionary unpacking in a dict comprehension on Python 3.14 (syntax was added in Python 3.15)
 5 | (*x for x in y)
 6 | f(*x for x in y)
   |
