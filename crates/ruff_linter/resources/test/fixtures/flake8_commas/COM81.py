@@ -37,6 +37,8 @@ foo = 1,
 
 bar = 1; foo = bar,
 
+print("Hello,"),;
+
 foo = (
 3,
 4,

@@ -20,6 +20,7 @@ enum TokenType {
     OpeningSquareBracket,
     Colon,
     Comma,
+    Semicolon,
     OpeningCurlyBracket,
     Def,
     For,
@@ -68,6 +69,7 @@ impl From<(TokenKind, TextRange)> for SimpleToken {
             TokenKind::Rsqb => TokenType::ClosingBracket,
             TokenKind::Colon => TokenType::Colon,
             TokenKind::Comma => TokenType::Comma,
+            TokenKind::Semi => TokenType::Semicolon,
             TokenKind::Lbrace => TokenType::OpeningCurlyBracket,
             TokenKind::Rbrace => TokenType::ClosingBracket,
             TokenKind::Def => TokenType::Def,
@@ -374,8 +376,9 @@ fn check_token(
     }
 
     // Is prev a prohibited trailing comma on a bare tuple?
-    // Approximation: any comma followed by a statement-ending newline.
-    let bare_comma_prohibited = prev.ty == TokenType::Comma && token.ty == TokenType::Newline;
+    // Approximation: any comma followed by a statement-ending newline or semicolon.
+    let bare_comma_prohibited = prev.ty == TokenType::Comma
+        && matches!(token.ty, TokenType::Newline | TokenType::Semicolon);
     if bare_comma_prohibited {
         lint_context.report_diagnostic_if_enabled(TrailingCommaOnBareTuple, prev.range());
         return;
