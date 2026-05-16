@@ -1747,8 +1747,8 @@ reveal_type(Model.__init__)  # revealed: (self: Model, x: int) -> None
 
 ### Decorator return types are still metadata-only in decorator position
 
-When a `@dataclass_transform()`-decorated function is used as a class decorator, we currently use
-it to shape the class like a dataclass but do not yet let an explicit non-class return annotation
+When a `@dataclass_transform()`-decorated function is used as a class decorator, we currently use it
+to shape the class like a dataclass but do not yet let an explicit non-class return annotation
 replace the public class binding.
 
 ```py
