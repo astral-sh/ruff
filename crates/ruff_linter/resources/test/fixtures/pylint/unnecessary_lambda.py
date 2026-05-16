@@ -61,3 +61,10 @@ _ = lambda *args: f(*args, y=x)
 # https://github.com/astral-sh/ruff/issues/18675
 _ = lambda x: (string := str)(x)
 _ = lambda x: ((x := 1) and str)(x)
+
+# https://github.com/astral-sh/ruff/issues/24704
+# Forward reference: `forward_ref_fn` is defined after the lambda, so inlining would cause a NameError.
+x = {"a": lambda y: forward_ref_fn(y)}
+
+def forward_ref_fn(y):
+    pass

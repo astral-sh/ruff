@@ -171,6 +171,8 @@ help: Inline function call
    - _ = lambda x: (string := str)(x)
 62 + _ = (string := str)
 63 | _ = lambda x: ((x := 1) and str)(x)
+64 |
+65 | # https://github.com/astral-sh/ruff/issues/24704
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0108 Lambda may be unnecessary; consider inlining inner function
@@ -180,5 +182,7 @@ PLW0108 Lambda may be unnecessary; consider inlining inner function
 62 | _ = lambda x: (string := str)(x)
 63 | _ = lambda x: ((x := 1) and str)(x)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+64 |
+65 | # https://github.com/astral-sh/ruff/issues/24704
    |
 help: Inline function call

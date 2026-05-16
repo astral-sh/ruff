@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, ExprLambda, Parameter, ParameterWithDefault, visitor};
+use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -215,6 +216,14 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
         if let Some(binding_id) = checker.semantic().resolve_name(name) {
             let binding = checker.semantic().binding(binding_id);
             if checker.semantic().is_current_scope(binding.scope) {
+                return;
+            }
+            // If the callable is defined in the module scope after the lambda, replacing
+            // the lambda with the bare name would cause a `NameError` at evaluation time.
+            let binding_scope = &checker.semantic().scopes[binding.scope];
+            if matches!(binding_scope.kind, ScopeKind::Module)
+                && binding.range.start() > lambda.range().start()
+            {
                 return;
             }
         }
