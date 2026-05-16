@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, Decorator, Expr};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 
+use crate::binding::{BindingKind, FromImport};
 use crate::model::SemanticModel;
 use crate::{Module, ModuleSource};
 
@@ -35,9 +36,40 @@ pub fn is_overload(decorator_list: &[Decorator], semantic: &SemanticModel) -> bo
 
 /// Returns `true` if a function definition is an `@override` (PEP 698).
 pub fn is_override(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
-    decorator_list
-        .iter()
-        .any(|decorator| semantic.match_typing_expr(&decorator.expression, "override"))
+    decorator_list.iter().any(|decorator| {
+        if semantic.match_typing_expr(&decorator.expression, "override") {
+            return true;
+        }
+        // Handle the pattern where `override` is imported under `TYPE_CHECKING` with
+        // a runtime no-op fallback, e.g.:
+        //
+        // ```python
+        // if TYPE_CHECKING:
+        //     from typing_extensions import override
+        // else:
+        //     override = lambda f: f
+        // ```
+        //
+        // In this case, `match_typing_expr` resolves the decorator to the runtime
+        // binding (the lambda), so we must also check whether any binding for the
+        // same name in the global scope is a typing-only import of `override`.
+        if let Expr::Name(name) = &decorator.expression {
+            return semantic
+                .global_scope()
+                .get_all(&name.id)
+                .any(|binding_id| {
+                    let binding = semantic.binding(binding_id);
+                    binding.context.is_typing()
+                        && matches!(
+                            &binding.kind,
+                            BindingKind::FromImport(FromImport { qualified_name })
+                                if semantic
+                                    .match_typing_qualified_name(qualified_name, "override")
+                        )
+                });
+        }
+        false
+    })
 }
 
 /// Returns `true` if a function definition is an abstract method based on its decorators.

@@ -152,3 +152,24 @@ class TPerson:
         msg = t"{x}"
         raise NotImplementedError(msg)
 
+
+# See: https://github.com/astral-sh/ruff/issues/24713
+# `override` imported under TYPE_CHECKING with a runtime no-op fallback.
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing_extensions import override as override
+else:
+    override = lambda f: f  # noqa: E731
+
+
+class BaseClass:
+    def method(self):
+        ...
+
+
+class DerivedClass(BaseClass):
+    @override
+    def method(self):  # OK - decorated with override (TYPE_CHECKING import)
+        ...
+
