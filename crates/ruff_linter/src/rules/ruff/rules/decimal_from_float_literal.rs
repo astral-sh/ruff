@@ -20,11 +20,15 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Example
 ///
 /// ```python
+/// from decimal import Decimal
+///
 /// num = Decimal(1.2345)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from decimal import Decimal
+///
 /// num = Decimal("1.2345")
 /// ```
 ///
