@@ -62,3 +62,11 @@ def for_else_no_false_positive(result: dict[str, float]) -> dict[str, float]:
             if result[res_glob] <= 0:  # okay, res_glob from loop may be unbound
                 result.pop(res_glob)
     return result
+
+
+def shadowed_loop_variable(d: dict):
+    for k, v in d.items():
+        for k in d:  # shadows outer `k`
+            print(d[k])  # OK, not the same `k`
+        for v in d:  # shadows outer `v`
+            print(d[k])  # OK, not the same `v`

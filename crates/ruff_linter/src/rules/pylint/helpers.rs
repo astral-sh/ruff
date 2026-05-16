@@ -137,6 +137,13 @@ impl Visitor<'_> for SequenceIndexVisitor<'_> {
             Stmt::Delete(ast::StmtDelete { targets, .. }) => {
                 self.modified = targets.iter().any(|target| self.is_assignment(target));
             }
+            Stmt::For(ast::StmtFor { target, .. }) => {
+                if self.is_assignment(target) {
+                    self.modified = true;
+                } else {
+                    visitor::walk_stmt(self, stmt);
+                }
+            }
             _ => visitor::walk_stmt(self, stmt),
         }
     }
