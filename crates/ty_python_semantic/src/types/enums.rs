@@ -39,6 +39,11 @@ pub(crate) struct EnumMetadata<'db> {
     /// independently.
     pub(crate) new_function: Option<FunctionType<'db>>,
 
+    /// The custom `_generate_next_value_` function, if defined on this enum.
+    ///
+    /// When present, defines the value returned by calls to `auto()`
+    pub(crate) generate_next_value_function: Option<FunctionType<'db>>,
+
     /// Whether the enum metaclass may transform member values before they are
     /// passed to enum construction hooks.
     pub(crate) custom_enum_metaclass_new: bool,
@@ -55,6 +60,7 @@ impl<'db> EnumMetadata<'db> {
             value_annotation: None,
             init_function: None,
             new_function: None,
+            generate_next_value_function: None,
             custom_enum_metaclass_new: false,
         }
     }
@@ -64,11 +70,16 @@ impl<'db> EnumMetadata<'db> {
     /// Priority: explicit `_value_` annotation, then custom construction hooks
     /// or metaclass value transformation → `Any`, then the inferred member
     /// value type.
-    pub(crate) fn value_type(&self, member_name: &Name) -> Option<Type<'db>> {
+    pub(crate) fn value_type(&self, db: &'db dyn Db, member_name: &Name) -> Option<Type<'db>> {
         if !self.members.contains_key(member_name) {
             return None;
         }
-        if let Some(annotation) = self.value_annotation {
+        if let Some(func_ty) = self.generate_next_value_function
+            && self.auto_members.contains(member_name)
+        {
+            let return_ty = func_ty.signature(db).overload_return_type_or_unknown(db);
+            Some(return_ty)
+        } else if let Some(annotation) = self.value_annotation {
             Some(annotation)
         } else if self.init_function.is_some()
             || self.new_function.is_some()
@@ -100,7 +111,10 @@ impl<'db> EnumMetadata<'db> {
         if self.members.is_empty() {
             return None;
         }
-        if let Some(annotation) = self.value_annotation {
+        if let Some(func_ty) = self.generate_next_value_function {
+            let return_ty = func_ty.signature(db).overload_return_type_or_unknown(db);
+            Some(return_ty)
+        } else if let Some(annotation) = self.value_annotation {
             Some(annotation)
         } else if self.init_function.is_some()
             || self.new_function.is_some()
@@ -243,6 +257,7 @@ pub(crate) fn enum_metadata<'db>(
                 value_annotation: None,
                 init_function: None,
                 new_function: None,
+                generate_next_value_function: None,
                 custom_enum_metaclass_new: false,
             });
         }
@@ -454,6 +469,8 @@ pub(crate) fn enum_metadata<'db>(
     let new_function = custom_new(db, scope_id).or_else(|| inherited_new(db, class));
     let custom_enum_metaclass_new = custom_enum_metaclass_new(db, class);
     let custom_value_annotation = custom_value_annotation(db, scope_id);
+    let generate_next_value_function = custom_generate_next_value(db, scope_id)
+        .or_else(|| inherited_generate_next_value(db, class));
     let value_annotation = custom_value_annotation.or_else(|| {
         if custom_enum_metaclass_new {
             inherited_user_defined_value_annotation(db, class)
@@ -469,6 +486,7 @@ pub(crate) fn enum_metadata<'db>(
         value_annotation,
         init_function,
         new_function,
+        generate_next_value_function,
         custom_enum_metaclass_new,
     })
 }
@@ -559,6 +577,15 @@ fn inherited_new<'db>(
     iter_parent_enum_classes(db, class).find_map(|base| custom_new(db, base.body_scope(db)))
 }
 
+/// Looks up an inherited `_generate_next_value_` from parent enum classes in the MRO.
+fn inherited_generate_next_value<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<FunctionType<'db>> {
+    iter_parent_enum_classes(db, class)
+        .find_map(|base| custom_generate_next_value(db, base.body_scope(db)))
+}
+
 /// Returns the custom `__init__` function type if one is defined on the enum.
 fn custom_init<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<FunctionType<'db>> {
     let init_symbol_id = place_table(db, scope).symbol_id("__init__")?;
@@ -585,6 +612,26 @@ fn custom_new<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<FunctionType<
     .ignore_conflicting_declarations()
     .ignore_possibly_undefined()?;
 
+    match new_type {
+        Type::FunctionLiteral(f) => Some(f),
+        _ => None,
+    }
+}
+
+/// Returns the custom `_generate_next_value_` function type if one is defined on the enum.
+fn custom_generate_next_value<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+) -> Option<FunctionType<'db>> {
+    let symbol_id_opt = place_table(db, scope).symbol_id("_generate_next_value_");
+    let new_symbol_id = symbol_id_opt?;
+    let new_type = place_from_declarations(
+        db,
+        use_def_map(db, scope).end_of_scope_symbol_declarations(new_symbol_id),
+    )
+    .ignore_conflicting_declarations()
+    .ignore_possibly_undefined();
+    let new_type = new_type?;
     match new_type {
         Type::FunctionLiteral(f) => Some(f),
         _ => None,

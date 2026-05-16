@@ -1093,6 +1093,74 @@ class WithInit(Enum):
 reveal_type(WithInit.MERCURY.value)  # revealed: Any
 ```
 
+When `_generate_next_value_` is overridden, its return type takes precedence for `auto()` value
+types:
+
+```py
+from enum import StrEnum, IntEnum, auto
+from typing import Literal
+
+class CustomNextValue(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values): ...
+
+    A = auto()
+    B = auto()
+
+reveal_type(CustomNextValue.A.value)  # revealed: Unknown
+
+class CustomNextValueNonAuto(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal[3]:
+        return 3
+
+    A = 1
+    B = 2
+
+reveal_type(CustomNextValueNonAuto.A.value)  # revealed: Literal[1]
+
+class CustomNextValueStr(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return ""
+
+    A = auto()
+    B = auto()
+
+# Should not be `Literal['A']`
+# revealed: str
+reveal_type(CustomNextValueStr.A.value)
+
+class CustomNextValuePrecedence(Enum):
+    _value_: str
+
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal["a"]:
+        return "a"
+
+    A = auto()
+    B = auto()
+
+# revealed: Literal["a"]
+reveal_type(CustomNextValuePrecedence.A.value)
+
+def foo(a: CustomNextValuePrecedence):
+    # Instance value type is also correct
+    # revealed: Literal["a"]
+    reveal_type(a.value)
+
+class CustomNextValueInt(IntEnum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal[42]:
+        return 42
+
+    A = auto()
+    B = auto()
+
+# revealed: Literal[42]
+reveal_type(CustomNextValueInt.A.value)
+```
+
 ### `member` and `nonmember`
 
 ```toml

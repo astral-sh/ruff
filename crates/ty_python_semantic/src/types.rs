@@ -3443,8 +3443,10 @@ impl<'db> Type<'db> {
                     .and_then(|metadata| match name_str {
                         "name" if is_enum_subclass => metadata.name_type(db, enum_literal.name(db)),
                         "_name_" => metadata.name_type(db, enum_literal.name(db)),
-                        "value" if is_enum_subclass => metadata.value_type(enum_literal.name(db)),
-                        "_value_" => metadata.value_type(enum_literal.name(db)),
+                        "value" if is_enum_subclass => {
+                            metadata.value_type(db, enum_literal.name(db))
+                        }
+                        "_value_" => metadata.value_type(db, enum_literal.name(db)),
                         _ => None,
                     })
                     .map_or_else(|| Place::Undefined, Place::bound)
