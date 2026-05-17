@@ -218,16 +218,26 @@ fn try_register_alias<'db>(
 /// with a custom `_generate_next_value_`, aliasing is based on the generated
 /// value instead of the pre-generator placeholder used while collecting
 /// members.
+///
+/// Returns `None` for `auto()` members when `__new__` or a custom metaclass can
+/// rewrite `_value_` before alias registration, because neither the generated
+/// value nor the placeholder is reliable alias evidence in that case.
 fn alias_detection_value<'db>(
     db: &'db dyn Db,
     value_ty: Type<'db>,
     is_auto: bool,
     generate_next_value_function: Option<FunctionType<'db>>,
-) -> Type<'db> {
-    if is_auto && let Some(func_ty) = generate_next_value_function {
-        func_ty.signature(db).overload_return_type_or_unknown(db)
+    user_defined_new_function: Option<FunctionType<'db>>,
+    custom_enum_metaclass_new: bool,
+) -> Option<Type<'db>> {
+    if !is_auto {
+        Some(value_ty)
+    } else if user_defined_new_function.is_some() || custom_enum_metaclass_new {
+        None
+    } else if let Some(func_ty) = generate_next_value_function {
+        Some(func_ty.signature(db).overload_return_type_or_unknown(db))
     } else {
-        value_ty
+        Some(value_ty)
     }
 }
 
@@ -301,6 +311,13 @@ pub(crate) fn enum_metadata<'db>(
     let mut prev_value_was_non_literal_int = false;
     let mut prev_bool_literal = None;
     let ignored_names = enum_ignored_names(db, scope_id);
+
+    // Look up custom construction hooks, falling back to parent enum classes.
+    let init_function = custom_init(db, scope_id).or_else(|| inherited_init(db, class));
+    let user_defined_new_function =
+        custom_new(db, scope_id).or_else(|| inherited_user_defined_new(db, class));
+    let new_function = user_defined_new_function.or_else(|| inherited_new(db, class));
+    let custom_enum_metaclass_new = custom_enum_metaclass_new(db, class);
     let generate_next_value_function = custom_generate_next_value(db, scope_id)
         .or_else(|| inherited_generate_next_value(db, class));
 
@@ -444,8 +461,12 @@ pub(crate) fn enum_metadata<'db>(
                 value_ty,
                 auto_members.contains(name),
                 generate_next_value_function,
+                user_defined_new_function,
+                custom_enum_metaclass_new,
             );
-            if try_register_alias(alias_value_ty, name, &mut enum_values, &mut aliases) {
+            if let Some(alias_value_ty) = alias_value_ty
+                && try_register_alias(alias_value_ty, name, &mut enum_values, &mut aliases)
+            {
                 return None;
             }
 
@@ -488,10 +509,6 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
-    // Look up custom construction hooks, falling back to parent enum classes.
-    let init_function = custom_init(db, scope_id).or_else(|| inherited_init(db, class));
-    let new_function = custom_new(db, scope_id).or_else(|| inherited_new(db, class));
-    let custom_enum_metaclass_new = custom_enum_metaclass_new(db, class);
     let custom_value_annotation = custom_value_annotation(db, scope_id);
     let value_annotation = custom_value_annotation.or_else(|| {
         if custom_enum_metaclass_new {
@@ -597,6 +614,16 @@ fn inherited_new<'db>(
     class: StaticClassLiteral<'db>,
 ) -> Option<FunctionType<'db>> {
     iter_parent_enum_classes(db, class).find_map(|base| custom_new(db, base.body_scope(db)))
+}
+
+/// Looks up an inherited `__new__` from user-defined parent enum classes in the MRO.
+fn inherited_user_defined_new<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<FunctionType<'db>> {
+    iter_parent_enum_classes(db, class)
+        .filter(|base| base.known(db).is_none())
+        .find_map(|base| custom_new(db, base.body_scope(db)))
 }
 
 /// Looks up an inherited `_generate_next_value_` from parent enum classes in the MRO.

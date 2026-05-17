@@ -1169,6 +1169,7 @@ precedence:
 
 ```py
 from enum import Enum, EnumMeta, IntEnum, auto
+from ty_extensions import enum_members
 from typing import Literal
 
 class WithNewAndGenerateNextValue(Enum):
@@ -1190,6 +1191,27 @@ reveal_type(WithNewAndGenerateNextValue.A.value)  # revealed: Any
 def _instance_new(a: WithNewAndGenerateNextValue):
     reveal_type(a.value)  # revealed: Any
 
+class WithNewAndLiteralGenerateNextValue(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal["x"]:
+        return "x"
+
+    def __new__(cls, value: str) -> "WithNewAndLiteralGenerateNextValue":
+        obj = object.__new__(cls)
+        obj._value_ = object()
+        return obj
+
+    A = auto()
+    B = auto()
+
+# `__new__` can rewrite duplicate generated values to distinct values, so `B` is not an alias of `A`.
+# revealed: tuple[Literal["A"], Literal["B"]]
+reveal_type(enum_members(WithNewAndLiteralGenerateNextValue))
+reveal_type(WithNewAndLiteralGenerateNextValue.A)  # revealed: Literal[WithNewAndLiteralGenerateNextValue.A]
+reveal_type(WithNewAndLiteralGenerateNextValue.B)  # revealed: Literal[WithNewAndLiteralGenerateNextValue.B]
+reveal_type(WithNewAndLiteralGenerateNextValue.A.value)  # revealed: Any
+reveal_type(WithNewAndLiteralGenerateNextValue.B.value)  # revealed: Any
+
 class WithInitAndGenerateNextValue(Enum):
     @staticmethod
     def _generate_next_value_(name, start, count, last_values) -> str:
@@ -1204,6 +1226,20 @@ reveal_type(WithInitAndGenerateNextValue.A.value)  # revealed: Any
 
 def _instance_init(a: WithInitAndGenerateNextValue):
     reveal_type(a.value)  # revealed: Any
+
+class WithInitAndLiteralGenerateNextValue(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal["x"]:
+        return "x"
+
+    def __init__(self, value: str) -> None: ...
+
+    A = auto()
+    B = auto()
+
+# `__init__` runs after duplicate generated values are resolved to aliases.
+# revealed: tuple[Literal["A"]]
+reveal_type(enum_members(WithInitAndLiteralGenerateNextValue))
 
 class ChoicesType(EnumMeta):
     def __new__(metacls, classname, bases, classdict, **kwds): ...
@@ -1222,6 +1258,18 @@ reveal_type(MyModelChoices.A.value)  # revealed: Any
 
 def _instance_metaclass(a: MyModelChoices):
     reveal_type(a.value)  # revealed: Any
+
+class IntEnumDuplicateAutoAliases(IntEnum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal[42]:
+        return 42
+
+    A = auto()
+    B = auto()
+
+# The stdlib `IntEnum.__new__` preserves duplicate generated values as aliases.
+# revealed: tuple[Literal["A"]]
+reveal_type(enum_members(IntEnumDuplicateAutoAliases))
 ```
 
 For non-`auto()` members in a mixed enum, `_generate_next_value_` does not apply at all, and the
