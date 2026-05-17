@@ -1,0 +1,229 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+---
+TC200 [*] Annotation `threading.Thread` needs to be a string literal. Import is only available under `TYPE_CHECKING`.
+  --> TC200.py:9:23
+   |
+ 9 | def fires_on_param(t: Thread):
+   |                       ^^^^^^
+10 |     return t
+   |
+help: Add quotes
+6  |     import pandas as pd
+7  |
+8  |
+   - def fires_on_param(t: Thread):
+9  + def fires_on_param(t: "Thread"):
+10 |     return t
+11 |
+12 |
+
+TC200 [*] Annotation `threading.Thread` needs to be a string literal. Import is only available under `TYPE_CHECKING`.
+  --> TC200.py:13:26
+   |
+13 | def fires_on_return() -> Thread:
+   |                          ^^^^^^
+14 |     ...
+   |
+help: Add quotes
+10 |     return t
+11 |
+12 |
+   - def fires_on_return() -> Thread:
+13 + def fires_on_return() -> "Thread":
+14 |     ...
+15 |
+16 |
+
+TC200 [*] Annotation `threading.Thread` needs to be a string literal. Import is only available under `TYPE_CHECKING`.
+  --> TC200.py:17:32
+   |
+17 | def fires_in_subscript(x: list[Thread]):
+   |                                ^^^^^^
+18 |     return x
+   |
+help: Add quotes
+14 |     ...
+15 |
+16 |
+   - def fires_in_subscript(x: list[Thread]):
+17 + def fires_in_subscript(x: list["Thread"]):
+18 |     return x
+19 |
+20 |
+
+TC200 [*] Annotation `threading.Thread` needs to be a string literal. Import is only available under `TYPE_CHECKING`.
+  --> TC200.py:21:23
+   |
+21 | def fires_in_union(x: Thread | int):
+   |                       ^^^^^^
+22 |     return x
+   |
+help: Add quotes
+18 |     return x
+19 |
+20 |
+   - def fires_in_union(x: Thread | int):
+21 + def fires_in_union(x: "Thread | int"):
+22 |     return x
+23 |
+24 |
+
+TC200 [*] Annotation `pandas` needs to be a string literal. Import is only available under `TYPE_CHECKING`.
+  --> TC200.py:25:27
+   |
+25 | def fires_on_attribute(x: pd.DataFrame):
+   |                           ^^
+26 |     return x
+   |
+help: Add quotes
+22 |     return x
+23 |
+24 |
+   - def fires_on_attribute(x: pd.DataFrame):
+25 + def fires_on_attribute(x: "pd.DataFrame"):
+26 |     return x
+27 |
+28 |
+
+TC200 [*] Annotation `threading.Thread` needs to be a string literal. Import is only available under `TYPE_CHECKING`.
+  --> TC200.py:29:15
+   |
+29 | module_level: Thread
+   |               ^^^^^^
+   |
+help: Add quotes
+26 |     return x
+27 |
+28 |
+   - module_level: Thread
+29 + module_level: "Thread"
+30 |
+31 |
+32 | class Klass:
+
+TC200 [*] Annotation `threading.Thread` needs to be a string literal. Import is only available under `TYPE_CHECKING`.
+  --> TC200.py:33:12
+   |
+32 | class Klass:
+33 |     field: Thread
+   |            ^^^^^^
+34 |
+35 |     def method(self, t: Thread):
+   |
+help: Add quotes
+30 |
+31 |
+32 | class Klass:
+   -     field: Thread
+33 +     field: "Thread"
+34 |
+35 |     def method(self, t: Thread):
+36 |         return t
+
+TC200 [*] Annotation `threading.Thread` needs to be a string literal. Import is only available under `TYPE_CHECKING`.
+  --> TC200.py:35:25
+   |
+33 |     field: Thread
+34 |
+35 |     def method(self, t: Thread):
+   |                         ^^^^^^
+36 |         return t
+   |
+help: Add quotes
+32 | class Klass:
+33 |     field: Thread
+34 |
+   -     def method(self, t: Thread):
+35 +     def method(self, t: "Thread"):
+36 |         return t
+37 |
+38 |
+
+TC200 [*] Annotation `threading.Thread` needs to be a string literal. Import is only available under `TYPE_CHECKING`.
+  --> TC200.py:39:28
+   |
+39 | def multiple_references(x: Thread, y: Series, z: DataFrame):
+   |                            ^^^^^^
+40 |     return x, y, z
+   |
+help: Add quotes
+36 |         return t
+37 |
+38 |
+   - def multiple_references(x: Thread, y: Series, z: DataFrame):
+39 + def multiple_references(x: "Thread", y: Series, z: DataFrame):
+40 |     return x, y, z
+41 |
+42 |
+
+TC200 [*] Annotation `pandas.Series` needs to be a string literal. Import is only available under `TYPE_CHECKING`.
+  --> TC200.py:39:39
+   |
+39 | def multiple_references(x: Thread, y: Series, z: DataFrame):
+   |                                       ^^^^^^
+40 |     return x, y, z
+   |
+help: Add quotes
+36 |         return t
+37 |
+38 |
+   - def multiple_references(x: Thread, y: Series, z: DataFrame):
+39 + def multiple_references(x: Thread, y: "Series", z: DataFrame):
+40 |     return x, y, z
+41 |
+42 |
+
+TC200 [*] Annotation `pandas.DataFrame` needs to be a string literal. Import is only available under `TYPE_CHECKING`.
+  --> TC200.py:39:50
+   |
+39 | def multiple_references(x: Thread, y: Series, z: DataFrame):
+   |                                                  ^^^^^^^^^
+40 |     return x, y, z
+   |
+help: Add quotes
+36 |         return t
+37 |
+38 |
+   - def multiple_references(x: Thread, y: Series, z: DataFrame):
+39 + def multiple_references(x: Thread, y: Series, z: "DataFrame"):
+40 |     return x, y, z
+41 |
+42 |
+
+TC200 [*] Annotation `threading.Thread` needs to be a string literal. Import is only available under `TYPE_CHECKING`.
+  --> TC200.py:64:33
+   |
+64 | def parenthesized_reference(x: (Thread)):
+   |                                 ^^^^^^
+65 |     return x
+   |
+help: Add quotes
+61 |     return x
+62 |
+63 |
+   - def parenthesized_reference(x: (Thread)):
+64 + def parenthesized_reference(x: ("Thread")):
+65 |     return x
+66 |
+67 |
+
+TC200 [*] Annotation `threading.Thread` needs to be a string literal. Import is only available under `TYPE_CHECKING`.
+  --> TC200.py:70:9
+   |
+68 | def parenthesized_multiline(
+69 |     x: (
+70 |         Thread
+   |         ^^^^^^
+71 |     ),
+72 | ):
+   |
+help: Add quotes
+67 |
+68 | def parenthesized_multiline(
+69 |     x: (
+   -         Thread
+70 +         "Thread"
+71 |     ),
+72 | ):
+73 |     return x

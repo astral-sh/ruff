@@ -302,6 +302,12 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         flake8_bandit::rules::suspicious_function_reference(checker, expr);
                     }
 
+                    if checker.is_rule_enabled(Rule::UnquotedTypeCheckingOnlyImport) {
+                        flake8_type_checking::rules::unquoted_type_checking_only_import(
+                            checker, expr_name,
+                        );
+                    }
+
                     // Ex) List[...]
                     if checker.any_rule_enabled(&[
                         Rule::FutureRewritableTypeAnnotation,

@@ -1,0 +1,109 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+---
+TC004 [*] Move import `threading.Thread` out of type-checking block. Import is used for more than type hinting.
+  --> TC200.py:4:27
+   |
+ 3 | if TYPE_CHECKING:
+ 4 |     from threading import Thread
+   |                           ^^^^^^
+ 5 |     from pandas import DataFrame, Series
+ 6 |     import pandas as pd
+   |
+  ::: TC200.py:9:23
+   |
+ 9 | def fires_on_param(t: Thread):
+   |                       ------ Used at runtime here
+10 |     return t
+   |
+help: Move out of type-checking block
+1 | from typing import TYPE_CHECKING
+2 + from threading import Thread
+3 |
+4 | if TYPE_CHECKING:
+  -     from threading import Thread
+5 |     from pandas import DataFrame, Series
+6 |     import pandas as pd
+7 |
+note: This is an unsafe fix and may change runtime behavior
+
+TC004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is used for more than type hinting.
+  --> TC200.py:5:24
+   |
+ 3 | if TYPE_CHECKING:
+ 4 |     from threading import Thread
+ 5 |     from pandas import DataFrame, Series
+   |                        ^^^^^^^^^
+ 6 |     import pandas as pd
+   |
+  ::: TC200.py:39:50
+   |
+39 | def multiple_references(x: Thread, y: Series, z: DataFrame):
+   |                                                  --------- Used at runtime here
+40 |     return x, y, z
+   |
+help: Move out of type-checking block
+1 | from typing import TYPE_CHECKING
+2 + from pandas import DataFrame, Series
+3 |
+4 | if TYPE_CHECKING:
+5 |     from threading import Thread
+  -     from pandas import DataFrame, Series
+6 |     import pandas as pd
+7 |
+8 |
+note: This is an unsafe fix and may change runtime behavior
+
+TC004 [*] Move import `pandas.Series` out of type-checking block. Import is used for more than type hinting.
+  --> TC200.py:5:35
+   |
+ 3 | if TYPE_CHECKING:
+ 4 |     from threading import Thread
+ 5 |     from pandas import DataFrame, Series
+   |                                   ^^^^^^
+ 6 |     import pandas as pd
+   |
+  ::: TC200.py:39:39
+   |
+39 | def multiple_references(x: Thread, y: Series, z: DataFrame):
+   |                                       ------ Used at runtime here
+40 |     return x, y, z
+   |
+help: Move out of type-checking block
+1 | from typing import TYPE_CHECKING
+2 + from pandas import DataFrame, Series
+3 |
+4 | if TYPE_CHECKING:
+5 |     from threading import Thread
+  -     from pandas import DataFrame, Series
+6 |     import pandas as pd
+7 |
+8 |
+note: This is an unsafe fix and may change runtime behavior
+
+TC004 [*] Move import `pandas` out of type-checking block. Import is used for more than type hinting.
+  --> TC200.py:6:22
+   |
+ 4 |     from threading import Thread
+ 5 |     from pandas import DataFrame, Series
+ 6 |     import pandas as pd
+   |                      ^^
+   |
+  ::: TC200.py:25:27
+   |
+25 | def fires_on_attribute(x: pd.DataFrame):
+   |                           -- Used at runtime here
+26 |     return x
+   |
+help: Move out of type-checking block
+1 | from typing import TYPE_CHECKING
+2 + import pandas as pd
+3 |
+4 | if TYPE_CHECKING:
+5 |     from threading import Thread
+6 |     from pandas import DataFrame, Series
+  -     import pandas as pd
+7 |
+8 |
+9 | def fires_on_param(t: Thread):
+note: This is an unsafe fix and may change runtime behavior

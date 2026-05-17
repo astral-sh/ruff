@@ -159,6 +159,58 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::UnquotedTypeCheckingOnlyImport, Path::new("TC200.py"))]
+    fn preview_rules_py313(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("preview_{}_{}", rule_code.name(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: settings::types::PreviewMode::Enabled,
+                unresolved_target_version: PythonVersion::PY313.into(),
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn tc200_defers_to_tc004() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join("TC200.py").as_path(),
+            &settings::LinterSettings {
+                preview: settings::types::PreviewMode::Enabled,
+                unresolved_target_version: PythonVersion::PY313.into(),
+                ..settings::LinterSettings::for_rules([
+                    Rule::UnquotedTypeCheckingOnlyImport,
+                    Rule::RuntimeImportInTypeCheckingBlock,
+                ])
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    // PEP 649 defers annotation evaluation on Python 3.14+, so TC200 must stay silent under
+    // the default (latest) target version.
+    #[test_case(Rule::UnquotedTypeCheckingOnlyImport, Path::new("TC200.py"))]
+    fn preview_rules_pep649(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview_pep649_{}_{}",
+            rule_code.name(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: settings::types::PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::QuotedTypeAlias, Path::new("TC008_union_syntax_pre_py310.py"))]
     fn type_alias_rules_pre_py310(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("pre_py310_{}_{}", rule_code.name(), path.to_string_lossy());
