@@ -1093,6 +1093,182 @@ class WithInit(Enum):
 reveal_type(WithInit.MERCURY.value)  # revealed: Any
 ```
 
+When `_generate_next_value_` is overridden, its return type is used for `auto()` value types, unless
+overridden by an explicit `_value_` annotation or a custom construction hook:
+
+```py
+from enum import StrEnum, IntEnum, auto
+from typing import Literal
+
+class CustomNextValue(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values): ...
+
+    A = auto()
+    B = auto()
+
+reveal_type(CustomNextValue.A.value)  # revealed: Unknown
+
+class CustomNextValueNonAuto(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal[3]:
+        return 3
+
+    A = 1
+    B = 2
+
+reveal_type(CustomNextValueNonAuto.A.value)  # revealed: Literal[1]
+
+class CustomNextValueStr(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return ""
+
+    A = auto()
+    B = auto()
+
+# Should not be `Literal['A']`
+# revealed: str
+reveal_type(CustomNextValueStr.A.value)
+
+class CustomNextValuePrecedence(Enum):
+    _value_: str
+
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal["a"]:
+        return "a"
+
+    A = auto()
+    B = auto()
+
+# `_value_` annotation takes precedence over `_generate_next_value_`'s return type
+# revealed: str
+reveal_type(CustomNextValuePrecedence.A.value)
+
+def foo(a: CustomNextValuePrecedence):
+    # revealed: str
+    reveal_type(a.value)
+
+class CustomNextValueInt(IntEnum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal[42]:
+        return 42
+
+    A = auto()
+    B = auto()
+
+# `IntEnum` inherits `_value_: int`, which takes precedence over `_generate_next_value_`
+# revealed: int
+reveal_type(CustomNextValueInt.A.value)
+```
+
+When an enum defines both `_generate_next_value_` and a construction hook (`__new__`, `__init__`, or
+a custom enum metaclass `__new__`), the hook can rewrite `_value_` to a different type than the
+value returned by `_generate_next_value_`. The hook-based `Any` fallback should therefore take
+precedence:
+
+```py
+from enum import Enum, EnumMeta, IntEnum, auto
+from typing import Literal
+
+class WithNewAndGenerateNextValue(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return ""
+
+    def __new__(cls, value: str) -> "WithNewAndGenerateNextValue":
+        obj = object.__new__(cls)
+        obj._value_ = len(value)
+        return obj
+
+    A = auto()
+    B = auto()
+
+# `__new__` rewrites `_value_` to an `int`, so we can't trust `_generate_next_value_`'s return type
+reveal_type(WithNewAndGenerateNextValue.A.value)  # revealed: Any
+
+def _instance_new(a: WithNewAndGenerateNextValue):
+    reveal_type(a.value)  # revealed: Any
+
+class WithInitAndGenerateNextValue(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return ""
+
+    def __init__(self, value: str) -> None: ...
+
+    A = auto()
+    B = auto()
+
+reveal_type(WithInitAndGenerateNextValue.A.value)  # revealed: Any
+
+def _instance_init(a: WithInitAndGenerateNextValue):
+    reveal_type(a.value)  # revealed: Any
+
+class ChoicesType(EnumMeta):
+    def __new__(metacls, classname, bases, classdict, **kwds): ...
+
+class IntegerChoices(IntEnum, metaclass=ChoicesType):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal[42]:
+        return 42
+
+class MyModelChoices(IntegerChoices):
+    A = auto()
+    B = auto()
+
+# The metaclass `__new__` can rewrite member values before they reach `_value_`
+reveal_type(MyModelChoices.A.value)  # revealed: Any
+
+def _instance_metaclass(a: MyModelChoices):
+    reveal_type(a.value)  # revealed: Any
+```
+
+For non-`auto()` members in a mixed enum, `_generate_next_value_` does not apply at all, and the
+inferred value type should be used (subject to the same hook-based `Any` fallback):
+
+```py
+from enum import Enum, auto
+from ty_extensions import enum_members
+from typing import Literal
+
+class MixedAutoAndLiteral(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return ""
+
+    A = auto()
+    B = 99
+
+reveal_type(MixedAutoAndLiteral.A.value)  # revealed: str
+reveal_type(MixedAutoAndLiteral.B.value)  # revealed: Literal[99]
+
+def _mixed_instance(x: MixedAutoAndLiteral):
+    # Union of all member value types, not just `_generate_next_value_`'s return type
+    reveal_type(x.value)  # revealed: str | Literal[99]
+
+class InheritedCustomNextValue(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return ""
+
+class InheritedCustomNextValueChild(InheritedCustomNextValue):
+    A = auto()
+    B = 1
+    C = 1
+
+# `A` uses the inherited `_generate_next_value_`, so `B` is not an alias of `A`.
+# revealed: tuple[Literal["A"], Literal["B"]]
+reveal_type(enum_members(InheritedCustomNextValueChild))
+reveal_type(InheritedCustomNextValueChild.A.value)  # revealed: str
+reveal_type(InheritedCustomNextValueChild.B)  # revealed: Literal[InheritedCustomNextValueChild.B]
+reveal_type(InheritedCustomNextValueChild.B.value)  # revealed: Literal[1]
+reveal_type(InheritedCustomNextValueChild.C)  # revealed: Literal[InheritedCustomNextValueChild.B]
+
+def _inherited_mixed_instance(x: InheritedCustomNextValueChild):
+    reveal_type(x.value)  # revealed: str | Literal[1]
+```
+
 ### `member` and `nonmember`
 
 ```toml
