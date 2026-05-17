@@ -215,3 +215,22 @@ help: Remove this comment
 65 |
 66 | # all of these should be fine
 note: This is an unsafe fix and may change runtime behavior
+
+RUF028 [*] This suppression comment is invalid because it cannot be in an expression, pattern, argument list, or other non-statement
+   --> RUF028.py:107:5
+    |
+106 | class FmtOffInClassSignature(
+107 |     # fmt: off
+    |     ^^^^^^^^^^
+108 |     dict[str, str],
+109 | ):
+    |
+help: Remove this comment
+104 |
+105 |
+106 | class FmtOffInClassSignature(
+    -     # fmt: off
+107 |     dict[str, str],
+108 | ):
+109 |     pass
+note: This is an unsafe fix and may change runtime behavior

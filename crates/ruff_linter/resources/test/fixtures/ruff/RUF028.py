@@ -101,3 +101,15 @@ import pytest
 )  # fmt: skip
 def test_eval(test_input, expected):
     assert eval(test_input) == expected
+
+
+class FmtOffInClassSignature(
+    # fmt: off
+    dict[str, str],
+):
+    pass
+
+
+class FmtOffBeforeClassBody:
+    # fmt: off
+    key = "value"
