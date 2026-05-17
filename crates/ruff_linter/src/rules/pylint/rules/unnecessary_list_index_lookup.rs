@@ -57,7 +57,6 @@ pub(crate) fn unnecessary_list_index_lookup(checker: &Checker, stmt_for: &StmtFo
     let ranges = {
         let mut visitor = SequenceIndexVisitor::new(&sequence.id, &index_name.id, &value_name.id);
         visitor.visit_body(&stmt_for.body);
-        visitor.visit_body(&stmt_for.orelse);
         visitor.into_accesses()
     };
 

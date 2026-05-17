@@ -62,3 +62,17 @@ def for_else_no_false_positive(result: dict[str, float]) -> dict[str, float]:
             if result[res_glob] <= 0:  # okay, res_glob from loop may be unbound
                 result.pop(res_glob)
     return result
+
+
+def no_false_positive_after_key_shadowing(result: dict[str, float]) -> None:
+    for res_glob, res_priority in result.items():
+        for res_glob in result.keys():
+            print(result[res_glob])  # OK, res_glob from items loop is shadowed
+        print(result[res_glob])  # OK, res_glob from items loop remains shadowed
+
+
+def no_false_positive_after_value_shadowing(result: dict[str, float]) -> None:
+    for res_glob, res_priority in result.items():
+        for res_priority in result.values():
+            print(result[res_glob])  # OK, res_priority from items loop is shadowed
+        print(result[res_glob])  # OK, res_priority from items loop remains shadowed

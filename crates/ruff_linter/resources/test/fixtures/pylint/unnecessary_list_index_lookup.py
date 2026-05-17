@@ -83,3 +83,24 @@ def nested_index_lookup():
     column_names = ["a", "b"]
     for index, column_name in enumerate(column_names):
         _ = data[column_names[index]]  # PLR1736
+
+
+def no_false_positive_in_loop_else():
+    for index, letter in enumerate(letters):
+        pass
+    else:
+        print(letters[index])  # OK, index may be unbound
+
+
+def no_false_positive_after_index_shadowing():
+    for index, letter in enumerate(letters):
+        for index in range(3):
+            print(letters[index])  # OK, index from enumerate loop is shadowed
+        print(letters[index])  # OK, index from enumerate loop remains shadowed
+
+
+def no_false_positive_after_value_shadowing():
+    for index, letter in enumerate(letters):
+        for letter in range(3):
+            print(letters[index])  # OK, letter from enumerate loop is shadowed
+        print(letters[index])  # OK, letter from enumerate loop remains shadowed

@@ -109,6 +109,9 @@ impl SequenceIndexVisitor<'_> {
                 }
                 false
             }
+            Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                elts.iter().any(|expr| self.is_assignment(expr))
+            }
             _ => false,
         }
     }
@@ -136,6 +139,9 @@ impl Visitor<'_> for SequenceIndexVisitor<'_> {
             }
             Stmt::Delete(ast::StmtDelete { targets, .. }) => {
                 self.modified = targets.iter().any(|target| self.is_assignment(target));
+            }
+            Stmt::For(ast::StmtFor { target, .. }) if self.is_assignment(target) => {
+                self.modified = true;
             }
             _ => visitor::walk_stmt(self, stmt),
         }
