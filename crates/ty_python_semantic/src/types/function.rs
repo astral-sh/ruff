@@ -55,6 +55,7 @@ use bitflags::bitflags;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_text_size::Ranged;
 use salsa::plumbing::AsId;
@@ -2230,6 +2231,13 @@ impl KnownFunction {
                         if source_display != casted_display {
                             diagnostic.info(format_args!(
                                 "`{casted_display}` is equivalent to `{source_display}`",
+                            ));
+                        }
+                        if let Some(source_expr) = call_expression.arguments.args.get(1) {
+                            diagnostic.help("Remove the redundant `cast`");
+                            diagnostic.set_fix(Fix::safe_edits(
+                                Edit::deletion(call_expression.start(), source_expr.start()),
+                                [Edit::deletion(source_expr.end(), call_expression.end())],
                             ));
                         }
                     }
