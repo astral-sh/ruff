@@ -82,12 +82,12 @@ def two(x: int | None, y: int | None):
 ## Assertions with `test` predicates that are statically known to always be `True`
 
 ```py
-assert True, (x := 1)
+assert True, (x := 1)  # error: [redundant-assert] "Assert condition is always true"
 
 # error: [unresolved-reference]
 reveal_type(x)  # revealed: Unknown
 
-assert False, (y := 1)
+assert False, (y := 1)  # error: [redundant-assert] "Assert condition is always false"
 
 # The `assert` statement is terminal if `test` resolves to `False`,
 # so even though we know the `msg` branch will have been taken here

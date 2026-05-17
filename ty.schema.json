@@ -1260,6 +1260,16 @@
             }
           ]
         },
+        "redundant-assert": {
+          "title": "detects redundant assert statements",
+          "description": "## What it does\nDetects `assert` statements with conditions that are statically known\nto always evaluate to `True` or always evaluate to `False`.\n\n## Why is this bad?\nAn assertion that always passes is redundant and may indicate stale\ndefensive code. An assertion that always fails is equivalent to an\nunconditional `AssertionError`.\n\n## Example\n```python\ndef f(x: str):\n    assert x is not None\n```",
+          "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "redundant-cast": {
           "title": "detects redundant `cast` calls",
           "description": "## What it does\nDetects redundant `cast` calls where the value already has the target type.\n\n## Why is this bad?\nThese casts have no effect and can be removed.\n\n## Example\n```python\ndef f() -> int:\n    return 10\n\ncast(int, f())  # Redundant\n```",

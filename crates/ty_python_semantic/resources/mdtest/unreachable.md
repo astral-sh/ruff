@@ -377,7 +377,7 @@ Similarly, assertions with statically-known falsy conditions can lead to unreach
 
 ```py
 def f():
-    assert sys.version_info > (3, 11)
+    assert sys.version_info > (3, 11)  # ty: ignore[redundant-assert]
 
     ExceptionGroup
 ```
