@@ -105,7 +105,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut dataclass_params = None;
         let mut dataclass_transformer_params = None;
         let mut total_ordering = false;
-        let original_class_ty = |deprecated,
+        let infer_original_class_ty = |deprecated,
                                  type_check_only,
                                  dataclass_params,
                                  dataclass_transformer_params,
@@ -131,6 +131,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )),
             }
         };
+
+        // TODO(charlie): Fill this out.
+        // In the first pass, ...
         for &(decorator_ty, decorator) in decorator_types_and_nodes.iter().rev() {
             if !metadata_applies_to_original_class {
                 decorators_to_apply.push((decorator_ty, decorator, None));
@@ -226,7 +229,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 continue;
             }
 
-            let current_original_class_ty = original_class_ty(
+            let original_class_ty = infer_original_class_ty(
                 deprecated,
                 type_check_only,
                 dataclass_params,
@@ -234,7 +237,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 total_ordering,
             );
             let decorator_result =
-                apply_class_decorator(db, decorator_ty, current_original_class_ty);
+                apply_class_decorator(db, decorator_ty, original_class_ty);
             let decorated_ty = match &decorator_result {
                 Ok(return_ty) => *return_ty,
                 Err(error) => error.return_type(db),
@@ -247,18 +250,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if !preserve_binding_for_unknown_result(db, decorator_ty, decorator_call_ty) {
                     metadata_applies_to_original_class = false;
                 }
-            } else if !type_retains_original_class(db, current_original_class_ty, decorated_ty) {
+            } else if !type_retains_original_class(db, original_class_ty, decorated_ty) {
                 metadata_applies_to_original_class = false;
             }
 
             decorators_to_apply.push((
                 decorator_ty,
                 decorator,
-                Some((current_original_class_ty, decorator_result)),
+                Some((original_class_ty, decorator_result)),
             ));
         }
 
-        let mut inferred_ty = original_class_ty(
+        let mut inferred_ty = infer_original_class_ty(
             deprecated,
             type_check_only,
             dataclass_params,
@@ -269,11 +272,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let original_class_ty = inferred_ty;
         let mut undecorated_ty = None;
 
-        // Apply class decorators from inner to outer and use their return types to update the
-        // public binding. `original_class_ty` remains the class object whose body and metadata
-        // were inferred above.
+        // In the second pass, apply class decorators from inner to outer and use their return types
+        // to update the public binding. `original_class_ty` remains the class object whose body and
+        // metadata were inferred above.
         for (decorator_ty, decorator_node, precomputed_result) in decorators_to_apply {
             let decorator_result = match precomputed_result {
+                // TODO(charlie): Why can we reuse this here...? But not in the second branch?
                 Some((precomputed_input_ty, decorator_result))
                     if precomputed_input_ty == inferred_ty =>
                 {
@@ -294,6 +298,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
             // If a class decorator application loses all precision, preserve the original class
             // binding when the decorator is known to preserve unknown results.
+            // TODO(charlie): Can we avoid re-computing these here...? Didn't we compute these
+            // above?
             let decorated_ty_is_unknown = is_unknown_decorator_result(db, decorated_ty);
             let should_preserve_binding = decorated_ty_is_unknown
                 && preserve_binding_for_unknown_result(
@@ -314,6 +320,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     decorated_ty,
                 )
             } else {
+                // Trying to understand this... do we not always set this? Or we don't need to if
+                // they all preserve?
                 undecorated_ty.get_or_insert(inferred_ty);
                 decorated_ty
             };
