@@ -1,20 +1,19 @@
-use crate::{
-    place::Place,
-    types::{
-        CallArguments, DataclassParams, KnownClass, KnownInstanceType, MemberLookupPolicy,
-        SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext,
-        call::CallError,
-        function::KnownFunction,
-        infer::{
-            TypeInferenceBuilder,
-            builder::{DeclaredAndInferredType, DeferredExpressionState},
-            original_class_type,
-        },
-        signatures::ParameterForm,
-        special_form::TypeQualifier,
+use crate::place::Place;
+use crate::types::{
+    CallArguments, DataclassParams, KnownClass, KnownInstanceType, MemberLookupPolicy,
+    SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext,
+    call::CallError,
+    function::KnownFunction,
+    infer::{
+        TypeInferenceBuilder,
+        builder::{DeclaredAndInferredType, DeferredExpressionState},
+        original_class_type,
     },
+    signatures::ParameterForm,
+    special_form::TypeQualifier,
 };
-use ruff_python_ast::{self as ast, helpers::any_over_expr, name::Name};
+use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast, helpers::any_over_expr};
 use ty_module_resolver::{KnownModule, file_to_module};
 use ty_python_core::{definition::Definition, scope::NodeWithScopeRef};
 
@@ -77,10 +76,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } = class_node;
         let db = self.db();
 
-        let decorator_types_and_nodes: Vec<(Type<'db>, &ast::Decorator)> = decorator_list
-            .iter()
-            .map(|decorator| (self.infer_decorator(decorator), decorator))
-            .collect();
+        let mut decorator_types_and_nodes: Vec<(Type<'db>, &ast::Decorator)> =
+            Vec::with_capacity(decorator_list.len());
+        for decorator in decorator_list {
+            let decorator_ty = self.infer_decorator(decorator);
+            decorator_types_and_nodes.push((decorator_ty, decorator));
+        }
 
         let body_scope = self
             .index
@@ -131,131 +132,130 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         };
         for &(decorator_ty, decorator) in decorator_types_and_nodes.iter().rev() {
-            if metadata_applies_to_original_class {
-                if decorator_ty
-                    .as_function_literal()
-                    .is_some_and(|function| function.is_known(db, KnownFunction::Dataclass))
-                {
-                    dataclass_params = Some(DataclassParams::default_params(db));
-                    continue;
-                }
-
-                if decorator_ty
-                    .as_function_literal()
-                    .is_some_and(|function| function.is_known(db, KnownFunction::TotalOrdering))
-                {
-                    total_ordering = true;
-                    continue;
-                }
-
-                if let Type::DataclassDecorator(params) = decorator_ty {
-                    dataclass_params = Some(params);
-                    continue;
-                }
-
-                if decorator_ty.is_unknown()
-                    && let ast::Expr::Call(call) = &decorator.expression
-                    && self
-                        .expression_type(&call.func)
-                        .as_function_literal()
-                        .is_some_and(|function| function.is_known(db, KnownFunction::Dataclass))
-                {
-                    continue;
-                }
-
-                if let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated_inst)) =
-                    decorator_ty
-                {
-                    deprecated = Some(deprecated_inst);
-                    continue;
-                }
-
-                if decorator_ty
-                    .as_function_literal()
-                    .is_some_and(|function| function.is_known(db, KnownFunction::TypeCheckOnly))
-                {
-                    type_check_only = true;
-                    continue;
-                }
-
-                // Skip identity decorators to avoid salsa cycles on typeshed.
-                if decorator_ty.as_function_literal().is_some_and(|function| {
-                    matches!(
-                        function.known(db),
-                        Some(
-                            KnownFunction::Final
-                                | KnownFunction::DisjointBase
-                                | KnownFunction::RuntimeCheckable
-                        )
-                    )
-                }) {
-                    continue;
-                }
-
-                if let Type::FunctionLiteral(f) = decorator_ty {
-                    // We do not yet detect or flag `@dataclass_transform` applied to more than one
-                    // overload, or an overload and the implementation both. Nevertheless, this is not
-                    // allowed. We do not try to treat the offenders intelligently -- just use the
-                    // params of the last seen usage of `@dataclass_transform`.
-                    //
-                    // In class-decorator position, dataclass-transform metadata shapes the
-                    // original class object. We keep it metadata-only here because the call path
-                    // uses synthetic dataclass-transform return types to model decorator factories;
-                    // treating this as an ordinary replacement-returning class decorator would
-                    // conflate those two cases.
-                    let transformer_params = f
-                        .iter_overloads_and_implementation(db)
-                        .rev()
-                        .find_map(|overload| overload.dataclass_transformer_params(db));
-                    if let Some(transformer_params) = transformer_params {
-                        dataclass_params = Some(DataclassParams::from_transformer_params(
-                            db,
-                            transformer_params,
-                        ));
-                        continue;
-                    }
-                }
-
-                if let Type::DataclassTransformer(params) = decorator_ty {
-                    dataclass_transformer_params = Some(params);
-                    continue;
-                }
-
-                let current_original_class_ty = original_class_ty(
-                    deprecated,
-                    type_check_only,
-                    dataclass_params,
-                    dataclass_transformer_params,
-                    total_ordering,
-                );
-                let decorator_result =
-                    apply_class_decorator(db, decorator_ty, current_original_class_ty);
-                let decorated_ty = match &decorator_result {
-                    Ok(return_ty) => *return_ty,
-                    Err(error) => error.return_type(db),
-                };
-                if is_unknown_decorator_result(db, decorated_ty) {
-                    let decorator_call_ty = match &decorator.expression {
-                        ast::Expr::Call(call) => Some(self.expression_type(&call.func)),
-                        _ => None,
-                    };
-                    if !preserve_binding_for_unknown_result(db, decorator_ty, decorator_call_ty) {
-                        metadata_applies_to_original_class = false;
-                    }
-                } else if !type_retains_original_class(db, current_original_class_ty, decorated_ty)
-                {
-                    metadata_applies_to_original_class = false;
-                }
-
-                decorators_to_apply.push((
-                    decorator_ty,
-                    decorator,
-                    Some((current_original_class_ty, decorator_result)),
-                ));
+            if !metadata_applies_to_original_class {
+                decorators_to_apply.push((decorator_ty, decorator, None));
                 continue;
             }
 
-            decorators_to_apply.push((decorator_ty, decorator, None));
+            if decorator_ty
+                .as_function_literal()
+                .is_some_and(|function| function.is_known(db, KnownFunction::Dataclass))
+            {
+                dataclass_params = Some(DataclassParams::default_params(db));
+                continue;
+            }
+
+            if decorator_ty
+                .as_function_literal()
+                .is_some_and(|function| function.is_known(db, KnownFunction::TotalOrdering))
+            {
+                total_ordering = true;
+                continue;
+            }
+
+            if let Type::DataclassDecorator(params) = decorator_ty {
+                dataclass_params = Some(params);
+                continue;
+            }
+
+            if decorator_ty.is_unknown()
+                && let ast::Expr::Call(call) = &decorator.expression
+                && self
+                    .expression_type(&call.func)
+                    .as_function_literal()
+                    .is_some_and(|function| function.is_known(db, KnownFunction::Dataclass))
+            {
+                continue;
+            }
+
+            if let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated_inst)) =
+                decorator_ty
+            {
+                deprecated = Some(deprecated_inst);
+                continue;
+            }
+
+            if decorator_ty
+                .as_function_literal()
+                .is_some_and(|function| function.is_known(db, KnownFunction::TypeCheckOnly))
+            {
+                type_check_only = true;
+                continue;
+            }
+
+            // Skip identity decorators to avoid salsa cycles on typeshed.
+            if decorator_ty.as_function_literal().is_some_and(|function| {
+                matches!(
+                    function.known(db),
+                    Some(
+                        KnownFunction::Final
+                            | KnownFunction::DisjointBase
+                            | KnownFunction::RuntimeCheckable
+                    )
+                )
+            }) {
+                continue;
+            }
+
+            if let Type::FunctionLiteral(f) = decorator_ty {
+                // We do not yet detect or flag `@dataclass_transform` applied to more than one
+                // overload, or an overload and the implementation both. Nevertheless, this is not
+                // allowed. We do not try to treat the offenders intelligently -- just use the
+                // params of the last seen usage of `@dataclass_transform`.
+                //
+                // In class-decorator position, dataclass-transform metadata shapes the
+                // original class object. We keep it metadata-only here because the call path
+                // uses synthetic dataclass-transform return types to model decorator factories;
+                // treating this as an ordinary replacement-returning class decorator would
+                // conflate those two cases.
+                let transformer_params = f
+                    .iter_overloads_and_implementation(db)
+                    .rev()
+                    .find_map(|overload| overload.dataclass_transformer_params(db));
+                if let Some(transformer_params) = transformer_params {
+                    dataclass_params = Some(DataclassParams::from_transformer_params(
+                        db,
+                        transformer_params,
+                    ));
+                    continue;
+                }
+            }
+
+            if let Type::DataclassTransformer(params) = decorator_ty {
+                dataclass_transformer_params = Some(params);
+                continue;
+            }
+
+            let current_original_class_ty = original_class_ty(
+                deprecated,
+                type_check_only,
+                dataclass_params,
+                dataclass_transformer_params,
+                total_ordering,
+            );
+            let decorator_result =
+                apply_class_decorator(db, decorator_ty, current_original_class_ty);
+            let decorated_ty = match &decorator_result {
+                Ok(return_ty) => *return_ty,
+                Err(error) => error.return_type(db),
+            };
+            if is_unknown_decorator_result(db, decorated_ty) {
+                let decorator_call_ty = match &decorator.expression {
+                    ast::Expr::Call(call) => Some(self.expression_type(&call.func)),
+                    _ => None,
+                };
+                if !preserve_binding_for_unknown_result(db, decorator_ty, decorator_call_ty) {
+                    metadata_applies_to_original_class = false;
+                }
+            } else if !type_retains_original_class(db, current_original_class_ty, decorated_ty) {
+                metadata_applies_to_original_class = false;
+            }
+
+            decorators_to_apply.push((
+                decorator_ty,
+                decorator,
+                Some((current_original_class_ty, decorator_result)),
+            ));
         }
 
         let mut inferred_ty = original_class_ty(
@@ -268,6 +268,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let original_class_ty = inferred_ty;
         let mut undecorated_ty = None;
+
+        // Apply class decorators from inner to outer and use their return types to update the
+        // public binding. `original_class_ty` remains the class object whose body and metadata
+        // were inferred above.
         for (decorator_ty, decorator_node, precomputed_result) in decorators_to_apply {
             let decorator_result = match precomputed_result {
                 Some((precomputed_input_ty, decorator_result))
