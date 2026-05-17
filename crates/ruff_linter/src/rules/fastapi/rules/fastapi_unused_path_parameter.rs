@@ -449,48 +449,80 @@ fn is_pydantic_base_model(expr: &Expr, semantic: &SemanticModel) -> bool {
 
 /// Extract the expected in-route name for a given parameter, if it has an alias.
 /// For example, given `document_id: Annotated[str, Path(alias="documentId")]`, returns `"documentId"`.
-fn parameter_alias<'a>(parameter: &'a Parameter, semantic: &SemanticModel) -> Option<&'a str> {
-    let Some(annotation) = &parameter.annotation else {
+fn parameter_alias<'a>(parameter: &'a Parameter, semantic: &SemanticModel<'a>) -> Option<&'a str> {
+    annotation_alias(parameter.annotation.as_deref()?, semantic, 0)
+}
+
+fn annotation_alias<'a>(
+    annotation: &'a Expr,
+    semantic: &SemanticModel<'a>,
+    depth: u8,
+) -> Option<&'a str> {
+    if depth > 5 {
+        return None;
+    }
+
+    if let Expr::Subscript(subscript) = annotation {
+        return annotated_path_alias(subscript, semantic);
+    }
+
+    let Expr::Name(name) = annotation else {
         return None;
     };
 
-    let Expr::Subscript(subscript) = annotation.as_ref() else {
+    let binding = semantic
+        .only_binding(name)
+        .or_else(|| semantic.lookup_symbol(name.id.as_str()))
+        .map(|id| semantic.binding(id))?;
+    if !matches!(
+        binding.kind,
+        BindingKind::Assignment | BindingKind::Annotation
+    ) {
         return None;
-    };
+    }
 
-    let Expr::Tuple(tuple) = subscript.slice.as_ref() else {
-        return None;
-    };
+    let statement = binding.source.map(|node_id| semantic.statement(node_id))?;
+    if let Some(assign) = statement.as_assign_stmt() {
+        annotation_alias(&assign.value, semantic, depth + 1)
+    } else if let Some(ann_assign) = statement.as_ann_assign_stmt() {
+        annotation_alias(ann_assign.value.as_deref()?, semantic, depth + 1)
+    } else {
+        None
+    }
+}
 
-    let Some(Expr::Call(path)) = tuple.elts.get(1) else {
-        return None;
-    };
-
-    // Find the `alias` keyword argument.
-    let alias = path
-        .arguments
-        .find_keyword("alias")
-        .map(|alias| &alias.value)?;
-
-    // Ensure that it's a literal string.
-    let Expr::StringLiteral(alias) = alias else {
-        return None;
-    };
-
+fn annotated_path_alias<'a>(
+    subscript: &'a ExprSubscript,
+    semantic: &SemanticModel,
+) -> Option<&'a str> {
     // Verify that the subscript was a `typing.Annotated`.
     if !semantic.match_typing_expr(&subscript.value, "Annotated") {
         return None;
     }
 
-    // Verify that the call was a `fastapi.Path`.
-    if !semantic
-        .resolve_qualified_name(&path.func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["fastapi", "Path"]))
-    {
+    let Expr::Tuple(tuple) = subscript.slice.as_ref() else {
         return None;
-    }
+    };
 
-    Some(alias.value.to_str())
+    tuple.elts.iter().skip(1).find_map(|metadata| {
+        let path = metadata.as_call_expr()?;
+
+        // Verify that the call was a `fastapi.Path`.
+        if !semantic
+            .resolve_qualified_name(&path.func)
+            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["fastapi", "Path"]))
+        {
+            return None;
+        }
+
+        let alias = path
+            .arguments
+            .find_keyword("alias")
+            .map(|alias| &alias.value)?;
+        alias
+            .as_string_literal_expr()
+            .map(|alias| alias.value.to_str())
+    })
 }
 
 /// An iterator to extract parameters from FastAPI route paths.

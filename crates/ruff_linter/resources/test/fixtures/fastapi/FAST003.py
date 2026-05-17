@@ -129,6 +129,17 @@ async def read_thing(*, author: str, title: str):
 async def read_thing(*, author: Annotated[str, Path(alias="name")], title: str):
     return {"author": author, "title": title}
 
+ExampleIdPathParameter = Annotated[str, Path(alias="exampleId")]
+MultiMetadataPathParameter = Annotated[str, "metadata", Path(alias="multiMetaId")]
+
+@app.get("/examples/{exampleId}")
+async def read_example_alias(example_id: ExampleIdPathParameter):
+    return {"example_id": example_id}
+
+@app.get("/examples/{multiMetaId}")
+async def read_example_multi_metadata_alias(example_id: MultiMetadataPathParameter):
+    return {"example_id": example_id}
+
 
 # Ignored
 @app.get("/things/{thing-id}")
