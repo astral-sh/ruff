@@ -1169,6 +1169,7 @@ precedence:
 
 ```py
 from enum import Enum, EnumMeta, IntEnum, auto
+from ty_extensions import enum_members
 from typing import Literal
 
 class WithNewAndGenerateNextValue(Enum):
@@ -1189,6 +1190,27 @@ reveal_type(WithNewAndGenerateNextValue.A.value)  # revealed: Any
 
 def _instance_new(a: WithNewAndGenerateNextValue):
     reveal_type(a.value)  # revealed: Any
+
+class WithNewAndLiteralGenerateNextValue(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal["x"]:
+        return "x"
+
+    def __new__(cls, value: str) -> "WithNewAndLiteralGenerateNextValue":
+        obj = object.__new__(cls)
+        obj._value_ = object()
+        return obj
+
+    A = auto()
+    B = auto()
+
+# `__new__` can rewrite duplicate generated values to distinct values, so `B` is not an alias of `A`.
+# revealed: tuple[Literal["A"], Literal["B"]]
+reveal_type(enum_members(WithNewAndLiteralGenerateNextValue))
+reveal_type(WithNewAndLiteralGenerateNextValue.A)  # revealed: Literal[WithNewAndLiteralGenerateNextValue.A]
+reveal_type(WithNewAndLiteralGenerateNextValue.B)  # revealed: Literal[WithNewAndLiteralGenerateNextValue.B]
+reveal_type(WithNewAndLiteralGenerateNextValue.A.value)  # revealed: Any
+reveal_type(WithNewAndLiteralGenerateNextValue.B.value)  # revealed: Any
 
 class WithInitAndGenerateNextValue(Enum):
     @staticmethod
