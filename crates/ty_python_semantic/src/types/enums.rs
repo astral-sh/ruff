@@ -212,6 +212,25 @@ fn try_register_alias<'db>(
     false
 }
 
+/// Returns the value to use when checking whether an enum member is an alias.
+///
+/// For ordinary members, this is the inferred value type. For `auto()` members
+/// with a custom `_generate_next_value_`, aliasing is based on the generated
+/// value instead of the pre-generator placeholder used while collecting
+/// members.
+fn alias_detection_value<'db>(
+    db: &'db dyn Db,
+    value_ty: Type<'db>,
+    is_auto: bool,
+    generate_next_value_function: Option<FunctionType<'db>>,
+) -> Type<'db> {
+    if is_auto && let Some(func_ty) = generate_next_value_function {
+        func_ty.signature(db).overload_return_type_or_unknown(db)
+    } else {
+        value_ty
+    }
+}
+
 /// List all members of an enum.
 #[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| Some(EnumMetadata::empty()), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn enum_metadata<'db>(
@@ -282,6 +301,8 @@ pub(crate) fn enum_metadata<'db>(
     let mut prev_value_was_non_literal_int = false;
     let mut prev_bool_literal = None;
     let ignored_names = enum_ignored_names(db, scope_id);
+    let generate_next_value_function = custom_generate_next_value(db, scope_id)
+        .or_else(|| inherited_generate_next_value(db, class));
 
     let mut aliases = FxHashMap::default();
 
@@ -418,7 +439,13 @@ pub(crate) fn enum_metadata<'db>(
                 }
             };
 
-            if try_register_alias(value_ty, name, &mut enum_values, &mut aliases) {
+            let alias_value_ty = alias_detection_value(
+                db,
+                value_ty,
+                auto_members.contains(name),
+                generate_next_value_function,
+            );
+            if try_register_alias(alias_value_ty, name, &mut enum_values, &mut aliases) {
                 return None;
             }
 
@@ -440,7 +467,7 @@ pub(crate) fn enum_metadata<'db>(
                 return None;
             }
 
-            //Ttrack whether this member's value is a non-literal `int`, so a
+            // Track whether this member's value is a non-literal `int`, so a
             // following `auto()` knows to widen its result to `int`.
             prev_value_was_non_literal_int = value_ty.as_int_like_literal().is_none()
                 && value_ty.is_assignable_to(db, KnownClass::Int.to_instance(db));
@@ -466,8 +493,6 @@ pub(crate) fn enum_metadata<'db>(
     let new_function = custom_new(db, scope_id).or_else(|| inherited_new(db, class));
     let custom_enum_metaclass_new = custom_enum_metaclass_new(db, class);
     let custom_value_annotation = custom_value_annotation(db, scope_id);
-    let generate_next_value_function = custom_generate_next_value(db, scope_id)
-        .or_else(|| inherited_generate_next_value(db, class));
     let value_annotation = custom_value_annotation.or_else(|| {
         if custom_enum_metaclass_new {
             inherited_user_defined_value_annotation(db, class)

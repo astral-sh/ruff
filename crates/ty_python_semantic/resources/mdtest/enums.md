@@ -1229,6 +1229,7 @@ inferred value type should be used (subject to the same hook-based `Any` fallbac
 
 ```py
 from enum import Enum, auto
+from ty_extensions import enum_members
 from typing import Literal
 
 class MixedAutoAndLiteral(Enum):
@@ -1245,6 +1246,27 @@ reveal_type(MixedAutoAndLiteral.B.value)  # revealed: Literal[99]
 def _mixed_instance(x: MixedAutoAndLiteral):
     # Union of all member value types, not just `_generate_next_value_`'s return type
     reveal_type(x.value)  # revealed: str | Literal[99]
+
+class InheritedCustomNextValue(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return ""
+
+class InheritedCustomNextValueChild(InheritedCustomNextValue):
+    A = auto()
+    B = 1
+    C = 1
+
+# `A` uses the inherited `_generate_next_value_`, so `B` is not an alias of `A`.
+# revealed: tuple[Literal["A"], Literal["B"]]
+reveal_type(enum_members(InheritedCustomNextValueChild))
+reveal_type(InheritedCustomNextValueChild.A.value)  # revealed: str
+reveal_type(InheritedCustomNextValueChild.B)  # revealed: Literal[InheritedCustomNextValueChild.B]
+reveal_type(InheritedCustomNextValueChild.B.value)  # revealed: Literal[1]
+reveal_type(InheritedCustomNextValueChild.C)  # revealed: Literal[InheritedCustomNextValueChild.B]
+
+def _inherited_mixed_instance(x: InheritedCustomNextValueChild):
+    reveal_type(x.value)  # revealed: str | Literal[1]
 ```
 
 ### `member` and `nonmember`
