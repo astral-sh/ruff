@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
 ---
-PERF402 Use `list` or `list.copy` to create a copy of a list
+PERF402 Use `list` to create a list from an iterable
  --> PERF402.py:5:9
   |
 3 |     result = []

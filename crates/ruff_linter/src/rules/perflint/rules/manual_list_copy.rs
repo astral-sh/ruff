@@ -7,14 +7,14 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `for` loops that can be replaced by a making a copy of a list.
+/// Checks for `for` loops that can be replaced with `list()`.
 ///
 /// ## Why is this bad?
-/// When creating a copy of an existing list using a for-loop, prefer
-/// `list` or `list.copy` instead. Making a direct copy is more readable and
+/// When collecting every item from an iterable into a list using a for-loop,
+/// prefer `list()` instead. Creating the list directly is more readable and
 /// more performant.
 ///
-/// Using the below as an example, the `list`-based copy is ~2x faster on
+/// Using the below as an example, the `list()` call is ~2x faster on
 /// Python 3.11.
 ///
 /// Note that, as with all `perflint` rules, this is only intended as a
@@ -23,7 +23,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
-/// original = list(range(10000))
+/// original = range(10000)
 /// filtered = []
 /// for i in original:
 ///     filtered.append(i)
@@ -31,7 +31,7 @@ use crate::checkers::ast::Checker;
 ///
 /// Use instead:
 /// ```python
-/// original = list(range(10000))
+/// original = range(10000)
 /// filtered = list(original)
 /// ```
 #[derive(ViolationMetadata)]
@@ -41,7 +41,7 @@ pub(crate) struct ManualListCopy;
 impl Violation for ManualListCopy {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Use `list` or `list.copy` to create a copy of a list".to_string()
+        "Use `list` to create a list from an iterable".to_string()
     }
 }
 
