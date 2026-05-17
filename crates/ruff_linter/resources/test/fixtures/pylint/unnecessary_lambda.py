@@ -61,3 +61,23 @@ _ = lambda *args: f(*args, y=x)
 # https://github.com/astral-sh/ruff/issues/18675
 _ = lambda x: (string := str)(x)
 _ = lambda x: ((x := 1) and str)(x)
+
+# https://github.com/astral-sh/ruff/issues/24704
+def defined_earlier(y):
+    pass
+
+_ = {"a": lambda y: defined_earlier(y)}  # [unnecessary-lambda]
+_ = {"a": lambda y: defined_later(y)}
+
+def defined_later(y):
+    pass
+
+def enclosing_function():
+    def local_defined_earlier(y):
+        pass
+
+    _ = lambda y: local_defined_earlier(y)  # [unnecessary-lambda]
+    _ = lambda y: local_defined_later(y)
+
+    def local_defined_later(y):
+        pass

@@ -171,6 +171,8 @@ help: Inline function call
    - _ = lambda x: (string := str)(x)
 62 + _ = (string := str)
 63 | _ = lambda x: ((x := 1) and str)(x)
+64 |
+65 | # https://github.com/astral-sh/ruff/issues/24704
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0108 Lambda may be unnecessary; consider inlining inner function
@@ -180,5 +182,47 @@ PLW0108 Lambda may be unnecessary; consider inlining inner function
 62 | _ = lambda x: (string := str)(x)
 63 | _ = lambda x: ((x := 1) and str)(x)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+64 |
+65 | # https://github.com/astral-sh/ruff/issues/24704
    |
 help: Inline function call
+
+PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
+  --> unnecessary_lambda.py:69:11
+   |
+67 |     pass
+68 |
+69 | _ = {"a": lambda y: defined_earlier(y)}  # [unnecessary-lambda]
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+70 | _ = {"a": lambda y: defined_later(y)}
+   |
+help: Inline function call
+66 | def defined_earlier(y):
+67 |     pass
+68 |
+   - _ = {"a": lambda y: defined_earlier(y)}  # [unnecessary-lambda]
+69 + _ = {"a": defined_earlier}  # [unnecessary-lambda]
+70 | _ = {"a": lambda y: defined_later(y)}
+71 |
+72 | def defined_later(y):
+note: This is an unsafe fix and may change runtime behavior
+
+PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
+  --> unnecessary_lambda.py:79:9
+   |
+77 |         pass
+78 |
+79 |     _ = lambda y: local_defined_earlier(y)  # [unnecessary-lambda]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+80 |     _ = lambda y: local_defined_later(y)
+   |
+help: Inline function call
+76 |     def local_defined_earlier(y):
+77 |         pass
+78 |
+   -     _ = lambda y: local_defined_earlier(y)  # [unnecessary-lambda]
+79 +     _ = local_defined_earlier  # [unnecessary-lambda]
+80 |     _ = lambda y: local_defined_later(y)
+81 |
+82 |     def local_defined_later(y):
+note: This is an unsafe fix and may change runtime behavior

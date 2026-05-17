@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, ExprLambda, Parameter, ParameterWithDefault, visitor};
+use ruff_python_semantic::TypingOnlyBindingsStatus;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -211,10 +212,38 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
         finder.names
     };
 
+    let inlined_scope_id = checker
+        .semantic()
+        .first_non_type_parent_scope_id(checker.semantic().scope_id)
+        .unwrap_or(checker.semantic().scope_id);
+
     for name in &names {
         if let Some(binding_id) = checker.semantic().resolve_name(name) {
             let binding = checker.semantic().binding(binding_id);
             if checker.semantic().is_current_scope(binding.scope) {
+                return;
+            }
+        }
+    }
+
+    let runtime_load_names = {
+        let mut finder = RuntimeLoadNameFinder::default();
+        finder.visit_expr(func);
+        finder.names
+    };
+
+    for name in runtime_load_names {
+        if let Some(binding_id) = checker.semantic().resolve_name(name) {
+            if checker
+                .semantic()
+                .simulate_runtime_load_at_location_in_scope(
+                    name.id.as_str(),
+                    name.range(),
+                    inlined_scope_id,
+                    TypingOnlyBindingsStatus::Disallowed,
+                )
+                .is_none_or(|runtime_binding_id| runtime_binding_id != binding_id)
+            {
                 return;
             }
         }
@@ -259,6 +288,24 @@ struct NameFinder<'a> {
 
 impl<'a> Visitor<'a> for NameFinder<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
+        if let Expr::Name(expr_name) = expr {
+            self.names.push(expr_name);
+        }
+        visitor::walk_expr(self, expr);
+    }
+}
+
+/// Identify `Expr::Name` nodes that are evaluated while creating the replacement expression.
+#[derive(Debug, Default)]
+struct RuntimeLoadNameFinder<'a> {
+    names: Vec<&'a ast::ExprName>,
+}
+
+impl<'a> Visitor<'a> for RuntimeLoadNameFinder<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        if let Expr::Lambda(_) = expr {
+            return;
+        }
         if let Expr::Name(expr_name) = expr {
             self.names.push(expr_name);
         }
