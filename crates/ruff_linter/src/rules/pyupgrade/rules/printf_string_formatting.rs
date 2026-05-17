@@ -391,7 +391,7 @@ pub(crate) fn printf_string_formatting(
             return;
         };
         if !convertible(&format_string, right) {
-            checker.report_diagnostic(PrintfStringFormatting, string_expr.range());
+            checker.report_diagnostic(PrintfStringFormatting, bin_op.range());
             return;
         }
 
