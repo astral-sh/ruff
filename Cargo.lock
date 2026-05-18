@@ -3269,6 +3269,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruff_mdtest"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "camino",
+ "datatest-stable",
+ "mdtest",
+ "ruff_db",
+ "ruff_linter",
+ "ruff_python_ast",
+ "ruff_workspace",
+ "salsa",
+]
+
+[[package]]
 name = "ruff_memory_usage"
 version = "0.0.0"
 dependencies = [

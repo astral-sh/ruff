@@ -6,9 +6,10 @@ use colored::Colorize;
 use similar::{ChangeTag, TextDiff};
 
 use ruff_db::Db;
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, FileResolver};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
 use ruff_db::files::File;
 use ruff_db::panic::{PanicError, catch_unwind};
+use ruff_db::source::line_index;
 use ruff_diagnostics::Applicability;
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{Ranged, TextRange};
@@ -319,24 +320,20 @@ pub(crate) fn diagnostic_display_config(tool_name: &'static str) -> DisplayDiagn
         .context(0)
 }
 
-pub fn render_diagnostic(
-    resolver: &dyn FileResolver,
-    tool_name: &'static str,
-    diagnostic: &Diagnostic,
-) -> String {
+pub fn render_diagnostic(db: &dyn Db, tool_name: &'static str, diagnostic: &Diagnostic) -> String {
     diagnostic
-        .display(resolver, &diagnostic_display_config(tool_name))
+        .display(&db, &diagnostic_display_config(tool_name))
         .to_string()
 }
 
 pub(crate) fn render_diagnostics(
-    resolver: &dyn FileResolver,
+    db: &dyn Db,
     tool_name: &'static str,
     diagnostics: &[Diagnostic],
 ) -> String {
     let mut rendered = String::new();
     for diag in diagnostics {
-        writeln!(rendered, "{}", render_diagnostic(resolver, tool_name, diag)).unwrap();
+        writeln!(rendered, "{}", render_diagnostic(db, tool_name, diag)).unwrap();
     }
 
     rendered.trim_end_matches('\n').to_string()
@@ -357,15 +354,14 @@ pub(crate) fn apply_snapshot_filters(rendered: &str) -> std::borrow::Cow<'_, str
 }
 
 pub fn validate_inline_snapshot(
-    resolver: &dyn FileResolver,
+    db: &dyn Db,
     tool_name: &'static str,
     test_file: &TestFile<'_>,
     inline_diagnostics: &[Diagnostic],
     markdown_edits: &mut Vec<MarkdownEdit>,
 ) -> Result<(), matcher::FailuresByLine> {
     let update_snapshots = is_update_inline_snapshots_enabled();
-    let input = resolver.input(test_file.file);
-    let line_index = input.line_index();
+    let line_index = line_index(db, test_file.file);
     let mut failures = matcher::FailuresByLine::default();
     let mut inline_diagnostics = inline_diagnostics;
 
@@ -419,9 +415,8 @@ pub fn validate_inline_snapshot(
             continue;
         };
 
-        let actual =
-            apply_snapshot_filters(&render_diagnostics(resolver, tool_name, block_diagnostics))
-                .into_owned();
+        let actual = apply_snapshot_filters(&render_diagnostics(db, tool_name, block_diagnostics))
+            .into_owned();
 
         let Some(snapshot_code_block) = code_block.inline_snapshot_block() else {
             if update_snapshots {
@@ -522,7 +517,7 @@ fn try_apply_markdown_edits(
 }
 
 pub fn create_diagnostic_snapshot<'d, C>(
-    resolver: &dyn FileResolver,
+    db: &dyn Db,
     tool_name: &'static str,
     relative_fixture_path: &Utf8Path,
     test: &parser::MarkdownTest<'_, '_, C>,
@@ -564,12 +559,7 @@ pub fn create_diagnostic_snapshot<'d, C>(
             writeln!(snapshot).unwrap();
         }
         writeln!(snapshot, "```").unwrap();
-        write!(
-            snapshot,
-            "{}",
-            render_diagnostic(resolver, tool_name, diagnostic)
-        )
-        .unwrap();
+        write!(snapshot, "{}", render_diagnostic(db, tool_name, diagnostic)).unwrap();
         writeln!(snapshot, "```").unwrap();
     }
     snapshot
@@ -695,7 +685,7 @@ pub fn check_panic<C>(test: &MarkdownTest<'_, '_, C>, panic_info: Option<PanicEr
 
 pub fn snapshot_diagnostics<C>(
     test: &MarkdownTest<'_, '_, C>,
-    resolver: &dyn FileResolver,
+    db: &dyn Db,
     tool_name: &'static str,
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
@@ -710,7 +700,7 @@ pub fn snapshot_diagnostics<C>(
         );
 
         let snapshot = crate::create_diagnostic_snapshot(
-            resolver,
+            db,
             tool_name,
             relative_fixture_path,
             test,
