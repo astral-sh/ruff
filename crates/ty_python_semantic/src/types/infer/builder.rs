@@ -6,7 +6,7 @@ use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
-use ruff_python_ast::helpers::is_dotted_name;
+use ruff_python_ast::helpers::{any_over_expr, is_dotted_name};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
@@ -4726,6 +4726,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
 
+        if Self::is_sys_version_info_or_platform_assert(test) {
+            self.infer_optional_expression(msg.as_deref(), TypeContext::default());
+            return;
+        }
+
+        if self.is_runtime_check_assert(test) {
+            self.infer_optional_expression(msg.as_deref(), TypeContext::default());
+            return;
+        }
+
         match test_ty.try_bool(self.db()) {
             Ok(Truthiness::AlwaysTrue) => {
                 if let Some(builder) = self.context.report_lint(&REDUNDANT_ASSERT, &**test) {
@@ -4742,6 +4752,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         self.infer_optional_expression(msg.as_deref(), TypeContext::default());
+    }
+
+    fn is_sys_version_info_or_platform_assert(expr: &ast::Expr) -> bool {
+        any_over_expr(expr, |expr| {
+            let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = expr else {
+                return false;
+            };
+
+            matches!(attr.as_str(), "version_info" | "platform")
+                && matches!(value.as_ref(), ast::Expr::Name(ast::ExprName { id, .. }) if id == "sys")
+        })
+    }
+
+    fn is_runtime_check_assert(&self, expr: &ast::Expr) -> bool {
+        any_over_expr(expr, |expr| {
+            let ast::Expr::Call(call) = expr else {
+                return false;
+            };
+
+            matches!(
+                self.expression_type(&call.func),
+                Type::FunctionLiteral(function)
+                    if matches!(
+                        function.known(self.db()),
+                        Some(
+                            KnownFunction::IsInstance
+                                | KnownFunction::IsSubclass
+                                | KnownFunction::HasAttr
+                        )
+                    )
+            )
+        })
     }
 
     fn infer_raise_statement(&mut self, raise: &ast::StmtRaise) {
