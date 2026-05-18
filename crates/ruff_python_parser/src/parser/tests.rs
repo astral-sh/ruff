@@ -301,3 +301,26 @@ fn recursion_limit_default_set() {
     assert!(opts.max_recursion_depth() >= 200);
     assert!(opts.max_recursion_depth() <= 2000);
 }
+
+#[test]
+fn recursion_limit_right_assoc_pow_chain() {
+    // `1**1**1**...**1` — `**` is right-associative, so the right operand
+    // is parsed by a recursive `parse_binary_expression_or_higher` call
+    // *without* any intervening parentheses or atom nesting. This exercises
+    // the binary-expression recursion path directly, unlike the
+    // `1+(1+(...))` interplay test which recurses through parenthesised
+    // atoms.
+    let depth = 2_000;
+    let mut src = String::with_capacity(depth * 3 + 1);
+    for _ in 0..depth {
+        src.push_str("1**");
+    }
+    src.push('1');
+    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
+    let err = parse(&src, opts).unwrap_err();
+    assert!(
+        matches!(err.error, ParseErrorType::RecursionLimitExceeded),
+        "expected RecursionLimitExceeded, got {:?}",
+        err.error
+    );
+}

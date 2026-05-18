@@ -300,7 +300,20 @@ impl<'src> Parser<'src> {
                 BinaryLikeOperator::Binary(bin_op) => {
                     self.bump(TokenKind::from(bin_op));
 
-                    let right = self.parse_binary_expression_or_higher(new_precedence, context);
+                    // The right operand is parsed by a recursive call. For
+                    // right-associative operators (`**`) this recursion is
+                    // unbounded in `a**a**a**...`, and it bypasses the guard
+                    // in `parse_lhs_expression` (that scope is exited once
+                    // the atom is parsed). Guard the recursion here too.
+                    let right = if let Some(scope) =
+                        self.enter_recursion(self.current_token_range())
+                    {
+                        let right = self.parse_binary_expression_or_higher(new_precedence, context);
+                        scope.exit(self);
+                        right
+                    } else {
+                        self.recursion_recovery_expr()
+                    };
 
                     Expr::BinOp(ast::ExprBinOp {
                         left: Box::new(left.expr),
@@ -336,18 +349,21 @@ impl<'src> Parser<'src> {
             scope.exit(self);
             result
         } else {
-            // The recursion limit has been exceeded; return the standard
-            // expression-recovery node (an empty `Name` with the `Invalid`
-            // context).
-            ParsedExpr {
-                expr: Expr::Name(ast::ExprName {
-                    range: self.missing_node_range(),
-                    id: Name::empty(),
-                    ctx: ExprContext::Invalid,
-                    node_index: AtomicNodeIndex::NONE,
-                }),
-                is_parenthesized: false,
-            }
+            self.recursion_recovery_expr()
+        }
+    }
+
+    /// The standard expression-recovery node returned when the recursion
+    /// limit is exceeded: an empty `Name` with the `Invalid` context.
+    fn recursion_recovery_expr(&mut self) -> ParsedExpr {
+        ParsedExpr {
+            expr: Expr::Name(ast::ExprName {
+                range: self.missing_node_range(),
+                id: Name::empty(),
+                ctx: ExprContext::Invalid,
+                node_index: AtomicNodeIndex::NONE,
+            }),
+            is_parenthesized: false,
         }
     }
 
