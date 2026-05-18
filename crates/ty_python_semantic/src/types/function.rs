@@ -1675,6 +1675,10 @@ fn is_instance_truthiness<'db>(
             }
         }
 
+        Type::EnumComplement(complement) => {
+            is_instance_truthiness(db, complement.to_intersection(db), class)
+        }
+
         Type::NominalInstance(..) => always_true_if(is_instance(&ty)),
 
         Type::NewTypeInstance(newtype) => {

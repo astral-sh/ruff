@@ -22,6 +22,32 @@ static_assert(not is_disjoint_from(LiteralString, LiteralString))
 static_assert(not is_disjoint_from(str, LiteralString))
 ```
 
+## Enum complements
+
+```py
+from enum import Enum
+from typing import Literal
+from ty_extensions import Intersection, Not, is_disjoint_from, static_assert
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+static_assert(
+    is_disjoint_from(
+        Intersection[Color, Not[Literal[Color.RED]]],
+        Intersection[Color, Not[Literal[Color.GREEN, Color.BLUE]]],
+    )
+)
+static_assert(
+    is_disjoint_from(
+        Intersection[Color, Not[Literal[Color.GREEN, Color.BLUE]]],
+        Intersection[Color, Not[Literal[Color.RED]]],
+    )
+)
+```
+
 ## Class hierarchies
 
 ```py

@@ -735,6 +735,27 @@ def _(
     reveal_type(c8)  # revealed: (x: int) -> str
 ```
 
+Narrowed callable enum values can still be used with callable type extraction:
+
+```py
+from enum import Enum
+from ty_extensions import CallableTypeOf, RegularCallableTypeOf
+
+class CallableEnum(Enum):
+    LEFT = 1
+    RIGHT = 2
+
+    def __call__(self, value: int) -> str:
+        return str(value)
+
+def _(value: CallableEnum) -> None:
+    if value is CallableEnum.LEFT:
+        return
+
+    callable_type: CallableTypeOf[value]
+    regular_callable_type: RegularCallableTypeOf[value]
+```
+
 ## `RegularCallableTypeOf`
 
 The `RegularCallableTypeOf` special form also extracts a callable type from a callable object, but

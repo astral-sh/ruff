@@ -6,6 +6,7 @@ use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin,
 };
 use crate::types::class::KnownClass;
+use crate::types::enums::EnumComplement;
 use crate::types::{Type, TypeQualifiers};
 use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet};
@@ -664,6 +665,32 @@ pub(crate) fn walk_intersection_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>
 
 #[salsa::tracked]
 impl<'db> IntersectionType<'db> {
+    /// Return the compact enum-complement view of this intersection, if it has one.
+    pub(crate) fn enum_complement(self, db: &'db dyn Db) -> Option<EnumComplement<'db>> {
+        EnumComplement::from_intersection_parts(db, self.positive(db), self.negative(db))
+    }
+
+    /// Return the exact finite alternatives represented by this intersection, if available.
+    pub fn finite_alternatives(self, db: &'db dyn Db) -> Option<Vec<Type<'db>>> {
+        self.enum_complement(db)
+            .map(|complement| complement.remaining_literal_types(db))
+    }
+
+    /// Return the exact finite alternative union represented by this intersection, if available.
+    pub(crate) fn finite_alternative_union(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        Some(self.enum_complement(db)?.remaining_literal_union(db))
+    }
+
+    /// Return the finite alternatives only if they remain concise enough for display.
+    pub(crate) fn finite_alternatives_for_display(
+        self,
+        db: &'db dyn Db,
+        max_literals: usize,
+    ) -> Option<Vec<Type<'db>>> {
+        self.enum_complement(db)?
+            .remaining_literal_types_for_display(db, max_literals)
+    }
+
     /// Create an intersection type `E1 & E2 & ... & En` from a list of (positive) elements.
     ///
     /// For performance reasons, consider using [`IntersectionType::from_two_elements`] if

@@ -92,6 +92,36 @@ for x in OldStyleIterable():
 reveal_type(x)
 ```
 
+## Enum complement as overloaded `__iter__` receiver
+
+`overloaded.pyi`:
+
+```pyi
+from enum import Enum
+from typing import Iterator, Literal, overload
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+    @overload
+    def __iter__(self: Literal[Color.GREEN]) -> Iterator[int]: ...
+    @overload
+    def __iter__(self: Literal[Color.BLUE]) -> Iterator[str]: ...
+```
+
+```py
+from overloaded import Color
+
+def _(color: Color):
+    if color is Color.RED:
+        return
+
+    for item in color:
+        reveal_type(item)  # revealed: int | str
+```
+
 ## With heterogeneous tuple
 
 ```py

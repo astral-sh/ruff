@@ -2599,7 +2599,8 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
             | Type::PropertyInstance(_)
             | Type::BoundSuper(_)
             | Type::TypedDict(_)
-            | Type::NewTypeInstance(_) => CompletionKind::Struct,
+            | Type::NewTypeInstance(_)
+            | Type::EnumComplement(_) => CompletionKind::Struct,
             Type::LiteralValue(literal) if literal.is_enum() => CompletionKind::Enum,
             Type::LiteralValue(_) | Type::TypeIs(_) | Type::TypeGuard(_) => CompletionKind::Value,
             Type::ProtocolInstance(_) => CompletionKind::Interface,
