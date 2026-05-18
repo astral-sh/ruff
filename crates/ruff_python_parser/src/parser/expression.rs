@@ -305,13 +305,12 @@ impl<'src> Parser<'src> {
                     // unbounded in `a**a**a**...`, and it bypasses the guard
                     // in `parse_lhs_expression` (that scope is exited once
                     // the atom is parsed). Guard the recursion here too.
-                    let right = if let Some(scope) =
-                        self.enter_recursion(self.current_token_range())
-                    {
+                    let right = if self.enter_recursion() {
                         let right = self.parse_binary_expression_or_higher(new_precedence, context);
-                        scope.exit(self);
+                        self.exit_recursion();
                         right
                     } else {
+                        self.report_recursion_limit_exceeded(self.current_token_range());
                         self.recursion_recovery_expr()
                     };
 
@@ -343,14 +342,37 @@ impl<'src> Parser<'src> {
         left_precedence: OperatorPrecedence,
         context: ExpressionContext,
     ) -> ParsedExpr {
-        let range = self.current_token_range();
-        if let Some(scope) = self.enter_recursion(range) {
-            let result = self.parse_lhs_expression_inner(left_precedence, context);
-            scope.exit(self);
+        let token = self.current_token_kind();
+        if !Self::token_starts_recursive_lhs(token) {
+            return self.parse_lhs_expression_inner(left_precedence, context, token);
+        }
+
+        if self.enter_recursion() {
+            let result = self.parse_lhs_expression_inner(left_precedence, context, token);
+            self.exit_recursion();
             result
         } else {
+            self.report_recursion_limit_exceeded(self.current_token_range());
             self.recursion_recovery_expr()
         }
+    }
+
+    #[inline]
+    fn token_starts_recursive_lhs(token: TokenKind) -> bool {
+        token.as_unary_operator().is_some()
+            || matches!(
+                token,
+                TokenKind::Star
+                    | TokenKind::Await
+                    | TokenKind::Lambda
+                    | TokenKind::Yield
+                    | TokenKind::String
+                    | TokenKind::FStringStart
+                    | TokenKind::TStringStart
+                    | TokenKind::Lpar
+                    | TokenKind::Lsqb
+                    | TokenKind::Lbrace
+            )
     }
 
     /// The standard expression-recovery node returned when the recursion
@@ -371,9 +393,9 @@ impl<'src> Parser<'src> {
         &mut self,
         left_precedence: OperatorPrecedence,
         context: ExpressionContext,
+        token: TokenKind,
     ) -> ParsedExpr {
         let start = self.node_start();
-        let token = self.current_token_kind();
 
         if let Some(unary_op) = token.as_unary_operator() {
             let expr = self.parse_unary_expression(unary_op, context);
@@ -407,7 +429,7 @@ impl<'src> Parser<'src> {
             return Expr::UnaryOp(expr).into();
         }
 
-        match self.current_token_kind() {
+        match token {
             TokenKind::Star => {
                 let starred_expr = self.parse_starred_expression(context);
 
@@ -707,8 +729,26 @@ impl<'src> Parser<'src> {
     pub(super) fn parse_postfix_expression(&mut self, mut lhs: Expr, start: TextSize) -> Expr {
         loop {
             lhs = match self.current_token_kind() {
-                TokenKind::Lpar => Expr::Call(self.parse_call_expression(lhs, start)),
-                TokenKind::Lsqb => Expr::Subscript(self.parse_subscript_expression(lhs, start)),
+                TokenKind::Lpar => {
+                    if self.enter_recursion() {
+                        let expr = Expr::Call(self.parse_call_expression(lhs, start));
+                        self.exit_recursion();
+                        expr
+                    } else {
+                        self.report_recursion_limit_exceeded(self.current_token_range());
+                        break lhs;
+                    }
+                }
+                TokenKind::Lsqb => {
+                    if self.enter_recursion() {
+                        let expr = Expr::Subscript(self.parse_subscript_expression(lhs, start));
+                        self.exit_recursion();
+                        expr
+                    } else {
+                        self.report_recursion_limit_exceeded(self.current_token_range());
+                        break lhs;
+                    }
+                }
                 TokenKind::Dot => Expr::Attribute(self.parse_attribute_expression(lhs, start)),
                 _ => break lhs,
             };
@@ -1844,15 +1884,16 @@ impl<'src> Parser<'src> {
 
         let format_spec = if self.eat(TokenKind::Colon) {
             let spec_start = self.node_start();
-            let elements = if let Some(scope) = self.enter_recursion(self.current_token_range()) {
+            let elements = if self.enter_recursion() {
                 let elements = self.parse_interpolated_string_elements(
                     flags,
                     InterpolatedStringElementsKind::FormatSpec(string_kind),
                     string_kind,
                 );
-                scope.exit(self);
+                self.exit_recursion();
                 elements
             } else {
+                self.report_recursion_limit_exceeded(self.current_token_range());
                 ast::InterpolatedStringElements::from(vec![])
             };
             Some(Box::new(ast::InterpolatedStringFormatSpec {
@@ -2929,11 +2970,12 @@ impl<'src> Parser<'src> {
 
         // `lambda: lambda: lambda: ...` recurses through the lambda body at
         // the conditional layer, bypassing the `parse_lhs_expression` guard.
-        let body = if let Some(scope) = self.enter_recursion(self.current_token_range()) {
+        let body = if self.enter_recursion() {
             let body = self.parse_conditional_expression_or_higher();
-            scope.exit(self);
+            self.exit_recursion();
             body
         } else {
+            self.report_recursion_limit_exceeded(self.current_token_range());
             self.recursion_recovery_expr()
         };
 
@@ -2962,11 +3004,12 @@ impl<'src> Parser<'src> {
         // `a if b else a if b else ...` recurses through `orelse` at the
         // conditional layer, which is not covered by the `parse_lhs_expression`
         // guard (that scope is released once each atom is parsed). Guard here.
-        let orelse = if let Some(scope) = self.enter_recursion(self.current_token_range()) {
+        let orelse = if self.enter_recursion() {
             let orelse = self.parse_conditional_expression_or_higher();
-            scope.exit(self);
+            self.exit_recursion();
             orelse
         } else {
+            self.report_recursion_limit_exceeded(self.current_token_range());
             self.recursion_recovery_expr()
         };
 

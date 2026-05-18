@@ -224,6 +224,22 @@ fn recursion_limit_nested_lists() {
 }
 
 #[test]
+fn recursion_limit_nested_calls() {
+    let src = format!("x = {}1{}", "f(".repeat(1_000), ")".repeat(1_000));
+    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
+    let err = parse(&src, opts).unwrap_err();
+    assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
+}
+
+#[test]
+fn recursion_limit_nested_subscripts() {
+    let src = format!("x = {}1{}", "a[".repeat(1_000), "]".repeat(1_000));
+    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
+    let err = parse(&src, opts).unwrap_err();
+    assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
+}
+
+#[test]
 fn recursion_limit_nested_match_patterns() {
     // Deeply parenthesised match patterns — exercises pattern-parsing
     // instrumentation in addition to statement / expression paths.
