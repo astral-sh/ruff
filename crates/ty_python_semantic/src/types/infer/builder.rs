@@ -8178,6 +8178,50 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_call_expression_impl(call_expression, callable_type, tcx)
     }
 
+    fn infer_builtin_range_instance_type(
+        &mut self,
+        callable_type: Type<'db>,
+        arguments: &ast::Arguments,
+    ) -> Option<Type<'db>> {
+        let Type::ClassLiteral(class) = callable_type else {
+            return None;
+        };
+        if !class.is_known(self.db(), KnownClass::Range)
+            || !arguments.keywords.is_empty()
+            || arguments.args.iter().any(ast::Expr::is_starred_expr)
+        {
+            return None;
+        }
+
+        let mut speculative = self.speculate();
+        let mut int_literal = |expr: &ast::Expr| {
+            speculative
+                .infer_expression(expr, TypeContext::default())
+                .as_int_literal()
+        };
+
+        let is_non_empty = match arguments.args.as_ref() {
+            [stop] => int_literal(stop)? > 0,
+            [start, stop] => int_literal(start)? < int_literal(stop)?,
+            [start, stop, step] => {
+                let start = int_literal(start)?;
+                let stop = int_literal(stop)?;
+                let step = int_literal(step)?;
+
+                match step.cmp(&0) {
+                    std::cmp::Ordering::Greater => start < stop,
+                    std::cmp::Ordering::Less => start > stop,
+                    std::cmp::Ordering::Equal => return None,
+                }
+            }
+            _ => return None,
+        };
+
+        Some(Type::KnownInstance(KnownInstanceType::Range {
+            is_non_empty,
+        }))
+    }
+
     fn infer_call_expression_impl(
         &mut self,
         call_expression: &ast::ExprCall,
@@ -8732,6 +8776,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
+        }
+
+        // `range(...)` always constructs a `range`, but with literal arguments we can preserve
+        // whether that range is statically non-empty on the constructed instance itself.
+        if let Some(instance_ty) = self.infer_builtin_range_instance_type(callable_type, arguments)
+        {
+            bindings = bindings.with_constructed_instance_type(self.db(), instance_ty);
         }
 
         let db = self.db();

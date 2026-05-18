@@ -11,7 +11,6 @@ use ruff_db::files::File;
 use ruff_index::{FrozenIndexVec, Idx, IndexVec};
 use ruff_python_ast::{Singleton, name::Name};
 
-use crate::ast_ids::ExpressionNodeKey;
 use crate::db::Db;
 use crate::expression::Expression;
 use crate::global_scope;
@@ -110,29 +109,6 @@ pub struct CallableAndCallExpr<'db> {
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub enum NonEmptyIterablePredicate<'db> {
-    /// A `range(...)` call that may be statically non-empty.
-    ///
-    /// Semantic reachability later confirms that the callable is builtin `range` and that the
-    /// argument types prove at least one iteration.
-    BuiltinRange {
-        call: Expression<'db>,
-        callable: ExpressionNodeKey,
-        start: Option<ExpressionNodeKey>,
-        stop: ExpressionNodeKey,
-        step: Option<ExpressionNodeKey>,
-    },
-}
-
-impl<'db> NonEmptyIterablePredicate<'db> {
-    pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        match self {
-            NonEmptyIterablePredicate::BuiltinRange { call, .. } => call.scope(db),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub enum PredicateNode<'db> {
     Expression(Expression<'db>),
     /// These predicates are recorded for statements with call expressions. As part of
@@ -154,7 +130,7 @@ pub enum PredicateNode<'db> {
     /// positives.
     IsNonTerminalCall(CallableAndCallExpr<'db>),
     /// A `for` iterable that may be statically known to be non-empty.
-    IsNonEmptyIterable(NonEmptyIterablePredicate<'db>),
+    IsNonEmptyIterable(Expression<'db>),
     Pattern(PatternPredicate<'db>),
     SubjectElementPattern(SubjectElementPatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
