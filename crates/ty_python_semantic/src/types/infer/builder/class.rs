@@ -106,10 +106,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut dataclass_transformer_params = None;
         let mut total_ordering = false;
         let infer_original_class_ty = |deprecated,
-                                 type_check_only,
-                                 dataclass_params,
-                                 dataclass_transformer_params,
-                                 total_ordering| {
+                                       type_check_only,
+                                       dataclass_params,
+                                       dataclass_transformer_params,
+                                       total_ordering| {
             match (maybe_known_class, &*name.id) {
                 (None, "NamedTuple") if in_typing_module() => {
                     Type::SpecialForm(SpecialFormType::NamedTuple)
@@ -131,9 +131,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )),
             }
         };
+        let decorator_call_ty = |decorator: &ast::Decorator| match &decorator.expression {
+            ast::Expr::Call(call) => Some(self.expression_type(&call.func)),
+            _ => None,
+        };
 
-        // TODO(charlie): Fill this out.
-        // In the first pass, ...
+        // In the first pass, collect metadata decorators that shape the original class object.
+        // Once an inner decorator replaces the public binding, outer decorators are ordinary
+        // runtime applications only: they cannot retroactively add metadata to the original class.
+        // For ordinary decorators that still apply to the original class, precompute the call so
+        // the second pass can reuse it if no inner decorator has changed the binding.
         for &(decorator_ty, decorator) in decorator_types_and_nodes.iter().rev() {
             if !metadata_applies_to_original_class {
                 decorators_to_apply.push((decorator_ty, decorator, None));
@@ -236,18 +243,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 dataclass_transformer_params,
                 total_ordering,
             );
-            let decorator_result =
-                apply_class_decorator(db, decorator_ty, original_class_ty);
+            let decorator_result = apply_class_decorator(db, decorator_ty, original_class_ty);
             let decorated_ty = match &decorator_result {
                 Ok(return_ty) => *return_ty,
                 Err(error) => error.return_type(db),
             };
             if is_unknown_decorator_result(db, decorated_ty) {
-                let decorator_call_ty = match &decorator.expression {
-                    ast::Expr::Call(call) => Some(self.expression_type(&call.func)),
-                    _ => None,
-                };
-                if !preserve_binding_for_unknown_result(db, decorator_ty, decorator_call_ty) {
+                if !preserve_binding_for_unknown_result(
+                    db,
+                    decorator_ty,
+                    decorator_call_ty(decorator),
+                ) {
                     metadata_applies_to_original_class = false;
                 }
             } else if !type_retains_original_class(db, original_class_ty, decorated_ty) {
@@ -277,7 +283,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // metadata were inferred above.
         for (decorator_ty, decorator_node, precomputed_result) in decorators_to_apply {
             let decorator_result = match precomputed_result {
-                // TODO(charlie): Why can we reuse this here...? But not in the second branch?
+                // The metadata pass already called this decorator with the same input. If an inner
+                // decorator changed the binding, apply this decorator to the new public binding.
                 Some((precomputed_input_ty, decorator_result))
                     if precomputed_input_ty == inferred_ty =>
                 {
@@ -297,18 +304,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 decorated_ty => decorated_ty,
             };
             // If a class decorator application loses all precision, preserve the original class
-            // binding when the decorator is known to preserve unknown results.
-            // TODO(charlie): Can we avoid re-computing these here...? Didn't we compute these
-            // above?
+            // binding for decorators known to preserve unknown results.
             let decorated_ty_is_unknown = is_unknown_decorator_result(db, decorated_ty);
             let should_preserve_binding = decorated_ty_is_unknown
                 && preserve_binding_for_unknown_result(
                     db,
                     decorator_ty,
-                    match &decorator_node.expression {
-                        ast::Expr::Call(call) => Some(self.expression_type(&call.func)),
-                        _ => None,
-                    },
+                    decorator_call_ty(decorator_node),
                 );
             inferred_ty = if should_preserve_binding {
                 inferred_ty
@@ -320,8 +322,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     decorated_ty,
                 )
             } else {
-                // Trying to understand this... do we not always set this? Or we don't need to if
-                // they all preserve?
+                // Only record an undecorated type once a decorator actually replaces the public
+                // binding. If all decorators preserve the class, there is no alternate class type
+                // to expose.
                 undecorated_ty.get_or_insert(inferred_ty);
                 decorated_ty
             };
