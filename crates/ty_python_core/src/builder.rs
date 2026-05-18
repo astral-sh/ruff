@@ -3483,7 +3483,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
 
-                let non_empty_range_constraint = if is_direct_range_call(iter) {
+                let non_empty_iterable_constraint = if literal_iterates_at_least_once(iter) {
+                    let after_iter = self.flow_snapshot();
+                    let constraint =
+                        self.record_reachability_constraint(PredicateOrLiteral::Literal(true));
+
+                    Some((after_iter, constraint))
+                } else if is_direct_range_call(iter) {
                     let after_iter = self.flow_snapshot();
                     let constraint = self.record_reachability_constraint(
                         PredicateOrLiteral::Predicate(Predicate {
@@ -3537,10 +3543,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // We may execute the `else` clause without ever executing the body, so merge in a
                 // zero-iteration state before visiting `else`.
-                if let Some((after_iter, non_empty_range_constraint)) = non_empty_range_constraint {
+                if let Some((after_iter, non_empty_iterable_constraint)) =
+                    non_empty_iterable_constraint
+                {
                     let post_loop_body = self.flow_snapshot();
                     self.flow_restore(after_iter);
-                    self.record_negated_reachability_constraint(non_empty_range_constraint);
+                    self.record_negated_reachability_constraint(non_empty_iterable_constraint);
                     let no_iteration = self.flow_snapshot();
                     self.flow_restore(post_loop_body);
                     self.flow_merge(no_iteration);
@@ -5055,6 +5063,23 @@ impl ExpressionsScopeMapBuilder {
     }
 }
 
+/// Returns `true` if the literal iterable must contain at least one element.
+///
+/// The check is intentionally syntactic and conservative: starred elements and dictionary
+/// unpacking only prove non-emptiness when there is also a non-starred/non-unpacked element.
+fn literal_iterates_at_least_once(expr: &ast::Expr) -> bool {
+    match expr {
+        ast::Expr::Tuple(ast::ExprTuple { elts, .. })
+        | ast::Expr::List(ast::ExprList { elts, .. })
+        | ast::Expr::Set(ast::ExprSet { elts, .. }) => {
+            elts.iter().any(|elt| !elt.is_starred_expr())
+        }
+        ast::Expr::Dict(ast::ExprDict { items, .. }) => items.iter().any(|item| item.key.is_some()),
+        ast::Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => !value.is_empty(),
+        ast::Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => !value.is_empty(),
+        _ => false,
+    }
+}
 /// Returns if the expression is a `TYPE_CHECKING` expression.
 fn is_if_type_checking(expr: &ast::Expr) -> bool {
     match expr {
