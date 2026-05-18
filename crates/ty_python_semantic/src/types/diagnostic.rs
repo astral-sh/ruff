@@ -4505,10 +4505,13 @@ impl<'db> IncompatibleBases<'db> {
                     .keys()
                     .filter(|other_base| other_base != disjoint_base)
                     .all(|other_base| {
+                        // CPython's layout check operates on runtime classes. Type arguments are
+                        // irrelevant here: a generic disjoint base and any specialization of that
+                        // base share the same layout.
                         !disjoint_base
                             .class
                             .default_specialization(db)
-                            .is_subclass_of(db, other_base.class.default_specialization(db))
+                            .is_subtype_of_class_literal(db, other_base.class)
                     })
             })
             .map(|(base, info)| (*base, *info))
