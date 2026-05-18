@@ -156,6 +156,33 @@ class Cyclic:
 reveal_type(Cyclic("").data)
 ```
 
+## Decorated methods with implicit class attributes
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3471>.
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+class A: ...
+
+T = TypeVar("T")
+U = TypeVar("U", bound=A)
+C = Callable[[T, U], object]
+
+def d() -> Callable[[C[U, A]], object]:
+    raise NotImplementedError
+
+class B:
+    @d()
+    def m1(self, p):
+        pass
+
+    @d()
+    def m2(self, p):
+        self.__slots__  # error: [unresolved-attribute]
+```
+
 ## Lazy cached property behind `hasattr`
 
 This pattern used to panic with "too many cycle iterations".

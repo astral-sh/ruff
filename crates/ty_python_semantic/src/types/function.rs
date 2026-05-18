@@ -1151,6 +1151,16 @@ impl<'db> FunctionType<'db> {
         self.literal(db).definition(db)
     }
 
+    /// Returns `true` if this function's last definition uses the same place as `other`.
+    pub(crate) fn has_same_place_as(self, db: &'db dyn Db, other: FunctionType<'db>) -> bool {
+        self.last_definition(db).place(db) == other.last_definition(db).place(db)
+    }
+
+    /// Returns the [`Definition`] for the last overload or implementation in this function.
+    pub(crate) fn last_definition(self, db: &'db dyn Db) -> Definition<'db> {
+        self.literal(db).last_definition.definition(db)
+    }
+
     /// Returns `true` if this function includes `definition` as one of its overload signatures or
     /// implementation.
     pub(crate) fn contains_definition(self, db: &'db dyn Db, definition: Definition<'db>) -> bool {
@@ -1285,7 +1295,8 @@ impl<'db> FunctionType<'db> {
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(
-        returns(ref), cycle_initial=last_definition_signature_cycle_initial,
+        returns(ref),
+        cycle_initial=|_, _, _|Signature::bottom(),
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
@@ -1298,7 +1309,8 @@ impl<'db> FunctionType<'db> {
     /// The `return_callable_typevar_scope` controls whether type variables that only appear in a
     /// return-position `Callable` stay bound to the function or move to the returned callable.
     #[salsa::tracked(
-        returns(ref), cycle_initial=last_definition_raw_signature_cycle_initial,
+        returns(ref),
+        cycle_initial=|_, _, _, _|Signature::bottom(),
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn last_definition_raw_signature(
@@ -1722,23 +1734,6 @@ fn is_instance_truthiness<'db>(
     }
 }
 
-fn last_definition_signature_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _function: FunctionType<'db>,
-) -> Signature<'db> {
-    Signature::bottom()
-}
-
-fn last_definition_raw_signature_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _function: FunctionType<'db>,
-    _return_callable_typevar_scope: ReturnCallableTypeVarScope,
-) -> Signature<'db> {
-    Signature::bottom()
-}
-
 /// Returns `true` if the function body is stub-like, ignoring a leading docstring.
 pub(crate) fn function_has_stub_body(node: &ast::StmtFunctionDef) -> bool {
     let suite = ast::helpers::body_without_leading_docstring(&node.body);
@@ -1929,6 +1924,20 @@ pub enum KnownFunction {
     NewClass,
 }
 
+fn call_argument_node<'a>(
+    call_expression: &'a ast::ExprCall,
+    name: &str,
+    position: usize,
+) -> Option<ast::AnyNodeRef<'a>> {
+    call_expression
+        .arguments
+        .find_argument(name, position)
+        .map(|argument| match argument {
+            ast::ArgOrKeyword::Arg(expr) => ast::AnyNodeRef::from(expr),
+            ast::ArgOrKeyword::Keyword(keyword) => ast::AnyNodeRef::from(keyword),
+        })
+}
+
 impl KnownFunction {
     pub fn into_classinfo_constraint_function(self) -> Option<ClassInfoConstraintFunction> {
         match self {
@@ -2040,7 +2049,12 @@ impl KnownFunction {
                     .arguments_for_parameter(call_arguments, 0)
                     .fold(UnionBuilder::new(db), |builder, (_, ty)| builder.add(ty))
                     .build();
-                report_revealed_type(context, revealed_type, &call_expression.arguments.args[0]);
+                report_revealed_type(
+                    context,
+                    revealed_type,
+                    call_argument_node(call_expression, "obj", 0)
+                        .unwrap_or_else(|| ast::AnyNodeRef::from(call_expression)),
+                );
             }
 
             KnownFunction::HasMember => {
@@ -2076,8 +2090,13 @@ impl KnownFunction {
                     ));
 
                     diagnostic.annotate(
-                        Annotation::secondary(context.span(&call_expression.arguments.args[0]))
-                            .message(format_args!("Inferred type is `{}`", actual_ty.display(db))),
+                        Annotation::secondary(
+                            context.span(
+                                call_argument_node(call_expression, "val", 0)
+                                    .unwrap_or_else(|| ast::AnyNodeRef::from(call_expression)),
+                            ),
+                        )
+                        .message(format_args!("Inferred type is `{}`", actual_ty.display(db))),
                     );
 
                     if actual_ty.is_subtype_of(db, *asserted_ty) {
@@ -2114,11 +2133,16 @@ impl KnownFunction {
                     let mut diagnostic =
                         builder.into_diagnostic("Argument does not have asserted type `Never`");
                     diagnostic.annotate(
-                        Annotation::secondary(context.span(&call_expression.arguments.args[0]))
-                            .message(format_args!(
-                                "Inferred type of argument is `{}`",
-                                actual_ty.display(db)
-                            )),
+                        Annotation::secondary(
+                            context.span(
+                                call_argument_node(call_expression, "arg", 0)
+                                    .unwrap_or_else(|| ast::AnyNodeRef::from(call_expression)),
+                            ),
+                        )
+                        .message(format_args!(
+                            "Inferred type of argument is `{}`",
+                            actual_ty.display(db)
+                        )),
                     );
                     diagnostic.info(format_args!(
                         "`Never` and `{inferred_type}` are not equivalent types",
@@ -2139,20 +2163,11 @@ impl KnownFunction {
                 let truthiness = match parameter_ty.try_bool(db) {
                     Ok(truthiness) => truthiness,
                     Err(err) => {
-                        let condition = call_expression
-                            .arguments
-                            .find_argument("condition", 0)
-                            .map(|argument| match argument {
-                                ruff_python_ast::ArgOrKeyword::Arg(expr) => {
-                                    ast::AnyNodeRef::from(expr)
-                                }
-                                ruff_python_ast::ArgOrKeyword::Keyword(keyword) => {
-                                    ast::AnyNodeRef::from(keyword)
-                                }
-                            })
-                            .unwrap_or(ast::AnyNodeRef::from(call_expression));
-
-                        err.report_diagnostic(context, condition);
+                        err.report_diagnostic(
+                            context,
+                            call_argument_node(call_expression, "condition", 0)
+                                .unwrap_or_else(|| ast::AnyNodeRef::from(call_expression)),
+                        );
 
                         return;
                     }
@@ -2184,13 +2199,14 @@ impl KnownFunction {
                             parameter_ty = parameter_ty.display(db)
                         ))
                     };
-                    diagnostic.annotate(
-                        Annotation::secondary(context.span(&call_expression.arguments.args[0]))
-                            .message(format_args!(
+                    if let Some(condition) = call_argument_node(call_expression, "condition", 0) {
+                        diagnostic.annotate(
+                            Annotation::secondary(context.span(condition)).message(format_args!(
                                 "Inferred type of argument is `{}`",
                                 parameter_ty.display(db)
                             )),
-                    );
+                        );
+                    }
                 }
             }
 
@@ -2249,7 +2265,10 @@ impl KnownFunction {
                     context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
                 {
                     let mut diag = builder.into_diagnostic("Revealed protocol interface");
-                    let span = context.span(&call_expression.arguments.args[0]);
+                    let span = context.span(
+                        call_argument_node(call_expression, "protocol", 0)
+                            .unwrap_or_else(|| ast::AnyNodeRef::from(call_expression)),
+                    );
                     diag.annotate(Annotation::primary(span).message(format_args!(
                         "`{}`",
                         protocol_class.interface(db).display(db)
@@ -2306,7 +2325,10 @@ impl KnownFunction {
                     context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
                 {
                     let mut diag = builder.into_diagnostic("Revealed MRO");
-                    let span = context.span(&call_expression.arguments.args[0]);
+                    let span = context.span(
+                        call_argument_node(call_expression, "cls", 0)
+                            .unwrap_or_else(|| ast::AnyNodeRef::from(call_expression)),
+                    );
                     let mut message = String::new();
                     let display_settings = DisplaySettings::from_possibly_ambiguous_types(
                         db,
@@ -2436,7 +2458,7 @@ impl KnownFunction {
 pub(super) fn report_revealed_type<'db>(
     context: &InferContext<'db, '_>,
     revealed_type: Type<'db>,
-    argument_node: &ast::Expr,
+    argument_node: impl Ranged,
 ) {
     if let Some(builder) = context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info) {
         let mut diag = builder.into_diagnostic("Revealed type");

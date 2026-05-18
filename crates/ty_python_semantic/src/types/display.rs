@@ -3109,6 +3109,9 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 f.with_type(ty).write_str(declaration.name(self.db))?;
                 f.write_str("'>")
             }
+            KnownInstanceType::Sentinel(sentinel) => {
+                f.with_type(ty).write_str(sentinel.name(self.db).as_str())
+            }
             KnownInstanceType::NamedTupleSpec(_) => f.write_str("NamedTupleSpec"),
             KnownInstanceType::FunctoolsPartial(partial) => {
                 f.write_str("partial[")?;

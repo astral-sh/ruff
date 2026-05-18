@@ -74,7 +74,7 @@ When working on ty, PR titles should start with `[ty]` and be tagged with the `t
 - Get your tests to pass. If you didn't run the tests, your code does not work.
 - Follow existing code style. Check neighboring files for patterns.
 - Rust imports should always go at the top of the file, never locally in functions.
-- Always run `uvx prek run -a` at the end of a task, after every rebase, after addressing any review comment, and before pushing any code.
+- Run `uvx prek` at the end of a task if you changed files in the repo. This includes changes such as rebases or addressing review comments. Prefer a branch-scoped run like `uvx prek run --from-ref '@{upstream}'`, which checks files changed relative to the current branch's configured upstream. If the branch has no configured upstream, use the intended base branch explicitly, usually `uvx prek run --from-ref main`. Use `uvx prek run -a` when a full-repository hook sweep is specifically needed.
 - Avoid writing significant amounts of new code. This is often a sign that we're missing an existing method or mechanism that could help solve the problem. Look for existing utilities first.
 - Try hard to avoid patterns that require `panic!`, `unreachable!`, or `.unwrap()`. Instead, try to encode those constraints in the type system. Don't be afraid to write code that's more verbose or requires largeish refactors if it enables you to avoid these unsafe calls.
 - Prefer let chains (`if let` combined with `&&`) over nested `if let` statements to reduce indentation and improve readability. At the end of a task, always check your work to see if you missed opportunities to use `let` chains.

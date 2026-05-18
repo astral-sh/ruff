@@ -36,9 +36,9 @@ reviewers = ["MichaReiser"]
 [[pools]]
 name = "ty-ide"
 paths = ["/crates/ty_ide/**"]
-reviewers = ["charliermarsh", "MichaReiser", "dhruvmanila"]
+reviewers = ["charliermarsh", "MichaReiser", "dhruvmanila", "lerebear"]
 
 [[pools]]
 name = "ty-server"
 paths = ["/crates/ty_server/**"]
-reviewers = ["charliermarsh", "MichaReiser", "dhruvmanila"]
+reviewers = ["charliermarsh", "MichaReiser", "dhruvmanila", "lerebear"]

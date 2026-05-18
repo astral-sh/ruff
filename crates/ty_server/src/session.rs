@@ -175,6 +175,10 @@ impl Session {
         })
     }
 
+    pub(crate) fn system(&self) -> &dyn System {
+        &*self.native_system
+    }
+
     pub(crate) fn request_queue(&self) -> &RequestQueue {
         &self.request_queue
     }
