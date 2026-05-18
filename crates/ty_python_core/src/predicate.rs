@@ -110,16 +110,23 @@ pub struct CallableAndCallExpr<'db> {
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub enum NonEmptyIterablePredicate<'db> {
-    /// A syntactically non-empty `range(...)` call.
+    /// A `range(...)` call that may be statically non-empty.
     ///
-    /// Semantic reachability later confirms that the callable is builtin `range`.
-    BuiltinRange { callable: Expression<'db> },
+    /// Semantic reachability later confirms that the callable is builtin `range` and that the
+    /// argument types prove at least one iteration.
+    BuiltinRange {
+        call: Expression<'db>,
+        callable: ExpressionNodeKey,
+        start: Option<ExpressionNodeKey>,
+        stop: ExpressionNodeKey,
+        step: Option<ExpressionNodeKey>,
+    },
 }
 
 impl<'db> NonEmptyIterablePredicate<'db> {
     pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self {
-            NonEmptyIterablePredicate::BuiltinRange { callable } => callable.scope(db),
+            NonEmptyIterablePredicate::BuiltinRange { call, .. } => call.scope(db),
         }
     }
 }
@@ -145,7 +152,7 @@ pub enum PredicateNode<'db> {
     /// call is `Unknown`/`Any`, because that would result in too many false
     /// positives.
     IsNonTerminalCall(CallableAndCallExpr<'db>),
-    /// A `for` iterable that is syntactically known to be non-empty.
+    /// A `for` iterable that may be statically known to be non-empty.
     IsNonEmptyIterable(NonEmptyIterablePredicate<'db>),
     Pattern(PatternPredicate<'db>),
     SubjectElementPattern(SubjectElementPatternPredicate<'db>),
