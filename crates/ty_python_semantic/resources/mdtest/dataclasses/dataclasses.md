@@ -675,7 +675,11 @@ grandchild.z = 2
 grandchild.unknown = 2
 ```
 
-Non-field attributes on subclasses of slotted frozen dataclasses are still rejected:
+Non-field attributes on subclasses of slotted frozen dataclasses are still rejected. This correctly
+models the runtime behavior, but is somewhat surprising and may be a CPython bug, as subclasses of
+slotted classes usually allow arbitrary attributes to be set on them unless the subclass also
+explicitly declares `__slots__`. We should change our behavior here to follow CPython, if they "fix"
+it.
 
 ```py
 from dataclasses import dataclass
