@@ -37,7 +37,7 @@
 //! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
 use super::RecursivelyDefined;
-use crate::types::enums::enum_metadata;
+use crate::types::enums::{EnumComplement, enum_metadata};
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
@@ -146,10 +146,7 @@ fn merge_truthiness_guarded_pair<'db>(
 /// ```
 fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'db>>) -> bool {
     for complement_index in 0..types.len() {
-        let Type::Intersection(intersection) = types[complement_index] else {
-            continue;
-        };
-        let Some(complement) = intersection.enum_complement(db) else {
+        let Type::EnumComplement(complement) = types[complement_index] else {
             continue;
         };
         let enum_class = complement.enum_class(db);
@@ -163,9 +160,7 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
                 continue;
             }
 
-            if let Type::Intersection(intersection) = ty
-                && let Some(other_complement) = intersection.enum_complement(db)
-            {
+            if let Type::EnumComplement(other_complement) = *ty {
                 if other_complement.enum_class(db) == enum_class
                     && other_complement.rest(db) == complement.rest(db)
                 {
@@ -1128,6 +1123,10 @@ impl<'db> IntersectionBuilder<'db> {
                 }
                 self
             }
+            Type::EnumComplement(complement) => {
+                let db = self.db;
+                self.add_positive_impl(complement.to_intersection(db), seen_aliases)
+            }
             Type::NominalInstance(instance)
                 if enum_metadata(self.db, instance.class_literal(self.db)).is_some() =>
             {
@@ -1209,6 +1208,10 @@ impl<'db> IntersectionBuilder<'db> {
                         builder
                     },
                 )
+            }
+            Type::EnumComplement(complement) => {
+                let db = self.db;
+                self.add_negative_impl(complement.to_intersection(db), seen_aliases)
             }
             Type::LiteralValue(_) => {
                 for inner in &mut self.intersections {
@@ -1720,6 +1723,12 @@ impl<'db> InnerIntersectionBuilder<'db> {
             if speculative.is_never() {
                 return Type::Never;
             }
+        }
+
+        if let Some(complement) =
+            EnumComplement::from_intersection_parts(db, &self.positive, &self.negative)
+        {
+            return Type::EnumComplement(complement);
         }
 
         match (self.positive.len(), self.negative.len()) {

@@ -685,19 +685,7 @@ impl<'db> IntersectionType<'db> {
 
     /// Return the exact finite alternative union represented by this intersection, if available.
     pub(crate) fn finite_alternative_union(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let alternatives = self.finite_alternatives(db)?;
-        Some(match alternatives.len() {
-            0 => Type::Never,
-            1 => alternatives[0],
-            // Keep this exact. Routing these literals through `UnionBuilder` can widen very large
-            // enum complements back to the original enum class, losing the excluded members that
-            // made the compact intersection useful in the first place.
-            _ => Type::Union(UnionType::new(
-                db,
-                alternatives.into_boxed_slice(),
-                RecursivelyDefined::No,
-            )),
-        })
+        Some(self.enum_complement(db)?.remaining_literal_union(db))
     }
 
     /// Return the finite alternatives only if they remain concise enough for display.

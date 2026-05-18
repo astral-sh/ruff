@@ -1188,9 +1188,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::Union(union) => union
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
-            Type::Intersection(intersection) => {
+            Type::Intersection(intersection) => intersection
+                .display_with(self.db, self.settings.clone())
+                .fmt_detailed(f),
+            Type::EnumComplement(complement) => {
                 if let Some(literals) =
-                    intersection.finite_alternatives_for_display(self.db, LITERAL_POLICY.max)
+                    complement.remaining_literal_types_for_display(self.db, LITERAL_POLICY.max)
                 {
                     DisplayLiteralGroup {
                         literals,
@@ -1199,7 +1202,8 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     }
                     .fmt_detailed(f)
                 } else {
-                    intersection
+                    complement
+                        .to_intersection(self.db)
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f)
                 }
@@ -2483,24 +2487,27 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
         /// # Color excluding RED displays through the literal-group path for BLUE.
         /// ```
         fn condensable_literals<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
-            if matches!(
-                ty.as_literal_value_kind(),
-                Some(
-                    LiteralValueTypeKind::Int(_)
-                        | LiteralValueTypeKind::String(_)
-                        | LiteralValueTypeKind::Bytes(_)
-                        | LiteralValueTypeKind::Bool(_)
-                        | LiteralValueTypeKind::Enum(_)
-                )
-            ) {
-                return Some(vec![ty]);
+            match ty {
+                Type::LiteralValue(literal)
+                    if matches!(
+                        literal.kind(),
+                        LiteralValueTypeKind::Int(_)
+                            | LiteralValueTypeKind::String(_)
+                            | LiteralValueTypeKind::Bytes(_)
+                            | LiteralValueTypeKind::Bool(_)
+                            | LiteralValueTypeKind::Enum(_)
+                    ) =>
+                {
+                    Some(vec![ty])
+                }
+                Type::EnumComplement(complement) => {
+                    complement.remaining_literal_types_for_display(db, LITERAL_POLICY.max)
+                }
+                Type::Intersection(intersection) => {
+                    intersection.finite_alternatives_for_display(db, LITERAL_POLICY.max)
+                }
+                _ => None,
             }
-
-            let Type::Intersection(intersection) = ty else {
-                return None;
-            };
-
-            intersection.finite_alternatives_for_display(db, LITERAL_POLICY.max)
         }
 
         fn singleline_union_element_label<'db>(

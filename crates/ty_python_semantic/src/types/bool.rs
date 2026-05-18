@@ -297,6 +297,10 @@ impl<'db> Type<'db> {
                 }
             }
 
+            Type::EnumComplement(complement) => complement
+                .remaining_literal_union(db)
+                .try_bool_impl(db, allow_short_circuit, visitor)?,
+
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::LiteralString => Truthiness::Ambiguous,
                 LiteralValueTypeKind::Enum(enum_type) => enum_type

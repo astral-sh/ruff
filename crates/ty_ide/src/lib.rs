@@ -306,6 +306,12 @@ impl HasNavigationTargets for Type<'_> {
                 }
             }
 
+            Type::EnumComplement(complement) => complement
+                .remaining_literal_types(db)
+                .iter()
+                .flat_map(|alternative| alternative.navigation_targets(db))
+                .collect(),
+
             ty => ty
                 .definition(db)
                 .map(|definition| definition.navigation_targets(db))

@@ -282,6 +282,7 @@ impl<'db> Type<'db> {
             | Type::SubclassOf(_)
             | Type::Union(_)
             | Type::Intersection(_)
+            | Type::EnumComplement(_)
             | Type::Callable(_)
             | Type::KnownBoundMethod(
                 KnownBoundMethodType::PropertyDunderGet(_)
@@ -984,6 +985,24 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (_, Type::TypeAlias(target_alias)) => self.with_recursion_guard(source, target, || {
                 self.check_type_pair(db, source, target_alias.value_type(db))
             }),
+
+            (Type::EnumComplement(complement), Type::LiteralValue(_) | Type::Union(_)) => {
+                complement
+                    .remaining_literal_types(db)
+                    .iter()
+                    .copied()
+                    .when_all(db, self.constraints, |literal| {
+                        self.check_type_pair(db, literal, target)
+                    })
+            }
+
+            (Type::EnumComplement(complement), _) => {
+                self.check_type_pair(db, complement.to_intersection(db), target)
+            }
+
+            (_, Type::EnumComplement(complement)) => {
+                self.check_type_pair(db, source, complement.to_intersection(db))
+            }
 
             // Field definitions in dataclasses and dataclass-transformers can involve calls to
             // `dataclasses.field` or custom field-specifier functions. The annotated return type
@@ -2209,6 +2228,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         ConstraintSet::from_bool(self.constraints, false)
     }
 
+    /// Fall back to structural disjointness for intersections without an exact finite expansion.
+    ///
+    /// An intersection is disjoint from another type if any positive component is disjoint from
+    /// that type, or if the other type is covered by one of the intersection's negative elements.
     fn check_intersection_pair_via_elements(
         &self,
         db: &'db dyn Db,
@@ -2269,6 +2292,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 self.with_recursion_guard(left, right, || {
                     self.check_type_pair(db, left, right_alias_ty)
                 })
+            }
+
+            (Type::EnumComplement(complement), other) => {
+                self.check_type_pair(db, complement.remaining_literal_union(db), other)
+            }
+
+            (other, Type::EnumComplement(complement)) => {
+                self.check_type_pair(db, other, complement.remaining_literal_union(db))
             }
 
             // `type[T]` is disjoint from a callable or protocol instance if its upper bound or constraints are.

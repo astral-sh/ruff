@@ -6,13 +6,19 @@ use smallvec::SmallVec;
 use crate::FxOrderSet;
 use crate::{
     Db, FxIndexMap,
-    place::{DefinedPlace, Place, place_from_bindings, place_from_declarations},
+    place::{
+        DefinedPlace, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations,
+    },
     reachability::DeclarationsIteratorExtension,
     types::{
-        ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, LiteralValueTypeKind,
-        MemberLookupPolicy, NegativeIntersectionElements, StaticClassLiteral, Type,
+        ClassBase, ClassLiteral, DynamicType, EnumLiteralType, IntersectionType, KnownClass,
+        LiteralValueTypeKind, MemberLookupPolicy, NegativeIntersectionElements, StaticClassLiteral,
+        Type, UnionType,
         function::FunctionType,
-        set_theoretic::builder::{IntersectionBuilder, UnionBuilder},
+        set_theoretic::{
+            RecursivelyDefined,
+            builder::{IntersectionBuilder, UnionBuilder},
+        },
     },
 };
 use ty_python_core::{definition::DefinitionKind, place_table, scope::ScopeId, use_def_map};
@@ -52,6 +58,103 @@ pub(crate) struct EnumMetadata<'db> {
 }
 
 impl get_size2::GetSize for EnumMetadata<'_> {}
+
+impl<'db> Type<'db> {
+    /// Return the enum class for an instance type if this type is an enum instance.
+    ///
+    /// This identifies the class behind values annotated as an enum instance, such as `Color` in
+    /// the following example:
+    ///
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Color(Enum):
+    ///     RED = 1
+    ///
+    /// def f(color: Color): ...
+    /// ```
+    pub(crate) fn enum_class(self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
+        self.as_nominal_instance().and_then(|instance| {
+            let class = instance.class_literal(db);
+            enum_metadata(db, class).is_some().then_some(class)
+        })
+    }
+
+    /// Return `true` if this type is an enum instance type.
+    ///
+    /// This recognizes instance types like `Color`, not individual enum literals like
+    /// `Literal[Color.RED]`.
+    ///
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Color(Enum):
+    ///     RED = 1
+    ///     BLUE = 2
+    ///
+    /// def f(color: Color): ...
+    /// ```
+    pub(super) fn is_enum(&self, db: &'db dyn Db) -> bool {
+        self.enum_class(db).is_some()
+    }
+}
+
+/// Look up an instance member on the finite enum literals represented by a complement.
+///
+/// The enum-owned `.name`/`.value` attributes can often be answered directly. Other members
+/// expand through the remaining literal union so descriptor lookup sees ordinary enum literals.
+pub(super) fn instance_member_for_enum_complement<'db>(
+    db: &'db dyn Db,
+    complement: EnumComplement<'db>,
+    name: &str,
+) -> PlaceAndQualifiers<'db> {
+    if let Some(member) = special_member_for_enum_complement(db, complement, name) {
+        member
+    } else {
+        complement
+            .remaining_literal_union(db)
+            .instance_member(db, name)
+    }
+}
+
+/// Perform full member lookup for an enum complement while preserving the caller's policy.
+///
+/// This mirrors `instance_member_for_enum_complement`, but routes the non-special case through
+/// general member lookup so descriptor and class-variable policy is still applied.
+pub(super) fn member_lookup_for_enum_complement<'db>(
+    db: &'db dyn Db,
+    complement: EnumComplement<'db>,
+    name: &str,
+    policy: MemberLookupPolicy,
+) -> PlaceAndQualifiers<'db> {
+    if let Some(member) = special_member_for_enum_complement(db, complement, name) {
+        member
+    } else {
+        complement
+            .remaining_literal_union(db)
+            .member_lookup_with_policy(db, name.into(), policy)
+    }
+}
+
+/// Return a precise enum-owned `.name`/`.value` attribute for a complement when possible.
+///
+/// Dynamic rest components would otherwise pollute attribute lookup after expansion to the
+/// remaining literal union. For these enum-owned attributes, the remaining canonical member
+/// metadata gives the exact result directly.
+fn special_member_for_enum_complement<'db>(
+    db: &'db dyn Db,
+    complement: EnumComplement<'db>,
+    name: &str,
+) -> Option<PlaceAndQualifiers<'db>> {
+    if matches!(name, "name" | "_name_" | "value" | "_value_")
+        && complement.rest(db).iter().all(Type::is_dynamic)
+        && let Some(member_ty) = complement.member_type(db, name)
+    {
+        Some(Place::bound(member_ty).into())
+    } else {
+        None
+    }
+}
 
 impl<'db> EnumMetadata<'db> {
     fn empty() -> Self {
@@ -164,9 +267,10 @@ impl<'db> EnumMetadata<'db> {
 
 /// A compact representation of an enum type with excluded members.
 ///
-/// This summarizes intersection types like `Color & ~Literal[Color.RED]`, so callers do not have
-/// to rediscover that intersection pattern independently. The complement remains compact until
-/// some operation explicitly needs the finite literal alternatives.
+/// This corresponds to intersection types like `Color & ~Literal[Color.RED]`, but is kept as its
+/// own type shape so callers do not have to rediscover that intersection pattern independently.
+/// The complement remains compact until some operation explicitly needs the finite literal
+/// alternatives.
 ///
 /// ```python
 /// from enum import Enum
@@ -180,7 +284,7 @@ impl<'db> EnumMetadata<'db> {
 ///         reveal_type(color)  # Color, excluding Color.RED
 /// ```
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-pub struct EnumComplement<'db> {
+pub struct EnumComplementType<'db> {
     pub(crate) enum_class: ClassLiteral<'db>,
     /// Canonical enum-member names excluded by this complement.
     #[returns(ref)]
@@ -192,10 +296,12 @@ pub struct EnumComplement<'db> {
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for EnumComplement<'_> {}
+impl get_size2::GetSize for EnumComplementType<'_> {}
+
+pub(crate) type EnumComplement<'db> = EnumComplementType<'db>;
 
 #[salsa::tracked]
-impl<'db> EnumComplement<'db> {
+impl<'db> EnumComplementType<'db> {
     /// Recognize the compact enum-complement shape inside an intersection.
     pub(crate) fn from_intersection_parts(
         db: &'db dyn Db,
@@ -253,7 +359,7 @@ impl<'db> EnumComplement<'db> {
         })
     }
 
-    /// Return the enum class whose members are represented by this complement.
+    /// Return metadata for the enum class whose members are represented by this complement.
     ///
     /// ```python
     /// from enum import Enum
@@ -265,7 +371,7 @@ impl<'db> EnumComplement<'db> {
     /// def f(color: Color):
     ///     if color is not Color.RED:
     ///         reveal_type(color)  # Color, excluding Color.RED
-    ///         # The enum class is `Color`.
+    ///         # The complement's metadata comes from `Color`.
     /// ```
     pub(crate) fn metadata(self, db: &'db dyn Db) -> &'db EnumMetadata<'db> {
         enum_metadata(db, self.enum_class(db)).expect("Enum complement class is an enum")
@@ -317,10 +423,18 @@ impl<'db> EnumComplement<'db> {
         self.remaining_member_count(db) > 0
     }
 
+    /// Return `true` when this complement represents exactly one enum literal.
+    ///
+    /// Complements with rest components are not singletons, because those positive intersection
+    /// components must still be preserved even when only one enum member remains.
     pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
         self.rest(db).is_empty() && self.remaining_member_count(db) == 1
     }
 
+    /// Return `true` when this complement is a single value under equality narrowing.
+    ///
+    /// Enums that override equality are excluded because one remaining enum literal can still
+    /// compare equal to non-identical values.
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         self.is_singleton(db)
             && !self
@@ -329,6 +443,10 @@ impl<'db> EnumComplement<'db> {
                 .overrides_equality(db)
     }
 
+    /// Return `true` when this complement can be losslessly split into single-valued literals.
+    ///
+    /// This permits finite-union narrowing over large complements without materializing the
+    /// alternatives for complements that still carry positive rest components.
     pub(crate) fn has_finite_single_valued_alternatives(self, db: &'db dyn Db) -> bool {
         self.rest(db).is_empty()
             && self.has_remaining_members(db)
@@ -351,12 +469,30 @@ impl<'db> EnumComplement<'db> {
     ///     if color is not Color.RED:
     ///         reveal_type(color)  # Literal[Color.BLUE]
     /// ```
-    pub(crate) fn remaining_literal_types(self, db: &'db dyn Db) -> Vec<Type<'db>> {
+    pub fn remaining_literal_types(self, db: &'db dyn Db) -> Vec<Type<'db>> {
         self.remaining_member_names(db)
             .map(|name| self.remaining_literal_type(db, name.clone()))
             .collect()
     }
 
+    /// Expand this complement to the union of enum literals that remain possible.
+    pub(crate) fn remaining_literal_union(self, db: &'db dyn Db) -> Type<'db> {
+        let alternatives = self.remaining_literal_types(db);
+        match alternatives.as_slice() {
+            [] => Type::Never,
+            [single] => *single,
+            // Keep this exact. Routing these literals through `UnionBuilder` can widen very large
+            // enum complements back to the original enum class, losing the excluded members that
+            // made the compact complement useful in the first place.
+            _ => Type::Union(UnionType::new(
+                db,
+                alternatives.into_boxed_slice(),
+                RecursivelyDefined::No,
+            )),
+        }
+    }
+
+    /// Build the type for one remaining canonical member, preserving any positive rest components.
     fn remaining_literal_type(self, db: &'db dyn Db, name: Name) -> Type<'db> {
         let literal = Type::enum_literal(EnumLiteralType::new(db, self.enum_class(db), name));
         if self.rest(db).is_empty() {
@@ -430,8 +566,8 @@ impl<'db> EnumComplement<'db> {
             let member_ty = (match member_name {
                 "name" if is_enum_subclass => self.metadata(db).name_type(db, name),
                 "_name_" => self.metadata(db).name_type(db, name),
-                "value" if is_enum_subclass => self.metadata(db).value_type(name),
-                "_value_" => self.metadata(db).value_type(name),
+                "value" if is_enum_subclass => self.metadata(db).value_type(db, name),
+                "_value_" => self.metadata(db).value_type(db, name),
                 _ => None,
             })?;
 
@@ -449,6 +585,28 @@ impl<'db> EnumComplement<'db> {
         // `Color & Any & ~Literal[Color.RED]`, are not equivalent to that literal union because the
         // additional intersection components must remain.
         self.rest(db).is_empty()
+            && self
+                .remaining_literal_types(db)
+                .iter()
+                .all(|literal| literal.is_spellable(db))
+    }
+
+    /// Reconstruct the equivalent set-theoretic intersection.
+    pub(crate) fn to_intersection(self, db: &'db dyn Db) -> Type<'db> {
+        let enum_class = self.enum_class(db);
+        let mut positive = FxOrderSet::from_iter([enum_class.to_non_generic_instance(db)]);
+        positive.extend(self.rest(db).iter().copied());
+
+        let mut negative = NegativeIntersectionElements::default();
+        for name in self.excluded_names(db) {
+            negative.insert(Type::enum_literal(EnumLiteralType::new(
+                db,
+                enum_class,
+                name.clone(),
+            )));
+        }
+
+        Type::Intersection(IntersectionType::new(db, positive, negative))
     }
 }
 

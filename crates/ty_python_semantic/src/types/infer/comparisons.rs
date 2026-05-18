@@ -170,6 +170,23 @@ pub(super) fn infer_binary_type_comparison<'db>(
     };
 
     let comparison_result = match (left, right) {
+        (Type::EnumComplement(complement), right) => Some(infer_binary_type_comparison(
+            context,
+            complement.remaining_literal_union(db),
+            op,
+            right,
+            range,
+            visitor,
+        )),
+        (left, Type::EnumComplement(complement)) => Some(infer_binary_type_comparison(
+            context,
+            left,
+            op,
+            complement.remaining_literal_union(db),
+            range,
+            visitor,
+        )),
+
         (Type::Union(union), other) => {
             let mut builder = UnionBuilder::new(db);
             for element in union.elements(db) {

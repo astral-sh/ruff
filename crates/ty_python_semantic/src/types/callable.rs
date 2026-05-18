@@ -274,6 +274,10 @@ impl<'db> Type<'db> {
                     })
             }
 
+            Type::EnumComplement(complement) => complement
+                .remaining_literal_union(db)
+                .try_upcast_to_callable_with_policy_and_context(db, policy, context),
+
             // TODO
             Type::DataclassDecorator(_)
             | Type::ModuleLiteral(_)

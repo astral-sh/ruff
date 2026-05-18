@@ -546,6 +546,14 @@ impl<'db> Type<'db> {
                 value_ty.subscript(db, element, expr_context)
             })),
 
+            (Type::EnumComplement(complement), _) => {
+                Some(complement.remaining_literal_union(db).subscript(db, slice_ty, expr_context))
+            }
+
+            (_, Type::EnumComplement(complement)) => {
+                Some(value_ty.subscript(db, complement.remaining_literal_union(db), expr_context))
+            }
+
             (Type::Intersection(intersection), _) => {
                 Some(map_intersection_subscript(db, intersection, |element| {
                     element.subscript(db, slice_ty, expr_context)

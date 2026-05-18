@@ -528,6 +528,7 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
 /// In other words, it returns `true` if [`expand_type`] returns [`Some`] for the given type.
 pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
+        Type::EnumComplement(_) => true,
         Type::Intersection(intersection) => intersection.has_finite_alternatives(db),
         Type::NominalInstance(instance) => {
             let class = instance.class(db);
@@ -552,6 +553,7 @@ pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
     // NOTE: Update `is_expandable_type` if this logic changes accordingly.
     match ty {
+        Type::EnumComplement(complement) => Some(complement.remaining_literal_types(db)),
         Type::Intersection(intersection) => intersection.finite_alternatives(db),
         Type::NominalInstance(instance) => {
             let class = instance.class(db);
@@ -606,6 +608,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                 .elements(db)
                 .iter()
                 .flat_map(|element| match element {
+                    Type::EnumComplement(complement) => complement.remaining_literal_types(db),
                     Type::Intersection(intersection) => intersection
                         .finite_alternatives(db)
                         .unwrap_or_else(|| vec![*element]),

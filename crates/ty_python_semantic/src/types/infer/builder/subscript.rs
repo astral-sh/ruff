@@ -1316,18 +1316,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             Type::Intersection(intersection) => {
-                if let Some(alternatives) = intersection.finite_alternative_union(db) {
-                    return self.validate_subscript_assignment_impl(
-                        target,
-                        full_object_ty,
-                        alternatives,
-                        infer_slice_ty,
-                        rhs_value_node,
-                        infer_rhs_value,
-                        emit_diagnostic,
-                    );
-                }
-
                 let mut infer_slice_ty = MultiInferenceGuard::new(infer_slice_ty);
                 let mut infer_rhs_value = MultiInferenceGuard::new(infer_rhs_value);
 
@@ -1366,6 +1354,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 valid
             }
+
+            Type::EnumComplement(complement) => self.validate_subscript_assignment_impl(
+                target,
+                full_object_ty,
+                complement.remaining_literal_union(db),
+                infer_slice_ty,
+                rhs_value_node,
+                infer_rhs_value,
+                emit_diagnostic,
+            ),
 
             Type::TypedDict(typed_dict) => {
                 // As an optimization, prevent calling `__setitem__` on (unions of) large `TypedDict`s, and
@@ -1704,16 +1702,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             Type::Intersection(intersection) => {
-                if let Some(alternatives) = intersection.finite_alternative_union(db) {
-                    self.validate_subscript_deletion_impl(
-                        target,
-                        full_object_ty,
-                        alternatives,
-                        slice_ty,
-                    );
-                    return;
-                }
-
                 // Check if any positive element supports deletion
                 let mut any_valid = false;
                 for element_ty in intersection.positive(db) {
@@ -1733,6 +1721,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
             }
+
+            Type::EnumComplement(complement) => self.validate_subscript_deletion_impl(
+                target,
+                full_object_ty,
+                complement.remaining_literal_union(db),
+                slice_ty,
+            ),
 
             _ => {
                 match object_ty.try_call_dunder(
