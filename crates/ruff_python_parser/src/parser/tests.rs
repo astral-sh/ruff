@@ -324,3 +324,43 @@ fn recursion_limit_right_assoc_pow_chain() {
         err.error
     );
 }
+
+#[test]
+fn recursion_limit_ternary_else_chain() {
+    // `1 if 1 else 1 if 1 else ...` — the `else` operand recurses at the
+    // conditional layer (`parse_if_expression` -> `orelse`), which is not
+    // covered by the `parse_lhs_expression` guard.
+    let depth = 2_000;
+    let mut src = String::with_capacity(depth * 12 + 1);
+    for _ in 0..depth {
+        src.push_str("1 if 1 else ");
+    }
+    src.push('1');
+    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
+    let err = parse(&src, opts).unwrap_err();
+    assert!(
+        matches!(err.error, ParseErrorType::RecursionLimitExceeded),
+        "expected RecursionLimitExceeded, got {:?}",
+        err.error
+    );
+}
+
+#[test]
+fn recursion_limit_nested_lambda_chain() {
+    // `lambda: lambda: lambda: ...` — the lambda body recurses at the
+    // conditional layer (`parse_lambda_expr` -> body), bypassing the
+    // `parse_lhs_expression` guard entirely.
+    let depth = 2_000;
+    let mut src = String::from("x = ");
+    for _ in 0..depth {
+        src.push_str("lambda: ");
+    }
+    src.push('1');
+    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
+    let err = parse(&src, opts).unwrap_err();
+    assert!(
+        matches!(err.error, ParseErrorType::RecursionLimitExceeded),
+        "expected RecursionLimitExceeded, got {:?}",
+        err.error
+    );
+}
