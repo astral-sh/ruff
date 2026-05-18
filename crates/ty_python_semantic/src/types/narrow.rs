@@ -190,7 +190,9 @@ pub(crate) fn infer_narrowing_constraints<'db>(
             .and_then(|constraints| constraints.get(&place).cloned());
             (positive, None)
         }
-        PredicateNode::IsNonTerminalCall(_) | PredicateNode::StarImportPlaceholder(_) => {
+        PredicateNode::IsNonTerminalCall(_)
+        | PredicateNode::IsNonEmptyIterable(_)
+        | PredicateNode::StarImportPlaceholder(_) => {
             (None, None)
         }
     };
@@ -1129,6 +1131,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 self.evaluate_subject_element_pattern(subject_element)
             }
             PredicateNode::IsNonTerminalCall(_) => return None,
+            PredicateNode::IsNonEmptyIterable(_) => return None,
             PredicateNode::StarImportPlaceholder(_) => return None,
         };
 
@@ -1930,6 +1933,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
                 callable.scope(self.db)
             }
+            PredicateNode::IsNonEmptyIterable(predicate) => predicate.scope(self.db),
             PredicateNode::StarImportPlaceholder(definition) => definition.scope(self.db),
         }
     }
