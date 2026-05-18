@@ -152,7 +152,7 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
         let enum_class = complement.enum_class(db);
         let metadata = enum_metadata(db, enum_class).expect("Enum complement class is an enum");
         let mut shared_excluded_names: FxHashSet<_> =
-            complement.excluded_member_names(db).cloned().collect();
+            complement.excluded_names(db).iter().cloned().collect();
 
         let mut remove_indices = Vec::new();
         for (index, ty) in types.iter().enumerate() {
@@ -164,7 +164,8 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
                 if other_complement.enum_class(db) == enum_class
                     && other_complement.rest(db) == complement.rest(db)
                 {
-                    shared_excluded_names.retain(|name| other_complement.excludes_member(db, name));
+                    shared_excluded_names
+                        .retain(|name| other_complement.excluded_names(db).contains(name));
                     remove_indices.push(index);
                 }
                 continue;
@@ -265,6 +266,9 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|ty| ty.splits_literals(db, kind)),
+            (Type::EnumComplement(complement), LiteralKind::Enum { enum_class }) => {
+                complement.enum_class(db) == enum_class
+            }
             _ => false,
         }
     }
@@ -1127,14 +1131,6 @@ impl<'db> IntersectionBuilder<'db> {
                 let db = self.db;
                 self.add_positive_impl(complement.to_intersection(db), seen_aliases)
             }
-            Type::NominalInstance(instance)
-                if enum_metadata(self.db, instance.class_literal(self.db)).is_some() =>
-            {
-                for inner in &mut self.intersections {
-                    inner.add_positive(self.db, ty);
-                }
-                self
-            }
             _ => {
                 // If we are already a union-of-intersections, distribute the new intersected element
                 // across all of those intersections.
@@ -1212,12 +1208,6 @@ impl<'db> IntersectionBuilder<'db> {
             Type::EnumComplement(complement) => {
                 let db = self.db;
                 self.add_negative_impl(complement.to_intersection(db), seen_aliases)
-            }
-            Type::LiteralValue(_) => {
-                for inner in &mut self.intersections {
-                    inner.add_negative(self.db, ty);
-                }
-                self
             }
             _ => {
                 for inner in &mut self.intersections {
@@ -1301,13 +1291,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 continue;
             }
 
-            let remaining_count = metadata
+            if metadata
                 .members
                 .keys()
-                .filter(|name| !excluded_names.contains(*name))
-                .count();
-
-            if remaining_count == 0 {
+                .all(|name| excluded_names.contains(name))
+            {
                 return true;
             }
         }

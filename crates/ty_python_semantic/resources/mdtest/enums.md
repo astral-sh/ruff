@@ -2701,6 +2701,19 @@ def color_after_different_complement_merge(color: Color, flag: bool) -> None:
     reveal_type(merged)  # revealed: Color
     assert_type(merged, Color)
 
+def color_after_grouped_literal_and_complement_merge(color: Color, flag: bool, other_flag: bool) -> None:
+    if flag:
+        if other_flag:
+            merged = Color.BLUE
+        else:
+            merged = Color.RED
+    else:
+        if color is Color.RED:
+            return
+        merged = color
+    reveal_type(merged)  # revealed: Color
+    assert_type(merged, Color)
+
 def color_after_dynamic_complement_merge(color: Intersection[Color, Any], flag: bool) -> None:
     if flag:
         if color is Color.RED:

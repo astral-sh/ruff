@@ -134,7 +134,7 @@ fn has_finite_single_valued_union_alternatives<'db>(db: &'db dyn Db, ty: Type<'d
         Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Bool) => true,
         Type::NominalInstance(instance)
             if enum_metadata(db, instance.class_literal(db))
-                .is_some_and(super::enums::EnumMetadata::has_members)
+                .is_some_and(|metadata| !metadata.members.is_empty())
                 && !ty.overrides_equality(db) =>
         {
             true
@@ -1060,7 +1060,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let rhs_ty = rhs_ty.resolve_type_alias(self.db);
 
         // We can only narrow on equality checks against single-valued types.
-        if rhs_ty.is_single_valued(self.db) || is_union_of_single_valued(self.db, rhs_ty) {
+        if is_union_of_single_valued(self.db, rhs_ty) {
             // The fully-general (and more efficient) approach here would be to introduce a
             // `NeverEqualTo` type that can wrap a single-valued type, and then simply return
             // `~NeverEqualTo(rhs_ty)` here and let union/intersection builder sort it out. This is
@@ -1178,7 +1178,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         let lhs_ty = lhs_ty.resolve_type_alias(self.db);
 
-        if lhs_ty.is_single_valued(self.db) || is_union_of_single_valued(self.db, lhs_ty) {
+        if is_union_of_single_valued(self.db, lhs_ty) {
             rhs_ty
                 .try_iterate(self.db)
                 .ok()
@@ -1196,15 +1196,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
             if let Some(lhs_union) = lhs_ty.as_union() {
                 for element in lhs_union.elements(self.db) {
-                    // Skip single-valued types (handled via RHS matching).
-                    if element.is_single_valued(self.db) {
-                        continue;
-                    }
-                    // Skip types that are handled specially (LiteralString, bool, enum, enum
-                    // complements).
-                    if element.is_subtype_of(self.db, Type::literal_string())
-                        || has_finite_single_valued_union_alternatives(self.db, *element)
-                    {
+                    // Skip types that are handled specially by RHS matching.
+                    if is_single_valued_union_component(self.db, *element) {
                         continue;
                     }
                     // Skip types that cannot compare equal to any RHS value.
@@ -1224,7 +1217,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let lhs_ty = lhs_ty.resolve_type_alias(self.db);
         let rhs_values = self.exact_fixed_length_membership_values(rhs_ty)?;
 
-        if lhs_ty.is_single_valued(self.db) || is_union_of_single_valued(self.db, lhs_ty) {
+        if is_union_of_single_valued(self.db, lhs_ty) {
             // Exclude the RHS values from the entire (single-valued) LHS domain.
             let complement = IntersectionBuilder::new(self.db)
                 .add_positive(lhs_ty)
@@ -1239,10 +1232,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
             if let Some(lhs_union) = lhs_ty.as_union() {
                 for element in lhs_union.elements(self.db) {
-                    if element.is_single_valued(self.db)
-                        || element.is_subtype_of(self.db, Type::literal_string())
-                        || has_finite_single_valued_union_alternatives(self.db, *element)
-                    {
+                    if is_single_valued_union_component(self.db, *element) {
                         single_builder = single_builder.add(*element);
                     } else {
                         rest_builder = rest_builder.add(*element);

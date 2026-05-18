@@ -138,9 +138,9 @@ pub(super) fn member_lookup_for_enum_complement<'db>(
 
 /// Return a precise enum-owned `.name`/`.value` attribute for a complement when possible.
 ///
-/// Dynamic rest components would otherwise pollute attribute lookup after expansion to the
-/// remaining literal union. For these enum-owned attributes, the remaining canonical member
-/// metadata gives the exact result directly.
+/// If a complement carries dynamic rest components, expanding it to the remaining literals would
+/// make `.name` and `.value` imprecise. These enum-owned attributes can instead be computed
+/// directly from the remaining canonical members.
 fn special_member_for_enum_complement<'db>(
     db: &'db dyn Db,
     complement: EnumComplement<'db>,
@@ -258,11 +258,6 @@ impl<'db> EnumMetadata<'db> {
             self.aliases.get(name)
         }
     }
-
-    /// Return `true` if this enum has at least one canonical member.
-    pub(crate) fn has_members(&self) -> bool {
-        !self.members.is_empty()
-    }
 }
 
 /// A compact representation of an enum type with excluded members.
@@ -311,11 +306,6 @@ impl<'db> EnumComplementType<'db> {
         let mut enum_class = None;
         let mut rest = SmallVec::<[Type<'db>; 1]>::default();
         for positive in positive {
-            if matches!(positive, Type::Dynamic(_)) {
-                rest.push(*positive);
-                continue;
-            }
-
             let Type::NominalInstance(instance) = positive else {
                 rest.push(*positive);
                 continue;
@@ -377,35 +367,6 @@ impl<'db> EnumComplementType<'db> {
         enum_metadata(db, self.enum_class(db)).expect("Enum complement class is an enum")
     }
 
-    /// Iterate over the canonical enum-member names excluded by this complement.
-    ///
-    /// Enum aliases are normalized before constructing the complement, so the returned names are
-    /// the canonical members whose values are no longer possible.
-    ///
-    /// ```python
-    /// from enum import Enum
-    ///
-    /// class Color(Enum):
-    ///     RED = 1
-    ///     ALSO_RED = 1
-    ///     BLUE = 2
-    ///
-    /// def f(color: Color):
-    ///     if color is not Color.ALSO_RED:
-    ///         reveal_type(color)  # Color, excluding Color.RED
-    /// ```
-    pub(crate) fn excluded_member_names(self, db: &'db dyn Db) -> impl Iterator<Item = &'db Name> {
-        self.excluded_names(db).iter()
-    }
-
-    /// Return `true` if the given canonical enum-member name is excluded by this complement.
-    ///
-    /// Callers should pass canonical member names, not alias names. Use `EnumMetadata::resolve_member`
-    /// before calling this when starting from a possibly aliased enum literal.
-    pub(crate) fn excludes_member(self, db: &'db dyn Db, name: &Name) -> bool {
-        self.excluded_names(db).contains(name)
-    }
-
     fn remaining_member_names(self, db: &'db dyn Db) -> impl Iterator<Item = &'db Name> {
         self.metadata(db)
             .members
@@ -416,11 +377,6 @@ impl<'db> EnumComplementType<'db> {
     /// Count the canonical enum members still represented by this complement.
     fn remaining_member_count(self, db: &'db dyn Db) -> usize {
         self.metadata(db).members.len() - self.excluded_names(db).len()
-    }
-
-    /// Return `true` if this complement still represents at least one enum member.
-    pub(crate) fn has_remaining_members(self, db: &'db dyn Db) -> bool {
-        self.remaining_member_count(db) > 0
     }
 
     /// Return `true` when this complement represents exactly one enum literal.
@@ -449,7 +405,7 @@ impl<'db> EnumComplementType<'db> {
     /// alternatives for complements that still carry positive rest components.
     pub(crate) fn has_finite_single_valued_alternatives(self, db: &'db dyn Db) -> bool {
         self.rest(db).is_empty()
-            && self.has_remaining_members(db)
+            && self.remaining_member_count(db) > 0
             && !self
                 .enum_class(db)
                 .to_non_generic_instance(db)
@@ -557,6 +513,7 @@ impl<'db> EnumComplementType<'db> {
     ///         reveal_type(color.value)  # Literal[2]
     /// ```
     pub(crate) fn member_type(self, db: &'db dyn Db, member_name: &str) -> Option<Type<'db>> {
+        let metadata = self.metadata(db);
         let is_enum_subclass = Type::ClassLiteral(self.enum_class(db))
             .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db));
         let mut builder = UnionBuilder::new(db);
@@ -564,10 +521,10 @@ impl<'db> EnumComplementType<'db> {
 
         for name in self.remaining_member_names(db) {
             let member_ty = (match member_name {
-                "name" if is_enum_subclass => self.metadata(db).name_type(db, name),
-                "_name_" => self.metadata(db).name_type(db, name),
-                "value" if is_enum_subclass => self.metadata(db).value_type(db, name),
-                "_value_" => self.metadata(db).value_type(db, name),
+                "name" if is_enum_subclass => metadata.name_type(db, name),
+                "_name_" => metadata.name_type(db, name),
+                "value" if is_enum_subclass => metadata.value_type(db, name),
+                "_value_" => metadata.value_type(db, name),
                 _ => None,
             })?;
 
