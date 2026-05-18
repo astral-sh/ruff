@@ -224,6 +224,22 @@ fn recursion_limit_nested_lists() {
 }
 
 #[test]
+fn recursion_limit_nested_calls() {
+    let src = format!("x = {}1{}", "f(".repeat(1_000), ")".repeat(1_000));
+    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
+    let err = parse(&src, opts).unwrap_err();
+    assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
+}
+
+#[test]
+fn recursion_limit_nested_subscripts() {
+    let src = format!("x = {}1{}", "a[".repeat(1_000), "]".repeat(1_000));
+    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
+    let err = parse(&src, opts).unwrap_err();
+    assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
+}
+
+#[test]
 fn recursion_limit_nested_match_patterns() {
     // Deeply parenthesised match patterns — exercises pattern-parsing
     // instrumentation in addition to statement / expression paths.
@@ -265,7 +281,7 @@ fn recursion_limit_first_error_is_recursion_not_noise() {
     // When the limit is hit the outer parser frames will emit secondary
     // errors as they unwind. Callers read the first error via `into_result`
     // / `Parsed::errors()`, so `RecursionLimitExceeded` must come first, and
-    // the drain-to-EOF inside `enter_recursion` should keep the total count
+    // the drain-to-EOF after reporting the recursion limit should keep the total count
     // small rather than producing one noisy error per unwound frame.
     let src = format!("{}1{}", "(".repeat(2_000), ")".repeat(2_000));
     let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(50);

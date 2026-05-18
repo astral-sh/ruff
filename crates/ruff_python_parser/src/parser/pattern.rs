@@ -88,12 +88,13 @@ impl Parser<'_> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-pattern>
     fn parse_match_pattern(&mut self, allow_star_pattern: AllowStarPattern) -> Pattern {
-        let range = self.current_token_range();
-        if let Some(scope) = self.enter_recursion(range) {
-            let result = self.parse_match_pattern_inner(allow_star_pattern);
-            scope.exit(self);
+        if let Some(result) =
+            self.with_recursion(|parser| parser.parse_match_pattern_inner(allow_star_pattern))
+        {
             result
         } else {
+            let range = self.current_token_range();
+            self.report_recursion_limit_exceeded(range);
             // Wildcard-style placeholder so the caller always gets a valid `Pattern`.
             Pattern::MatchAs(ast::PatternMatchAs {
                 range,

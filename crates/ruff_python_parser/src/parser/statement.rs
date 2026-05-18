@@ -111,23 +111,6 @@ impl<'src> Parser<'src> {
     /// - <https://docs.python.org/3/reference/compound_stmts.html>
     /// - <https://docs.python.org/3/reference/simple_stmts.html>
     pub(super) fn parse_statement(&mut self) -> Stmt {
-        let range = self.current_token_range();
-        if let Some(scope) = self.enter_recursion(range) {
-            let stmt = self.parse_statement_inner();
-            scope.exit(self);
-            stmt
-        } else {
-            // `enter_recursion` already recorded a `RecursionLimitExceeded`
-            // error, so the returned `Parsed` is already in a failed state;
-            // this placeholder is only here so the parser can keep unwinding.
-            Stmt::Pass(ast::StmtPass {
-                range,
-                node_index: AtomicNodeIndex::NONE,
-            })
-        }
-    }
-
-    fn parse_statement_inner(&mut self) -> Stmt {
         let start = self.node_start();
 
         match self.current_token_kind() {
@@ -2848,8 +2831,18 @@ impl<'src> Parser<'src> {
                 );
 
                 // Although this statement is not a valid `async` statement,
-                // we still parse it.
-                self.parse_statement()
+                // we still parse it. Guard the recursive recovery path so
+                // `async async async ...` cannot overflow the parser stack.
+                if let Some(stmt) = self.with_recursion(Self::parse_statement) {
+                    stmt
+                } else {
+                    let range = self.current_token_range();
+                    self.report_recursion_limit_exceeded(range);
+                    Stmt::Pass(ast::StmtPass {
+                        range,
+                        node_index: AtomicNodeIndex::NONE,
+                    })
+                }
             }
         }
     }
@@ -3086,8 +3079,14 @@ impl<'src> Parser<'src> {
     fn parse_block(&mut self) -> Vec<Stmt> {
         self.bump(TokenKind::Indent);
 
-        let statements =
-            self.parse_list_into_vec(RecoveryContextKind::BlockStatements, Self::parse_statement);
+        let statements = if let Some(statements) = self.with_recursion(|parser| {
+            parser.parse_list_into_vec(RecoveryContextKind::BlockStatements, Self::parse_statement)
+        }) {
+            statements
+        } else {
+            self.report_recursion_limit_exceeded(self.current_token_range());
+            Vec::new()
+        };
 
         self.expect(TokenKind::Dedent);
 
