@@ -25,7 +25,9 @@ expression: initialization_result
     "hoverProvider": true,
     "completionProvider": {
       "triggerCharacters": [
-        "."
+        ".",
+        "\"",
+        "'"
       ]
     },
     "signatureHelpProvider": {

@@ -1,0 +1,17 @@
+---
+source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
+---
+C400 [*] Unnecessary generator (rewrite as a list comprehension)
+ --> C400_py315.py:3:1
+  |
+1 | xs = [[1], [2]]
+2 |
+3 | list(*x for x in xs)
+  | ^^^^^^^^^^^^^^^^^^^^
+  |
+help: Rewrite as a list comprehension
+1 | xs = [[1], [2]]
+2 |
+  - list(*x for x in xs)
+3 + [*x for x in xs]
+note: This is an unsafe fix and may change runtime behavior

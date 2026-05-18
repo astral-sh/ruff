@@ -54,7 +54,7 @@ impl Violation for CompareToEmptyString {
             existing,
             replacement,
         } = self;
-        format!("`{existing}` can be simplified to `{replacement}` as an empty string is falsey",)
+        format!("`{existing}` can be simplified to `{replacement}` as an empty string is falsey")
     }
 }
 

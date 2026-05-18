@@ -281,8 +281,6 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
       |
     2 | from utils import add
       |      ^^^^^
-    3 |
-    4 | stat = add(10, 15)
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
@@ -396,16 +394,12 @@ fn user_configuration() -> anyhow::Result<()> {
       |
     2 | y = 4 / 0
       |     ^^^^^
-    3 |
-    4 | for a in range(0, int(y)):
       |
     info: rule `division-by-zero` was selected in the configuration file
 
     error[unresolved-reference]: Name `prin` used when not defined
      --> main.py:7:1
       |
-    5 |     x = a
-    6 |
     7 | prin(x)
       | ^^^^
       |
@@ -441,16 +435,12 @@ fn user_configuration() -> anyhow::Result<()> {
       |
     2 | y = 4 / 0
       |     ^^^^^
-    3 |
-    4 | for a in range(0, int(y)):
       |
     info: rule `division-by-zero` was selected in the configuration file
 
     warning[unresolved-reference]: Name `prin` used when not defined
      --> main.py:7:1
       |
-    5 |     x = a
-    6 |
     7 | prin(x)
       | ^^^^
       |
@@ -502,8 +492,6 @@ fn check_specific_paths() -> anyhow::Result<()> {
       |
     2 | from main2 import z  # error: unresolved-import
       |      ^^^^^
-    3 |
-    4 | print(z)
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
@@ -540,8 +528,6 @@ fn check_specific_paths() -> anyhow::Result<()> {
       |
     2 | from main2 import z  # error: unresolved-import
       |      ^^^^^
-    3 |
-    4 | print(z)
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
@@ -851,8 +837,6 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
     info[revealed-type]: Revealed type
      --> test.py:4:13
       |
-    2 | from typing_extensions import reveal_type
-    3 | total = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +…
     4 | reveal_type(total)
       |             ^^^^^ `Literal[2000]`
       |

@@ -1,5 +1,135 @@
 # Changelog
 
+## 0.15.13
+
+Released on 2026-05-14.
+
+### Preview features
+
+- Add a rule to flag lazy imports that are eagerly evaluated ([#25016](https://github.com/astral-sh/ruff/pull/25016))
+- \[`pylint`\] Standardize diagnostic message (`PLR0914`, `PLR0917`) ([#24996](https://github.com/astral-sh/ruff/pull/24996))
+
+### Bug fixes
+
+- Fix `F811` false positive for class methods ([#24933](https://github.com/astral-sh/ruff/pull/24933))
+- Fix setting selection for multi-folder workspace ([#24819](https://github.com/astral-sh/ruff/pull/24819))
+- \[`eradicate`\] Fix false positive for lines with leading whitespace (`ERA001`) ([#25122](https://github.com/astral-sh/ruff/pull/25122))
+- \[`flake8-pyi`\] Fix false positive for f-string debug specifier (`PYI016`) ([#24098](https://github.com/astral-sh/ruff/pull/24098))
+
+### Rule changes
+
+- Always include panic payload in panic diagnostic message ([#24873](https://github.com/astral-sh/ruff/pull/24873))
+- Restrict `PYI034` for in-place operations to enclosing class ([#24511](https://github.com/astral-sh/ruff/pull/24511))
+- Improve error message for parameters that are declared `global` ([#24902](https://github.com/astral-sh/ruff/pull/24902))
+- Update known stdlib ([#25103](https://github.com/astral-sh/ruff/pull/25103))
+
+### Performance
+
+- \[`isort`\] Avoid constructing `glob::Pattern`s for literal known modules ([#25123](https://github.com/astral-sh/ruff/pull/25123))
+
+### CLI
+
+- Add TOML examples to `--config` help text ([#25013](https://github.com/astral-sh/ruff/pull/25013))
+- Colorize ruff check 'All checks passed' ([#25085](https://github.com/astral-sh/ruff/pull/25085))
+
+### Configuration
+
+- Increase max allowed value of `line-length` setting ([#24962](https://github.com/astral-sh/ruff/pull/24962))
+
+### Documentation
+
+- Add `D203` to rules that conflict with the formatter ([#25044](https://github.com/astral-sh/ruff/pull/25044))
+- Clarify `COM819` and formatter interaction ([#25045](https://github.com/astral-sh/ruff/pull/25045))
+- Clarify that `NotImplemented` is a value, not an exception (`F901`) ([#25054](https://github.com/astral-sh/ruff/pull/25054))
+- Update number of lint rules supported ([#24942](https://github.com/astral-sh/ruff/pull/24942))
+
+### Other changes
+
+- Simplify the playground's markdown template ([#24924](https://github.com/astral-sh/ruff/pull/24924))
+
+### Contributors
+
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@brian-c11](https://github.com/brian-c11)
+- [@Andrej730](https://github.com/Andrej730)
+- [@denyszhak](https://github.com/denyszhak)
+- [@darestack](https://github.com/darestack)
+- [@sharkdp](https://github.com/sharkdp)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@EkriirkE](https://github.com/EkriirkE)
+- [@eyupcanakman](https://github.com/eyupcanakman)
+- [@Hrk84ya](https://github.com/Hrk84ya)
+- [@thernstig](https://github.com/thernstig)
+- [@ntBre](https://github.com/ntBre)
+
+## 0.15.12
+
+Released on 2026-04-24.
+
+### Preview features
+
+- Implement `#ruff:file-ignore` file-level suppressions ([#23599](https://github.com/astral-sh/ruff/pull/23599))
+- Implement `#ruff:ignore` logical-line suppressions ([#23404](https://github.com/astral-sh/ruff/pull/23404))
+- Revert preview changes to displayed diagnostic severity in LSP ([#24789](https://github.com/astral-sh/ruff/pull/24789))
+- \[`airflow`\] Implement `task-branch-as-short-circuit` (`AIR004`) ([#23579](https://github.com/astral-sh/ruff/pull/23579))
+- \[`flake8-bugbear`\] Fix `break`/`continue` handling in `loop-iterator-mutation` (`B909`) ([#24440](https://github.com/astral-sh/ruff/pull/24440))
+- \[`pylint`\] Fix `PLC2701` for type parameter scopes ([#24576](https://github.com/astral-sh/ruff/pull/24576))
+
+### Rule changes
+
+- \[`pandas-vet`\] Suggest `.array` as well in `PD011` ([#24805](https://github.com/astral-sh/ruff/pull/24805))
+
+### CLI
+
+- Respect default Unix permissions for cache files ([#24794](https://github.com/astral-sh/ruff/pull/24794))
+
+### Documentation
+
+- \[`pylint`\] Fix `PLR0124` description not to claim self-comparison always returns the same value ([#24749](https://github.com/astral-sh/ruff/pull/24749))
+- \[`pyupgrade`\] Expand docs on reusable `TypeVar`s and scoping (`UP046`) ([#24153](https://github.com/astral-sh/ruff/pull/24153))
+- Improve rules table accessibility ([#24711](https://github.com/astral-sh/ruff/pull/24711))
+
+### Contributors
+
+- [@dylwil3](https://github.com/dylwil3)
+- [@AlexWaygood](https://github.com/AlexWaygood)
+- [@woodruffw](https://github.com/woodruffw)
+- [@avasis-ai](https://github.com/avasis-ai)
+- [@Dev-iL](https://github.com/Dev-iL)
+- [@denyszhak](https://github.com/denyszhak)
+- [@ShipItAndPray](https://github.com/ShipItAndPray)
+- [@anishgirianish](https://github.com/anishgirianish)
+- [@augustelalande](https://github.com/augustelalande)
+- [@amyreese](https://github.com/amyreese)
+- [@majiayu000](https://github.com/majiayu000)
+
+## 0.15.11
+
+Released on 2026-04-16.
+
+### Preview features
+
+- \[`ruff`\] Ignore `RUF029` when function is decorated with `asynccontextmanager` ([#24642](https://github.com/astral-sh/ruff/pull/24642))
+- \[`airflow`\] Implement `airflow-xcom-pull-in-template-string` (`AIR201`) ([#23583](https://github.com/astral-sh/ruff/pull/23583))
+- \[`flake8-bandit`\] Fix `S103` false positives and negatives in mask analysis ([#24424](https://github.com/astral-sh/ruff/pull/24424))
+
+### Bug fixes
+
+- \[`flake8-async`\] Omit overridden methods for `ASYNC109` ([#24648](https://github.com/astral-sh/ruff/pull/24648))
+
+### Documentation
+
+- \[`flake8-async`\] Add override mention to `ASYNC109` docs ([#24666](https://github.com/astral-sh/ruff/pull/24666))
+- Update Neovim config examples to use `vim.lsp.config` ([#24577](https://github.com/astral-sh/ruff/pull/24577))
+
+### Contributors
+
+- [@augustelalande](https://github.com/augustelalande)
+- [@anishgirianish](https://github.com/anishgirianish)
+- [@benberryallwood](https://github.com/benberryallwood)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@Dev-iL](https://github.com/Dev-iL)
+
 ## 0.15.10
 
 Released on 2026-04-09.

@@ -193,16 +193,13 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/override.md
 
 ```
 error[invalid-explicit-override]: Method `___reprrr__` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:97:5
-    |
- 96 | class Invalid:
- 97 |     @override
-    |     ---------
- 98 |     def ___reprrr__(self): ...  # error: [invalid-explicit-override]
-    |         ^^^^^^^^^^^
- 99 |     @override
-100 |     @classmethod
-    |
+  --> src/mdtest_snippet.pyi:97:5
+   |
+97 |     @override
+   |     ---------
+98 |     def ___reprrr__(self): ...  # error: [invalid-explicit-override]
+   |         ^^^^^^^^^^^
+   |
 info: No `___reprrr__` definitions were found on any superclasses of `Invalid`
 
 ```
@@ -211,15 +208,11 @@ info: No `___reprrr__` definitions were found on any superclasses of `Invalid`
 error[invalid-explicit-override]: Method `foo` is decorated with `@override` but does not override anything
    --> src/mdtest_snippet.pyi:99:5
     |
- 97 |     @override
- 98 |     def ___reprrr__(self): ...  # error: [invalid-explicit-override]
  99 |     @override
     |     ---------
 100 |     @classmethod
 101 |     def foo(self): ...  # error: [invalid-explicit-override]
     |         ^^^
-102 |     @classmethod
-103 |     @override
     |
 info: No `foo` definitions were found on any superclasses of `Invalid`
 
@@ -229,14 +222,10 @@ info: No `foo` definitions were found on any superclasses of `Invalid`
 error[invalid-explicit-override]: Method `bar` is decorated with `@override` but does not override anything
    --> src/mdtest_snippet.pyi:103:5
     |
-101 |     def foo(self): ...  # error: [invalid-explicit-override]
-102 |     @classmethod
 103 |     @override
     |     ---------
 104 |     def bar(self): ...  # error: [invalid-explicit-override]
     |         ^^^
-105 |     @staticmethod
-106 |     @override
     |
 info: No `bar` definitions were found on any superclasses of `Invalid`
 
@@ -246,14 +235,10 @@ info: No `bar` definitions were found on any superclasses of `Invalid`
 error[invalid-explicit-override]: Method `baz` is decorated with `@override` but does not override anything
    --> src/mdtest_snippet.pyi:106:5
     |
-104 |     def bar(self): ...  # error: [invalid-explicit-override]
-105 |     @staticmethod
 106 |     @override
     |     ---------
 107 |     def baz(): ...  # error: [invalid-explicit-override]
     |         ^^^
-108 |     @override
-109 |     @staticmethod
     |
 info: No `baz` definitions were found on any superclasses of `Invalid`
 
@@ -263,15 +248,11 @@ info: No `baz` definitions were found on any superclasses of `Invalid`
 error[invalid-explicit-override]: Method `eggs` is decorated with `@override` but does not override anything
    --> src/mdtest_snippet.pyi:108:5
     |
-106 |     @override
-107 |     def baz(): ...  # error: [invalid-explicit-override]
 108 |     @override
     |     ---------
 109 |     @staticmethod
 110 |     def eggs(): ...  # error: [invalid-explicit-override]
     |         ^^^^
-111 |     @property
-112 |     @override
     |
 info: No `eggs` definitions were found on any superclasses of `Invalid`
 
@@ -281,14 +262,10 @@ info: No `eggs` definitions were found on any superclasses of `Invalid`
 error[invalid-explicit-override]: Method `bad_property1` is decorated with `@override` but does not override anything
    --> src/mdtest_snippet.pyi:112:5
     |
-110 |     def eggs(): ...  # error: [invalid-explicit-override]
-111 |     @property
 112 |     @override
     |     ---------
 113 |     def bad_property1(self) -> int: ...  # error: [invalid-explicit-override]
     |         ^^^^^^^^^^^^^
-114 |     @override
-115 |     @property
     |
 info: No `bad_property1` definitions were found on any superclasses of `Invalid`
 
@@ -298,15 +275,11 @@ info: No `bad_property1` definitions were found on any superclasses of `Invalid`
 error[invalid-explicit-override]: Method `bad_property2` is decorated with `@override` but does not override anything
    --> src/mdtest_snippet.pyi:114:5
     |
-112 |     @override
-113 |     def bad_property1(self) -> int: ...  # error: [invalid-explicit-override]
 114 |     @override
     |     ---------
 115 |     @property
 116 |     def bad_property2(self) -> int: ...  # error: [invalid-explicit-override]
     |         ^^^^^^^^^^^^^
-117 |     @property
-118 |     @override
     |
 info: No `bad_property2` definitions were found on any superclasses of `Invalid`
 
@@ -316,14 +289,10 @@ info: No `bad_property2` definitions were found on any superclasses of `Invalid`
 error[invalid-explicit-override]: Method `bad_settable_property` is decorated with `@override` but does not override anything
    --> src/mdtest_snippet.pyi:118:5
     |
-116 |     def bad_property2(self) -> int: ...  # error: [invalid-explicit-override]
-117 |     @property
 118 |     @override
     |     ---------
 119 |     def bad_settable_property(self) -> int: ...  # error: [invalid-explicit-override]
     |         ^^^^^^^^^^^^^^^^^^^^^
-120 |     @bad_settable_property.setter
-121 |     def bad_settable_property(self, x: int) -> None: ...
     |
 info: No `bad_settable_property` definitions were found on any superclasses of `Invalid`
 
@@ -333,20 +302,13 @@ info: No `bad_settable_property` definitions were found on any superclasses of `
 error[invalid-method-override]: Invalid override of method `class_method1`
    --> src/mdtest_snippet.pyi:143:9
     |
-141 |     @staticmethod
-142 |     @override
 143 |     def class_method1() -> int: ...  # error: [invalid-method-override]
     |         ^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.class_method1`
-144 |     @classmethod
-145 |     @override
     |
    ::: src/mdtest_snippet.pyi:19:9
     |
- 18 |     @classmethod
  19 |     def class_method1(cls) -> int: ...
     |         ------------------------- `Parent.class_method1` defined here
- 20 |     @staticmethod
- 21 |     def static_method1() -> int: ...
     |
 info: `LiskovViolatingButNotOverrideViolating.class_method1` is a staticmethod but `Parent.class_method1` is a classmethod
 info: This violates the Liskov Substitution Principle
@@ -357,18 +319,13 @@ info: This violates the Liskov Substitution Principle
 error[invalid-explicit-override]: Method `bar` is decorated with `@override` but does not override anything
    --> src/mdtest_snippet.pyi:174:9
     |
-172 |     @identity
-173 |     @identity
 174 |     def bar(self): ...  # error: [invalid-explicit-override]
     |         ^^^
     |
    ::: src/mdtest_snippet.pyi:155:5
     |
-154 | class Foo:
 155 |     @override
     |     ---------
-156 |     @identity
-157 |     @identity
     |
 info: No `bar` definitions were found on any superclasses of `Foo`
 

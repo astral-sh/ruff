@@ -366,6 +366,21 @@ mod tests {
     }
 
     #[test]
+    fn unnecessary_iterable_allocation_for_first_element_py315() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF015_py315.py"),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY315.into(),
+                ..settings::LinterSettings::for_rule(
+                    Rule::UnnecessaryIterableAllocationForFirstElement,
+                )
+            },
+        )?;
+        assert_diagnostics!("PY315_RUF015_RUF015_py315.py", diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn access_annotations_from_class_dict_py310() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF063.py"),
@@ -489,13 +504,16 @@ mod tests {
             Path::new("ruff/suppressions.py"),
             &settings::LinterSettings::for_rules(vec![
                 Rule::UnusedVariable,
+                Rule::UnusedFunctionArgument,
+                Rule::UnusedMethodArgument,
                 Rule::AmbiguousVariableName,
                 Rule::UnusedNOQA,
                 Rule::InvalidRuleCode,
                 Rule::InvalidSuppressionComment,
                 Rule::UnmatchedSuppressionComment,
             ])
-            .with_external_rules(&["TK421"]),
+            .with_external_rules(&["TK421"])
+            .with_preview_mode(),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())

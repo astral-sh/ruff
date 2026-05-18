@@ -450,6 +450,10 @@ def collect_expected_diagnostics(test_files: Sequence[Path]) -> list[ExpectedErr
     for file in test_files:
         for idx, line in enumerate(file.read_text().splitlines(), 1):
             if match := re.search(CONFORMANCE_ERROR_PATTERN, line):
+                prefix = line[: match.start()].lstrip()
+                if not prefix or prefix.startswith("#"):
+                    continue
+
                 errors.append(
                     ExpectedError(
                         description=(match.group("description") or "Missing"),
@@ -500,6 +504,7 @@ def collect_ty_diagnostics(
             "--error=invalid-enum-member-annotation",
             "--error=invalid-legacy-positional-parameter",
             "--error=mismatched-type-name",
+            "--error=invalid-named-tuple-override",
             "--error=deprecated",
             "--error=redundant-final-classvar",
             "--exit-zero",

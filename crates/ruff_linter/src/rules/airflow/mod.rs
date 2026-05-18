@@ -21,6 +21,9 @@ mod tests {
         Rule::AirflowVariableGetOutsideTask,
         Path::new("AIR003_dag_decorator.py")
     )]
+    #[test_case(Rule::AirflowTaskBranchAsShortCircuit, Path::new("AIR004.py"))]
+    #[test_case(Rule::AirflowTaskBranchAsShortCircuit, Path::new("AIR004_sdk.py"))]
+    #[test_case(Rule::AirflowXcomPullInTemplateString, Path::new("AIR201.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_args.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_names.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_names_fix.py"))]

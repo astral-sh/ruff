@@ -61,12 +61,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
 error[invalid-super-argument]: `<class 'OtherBase'>` is not an instance or subclass of `<class 'Meta'>` in `super(<class 'Meta'>, <class 'OtherBase'>)` call
   --> src/mdtest_snippet.py:34:1
    |
-32 |     pass
-33 |
 34 | super(Meta, OtherBase)  # error: [invalid-super-argument]
    | ^^^^^^^^^^^^^^^^^^^^^^
-35 |
-36 | T = TypeVar("T", bound=int)
    |
 
 ```
@@ -75,8 +71,6 @@ error[invalid-super-argument]: `<class 'OtherBase'>` is not an instance or subcl
 error[invalid-super-argument]: `type[T@__call__]` is not an instance or subclass of `<class 'BoundIntMeta'>` in `super(<class 'BoundIntMeta'>, type[T@__call__])` call
   --> src/mdtest_snippet.py:40:16
    |
-38 | class BoundIntMeta(type):
-39 |     def __call__(cls: type[T]) -> T:
 40 |         return super(BoundIntMeta, cls).__call__()  # error: [invalid-super-argument]
    |                ^^^^^^^^^^^^^^^^^^^^^^^^
    |

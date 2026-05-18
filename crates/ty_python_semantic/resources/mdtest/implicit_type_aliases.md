@@ -217,6 +217,57 @@ def _(int_or_int: IntOrInt, list_of_int_or_list_of_int: ListOfIntOrListOfInt):
 None | None  # error: [unsupported-operator] "Operator `|` is not supported between two objects of type `None`"
 ```
 
+Implicit aliases should also work when one union member is a `NewType` pseudo-class:
+
+```py
+from typing import NewType
+
+Foo = NewType("Foo", int)
+FooOrStr = Foo | str
+
+reveal_type(FooOrStr)  # revealed: <types.UnionType special-form 'Foo | str'>
+
+def _(x: FooOrStr):
+    reveal_type(x)  # revealed: Foo | str
+```
+
+Implicit aliases should also work when one union member is a `TypeAliasType`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeAliasType, Union
+
+type Pep695IntOrStr = int | str
+
+Pep695OrBytes = Pep695IntOrStr | bytes
+BytesOrPep695 = bytes | Pep695IntOrStr
+
+ManualIntOrStr = TypeAliasType("ManualIntOrStr", Union[int, str])
+
+ManualOrBytes = ManualIntOrStr | bytes
+BytesOrManual = bytes | ManualIntOrStr
+
+reveal_type(Pep695OrBytes)  # revealed: <types.UnionType special-form 'int | str | bytes'>
+reveal_type(BytesOrPep695)  # revealed: <types.UnionType special-form 'bytes | int | str'>
+reveal_type(ManualOrBytes)  # revealed: <types.UnionType special-form 'int | str | bytes'>
+reveal_type(BytesOrManual)  # revealed: <types.UnionType special-form 'bytes | int | str'>
+
+def _(
+    pep695_or_bytes: Pep695OrBytes,
+    bytes_or_pep695: BytesOrPep695,
+    manual_or_bytes: ManualOrBytes,
+    bytes_or_manual: BytesOrManual,
+):
+    reveal_type(pep695_or_bytes)  # revealed: int | str | bytes
+    reveal_type(bytes_or_pep695)  # revealed: bytes | int | str
+    reveal_type(manual_or_bytes)  # revealed: int | str | bytes
+    reveal_type(bytes_or_manual)  # revealed: bytes | int | str
+```
+
 When constructing something nonsensical like `int | 1`, we emit a diagnostic for the expression
 itself, as it leads to a `TypeError` at runtime. The result of the expression is then inferred as
 `Unknown`, so we permit it to be used in a type expression.
@@ -801,8 +852,6 @@ def _():
 
 ### Snapshots for verbose diagnostics
 
-<!-- snapshot-diagnostics -->
-
 ```toml
 [environment]
 python-version = "3.12"
@@ -811,19 +860,57 @@ python-version = "3.12"
 ```py
 type ListOfInts2 = list[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias `ListOfInts2`"
+# snapshot: not-subscriptable
 DoublySpecialized = ListOfInts2[int]
+```
 
+```snapshot
+error[not-subscriptable]: Cannot subscript non-generic type alias `ListOfInts2`
+ --> src/mdtest_snippet.py:4:21
+  |
+4 | DoublySpecialized = ListOfInts2[int]
+  |                     -----------^^^^^
+  |                     |
+  |                     Alias to `list[int]`, which is already specialized
+  |
+```
+
+```py
 ThreeInts = tuple[int, int, int]
 
+# snapshot: not-subscriptable
+three_ints: ThreeInts[int]
+```
+
+```snapshot
+error[not-subscriptable]: Cannot subscript non-generic type `<class 'tuple[int, int, int]'>`
+ --> src/mdtest_snippet.py:8:13
+  |
+8 | three_ints: ThreeInts[int]
+  |             ---------^^^^^
+  |             |
+  |             Type is already specialized
+  |
+```
+
+```py
 class A[T]: ...
 
 AliasForA = A[int]
 
-def f(
-    a: AliasForA[int],  # error: [not-subscriptable]
-    b: ThreeInts[int],  # error: [not-subscriptable]
-): ...
+# snapshot: not-subscriptable
+alias_for_a: AliasForA[int]
+```
+
+```snapshot
+error[not-subscriptable]: Cannot subscript non-generic type `<class 'A[int]'>`
+  --> src/mdtest_snippet.py:14:14
+   |
+14 | alias_for_a: AliasForA[int]
+   |              ---------^^^^^
+   |              |
+   |              Type is already specialized
+   |
 ```
 
 ### Multiple definitions

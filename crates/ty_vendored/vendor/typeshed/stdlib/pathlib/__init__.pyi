@@ -384,23 +384,23 @@ class Path(PurePath):
             this subtree.
             """
     elif sys.version_info >= (3, 12):
-        def glob(self, pattern: str, *, case_sensitive: bool | None = None) -> Generator[Self, None, None]:
+        def glob(self, pattern: str, *, case_sensitive: bool | None = None) -> Generator[Self]:
             """Iterate over this subtree and yield all existing files (of any
             kind, including directories) matching the given relative pattern.
             """
 
-        def rglob(self, pattern: str, *, case_sensitive: bool | None = None) -> Generator[Self, None, None]:
+        def rglob(self, pattern: str, *, case_sensitive: bool | None = None) -> Generator[Self]:
             """Recursively yield all existing files (of any kind, including
             directories) matching the given relative pattern, anywhere in
             this subtree.
             """
     else:
-        def glob(self, pattern: str) -> Generator[Self, None, None]:
+        def glob(self, pattern: str) -> Generator[Self]:
             """Iterate over this subtree and yield all existing files (of any
             kind, including directories) matching the given relative pattern.
             """
 
-        def rglob(self, pattern: str) -> Generator[Self, None, None]:
+        def rglob(self, pattern: str) -> Generator[Self]:
             """Recursively yield all existing files (of any kind, including
             directories) matching the given relative pattern, anywhere in
             this subtree.
@@ -449,7 +449,7 @@ class Path(PurePath):
             Whether this path is a junction.
             """
 
-    def iterdir(self) -> Generator[Self, None, None]:
+    def iterdir(self) -> Generator[Self]:
         """Yield path objects of the directory contents.
 
         The children are yielded in arbitrary order, and the

@@ -628,3 +628,12 @@ PTH115 `os.readlink()` should be replaced by `Path.readlink()`
 171 |         break
     |
 help: Replace with `Path(...).readlink()`
+
+PTH101 `os.chmod()` should be replaced by `Path.chmod()`
+   --> full_name.py:187:1
+    |
+186 | os.chmod(_AttrHolder.fd, 0o644)    # Suppressed: resolved as `int`
+187 | os.chmod(_AttrHolder.name, 0o644)  # Diagnostic + fix: resolved as `str`
+    | ^^^^^^^^
+    |
+help: Replace with `Path(...).chmod(...)`

@@ -197,6 +197,16 @@ enum UnionElement<'db> {
 }
 
 impl<'db> UnionElement<'db> {
+    fn type_count(&self) -> usize {
+        match self {
+            UnionElement::Type(_) => 1,
+            UnionElement::IntLiterals(literals) => literals.len(),
+            UnionElement::StringLiterals(literals) => literals.len(),
+            UnionElement::BytesLiterals(literals) => literals.len(),
+            UnionElement::EnumLiterals { literals, .. } => literals.len(),
+        }
+    }
+
     /// Try reducing this `UnionElement` given the presence in the same union of `other_type`.
     fn try_reduce(&mut self, db: &'db dyn Db, other_type: Type<'db>) -> ReduceResult<'db> {
         let mut other_type_negated_cache = None;
@@ -338,6 +348,62 @@ pub(crate) struct UnionBuilder<'db> {
     /// execution of `is_redundant_with` is skipped.
     cycle_recovery: bool,
     recursively_defined: RecursivelyDefined,
+}
+
+/// Accumulates types into a union.
+///
+/// Most real-world type variables only accumulate one or two constraints. We keep those cases as
+/// plain `Type`s and only allocate a `UnionBuilder` once we know the accumulation is larger.
+pub(crate) enum UnionAccumulator<'db> {
+    One(Type<'db>),
+    Two(Type<'db>, Type<'db>),
+    Deferred(UnionBuilder<'db>),
+}
+
+impl<'db> UnionAccumulator<'db> {
+    pub(crate) fn new(ty: Type<'db>) -> Self {
+        UnionAccumulator::One(ty)
+    }
+
+    pub(crate) fn add(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+        match self {
+            UnionAccumulator::One(existing) => {
+                *self = UnionAccumulator::Two(*existing, ty);
+            }
+            UnionAccumulator::Two(first, second) => {
+                let mut builder = UnionBuilder::new(db);
+                builder.add_in_place(*first);
+                builder.add_in_place(*second);
+                builder.add_in_place(ty);
+                *self = UnionAccumulator::Deferred(builder);
+            }
+            UnionAccumulator::Deferred(builder) => builder.add_in_place(ty),
+        }
+    }
+
+    pub(crate) fn get_or_build(&mut self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            UnionAccumulator::One(ty) => *ty,
+            UnionAccumulator::Two(first, second) => {
+                let ty = UnionType::from_two_elements(db, *first, *second);
+                *self = UnionAccumulator::One(ty);
+                ty
+            }
+            UnionAccumulator::Deferred(_) => {
+                let ty = std::mem::replace(self, UnionAccumulator::new(Type::Never)).into_type(db);
+                *self = UnionAccumulator::new(ty);
+                ty
+            }
+        }
+    }
+
+    pub(crate) fn into_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            UnionAccumulator::One(ty) => ty,
+            UnionAccumulator::Two(first, second) => UnionType::from_two_elements(db, first, second),
+            UnionAccumulator::Deferred(builder) => builder.build(),
+        }
+    }
 }
 
 impl<'db> UnionBuilder<'db> {
@@ -823,7 +889,8 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn try_build(self) -> Option<Type<'db>> {
-        let mut types = vec![];
+        let type_count = self.elements.iter().map(UnionElement::type_count).sum();
+        let mut types = Vec::with_capacity(type_count);
         for element in self.elements {
             match element {
                 UnionElement::IntLiterals(literals) => {
@@ -1548,13 +1615,17 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
 #[cfg(test)]
 mod tests {
-    use super::{IntersectionBuilder, Type, UnionBuilder, UnionType};
+    use super::{
+        IntersectionBuilder, MAX_NON_RECURSIVE_UNION_LITERALS, Type, UnionBuilder, UnionType,
+    };
 
     use crate::db::tests::{TestDb, setup_db};
-    use crate::place::known_module_symbol;
+    use crate::place::{global_symbol, known_module_symbol};
     use crate::types::enums::enum_member_literals;
-    use crate::types::{KnownClass, Truthiness};
+    use crate::types::type_alias::TypeAliasType;
+    use crate::types::{KnownClass, KnownInstanceType, Truthiness};
 
+    use ruff_db::system::DbWithWritableSystem as _;
     use ty_module_resolver::KnownModule;
 
     #[test]
@@ -1583,6 +1654,62 @@ mod tests {
         let union = UnionType::from_elements(&db, [t0, t1]).expect_union();
 
         assert_eq!(union.elements(&db), &[t0, t1]);
+    }
+
+    fn map_marker<'db>(ty: &Type<'db>, marker: Type<'db>, replacement: Type<'db>) -> Type<'db> {
+        if *ty == marker { replacement } else { *ty }
+    }
+
+    #[test]
+    fn map_rebuilds_prefix_for_literal_widening() {
+        let db = setup_db();
+
+        let marker = KnownClass::Str.to_instance(&db);
+        let literal_limit =
+            i64::try_from(MAX_NON_RECURSIVE_UNION_LITERALS).expect("literal limit fits in i64");
+        let widening_literal = Type::int_literal(literal_limit);
+        let expected = KnownClass::Int.to_instance(&db);
+
+        let elements = (0..literal_limit).map(Type::int_literal).chain([marker]);
+        let union = UnionType::from_elements(&db, elements).expect_union();
+
+        assert_eq!(
+            union.map(&db, |ty| map_marker(ty, marker, widening_literal)),
+            expected
+        );
+        assert_eq!(
+            union.map_leave_aliases(&db, |ty| map_marker(ty, marker, widening_literal)),
+            expected
+        );
+        assert_eq!(
+            union.try_map(&db, |ty| Some(map_marker(ty, marker, widening_literal))),
+            Some(expected)
+        );
+    }
+
+    #[test]
+    fn map_preserves_alias_unpacking_behavior() {
+        let mut db = setup_db();
+        db.write_dedented("/src/a.py", "type Alias = int").unwrap();
+
+        let module = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
+        let alias_ty = global_symbol(&db, module, "Alias").place.expect_type();
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))) =
+            alias_ty
+        else {
+            panic!("Expected `Alias` to be a type alias");
+        };
+
+        let alias = Type::TypeAlias(TypeAliasType::PEP695(alias));
+        let str_instance = KnownClass::Str.to_instance(&db);
+        let union_ty = UnionType::from_elements_leave_aliases(&db, [alias, str_instance]);
+        let union = union_ty.expect_union();
+        let unpacked =
+            UnionType::from_elements(&db, [KnownClass::Int.to_instance(&db), str_instance]);
+
+        assert_eq!(union.map(&db, |ty| *ty), unpacked);
+        assert_eq!(union.try_map(&db, |ty| Some(*ty)), Some(unpacked));
+        assert_eq!(union.map_leave_aliases(&db, |ty| *ty), union_ty);
     }
 
     #[test]

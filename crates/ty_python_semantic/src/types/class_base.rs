@@ -191,10 +191,12 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Literal(_)
                 | KnownInstanceType::LiteralStringAlias(_)
                 | KnownInstanceType::NamedTupleSpec(_)
+                | KnownInstanceType::Sentinel(_)
                 // A class inheriting from a newtype would make intuitive sense, but newtype
                 // wrappers are just identity callables at runtime, so this sort of inheritance
                 // doesn't work and isn't allowed.
-                | KnownInstanceType::NewType(_) => None,
+                | KnownInstanceType::NewType(_)
+                | KnownInstanceType::FunctoolsPartial(_) => None,
                 KnownInstanceType::TypeGenericAlias(_) => {
                     Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
                 }
@@ -379,7 +381,7 @@ impl<'db> ClassBase<'db> {
         self,
         db: &'db dyn Db,
         additional_specialization: Option<Specialization<'db>>,
-    ) -> impl Iterator<Item = ClassBase<'db>> {
+    ) -> impl Iterator<Item = ClassBase<'db>> + Clone {
         match self {
             ClassBase::Protocol => ClassBaseMroIterator::length_3(db, self, ClassBase::Generic),
             ClassBase::Dynamic(_)
@@ -456,6 +458,7 @@ impl<'db> From<&ClassBase<'db>> for Type<'db> {
 }
 
 /// An iterator over the MRO of a class base.
+#[derive(Clone)]
 enum ClassBaseMroIterator<'db> {
     Length2(core::array::IntoIter<ClassBase<'db>, 2>),
     Length3(core::array::IntoIter<ClassBase<'db>, 3>),

@@ -611,8 +611,6 @@ We offer a helpful subdiagnostic if a variable in a type expression is inferred 
 `Never`, since this almost certainly resulted in the definition of the type being inferred by ty as
 being unreachable:
 
-<!-- snapshot-diagnostics -->
-
 ```toml
 [environment]
 python-version = "3.14"
@@ -634,5 +632,16 @@ class AwesomeAPI: ...
 ```py
 import module
 
-def f(x: module.AwesomeAPI): ...  # error: [invalid-type-form]
+# snapshot: invalid-type-form
+def f(x: module.AwesomeAPI): ...
+```
+
+```snapshot
+error[invalid-type-form]: Variable of type `Never` is not allowed in a parameter annotation
+ --> src/main.py:4:10
+  |
+4 | def f(x: module.AwesomeAPI): ...
+  |          ^^^^^^^^^^^^^^^^^
+  |
+help: The variable may have been inferred as `Never` because its definition was inferred as being unreachable
 ```

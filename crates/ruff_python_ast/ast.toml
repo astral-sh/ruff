@@ -383,7 +383,7 @@ fields = [
 [Expr.nodes.ExprDictComp]
 doc = "See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictComp)"
 fields = [
-  { name = "key", type = "Expr" },
+  { name = "key", type = "Expr?" },
   { name = "value", type = "Expr" },
   { name = "generators", type = "Comprehension*" },
 ]

@@ -5,8 +5,9 @@ A type is a singleton type iff it has exactly one inhabitant.
 ## Basic
 
 ```py
-from typing_extensions import Literal, Never, Callable
-from ty_extensions import is_singleton, static_assert
+from types import UnionType
+from typing_extensions import Literal, Never, Callable, TypeAliasType
+from ty_extensions import TypeOf, is_singleton, static_assert
 from enum import Enum
 
 class Answer(Enum):
@@ -38,6 +39,10 @@ static_assert(not is_singleton(tuple[None, Literal[True]]))
 
 static_assert(not is_singleton(Callable[..., None]))
 static_assert(not is_singleton(Callable[[int, str], None]))
+
+static_assert(not is_singleton(TypeAliasType))
+static_assert(not is_singleton(UnionType))
+static_assert(not is_singleton(TypeOf[list[int]]))
 ```
 
 ## `NoDefault`

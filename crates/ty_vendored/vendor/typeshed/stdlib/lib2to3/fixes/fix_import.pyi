@@ -17,7 +17,7 @@ from typing import ClassVar, Literal
 from .. import fixer_base
 from ..pytree import Node
 
-def traverse_imports(names) -> Generator[str, None, None]:
+def traverse_imports(names) -> Generator[str]:
     """
     Walks over all the names imported in a dotted_as_names node.
     """

@@ -35,19 +35,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.m
 error[invalid-argument-type]: Argument to function `f2` is incorrect
   --> src/mdtest_snippet.py:14:11
    |
-12 |     # error: [too-many-positional-arguments]
-13 |     # error: [invalid-argument-type]
 14 |     x = f(3)
    |           ^ Expected `str`, found `Literal[3]`
    |
 info: Function defined here
  --> src/mdtest_snippet.py:4:5
   |
-2 |     return 0
-3 |
 4 | def f2(name: str) -> int:
   |     ^^ --------- Parameter declared here
-5 |     return 0
   |
 info: Union variant `def f2(name: str) -> int` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int)`
@@ -58,8 +53,6 @@ info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> in
 error[too-many-positional-arguments]: Too many positional arguments to function `f1`: expected 0, got 1
   --> src/mdtest_snippet.py:14:11
    |
-12 |     # error: [too-many-positional-arguments]
-13 |     # error: [invalid-argument-type]
 14 |     x = f(3)
    |           ^
    |

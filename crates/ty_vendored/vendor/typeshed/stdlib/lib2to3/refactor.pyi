@@ -195,10 +195,10 @@ class RefactoringTool:
 
     def wrap_toks(
         self, block: Iterable[str], lineno: int, indent: int
-    ) -> Generator[tuple[int, str, tuple[int, int], tuple[int, int], str], None, None]:
+    ) -> Generator[tuple[int, str, tuple[int, int], tuple[int, int], str]]:
         """Wraps a tokenize stream to systematically modify start/end."""
 
-    def gen_lines(self, block: Iterable[str], indent: int) -> Generator[str, None, None]:
+    def gen_lines(self, block: Iterable[str], indent: int) -> Generator[str]:
         """Generates lines as expected by tokenize from a list of lines.
 
         This strips the first len(indent + self.PS1) characters off each line.

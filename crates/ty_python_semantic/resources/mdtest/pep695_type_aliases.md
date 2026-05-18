@@ -163,8 +163,6 @@ def f(x: Foo[int]):
 
 ## Stringified values
 
-<!-- snapshot-diagnostics -->
-
 Stringifying the right-hand side of a type alias is redundant, but allowed:
 
 ```py
@@ -179,11 +177,24 @@ accesses the `.__value__` attribute. Normal runtime rules still therefore apply 
 stringified alias values:
 
 ```py
-# error: [unsupported-operator]
+# snapshot: unsupported-operator
 type Y = "int" | str
 
 def g(obj: Y):
     reveal_type(obj)  # revealed: int | str
+```
+
+```snapshot
+error[unsupported-operator]: Unsupported `|` operation
+ --> src/mdtest_snippet.py:6:10
+  |
+6 | type Y = "int" | str
+  |          -----^^^---
+  |          |       |
+  |          |       Has type `<class 'str'>`
+  |          Has type `Literal["int"]`
+  |
+info: A type alias scope is lazy but will be executed at runtime if the `__value__` property is accessed
 ```
 
 ## In unions and intersections
@@ -365,6 +376,11 @@ def f(x: OptNestedInt) -> None:
     reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...] | None
     if x is not None:
         reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...]
+
+type RecursiveList = list[RecursiveList]
+
+def g(x: RecursiveList):
+    reveal_type(x[0])  # revealed: list[RecursiveList]
 ```
 
 ### Invalid self-referential
@@ -420,8 +436,7 @@ type Foo[T] = list[T] | Bar[T]
 type Bar[T] = int | Foo[T]
 
 def _(x: Bar[int]):
-    # TODO: should be `int | list[int]`
-    reveal_type(x)  # revealed: int | list[int] | Any
+    reveal_type(x)  # revealed: int | list[int]
 ```
 
 ### With legacy generic
@@ -568,7 +583,7 @@ type A = list[Union["A", str]]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str]
     for item in x:
-        reveal_type(item)  # revealed: list[Any | str] | str
+        reveal_type(item)  # revealed: list[A | str] | str
 ```
 
 #### With new-style union
@@ -579,7 +594,7 @@ type A = list[A | str]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str]
     for item in x:
-        reveal_type(item)  # revealed: list[Any | str] | str
+        reveal_type(item)  # revealed: list[A | str] | str
 ```
 
 #### With Optional
@@ -592,7 +607,7 @@ type A = list[Optional[Union["A", str]]]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str | None]
     for item in x:
-        reveal_type(item)  # revealed: list[Any | str | None] | str | None
+        reveal_type(item)  # revealed: list[A | str | None] | str | None
 ```
 
 ### Tuple comparison
@@ -646,4 +661,16 @@ type CallableGuard = TypeGuard[Callable[[], CallableGuard]]
 
 reveal_type(CallableIs)  # revealed: TypeAliasType
 reveal_type(CallableGuard)  # revealed: TypeAliasType
+```
+
+### Recursive alias in binary operators doesn't stack overflow
+
+```py
+from typing import reveal_type
+
+type A = int | A
+
+def foo(x: A):
+    reveal_type(x + 1)  # revealed: int
+    reveal_type(1 + x)  # revealed: int
 ```

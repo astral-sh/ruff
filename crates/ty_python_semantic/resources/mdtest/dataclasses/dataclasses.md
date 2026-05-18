@@ -594,9 +594,116 @@ class MyFrozenClass:
     x: int = 1
 
 class MyFrozenChildClass(MyFrozenClass): ...
+class MyFrozenGrandchildClass(MyFrozenChildClass): ...
 
 frozen = MyFrozenChildClass()
 frozen.x = 2  # error: [invalid-assignment]
+
+grandchild = MyFrozenGrandchildClass()
+grandchild.x = 2  # error: [invalid-assignment]
+```
+
+Non-field attributes on a non-dataclass subclass of a frozen dataclass are still assignable:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int = 1
+
+class MyFrozenChildClass(MyFrozenClass):
+    y: int
+
+class MyFrozenGrandchildClass(MyFrozenChildClass):
+    z: int
+
+frozen = MyFrozenChildClass()
+frozen.y = 2
+frozen.z = 2
+
+grandchild = MyFrozenGrandchildClass()
+grandchild.y = 2
+grandchild.z = 2
+grandchild.unknown = 2
+```
+
+The synthesized `__setattr__` is exposed as a member on non-dataclass subclasses of frozen
+dataclasses:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int = 1
+
+class MyFrozenChildClass(MyFrozenClass): ...
+
+child = MyFrozenChildClass()
+reveal_type(child.__setattr__)  # revealed: Overload[(name: Literal["x"], value) -> Never, (name: str, value) -> None]
+```
+
+An explicit `__setattr__` on an intermediate subclass overrides the inherited frozen dataclass
+setter:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int = 1
+
+class MyFrozenIntermediateClass(MyFrozenClass):
+    def __setattr__(self, name: str, value: object) -> None: ...  # error: [invalid-method-override]
+
+class MyFrozenChildClass(MyFrozenIntermediateClass):
+    y: int
+
+class MyFrozenGrandchildClass(MyFrozenChildClass):
+    z: int
+
+child = MyFrozenChildClass()
+child.x = 2
+child.y = 2
+child.unknown = 2
+
+grandchild = MyFrozenGrandchildClass()
+grandchild.x = 2
+grandchild.y = 2
+grandchild.z = 2
+grandchild.unknown = 2
+```
+
+Non-field attributes on subclasses of slotted frozen dataclasses are still rejected. This correctly
+models the runtime behavior, but is somewhat surprising and may be a CPython bug, as subclasses of
+slotted classes usually allow arbitrary attributes to be set on them unless the subclass also
+explicitly declares `__slots__`. We should change our behavior here to follow CPython, if they "fix"
+it.
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True, slots=True)
+class MySlottedFrozenClass:
+    x: int = 1
+
+class MySlottedFrozenChildClass(MySlottedFrozenClass):
+    y: int
+
+class MySlottedFrozenGrandchildClass(MySlottedFrozenChildClass):
+    z: int
+
+frozen = MySlottedFrozenChildClass()
+frozen.x = 2  # error: [invalid-assignment]
+frozen.y = 2  # error: [invalid-assignment]
+frozen.z = 2  # error: [invalid-assignment]
+
+grandchild = MySlottedFrozenGrandchildClass()
+grandchild.x = 2  # error: [invalid-assignment]
+grandchild.y = 2  # error: [invalid-assignment]
+grandchild.z = 2  # error: [invalid-assignment]
+grandchild.unknown = 2  # error: [invalid-assignment]
 ```
 
 The same diagnostic is emitted if a frozen dataclass is inherited, and an attempt is made to delete
@@ -620,9 +727,7 @@ del frozen.x  # TODO this should emit an [invalid-assignment]
 If a non-frozen dataclass inherits from a frozen dataclass, an exception is raised at runtime. We
 catch this error:
 
-<!-- snapshot-diagnostics -->
-
-`a.py`:
+`foo.py`:
 
 ```py
 from dataclasses import dataclass
@@ -632,14 +737,35 @@ class FrozenBase:
     x: int
 
 @dataclass
-# error: [invalid-frozen-dataclass-subclass] "Non-frozen dataclass `Child` cannot inherit from frozen dataclass `FrozenBase`"
+# snapshot: invalid-frozen-dataclass-subclass
 class Child(FrozenBase):
     y: int
 ```
 
+```snapshot
+error[invalid-frozen-dataclass-subclass]: Non-frozen dataclass cannot inherit from frozen dataclass
+ --> src/foo.py:7:1
+  |
+7 | @dataclass
+  | ---------- `Child` dataclass parameters
+8 | # snapshot: invalid-frozen-dataclass-subclass
+9 | class Child(FrozenBase):
+  |       ^^^^^^----------^ Subclass `Child` is not frozen but base class `FrozenBase` is
+  |
+info: This causes the class creation to fail
+info: Base class definition
+ --> src/foo.py:3:1
+  |
+3 | @dataclass(frozen=True)
+  | ----------------------- `FrozenBase` dataclass parameters
+4 | class FrozenBase:
+  |       ^^^^^^^^^^ `FrozenBase` definition
+  |
+```
+
 Frozen dataclasses inheriting from non-frozen dataclasses are also illegal:
 
-`b.py`:
+`bar.py`:
 
 ```py
 from dataclasses import dataclass
@@ -835,7 +961,7 @@ python-version = "3.9"
 ```py
 from dataclasses import dataclass
 
-@dataclass(kw_only=True)  # TODO: Emit a diagnostic here
+@dataclass(kw_only=True)  # error: [no-matching-overload]
 class A:
     x: int
     y: int
@@ -1069,8 +1195,7 @@ from dataclasses import dataclass
 
 # fmt: off
 
-# TODO: these nonexistent keyword arguments should cause us to emit diagnostics on Python 3.9
-@dataclass(
+@dataclass(  # error: [no-matching-overload]
     slots=True,
     weakref_slot=True,
     match_args=True
@@ -1535,8 +1660,6 @@ asdict(Foo)
 
 ## `dataclasses.KW_ONLY`
 
-<!-- snapshot-diagnostics -->
-
 If an attribute is annotated with `dataclasses.KW_ONLY`, it is not added to the synthesized
 `__init__` of the class. Instead, this special marker annotation causes Python at runtime to ensure
 that all annotations following it have keyword-only parameters generated for them in the class's
@@ -1558,11 +1681,28 @@ class C:
 
 reveal_type(C.__init__)  # revealed: (self: C, x: int, *, y: str) -> None
 
-# error: [missing-argument]
-# error: [too-many-positional-arguments]
+# snapshot: missing-argument
+# snapshot: too-many-positional-arguments
 C(3, "")
 
 C(3, y="")
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `y`
+  --> src/mdtest_snippet.py:13:1
+   |
+13 | C(3, "")
+   | ^^^^^^^^
+   |
+
+
+error[too-many-positional-arguments]: Too many positional arguments: expected 1, got 2
+  --> src/mdtest_snippet.py:13:6
+   |
+13 | C(3, "")
+   |      ^^
+   |
 ```
 
 Using `KW_ONLY` to annotate more than one field in a dataclass causes a `TypeError` to be raised at

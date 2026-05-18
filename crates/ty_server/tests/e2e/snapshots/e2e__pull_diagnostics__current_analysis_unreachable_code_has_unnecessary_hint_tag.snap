@@ -1,0 +1,28 @@
+---
+source: crates/ty_server/tests/e2e/pull_diagnostics.rs
+expression: diagnostics
+---
+{
+  "kind": "full",
+  "resultId": "[RESULT_ID]",
+  "items": [
+    {
+      "range": {
+        "start": {
+          "line": 3,
+          "character": 4
+        },
+        "end": {
+          "line": 3,
+          "character": 27
+        }
+      },
+      "severity": 4,
+      "source": "ty",
+      "message": "Code is unreachable\nThis may depend on your current environment and settings",
+      "tags": [
+        1
+      ]
+    }
+  ]
+}

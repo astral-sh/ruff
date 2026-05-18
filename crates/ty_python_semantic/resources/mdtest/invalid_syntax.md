@@ -92,6 +92,22 @@ for x in foo.pass:
     pass
 ```
 
+## Invalid assignment expression target
+
+Parser recovery can produce a named expression target that is not a name. If that named expression
+is used as part of a member expression, we should report the syntax error without treating it as a
+valid place.
+
+```py
+obj = 1
+
+# error: [invalid-syntax] "Assignment expression target must be an identifier"
+out = (obj.attr := obj).attr
+
+# error: [invalid-syntax] "Assignment expression target must be an identifier"
+out = (obj[0] := obj).attr
+```
+
 ## Invalid annotation
 
 ### `typing.Callable`

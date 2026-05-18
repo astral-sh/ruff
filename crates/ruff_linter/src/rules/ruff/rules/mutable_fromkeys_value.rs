@@ -121,7 +121,7 @@ fn generate_dict_comprehension(
     };
     // Construct the dict comprehension.
     let dict_comp = ast::ExprDictComp {
-        key: Box::new(key.into()),
+        key: Some(Box::new(key.into())),
         value: Box::new(value.clone()),
         generators: vec![comp],
         range: TextRange::default(),

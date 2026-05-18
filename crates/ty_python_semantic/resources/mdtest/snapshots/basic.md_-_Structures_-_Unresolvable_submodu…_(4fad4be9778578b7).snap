@@ -31,11 +31,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/import/basic.md
 error[unresolved-import]: Cannot resolve imported module `a.foo`
  --> src/mdtest_snippet.py:2:8
   |
-1 | # Topmost component resolvable, submodule not resolvable:
 2 | import a.foo  # error: [unresolved-import] "Cannot resolve imported module `a.foo`"
   |        ^^^^^
-3 |
-4 | # Topmost component unresolvable:
   |
 info: Searched in the following paths during module resolution:
 info:   1. /src (first-party code)
@@ -48,7 +45,6 @@ info: make sure your Python environment is properly configured: https://docs.ast
 error[unresolved-import]: Cannot resolve imported module `b.foo`
  --> src/mdtest_snippet.py:5:8
   |
-4 | # Topmost component unresolvable:
 5 | import b.foo  # error: [unresolved-import] "Cannot resolve imported module `b.foo`"
   |        ^^^^^
   |

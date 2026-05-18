@@ -26,7 +26,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_awai
 error[invalid-await]: `MissingAwait` is not awaitable
  --> src/mdtest_snippet.py:5:11
   |
-4 | async def main() -> None:
 5 |     await MissingAwait()  # error: [invalid-await]
   |           ^^^^^^^^^^^^^^
   |
@@ -34,7 +33,6 @@ error[invalid-await]: `MissingAwait` is not awaitable
   |
 1 | class MissingAwait:
   |       ------------ type defined here
-2 |     pass
   |
 info: `__await__` is missing
 

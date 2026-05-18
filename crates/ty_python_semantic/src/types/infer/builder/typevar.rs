@@ -582,10 +582,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         paramspec_name: Option<&str>,
     ) {
         let previously_allowed_paramspec = self
+            .context
             .inference_flags
             .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true);
         self.infer_paramspec_default_impl(default_expr, paramspec_name);
-        self.inference_flags.set(
+        self.context.inference_flags.set(
             InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
             previously_allowed_paramspec,
         );
@@ -606,13 +607,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             ast::Expr::List(ast::ExprList { elts, .. }) => {
                 let previously_allowed_paramspec = self
+                    .context
                     .inference_flags
                     .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, false);
                 let types = elts
                     .iter()
                     .map(|elt| self.infer_type_expression(elt))
                     .collect::<Vec<_>>();
-                self.inference_flags.set(
+                self.context.inference_flags.set(
                     InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
                     previously_allowed_paramspec,
                 );
@@ -698,6 +700,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             |version: PythonVersion| assume_all_features || python_version >= version;
 
         let mut default = None;
+        let mut covariant = false;
+        let mut contravariant = false;
+        let mut infer_variance = false;
         let mut name_param_ty = None;
         let mut name_param_node = None;
 
@@ -740,12 +745,70 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     name_param_ty =
                         Some(self.infer_expression(&kwarg.value, TypeContext::default()));
                 }
-                "bound" | "covariant" | "contravariant" | "infer_variance" => {
+                "bound" => {
                     return error(
                         &self.context,
-                        "The variance and bound arguments for `ParamSpec` do not have defined semantics yet",
+                        "The `bound` argument for `ParamSpec` is not supported",
                         call_expr,
                     );
+                }
+                "infer_variance" => {
+                    if !have_features_from(PythonVersion::PY312) {
+                        error(
+                            &self.context,
+                            "The `infer_variance` parameter of `typing.ParamSpec` was added in Python 3.12",
+                            kwarg,
+                        );
+                    }
+                    match self
+                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .bool(db)
+                    {
+                        Truthiness::AlwaysTrue => infer_variance = true,
+                        Truthiness::AlwaysFalse => {}
+                        Truthiness::Ambiguous => {
+                            return error(
+                                &self.context,
+                                "The `infer_variance` parameter of `ParamSpec` \
+                                cannot have an ambiguous truthiness",
+                                &kwarg.value,
+                            );
+                        }
+                    }
+                }
+                "covariant" => {
+                    match self
+                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .bool(db)
+                    {
+                        Truthiness::AlwaysTrue => covariant = true,
+                        Truthiness::AlwaysFalse => {}
+                        Truthiness::Ambiguous => {
+                            return error(
+                                &self.context,
+                                "The `covariant` parameter of `ParamSpec` \
+                                cannot have an ambiguous truthiness",
+                                &kwarg.value,
+                            );
+                        }
+                    }
+                }
+                "contravariant" => {
+                    match self
+                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .bool(db)
+                    {
+                        Truthiness::AlwaysTrue => contravariant = true,
+                        Truthiness::AlwaysFalse => {}
+                        Truthiness::Ambiguous => {
+                            return error(
+                                &self.context,
+                                "The `contravariant` parameter of `ParamSpec` \
+                                cannot have an ambiguous truthiness",
+                                &kwarg.value,
+                            );
+                        }
+                    }
                 }
                 "default" => {
                     if !have_features_from(PythonVersion::PY313) {
@@ -773,6 +836,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         }
+
+        let variance = match (covariant, contravariant, infer_variance) {
+            (true, true, _) => {
+                return error(
+                    &self.context,
+                    "A `ParamSpec` cannot be both covariant and contravariant",
+                    call_expr,
+                );
+            }
+            (true, false, true) | (false, true, true) => {
+                return error(
+                    &self.context,
+                    "A `ParamSpec` cannot specify variance when `infer_variance=True`",
+                    call_expr,
+                );
+            }
+            (true, false, false) => Some(TypeVarVariance::Covariant),
+            (false, true, false) => Some(TypeVarVariance::Contravariant),
+            (false, false, false) => Some(TypeVarVariance::Invariant),
+            (false, false, true) => None,
+        };
 
         let Some(name_param_ty) = name_param_ty.or_else(|| {
             arguments
@@ -830,7 +914,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             TypeVarKind::ParamSpec,
         );
         Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
-            db, identity, None, None, default,
+            db, identity, None, variance, default,
         )))
     }
 
@@ -866,6 +950,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut default = None;
         let mut covariant = false;
         let mut contravariant = false;
+        let mut infer_variance = false;
         let mut name_param_ty = None;
         let mut name_param_node = None;
 
@@ -958,18 +1043,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             kwarg,
                         );
                     }
-                    // TODO support `infer_variance` in legacy TypeVars
-                    if self
+                    match self
                         .infer_expression(&kwarg.value, TypeContext::default())
                         .bool(db)
-                        .is_ambiguous()
                     {
-                        return error(
-                            &self.context,
-                            "The `infer_variance` parameter of `TypeVar` \
-                            cannot have an ambiguous truthiness",
-                            &kwarg.value,
-                        );
+                        Truthiness::AlwaysTrue => infer_variance = true,
+                        Truthiness::AlwaysFalse => {}
+                        Truthiness::Ambiguous => {
+                            return error(
+                                &self.context,
+                                "The `infer_variance` parameter of `TypeVar` \
+                                cannot have an ambiguous truthiness",
+                                &kwarg.value,
+                            );
+                        }
                     }
                 }
                 name => {
@@ -979,7 +1066,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // can.
                     error(
                         &self.context,
-                        format_args!("Unknown keyword argument `{name}` in `TypeVar` creation",),
+                        format_args!("Unknown keyword argument `{name}` in `TypeVar` creation"),
                         kwarg,
                     );
                     self.infer_expression(&kwarg.value, TypeContext::default());
@@ -987,17 +1074,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let variance = match (covariant, contravariant) {
-            (true, true) => {
+        let variance = match (covariant, contravariant, infer_variance) {
+            (true, true, _) => {
                 return error(
                     &self.context,
                     "A `TypeVar` cannot be both covariant and contravariant",
                     call_expr,
                 );
             }
-            (true, false) => TypeVarVariance::Covariant,
-            (false, true) => TypeVarVariance::Contravariant,
-            (false, false) => TypeVarVariance::Invariant,
+            (true, false, true) | (false, true, true) => {
+                return error(
+                    &self.context,
+                    "A `TypeVar` cannot specify variance when `infer_variance=True`",
+                    call_expr,
+                );
+            }
+            (true, false, false) => Some(TypeVarVariance::Covariant),
+            (false, true, false) => Some(TypeVarVariance::Contravariant),
+            (false, false, false) => Some(TypeVarVariance::Invariant),
+            (false, false, true) => None,
         };
 
         let Some(name_param_ty) = name_param_ty.or_else(|| {
@@ -1084,7 +1179,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db,
             identity,
             bound_or_constraints,
-            Some(variance),
+            variance,
             default,
         )))
     }

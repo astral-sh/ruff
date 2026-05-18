@@ -1151,7 +1151,11 @@ class TarInfo:
 
     @classmethod
     def frombuf(cls, buf: bytes | bytearray, encoding: str, errors: str) -> Self:
-        """Construct a TarInfo object from a 512 byte bytes object."""
+        """Construct a TarInfo object from a 512 byte bytes object.
+
+        To support the old v7 tar format AREGTYPE headers are
+        transformed to DIRTYPE headers if their name ends in '/'.
+        """
 
     @classmethod
     def fromtarfile(cls, tarfile: TarFile) -> Self:
