@@ -19,6 +19,15 @@ $ ruff check --watch          # Lint files in the current directory and re-lint 
 $ ruff check path/to/code/    # Lint files in `path/to/code`.
 ```
 
+To read command-line arguments from a file, prefix the file path with `@`. Each argument in the
+file must be on its own line, which can be useful in CI when you need to pass a long or generated
+list of paths:
+
+```console
+$ find path/to/code -name '*.py' > changed-files.txt
+$ ruff check @changed-files.txt
+```
+
 For the full list of supported options, run `ruff check --help`.
 
 ## Rule selection

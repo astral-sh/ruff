@@ -231,7 +231,9 @@ pub struct AnalyzeGraphCommand {
 #[expect(clippy::struct_excessive_bools)]
 pub struct CheckCommand {
     /// List of files or directories to check.
-    #[clap(help = "List of files or directories to check, or `-` to read from stdin [default: .]")]
+    #[clap(
+        help = "List of files or directories to check, or `-` to read from stdin. Prefix an argument file with `@` to read additional newline-delimited arguments from that file [default: .]"
+    )]
     pub files: Vec<PathBuf>,
     /// Apply fixes to resolve lint violations.
     /// Use `--no-fix` to disable or `--unsafe-fixes` to include unsafe fixes.
@@ -500,7 +502,7 @@ pub struct CheckCommand {
 pub struct FormatCommand {
     /// List of files or directories to format.
     #[clap(
-        help = "List of files or directories to format, or `-` to read from stdin [default: .]"
+        help = "List of files or directories to format, or `-` to read from stdin. Prefix an argument file with `@` to read additional newline-delimited arguments from that file [default: .]"
     )]
     pub files: Vec<PathBuf>,
     /// Avoid writing any formatted files back; instead, exit with a non-zero status code if any
