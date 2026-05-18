@@ -332,8 +332,8 @@ enum ReduceResult<'db> {
 const MAX_RECURSIVE_UNION_LITERALS: usize = 5;
 /// If the value ​​is defined non-recursively, the fixed-point iteration will converge in one go,
 /// so in principle we can have as many literal elements as we want.
-/// We set a large limit for string and enum literals than for other kinds of literals.
-/// Huge enums and string literals are not uncommon (especially in generated code), and it's annoying
+/// We set a large limit for union and enum literals.
+/// Huge enums and string literal sets are not uncommon (especially in generated code), and it's annoying
 /// if reachability analysis etc. fails when analysing these enums.
 const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 8192;
 const MAX_NON_RECURSIVE_UNION_ENUM_LITERALS: usize = 8192;
