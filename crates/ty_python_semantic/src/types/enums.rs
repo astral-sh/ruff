@@ -39,6 +39,13 @@ pub(crate) struct EnumMetadata<'db> {
     /// independently.
     pub(crate) new_function: Option<FunctionType<'db>>,
 
+    /// Whether a user-defined enum in the inheritance chain binds `__new__`.
+    ///
+    /// Assignment forms like `__new__ = make` or `__new__ = staticmethod(make)`
+    /// may not resolve to a function literal, but they can still rewrite
+    /// `_value_` at runtime.
+    pub(crate) custom_new_binding: bool,
+
     /// The custom `_generate_next_value_` function, if defined on this enum.
     ///
     /// When present, defines the value returned by calls to `auto()`
@@ -47,6 +54,9 @@ pub(crate) struct EnumMetadata<'db> {
     /// Whether the enum metaclass may transform member values before they are
     /// passed to enum construction hooks.
     pub(crate) custom_enum_metaclass_new: bool,
+
+    /// Whether the enum metaclass may override default value-to-member lookup.
+    pub(crate) custom_enum_metaclass_call: bool,
 }
 
 impl get_size2::GetSize for EnumMetadata<'_> {}
@@ -60,8 +70,10 @@ impl<'db> EnumMetadata<'db> {
             value_annotation: None,
             init_function: None,
             new_function: None,
+            custom_new_binding: false,
             generate_next_value_function: None,
             custom_enum_metaclass_new: false,
+            custom_enum_metaclass_call: false,
         }
     }
 
@@ -153,6 +165,40 @@ impl<'db> EnumMetadata<'db> {
             self.aliases.get(name)
         }
     }
+
+    /// Returns the value that can be passed to the enum class to retrieve `member_name`.
+    fn lookup_value_type(
+        &self,
+        db: &'db dyn Db,
+        class: ClassLiteral<'db>,
+        member_name: &Name,
+    ) -> Option<Type<'db>> {
+        let is_user_defined =
+            |function: FunctionType<'db>| !function.file(db).path(db).is_vendored_path();
+        if self.init_function.is_some_and(is_user_defined)
+            || self.custom_new_binding
+            || self.custom_enum_metaclass_new
+            || self.custom_enum_metaclass_call
+        {
+            return None;
+        }
+
+        let mut value_ty = self.members.get(member_name).copied()?;
+        if self.auto_members.contains(member_name) {
+            // Default `auto()` values depend on the preceding runtime values,
+            // so the collected placeholder is not precise enough for lookup.
+            value_ty = self
+                .generate_next_value_function?
+                .signature(db)
+                .overload_return_type_or_unknown(db);
+        }
+
+        if data_mixin_preserves_value(db, class, value_ty) {
+            Some(value_ty)
+        } else {
+            None
+        }
+    }
 }
 
 /// Returns the set of names listed in an enum's `_ignore_` attribute.
@@ -227,18 +273,51 @@ fn alias_detection_value<'db>(
     value_ty: Type<'db>,
     is_auto: bool,
     generate_next_value_function: Option<FunctionType<'db>>,
-    user_defined_new_function: Option<FunctionType<'db>>,
+    custom_new_binding: bool,
     custom_enum_metaclass_new: bool,
 ) -> Option<Type<'db>> {
     if !is_auto {
         Some(value_ty)
-    } else if user_defined_new_function.is_some() || custom_enum_metaclass_new {
+    } else if custom_new_binding || custom_enum_metaclass_new {
         None
     } else if let Some(func_ty) = generate_next_value_function {
         Some(func_ty.signature(db).overload_return_type_or_unknown(db))
     } else {
         Some(value_ty)
     }
+}
+
+/// Returns `true` if an enum data-type mixin leaves `value_ty` unchanged at runtime.
+///
+/// Enum construction looks up members by the post-mixin value, not necessarily the raw RHS in the
+/// class body. We only reuse the raw RHS for builtin mixins with literal values that are known to
+/// be preserved by the mixin constructor.
+fn data_mixin_preserves_value<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+    value_ty: Type<'db>,
+) -> bool {
+    let Some(data_mixin) = class
+        .iter_mro(db)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+        .find(|base| {
+            !base.is_object(db)
+                && !Type::from(*base).is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
+        })
+    else {
+        return true;
+    };
+
+    matches!(
+        (data_mixin.known(db), value_ty.as_literal_value_kind()),
+        (Some(KnownClass::Int), Some(LiteralValueTypeKind::Int(_)))
+            | (Some(KnownClass::Str), Some(LiteralValueTypeKind::String(_)))
+            | (
+                Some(KnownClass::Bytes),
+                Some(LiteralValueTypeKind::Bytes(_))
+            )
+    )
 }
 
 /// List all members of an enum.
@@ -283,8 +362,10 @@ pub(crate) fn enum_metadata<'db>(
                 value_annotation: None,
                 init_function: None,
                 new_function: None,
+                custom_new_binding: false,
                 generate_next_value_function: None,
                 custom_enum_metaclass_new: false,
+                custom_enum_metaclass_call: false,
             });
         }
     };
@@ -317,7 +398,11 @@ pub(crate) fn enum_metadata<'db>(
     let user_defined_new_function =
         custom_new(db, scope_id).or_else(|| inherited_user_defined_new(db, class));
     let new_function = user_defined_new_function.or_else(|| inherited_new(db, class));
+    let custom_new_binding = (is_user_defined_class(db, class)
+        && has_custom_new_binding(db, scope_id))
+        || inherited_custom_new_binding(db, class);
     let custom_enum_metaclass_new = custom_enum_metaclass_new(db, class);
+    let custom_enum_metaclass_call = custom_enum_metaclass_call(db, class);
     let generate_next_value_function = custom_generate_next_value(db, scope_id)
         .or_else(|| inherited_generate_next_value(db, class));
 
@@ -461,7 +546,7 @@ pub(crate) fn enum_metadata<'db>(
                 value_ty,
                 auto_members.contains(name),
                 generate_next_value_function,
-                user_defined_new_function,
+                custom_new_binding,
                 custom_enum_metaclass_new,
             );
             if let Some(alias_value_ty) = alias_value_ty
@@ -525,8 +610,10 @@ pub(crate) fn enum_metadata<'db>(
         value_annotation,
         init_function,
         new_function,
+        custom_new_binding,
         generate_next_value_function,
         custom_enum_metaclass_new,
+        custom_enum_metaclass_call,
     })
 }
 
@@ -546,7 +633,36 @@ fn custom_enum_metaclass_new<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db
         .filter_map(ClassBase::into_class)
         .filter_map(|base| base.class_literal(db).as_static())
         .take_while(|base| base.known(db) != Some(KnownClass::EnumType))
-        .any(|base| custom_new(db, base.body_scope(db)).is_some())
+        .any(|base| has_custom_new_binding(db, base.body_scope(db)))
+}
+
+/// Returns whether an enum's metaclass has a custom `__call__` before the
+/// stdlib `EnumType`/`EnumMeta` implementation.
+///
+/// Such a metaclass can replace the usual value-to-member lookup performed by
+/// `EnumType.__call__`. If the metaclass is dynamic or otherwise not
+/// inspectable, we conservatively assume that lookup may be replaced.
+fn custom_enum_metaclass_call<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
+    let Some(metaclass) = class.metaclass(db).to_class_type(db) else {
+        return true;
+    };
+
+    for base in metaclass.class_literal(db).iter_mro(db) {
+        let Some(base) = base.into_class() else {
+            return true;
+        };
+        let Some(base) = base.class_literal(db).as_static() else {
+            return true;
+        };
+        if base.known(db) == Some(KnownClass::EnumType) {
+            return false;
+        }
+        if custom_call(db, base.body_scope(db)) {
+            return true;
+        }
+    }
+
+    false
 }
 
 /// Iterates over parent enum classes in the MRO, skipping known enum
@@ -622,8 +738,15 @@ fn inherited_user_defined_new<'db>(
     class: StaticClassLiteral<'db>,
 ) -> Option<FunctionType<'db>> {
     iter_parent_enum_classes(db, class)
-        .filter(|base| base.known(db).is_none())
+        .filter(|base| is_user_defined_class(db, *base))
         .find_map(|base| custom_new(db, base.body_scope(db)))
+}
+
+/// Returns whether a user-defined parent enum class in the MRO binds `__new__`.
+fn inherited_custom_new_binding<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
+    iter_parent_enum_classes(db, class)
+        .filter(|base| is_user_defined_class(db, *base))
+        .any(|base| has_custom_new_binding(db, base.body_scope(db)))
 }
 
 /// Looks up an inherited `_generate_next_value_` from parent enum classes in the MRO.
@@ -667,6 +790,36 @@ fn custom_new<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<FunctionType<
     }
 }
 
+/// Returns whether `__new__` has any reachable binding in the given scope.
+fn has_custom_new_binding<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> bool {
+    let Some(new_symbol_id) = place_table(db, scope).symbol_id("__new__") else {
+        return false;
+    };
+    let new_place = place_from_bindings(
+        db,
+        use_def_map(db, scope).end_of_scope_symbol_bindings(new_symbol_id),
+    )
+    .place;
+    !matches!(new_place, Place::Undefined)
+}
+
+fn is_user_defined_class(db: &dyn Db, class: StaticClassLiteral<'_>) -> bool {
+    !class.file(db).path(db).is_vendored_path()
+}
+
+/// Returns whether a custom `__call__` is defined on the enum metaclass.
+fn custom_call<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> bool {
+    let Some(call_symbol_id) = place_table(db, scope).symbol_id("__call__") else {
+        return false;
+    };
+    let call_place = place_from_bindings(
+        db,
+        use_def_map(db, scope).end_of_scope_symbol_bindings(call_symbol_id),
+    )
+    .place;
+    !matches!(call_place, Place::Undefined)
+}
+
 /// Returns the custom `_generate_next_value_` function type if one is defined on the enum.
 fn custom_generate_next_value<'db>(
     db: &'db dyn Db,
@@ -699,6 +852,171 @@ pub(crate) fn enum_member_literals<'a, 'db: 'a>(
             .filter(move |name| Some(*name) != exclude_member)
             .map(move |name| Type::enum_literal(EnumLiteralType::new(db, class, name.clone())))
     })
+}
+
+pub(crate) fn enum_member_by_value<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+    value_ty: Type<'db>,
+) -> Option<Type<'db>> {
+    enum EnumValueMatch {
+        Equal,
+        NotEqual,
+        Unknown,
+    }
+
+    fn enum_value_match<'db>(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> EnumValueMatch {
+        #[derive(Copy, Clone, Eq, PartialEq)]
+        enum ValueMixinKind {
+            Int,
+            Str,
+            Bytes,
+        }
+
+        fn enum_literal_value_mixin_kind<'db>(
+            db: &'db dyn Db,
+            enum_literal: EnumLiteralType<'db>,
+        ) -> Option<ValueMixinKind> {
+            let enum_class = Type::from(enum_literal.enum_class(db));
+            if enum_class.is_subtype_of(db, KnownClass::Int.to_subclass_of(db)) {
+                Some(ValueMixinKind::Int)
+            } else if enum_class.is_subtype_of(db, KnownClass::Str.to_subclass_of(db)) {
+                Some(ValueMixinKind::Str)
+            } else if enum_class.is_subtype_of(db, KnownClass::Bytes.to_subclass_of(db)) {
+                Some(ValueMixinKind::Bytes)
+            } else {
+                None
+            }
+        }
+
+        fn literal_value_mixin_kind<'db>(
+            db: &'db dyn Db,
+            literal: LiteralValueTypeKind<'db>,
+        ) -> Option<ValueMixinKind> {
+            match literal {
+                LiteralValueTypeKind::Int(_) | LiteralValueTypeKind::Bool(_) => {
+                    Some(ValueMixinKind::Int)
+                }
+                LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => {
+                    Some(ValueMixinKind::Str)
+                }
+                LiteralValueTypeKind::Bytes(_) => Some(ValueMixinKind::Bytes),
+                LiteralValueTypeKind::Enum(enum_literal) => {
+                    enum_literal_value_mixin_kind(db, enum_literal)
+                }
+            }
+        }
+
+        // `Literal[...]` annotations produce unpromotable literal types, while enum member
+        // expressions store promotable literals. Enum value lookup only cares about the underlying
+        // runtime value.
+        match (left.as_literal_value_kind(), right.as_literal_value_kind()) {
+            (
+                Some(LiteralValueTypeKind::LiteralString),
+                Some(LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString),
+            )
+            | (Some(LiteralValueTypeKind::String(_)), Some(LiteralValueTypeKind::LiteralString)) => {
+                return EnumValueMatch::Unknown;
+            }
+            (
+                Some(LiteralValueTypeKind::LiteralString),
+                Some(LiteralValueTypeKind::Enum(enum_literal)),
+            )
+            | (
+                Some(LiteralValueTypeKind::Enum(enum_literal)),
+                Some(LiteralValueTypeKind::LiteralString),
+            ) if enum_literal_value_mixin_kind(db, enum_literal) == Some(ValueMixinKind::Str) => {
+                return EnumValueMatch::Unknown;
+            }
+            (Some(LiteralValueTypeKind::LiteralString), Some(_))
+            | (Some(_), Some(LiteralValueTypeKind::LiteralString)) => {
+                return EnumValueMatch::NotEqual;
+            }
+            (Some(LiteralValueTypeKind::Bool(left)), Some(LiteralValueTypeKind::Int(right)))
+            | (Some(LiteralValueTypeKind::Int(right)), Some(LiteralValueTypeKind::Bool(left))) => {
+                return if right.as_i64() == i64::from(left) {
+                    EnumValueMatch::Equal
+                } else {
+                    EnumValueMatch::NotEqual
+                };
+            }
+            (Some(LiteralValueTypeKind::Enum(left)), Some(LiteralValueTypeKind::Enum(right)))
+                if left == right =>
+            {
+                return EnumValueMatch::Equal;
+            }
+            (Some(LiteralValueTypeKind::Enum(enum_literal)), Some(other))
+            | (Some(other), Some(LiteralValueTypeKind::Enum(enum_literal)))
+                if enum_literal_value_mixin_kind(db, enum_literal)
+                    .is_some_and(|kind| literal_value_mixin_kind(db, other) == Some(kind)) =>
+            {
+                return EnumValueMatch::Unknown;
+            }
+            (Some(left), Some(right)) => {
+                return if left == right {
+                    EnumValueMatch::Equal
+                } else {
+                    EnumValueMatch::NotEqual
+                };
+            }
+            _ => {}
+        }
+
+        if left == right && left.is_singleton(db) && right.is_singleton(db) {
+            EnumValueMatch::Equal
+        } else {
+            EnumValueMatch::Unknown
+        }
+    }
+
+    fn add_matching_member<'db>(
+        db: &'db dyn Db,
+        class: ClassLiteral<'db>,
+        metadata: &EnumMetadata<'db>,
+        value_ty: Type<'db>,
+        builder: &mut UnionBuilder<'db>,
+    ) -> Option<()> {
+        if let Some(union) = value_ty.as_union_like(db) {
+            for element in union.elements(db) {
+                add_matching_member(db, class, metadata, *element, builder)?;
+            }
+            return Some(());
+        }
+
+        if let Some(enum_literal) = value_ty.as_enum_literal()
+            && enum_literal.enum_class(db) == class
+        {
+            if metadata.custom_enum_metaclass_call {
+                return None;
+            }
+            builder.add_in_place(value_ty);
+            return Some(());
+        }
+
+        for name in metadata.members.keys() {
+            let member_value_ty = metadata.lookup_value_type(db, class, name)?;
+            match enum_value_match(db, member_value_ty, value_ty) {
+                EnumValueMatch::Equal => {
+                    builder.add_in_place(Type::enum_literal(EnumLiteralType::new(
+                        db,
+                        class,
+                        name.clone(),
+                    )));
+                    return Some(());
+                }
+                EnumValueMatch::NotEqual => {}
+                EnumValueMatch::Unknown => return None,
+            }
+        }
+
+        None
+    }
+
+    let metadata = enum_metadata(db, class)?;
+    let mut builder = UnionBuilder::new(db);
+
+    add_matching_member(db, class, metadata, value_ty, &mut builder)?;
+    Some(builder.build())
 }
 
 pub(crate) fn is_single_member_enum<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {

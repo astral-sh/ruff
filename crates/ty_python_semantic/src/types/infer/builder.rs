@@ -66,7 +66,7 @@ use crate::types::diagnostic::{
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
     report_unsupported_augmented_assignment, report_unsupported_comparison,
 };
-use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
+use crate::types::enums::{enum_ignored_names, enum_member_by_value, is_enum_class_by_inheritance};
 use crate::types::function::{
     FunctionDecorators, FunctionType, KnownFunction, report_revealed_type,
 };
@@ -7778,7 +7778,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let scope = self.scope();
-        let return_ty = bindings.return_type(db);
+        let return_ty = callable_type
+            .as_class_literal()
+            .and_then(|class| {
+                let value_arg = match (&*arguments.args, &*arguments.keywords) {
+                    ([arg], []) => Some(arg),
+                    ([], [keyword])
+                        if keyword.arg.as_ref().is_some_and(|arg| arg.id == "value") =>
+                    {
+                        Some(&keyword.value)
+                    }
+                    _ => None,
+                }?;
+                let value_ty = self.expression_type(value_arg);
+                enum_member_by_value(db, class, value_ty)
+            })
+            .unwrap_or_else(|| bindings.return_type(db));
 
         let find_narrowed_place = |argument_index: usize| match arguments.args.get(argument_index) {
             None => {

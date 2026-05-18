@@ -17,40 +17,233 @@ reveal_type(Color.RED.value)  # revealed: Literal[1]
 
 # TODO: Could be `Literal[Color.RED]` to be more precise
 reveal_type(Color["RED"])  # revealed: Color
-reveal_type(Color(1))  # revealed: Color
+reveal_type(Color(1))  # revealed: Literal[Color.RED]
 
 reveal_type(Color.RED in Color)  # revealed: bool
 ```
 
 ## Constructor calls
 
+ty returns the precise enum member literal when the single `value` argument is statically known to
+match an existing enum value. Unknown values and values that do not statically match a member still
+fall back to the enum class type.
+
 ```py
-from enum import Enum, IntEnum
+from enum import Enum, Flag, IntEnum, IntFlag, auto
+from typing import Any, Literal
+from typing_extensions import LiteralString
 
 class Number(Enum):
     ONE = 1
     TWO = 2
 
-reveal_type(Number(1))  # revealed: Number
-reveal_type(Number(value=1))  # revealed: Number
+reveal_type(Number(1))  # revealed: Literal[Number.ONE]
+reveal_type(Number(value=1))  # revealed: Literal[Number.ONE]
+reveal_type(Number(3))  # revealed: Number
+reveal_type(Number(Number.ONE))  # revealed: Literal[Number.ONE]
+
+def number_from_literal(value: Literal[1, 2]):
+    # This is equivalent to `Literal[Number.ONE, Number.TWO]`.
+    reveal_type(Number(value))  # revealed: Number
+
+class ManyNumbers(Enum):
+    ONE = 1
+    TWO = 2
+    THREE = 3
+
+def many_numbers_from_literal(value: Literal[1, 2]):
+    reveal_type(ManyNumbers(value))  # revealed: Literal[ManyNumbers.ONE, ManyNumbers.TWO]
 
 class MixedInt(IntEnum):
     ONE = 1
     TWO = 2
 
-reveal_type(MixedInt(1))  # revealed: MixedInt
+reveal_type(MixedInt(1))  # revealed: Literal[MixedInt.ONE]
 
 class MixedStr(str, Enum):
     RED = "red"
     BLUE = "blue"
 
-reveal_type(MixedStr("red"))  # revealed: MixedStr
+reveal_type(MixedStr("red"))  # revealed: Literal[MixedStr.RED]
+
+class StrValue(str, Enum):
+    X = "x"
+    Y = "y"
+
+class StrEnumValueAlias(Enum):
+    MEMBER = StrValue.X
+    ALIAS = "x"
+
+reveal_type(StrEnumValueAlias("x"))  # revealed: StrEnumValueAlias
+reveal_type(StrEnumValueAlias(StrValue.X))  # revealed: Literal[StrEnumValueAlias.MEMBER]
+
+class CoercedStr(str, Enum):
+    ONE = 1
+    TWO = 2
+
+reveal_type(CoercedStr(1))  # revealed: CoercedStr
+
+class CoercedStrAlias(str, Enum):
+    ONE = 1
+    ALSO_ONE = "1"
+
+reveal_type(CoercedStrAlias("1"))  # revealed: CoercedStrAlias
+
+def get_str() -> str:
+    return "red"
+
+class BroadStr(Enum):
+    RED = get_str()
+    BLUE = "blue"
+
+def broad_str(value: str):
+    reveal_type(BroadStr(value))  # revealed: BroadStr
+
+def get_literal_string() -> LiteralString:
+    return "red"
+
+class BroadLiteralString(Enum):
+    RED = get_literal_string()
+    BLUE = "blue"
+
+def broad_literal_string(value: LiteralString):
+    reveal_type(BroadLiteralString(value))  # revealed: BroadLiteralString
 
 class Maybe(Enum):
     NONE = None
     SOME = "some"
 
-reveal_type(Maybe(None))  # revealed: Maybe
+reveal_type(Maybe(None))  # revealed: Literal[Maybe.NONE]
+
+class Alias(Enum):
+    FIRST = "same"
+    SECOND = "other"
+    ALSO_FIRST = "same"
+
+reveal_type(Alias("same"))  # revealed: Literal[Alias.FIRST]
+reveal_type(Alias("other"))  # revealed: Literal[Alias.SECOND]
+
+class BoolIntAlias(Enum):
+    TRUE = True
+    ONE = 1
+
+reveal_type(BoolIntAlias(1))  # revealed: Literal[BoolIntAlias.TRUE]
+reveal_type(BoolIntAlias(True))  # revealed: Literal[BoolIntAlias.TRUE]
+
+class DefaultAutoAfterNegative(Enum):
+    NEGATIVE = -1
+    AUTO = auto()
+
+reveal_type(DefaultAutoAfterNegative(1))  # revealed: DefaultAutoAfterNegative
+
+class ReferencedIntEnum(IntEnum):
+    A = 1
+    B = 2
+
+class IntEnumValueAlias(Enum):
+    Y = ReferencedIntEnum.A
+    X = 1
+
+reveal_type(IntEnumValueAlias(1))  # revealed: IntEnumValueAlias
+reveal_type(IntEnumValueAlias(ReferencedIntEnum.A))  # revealed: Literal[IntEnumValueAlias.Y]
+
+class FloatIntAlias(Enum):
+    FLOAT = 1.0
+    INT = 1
+
+reveal_type(FloatIntAlias(1))  # revealed: FloatIntAlias
+
+class CustomAutoLookup(Enum):
+    _value_: Literal[1]
+
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal[2]:
+        return 2
+
+    A = auto()
+    B = 1
+
+reveal_type(CustomAutoLookup(1))  # revealed: Literal[CustomAutoLookup.B]
+reveal_type(CustomAutoLookup(2))  # revealed: Literal[CustomAutoLookup.A]
+
+def assigned_new(cls: Any, value: int) -> Any:
+    obj = object.__new__(cls)
+    obj._value_ = value + 1
+    return obj
+
+class AssignedNew(Enum):
+    __new__ = assigned_new
+    A = 1
+    B = 2
+
+reveal_type(AssignedNew(2))  # revealed: AssignedNew
+
+class StaticmethodAssignedNew(Enum):
+    __new__ = staticmethod(assigned_new)
+    A = 1
+    B = 2
+
+reveal_type(StaticmethodAssignedNew(2))  # revealed: StaticmethodAssignedNew
+
+class CustomCallMeta(type(Enum)):
+    def __call__(self, value: Any, names: None = None) -> Any:  # ty: ignore[invalid-method-override]
+        return super().__call__(2)
+
+class CustomCall(Enum, metaclass=CustomCallMeta):
+    A = 1
+    B = 2
+
+reveal_type(CustomCall(1))  # revealed: CustomCall
+reveal_type(CustomCall(CustomCall.A))  # revealed: CustomCall
+
+class CallableCall:
+    def __call__(self, value: Any, names: None = None) -> Any:
+        return value
+
+class NonFunctionCallMeta(type(Enum)):
+    __call__ = CallableCall()
+
+class NonFunctionCall(Enum, metaclass=NonFunctionCallMeta):
+    A = 1
+    B = 2
+
+reveal_type(NonFunctionCall(1))  # revealed: NonFunctionCall
+
+def get_meta() -> Any:
+    return type(Enum)
+
+class DynamicMeta(Enum, metaclass=get_meta()):
+    A = 1
+    B = 2
+
+reveal_type(DynamicMeta(1))  # revealed: DynamicMeta
+reveal_type(DynamicMeta(DynamicMeta.A))  # revealed: DynamicMeta
+
+def get_base() -> Any:
+    return type
+
+class DynamicBaseMeta(get_base(), type(Enum)):
+    pass
+
+class DynamicBaseEnum(Enum, metaclass=DynamicBaseMeta):
+    A = 1
+    B = 2
+
+reveal_type(DynamicBaseEnum(1))  # revealed: DynamicBaseEnum
+
+class Permission(Flag):
+    READ = auto()
+    WRITE = auto()
+    EXECUTE = auto()
+
+reveal_type(Permission(3))  # revealed: Permission
+
+class IntPermission(IntFlag):
+    READ = auto()
+    WRITE = auto()
+    EXECUTE = auto()
+
+reveal_type(IntPermission(3))  # revealed: IntPermission
 
 class Planet(Enum):
     _value_: int
@@ -75,7 +268,7 @@ reveal_type(EmptyEnum(1, 2))  # revealed: EmptyEnum
 
 Dynamic = Enum("Dynamic", {"RED": "red", "GREEN": "green"})
 
-reveal_type(Dynamic("red"))  # revealed: Dynamic
+reveal_type(Dynamic("red"))  # revealed: Literal[Dynamic.RED]
 ```
 
 ## Constructor calls on Python 3.12
