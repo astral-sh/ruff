@@ -2926,7 +2926,16 @@ impl<'src> Parser<'src> {
         // test_err lambda_body_with_yield_expr
         // lambda x: yield y
         // lambda x: yield from y
-        let body = self.parse_conditional_expression_or_higher();
+
+        // `lambda: lambda: lambda: ...` recurses through the lambda body at
+        // the conditional layer, bypassing the `parse_lhs_expression` guard.
+        let body = if let Some(scope) = self.enter_recursion(self.current_token_range()) {
+            let body = self.parse_conditional_expression_or_higher();
+            scope.exit(self);
+            body
+        } else {
+            self.recursion_recovery_expr()
+        };
 
         ast::ExprLambda {
             body: Box::new(body.expr),
@@ -2950,7 +2959,16 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Else);
 
-        let orelse = self.parse_conditional_expression_or_higher();
+        // `a if b else a if b else ...` recurses through `orelse` at the
+        // conditional layer, which is not covered by the `parse_lhs_expression`
+        // guard (that scope is released once each atom is parsed). Guard here.
+        let orelse = if let Some(scope) = self.enter_recursion(self.current_token_range()) {
+            let orelse = self.parse_conditional_expression_or_higher();
+            scope.exit(self);
+            orelse
+        } else {
+            self.recursion_recovery_expr()
+        };
 
         ast::ExprIf {
             body: Box::new(body),
