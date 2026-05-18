@@ -199,22 +199,29 @@ use crate::{
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
         CallableTypes, IntersectionBuilder, KnownClass, NarrowingConstraint, Type, TypeContext,
-        UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
+        UnionBuilder, UnionType, infer_expression_type, infer_expression_types,
+        infer_narrowing_constraint,
     },
 };
+use ruff_db::parsed::parsed_module;
+use ruff_python_ast as ast;
+use ruff_python_ast::helpers::any_over_expr;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
     SemanticIndex, Truthiness, UseDefMap,
     definition::DefinitionState,
-    place::ScopedPlaceId,
+    expression::Expression,
+    place::{PlaceExpr, ScopedPlaceId},
     place_table,
     predicate::{
-        CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
-        Predicates, ScopedPredicateId,
+        CallableAndCallExpr, ChainedComparisonPart, PatternPredicate, PatternPredicateKind,
+        Predicate, PredicateNode, Predicates, ScopedPredicateId,
     },
-    reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
+    reachability_constraints::{
+        InteriorNode, ReachabilityConstraints, ScopedReachabilityConstraintId,
+    },
 };
 
 fn singleton_to_type(db: &dyn Db, singleton: ruff_python_ast::Singleton) -> Type<'_> {
@@ -674,34 +681,49 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                 let node = self.constraints.get_interior_node(id);
                 let predicate = self.predicates[node.atom()];
 
-                if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
-                    match analyze_single(self.db, &predicate) {
-                        Truthiness::AlwaysTrue => self.project(node.if_true()),
-                        Truthiness::AlwaysFalse => self.project(node.if_false()),
-                        Truthiness::Ambiguous => {
-                            unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
+                match predicate.node {
+                    PredicateNode::IsNonTerminalCall(_) => {
+                        match analyze_single(self.db, &predicate) {
+                            Truthiness::AlwaysTrue => self.project(node.if_true()),
+                            Truthiness::AlwaysFalse => self.project(node.if_false()),
+                            Truthiness::Ambiguous => {
+                                unreachable!(
+                                    "`IsNonTerminalCall` predicates should never be Ambiguous"
+                                )
+                            }
                         }
                     }
-                } else {
-                    let if_true = self.project(node.if_true());
-                    let if_false = self.project(node.if_false());
-                    let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom());
-
-                    if pos_constraint.is_none() && neg_constraint.is_none() {
-                        self.graph.or(if_true, if_false)
-                    } else {
-                        self.graph.add_node(ProjectedNarrowingNode {
-                            atom: node.atom(),
-                            if_true,
-                            if_false,
-                        })
+                    PredicateNode::ChainedComparisonPart(_) => {
+                        match analyze_single(self.db, &predicate) {
+                            Truthiness::AlwaysTrue => self.project(node.if_true()),
+                            Truthiness::AlwaysFalse => self.project(node.if_false()),
+                            Truthiness::Ambiguous => self.project_ambiguous_node(node),
+                        }
                     }
+                    _ => self.project_ambiguous_node(node),
                 }
             }
         };
 
         self.project_cache.insert(id, projected);
         projected
+    }
+
+    fn project_ambiguous_node(&mut self, node: InteriorNode) -> ProjectedNarrowingNodeId {
+        let atom = node.atom();
+        let if_true = self.project(node.if_true());
+        let if_false = self.project(node.if_false());
+        let (pos_constraint, neg_constraint) = self.predicate_constraints(atom);
+
+        if pos_constraint.is_none() && neg_constraint.is_none() {
+            self.graph.or(if_true, if_false)
+        } else {
+            self.graph.add_node(ProjectedNarrowingNode {
+                atom,
+                if_true,
+                if_false,
+            })
+        }
     }
 }
 
@@ -864,6 +886,110 @@ fn analyze_single_pattern_predicate_kind<'db>(
     }
 }
 
+#[salsa::tracked(
+    cycle_initial=|_, _, _, _| Truthiness::Ambiguous,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn analyze_chained_comparison_part<'db>(
+    db: &'db dyn Db,
+    comparison: Expression<'db>,
+    index: u32,
+) -> Truthiness {
+    let part = ChainedComparisonPart { comparison, index };
+    let module = parsed_module(db, comparison.file(db)).load(db);
+    let expression_node = comparison.node_ref(db).node(&module);
+    let ast::Expr::Compare(expr_compare) = expression_node else {
+        return Truthiness::Ambiguous;
+    };
+    let Some((left, op, right)) = part.expressions(expr_compare) else {
+        return Truthiness::Ambiguous;
+    };
+
+    if let Some(truthiness) = same_symbol_identity_comparison(left, op, right) {
+        return truthiness;
+    }
+
+    if let (Some(left), Some(right)) = (singleton_expression(left), singleton_expression(right)) {
+        let truthiness = Truthiness::from(left == right);
+        return match op {
+            ast::CmpOp::Is => truthiness,
+            ast::CmpOp::IsNot => truthiness.negate(),
+            _ => Truthiness::Ambiguous,
+        };
+    }
+
+    let inference = infer_expression_types(db, comparison, TypeContext::default());
+    let left_ty = inference.expression_type(left);
+    let right_ty = inference.expression_type(right);
+
+    match op {
+        ast::CmpOp::Is => analyze_identity_comparison(db, left_ty, right_ty),
+        ast::CmpOp::IsNot => analyze_identity_comparison(db, left_ty, right_ty).negate(),
+        _ => Truthiness::Ambiguous,
+    }
+}
+
+fn same_symbol_identity_comparison(
+    left: &ast::Expr,
+    op: ast::CmpOp,
+    right: &ast::Expr,
+) -> Option<Truthiness> {
+    if !matches!(op, ast::CmpOp::Is | ast::CmpOp::IsNot) {
+        return None;
+    }
+
+    let left = PlaceExpr::try_from_expr(left)?;
+    let right_place = PlaceExpr::try_from_expr(right)?;
+
+    if !matches!(&left, PlaceExpr::Symbol(_))
+        || left != right_place
+        || expression_rebinds_place(right, &left)
+    {
+        return None;
+    }
+
+    Some(Truthiness::from(matches!(op, ast::CmpOp::Is)))
+}
+
+fn expression_rebinds_place(expr: &ast::Expr, place: &PlaceExpr) -> bool {
+    let root = place.root_symbol_name();
+    any_over_expr(expr, |expr| {
+        let ast::Expr::Named(named) = expr else {
+            return false;
+        };
+        named
+            .target
+            .as_name_expr()
+            .is_some_and(|target| target.id == root)
+    })
+}
+
+fn singleton_expression(expr: &ast::Expr) -> Option<ast::Singleton> {
+    match expr {
+        ast::Expr::NoneLiteral(_) => Some(ast::Singleton::None),
+        ast::Expr::BooleanLiteral(boolean) => Some(if boolean.value {
+            ast::Singleton::True
+        } else {
+            ast::Singleton::False
+        }),
+        _ => None,
+    }
+}
+
+fn analyze_identity_comparison<'db>(
+    db: &'db dyn Db,
+    left_ty: Type<'db>,
+    right_ty: Type<'db>,
+) -> Truthiness {
+    if left_ty.is_disjoint_from(db, right_ty) {
+        Truthiness::AlwaysFalse
+    } else if left_ty.is_singleton(db) && left_ty.is_equivalent_to(db, right_ty) {
+        Truthiness::AlwaysTrue
+    } else {
+        Truthiness::Ambiguous
+    }
+}
+
 fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
@@ -871,6 +997,10 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
         PredicateNode::Expression(test_expr) => {
             infer_expression_type(db, test_expr, TypeContext::default())
                 .bool(db)
+                .negate_if(!predicate.is_positive)
+        }
+        PredicateNode::ChainedComparisonPart(part) => {
+            analyze_chained_comparison_part(db, part.comparison, part.index)
                 .negate_if(!predicate.is_positive)
         }
         PredicateNode::IsNonTerminalCall(CallableAndCallExpr {

@@ -67,6 +67,13 @@ impl PlaceExpr {
         let member_expression = MemberExpr::try_from_builder(builder)?;
         Some(Self::Member(Member::new(member_expression)))
     }
+
+    pub fn root_symbol_name(&self) -> &str {
+        match self {
+            Self::Symbol(symbol) => symbol.name().as_str(),
+            Self::Member(member) => member.expression().symbol_name(),
+        }
+    }
 }
 
 impl std::fmt::Display for PlaceExpr {
@@ -646,23 +653,22 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
     fn expr_compare(&self, expr_compare: &ast::ExprCompare) -> PossiblyNarrowedPlaces {
         let mut places = PossiblyNarrowedPlaces::default();
 
-        // The left side can be narrowed
-        self.add_narrowing_target(&expr_compare.left, &mut places);
-
-        // Each comparator can also be narrowed
-        for comparator in &expr_compare.comparators {
-            self.add_narrowing_target(comparator, &mut places);
+        for expr in std::iter::once(&*expr_compare.left).chain(&expr_compare.comparators) {
+            self.add_comparison_narrowing_target(expr, &mut places);
         }
 
-        // For subscript expressions on either side, the subscript base can also be narrowed.
-        // (TypedDict and tuple discriminated union narrowing.)
-        for expr in std::iter::once(&*expr_compare.left).chain(&expr_compare.comparators) {
-            if let ast::Expr::Subscript(subscript) = expr.expression_value()
-                && let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value)
-                && let Some(place) = self.places.place_id((&place_expr).into())
-            {
-                places.insert(place);
-            }
+        places
+    }
+
+    pub(crate) fn chained_comparison_part(
+        &self,
+        left: &ast::Expr,
+        right: &ast::Expr,
+    ) -> PossiblyNarrowedPlaces {
+        let mut places = PossiblyNarrowedPlaces::default();
+
+        for expr in [left, right] {
+            self.add_comparison_narrowing_target(expr, &mut places);
         }
 
         places
@@ -739,6 +745,23 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                 }
             }
             _ => {}
+        }
+    }
+
+    fn add_comparison_narrowing_target(
+        &self,
+        expr: &ast::Expr,
+        places: &mut PossiblyNarrowedPlaces,
+    ) {
+        self.add_narrowing_target(expr, places);
+
+        // For subscript expressions on either side, the subscript base can also be narrowed.
+        // (TypedDict and tuple discriminated union narrowing.)
+        if let ast::Expr::Subscript(subscript) = expr.expression_value()
+            && let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value)
+            && let Some(place) = self.places.place_id((&place_expr).into())
+        {
+            places.insert(place);
         }
     }
 

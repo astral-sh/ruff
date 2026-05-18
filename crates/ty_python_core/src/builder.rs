@@ -26,19 +26,21 @@ use crate::ast_ids::node_key::ExpressionNodeKey;
 use crate::ast_node_ref::AstNodeRef;
 use crate::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
-    ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
-    DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef, ExceptHandlerDefinitionNodeRef,
-    ForStmtDefinitionNodeRef, ImportDefinitionNodeRef, ImportFromDefinitionNodeRef,
-    ImportFromSubmoduleDefinitionNodeRef, LambdaParameterDefinitionNodeRef,
-    LoopHeaderDefinitionNodeRef, LoopStmtRef, MatchPatternDefinitionNodeRef,
-    ParameterDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionKind,
+    DefinitionNodeKey, DefinitionNodeRef, DefinitionState, Definitions, DictKeyAssignmentNodeRef,
+    ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef, ImportDefinitionNodeRef,
+    ImportFromDefinitionNodeRef, ImportFromSubmoduleDefinitionNodeRef,
+    LambdaParameterDefinitionNodeRef, LoopHeaderDefinitionNodeRef, LoopStmtRef,
+    MatchPatternDefinitionNodeRef, ParameterDefinitionNodeRef, StarImportDefinitionNodeRef,
+    WithItemDefinitionNodeRef,
 };
 use crate::expression::{Expression, ExpressionKind};
 use crate::member::MemberExprBuilder;
 use crate::place::{PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId};
 use crate::predicate::{
-    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode, PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
+    CallableAndCallExpr, ChainedComparisonPart, ClassPatternKind, PatternPredicate,
+    PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral, ScopedPredicateId,
+    StarImportPlaceholderPredicate,
 };
 use crate::program::Program;
 use crate::re_exports::exported_names;
@@ -895,13 +897,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let Some(alias) = self.narrowing_aliases.get(&name.id).cloned() else {
                 return;
             };
-            let aliased_expression = Expression::new(
-                self.db,
-                self.file,
+            let aliased_expression = self.expression_in_scope(
+                alias.expression,
                 alias.expression_scope,
-                AstNodeRef::new(self.module, alias.expression),
-                None,
                 ExpressionKind::Normal,
+                None,
             );
             self.alias_predicates.insert(
                 ExpressionNodeKey::from(leaf),
@@ -937,7 +937,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// leave different bindings behind depending on the condition outcome.
     fn condition_flow_snapshots(&self, expr: &ast::Expr) -> Option<ConditionFlowSnapshots> {
         match expr {
-            ast::Expr::BoolOp(_) => self
+            ast::Expr::BoolOp(_) | ast::Expr::Compare(_) => self
                 .condition_flow_snapshots_by_node
                 .get(&ExpressionNodeKey::from(expr))
                 .cloned(),
@@ -948,6 +948,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     falsy: snapshots.truthy,
                 })
             }
+            ast::Expr::Call(call) => {
+                let argument = self.bool_call_argument(call)?;
+                self.condition_flow_snapshots(argument)
+            }
             _ => None,
         }
     }
@@ -957,6 +961,61 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             fallback: self.flow_snapshot(),
             snapshots: self.condition_flow_snapshots(condition),
         }
+    }
+
+    fn bool_call_argument<'expr>(&self, call: &'expr ast::ExprCall) -> Option<&'expr ast::Expr> {
+        if call.arguments.args.len() != 1 || !call.arguments.keywords.is_empty() {
+            return None;
+        }
+
+        let name = call.func.as_name_expr()?;
+        if name.id != "bool" {
+            return None;
+        }
+
+        if !self.symbol_resolves_to_builtin("bool") {
+            return None;
+        }
+
+        call.arguments.args.first()
+    }
+
+    fn symbol_resolves_to_builtin(&self, name: &str) -> bool {
+        let place_table = self.current_place_table();
+        if let Some(symbol_id) = place_table.symbol_id(name)
+            && place_table.symbol(symbol_id).is_local()
+        {
+            return self.current_live_symbol_definitions_are_builtin_imports(symbol_id, name);
+        }
+
+        // Enclosing bindings can be rebound after a lazy nested scope is created, so only
+        // the current scope's live bindings are stable enough for this syntax-only shortcut.
+        self.resolve_nested_reference_scope(self.current_scope(), name)
+            .is_none()
+    }
+
+    fn current_live_symbol_definitions_are_builtin_imports(
+        &self,
+        symbol_id: ScopedSymbolId,
+        name: &str,
+    ) -> bool {
+        self.current_use_def_map()
+            .live_symbol_definitions(symbol_id)
+            .all(|definition| self.definition_is_builtin_import(definition, name))
+    }
+
+    fn definition_is_builtin_import(&self, definition: DefinitionState<'db>, name: &str) -> bool {
+        let DefinitionState::Defined(definition) = definition else {
+            return false;
+        };
+        let DefinitionKind::ImportFrom(import) = definition.kind(self.db) else {
+            return false;
+        };
+        let import_node = import.import(self.module);
+
+        import_node.level == 0
+            && import_node.module.as_deref() == Some("builtins")
+            && import.alias(self.module).name.id == name
     }
 
     fn flow_restore(&mut self, state: FlowSnapshot) {
@@ -1397,6 +1456,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         (predicate, predicate_id)
     }
 
+    fn build_chained_comparison_part_predicate(
+        comparison: Expression<'db>,
+        index: usize,
+    ) -> Option<PredicateOrLiteral<'db>> {
+        let index = u32::try_from(index).ok()?;
+        Some(PredicateOrLiteral::Predicate(Predicate {
+            node: PredicateNode::ChainedComparisonPart(ChainedComparisonPart { comparison, index }),
+            is_positive: true,
+        }))
+    }
+
     fn build_predicate(&mut self, predicate_node: &'ast ast::Expr) -> PredicateOrLiteral<'db> {
         // Some commonly used test expressions are eagerly evaluated as `true`
         // or `false` here for performance reasons. This list does not need to
@@ -1493,6 +1563,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             .expression(expression_node);
                         self.add_alias_narrowed_places(expression_node, &mut places);
                         places
+                    }
+                    PredicateNode::ChainedComparisonPart(part) => {
+                        let expression_node = part.comparison.node_ref(self.db).node(self.module);
+                        let ast::Expr::Compare(compare) = expression_node else {
+                            return PossiblyNarrowedPlaces::default();
+                        };
+                        let Some((left, _, right)) = part.expressions(compare) else {
+                            return PossiblyNarrowedPlaces::default();
+                        };
+                        PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
+                            .chained_comparison_part(left, right)
                     }
                     PredicateNode::Pattern(pattern) => {
                         let module = self.module;
@@ -1769,17 +1850,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         expression_kind: ExpressionKind,
         assigned_to: Option<&ast::StmtAssign>,
     ) -> Expression<'db> {
-        let expression = Expression::new(
-            self.db,
-            self.file,
+        let expression = self.expression_in_scope(
+            expression_node,
             self.current_scope(),
-            AstNodeRef::new(self.module, expression_node),
-            assigned_to.map(|assigned_to| AstNodeRef::new(self.module, assigned_to)),
             expression_kind,
+            assigned_to,
         );
         self.expressions_by_node
             .insert(expression_node.into(), expression);
         expression
+    }
+
+    fn expression_in_scope(
+        &self,
+        expression_node: &ast::Expr,
+        scope: FileScopeId,
+        expression_kind: ExpressionKind,
+        assigned_to: Option<&ast::StmtAssign>,
+    ) -> Expression<'db> {
+        Expression::new(
+            self.db,
+            self.file,
+            scope,
+            AstNodeRef::new(self.module, expression_node),
+            assigned_to.map(|assigned_to| AstNodeRef::new(self.module, assigned_to)),
+            expression_kind,
+        )
     }
 
     fn add_standalone_statement(&mut self, statement_node: &ast::Stmt) -> Statement<'db> {
@@ -3694,6 +3790,92 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(orelse);
                 self.flow_merge(post_body);
             }
+            ast::Expr::Compare(compare)
+                if compare.comparators.len() > 1
+                    && any_over_expr(expr, &ast::Expr::is_named_expr) =>
+            {
+                // Chained comparisons short-circuit like `and`; later comparator bindings might
+                // not run, so preserve separate truthy and falsy binding states.
+                self.visit_expr(&compare.left);
+
+                let comparison = self.expression_in_scope(
+                    expr,
+                    self.current_scope(),
+                    ExpressionKind::Normal,
+                    None,
+                );
+                let mut falsy_snapshots = vec![];
+                let mut reachability_constraints = vec![];
+                let mut true_path_narrowed = PossiblyNarrowedPlaces::default();
+
+                for (index, comparator) in compare.comparators.iter().enumerate() {
+                    for id in &reachability_constraints {
+                        self.current_use_def_map_mut()
+                            .record_reachability_constraint(*id);
+                    }
+
+                    self.visit_expr(comparator);
+
+                    let Some(predicate) =
+                        Self::build_chained_comparison_part_predicate(comparison, index)
+                    else {
+                        continue;
+                    };
+                    let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
+                    let predicate_id = self.add_predicate(predicate);
+                    let reachability_constraint = self
+                        .current_reachability_constraints_mut()
+                        .add_atom(predicate_id);
+
+                    let after_comparator = self.flow_snapshot();
+                    self.record_negated_reachability_constraint(reachability_constraint);
+                    let mut falsy_possibly_narrowed = possibly_narrowed.clone();
+                    falsy_possibly_narrowed.extend(true_path_narrowed.iter().copied());
+                    self.current_use_def_map_mut()
+                        .record_negated_narrowing_constraint_for_places(
+                            predicate_id,
+                            &falsy_possibly_narrowed,
+                        );
+                    falsy_snapshots.push(self.flow_snapshot());
+
+                    self.flow_restore(after_comparator);
+
+                    if index < compare.comparators.len() - 1 {
+                        self.record_narrowing_constraint_id_for_places(
+                            predicate_id,
+                            &possibly_narrowed,
+                        );
+                        true_path_narrowed.extend(possibly_narrowed.iter().copied());
+                        reachability_constraints.push(reachability_constraint);
+                    } else {
+                        self.current_use_def_map_mut()
+                            .record_reachability_constraint(reachability_constraint);
+                        self.record_narrowing_constraint_id_for_places(
+                            predicate_id,
+                            &possibly_narrowed,
+                        );
+                    }
+                }
+
+                let truthy = self.flow_snapshot();
+
+                let mut snapshots = falsy_snapshots.into_iter();
+                if let Some(first) = snapshots.next() {
+                    self.flow_restore(first);
+                    for snapshot in snapshots {
+                        self.flow_merge(snapshot);
+                    }
+                    let falsy = self.flow_snapshot();
+
+                    self.flow_restore(truthy.clone());
+                    self.flow_merge(falsy.clone());
+
+                    self.condition_flow_snapshots_by_node.insert(
+                        ExpressionNodeKey::from(expr),
+                        ConditionFlowSnapshots { truthy, falsy },
+                    );
+                }
+            }
             ast::Expr::ListComp(
                 list_comprehension @ ast::ExprListComp {
                     elt, generators, ..
@@ -3752,8 +3934,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 node_index: _,
                 op,
             }) => {
-                let mut snapshots = vec![];
+                let mut short_circuit_snapshots = vec![];
                 let mut reachability_constraints = vec![];
+                let mut terminal_snapshots = None;
 
                 for (index, value) in values.iter().enumerate() {
                     for id in &reachability_constraints {
@@ -3765,6 +3948,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.current_use_def_map_mut()
                         .record_range_reachability(value.range(), in_type_checking_block);
                     self.visit_expr(value);
+                    let value_snapshots = self.condition_flow_snapshots(value);
 
                     // For the last value, we don't need to model control flow. There is no short-circuiting
                     // anymore.
@@ -3780,43 +3964,74 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             .add_atom(predicate_id);
 
                         let after_expr = self.flow_snapshot();
+                        let (short_circuit, no_short_circuit) = match (op, value_snapshots.as_ref())
+                        {
+                            (ast::BoolOp::And, Some(snapshots)) => {
+                                (snapshots.falsy.clone(), snapshots.truthy.clone())
+                            }
+                            (ast::BoolOp::Or, Some(snapshots)) => {
+                                (snapshots.truthy.clone(), snapshots.falsy.clone())
+                            }
+                            _ => (after_expr.clone(), after_expr),
+                        };
 
                         // We first model the short-circuiting behavior. We take the short-circuit
                         // path here if all of the previous short-circuit paths were not taken, so
                         // we record all previously existing reachability constraints, and negate the
                         // one for the current expression.
 
+                        self.flow_restore(short_circuit);
                         self.record_negated_reachability_constraint(reachability_constraint);
-                        snapshots.push(self.flow_snapshot());
+                        short_circuit_snapshots.push(self.flow_snapshot());
 
                         // Then we model the non-short-circuiting behavior. Here, we need to delay
                         // the application of the reachability constraint until after the expression
                         // has been evaluated, so we only push it onto the stack here.
-                        self.flow_restore(after_expr);
+                        self.flow_restore(no_short_circuit);
                         self.record_narrowing_constraint_id_for_places(
                             predicate_id,
                             &possibly_narrowed,
                         );
                         reachability_constraints.push(reachability_constraint);
+                    } else {
+                        terminal_snapshots = value_snapshots;
                     }
                 }
 
-                let no_short_circuit =
-                    any_over_expr(expr, &ast::Expr::is_named_expr).then(|| self.flow_snapshot());
+                let terminal = self.flow_snapshot();
+                let terminal_truthy = terminal_snapshots
+                    .as_ref()
+                    .map_or_else(|| terminal.clone(), |snapshots| snapshots.truthy.clone());
+                let terminal_falsy = terminal_snapshots
+                    .as_ref()
+                    .map_or_else(|| terminal.clone(), |snapshots| snapshots.falsy.clone());
 
-                for snapshot in snapshots {
-                    self.flow_merge(snapshot);
+                for snapshot in &short_circuit_snapshots {
+                    self.flow_merge(snapshot.clone());
                 }
+                let merged = self.flow_snapshot();
 
-                if let Some(no_short_circuit) = no_short_circuit {
+                if any_over_expr(expr, &ast::Expr::is_named_expr) {
                     let bool_op_key = ExpressionNodeKey::from(expr);
-                    let maybe_short_circuit = self.flow_snapshot();
                     let (truthy, falsy) = match op {
-                        ast::BoolOp::And => (no_short_circuit, maybe_short_circuit),
-                        ast::BoolOp::Or => (maybe_short_circuit, no_short_circuit),
+                        ast::BoolOp::And => {
+                            self.flow_restore(terminal_falsy);
+                            for snapshot in &short_circuit_snapshots {
+                                self.flow_merge(snapshot.clone());
+                            }
+                            (terminal_truthy, self.flow_snapshot())
+                        }
+                        ast::BoolOp::Or => {
+                            self.flow_restore(terminal_truthy);
+                            for snapshot in &short_circuit_snapshots {
+                                self.flow_merge(snapshot.clone());
+                            }
+                            (self.flow_snapshot(), terminal_falsy)
+                        }
                     };
                     self.condition_flow_snapshots_by_node
                         .insert(bool_op_key, ConditionFlowSnapshots { truthy, falsy });
+                    self.flow_restore(merged);
                 }
             }
             ast::Expr::StringLiteral(_) => {

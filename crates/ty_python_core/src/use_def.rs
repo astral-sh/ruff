@@ -1053,6 +1053,16 @@ impl<'db> UseDefMapBuilder<'db> {
         self.all_definitions.next_index()
     }
 
+    pub(super) fn live_symbol_definitions(
+        &self,
+        symbol: ScopedSymbolId,
+    ) -> impl Iterator<Item = DefinitionState<'db>> + '_ {
+        self.symbol_states[symbol]
+            .bindings()
+            .iter()
+            .map(|binding| self.all_definitions[binding.binding()])
+    }
+
     pub(super) fn record_binding(
         &mut self,
         place: ScopedPlaceId,

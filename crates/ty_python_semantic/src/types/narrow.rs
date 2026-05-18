@@ -16,13 +16,14 @@ use crate::types::{
 use ty_python_core::expression::Expression;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
 use ty_python_core::predicate::{
-    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode,
+    CallableAndCallExpr, ChainedComparisonPart, ClassPatternKind, PatternPredicate,
+    PatternPredicateKind, Predicate, PredicateNode,
 };
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{NarrowingEvaluator, place_table, semantic_index};
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_identifier;
 
@@ -62,6 +63,9 @@ pub(crate) fn infer_narrowing_constraint<'db>(
             } else {
                 all_negative_narrowing_constraints_for_expression(db, expression)
             }
+        }
+        PredicateNode::ChainedComparisonPart(part) => {
+            all_narrowing_constraints_for_chained_comparison_part(db, part, predicate.is_positive)
         }
         PredicateNode::Pattern(pattern) => {
             if predicate.is_positive {
@@ -112,6 +116,26 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
     let module = parsed_module(db, expression.file(db)).load(db);
     NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Expression(expression), false)
         .finish()
+}
+
+#[salsa::tracked(
+    returns(as_ref),
+    cycle_initial=|_, _, _, _| None,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn all_narrowing_constraints_for_chained_comparison_part<'db>(
+    db: &'db dyn Db,
+    part: ChainedComparisonPart<'db>,
+    is_positive: bool,
+) -> Option<NarrowingConstraints<'db>> {
+    let module = parsed_module(db, part.comparison.file(db)).load(db);
+    NarrowingConstraintsBuilder::new(
+        db,
+        &module,
+        PredicateNode::ChainedComparisonPart(part),
+        is_positive,
+    )
+    .finish()
 }
 
 #[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
@@ -604,6 +628,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PredicateNode::Expression(expression) => {
                 self.evaluate_expression_predicate(expression, self.is_positive)
             }
+            PredicateNode::ChainedComparisonPart(part) => {
+                self.evaluate_chained_comparison_part(part, self.is_positive)
+            }
             PredicateNode::Pattern(pattern) => {
                 self.evaluate_pattern_predicate(pattern, self.is_positive)
             }
@@ -778,6 +805,79 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         )
     }
 
+    fn evaluate_chained_comparison_part(
+        &mut self,
+        part: ChainedComparisonPart<'db>,
+        is_positive: bool,
+    ) -> Option<NarrowingConstraints<'db>> {
+        let comparison = part.comparison;
+        let expression_node = comparison.node_ref(self.db).node(self.module);
+        let ast::Expr::Compare(expr_compare) = expression_node else {
+            return None;
+        };
+        let (left, op, right) = part.expressions(expr_compare)?;
+
+        let inference = infer_expression_types(self.db, comparison, TypeContext::default());
+        let lhs_ty = inference.expression_type(left);
+        let rhs_ty = inference.expression_type(right);
+        let mut constraints = NarrowingConstraints::default();
+
+        if let Some(narrowable) = Self::narrowable_chained_comparison_operand(left)
+            && !Self::expression_rebinds_place(right, &narrowable)
+            && let Some(ty) = self.evaluate_expr_compare_op(lhs_ty, rhs_ty, op, is_positive)
+        {
+            let place = self.expect_place(&narrowable);
+            constraints.insert(place, NarrowingConstraint::intersection(ty));
+        }
+
+        if !matches!(op, ast::CmpOp::In | ast::CmpOp::NotIn)
+            && let Some(narrowable) = Self::narrowable_chained_comparison_operand(right)
+            && let Some(ty) = self.evaluate_expr_compare_op(rhs_ty, lhs_ty, op, is_positive)
+        {
+            let place = self.expect_place(&narrowable);
+            let constraint = NarrowingConstraint::intersection(ty);
+            constraints
+                .entry(place)
+                .and_modify(|existing| {
+                    *existing = existing.merge_constraint_and(constraint.clone());
+                })
+                .or_insert(constraint);
+        }
+
+        (!constraints.is_empty()).then_some(constraints)
+    }
+
+    fn narrowable_chained_comparison_operand(expr: &ast::Expr) -> Option<PlaceExpr> {
+        if Self::narrowable_comparison_operand(expr) {
+            PlaceExpr::try_from_expr(expr)
+        } else {
+            None
+        }
+    }
+
+    fn expression_rebinds_place(expr: &ast::Expr, place: &PlaceExpr) -> bool {
+        let root = place.root_symbol_name();
+        any_over_expr(expr, |expr| {
+            let ast::Expr::Named(named) = expr else {
+                return false;
+            };
+            named
+                .target
+                .as_name_expr()
+                .is_some_and(|target| target.id == root)
+        })
+    }
+
+    fn narrowable_comparison_operand(expr: &ast::Expr) -> bool {
+        matches!(
+            expr,
+            ast::Expr::Name(_)
+                | ast::Expr::Attribute(_)
+                | ast::Expr::Subscript(_)
+                | ast::Expr::Named(_)
+        )
+    }
+
     fn places(&self) -> &'db PlaceTable {
         place_table(self.db, self.scope())
     }
@@ -785,6 +885,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     fn scope(&self) -> ScopeId<'db> {
         match self.predicate {
             PredicateNode::Expression(expression) => expression.scope(self.db),
+            PredicateNode::ChainedComparisonPart(part) => part.comparison.scope(self.db),
             PredicateNode::Pattern(pattern) => pattern.scope(self.db),
             PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
                 callable.scope(self.db)
@@ -1195,16 +1296,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             )
         }
 
-        fn narrowable_ast(expr: &ast::Expr) -> bool {
-            matches!(
-                expr,
-                ast::Expr::Name(_)
-                    | ast::Expr::Attribute(_)
-                    | ast::Expr::Subscript(_)
-                    | ast::Expr::Named(_)
-            )
-        }
-
         /// Attempt to find an underlying class literal for purposes of `if type(x) is Y` narrowing.
         ///
         /// We deliberately return `None` for generic-alias types, since narrowing based
@@ -1544,7 +1635,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // - `if x is not y`
             // - `if x in y`
             // - `if x not in y`
-            if narrowable_ast(left)
+            if Self::narrowable_comparison_operand(left)
                 && let Some(narrowable) = PlaceExpr::try_from_expr(left)
                 && let Some(ty) = self.evaluate_expr_compare_op(lhs_ty, rhs_ty, *op, is_positive)
             {
@@ -1566,7 +1657,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             //
             // `in` and `not in` are not symmetric, so we don't narrow the right-hand side.
             if !matches!(op, ast::CmpOp::In | ast::CmpOp::NotIn)
-                && narrowable_ast(right)
+                && Self::narrowable_comparison_operand(right)
                 && let Some(narrowable) = PlaceExpr::try_from_expr(right)
                 && let Some(ty) = self.evaluate_expr_compare_op(rhs_ty, lhs_ty, *op, is_positive)
             {

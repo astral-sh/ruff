@@ -9,7 +9,7 @@
 
 use ruff_db::files::File;
 use ruff_index::{Idx, IndexVec};
-use ruff_python_ast::{Singleton, name::Name};
+use ruff_python_ast::{self as ast, Singleton, name::Name};
 
 use crate::db::Db;
 use crate::expression::Expression;
@@ -109,8 +109,33 @@ pub struct CallableAndCallExpr<'db> {
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub struct ChainedComparisonPart<'db> {
+    pub comparison: Expression<'db>,
+    pub index: u32,
+}
+
+impl ChainedComparisonPart<'_> {
+    pub fn expressions(
+        self,
+        compare: &ast::ExprCompare,
+    ) -> Option<(&ast::Expr, ast::CmpOp, &ast::Expr)> {
+        let index = usize::try_from(self.index).ok()?;
+        let op = *compare.ops.get(index)?;
+        let right = compare.comparators.get(index)?;
+        let left = index
+            .checked_sub(1)
+            .map_or(Some(&*compare.left), |previous| {
+                compare.comparators.get(previous)
+            })?;
+
+        Some((left, op, right))
+    }
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub enum PredicateNode<'db> {
     Expression(Expression<'db>),
+    ChainedComparisonPart(ChainedComparisonPart<'db>),
     /// These predicates are recorded for statements with call expressions. As part of
     /// reachability constraints, they are used to determine whether control flow can
     /// continue past this statement or not.

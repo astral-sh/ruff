@@ -139,6 +139,94 @@ else:
     reveal_type(x)  # revealed: Literal[1, 2]
 ```
 
+## Assignment expressions in chained `is` comparisons
+
+```py
+def f() -> int | None: ...
+
+if (x := f()) is None is (x := f()):
+    reveal_type(x)  # revealed: None
+else:
+    reveal_type(x)  # revealed: int
+
+def g() -> str | None: ...
+def h() -> int | None: ...
+
+if (y := g()) is None is (y := h()):
+    reveal_type(y)  # revealed: None
+else:
+    reveal_type(y)  # revealed: str | int
+
+if not ((x := f()) is None is (x := f())):
+    reveal_type(x)  # revealed: int
+else:
+    reveal_type(x)  # revealed: None
+
+if bool((x := f()) is None is (x := f())):
+    reveal_type(x)  # revealed: None
+else:
+    reveal_type(x)  # revealed: int
+
+from builtins import bool
+
+if bool((x := f()) is None is (x := f())):
+    reveal_type(x)  # revealed: None
+else:
+    reveal_type(x)  # revealed: int
+
+def shadow_bool(_: object) -> bool:
+    return f() is None
+
+from typing import Any
+
+def bool_shadowed_in_outer_scope() -> None:
+    bool = shadow_bool
+
+    def inner() -> None:
+        if bool((x := f()) is None is (x := f())):
+            reveal_type(x)  # revealed: int | None
+        else:
+            reveal_type(x)  # revealed: int | None
+
+def bool_rebound_after_nested_scope() -> None:
+    from builtins import bool
+
+    def inner() -> None:
+        if bool((x := f()) is None is (x := f())):
+            reveal_type(x)  # revealed: int | None
+        else:
+            reveal_type(x)  # revealed: int | None
+
+    shadow: Any = shadow_bool
+    bool = shadow
+    inner()
+
+if (x := f()) is None is None:
+    reveal_type(x)  # revealed: None
+else:
+    reveal_type(x)  # revealed: int
+
+def flag() -> bool:
+    return bool(f())
+
+if ((x := f()) is None is (x := f())) or flag():
+    pass
+else:
+    reveal_type(x)  # revealed: int
+
+x = f()
+if x is (x := None) is None:
+    reveal_type(x)  # revealed: None
+else:
+    reveal_type(x)  # revealed: None
+
+y: str | int | None = ""
+if (x := f()) is x is (y := f()):
+    pass
+else:
+    reveal_type(y)  # revealed: int | None
+```
+
 ## `is` with two narrowable operands
 
 Both operands should be narrowed when both are narrowable expressions.
