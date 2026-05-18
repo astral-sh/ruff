@@ -169,7 +169,15 @@ impl AlwaysFixableViolation for MissingTrailingComma {
 
 /// ## What it does
 /// Checks for the presence of trailing commas on bare (i.e., unparenthesized)
-/// tuples.
+/// tuples in statement position.
+///
+/// Specifically, this rule flags a trailing comma when it is followed by a
+/// statement-ending newline. Trailing commas in other contexts are out of
+/// scope:
+///
+/// - Bare tuples in subscripts (e.g., `x[1,]`) are covered by [RUF031].
+/// - Bare tuples appearing in `yield` expressions or before a semicolon
+///   are not currently detected.
 ///
 /// ## Why is this bad?
 /// The presence of a misplaced comma will cause Python to interpret the value
@@ -198,6 +206,8 @@ impl AlwaysFixableViolation for MissingTrailingComma {
 ///
 /// foo = (json.dumps({"bar": 1}),)
 /// ```
+///
+/// [RUF031]: https://docs.astral.sh/ruff/rules/incorrectly-parenthesized-tuple-in-subscript/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.223")]
 pub(crate) struct TrailingCommaOnBareTuple;
