@@ -4605,6 +4605,7 @@ name = "ty_project"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "bitvec",
  "camino",
  "colored 3.1.1",
  "crossbeam",
