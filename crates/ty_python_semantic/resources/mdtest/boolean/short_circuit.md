@@ -51,14 +51,10 @@ def returns_bool() -> bool:
 
 def _(flag: bool):
     while flag and (x := 1):
-        # TODO: should not emit [possibly-unresolved-reference]
-        # error: [possibly-unresolved-reference]
         reveal_type(x)  # revealed: Literal[1]
 
 def _(flag: bool):
     while flag and (x := returns_bool()):
-        # TODO: should not emit [possibly-unresolved-reference]
-        # error: [possibly-unresolved-reference]
         reveal_type(x)  # revealed: Literal[True]
 
 def _(flag: bool):
@@ -134,4 +130,23 @@ def _(x: str):
         raise ValueError
 
     reveal_type(y)  # revealed: str & ~AlwaysFalsy
+```
+
+## Other condition consumers
+
+```py
+def assert_statement(flag: bool):
+    assert flag and (x := 1)
+    reveal_type(x)  # revealed: Literal[1]
+
+def if_expression(flag: bool):
+    reveal_type(x) if flag and (x := 1) else None  # revealed: Literal[1]
+
+def match_guard(flag: bool, subject: object):
+    match subject:
+        case _ if flag and (x := 1):
+            reveal_type(x)  # revealed: Literal[1]
+
+def comprehension_filter(flag: bool):
+    [reveal_type(x) for _ in range(1) if flag and (x := 1)]  # revealed: Literal[1]
 ```
