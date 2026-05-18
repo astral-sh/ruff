@@ -8,6 +8,7 @@ use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
     DIVISION_BY_ZERO, report_unsupported_augmented_assignment, report_unsupported_binary_operation,
 };
+use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
     DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -339,6 +340,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 || self.file().is_stub(db)
                 || self.is_in_type_checking_block(self.scope(), node)
         };
+
+        // This is not strictly sound, because a tuple subclass could define `__add__` in a weird
+        // way; but in practice the benefit of understanding this behavior for normal tuples (and
+        // all normally-behaved tuple subclasses) far outweighs the cost of being wrong for a rare
+        // weird subclass.
+        if op == ast::Operator::Add
+            && let Some(left_tuple) = left_ty.exact_tuple_instance_spec(db)
+            && let Some(right_tuple) = right_ty.exact_tuple_instance_spec(db)
+        {
+            let tuple = TupleSpecBuilder::from(left_tuple.as_ref())
+                .concat(db, right_tuple.as_ref())
+                .build();
+            return Some(Type::tuple(TupleType::new(db, &tuple)));
+        }
 
         match (left_ty, right_ty, op) {
             (Type::Union(lhs_union), rhs, _) => lhs_union.try_map(db, |lhs_element| {

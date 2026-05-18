@@ -39,6 +39,7 @@
 use super::RecursivelyDefined;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
+use crate::types::tuple::TupleLength;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType, Type,
@@ -338,6 +339,9 @@ const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 256;
 /// Huge enums are not uncommon (especially in generated code), and it's annoying
 /// if reachability analysis etc. fails when analysing these enums.
 const MAX_NON_RECURSIVE_UNION_ENUM_LITERALS: usize = 8192;
+/// The maximum number of distinct tuple lengths to keep in a union before collapsing them to a
+/// single homogeneous tuple.
+const MAX_UNION_TUPLE_LENGTHS: usize = 32;
 
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
@@ -888,16 +892,80 @@ impl<'db> UnionBuilder<'db> {
         self.try_build().unwrap_or(Type::Never)
     }
 
+    /// Collapse precise tuple shapes to a single homogeneous variable-length tuple when doing so
+    /// is necessary for convergence or to keep a union from growing without bound.
+    ///
+    /// This preserves precise tuple concatenation for small acyclic inference while ensuring
+    /// fixed-point iteration can converge when each iteration appends another fixed suffix to the
+    /// tuple, and prevents conditional tuple concatenation from producing exponentially many tuple
+    /// shapes.
+    fn collapse_tuple_shapes(
+        db: &'db dyn Db,
+        cycle_recovery: bool,
+        recursively_defined: RecursivelyDefined,
+        types: Vec<Type<'db>>,
+    ) -> Vec<Type<'db>> {
+        let mut tuple_lengths = SmallVec::<[TupleLength; 8]>::new();
+        let mut has_multiple_tuple_lengths = false;
+
+        for ty in &types {
+            let Some(tuple) = ty.exact_tuple_instance_spec(db) else {
+                continue;
+            };
+
+            let tuple_length = tuple.len();
+            has_multiple_tuple_lengths |= tuple_lengths
+                .first()
+                .is_some_and(|first_tuple_length| *first_tuple_length != tuple_length);
+            if tuple_lengths.len() <= MAX_UNION_TUPLE_LENGTHS
+                && !tuple_lengths.contains(&tuple_length)
+            {
+                tuple_lengths.push(tuple_length);
+            }
+        }
+
+        let collapse_for_cycle_recovery =
+            cycle_recovery && recursively_defined.is_yes() && has_multiple_tuple_lengths;
+        let collapse_for_size_limit = tuple_lengths.len() > MAX_UNION_TUPLE_LENGTHS;
+        if !(collapse_for_cycle_recovery || collapse_for_size_limit) {
+            return types;
+        }
+
+        let mut collapsed = Vec::with_capacity(types.len());
+        let mut tuple_element_type = UnionBuilder::new(db)
+            .unpack_aliases(false)
+            .cycle_recovery(cycle_recovery)
+            .recursively_defined(recursively_defined);
+
+        for ty in types {
+            if let Some(tuple) = ty.exact_tuple_instance_spec(db) {
+                tuple_element_type = tuple_element_type.add(tuple.homogeneous_element_type(db));
+            } else {
+                collapsed.push(ty);
+            }
+        }
+
+        collapsed.push(Type::homogeneous_tuple(db, tuple_element_type.build()));
+        collapsed
+    }
+
     pub(crate) fn try_build(self) -> Option<Type<'db>> {
-        let type_count = self.elements.iter().map(UnionElement::type_count).sum();
+        let Self {
+            elements,
+            db,
+            unpack_aliases: _,
+            cycle_recovery,
+            recursively_defined,
+        } = self;
+        let type_count = elements.iter().map(UnionElement::type_count).sum();
         let mut types = Vec::with_capacity(type_count);
-        for element in self.elements {
+        for element in elements {
             match element {
                 UnionElement::IntLiterals(literals) => {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
                         Type::from(
                             LiteralValueType::new(literal, promotable)
-                                .with_recursively_defined(self.recursively_defined),
+                                .with_recursively_defined(recursively_defined),
                         )
                     }));
                 }
@@ -905,7 +973,7 @@ impl<'db> UnionBuilder<'db> {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
                         Type::from(
                             LiteralValueType::new(literal, promotable)
-                                .with_recursively_defined(self.recursively_defined),
+                                .with_recursively_defined(recursively_defined),
                         )
                     }));
                 }
@@ -913,7 +981,7 @@ impl<'db> UnionBuilder<'db> {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
                         Type::from(
                             LiteralValueType::new(literal, promotable)
-                                .with_recursively_defined(self.recursively_defined),
+                                .with_recursively_defined(recursively_defined),
                         )
                     }));
                 }
@@ -921,20 +989,21 @@ impl<'db> UnionBuilder<'db> {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
                         Type::from(
                             LiteralValueType::new(literal, promotable)
-                                .with_recursively_defined(self.recursively_defined),
+                                .with_recursively_defined(recursively_defined),
                         )
                     }));
                 }
                 UnionElement::Type(ty) => types.push(ty),
             }
         }
+        let types = Self::collapse_tuple_shapes(db, cycle_recovery, recursively_defined, types);
         match types.len() {
             0 => None,
             1 => Some(types[0]),
             _ => Some(Type::Union(UnionType::new(
-                self.db,
+                db,
                 types.into_boxed_slice(),
-                self.recursively_defined,
+                recursively_defined,
             ))),
         }
     }
@@ -1616,7 +1685,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
 #[cfg(test)]
 mod tests {
     use super::{
-        IntersectionBuilder, MAX_NON_RECURSIVE_UNION_LITERALS, Type, UnionBuilder, UnionType,
+        IntersectionBuilder, MAX_NON_RECURSIVE_UNION_LITERALS, MAX_UNION_TUPLE_LENGTHS, Type,
+        UnionBuilder, UnionType,
     };
 
     use crate::db::tests::{TestDb, setup_db};
@@ -1710,6 +1780,38 @@ mod tests {
         assert_eq!(union.map(&db, |ty| *ty), unpacked);
         assert_eq!(union.try_map(&db, |ty| Some(*ty)), Some(unpacked));
         assert_eq!(union.map_leave_aliases(&db, |ty| *ty), union_ty);
+    }
+
+    #[test]
+    fn build_union_preserves_many_tuple_shapes_of_same_length() {
+        let db = setup_db();
+
+        let tuples: Vec<_> = (0..=MAX_UNION_TUPLE_LENGTHS)
+            .map(|literal| {
+                let literal = i64::try_from(literal).expect("test literal fits in i64");
+                let literal = Type::int_literal(literal);
+                Type::heterogeneous_tuple(&db, [literal, literal])
+            })
+            .collect();
+        let union_ty = UnionType::from_elements(&db, tuples.iter().copied());
+        let union = union_ty.expect_union();
+
+        assert_eq!(union.elements(&db).len(), tuples.len());
+        for tuple in tuples {
+            assert!(union.elements(&db).contains(&tuple));
+        }
+    }
+
+    #[test]
+    fn build_union_collapses_many_tuple_lengths() {
+        let db = setup_db();
+
+        let int_instance = KnownClass::Int.to_instance(&db);
+        let tuples = (1..=MAX_UNION_TUPLE_LENGTHS + 1)
+            .map(|len| Type::heterogeneous_tuple(&db, std::iter::repeat_n(int_instance, len)));
+        let union = UnionType::from_elements(&db, tuples);
+
+        assert_eq!(union, Type::homogeneous_tuple(&db, int_instance));
     }
 
     #[test]
