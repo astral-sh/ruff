@@ -170,6 +170,23 @@ pub(super) fn infer_binary_type_comparison<'db>(
     };
 
     let comparison_result = match (left, right) {
+        (Type::EnumComplement(complement), right) => Some(infer_binary_type_comparison(
+            context,
+            complement.remaining_literal_union(db),
+            op,
+            right,
+            range,
+            visitor,
+        )),
+        (left, Type::EnumComplement(complement)) => Some(infer_binary_type_comparison(
+            context,
+            left,
+            op,
+            complement.remaining_literal_union(db),
+            range,
+            visitor,
+        )),
+
         (Type::Union(union), other) => {
             let mut builder = UnionBuilder::new(db);
             for element in union.elements(db) {
@@ -676,6 +693,17 @@ fn infer_binary_intersection_type_comparison<'db>(
     }
 
     let db = context.db();
+
+    if let Some(alternatives) = intersection.finite_alternative_union(db) {
+        return match intersection_on {
+            IntersectionOn::Left => {
+                infer_binary_type_comparison(context, alternatives, op, other, range, visitor)
+            }
+            IntersectionOn::Right => {
+                infer_binary_type_comparison(context, other, op, alternatives, range, visitor)
+            }
+        };
+    }
 
     // If a comparison yields a definitive true/false answer on a (positive) part
     // of an intersection type, it will also yield a definitive answer on the full

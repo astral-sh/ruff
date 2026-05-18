@@ -198,12 +198,14 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, IntersectionBuilder, KnownClass, NarrowingConstraint, Type, TypeContext,
-        UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
+        CallableTypes, ClassLiteral, IntersectionBuilder, KnownClass, NarrowingConstraint, Type,
+        TypeContext, UnionBuilder, UnionType, enum_metadata, infer_expression_type,
+        infer_narrowing_constraint,
     },
 };
+use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
     SemanticIndex, Truthiness, UseDefMap,
@@ -310,6 +312,120 @@ fn type_excluded_by_previous_patterns<'db>(
     builder.build()
 }
 
+/// Return the enum class and canonical member names represented by an enum-literal subject type.
+///
+/// This succeeds only when the subject is a single enum literal, a union of enum literals from the
+/// same enum class, or an alias to either form. Enum aliases are normalized to the canonical member
+/// name so previous `match` cases can be compared by member identity.
+fn enum_literal_subject_names<'db>(
+    db: &'db dyn Db,
+    subject_ty: Type<'db>,
+) -> Option<(ClassLiteral<'db>, FxHashSet<Name>)> {
+    fn add_enum_literal<'db>(
+        db: &'db dyn Db,
+        enum_class: &mut Option<ClassLiteral<'db>>,
+        names: &mut FxHashSet<Name>,
+        ty: Type<'db>,
+    ) -> Option<()> {
+        let enum_literal = ty.as_enum_literal()?;
+        let class = enum_literal.enum_class(db);
+
+        if let Some(existing_class) = *enum_class {
+            if existing_class != class {
+                return None;
+            }
+        } else {
+            *enum_class = Some(class);
+        }
+
+        let metadata = enum_metadata(db, class)?;
+        let name = enum_literal.name(db);
+        let canonical_name = metadata.resolve_member(name).unwrap_or(name);
+        names.insert(canonical_name.clone());
+        Some(())
+    }
+
+    let mut enum_class = None;
+    let mut names = FxHashSet::default();
+
+    match subject_ty {
+        Type::LiteralValue(_) => {
+            add_enum_literal(db, &mut enum_class, &mut names, subject_ty)?;
+        }
+        Type::Union(union) => {
+            for element in union.elements(db) {
+                add_enum_literal(db, &mut enum_class, &mut names, *element)?;
+            }
+        }
+        Type::TypeAlias(alias) => return enum_literal_subject_names(db, alias.value_type(db)),
+        _ => return None,
+    }
+
+    Some((enum_class?, names))
+}
+
+/// Return the canonical enum-member name matched by a value pattern.
+///
+/// This recognizes patterns like `case Color.RED:` only when the pattern expression is
+/// single-valued and belongs to the expected enum class. Enum aliases are resolved to their
+/// canonical member names before returning.
+fn enum_member_pattern_name<'db>(
+    db: &'db dyn Db,
+    enum_class: ClassLiteral<'db>,
+    kind: &PatternPredicateKind<'db>,
+) -> Option<Name> {
+    let value_ty = pattern_kind_to_type(db, kind);
+    let enum_literal = value_ty.as_enum_literal()?;
+    if enum_literal.enum_class(db) != enum_class {
+        return None;
+    }
+
+    let metadata = enum_metadata(db, enum_class)?;
+    let name = enum_literal.name(db);
+    let canonical_name = metadata.resolve_member(name).unwrap_or(name);
+    Some(canonical_name.clone())
+}
+
+/// Determine the static truthiness of a `match` case over a union of enum literals.
+///
+/// The analysis removes enum members already matched by earlier unguarded cases, then decides
+/// whether the current case is impossible, exhaustive, or still ambiguous. Guarded cases remain
+/// ambiguous because the guard can reject an otherwise matching enum member.
+fn analyze_enum_literal_union_pattern_predicate<'db>(
+    db: &'db dyn Db,
+    predicate: PatternPredicate<'db>,
+    subject_ty: Type<'db>,
+) -> Option<Truthiness> {
+    let (enum_class, mut remaining_names) = enum_literal_subject_names(db, subject_ty)?;
+    let current_name = enum_member_pattern_name(db, enum_class, predicate.kind(db))?;
+
+    let mut previous_predicate = predicate;
+    while let Some(previous) = previous_predicate.previous_predicate(db) {
+        previous_predicate = *previous;
+
+        if previous_predicate.guard(db).is_some() {
+            continue;
+        }
+
+        let previous_name = enum_member_pattern_name(db, enum_class, previous_predicate.kind(db))?;
+        remaining_names.remove(&previous_name);
+    }
+
+    if !remaining_names.contains(&current_name) {
+        return Some(Truthiness::AlwaysFalse);
+    }
+
+    if remaining_names.len() == 1 {
+        if predicate.guard(db).is_some() {
+            Some(Truthiness::Ambiguous)
+        } else {
+            Some(Truthiness::AlwaysTrue)
+        }
+    } else {
+        Some(Truthiness::Ambiguous)
+    }
+}
+
 /// Analyze a pattern predicate to determine its static truthiness.
 ///
 /// This is a Salsa tracked function to enable memoization. Without memoization, for a match
@@ -322,6 +438,12 @@ fn type_excluded_by_previous_patterns<'db>(
 )]
 fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'db>) -> Truthiness {
     let subject_ty = infer_expression_type(db, predicate.subject(db), TypeContext::default());
+
+    if let Some(truthiness) =
+        analyze_enum_literal_union_pattern_predicate(db, predicate, subject_ty)
+    {
+        return truthiness;
+    }
 
     let narrowed_subject = IntersectionBuilder::new(db)
         .add_positive(subject_ty)

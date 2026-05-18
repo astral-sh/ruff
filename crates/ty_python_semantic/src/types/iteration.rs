@@ -214,6 +214,9 @@ impl<'db> Type<'db> {
                     // Flattening changed the type; recursively iterate the flattened result.
                     flattened.try_iterate(db).ok()
                 }
+                Type::EnumComplement(complement) => {
+                    non_async_special_case(db, complement.remaining_literal_union(db))
+                }
                 // N.B. This special case isn't strictly necessary, it's just an obvious optimization
                 Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
                 Type::Divergent(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
