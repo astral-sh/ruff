@@ -134,9 +134,36 @@ reveal_type(x)
 for x in (1, "a", b"foo"):
     pass
 
-# revealed: Literal[1, "a", b"foo"]
-# error: [possibly-unresolved-reference]
-reveal_type(x)
+reveal_type(x)  # revealed: Literal[1, "a", b"foo"]
+```
+
+## With statically non-empty literals
+
+```py
+for x in [1]:
+    pass
+
+reveal_type(x)  # revealed: int
+
+for x in {1}:
+    pass
+
+reveal_type(x)  # revealed: int
+
+for x in {"foo": 1}:
+    pass
+
+reveal_type(x)  # revealed: str
+
+for x in "a":
+    pass
+
+reveal_type(x)  # revealed: Literal["a"]
+
+for x in b"a":
+    pass
+
+reveal_type(x)  # revealed: Literal[97]
 ```
 
 ## With non-callable iterator

@@ -1533,12 +1533,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Returns a reachability predicate for iterables that are syntactically known to be non-empty.
     ///
-    /// The `range` case only proves the arguments are non-empty; semantic reachability still
-    /// confirms that the callable is builtin `range`, so shadowed callables remain ambiguous.
+    /// Literal iterables are proven entirely syntactically. The `range` case only proves the
+    /// arguments are non-empty; semantic reachability still confirms that the callable is builtin
+    /// `range`, so shadowed callables remain ambiguous.
     fn non_empty_iterable_predicate(
         &mut self,
         iter: &'ast ast::Expr,
     ) -> Option<PredicateOrLiteral<'db>> {
+        if literal_iterates_at_least_once(iter) {
+            return Some(PredicateOrLiteral::Literal(true));
+        }
+
         let ast::Expr::Call(call) = iter else {
             return None;
         };
@@ -4319,6 +4324,24 @@ impl ExpressionsScopeMapBuilder {
         interval_map.push((range, current_scope));
 
         ExpressionsScopeMap(interval_map.into_boxed_slice())
+    }
+}
+
+/// Returns `true` if the literal iterable must contain at least one element.
+///
+/// The check is intentionally syntactic and conservative: starred elements and dictionary
+/// unpacking only prove non-emptiness when there is also a non-starred/non-unpacked element.
+fn literal_iterates_at_least_once(expr: &ast::Expr) -> bool {
+    match expr {
+        ast::Expr::Tuple(ast::ExprTuple { elts, .. })
+        | ast::Expr::List(ast::ExprList { elts, .. })
+        | ast::Expr::Set(ast::ExprSet { elts, .. }) => {
+            elts.iter().any(|elt| !elt.is_starred_expr())
+        }
+        ast::Expr::Dict(ast::ExprDict { items, .. }) => items.iter().any(|item| item.key.is_some()),
+        ast::Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => !value.is_empty(),
+        ast::Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => !value.is_empty(),
+        _ => false,
     }
 }
 
