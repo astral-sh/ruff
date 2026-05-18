@@ -234,6 +234,10 @@ impl<'db> Type<'db> {
                 Truthiness::from(tracked_set.is_always_satisfied(db))
             }
 
+            Type::KnownInstance(KnownInstanceType::Range { is_non_empty }) => {
+                Truthiness::from(*is_non_empty)
+            }
+
             Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)

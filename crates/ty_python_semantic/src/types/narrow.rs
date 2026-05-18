@@ -1933,7 +1933,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
                 callable.scope(self.db)
             }
-            PredicateNode::IsNonEmptyIterable(predicate) => predicate.scope(self.db),
+            PredicateNode::IsNonEmptyIterable(expression) => expression.scope(self.db),
             PredicateNode::StarImportPlaceholder(definition) => definition.scope(self.db),
         }
     }

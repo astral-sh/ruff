@@ -43,9 +43,9 @@ use crate::place::{
     match_subject_place_expressions,
 };
 use crate::predicate::{
-    CallableAndCallExpr, ClassPatternKind, NonEmptyIterablePredicate, PatternPredicate,
-    PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral, ScopedPredicateId,
-    SequencePatternPredicateKind, StarImportPlaceholderPredicate, SubjectElementPatternPredicate,
+    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
+    PredicateNode, PredicateOrLiteral, ScopedPredicateId, SequencePatternPredicateKind,
+    StarImportPlaceholderPredicate, SubjectElementPatternPredicate,
 };
 use crate::program::Program;
 use crate::re_exports::exported_names;
@@ -1962,46 +1962,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .record_reachability_constraint(ScopedReachabilityConstraintId::AMBIGUOUS);
     }
 
-    /// Returns a reachability predicate for iterables that may be statically non-empty.
-    ///
-    /// The `range` case only checks the syntactic shape here; semantic reachability confirms that
-    /// the callable is builtin `range` and that the argument types prove at least one iteration.
-    fn non_empty_iterable_predicate(
-        iter_expr: Expression<'db>,
-        iter: &'ast ast::Expr,
-    ) -> Option<PredicateOrLiteral<'db>> {
-        let ast::Expr::Call(call) = iter else {
-            return None;
-        };
-        let ast::Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() else {
-            return None;
-        };
-
-        if id != "range"
-            || !call.arguments.keywords.is_empty()
-            || call.arguments.args.iter().any(ast::Expr::is_starred_expr)
-        {
-            return None;
-        }
-
-        let (start, stop, step) = match call.arguments.args.as_ref() {
-            [stop] => (None, stop.into(), None),
-            [start, stop] => (Some(start.into()), stop.into(), None),
-            [start, stop, step] => (Some(start.into()), stop.into(), Some(step.into())),
-            _ => return None,
-        };
-        Some(PredicateOrLiteral::Predicate(Predicate {
-            node: PredicateNode::IsNonEmptyIterable(NonEmptyIterablePredicate::BuiltinRange {
-                call: iter_expr,
-                callable: call.func.as_ref().into(),
-                start,
-                stop,
-                step,
-            }),
-            is_positive: true,
-        }))
-    }
-
     /// Record a constraint that affects the reachability of the current position in the semantic
     /// index analysis. For example, if we encounter a `if test:` branch, we immediately record
     /// a `test` constraint, because if `test` later (during type checking) evaluates to `False`,
@@ -3525,16 +3485,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let after_iter = self.flow_snapshot();
 
                 let non_empty_iterable_constraint =
-                    Self::non_empty_iterable_predicate(iter_expr, iter)
-                        .map(|predicate| self.record_reachability_constraint(predicate));
-
-                let no_iteration_base = match non_empty_iterable_constraint {
-                    Some(_) => after_iter,
-                    None => {
-                        self.record_ambiguous_reachability();
-                        self.flow_snapshot()
-                    }
-                };
+                    self.record_reachability_constraint(PredicateOrLiteral::Predicate(Predicate {
+                        node: PredicateNode::IsNonEmptyIterable(iter_expr),
+                        is_positive: true,
+                    }));
 
                 // Pre-walk the loop to collect all the bound places, then create a loop header
                 // definition for each bound place. See `struct LoopHeader` for more on this. Loop
@@ -3573,16 +3527,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // We may execute the `else` clause without ever executing the body, so merge in a
                 // zero-iteration state before visiting `else`.
-                if let Some(non_empty_iterable_constraint) = non_empty_iterable_constraint {
-                    let post_loop_body = self.flow_snapshot();
-                    self.flow_restore(no_iteration_base);
-                    self.record_negated_reachability_constraint(non_empty_iterable_constraint);
-                    let no_iteration = self.flow_snapshot();
-                    self.flow_restore(post_loop_body);
-                    self.flow_merge(no_iteration);
-                } else {
-                    self.flow_merge(no_iteration_base);
-                }
+                let post_loop_body = self.flow_snapshot();
+                self.flow_restore(after_iter);
+                self.record_negated_reachability_constraint(non_empty_iterable_constraint);
+                let no_iteration = self.flow_snapshot();
+                self.flow_restore(post_loop_body);
+                self.flow_merge(no_iteration);
                 self.visit_body(orelse);
 
                 // Breaking out of a `for` loop bypasses the `else` clause, so merge in the break
