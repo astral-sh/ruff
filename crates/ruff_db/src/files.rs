@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fmt;
 use std::sync::Arc;
 
@@ -222,29 +223,50 @@ impl Files {
         }
     }
 
-    /// Refreshes the state of all known files under `path` recursively.
+    /// Refreshes the state of all known files under `paths` recursively.
     ///
-    /// The most common use case is to update the [`Files`] state after removing or moving a directory.
+    /// The most common use case is to update the [`Files`] state after removing or moving directories.
     ///
     /// # Performance
-    /// Refreshing the state of every file under `path` is expensive. It requires iterating over all known files
-    /// and making system calls to get the latest status of each file in `path`.
-    /// That's why [`File::sync_path`] and [`File::sync_path`] is preferred if it is known that the path is a file.
-    pub fn sync_recursively(db: &mut dyn Db, path: &SystemPath) {
-        let path = SystemPath::absolute(path, db.system().current_directory());
-        tracing::debug!("Syncing all files in '{path}'");
+    /// Refreshing the state of files recursively is expensive. It requires iterating over all known files
+    /// and making system calls to get the latest status of matching files.
+    /// That's why [`File::sync_path`] is preferred if it is known that the path is a file.
+    pub fn sync_all_recursive<P, I>(db: &mut dyn Db, paths: I)
+    where
+        P: AsRef<SystemPath>,
+        I: IntoIterator<Item = P>,
+    {
+        let current_directory = db.system().current_directory();
+        let paths = paths
+            .into_iter()
+            .map(|path| SystemPath::absolute(path.as_ref(), current_directory))
+            .collect::<BTreeSet<_>>();
+
+        if paths.is_empty() {
+            return;
+        }
 
         let inner = Arc::clone(&db.files().inner);
         for entry in inner.system_by_path.iter_mut() {
-            if entry.key().starts_with(&path) {
-                File::sync_system_path(db, entry.key(), Some(*entry.value()));
+            let path = entry.key();
+            if paths
+                .range(..=path.to_path_buf())
+                .next_back()
+                .is_some_and(|candidate| path.starts_with(candidate.as_path()))
+            {
+                File::sync_system_path(db, path, Some(*entry.value()));
             }
         }
 
         let roots = inner.roots.read().unwrap();
 
         for root in roots.all() {
-            if path.starts_with(root.path(db)) {
+            let root_path = root.path(db);
+            if paths
+                .range(root_path.to_path_buf()..)
+                .next()
+                .is_some_and(|path| path.starts_with(root_path))
+            {
                 root.set_revision(db).to(FileRevision::now());
             }
         }

@@ -252,17 +252,9 @@ impl WorkspaceOptions {
         if let Some(extension) = self.python_extension
             && let Some(active_environment) = extension.active_environment
         {
-            overrides.fallback_python = if let Some(environment) = &active_environment.environment {
-                environment.folder_uri.to_file_path().ok().and_then(|path| {
-                    Some(RelativePathBuf::python_extension(
-                        SystemPathBuf::from_path_buf(path).ok()?,
-                    ))
-                })
-            } else {
-                Some(RelativePathBuf::python_extension(
-                    active_environment.executable.sys_prefix,
-                ))
-            };
+            overrides.fallback_python = Some(RelativePathBuf::python_extension(
+                active_environment.executable.sys_prefix,
+            ));
 
             overrides.fallback_python_version = active_environment
                 .version
@@ -476,6 +468,7 @@ impl Combine for PythonExtension {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ActiveEnvironment {
     pub(crate) executable: PythonExecutable,
+    #[deprecated]
     pub(crate) environment: Option<PythonEnvironment>,
     pub(crate) version: Option<EnvironmentVersion>,
 }
@@ -485,27 +478,32 @@ pub(crate) struct ActiveEnvironment {
 pub(crate) struct EnvironmentVersion {
     pub(crate) major: i64,
     pub(crate) minor: i64,
-    #[allow(dead_code)]
-    pub(crate) patch: i64,
-    #[allow(dead_code)]
-    pub(crate) sys_version: String,
+    #[deprecated(
+        note = "Not provided by all clients (Zed, VS Code when using the Python Environment extension). Use `major` and `minor` instead."
+    )]
+    pub(crate) patch: Option<i64>,
+    #[deprecated(
+        note = "Not provided by all clients (Zed, VS Code when using the Python Environment extension)."
+    )]
+    pub(crate) sys_version: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonEnvironment {
-    pub(crate) folder_uri: Url,
-    #[allow(dead_code)]
+    #[deprecated]
+    pub(crate) folder_uri: Option<Url>,
+    #[deprecated]
     #[serde(rename = "type")]
-    pub(crate) kind: String,
-    #[allow(dead_code)]
+    pub(crate) kind: Option<String>,
+    #[deprecated]
     pub(crate) name: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonExecutable {
-    #[allow(dead_code)]
-    pub(crate) uri: Url,
+    #[deprecated]
+    pub(crate) uri: Option<Url>,
     pub(crate) sys_prefix: SystemPathBuf,
 }

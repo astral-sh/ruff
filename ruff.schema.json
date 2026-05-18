@@ -3004,6 +3004,15 @@
           ],
           "format": "uint",
           "minimum": 0
+        },
+        "max-statements-in-try": {
+          "description": "Maximum number of statements allowed for a try clause body (see `W0717`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
         }
       },
       "additionalProperties": false
@@ -3976,6 +3985,7 @@
         "PLW07",
         "PLW071",
         "PLW0711",
+        "PLW0717",
         "PLW1",
         "PLW15",
         "PLW150",

@@ -93,14 +93,6 @@ pub struct StaticClassLiteral<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for StaticClassLiteral<'_> {}
 
-fn generic_context_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: StaticClassLiteral<'db>,
-) -> Option<GenericContext<'db>> {
-    None
-}
-
 #[salsa::tracked]
 impl<'db> StaticClassLiteral<'db> {
     /// Return `true` if this class represents `known_class`
@@ -250,7 +242,8 @@ impl<'db> StaticClassLiteral<'db> {
         self.pep695_generic_context(db).is_some()
     }
 
-    #[salsa::tracked(cycle_initial=generic_context_cycle_initial,
+    #[salsa::tracked(
+        cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
@@ -275,7 +268,8 @@ impl<'db> StaticClassLiteral<'db> {
         })
     }
 
-    #[salsa::tracked(cycle_initial=generic_context_cycle_initial,
+    #[salsa::tracked(
+        cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn inherited_legacy_generic_context(
@@ -579,7 +573,16 @@ impl<'db> StaticClassLiteral<'db> {
     /// attribute on a class at runtime.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    #[salsa::tracked(returns(as_ref), cycle_initial=static_class_try_mro_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        returns(as_ref),
+        cycle_initial=|db, _, self_: StaticClassLiteral<'db>, specialization| {
+            Err(StaticMroError::cycle(
+                db,
+                self_.apply_optional_specialization(db, specialization),
+            ))
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     pub(crate) fn try_mro(
         self,
         db: &'db dyn Db,
@@ -803,7 +806,10 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
-    #[salsa::tracked(cycle_initial=try_metaclass_cycle_initial,
+    #[salsa::tracked(
+        cycle_initial=|_, _, _| Err(MetaclassError {
+            kind: MetaclassErrorKind::Cycle,
+        }),
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn try_metaclass(
@@ -1930,7 +1936,9 @@ impl<'db> StaticClassLiteral<'db> {
 
     #[salsa::tracked(
         cycle_fn=implicit_attribute_cycle_recover,
-        cycle_initial=implicit_attribute_initial,
+        cycle_initial=|_, id, _, _, _| Member {
+            inner: Place::bound(Type::divergent(id)).into(),
+        },
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(super) fn implicit_attribute_inner(
@@ -2862,40 +2870,6 @@ fn explicit_bases_cycle_fn<'db>(
         // which previous entries correspond to which current ones. An oscillation here would be
         // unfortunate, but maybe only pathological programs can trigger such a thing.
         current
-    }
-}
-
-fn static_class_try_mro_cycle_initial<'db>(
-    db: &'db dyn Db,
-    _id: salsa::Id,
-    self_: StaticClassLiteral<'db>,
-    specialization: Option<Specialization<'db>>,
-) -> Result<Mro<'db>, StaticMroError<'db>> {
-    Err(StaticMroError::cycle(
-        db,
-        self_.apply_optional_specialization(db, specialization),
-    ))
-}
-
-fn try_metaclass_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self_: StaticClassLiteral<'db>,
-) -> Result<(Type<'db>, Option<MetaclassTransformInfo<'db>>), MetaclassError<'db>> {
-    Err(MetaclassError {
-        kind: MetaclassErrorKind::Cycle,
-    })
-}
-
-fn implicit_attribute_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _class_body_scope: ScopeId<'db>,
-    _name: String,
-    _target_method_decorator: MethodDecorator,
-) -> Member<'db> {
-    Member {
-        inner: Place::bound(Type::divergent(id)).into(),
     }
 }
 

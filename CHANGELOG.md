@@ -1,5 +1,67 @@
 # Changelog
 
+## 0.15.13
+
+Released on 2026-05-14.
+
+### Preview features
+
+- Add a rule to flag lazy imports that are eagerly evaluated ([#25016](https://github.com/astral-sh/ruff/pull/25016))
+- \[`pylint`\] Standardize diagnostic message (`PLR0914`, `PLR0917`) ([#24996](https://github.com/astral-sh/ruff/pull/24996))
+
+### Bug fixes
+
+- Fix `F811` false positive for class methods ([#24933](https://github.com/astral-sh/ruff/pull/24933))
+- Fix setting selection for multi-folder workspace ([#24819](https://github.com/astral-sh/ruff/pull/24819))
+- \[`eradicate`\] Fix false positive for lines with leading whitespace (`ERA001`) ([#25122](https://github.com/astral-sh/ruff/pull/25122))
+- \[`flake8-pyi`\] Fix false positive for f-string debug specifier (`PYI016`) ([#24098](https://github.com/astral-sh/ruff/pull/24098))
+
+### Rule changes
+
+- Always include panic payload in panic diagnostic message ([#24873](https://github.com/astral-sh/ruff/pull/24873))
+- Restrict `PYI034` for in-place operations to enclosing class ([#24511](https://github.com/astral-sh/ruff/pull/24511))
+- Improve error message for parameters that are declared `global` ([#24902](https://github.com/astral-sh/ruff/pull/24902))
+- Update known stdlib ([#25103](https://github.com/astral-sh/ruff/pull/25103))
+
+### Performance
+
+- \[`isort`\] Avoid constructing `glob::Pattern`s for literal known modules ([#25123](https://github.com/astral-sh/ruff/pull/25123))
+
+### CLI
+
+- Add TOML examples to `--config` help text ([#25013](https://github.com/astral-sh/ruff/pull/25013))
+- Colorize ruff check 'All checks passed' ([#25085](https://github.com/astral-sh/ruff/pull/25085))
+
+### Configuration
+
+- Increase max allowed value of `line-length` setting ([#24962](https://github.com/astral-sh/ruff/pull/24962))
+
+### Documentation
+
+- Add `D203` to rules that conflict with the formatter ([#25044](https://github.com/astral-sh/ruff/pull/25044))
+- Clarify `COM819` and formatter interaction ([#25045](https://github.com/astral-sh/ruff/pull/25045))
+- Clarify that `NotImplemented` is a value, not an exception (`F901`) ([#25054](https://github.com/astral-sh/ruff/pull/25054))
+- Update number of lint rules supported ([#24942](https://github.com/astral-sh/ruff/pull/24942))
+
+### Other changes
+
+- Simplify the playground's markdown template ([#24924](https://github.com/astral-sh/ruff/pull/24924))
+
+### Contributors
+
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@brian-c11](https://github.com/brian-c11)
+- [@Andrej730](https://github.com/Andrej730)
+- [@denyszhak](https://github.com/denyszhak)
+- [@darestack](https://github.com/darestack)
+- [@sharkdp](https://github.com/sharkdp)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@EkriirkE](https://github.com/EkriirkE)
+- [@eyupcanakman](https://github.com/eyupcanakman)
+- [@Hrk84ya](https://github.com/Hrk84ya)
+- [@thernstig](https://github.com/thernstig)
+- [@ntBre](https://github.com/ntBre)
+
 ## 0.15.12
 
 Released on 2026-04-24.

@@ -756,6 +756,105 @@ foo1(f1, 1, "a", "b")
 foo1(f1, x=1, z="a")
 ```
 
+Inline literals passed through `ParamSpec` components should be inferred using the specialized
+parameter types of the callable argument. This mirrors wrappers like `asyncio.to_thread` around
+clients that expose large `Unpack[TypedDict]` keyword signatures, but also applies to other
+context-sensitive literals.
+
+```py
+from typing import Callable, TypedDict, Unpack, overload
+
+class Tag(TypedDict):
+    Key: str
+    Value: str
+
+class PutObjectRequest(TypedDict):
+    TagSet: list[Tag]
+
+def put_tags(tags: list[Tag], /) -> None: ...
+def put_object(**kwargs: Unpack[PutObjectRequest]) -> None: ...
+def put_int_list(values: list[int], /) -> None: ...
+def put_int_tuple(values: tuple[int, ...], /) -> None: ...
+def put_int_tuples(values: list[tuple[int, ...]], /) -> None: ...
+def to_thread_like[**P, R](func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return func(*args, **kwargs)
+
+def to_thread_like_keyword[**P, R](func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+    return func(*args, **kwargs)
+
+to_thread_like(put_tags, reveal_type([{"Key": "k", "Value": "v"}]))  # revealed: list[Tag]
+to_thread_like(put_object, TagSet=reveal_type([{"Key": "k", "Value": "v"}]))  # revealed: list[Tag]
+to_thread_like(put_int_list, reveal_type([1, 2]))  # revealed: list[int]
+to_thread_like(put_int_tuple, reveal_type((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
+to_thread_like(put_int_tuples, reveal_type([(1, 2)]))  # revealed: list[tuple[int, ...]]
+to_thread_like_keyword(func=put_object, TagSet=reveal_type([{"Key": "k", "Value": "v"}]))  # revealed: list[Tag]
+to_thread_like_keyword(TagSet=reveal_type([{"Key": "k", "Value": "v"}]), func=put_object)  # revealed: list[Tag]
+
+class ThreadRunner:
+    def run[**P, R](self, func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+        return func(*args, **kwargs)
+
+class ClassThreadRunner:
+    @classmethod
+    def run[**P, R](cls, func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+        return func(*args, **kwargs)
+
+runner = ThreadRunner()
+runner.run(put_tags, reveal_type([{"Key": "k", "Value": "v"}]))  # revealed: list[Tag]
+runner.run(put_object, TagSet=reveal_type([{"Key": "k", "Value": "v"}]))  # revealed: list[Tag]
+runner.run(put_int_list, reveal_type([1, 2]))  # revealed: list[int]
+runner.run(put_int_tuple, reveal_type((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
+runner.run(put_int_tuples, reveal_type([(1, 2)]))  # revealed: list[tuple[int, ...]]
+ClassThreadRunner.run(put_int_list, reveal_type([1, 2]))  # revealed: list[int]
+ClassThreadRunner.run(put_int_tuple, reveal_type((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
+ClassThreadRunner.run(put_int_tuples, reveal_type([(1, 2)]))  # revealed: list[tuple[int, ...]]
+
+def requires_x(*, x: int) -> str:
+    return ""
+
+def with_flag[**P, R](func: Callable[P, R], flag: int, *args: P.args, **kwargs: P.kwargs) -> R:
+    return func(*args, **kwargs)
+
+with_flag(x=1, func=requires_x, flag=1)
+with_flag(x=1, func=requires_x, flag="bad")  # error: [invalid-argument-type]
+
+@overload
+def overloaded_put_object(*, TagSet: list[Tag]) -> None: ...
+@overload
+def overloaded_put_object(*, func: object, TagSet: list[int]) -> None: ...
+def overloaded_put_object(*, TagSet: object, func: object = None) -> None: ...
+
+to_thread_like_keyword(TagSet=reveal_type([{"Key": "k", "Value": "v"}]), func=overloaded_put_object)  # revealed: list[Tag]
+```
+
+ParamSpec forwarding should not use raw unspecialized parameter types from a wrapped generic
+callable as argument context. The forwarded list literals should be inferred the same way as in the
+equivalent direct generic call, not with a raw `list[T]` context from the wrapped callable.
+
+```py
+from typing import Callable
+
+def generic_pair[T](x: list[T], y: list[T], /) -> None: ...
+def generic_pair_with_container[T](x: T, y: list[T], /) -> None: ...
+def generic_identity_list[T](x: list[T], /) -> list[T]:
+    raise NotImplementedError
+
+def to_thread_like[**P, R](func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return func(*args, **kwargs)
+
+# TODO: This should not error once the call-expression type context specializes the generic
+# wrapped callable before we infer forwarded `ParamSpec` arguments.
+# error: [invalid-assignment]
+union_list_result: list[int | str] = to_thread_like(generic_identity_list, reveal_type([1]))  # revealed: list[int]
+
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+to_thread_like(generic_pair, [1], reveal_type([""]))  # revealed: list[str]
+
+# error: [invalid-argument-type]
+to_thread_like(generic_pair_with_container, 1, reveal_type([""]))  # revealed: list[str]
+```
+
 ### Specializing `ParamSpec` with another `ParamSpec`
 
 ```py

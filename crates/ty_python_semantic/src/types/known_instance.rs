@@ -1,4 +1,5 @@
 use itertools::Either;
+use ruff_python_ast::name::Name;
 
 use crate::{
     Db, DisplaySettings,
@@ -112,6 +113,9 @@ pub enum KnownInstanceType<'db> {
     /// subtype of `base` in type expressions. See the `struct NewType` payload for an example.
     NewType(NewType<'db>),
 
+    /// A single sentinel object created with `typing_extensions.Sentinel`.
+    Sentinel(SentinelInstance<'db>),
+
     /// The inferred spec for a functional `NamedTuple` class.
     NamedTupleSpec(NamedTupleSpec<'db>),
 
@@ -167,6 +171,9 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         }
         KnownInstanceType::NewType(newtype) => {
             visitor.visit_type(db, newtype.concrete_base_type(db));
+        }
+        KnownInstanceType::Sentinel(_) => {
+            // Nothing to visit
         }
         KnownInstanceType::NamedTupleSpec(spec) => {
             for field in spec.fields(db) {
@@ -231,6 +238,7 @@ impl<'db> KnownInstanceType<'db> {
                     class_type.recursive_type_normalized_impl(db, div, true)
                 })
                 .map(Self::NewType),
+            Self::Sentinel(sentinel) => Some(Self::Sentinel(sentinel)),
             Self::GenericContext(generic) => Some(Self::GenericContext(generic)),
             Self::Specialization(specialization) => specialization
                 .recursive_type_normalized_impl(db, div, true)
@@ -267,6 +275,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Callable(_) => KnownClass::GenericAlias,
             Self::LiteralStringAlias(_) => KnownClass::Str,
             Self::NewType(_) => KnownClass::NewType,
+            Self::Sentinel(_) => KnownClass::Sentinel,
             Self::NamedTupleSpec(_) => KnownClass::Sequence,
             Self::FunctoolsPartial(_) => KnownClass::FunctoolsPartial,
         }
@@ -358,11 +367,32 @@ impl<'db> KnownInstanceType<'db> {
             | KnownInstanceType::Literal(_)
             | KnownInstanceType::LiteralStringAlias(_)
             | KnownInstanceType::NamedTupleSpec(_)
-            | KnownInstanceType::NewType(_) => {
+            | KnownInstanceType::NewType(_)
+            | KnownInstanceType::Sentinel(_) => {
                 // TODO: For some of these, we may need to apply the type mapping to inner types.
                 Type::KnownInstance(self)
             }
         }
+    }
+}
+
+/// Contains information about a sentinel object created with `typing_extensions.Sentinel`.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct SentinelInstance<'db> {
+    pub name: Name,
+    pub definition: Definition<'db>,
+}
+
+impl get_size2::GetSize for SentinelInstance<'_> {}
+
+impl<'db> SentinelInstance<'db> {
+    pub(crate) fn is_same_sentinel(self, db: &'db dyn Db, other: Self) -> bool {
+        let self_definition = self.definition(db);
+        let other_definition = other.definition(db);
+
+        self_definition.file(db) == other_definition.file(db)
+            && self_definition.file_scope(db) == other_definition.file_scope(db)
+            && self_definition.place(db) == other_definition.place(db)
     }
 }
 

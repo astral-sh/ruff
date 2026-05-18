@@ -6,8 +6,8 @@ expression: ranges
   {
     "startLine": 0,
     "startCharacter": 8,
-    "endLine": 3,
-    "endCharacter": 0
+    "endLine": 4,
+    "endCharacter": 8
   },
   {
     "startLine": 3,
@@ -24,8 +24,8 @@ expression: ranges
   {
     "startLine": 7,
     "startCharacter": 10,
-    "endLine": 10,
-    "endCharacter": 4
+    "endLine": 11,
+    "endCharacter": 24
   },
   {
     "startLine": 10,

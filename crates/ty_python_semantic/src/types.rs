@@ -68,7 +68,9 @@ use crate::types::generics::{
     ApplySpecialization, InferableTypeVars, Specialization, bind_typevar,
 };
 use crate::types::infer::InferenceFlags;
-use crate::types::known_instance::{InternedConstraintSet, InternedType, UnionTypeInstance};
+use crate::types::known_instance::{
+    InternedConstraintSet, InternedType, SentinelInstance, UnionTypeInstance,
+};
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraint};
@@ -2237,6 +2239,7 @@ impl<'db> Type<'db> {
                 !(special_form.check_module(KnownModule::Typing)
                     && special_form.check_module(KnownModule::TypingExtensions))
             }
+            Type::KnownInstance(KnownInstanceType::Sentinel(_)) => true,
             Type::KnownInstance(_) => false,
             Type::Callable(_) => {
                 // A callable type is never a singleton because for any given signature,
@@ -2514,7 +2517,7 @@ impl<'db> Type<'db> {
     }
 
     fn lookup_dunder_new(self, db: &'db dyn Db) -> Option<PlaceAndQualifiers<'db>> {
-        #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(cycle_initial=|_, _, _, ()| None, heap_size=ruff_memory_usage::heap_size)]
         fn lookup_dunder_new_inner<'db>(
             db: &'db dyn Db,
             ty: Type<'db>,
@@ -3440,8 +3443,10 @@ impl<'db> Type<'db> {
                     .and_then(|metadata| match name_str {
                         "name" if is_enum_subclass => metadata.name_type(db, enum_literal.name(db)),
                         "_name_" => metadata.name_type(db, enum_literal.name(db)),
-                        "value" if is_enum_subclass => metadata.value_type(enum_literal.name(db)),
-                        "_value_" => metadata.value_type(enum_literal.name(db)),
+                        "value" if is_enum_subclass => {
+                            metadata.value_type(db, enum_literal.name(db))
+                        }
+                        "_value_" => metadata.value_type(db, enum_literal.name(db)),
                         _ => None,
                     })
                     .map_or_else(|| Place::Undefined, Place::bound)
@@ -5402,6 +5407,9 @@ impl<'db> Type<'db> {
                 }
                 KnownInstanceType::Callable(callable) => Ok(Type::Callable(*callable)),
                 KnownInstanceType::LiteralStringAlias(ty) => Ok(ty.inner(db)),
+                KnownInstanceType::Sentinel(sentinel) => {
+                    Ok(Type::KnownInstance(KnownInstanceType::Sentinel(*sentinel)))
+                }
                 KnownInstanceType::FunctoolsPartial(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
                         *self, scope_id
@@ -6139,6 +6147,7 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::LiteralStringAlias(_)
                 | KnownInstanceType::NamedTupleSpec(_)
                 | KnownInstanceType::NewType(_)
+                | KnownInstanceType::Sentinel(_)
                 | KnownInstanceType::FunctoolsPartial(_) => {
                     // TODO: For some of these, we may need to try to find legacy typevars in inner types.
                 }

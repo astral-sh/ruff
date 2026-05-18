@@ -59,14 +59,14 @@ pub fn folding_ranges(
     let mut visitor = FoldingRangeVisitor {
         source: source.as_str(),
         ranges: vec![],
-        active_block_header_delimiter_ranges: vec![],
+        active_block_fold_start_lines: vec![],
         tokens: parsed.tokens(),
         range_filter,
     };
     walk_node(&mut visitor, AnyNodeRef::from(parsed.syntax()));
     debug_assert!(
-        visitor.active_block_header_delimiter_ranges.is_empty(),
-        "all active block header delimiter ranges should be cleared after traversal"
+        visitor.active_block_fold_start_lines.is_empty(),
+        "all active block fold start lines should be cleared after traversal"
     );
 
     // Add remaining ranges not covered by the AST visitor.
@@ -95,15 +95,15 @@ pub fn folding_ranges(
 struct FoldingRangeVisitor<'a> {
     source: &'a str,
     ranges: Vec<FoldingRange>,
-    active_block_header_delimiter_ranges: Vec<ActiveBlockHeaderDelimiterRange<'a>>,
+    active_block_fold_start_lines: Vec<ActiveBlockFoldStartLine<'a>>,
     tokens: &'a Tokens,
     range_filter: Option<TextRange>,
 }
 
 #[derive(Debug, Clone, Copy)]
-struct ActiveBlockHeaderDelimiterRange<'a> {
+struct ActiveBlockFoldStartLine<'a> {
     parent: AnyNodeRef<'a>,
-    range: TextRange,
+    line_start: TextSize,
 }
 
 impl<'a> FoldingRangeVisitor<'a> {
@@ -130,12 +130,26 @@ impl<'a> FoldingRangeVisitor<'a> {
         true
     }
 
-    /// Add the given expression folding range unless it's already covered by a block header fold.
+    /// Adds a single folding range for a block.
+    fn add_block_range(&mut self, parent: AnyNodeRef<'a>, range: TextRange) {
+        if self.add_range(range) {
+            self.active_block_fold_start_lines
+                .push(ActiveBlockFoldStartLine {
+                    parent,
+                    line_start: self.source.line_start(range.start()),
+                });
+        }
+    }
+
+    /// Adds a folding range for an expression.
     fn add_expression_range(&mut self, range: TextRange) {
+        // Block folds preserve statement headers, so they take precedence over expression folds
+        // when both would render a folding trigger on the same line.
+        let line_start = self.source.line_start(range.start());
         if self
-            .active_block_header_delimiter_ranges
+            .active_block_fold_start_lines
             .iter()
-            .any(|header_range| header_range.range.intersect(range).is_some())
+            .any(|block_fold| block_fold.line_start == line_start)
         {
             return;
         }
@@ -321,84 +335,116 @@ impl<'a> FoldingRangeVisitor<'a> {
             .map(Ranged::start)
     }
 
-    /// Adds folding ranges for any multi-line delimiter pairs (i.e., `()`, `[]`, or `{}`) in a block header.
-    fn add_block_header_ranges(&mut self, parent: AnyNodeRef<'a>, header_range: TextRange) {
-        let mut delimiter_stack: Vec<(TokenKind, TextSize)> = Vec::new();
-        let mut delimiter_ranges = Vec::new();
+    /// Finds where a class or function definition actually starts once we skip over decorators.
+    fn definition_header_start<D: Ranged>(
+        &self,
+        keyword: TokenKind,
+        statement_start: TextSize,
+        decorators: &[D],
+        name_start: TextSize,
+    ) -> TextSize {
+        let search_start = decorators.last().map_or(statement_start, Ranged::end);
+        self.find_token_start(keyword, TextRange::new(search_start, name_start))
+            .unwrap_or(search_start)
+    }
 
-        for token in self.tokens.in_range(header_range) {
-            match token.kind() {
-                TokenKind::Lpar => delimiter_stack.push((TokenKind::Rpar, token.end())),
-                TokenKind::Lsqb => delimiter_stack.push((TokenKind::Rsqb, token.end())),
-                TokenKind::Lbrace => delimiter_stack.push((TokenKind::Rbrace, token.end())),
-                TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace => {
-                    if let Some(index) =
-                        delimiter_stack
-                            .iter()
-                            .rposition(|(expected_closing_kind, _)| {
-                                *expected_closing_kind == token.kind()
-                            })
-                    {
-                        let (_, open_end) = delimiter_stack.remove(index);
-                        delimiter_ranges.push(TextRange::new(open_end, token.start()));
-                    }
-                }
-                _ => {}
+    /// Returns the start offsets for a block's full fold and body fold.
+    ///
+    /// The first offset marks the line on which we should start the full fold (the actual character
+    /// offset will be computed as the end of this line).
+    ///
+    /// The second offset marks where we start scanning for the newline that begins the body fold.
+    fn block_range_starts(&self, parent: AnyNodeRef<'a>) -> (TextSize, TextSize) {
+        match parent {
+            AnyNodeRef::StmtFunctionDef(func) => {
+                let keyword = if func.is_async {
+                    TokenKind::Async
+                } else {
+                    TokenKind::Def
+                };
+                (
+                    self.definition_header_start(
+                        keyword,
+                        func.start(),
+                        &func.decorator_list,
+                        func.name.start(),
+                    ),
+                    func.name.end(),
+                )
             }
-        }
-
-        delimiter_ranges.sort_by(|left, right| {
-            left.start()
-                .cmp(&right.start())
-                .then_with(|| right.end().cmp(&left.end()))
-        });
-
-        for range in delimiter_ranges {
-            if self.add_range(range) {
-                self.active_block_header_delimiter_ranges
-                    .push(ActiveBlockHeaderDelimiterRange { parent, range });
-            }
+            AnyNodeRef::StmtClassDef(class) => (
+                self.definition_header_start(
+                    TokenKind::Class,
+                    class.start(),
+                    &class.decorator_list,
+                    class.name.start(),
+                ),
+                class.name.end(),
+            ),
+            _ => (parent.start(), parent.start()),
         }
     }
 
-    /// Adds folding ranges for the header and body of the given block.
-    fn add_block_ranges<T: Ranged>(&mut self, node: AnyNodeRef<'a>, block: &[T]) {
-        let Some(first_block_statement) = block.first() else {
-            return;
-        };
-        let header_start = match node {
-            AnyNodeRef::StmtFunctionDef(function) => function.name.start(),
-            AnyNodeRef::StmtClassDef(class) => class.name.start(),
-            _ => node.start(),
-        };
-
-        self.add_block_header_ranges(
-            node,
-            TextRange::new(header_start, first_block_statement.start()),
-        );
-        self.add_block_body_range(header_start, block);
+    /// Adds folding ranges for a block.
+    fn add_block_ranges<T: Ranged>(&mut self, parent: AnyNodeRef<'a>, block: &[T]) {
+        let (block_start, body_header_start) = self.block_range_starts(parent);
+        let full_range = self.full_block_range(block_start, block);
+        let body_range = self.block_body_range(body_header_start, block);
+        self.add_distinct_block_ranges(parent, full_range, body_range);
     }
 
-    /// Adds a folding range for the body of the given block, while leaving the block header visible.
-    fn add_block_body_range<T: Ranged>(&mut self, header_start: TextSize, block: &[T]) {
+    /// Adds the full range if present, and also adds the body range if both present and distinct
+    /// from the full range.
+    fn add_distinct_block_ranges(
+        &mut self,
+        parent: AnyNodeRef<'a>,
+        full_range: Option<TextRange>,
+        body_range: Option<TextRange>,
+    ) {
+        if let Some(full_range) = full_range {
+            self.add_block_range(parent, full_range);
+        }
+        if body_range != full_range
+            && let Some(body_range) = body_range
+        {
+            self.add_block_range(parent, body_range);
+        }
+    }
+
+    /// Returns a folding range for a full block, preserving the first line of the block header.
+    fn full_block_range<T: Ranged>(&self, block_start: TextSize, block: &[T]) -> Option<TextRange> {
+        let last_block_statement = block.last()?;
+        let start = self.source.line_end(block_start);
+        let end = last_block_statement.end();
+
+        if start >= end {
+            return None;
+        }
+
+        Some(TextRange::new(start, end))
+    }
+
+    /// Returns a folding range for just the body of a block.
+    fn block_body_range<T: Ranged>(
+        &self,
+        header_start: TextSize,
+        block: &[T],
+    ) -> Option<TextRange> {
         let (Some(first_block_statement), Some(last_block_statement)) =
             (block.first(), block.last())
         else {
-            return;
+            return None;
         };
-        let Some(block_fold_start) = self.find_token_start(
+        let block_fold_start = self.find_token_start(
             TokenKind::Newline,
             TextRange::new(header_start, first_block_statement.start()),
-        ) else {
-            return;
-        };
+        )?;
 
-        self.add_range(TextRange::new(block_fold_start, last_block_statement.end()));
+        Some(TextRange::new(block_fold_start, last_block_statement.end()))
     }
 
-    /// Searches for a given keyword and, if present, adds a fold for the body of the block while
-    /// leaving the block header visible.
-    fn add_block_body_range_after_keyword<T: Ranged>(
+    /// Searches for a given keyword and, if present, adds folds for the block it defines.
+    fn add_block_ranges_after_keyword<T: Ranged>(
         &mut self,
         parent: AnyNodeRef<'a>,
         keyword: TokenKind,
@@ -415,11 +461,11 @@ impl<'a> FoldingRangeVisitor<'a> {
             return;
         };
 
-        self.add_block_header_ranges(
+        self.add_distinct_block_ranges(
             parent,
-            TextRange::new(keyword_start, first_body_statement.start()),
+            self.full_block_range(keyword_start, block),
+            self.block_body_range(keyword_start, block),
         );
-        self.add_block_body_range(keyword_start, block);
     }
 }
 
@@ -464,7 +510,7 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
                 // Fold the for body separately from the else block.
                 self.add_block_ranges(node, &for_stmt.body);
                 if let Some(body_last) = for_stmt.body.last() {
-                    self.add_block_body_range_after_keyword(
+                    self.add_block_ranges_after_keyword(
                         node,
                         TokenKind::Else,
                         body_last.end(),
@@ -476,7 +522,7 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
                 // Fold the while body separately from the else block.
                 self.add_block_ranges(node, &while_stmt.body);
                 if let Some(body_last) = while_stmt.body.last() {
-                    self.add_block_body_range_after_keyword(
+                    self.add_block_ranges_after_keyword(
                         node,
                         TokenKind::Else,
                         body_last.end(),
@@ -498,7 +544,7 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
                     .map(Ranged::end)
                     .or_else(|| try_stmt.body.last().map(Ranged::end))
                 {
-                    self.add_block_body_range_after_keyword(
+                    self.add_block_ranges_after_keyword(
                         node,
                         TokenKind::Else,
                         previous_block_end,
@@ -513,7 +559,7 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
                     .or_else(|| try_stmt.handlers.last().map(Ranged::end))
                     .or_else(|| try_stmt.body.last().map(Ranged::end))
                 {
-                    self.add_block_body_range_after_keyword(
+                    self.add_block_ranges_after_keyword(
                         node,
                         TokenKind::Finally,
                         previous_block_end,
@@ -595,11 +641,11 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
 
     fn leave_node(&mut self, node: AnyNodeRef<'a>) {
         while self
-            .active_block_header_delimiter_ranges
+            .active_block_fold_start_lines
             .last()
-            .is_some_and(|header_range| header_range.parent.ptr_eq(node))
+            .is_some_and(|block_fold| block_fold.parent.ptr_eq(node))
         {
-            self.active_block_header_delimiter_ranges.pop();
+            self.active_block_fold_start_lines.pop();
         }
     }
 
@@ -1043,6 +1089,279 @@ else:
     }
 
     #[test]
+    fn test_folding_range_multi_line_block_headers() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def choose(
+    value,
+    fallback,
+):
+    if any(
+        [
+            value,
+        ]
+    ):
+        return value
+    elif (
+        fallback
+    ):
+        return fallback
+
+class Repository[
+    Model,
+    Key,
+](
+    Mapping[Key, Model],
+    Protocol,
+):
+    pass
+
+try:
+    pass
+except (
+    ValueError,
+    TypeError,
+) as error:
+    raise error
+
+match value:
+    case {
+        "kind": kind,
+        "payload": payload,
+    }:
+        handle_mapping()
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @r#"
+        info[folding-range]: Folding Range
+          --> main.py:2:12
+           |
+         2 |   def choose(
+           |  ____________^
+         3 | |     value,
+         4 | |     fallback,
+         5 | | ):
+         6 | |     if any(
+         7 | |         [
+         8 | |             value,
+         9 | |         ]
+        10 | |     ):
+        11 | |         return value
+        12 | |     elif (
+        13 | |         fallback
+        14 | |     ):
+        15 | |         return fallback
+           | |_______________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:5:3
+           |
+         5 |   ):
+           |  ___^
+         6 | |     if any(
+         7 | |         [
+         8 | |             value,
+         9 | |         ]
+        10 | |     ):
+        11 | |         return value
+        12 | |     elif (
+        13 | |         fallback
+        14 | |     ):
+        15 | |         return fallback
+           | |_______________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:6:12
+           |
+         6 |       if any(
+           |  ____________^
+         7 | |         [
+         8 | |             value,
+         9 | |         ]
+        10 | |     ):
+        11 | |         return value
+           | |____________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:10:7
+           |
+        10 |       ):
+           |  _______^
+        11 | |         return value
+           | |____________________^
+           |
+
+        info[folding-range]: Folding Range
+         --> main.py:7:9
+          |
+        7 | /         [
+        8 | |             value,
+        9 | |         ]
+          | |_________^
+          |
+
+        info[folding-range]: Folding Range
+          --> main.py:12:11
+           |
+        12 |       elif (
+           |  ___________^
+        13 | |         fallback
+        14 | |     ):
+        15 | |         return fallback
+           | |_______________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:14:7
+           |
+        14 |       ):
+           |  _______^
+        15 | |         return fallback
+           | |_______________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:17:18
+           |
+        17 |   class Repository[
+           |  __________________^
+        18 | |     Model,
+        19 | |     Key,
+        20 | | ](
+        21 | |     Mapping[Key, Model],
+        22 | |     Protocol,
+        23 | | ):
+        24 | |     pass
+           | |________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:23:3
+           |
+        23 |   ):
+           |  ___^
+        24 | |     pass
+           | |________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:26:5
+           |
+        26 |   try:
+           |  _____^
+        27 | |     pass
+           | |________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:28:9
+           |
+        28 |   except (
+           |  _________^
+        29 | |     ValueError,
+        30 | |     TypeError,
+        31 | | ) as error:
+        32 | |     raise error
+           | |_______________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:31:12
+           |
+        31 |   ) as error:
+           |  ____________^
+        32 | |     raise error
+           | |_______________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:34:13
+           |
+        34 |   match value:
+           |  _____________^
+        35 | |     case {
+        36 | |         "kind": kind,
+        37 | |         "payload": payload,
+        38 | |     }:
+        39 | |         handle_mapping()
+           | |________________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:35:11
+           |
+        35 |       case {
+           |  ___________^
+        36 | |         "kind": kind,
+        37 | |         "payload": payload,
+        38 | |     }:
+        39 | |         handle_mapping()
+           | |________________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:38:7
+           |
+        38 |       }:
+           |  _______^
+        39 | |         handle_mapping()
+           | |________________________^
+           |
+        "#);
+    }
+
+    #[test]
+    fn test_folding_range_suppresses_header_expression_on_block_start_line() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def foo(x=[
+    bar,
+    baz,
+]):
+    qux = x[0] + 1
+    return qux
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:12
+          |
+        2 |   def foo(x=[
+          |  ____________^
+        3 | |     bar,
+        4 | |     baz,
+        5 | | ]):
+        6 | |     qux = x[0] + 1
+        7 | |     return qux
+          | |______________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:5:4
+          |
+        5 |   ]):
+          |  ____^
+        6 | |     qux = x[0] + 1
+        7 | |     return qux
+          | |______________^
+          |
+        ");
+    }
+
+    #[test]
     fn test_folding_range_preserves_inline_block_header_comment() {
         let test = CursorTest::builder()
             .source(
@@ -1268,361 +1587,6 @@ finally:
           | |_______________________^
           |
         ");
-    }
-
-    #[test]
-    fn test_folding_range_multiline_block_headers() {
-        let test = CursorTest::builder()
-            .source(
-                "main.py",
-                r#"
-def foo(
-    x: int,
-    y: str,
-) -> None:
-    pass
-
-def foo(a = (
-    10 + 10
-)) -> (
-    int | None
-):
-    pass
-
-class Repository[
-    Model,
-    Key,
-](
-    Mapping[Key, Model],
-    Protocol,
-):
-    pass
-
-if (
-    first
-    and second
-):
-    pass
-
-for (
-    key,
-    value,
-) in (
-    items
-):
-    pass
-
-with (
-    open("a") as a,
-    open("b") as b,
-):
-    pass
-
-try:
-    pass
-except (
-    ValueError,
-    TypeError,
-) as error:
-    raise error
-<CURSOR>
-"#,
-            )
-            .build();
-
-        assert_snapshot!(test.folding_ranges(), @r#"
-        info[folding-range]: Folding Range
-         --> main.py:2:9
-          |
-        2 |   def foo(
-          |  _________^
-        3 | |     x: int,
-        4 | |     y: str,
-          | |____________^
-          |
-
-        info[folding-range]: Folding Range
-         --> main.py:5:11
-          |
-        5 |   ) -> None:
-          |  ___________^
-        6 | |     pass
-          | |________^
-          |
-
-        info[folding-range]: Folding Range
-          --> main.py:8:9
-           |
-         8 |   def foo(a = (
-           |  _________^
-         9 | |     10 + 10
-        10 | | )) -> (
-           | |_^
-           |
-
-        info[folding-range]: Folding Range
-         --> main.py:8:14
-          |
-        8 |   def foo(a = (
-          |  ______________^
-        9 | |     10 + 10
-          | |____________^
-          |
-
-        info[folding-range]: Folding Range
-          --> main.py:10:8
-           |
-        10 |   )) -> (
-           |  ________^
-        11 | |     int | None
-           | |_______________^
-           |
-
-        info[folding-range]: Folding Range
-          --> main.py:12:3
-           |
-        12 |   ):
-           |  ___^
-        13 | |     pass
-           | |________^
-           |
-
-        info[folding-range]: Folding Range
-          --> main.py:15:18
-           |
-        15 |   class Repository[
-           |  __________________^
-        16 | |     Model,
-        17 | |     Key,
-           | |_________^
-           |
-
-        info[folding-range]: Folding Range
-          --> main.py:18:3
-           |
-        18 |   ](
-           |  ___^
-        19 | |     Mapping[Key, Model],
-        20 | |     Protocol,
-           | |______________^
-           |
-
-        info[folding-range]: Folding Range
-          --> main.py:21:3
-           |
-        21 |   ):
-           |  ___^
-        22 | |     pass
-           | |________^
-           |
-
-        info[folding-range]: Folding Range
-          --> main.py:24:5
-           |
-        24 |   if (
-           |  _____^
-        25 | |     first
-        26 | |     and second
-           | |_______________^
-           |
-
-        info[folding-range]: Folding Range
-          --> main.py:27:3
-           |
-        27 |   ):
-           |  ___^
-        28 | |     pass
-           | |________^
-           |
-
-        info[folding-range]: Folding Range
-          --> main.py:30:6
-           |
-        30 |   for (
-           |  ______^
-        31 | |     key,
-        32 | |     value,
-           | |___________^
-           |
-
-        info[folding-range]: Folding Range
-          --> main.py:33:7
-           |
-        33 |   ) in (
-           |  _______^
-        34 | |     items
-           | |__________^
-           |
-
-        info[folding-range]: Folding Range
-          --> main.py:35:3
-           |
-        35 |   ):
-           |  ___^
-        36 | |     pass
-           | |________^
-           |
-
-        info[folding-range]: Folding Range
-          --> main.py:38:7
-           |
-        38 |   with (
-           |  _______^
-        39 | |     open("a") as a,
-        40 | |     open("b") as b,
-           | |____________________^
-           |
-
-        info[folding-range]: Folding Range
-          --> main.py:41:3
-           |
-        41 |   ):
-           |  ___^
-        42 | |     pass
-           | |________^
-           |
-
-        info[folding-range]: Folding Range
-          --> main.py:44:5
-           |
-        44 |   try:
-           |  _____^
-        45 | |     pass
-           | |________^
-           |
-
-        info[folding-range]: Folding Range
-          --> main.py:46:9
-           |
-        46 |   except (
-           |  _________^
-        47 | |     ValueError,
-        48 | |     TypeError,
-           | |_______________^
-           |
-
-        info[folding-range]: Folding Range
-          --> main.py:49:12
-           |
-        49 |   ) as error:
-           |  ____________^
-        50 | |     raise error
-           | |_______________^
-           |
-        "#);
-    }
-
-    #[test]
-    fn test_folding_range_multiline_case_block_headers() {
-        let test = CursorTest::builder()
-            .source(
-                "main.py",
-                r#"
-match value:
-    case [
-        first,
-        second,
-    ]:
-        handle_sequence()
-    case {
-        "kind": kind,
-        "payload": payload,
-    }:
-        handle_mapping()
-    case """
-        alpha
-        beta
-    """:
-        handle_string()
-<CURSOR>
-"#,
-            )
-            .build();
-
-        assert_snapshot!(test.folding_ranges(), @r#"
-        info[folding-range]: Folding Range
-          --> main.py:2:13
-           |
-         2 |   match value:
-           |  _____________^
-         3 | |     case [
-         4 | |         first,
-         5 | |         second,
-         6 | |     ]:
-         7 | |         handle_sequence()
-         8 | |     case {
-         9 | |         "kind": kind,
-        10 | |         "payload": payload,
-        11 | |     }:
-        12 | |         handle_mapping()
-        13 | |     case """
-        14 | |         alpha
-        15 | |         beta
-        16 | |     """:
-        17 | |         handle_string()
-           | |_______________________^
-           |
-
-        info[folding-range]: Folding Range
-         --> main.py:3:11
-          |
-        3 |       case [
-          |  ___________^
-        4 | |         first,
-        5 | |         second,
-        6 | |     ]:
-          | |____^
-          |
-
-        info[folding-range]: Folding Range
-         --> main.py:6:7
-          |
-        6 |       ]:
-          |  _______^
-        7 | |         handle_sequence()
-          | |_________________________^
-          |
-
-        info[folding-range]: Folding Range
-          --> main.py:8:11
-           |
-         8 |       case {
-           |  ___________^
-         9 | |         "kind": kind,
-        10 | |         "payload": payload,
-        11 | |     }:
-           | |____^
-           |
-
-        info[folding-range]: Folding Range
-          --> main.py:11:7
-           |
-        11 |       }:
-           |  _______^
-        12 | |         handle_mapping()
-           | |________________________^
-           |
-
-        info[folding-range]: Folding Range
-          --> main.py:16:9
-           |
-        16 |       """:
-           |  _________^
-        17 | |         handle_string()
-           | |_______________________^
-           |
-
-        info[folding-range]: Folding Range
-          --> main.py:13:10
-           |
-        13 |       case """
-           |  __________^
-        14 | |         alpha
-        15 | |         beta
-        16 | |     """:
-           | |_______^
-           |
-        "#);
     }
 
     #[test]
@@ -2269,14 +2233,23 @@ with open("file.txt") as f:
     }
 
     #[test]
-    fn test_folding_multiline() {
-        // A class definition on a single line shouldn't have
-        // any folding ranges.
+    fn test_folding_range_single_line_class() {
         let test = CursorTest::builder()
             .source("main.py", "class MyClass: pass\n<CURSOR>")
             .build();
         assert_snapshot!(test.folding_ranges(), @"No folding ranges found");
+    }
 
+    #[test]
+    fn test_folding_range_single_line_class_with_trailing_comment() {
+        let test = CursorTest::builder()
+            .source("main.py", "class MyClass: pass  # comment\n<CURSOR>")
+            .build();
+        assert_snapshot!(test.folding_ranges(), @"No folding ranges found");
+    }
+
+    #[test]
+    fn test_folding_multiline() {
         // A single LF new-line results in a folding range.
         let test = CursorTest::builder()
             .source("main.py", "class MyClass:\n    pass\n<CURSOR>")

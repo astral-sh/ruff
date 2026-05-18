@@ -20,8 +20,9 @@ pub fn goto_definition(
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &module, offset)?;
     let definition_targets = goto_target
-        .get_definition_targets(&model, ImportAliasResolution::ResolveAliases)?
-        .definition_targets(&model, &goto_target)?;
+        .definitions(&model, ImportAliasResolution::ResolveAliases)?
+        .goto_definition(&model, &goto_target)?
+        .into_navigation_targets(model.db());
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
@@ -40,6 +41,82 @@ pub(super) mod test {
         SubDiagnosticSeverity,
     };
     use ruff_text_size::Ranged;
+
+    #[test]
+    fn goto_definition_relative_import() {
+        let test = CursorTest::builder()
+            .source("mypackage/__init__.py", "from . import module_a<CURSOR>")
+            .source("mypackage/module_a.py", "class Test: ...")
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> mypackage/__init__.py:1:15
+          |
+        1 | from . import module_a
+          |               ^^^^^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> mypackage/module_a.py:1:1
+          |
+        1 | class Test: ...
+          | -
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_relative_import_reference() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                "from . import module_a\nx = module_a<CURSOR>",
+            )
+            .source("mypackage/module_a.py", "class Test: ...")
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> mypackage/__init__.py:2:5
+          |
+        2 | x = module_a
+          |     ^^^^^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> mypackage/module_a.py:1:1
+          |
+        1 | class Test: ...
+          | -
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_relative_star_imported_submodule_reference() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                "from .exporter import *\nx = module_a<CURSOR>",
+            )
+            .source("mypackage/exporter.py", "from . import module_a")
+            .source("mypackage/module_a.py", "class Test: ...")
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> mypackage/__init__.py:2:5
+          |
+        2 | x = module_a
+          |     ^^^^^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> mypackage/module_a.py:1:1
+          |
+        1 | class Test: ...
+          | -
+          |
+        ");
+    }
 
     /// goto-definition on a module should go to the .py not the .pyi
     ///

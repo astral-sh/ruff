@@ -5,6 +5,7 @@ pub use crate::goto_type_definition::goto_type_definition;
 
 use std::borrow::Cow;
 
+use crate::NavigationTarget;
 use crate::stub_mapping::StubMapper;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
@@ -241,10 +242,14 @@ pub(crate) enum GotoTarget<'a> {
 }
 
 /// The resolved definitions for a `GotoTarget`
-#[derive(Debug, Clone)]
-pub(crate) struct Definitions<'db>(pub Vec<ResolvedDefinition<'db>>);
+#[derive(Debug)]
+pub(crate) struct Definitions<'db>(Vec<ResolvedDefinition<'db>>);
 
 impl<'db> Definitions<'db> {
+    fn new(resolved: Vec<ResolvedDefinition<'db>>) -> Self {
+        Self(resolved)
+    }
+
     pub(crate) fn from_ty(db: &'db dyn crate::Db, ty: Type<'db>) -> Option<Self> {
         let ty_def = ty.definition(db)?;
         let resolved = match ty_def {
@@ -262,35 +267,103 @@ impl<'db> Definitions<'db> {
                 ResolvedDefinition::Definition(definition)
             }
         };
-        Some(Definitions(vec![resolved]))
+        Some(Self::new(vec![resolved]))
     }
 
-    /// Get the "goto-declaration" interpretation of this definition
-    ///
-    /// In this case it basically returns exactly what was found.
-    pub(crate) fn declaration_targets(
+    /// Apply the "goto declaration" interpretation to these definitions.
+    pub(crate) fn goto_declaration(
         self,
         model: &SemanticModel<'db>,
         goto_target: &GotoTarget<'_>,
-    ) -> Option<crate::NavigationTargets> {
-        definitions_to_navigation_targets(model, None, goto_target, self.0)
+    ) -> Option<Definitions<'db>> {
+        let mut definitions = self.0;
+
+        // When our target is a class constructor, we want to exclude
+        // navigation targets to its `__init__` or `__new__` methods.
+        //
+        // ... unless the cursor is on the parenthesis of the call,
+        // in which case we want to prefer the constructor methods
+        // if available.
+        //
+        // See: https://github.com/astral-sh/ty/issues/2218
+        if let GotoTarget::Call { on_parenthesis, .. } = *goto_target
+            && goto_target
+                .inferred_type(model)
+                .is_some_and(|ty| ty.is_class_literal())
+        {
+            let is_constructor_method =
+                |resolved_def: &ty_python_semantic::ResolvedDefinition<'_>| {
+                    let Some(def) = resolved_def.definition() else {
+                        return false;
+                    };
+                    if !matches!(*def.kind(model.db()), DefinitionKind::Function(_)) {
+                        return false;
+                    }
+                    def.name(model.db())
+                        .is_some_and(|name| name == "__init__" || name == "__new__")
+                };
+
+            if on_parenthesis {
+                // Only limit to constructor methods if we have at least one.
+                // Otherwise we could end up removing all navigation targets.
+                // e.g., See `goto_definition_dynamic_namedtuple_literal_parenthesis`
+                // test.
+                if definitions.iter().any(is_constructor_method) {
+                    definitions.retain(|resolved_def| is_constructor_method(resolved_def));
+                }
+            } else {
+                definitions.retain(|resolved_def| !is_constructor_method(resolved_def));
+            }
+        }
+
+        if definitions.is_empty() {
+            None
+        } else {
+            Some(Self::new(definitions))
+        }
     }
 
     /// Get the "goto-definition" interpretation of this definition
     ///
     /// In this case we apply stub-mapping to try to find the "real" implementation
     /// if the definition we have is found in a stub file.
-    pub(crate) fn definition_targets(
+    pub(crate) fn goto_definition(
         self,
         model: &SemanticModel<'db>,
         goto_target: &GotoTarget<'_>,
-    ) -> Option<crate::NavigationTargets> {
-        definitions_to_navigation_targets(
-            model,
-            Some(&StubMapper::new(model.db())),
-            goto_target,
-            self.0,
-        )
+    ) -> Option<Definitions<'db>> {
+        let definitions = self.goto_declaration(model, goto_target)?;
+        let resolved = StubMapper::new(model.db()).map_definitions(definitions.0);
+        Some(Self::new(resolved))
+    }
+
+    /// Convert these semantic definitions to editor-facing navigation targets.
+    pub(crate) fn into_navigation_targets(
+        self,
+        db: &'db dyn ty_python_semantic::Db,
+    ) -> crate::NavigationTargets {
+        self.0
+            .into_iter()
+            .map(|definition| match definition {
+                ResolvedDefinition::Definition(definition) => {
+                    let file = definition.file(db);
+                    let module = ruff_db::parsed::parsed_module(db, file).load(db);
+
+                    let focus_range = definition.focus_range(db, &module);
+                    let full_range = definition.full_range(db, &module);
+
+                    NavigationTarget {
+                        file: focus_range.file(),
+                        focus_range: focus_range.range(),
+                        full_range: full_range.range(),
+                    }
+                }
+                ResolvedDefinition::Module(file) => {
+                    NavigationTarget::new(file, TextRange::default())
+                }
+                ResolvedDefinition::FileWithRange(file_range) => NavigationTarget::from(file_range),
+            })
+            .collect()
     }
 
     /// Get the docstring for this definition
@@ -299,7 +372,7 @@ impl<'db> Definitions<'db> {
     /// so this will check both the goto-declarations and goto-definitions (in that order)
     /// and return the first one found.
     pub(crate) fn docstring(self, db: &'db dyn crate::Db) -> Option<Docstring> {
-        for definition in &self.0 {
+        for definition in &self {
             // If we got a docstring from the original definition, use it
             if let Some(docstring) = definition.docstring(db) {
                 return Some(Docstring::new(docstring));
@@ -320,6 +393,30 @@ impl<'db> Definitions<'db> {
 
         None
     }
+
+    /// Return true if `self` and `other` contain at least one shared `definition`.
+    ///
+    /// A symbol can resolve to multiple definitions (for example, overload groups,
+    /// property getter/setter co-definitions, or an import binding plus its
+    /// underlying definition). Intersection semantics avoid missing valid
+    /// references/renames when target ordering differs or when one occurrence
+    /// exposes only part of the co-definition set.
+    pub(crate) fn intersects(&self, other: &Self) -> bool {
+        self.iter().any(|definition| other.0.contains(definition))
+    }
+
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, ResolvedDefinition<'db>> {
+        self.0.iter()
+    }
+}
+
+impl<'a, 'db> IntoIterator for &'a Definitions<'db> {
+    type Item = &'a ResolvedDefinition<'db>;
+    type IntoIter = std::slice::Iter<'a, ResolvedDefinition<'db>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
 /// Resolve the docstring for a call-signature's resolved definition.
@@ -336,7 +433,7 @@ pub(crate) fn docstring_for_call_definition<'db>(
     definition: Definition<'db>,
 ) -> Option<Docstring> {
     let resolved = ResolvedDefinition::Definition(definition);
-    Definitions(vec![resolved.clone()])
+    Definitions::new(vec![resolved.clone()])
         .docstring(db)
         .or_else(|| resolved.implementation_docstring(db).map(Docstring::new))
 }
@@ -449,13 +546,7 @@ impl GotoTarget<'_> {
     /// (i.e. "x" in "from a import b as x") are resolved or returned as is.
     /// We want to resolve them in some cases (like "goto declaration") but not in others
     /// (like find references or rename).
-    ///
-    ///
-    /// Ideally this would always return `DefinitionsOrTargets::Definitions`
-    /// as this is more useful for doing stub mapping (goto-definition) and
-    /// retrieving docstrings. However for now some cases are stubbed out
-    /// as just returning a raw `NavigationTarget`.
-    pub(crate) fn get_definition_targets<'db>(
+    pub(crate) fn definitions<'db>(
         &self,
         model: &SemanticModel<'db>,
         alias_resolution: ImportAliasResolution,
@@ -704,7 +795,7 @@ impl GotoTarget<'_> {
             } => typed_dict_key_definition(model, subscript, literal_key)
                 .map(|definition| vec![definition]),
         };
-        definitions.map(Definitions)
+        definitions.map(Definitions::new)
     }
 
     /// Returns the text representation of this goto target.
@@ -1177,41 +1268,6 @@ impl Ranged for GotoTarget<'_> {
     }
 }
 
-/// Converts a collection of `ResolvedDefinition` items into `NavigationTarget` items.
-fn convert_resolved_definitions_to_targets<'db>(
-    db: &'db dyn ty_python_semantic::Db,
-    definitions: Vec<ty_python_semantic::ResolvedDefinition<'db>>,
-) -> Vec<crate::NavigationTarget> {
-    definitions
-        .into_iter()
-        .map(|resolved_definition| match resolved_definition {
-            ty_python_semantic::ResolvedDefinition::Definition(definition) => {
-                // Get the parsed module for range calculation
-                let definition_file = definition.file(db);
-                let module = ruff_db::parsed::parsed_module(db, definition_file).load(db);
-
-                // Get the ranges for this definition
-                let focus_range = definition.focus_range(db, &module);
-                let full_range = definition.full_range(db, &module);
-
-                crate::NavigationTarget {
-                    file: focus_range.file(),
-                    focus_range: focus_range.range(),
-                    full_range: full_range.range(),
-                }
-            }
-            ty_python_semantic::ResolvedDefinition::Module(file) => {
-                // For modules, navigate to the start of the file
-                crate::NavigationTarget::new(file, TextRange::default())
-            }
-            ty_python_semantic::ResolvedDefinition::FileWithRange(file_range) => {
-                // For file ranges, navigate to the specific range within the file
-                crate::NavigationTarget::from(file_range)
-            }
-        })
-        .collect()
-}
-
 /// If a function is a property setter or deleter (e.g., decorated with
 /// `@my_property.setter`), return the definitions for the property getter.
 /// This ensures that the setter/deleter function name is recognized as a
@@ -1265,65 +1321,6 @@ fn definitions_for_callable<'db>(
         .into_iter()
         .filter_map(|signature| signature.definition.map(ResolvedDefinition::Definition))
         .collect()
-}
-
-/// Shared helper to map and convert resolved definitions into navigation targets.
-///
-/// The `goto_target` corresponds to the original target that definitions were
-/// requested for. In some cases, this can influence the targets returned. For
-/// example, when the target is a constructor for a class, definitions other
-/// than the class definition are filtered out.
-fn definitions_to_navigation_targets<'db>(
-    model: &SemanticModel<'db>,
-    stub_mapper: Option<&StubMapper<'db>>,
-    goto_target: &GotoTarget<'_>,
-    mut definitions: Vec<ty_python_semantic::ResolvedDefinition<'db>>,
-) -> Option<crate::NavigationTargets> {
-    // When our target is a class constructor, we want to exclude
-    // navigation targets to its `__init__` or `__new__` methods.
-    //
-    // ... unless the cursor is on the parenthesis of the call,
-    // in which case we want to prefer the constructor methods
-    // if available.
-    //
-    // See: https://github.com/astral-sh/ty/issues/2218
-    if let GotoTarget::Call { on_parenthesis, .. } = *goto_target
-        && goto_target
-            .inferred_type(model)
-            .is_some_and(|ty| ty.is_class_literal())
-    {
-        let is_constructor_method = |resolved_def: &ty_python_semantic::ResolvedDefinition<'_>| {
-            let Some(def) = resolved_def.definition() else {
-                return false;
-            };
-            if !matches!(*def.kind(model.db()), DefinitionKind::Function(_)) {
-                return false;
-            }
-            def.name(model.db())
-                .is_some_and(|name| name == "__init__" || name == "__new__")
-        };
-
-        if on_parenthesis {
-            // Only limit to constructor methods if we have at least one.
-            // Otherwise we could end up removing all navigation targets.
-            // e.g., See `goto_definition_dynamic_namedtuple_literal_parenthesis`
-            // test.
-            if definitions.iter().any(is_constructor_method) {
-                definitions.retain(|resolved_def| is_constructor_method(resolved_def));
-            }
-        } else {
-            definitions.retain(|resolved_def| !is_constructor_method(resolved_def));
-        }
-    }
-    if let Some(mapper) = stub_mapper {
-        definitions = mapper.map_definitions(definitions);
-    }
-    if definitions.is_empty() {
-        None
-    } else {
-        let targets = convert_resolved_definitions_to_targets(model.db(), definitions);
-        Some(crate::NavigationTargets::unique(targets))
-    }
 }
 
 pub(crate) fn find_goto_target<'a>(

@@ -913,7 +913,7 @@ pub struct ExprSetComp<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprDictComp<'a> {
-    key: Box<ComparableExpr<'a>>,
+    key: Option<Box<ComparableExpr<'a>>>,
     value: Box<ComparableExpr<'a>>,
     generators: Vec<ComparableComprehension<'a>>,
 }
@@ -1186,7 +1186,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 range: _,
                 node_index: _,
             }) => Self::DictComp(ExprDictComp {
-                key: key.into(),
+                key: key.as_ref().map(Into::into),
                 value: value.into(),
                 generators: generators.iter().map(Into::into).collect(),
             }),
