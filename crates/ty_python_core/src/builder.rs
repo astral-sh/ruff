@@ -37,8 +37,9 @@ use crate::expression::{Expression, ExpressionKind};
 use crate::member::MemberExprBuilder;
 use crate::place::{PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId};
 use crate::predicate::{
-    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode, PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
+    CallableAndCallExpr, ClassPatternKind, NonEmptyIterablePredicate, PatternPredicate,
+    PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral, ScopedPredicateId,
+    StarImportPlaceholderPredicate,
 };
 use crate::program::Program;
 use crate::re_exports::exported_names;
@@ -1485,6 +1486,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             .pattern(pattern, module)
                     }
                     PredicateNode::IsNonTerminalCall(_)
+                    | PredicateNode::IsNonEmptyIterable(_)
                     | PredicateNode::StarImportPlaceholder(_) => {
                         // These predicates don't narrow any places
                         PossiblyNarrowedPlaces::default()
@@ -1527,6 +1529,34 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn record_ambiguous_reachability(&mut self) {
         self.current_use_def_map_mut()
             .record_reachability_constraint(ScopedReachabilityConstraintId::AMBIGUOUS);
+    }
+
+    /// Returns a reachability predicate for iterables that are syntactically known to be non-empty.
+    ///
+    /// The `range` case only proves the arguments are non-empty; semantic reachability still
+    /// confirms that the callable is builtin `range`, so shadowed callables remain ambiguous.
+    fn non_empty_iterable_predicate(
+        &mut self,
+        iter: &'ast ast::Expr,
+    ) -> Option<PredicateOrLiteral<'db>> {
+        let ast::Expr::Call(call) = iter else {
+            return None;
+        };
+        let ast::Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() else {
+            return None;
+        };
+
+        if id != "range" || !range_call_iterates_at_least_once(call) {
+            return None;
+        }
+
+        let callable = self.add_standalone_expression(&call.func);
+        Some(PredicateOrLiteral::Predicate(Predicate {
+            node: PredicateNode::IsNonEmptyIterable(NonEmptyIterablePredicate::BuiltinRange {
+                callable,
+            }),
+            is_positive: true,
+        }))
     }
 
     /// Record a constraint that affects the reachability of the current position in the semantic
@@ -2946,9 +2976,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
 
-                self.record_ambiguous_reachability();
+                let after_iter = self.flow_snapshot();
 
-                let pre_loop = self.flow_snapshot();
+                let non_empty_iterable_constraint = self
+                    .non_empty_iterable_predicate(iter)
+                    .map(|predicate| self.record_reachability_constraint(predicate));
+
+                let no_iteration_base = match non_empty_iterable_constraint {
+                    Some(_) => after_iter,
+                    None => {
+                        self.record_ambiguous_reachability();
+                        self.flow_snapshot()
+                    }
+                };
 
                 // Pre-walk the loop to collect all the bound places, then create a loop header
                 // definition for each bound place. See `struct LoopHeader` for more on this. Loop
@@ -2985,9 +3025,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.populate_loop_header(&bound_place_ids, loop_token, loop_min_definition_id);
                 }
 
-                // We may execute the `else` clause without ever executing the body, so merge in
-                // the pre-loop state before visiting `else`.
-                self.flow_merge(pre_loop);
+                // We may execute the `else` clause without ever executing the body, so merge in a
+                // zero-iteration state before visiting `else`.
+                if let Some(non_empty_iterable_constraint) = non_empty_iterable_constraint {
+                    let post_loop_body = self.flow_snapshot();
+                    self.flow_restore(no_iteration_base);
+                    self.record_negated_reachability_constraint(non_empty_iterable_constraint);
+                    let no_iteration = self.flow_snapshot();
+                    self.flow_restore(post_loop_body);
+                    self.flow_merge(no_iteration);
+                } else {
+                    self.flow_merge(no_iteration_base);
+                }
                 self.visit_body(orelse);
 
                 // Breaking out of a `for` loop bypasses the `else` clause, so merge in the break
@@ -4270,6 +4319,52 @@ impl ExpressionsScopeMapBuilder {
         interval_map.push((range, current_scope));
 
         ExpressionsScopeMap(interval_map.into_boxed_slice())
+    }
+}
+
+/// Returns `true` if the literal arguments to `range(...)` guarantee at least one iteration.
+///
+/// The check is intentionally syntactic and conservative: keywords, starred arguments,
+/// non-integer literals, dynamic arguments, and `step == 0` all fall back to `false`.
+fn range_call_iterates_at_least_once(call: &ast::ExprCall) -> bool {
+    if !call.arguments.keywords.is_empty()
+        || call.arguments.args.iter().any(ast::Expr::is_starred_expr)
+    {
+        return false;
+    }
+
+    match call.arguments.args.as_ref() {
+        [stop] => int_literal_value(stop).is_some_and(|stop| stop > 0),
+        [start, stop] => int_literal_value(start)
+            .zip(int_literal_value(stop))
+            .is_some_and(|(start, stop)| start < stop),
+        [start, stop, step] => int_literal_value(start)
+            .zip(int_literal_value(stop))
+            .zip(int_literal_value(step))
+            .is_some_and(|((start, stop), step)| {
+                (step > 0 && start < stop) || (step < 0 && start > stop)
+            }),
+        _ => false,
+    }
+}
+
+fn int_literal_value(expr: &ast::Expr) -> Option<i64> {
+    match expr {
+        ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Int(value),
+            ..
+        }) => value.as_i64(),
+        ast::Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::UAdd,
+            operand,
+            ..
+        }) => int_literal_value(operand),
+        ast::Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::USub,
+            operand,
+            ..
+        }) => int_literal_value(operand)?.checked_neg(),
+        _ => None,
     }
 }
 

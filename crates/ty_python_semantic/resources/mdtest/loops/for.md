@@ -38,6 +38,42 @@ for x in IntIterable():
 reveal_type(x)  # revealed: Literal["foo"] | int
 ```
 
+## With statically non-empty builtin `range`
+
+```py
+for x in range(42):
+    pass
+
+reveal_type(x)  # revealed: int
+
+previous = "foo"
+
+for previous in range(1, 3):
+    pass
+
+reveal_type(previous)  # revealed: int
+
+for descending in range(3, 0, -1):
+    pass
+
+reveal_type(descending)  # revealed: int
+```
+
+## With shadowed `range`
+
+```py
+def shadowed_range():
+    def range(n: int) -> list[int]:
+        return []
+
+    for x in range(42):
+        pass
+
+    # revealed: int
+    # error: [possibly-unresolved-reference]
+    reveal_type(x)
+```
+
 ## With `else` (no break)
 
 ```py
@@ -1403,10 +1439,11 @@ reveal_type(loop_only)  # revealed: int
 def random() -> bool:
     return False
 
+count = 1_000_000
 x = "A"
-for _ in range(1_000_000):
+for _ in range(count):
     reveal_type(x)  # revealed: Literal["A", "D"]
-    for _ in range(1_000_000):
+    for _ in range(count):
         # The "C" binding isn't visible here. It breaks this inner loop, and it always gets
         # overwritten before the end of the outer loop.
         reveal_type(x)  # revealed: Literal["A", "D", "B"]
@@ -1478,8 +1515,9 @@ On the other hand, if `x` is defined before the loop, the `del` makes it a
 `[possibly-unresolved-reference]`:
 
 ```py
+count = 1_000_000
 x = 0
-for _ in range(1_000_000):
+for _ in range(count):
     x  # error: [possibly-unresolved-reference]
     x = 42
     del x
@@ -1488,8 +1526,9 @@ for _ in range(1_000_000):
 ### `del` in a loop makes a variable possibly-unbound after the loop
 
 ```py
+count = 1_000_000
 x = 0
-for _ in range(1_000_000):
+for _ in range(count):
     # error: [possibly-unresolved-reference]
     del x
 # error: [possibly-unresolved-reference]
@@ -1499,7 +1538,8 @@ x
 ### Bindings in a loop are possibly-unbound after the loop
 
 ```py
-for _ in range(1_000_000):
+count = 1_000_000
+for _ in range(count):
     x = 42
 # error: [possibly-unresolved-reference]
 x

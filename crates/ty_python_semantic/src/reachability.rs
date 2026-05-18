@@ -198,21 +198,23 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, IntersectionBuilder, KnownClass, NarrowingConstraint, Type, TypeContext,
-        UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
+        CallableTypes, ClassLiteral, IntersectionBuilder, KnownClass, NarrowingConstraint, Type,
+        TypeContext, UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
     },
 };
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
+use ty_module_resolver::{KnownModule, file_to_module};
 use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
     SemanticIndex, Truthiness, UseDefMap,
     definition::DefinitionState,
+    expression::Expression,
     place::ScopedPlaceId,
     place_table,
     predicate::{
-        CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
-        Predicates, ScopedPredicateId,
+        CallableAndCallExpr, NonEmptyIterablePredicate, PatternPredicate, PatternPredicateKind,
+        Predicate, PredicateNode, Predicates, ScopedPredicateId,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
 };
@@ -864,6 +866,35 @@ fn analyze_single_pattern_predicate_kind<'db>(
     }
 }
 
+fn analyze_non_empty_iterable(db: &dyn Db, predicate: NonEmptyIterablePredicate<'_>) -> Truthiness {
+    match predicate {
+        NonEmptyIterablePredicate::BuiltinRange { callable } => {
+            analyze_builtin_range_call(db, callable)
+        }
+    }
+}
+
+/// Confirms that a syntactically non-empty `range(...)` call refers to builtin `range`.
+fn analyze_builtin_range_call(db: &dyn Db, callable: Expression) -> Truthiness {
+    let callable_ty = infer_expression_type(db, callable, TypeContext::default());
+    let Some(class) = callable_ty
+        .as_class_literal()
+        .and_then(ClassLiteral::as_static)
+    else {
+        return Truthiness::Ambiguous;
+    };
+
+    if class.name(db) == "range"
+        && file_to_module(db, class.file(db))
+            .and_then(|module| module.known(db))
+            .is_some_and(KnownModule::is_builtins)
+    {
+        Truthiness::AlwaysTrue
+    } else {
+        Truthiness::Ambiguous
+    }
+}
+
 fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
@@ -933,6 +964,9 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             .negate_if(!predicate.is_positive)
         }
         PredicateNode::Pattern(inner) => analyze_pattern_predicate(db, inner),
+        PredicateNode::IsNonEmptyIterable(inner) => {
+            analyze_non_empty_iterable(db, inner).negate_if(!predicate.is_positive)
+        }
         PredicateNode::StarImportPlaceholder(star_import) => {
             let place_table = place_table(db, star_import.scope(db));
             let symbol = place_table.symbol(star_import.symbol_id(db));
