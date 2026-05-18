@@ -210,16 +210,18 @@ use ruff_index::{Idx, IndexSlice};
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
+use ty_module_resolver::{KnownModule, file_to_module};
 use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
     ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
     definition::DefinitionState,
+    expression::Expression,
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
     place::ScopedPlaceId,
     place_table,
     predicate::{
-        CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
-        ScopedPredicateId,
+        CallableAndCallExpr, NonEmptyIterablePredicate, PatternPredicate, PatternPredicateKind,
+        Predicate, PredicateNode, ScopedPredicateId,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
     scope::ScopeId,
@@ -1092,6 +1094,35 @@ fn analyze_single_pattern_predicate_kind<'db>(
     }
 }
 
+fn analyze_non_empty_iterable(db: &dyn Db, predicate: NonEmptyIterablePredicate<'_>) -> Truthiness {
+    match predicate {
+        NonEmptyIterablePredicate::BuiltinRange { callable } => {
+            analyze_builtin_range_call(db, callable)
+        }
+    }
+}
+
+/// Confirms that a syntactically non-empty `range(...)` call refers to builtin `range`.
+fn analyze_builtin_range_call(db: &dyn Db, callable: Expression) -> Truthiness {
+    let callable_ty = infer_same_file_expression_type(db, callable, TypeContext::default());
+    let Some(class) = callable_ty
+        .as_class_literal()
+        .and_then(ClassLiteral::as_static)
+    else {
+        return Truthiness::Ambiguous;
+    };
+
+    if class.name(db) == "range"
+        && file_to_module(db, class.file(db))
+            .and_then(|module| module.known(db))
+            .is_some_and(KnownModule::is_builtins)
+    {
+        Truthiness::AlwaysTrue
+    } else {
+        Truthiness::Ambiguous
+    }
+}
+
 fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
@@ -1164,6 +1195,9 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
         PredicateNode::Pattern(inner) => analyze_pattern_predicate(db, inner),
         PredicateNode::SubjectElementPattern(subject_element) => {
             analyze_pattern_predicate(db, subject_element.pattern)
+        }
+        PredicateNode::IsNonEmptyIterable(inner) => {
+            analyze_non_empty_iterable(db, inner).negate_if(!predicate.is_positive)
         }
         PredicateNode::StarImportPlaceholder(star_import) => {
             let place_table = place_table(db, star_import.scope(db));
@@ -1320,6 +1354,7 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             PredicateNode::SubjectElementPattern(subject_element) => {
                 subject_element.pattern.scope(db)
             }
+            PredicateNode::IsNonEmptyIterable(predicate) => predicate.scope(db),
             PredicateNode::StarImportPlaceholder(star_import) => star_import.scope(db),
         };
 
