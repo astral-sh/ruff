@@ -43,7 +43,7 @@ use crate::checkers::ast::Checker;
 /// def example_fn(complex_argument: dict[str, list[TaskUserMap]]) -> None: ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.06")]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct ComplexAnnotation {
     symbol_name: String,
     complexity_value: usize,
