@@ -670,13 +670,6 @@ impl<'db> IntersectionType<'db> {
         EnumComplement::from_intersection_parts(db, self.positive(db), self.negative(db))
     }
 
-    /// Return `true` if this intersection has an exact finite expansion.
-    ///
-    /// Compact enum complements are currently the only intersection form with such an expansion.
-    pub(crate) fn has_finite_alternatives(self, db: &'db dyn Db) -> bool {
-        self.enum_complement(db).is_some()
-    }
-
     /// Return the exact finite alternatives represented by this intersection, if available.
     pub fn finite_alternatives(self, db: &'db dyn Db) -> Option<Vec<Type<'db>>> {
         self.enum_complement(db)

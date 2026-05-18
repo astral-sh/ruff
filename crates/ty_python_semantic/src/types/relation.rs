@@ -987,13 +987,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }),
 
             (Type::EnumComplement(complement), Type::LiteralValue(_) | Type::Union(_)) => {
-                complement
-                    .remaining_literal_types(db)
-                    .iter()
-                    .copied()
-                    .when_all(db, self.constraints, |literal| {
-                        self.check_type_pair(db, literal, target)
-                    })
+                self.check_type_pair(db, complement.remaining_literal_union(db), target)
             }
 
             (Type::EnumComplement(complement), _) => {

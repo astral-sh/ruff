@@ -529,7 +529,7 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
 pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
         Type::EnumComplement(_) => true,
-        Type::Intersection(intersection) => intersection.has_finite_alternatives(db),
+        Type::Intersection(intersection) => intersection.finite_alternatives(db).is_some(),
         Type::NominalInstance(instance) => {
             let class = instance.class(db);
             class.is_known(db, KnownClass::Bool)

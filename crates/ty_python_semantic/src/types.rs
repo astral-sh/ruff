@@ -1035,6 +1035,11 @@ impl<'db> Type<'db> {
         self.is_instance_of(db, KnownClass::Bool)
     }
 
+    fn is_enum(&self, db: &'db dyn Db) -> bool {
+        self.as_nominal_instance()
+            .is_some_and(|instance| enum_metadata(db, instance.class_literal(db)).is_some())
+    }
+
     fn is_typealias_special_form(&self) -> bool {
         matches!(self, Type::SpecialForm(SpecialFormType::TypeAlias))
     }

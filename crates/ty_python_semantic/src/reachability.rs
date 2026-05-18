@@ -317,39 +317,10 @@ fn type_excluded_by_previous_patterns<'db>(
 /// This succeeds only when the subject is a single enum literal, a union of enum literals from the
 /// same enum class, or an alias to either form. Enum aliases are normalized to the canonical member
 /// name so previous `match` cases can be compared by member identity.
-///
-/// For example, a subject narrowed to `Literal[Color.RED, Color.BLUE]` yields the `Color` class and
-/// the canonical names `{RED, BLUE}`:
-///
-/// ```python
-/// from enum import Enum
-/// from typing import Literal
-///
-/// class Color(Enum):
-///     RED = 1
-///     BLUE = 2
-///
-/// def f(color: Literal[Color.RED, Color.BLUE]): ...
-/// ```
 fn enum_literal_subject_names<'db>(
     db: &'db dyn Db,
     subject_ty: Type<'db>,
 ) -> Option<(ClassLiteral<'db>, FxHashSet<Name>)> {
-    /// Add one enum literal to the accumulated enum class and canonical member-name set.
-    ///
-    /// Returns `None` for non-enum literals or literals from a different enum class, since match
-    /// exhaustiveness for enum-literal unions can only be decided within a single enum class.
-    ///
-    /// ```python
-    /// from enum import Enum
-    /// from typing import Literal
-    ///
-    /// class Color(Enum):
-    ///     RED = 1
-    ///     BLUE = 2
-    ///
-    /// def f(color: Literal[Color.RED, Color.BLUE]): ...
-    /// ```
     fn add_enum_literal<'db>(
         db: &'db dyn Db,
         enum_class: &mut Option<ClassLiteral<'db>>,
@@ -398,20 +369,6 @@ fn enum_literal_subject_names<'db>(
 /// This recognizes patterns like `case Color.RED:` only when the pattern expression is
 /// single-valued and belongs to the expected enum class. Enum aliases are resolved to their
 /// canonical member names before returning.
-///
-/// ```python
-/// from enum import Enum
-/// from typing import Literal
-///
-/// class Color(Enum):
-///     RED = 1
-///     BLUE = 2
-///
-/// def f(color: Literal[Color.RED, Color.BLUE]):
-///     match color:
-///         case Color.RED:
-///             ...
-/// ```
 fn enum_member_pattern_name<'db>(
     db: &'db dyn Db,
     enum_class: ClassLiteral<'db>,
@@ -434,22 +391,6 @@ fn enum_member_pattern_name<'db>(
 /// The analysis removes enum members already matched by earlier unguarded cases, then decides
 /// whether the current case is impossible, exhaustive, or still ambiguous. Guarded cases remain
 /// ambiguous because the guard can reject an otherwise matching enum member.
-///
-/// ```python
-/// from enum import Enum
-/// from typing import Literal
-///
-/// class Color(Enum):
-///     RED = 1
-///     BLUE = 2
-///
-/// def f(color: Literal[Color.RED, Color.BLUE]):
-///     match color:
-///         case Color.RED:
-///             ...
-///         case Color.BLUE:  # Always reached if the first case did not match.
-///             ...
-/// ```
 fn analyze_enum_literal_union_pattern_predicate<'db>(
     db: &'db dyn Db,
     predicate: PatternPredicate<'db>,

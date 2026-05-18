@@ -59,46 +59,6 @@ pub(crate) struct EnumMetadata<'db> {
 
 impl get_size2::GetSize for EnumMetadata<'_> {}
 
-impl<'db> Type<'db> {
-    /// Return the enum class for an instance type if this type is an enum instance.
-    ///
-    /// This identifies the class behind values annotated as an enum instance, such as `Color` in
-    /// the following example:
-    ///
-    /// ```python
-    /// from enum import Enum
-    ///
-    /// class Color(Enum):
-    ///     RED = 1
-    ///
-    /// def f(color: Color): ...
-    /// ```
-    pub(crate) fn enum_class(self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
-        self.as_nominal_instance().and_then(|instance| {
-            let class = instance.class_literal(db);
-            enum_metadata(db, class).is_some().then_some(class)
-        })
-    }
-
-    /// Return `true` if this type is an enum instance type.
-    ///
-    /// This recognizes instance types like `Color`, not individual enum literals like
-    /// `Literal[Color.RED]`.
-    ///
-    /// ```python
-    /// from enum import Enum
-    ///
-    /// class Color(Enum):
-    ///     RED = 1
-    ///     BLUE = 2
-    ///
-    /// def f(color: Color): ...
-    /// ```
-    pub(super) fn is_enum(&self, db: &'db dyn Db) -> bool {
-        self.enum_class(db).is_some()
-    }
-}
-
 /// Look up an instance member on the finite enum literals represented by a complement.
 ///
 /// The enum-owned `.name`/`.value` attributes can often be answered directly. Other members
@@ -350,19 +310,6 @@ impl<'db> EnumComplementType<'db> {
     }
 
     /// Return metadata for the enum class whose members are represented by this complement.
-    ///
-    /// ```python
-    /// from enum import Enum
-    ///
-    /// class Color(Enum):
-    ///     RED = 1
-    ///     BLUE = 2
-    ///
-    /// def f(color: Color):
-    ///     if color is not Color.RED:
-    ///         reveal_type(color)  # Color, excluding Color.RED
-    ///         # The complement's metadata comes from `Color`.
-    /// ```
     pub(crate) fn metadata(self, db: &'db dyn Db) -> &'db EnumMetadata<'db> {
         enum_metadata(db, self.enum_class(db)).expect("Enum complement class is an enum")
     }
@@ -413,18 +360,6 @@ impl<'db> EnumComplementType<'db> {
     }
 
     /// Expand this complement to the enum literals that remain possible.
-    ///
-    /// ```python
-    /// from enum import Enum
-    ///
-    /// class Color(Enum):
-    ///     RED = 1
-    ///     BLUE = 2
-    ///
-    /// def f(color: Color):
-    ///     if color is not Color.RED:
-    ///         reveal_type(color)  # Literal[Color.BLUE]
-    /// ```
     pub fn remaining_literal_types(self, db: &'db dyn Db) -> Vec<Type<'db>> {
         self.remaining_member_names(db)
             .map(|name| self.remaining_literal_type(db, name.clone()))
@@ -466,18 +401,6 @@ impl<'db> EnumComplementType<'db> {
     ///
     /// This keeps small enum complements readable as literal groups while preserving the compact
     /// intersection form for large generated enums.
-    ///
-    /// ```python
-    /// from enum import Enum
-    ///
-    /// class Color(Enum):
-    ///     RED = 1
-    ///     BLUE = 2
-    ///
-    /// def f(color: Color):
-    ///     if color is not Color.RED:
-    ///         reveal_type(color)  # Literal[Color.BLUE]
-    /// ```
     pub(crate) fn remaining_literal_types_for_display(
         self,
         db: &'db dyn Db,
@@ -499,19 +422,6 @@ impl<'db> EnumComplementType<'db> {
     ///
     /// This handles `.name`, `.value`, `._name_`, and `._value_` by unioning the corresponding
     /// attribute type from each remaining canonical enum member.
-    ///
-    /// ```python
-    /// from enum import Enum
-    ///
-    /// class Color(Enum):
-    ///     RED = 1
-    ///     BLUE = 2
-    ///
-    /// def f(color: Color):
-    ///     if color is not Color.RED:
-    ///         reveal_type(color.name)  # Literal["BLUE"]
-    ///         reveal_type(color.value)  # Literal[2]
-    /// ```
     pub(crate) fn member_type(self, db: &'db dyn Db, member_name: &str) -> Option<Type<'db>> {
         let metadata = self.metadata(db);
         let is_enum_subclass = Type::ClassLiteral(self.enum_class(db))
@@ -542,10 +452,6 @@ impl<'db> EnumComplementType<'db> {
         // `Color & Any & ~Literal[Color.RED]`, are not equivalent to that literal union because the
         // additional intersection components must remain.
         self.rest(db).is_empty()
-            && self
-                .remaining_literal_types(db)
-                .iter()
-                .all(|literal| literal.is_spellable(db))
     }
 
     /// Reconstruct the equivalent set-theoretic intersection.
