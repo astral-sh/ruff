@@ -21,7 +21,7 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
 use salsa::{Database, Durability, Setter};
 use std::backtrace::BacktraceStatus;
-use std::collections::hash_set;
+use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
@@ -593,12 +593,23 @@ impl Project {
         index.remove(file);
     }
 
-    /// Removes all indexed project files under `path`.
+    /// Removes all indexed project files under `paths`.
     ///
     /// This is a no-op if the project files are still lazily indexed.
-    #[tracing::instrument(level = "debug", skip(self, db))]
-    pub(crate) fn remove_files_under(self, db: &mut dyn Db, path: &SystemPath) {
-        let path = SystemPath::absolute(path, db.system().current_directory());
+    #[tracing::instrument(level = "debug", skip(self, db, paths))]
+    pub(crate) fn remove_files_under<P, I>(self, db: &mut dyn Db, paths: I)
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<SystemPath>,
+    {
+        let paths = paths
+            .into_iter()
+            .map(|path| SystemPath::absolute(path, db.system().current_directory()))
+            .collect::<BTreeSet<_>>();
+
+        if paths.is_empty() {
+            return;
+        }
 
         if self.file_set(db).is_lazy() {
             return;
@@ -610,9 +621,11 @@ impl Project {
                 .iter()
                 .copied()
                 .filter(|file| {
-                    file.path(db)
-                        .as_system_path()
-                        .is_some_and(|file_path| file_path.starts_with(&path))
+                    file.path(db).as_system_path().is_some_and(|file_path| {
+                        file_path
+                            .ancestors()
+                            .any(|ancestor| paths.contains(ancestor))
+                    })
                 })
                 .collect::<Vec<_>>()
         };
