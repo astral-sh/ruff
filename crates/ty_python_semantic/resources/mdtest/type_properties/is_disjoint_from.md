@@ -147,6 +147,8 @@ static_assert(is_disjoint_from(list[Any], dict[Any, Any]))
 static_assert(is_disjoint_from(type[list], type[dict]))
 
 static_assert(is_disjoint_from(asyncio.Task, dict))
+static_assert(not is_disjoint_from(asyncio.Task, asyncio.Future))
+static_assert(not is_disjoint_from(type[asyncio.Task], type[asyncio.Future]))
 
 @disjoint_base
 class A: ...
