@@ -114,12 +114,39 @@ pub enum NonEmptyIterablePredicate<'db> {
     ///
     /// Semantic reachability later confirms that the callable is builtin `range`.
     BuiltinRange { callable: Expression<'db> },
+    /// A builtin call that preserves the non-emptiness of its iterable argument or arguments.
+    BuiltinWrapper {
+        callable: Expression<'db>,
+        wrapper: NonEmptyIterableWrapper,
+    },
 }
 
 impl<'db> NonEmptyIterablePredicate<'db> {
     pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self {
-            NonEmptyIterablePredicate::BuiltinRange { callable } => callable.scope(db),
+            NonEmptyIterablePredicate::BuiltinRange { callable }
+            | NonEmptyIterablePredicate::BuiltinWrapper { callable, .. } => callable.scope(db),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub enum NonEmptyIterableWrapper {
+    Enumerate,
+    Map,
+    Reversed,
+    Sorted,
+    Zip,
+}
+
+impl NonEmptyIterableWrapper {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Enumerate => "enumerate",
+            Self::Map => "map",
+            Self::Reversed => "reversed",
+            Self::Sorted => "sorted",
+            Self::Zip => "zip",
         }
     }
 }

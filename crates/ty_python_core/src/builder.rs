@@ -37,9 +37,9 @@ use crate::expression::{Expression, ExpressionKind};
 use crate::member::MemberExprBuilder;
 use crate::place::{PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId};
 use crate::predicate::{
-    CallableAndCallExpr, ClassPatternKind, NonEmptyIterablePredicate, PatternPredicate,
-    PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral, ScopedPredicateId,
-    StarImportPlaceholderPredicate,
+    CallableAndCallExpr, ClassPatternKind, NonEmptyIterablePredicate, NonEmptyIterableWrapper,
+    PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral,
+    ScopedPredicateId, StarImportPlaceholderPredicate,
 };
 use crate::program::Program;
 use crate::re_exports::exported_names;
@@ -1551,15 +1551,23 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             return None;
         };
 
-        if id != "range" || !range_call_iterates_at_least_once(call) {
+        let predicate = if id == "range" && range_call_iterates_at_least_once(call) {
+            NonEmptyIterablePredicate::BuiltinRange {
+                callable: self.add_standalone_expression(&call.func),
+            }
+        } else if let Some(wrapper) = non_empty_iterable_wrapper(id.as_str())
+            && wrapper_call_preserves_non_empty(call, wrapper)
+        {
+            NonEmptyIterablePredicate::BuiltinWrapper {
+                callable: self.add_standalone_expression(&call.func),
+                wrapper,
+            }
+        } else {
             return None;
-        }
+        };
 
-        let callable = self.add_standalone_expression(&call.func);
         Some(PredicateOrLiteral::Predicate(Predicate {
-            node: PredicateNode::IsNonEmptyIterable(NonEmptyIterablePredicate::BuiltinRange {
-                callable,
-            }),
+            node: PredicateNode::IsNonEmptyIterable(predicate),
             is_positive: true,
         }))
     }
@@ -4342,6 +4350,41 @@ fn literal_iterates_at_least_once(expr: &ast::Expr) -> bool {
         ast::Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => !value.is_empty(),
         ast::Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => !value.is_empty(),
         _ => false,
+    }
+}
+
+fn non_empty_iterable_wrapper(name: &str) -> Option<NonEmptyIterableWrapper> {
+    match name {
+        "enumerate" => Some(NonEmptyIterableWrapper::Enumerate),
+        "map" => Some(NonEmptyIterableWrapper::Map),
+        "reversed" => Some(NonEmptyIterableWrapper::Reversed),
+        "sorted" => Some(NonEmptyIterableWrapper::Sorted),
+        "zip" => Some(NonEmptyIterableWrapper::Zip),
+        _ => None,
+    }
+}
+
+fn wrapper_call_preserves_non_empty(
+    call: &ast::ExprCall,
+    wrapper: NonEmptyIterableWrapper,
+) -> bool {
+    let args = call.arguments.args.as_ref();
+    if args.iter().any(ast::Expr::is_starred_expr) {
+        return false;
+    }
+
+    match wrapper {
+        NonEmptyIterableWrapper::Enumerate
+        | NonEmptyIterableWrapper::Reversed
+        | NonEmptyIterableWrapper::Sorted => {
+            args.first().is_some_and(literal_iterates_at_least_once)
+        }
+        NonEmptyIterableWrapper::Zip => {
+            !args.is_empty() && args.iter().all(literal_iterates_at_least_once)
+        }
+        NonEmptyIterableWrapper::Map => {
+            args.len() >= 2 && args[1..].iter().all(literal_iterates_at_least_once)
+        }
     }
 }
 

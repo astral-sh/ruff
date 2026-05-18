@@ -871,28 +871,40 @@ fn analyze_non_empty_iterable(db: &dyn Db, predicate: NonEmptyIterablePredicate<
         NonEmptyIterablePredicate::BuiltinRange { callable } => {
             analyze_builtin_range_call(db, callable)
         }
+        NonEmptyIterablePredicate::BuiltinWrapper { callable, wrapper } => {
+            analyze_builtin_callable(db, callable, wrapper.name())
+        }
     }
 }
 
 /// Confirms that a syntactically non-empty `range(...)` call refers to builtin `range`.
 fn analyze_builtin_range_call(db: &dyn Db, callable: Expression) -> Truthiness {
-    let callable_ty = infer_expression_type(db, callable, TypeContext::default());
-    let Some(class) = callable_ty
-        .as_class_literal()
-        .and_then(ClassLiteral::as_static)
-    else {
-        return Truthiness::Ambiguous;
-    };
+    analyze_builtin_callable(db, callable, "range")
+}
 
-    if class.name(db) == "range"
-        && file_to_module(db, class.file(db))
-            .and_then(|module| module.known(db))
-            .is_some_and(KnownModule::is_builtins)
-    {
+fn analyze_builtin_callable(db: &dyn Db, callable: Expression, name: &str) -> Truthiness {
+    let callable_ty = infer_expression_type(db, callable, TypeContext::default());
+    if is_builtin_callable(db, callable_ty, name) {
         Truthiness::AlwaysTrue
     } else {
         Truthiness::Ambiguous
     }
+}
+
+fn is_builtin_callable(db: &dyn Db, ty: Type, name: &str) -> bool {
+    if let Some(class) = ty.as_class_literal().and_then(ClassLiteral::as_static) {
+        class.name(db) == name && is_builtin_file(db, class.file(db))
+    } else if let Type::FunctionLiteral(function) = ty {
+        function.name(db) == name && is_builtin_file(db, function.file(db))
+    } else {
+        false
+    }
+}
+
+fn is_builtin_file(db: &dyn Db, file: ruff_db::files::File) -> bool {
+    file_to_module(db, file)
+        .and_then(|module| module.known(db))
+        .is_some_and(KnownModule::is_builtins)
 }
 
 fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {

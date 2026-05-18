@@ -166,6 +166,50 @@ for x in b"a":
 reveal_type(x)  # revealed: Literal[97]
 ```
 
+## With statically non-empty builtin iterable wrappers
+
+```py
+for x in enumerate(["a"]):
+    pass
+
+reveal_type(x)  # revealed: tuple[int, str]
+
+for x in reversed(["a"]):
+    pass
+
+reveal_type(x)  # revealed: str
+
+for x in sorted(["a"]):
+    pass
+
+reveal_type(x)  # revealed: str
+
+for x in zip(["a"], [1]):
+    pass
+
+reveal_type(x)  # revealed: tuple[str, int]
+
+for x in map(str, [1]):
+    pass
+
+reveal_type(x)  # revealed: str
+```
+
+## With shadowed iterable wrapper
+
+```py
+def shadowed_sorted():
+    def sorted(values: list[str]) -> list[str]:
+        return []
+
+    for x in sorted(["a"]):
+        pass
+
+    # revealed: str
+    # error: [possibly-unresolved-reference]
+    reveal_type(x)
+```
+
 ## With non-callable iterator
 
 ```py
