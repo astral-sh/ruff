@@ -52,8 +52,8 @@ impl ProjectDatabase {
             project_changed: false,
             custom_stdlib_changed: false,
         };
-        // Paths that were added
-        let mut added_paths = FxHashSet::default();
+        // Paths whose project files should be discovered incrementally.
+        let mut added_paths = BTreeSet::default();
 
         // Deduplicate the `sync` calls. Many file watchers emit multiple events for the same path.
         let mut synced_files = FxHashSet::default();
@@ -80,9 +80,40 @@ impl ProjectDatabase {
                     continue;
                 }
 
-                if is_ignore_file(path) {
+                if is_ignore_file(path) && project.settings(self).src().respect_ignore_files {
                     File::sync_path(self, path);
-                    reload_project_files = true;
+                    if let Some(directory) = path.parent() {
+                        if project
+                            .included_paths_or_root(self)
+                            .iter()
+                            .any(|included_path| included_path.starts_with(directory))
+                        {
+                            tracing::debug!(
+                                ignore_file = %path,
+                                directory = %directory,
+                                "Reloading project files for changed ignore file at or above included path"
+                            );
+                            reload_project_files = true;
+                        } else if project.is_directory_included(self, directory) {
+                            tracing::debug!(
+                                ignore_file = %path,
+                                directory = %directory,
+                                "Queueing project-file reindex for changed ignore file"
+                            );
+
+                            removed_paths.insert(directory.to_path_buf());
+
+                            if self.system().path_exists(directory) {
+                                added_paths.insert(directory.to_path_buf());
+                            }
+                        } else {
+                            tracing::debug!(
+                                ignore_file = %path,
+                                directory = %directory,
+                                "Ignoring changed ignore file because it doesn't affect project paths"
+                            );
+                        }
+                    }
 
                     continue;
                 }
@@ -350,11 +381,11 @@ impl ProjectDatabase {
             }
         }
 
-        for path in deduplicate_nested_paths(removed_paths) {
-            project.remove_files_under(self, &path);
-        }
+        project.remove_files_under(self, deduplicate_nested_paths(removed_paths));
 
-        let diagnostics = if let Some(walker) = ProjectFilesWalker::incremental(self, added_paths) {
+        let diagnostics = if !project.file_set(self).is_lazy()
+            && let Some(walker) = ProjectFilesWalker::incremental(self, added_paths)
+        {
             // Use directory walking to discover newly added files.
             let (files, diagnostics) = walker.collect_vec(self);
 
