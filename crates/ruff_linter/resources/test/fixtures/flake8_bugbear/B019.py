@@ -1,9 +1,15 @@
 """
-Should emit:
-B019 - on lines 73, 77, 81, 85, 89, 93, 97, 101
+B019 should emit on every method below that is decorated with a method-caching
+decorator (functools.lru_cache, functools.cache, async_lru.alru_cache, or one
+of the aiocache decorators) AND is an instance method on a non-enum class.
 """
 import functools
 from functools import cache, cached_property, lru_cache
+
+import async_lru
+import aiocache
+from async_lru import alru_cache
+from aiocache import cached, cached_stampede, multi_cached
 
 
 def some_other_cache():
@@ -124,3 +130,84 @@ class Metaclass(type):
     @functools.lru_cache
     def lru_cached_instance_method_on_metaclass(cls, x: int):
         ...
+
+
+# `async_lru.alru_cache` and `aiocache.{cached, cached_stampede, multi_cached}`
+# have the same memory-leak failure mode as `functools.lru_cache` when applied
+# to an instance method (they retain a strong reference to `self`).
+class AsyncFoo:
+    def __init__(self, x):
+        self.x = x
+
+    # Classmethods and staticmethods should be ignored, mirroring the synchronous case.
+    @classmethod
+    @async_lru.alru_cache
+    async def alru_cached_classmethod(cls, y):
+        ...
+
+    @classmethod
+    @alru_cache
+    async def alru_cached_classmethod_imported(cls, y):
+        ...
+
+    @staticmethod
+    @aiocache.cached()
+    async def aiocache_cached_staticmethod(y):
+        ...
+
+    @staticmethod
+    @cached()
+    async def aiocache_cached_staticmethod_imported(y):
+        ...
+
+    # Remaining methods should emit B019.
+    @async_lru.alru_cache
+    async def alru_cached_instance_method(self, y):
+        ...
+
+    @alru_cache
+    async def alru_cached_instance_method_imported(self, y):
+        ...
+
+    @async_lru.alru_cache(maxsize=128)
+    async def called_alru_cached_instance_method(self, y):
+        ...
+
+    @aiocache.cached()
+    async def aiocache_cached_instance_method(self, y):
+        ...
+
+    @cached()
+    async def aiocache_cached_instance_method_imported(self, y):
+        ...
+
+    @aiocache.cached_stampede()
+    async def aiocache_cached_stampede_instance_method(self, y):
+        ...
+
+    @cached_stampede()
+    async def aiocache_cached_stampede_instance_method_imported(self, y):
+        ...
+
+    @aiocache.multi_cached()
+    async def aiocache_multi_cached_instance_method(self, keys):
+        ...
+
+    @multi_cached()
+    async def aiocache_multi_cached_instance_method_imported(self, keys):
+        ...
+
+
+class AsyncEnumFoo(enum.Enum):
+    ONE = enum.auto()
+    TWO = enum.auto()
+
+    # Enum members are singletons, so caching their methods does not retain
+    # any references that would not have been retained anyway.
+    @async_lru.alru_cache
+    async def alru_on_enum(self, arg: str) -> str:
+        return f"{self} - {arg}"
+
+    @aiocache.cached()
+    async def aiocache_on_enum(self, arg: str) -> str:
+        return f"{self} - {arg}"

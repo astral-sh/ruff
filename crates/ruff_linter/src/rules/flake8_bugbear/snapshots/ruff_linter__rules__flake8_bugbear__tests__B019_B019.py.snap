@@ -1,99 +1,197 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
-  --> B019.py:78:5
+B019 Use of caching decorators (e.g. `functools.lru_cache`, `async_lru.alru_cache`, `aiocache.cached`) on methods can lead to memory leaks
+  --> B019.py:84:5
    |
-77 |     # Remaining methods should emit B019
-78 |     @functools.cache
+83 |     # Remaining methods should emit B019
+84 |     @functools.cache
    |     ^^^^^^^^^^^^^^^^
-79 |     def cached_instance_method(self, y):
-80 |         ...
+85 |     def cached_instance_method(self, y):
+86 |         ...
    |
 
-B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
-  --> B019.py:82:5
+B019 Use of caching decorators (e.g. `functools.lru_cache`, `async_lru.alru_cache`, `aiocache.cached`) on methods can lead to memory leaks
+  --> B019.py:88:5
    |
-80 |         ...
-81 |
-82 |     @cache
+86 |         ...
+87 |
+88 |     @cache
    |     ^^^^^^
-83 |     def another_cached_instance_method(self, y):
-84 |         ...
+89 |     def another_cached_instance_method(self, y):
+90 |         ...
    |
 
-B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
-  --> B019.py:86:5
+B019 Use of caching decorators (e.g. `functools.lru_cache`, `async_lru.alru_cache`, `aiocache.cached`) on methods can lead to memory leaks
+  --> B019.py:92:5
    |
-84 |         ...
-85 |
-86 |     @functools.cache()
+90 |         ...
+91 |
+92 |     @functools.cache()
    |     ^^^^^^^^^^^^^^^^^^
-87 |     def called_cached_instance_method(self, y):
-88 |         ...
+93 |     def called_cached_instance_method(self, y):
+94 |         ...
    |
 
-B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
-  --> B019.py:90:5
+B019 Use of caching decorators (e.g. `functools.lru_cache`, `async_lru.alru_cache`, `aiocache.cached`) on methods can lead to memory leaks
+  --> B019.py:96:5
    |
-88 |         ...
-89 |
-90 |     @cache()
+94 |         ...
+95 |
+96 |     @cache()
    |     ^^^^^^^^
-91 |     def another_called_cached_instance_method(self, y):
-92 |         ...
+97 |     def another_called_cached_instance_method(self, y):
+98 |         ...
    |
 
-B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
-  --> B019.py:94:5
-   |
-92 |         ...
-93 |
-94 |     @functools.lru_cache
-   |     ^^^^^^^^^^^^^^^^^^^^
-95 |     def lru_cached_instance_method(self, y):
-96 |         ...
-   |
-
-B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
-   --> B019.py:98:5
+B019 Use of caching decorators (e.g. `functools.lru_cache`, `async_lru.alru_cache`, `aiocache.cached`) on methods can lead to memory leaks
+   --> B019.py:100:5
     |
- 96 |         ...
- 97 |
- 98 |     @lru_cache
-    |     ^^^^^^^^^^
- 99 |     def another_lru_cached_instance_method(self, y):
-100 |         ...
-    |
-
-B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
-   --> B019.py:102:5
-    |
-100 |         ...
-101 |
-102 |     @functools.lru_cache()
-    |     ^^^^^^^^^^^^^^^^^^^^^^
-103 |     def called_lru_cached_instance_method(self, y):
-104 |         ...
-    |
-
-B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
-   --> B019.py:106:5
-    |
-104 |         ...
-105 |
-106 |     @lru_cache()
-    |     ^^^^^^^^^^^^
-107 |     def another_called_lru_cached_instance_method(self, y):
-108 |         ...
-    |
-
-B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
-   --> B019.py:124:5
-    |
-123 | class Metaclass(type):
-124 |     @functools.lru_cache
+ 98 |         ...
+ 99 |
+100 |     @functools.lru_cache
     |     ^^^^^^^^^^^^^^^^^^^^
-125 |     def lru_cached_instance_method_on_metaclass(cls, x: int):
-126 |         ...
+101 |     def lru_cached_instance_method(self, y):
+102 |         ...
+    |
+
+B019 Use of caching decorators (e.g. `functools.lru_cache`, `async_lru.alru_cache`, `aiocache.cached`) on methods can lead to memory leaks
+   --> B019.py:104:5
+    |
+102 |         ...
+103 |
+104 |     @lru_cache
+    |     ^^^^^^^^^^
+105 |     def another_lru_cached_instance_method(self, y):
+106 |         ...
+    |
+
+B019 Use of caching decorators (e.g. `functools.lru_cache`, `async_lru.alru_cache`, `aiocache.cached`) on methods can lead to memory leaks
+   --> B019.py:108:5
+    |
+106 |         ...
+107 |
+108 |     @functools.lru_cache()
+    |     ^^^^^^^^^^^^^^^^^^^^^^
+109 |     def called_lru_cached_instance_method(self, y):
+110 |         ...
+    |
+
+B019 Use of caching decorators (e.g. `functools.lru_cache`, `async_lru.alru_cache`, `aiocache.cached`) on methods can lead to memory leaks
+   --> B019.py:112:5
+    |
+110 |         ...
+111 |
+112 |     @lru_cache()
+    |     ^^^^^^^^^^^^
+113 |     def another_called_lru_cached_instance_method(self, y):
+114 |         ...
+    |
+
+B019 Use of caching decorators (e.g. `functools.lru_cache`, `async_lru.alru_cache`, `aiocache.cached`) on methods can lead to memory leaks
+   --> B019.py:130:5
+    |
+129 | class Metaclass(type):
+130 |     @functools.lru_cache
+    |     ^^^^^^^^^^^^^^^^^^^^
+131 |     def lru_cached_instance_method_on_metaclass(cls, x: int):
+132 |         ...
+    |
+
+B019 Use of caching decorators (e.g. `functools.lru_cache`, `async_lru.alru_cache`, `aiocache.cached`) on methods can lead to memory leaks
+   --> B019.py:164:5
+    |
+163 |     # Remaining methods should emit B019.
+164 |     @async_lru.alru_cache
+    |     ^^^^^^^^^^^^^^^^^^^^^
+165 |     async def alru_cached_instance_method(self, y):
+166 |         ...
+    |
+
+B019 Use of caching decorators (e.g. `functools.lru_cache`, `async_lru.alru_cache`, `aiocache.cached`) on methods can lead to memory leaks
+   --> B019.py:168:5
+    |
+166 |         ...
+167 |
+168 |     @alru_cache
+    |     ^^^^^^^^^^^
+169 |     async def alru_cached_instance_method_imported(self, y):
+170 |         ...
+    |
+
+B019 Use of caching decorators (e.g. `functools.lru_cache`, `async_lru.alru_cache`, `aiocache.cached`) on methods can lead to memory leaks
+   --> B019.py:172:5
+    |
+170 |         ...
+171 |
+172 |     @async_lru.alru_cache(maxsize=128)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+173 |     async def called_alru_cached_instance_method(self, y):
+174 |         ...
+    |
+
+B019 Use of caching decorators (e.g. `functools.lru_cache`, `async_lru.alru_cache`, `aiocache.cached`) on methods can lead to memory leaks
+   --> B019.py:176:5
+    |
+174 |         ...
+175 |
+176 |     @aiocache.cached()
+    |     ^^^^^^^^^^^^^^^^^^
+177 |     async def aiocache_cached_instance_method(self, y):
+178 |         ...
+    |
+
+B019 Use of caching decorators (e.g. `functools.lru_cache`, `async_lru.alru_cache`, `aiocache.cached`) on methods can lead to memory leaks
+   --> B019.py:180:5
+    |
+178 |         ...
+179 |
+180 |     @cached()
+    |     ^^^^^^^^^
+181 |     async def aiocache_cached_instance_method_imported(self, y):
+182 |         ...
+    |
+
+B019 Use of caching decorators (e.g. `functools.lru_cache`, `async_lru.alru_cache`, `aiocache.cached`) on methods can lead to memory leaks
+   --> B019.py:184:5
+    |
+182 |         ...
+183 |
+184 |     @aiocache.cached_stampede()
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+185 |     async def aiocache_cached_stampede_instance_method(self, y):
+186 |         ...
+    |
+
+B019 Use of caching decorators (e.g. `functools.lru_cache`, `async_lru.alru_cache`, `aiocache.cached`) on methods can lead to memory leaks
+   --> B019.py:188:5
+    |
+186 |         ...
+187 |
+188 |     @cached_stampede()
+    |     ^^^^^^^^^^^^^^^^^^
+189 |     async def aiocache_cached_stampede_instance_method_imported(self, y):
+190 |         ...
+    |
+
+B019 Use of caching decorators (e.g. `functools.lru_cache`, `async_lru.alru_cache`, `aiocache.cached`) on methods can lead to memory leaks
+   --> B019.py:192:5
+    |
+190 |         ...
+191 |
+192 |     @aiocache.multi_cached()
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^
+193 |     async def aiocache_multi_cached_instance_method(self, keys):
+194 |         ...
+    |
+
+B019 Use of caching decorators (e.g. `functools.lru_cache`, `async_lru.alru_cache`, `aiocache.cached`) on methods can lead to memory leaks
+   --> B019.py:196:5
+    |
+194 |         ...
+195 |
+196 |     @multi_cached()
+    |     ^^^^^^^^^^^^^^^
+197 |     async def aiocache_multi_cached_instance_method_imported(self, keys):
+198 |         ...
     |

@@ -9,17 +9,20 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for uses of the `functools.lru_cache` and `functools.cache`
-/// decorators on methods.
+/// Checks for uses of method-caching decorators that retain a strong reference
+/// to `self`. This includes `functools.lru_cache` and `functools.cache`, as
+/// well as the async equivalents `async_lru.alru_cache` and the `aiocache`
+/// decorators (`aiocache.cached`, `aiocache.cached_stampede`, and
+/// `aiocache.multi_cached`).
 ///
 /// ## Why is this bad?
-/// Using the `functools.lru_cache` and `functools.cache` decorators on methods
-/// can lead to memory leaks, as the global cache will retain a reference to
-/// the instance, preventing it from being garbage collected.
+/// Applying these decorators to methods can lead to memory leaks, as the
+/// (global) cache will retain a reference to the instance, preventing it from
+/// being garbage collected.
 ///
 /// Instead, refactor the method to depend only on its arguments and not on the
-/// instance of the class, or use the `@lru_cache` decorator on a function
-/// outside of the class.
+/// instance of the class, or apply the decorator to a function defined outside
+/// of the class.
 ///
 /// This rule ignores instance methods on enumeration classes, as enum members
 /// are singletons.
@@ -69,6 +72,8 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `functools.lru_cache`](https://docs.python.org/3/library/functools.html#functools.lru_cache)
 /// - [Python documentation: `functools.cache`](https://docs.python.org/3/library/functools.html#functools.cache)
+/// - [`async_lru` documentation](https://github.com/aio-libs/async-lru)
+/// - [`aiocache` documentation](https://aiocache.aio-libs.org/)
 /// - [don't lru_cache methods!](https://www.youtube.com/watch?v=sVjtp6tGo0g)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.114")]
@@ -77,7 +82,8 @@ pub(crate) struct CachedInstanceMethod;
 impl Violation for CachedInstanceMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
+        "Use of caching decorators (e.g. `functools.lru_cache`, `async_lru.alru_cache`, \
+         `aiocache.cached`) on methods can lead to memory leaks"
             .to_string()
     }
 }
@@ -116,7 +122,16 @@ pub(crate) fn cached_instance_method(checker: &Checker, function_def: &ast::Stmt
     }
 }
 
-/// Returns `true` if the given expression is a call to `functools.lru_cache` or `functools.cache`.
+/// Returns `true` if the given expression is a call to one of the
+/// method-caching decorators handled by `B019`. This currently covers:
+///
+/// - `functools.lru_cache` / `functools.cache`
+/// - `async_lru.alru_cache`
+/// - `aiocache.cached` / `aiocache.cached_stampede` / `aiocache.multi_cached`
+///
+/// All of these store a strong reference to `self` in a (typically global)
+/// cache, so applying any of them to an instance method has the same
+/// memory-leak failure mode that `B019` was originally written to catch.
 fn is_cache_func(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(expr)
@@ -124,6 +139,8 @@ fn is_cache_func(expr: &Expr, semantic: &SemanticModel) -> bool {
             matches!(
                 qualified_name.segments(),
                 ["functools", "lru_cache" | "cache"]
+                    | ["async_lru", "alru_cache"]
+                    | ["aiocache", "cached" | "cached_stampede" | "multi_cached"]
             )
         })
 }
