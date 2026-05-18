@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 
 use bitflags::bitflags;
+use drop_bomb::DebugDropBomb;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{AtomicNodeIndex, Mod, ModExpression, ModModule};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -84,9 +85,14 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Call before entering a recursive parsing function. Returns `true` when
-    /// the caller may recurse, and `false` when the recursion limit has been
-    /// hit and the caller must abort and return a placeholder instead.
+    /// Call before entering a recursive parsing function. Returns [`Some`]
+    /// holding a [`RecursionScope`] guard when the caller may recurse, and
+    /// [`None`] when the recursion limit has been hit and the caller must abort
+    /// and return a placeholder instead.
+    ///
+    /// Every returned [`RecursionScope`] must be defused with
+    /// [`RecursionScope::exit`] before being dropped. The [`DebugDropBomb`]
+    /// catches missed restores in debug builds.
     ///
     /// # Note
     ///
@@ -94,20 +100,13 @@ impl<'src> Parser<'src> {
     /// fix is to refactor the parser to avoid recursive calls.
     #[must_use]
     #[inline]
-    fn enter_recursion(&mut self) -> bool {
+    fn enter_recursion(&mut self) -> Option<RecursionScope> {
         if self.options.max_recursion_depth == 0 {
-            return false;
+            return None;
         }
 
         self.options.max_recursion_depth -= 1;
-        true
-    }
-
-    /// Restore the parser's recursion budget after a successful
-    /// [`Self::enter_recursion`] call.
-    #[inline]
-    fn exit_recursion(&mut self) {
-        self.options.max_recursion_depth += 1;
+        Some(RecursionScope::new())
     }
 
     #[cold]
@@ -747,6 +746,30 @@ impl<'src> Parser<'src> {
         self.current_token_id = current_token_id;
         self.prev_token_end = prev_token_end;
         self.recovery_context = recovery_context;
+    }
+}
+
+/// RAII guard returned by [`Parser::enter_recursion`].
+#[must_use = "RecursionScope must be defused with `RecursionScope::exit`"]
+struct RecursionScope {
+    bomb: DebugDropBomb,
+}
+
+impl RecursionScope {
+    #[inline]
+    fn new() -> Self {
+        Self {
+            bomb: DebugDropBomb::new(
+                "RecursionScope must be defused with `RecursionScope::exit` so the parser's depth counter is restored.",
+            ),
+        }
+    }
+
+    /// Restore the parser's recursion budget and consume the scope.
+    #[inline]
+    fn exit(mut self, parser: &mut Parser<'_>) {
+        parser.options.max_recursion_depth += 1;
+        self.bomb.defuse();
     }
 }
 
