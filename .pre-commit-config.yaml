@@ -7,7 +7,7 @@ exclude: |
     crates/ty_project/resources/.*|
     crates/ty/docs/(configuration|rules|cli|environment).md|
     crates/ruff_benchmark/resources/.*|
-    crates/ruff_linter/resources/.*|
+    crates/ruff_linter/resources/(?!mdtest/).*|
     crates/ruff_linter/src/rules/.*/snapshots/.*|
     crates/ruff_notebook/resources/.*|
     crates/ruff_server/resources/.*|
