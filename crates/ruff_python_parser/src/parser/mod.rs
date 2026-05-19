@@ -57,6 +57,9 @@ pub(crate) struct Parser<'src> {
 
     /// The start offset in the source code from which to start parsing at.
     start_offset: TextSize,
+
+    /// Current parser recursion depth remaining before the depth limit is exceeded.
+    depth_remaining: u16,
 }
 
 impl<'src> Parser<'src> {
@@ -72,6 +75,7 @@ impl<'src> Parser<'src> {
         options: ParseOptions,
     ) -> Self {
         let tokens = TokenSource::from_source(source, options.mode, start_offset);
+        let depth_remaining = options.max_recursion_depth;
 
         Parser {
             options,
@@ -83,6 +87,7 @@ impl<'src> Parser<'src> {
             prev_token_end: TextSize::new(0),
             start_offset,
             current_token_id: TokenId::default(),
+            depth_remaining,
         }
     }
 
@@ -102,11 +107,11 @@ impl<'src> Parser<'src> {
     #[must_use]
     #[inline]
     fn enter_recursion(&mut self) -> Option<RecursionScope> {
-        if self.options.max_recursion_depth == 0 {
+        if self.depth_remaining == 0 {
             return None;
         }
 
-        self.options.max_recursion_depth -= 1;
+        self.depth_remaining -= 1;
         Some(RecursionScope::new())
     }
 
@@ -771,7 +776,7 @@ impl RecursionScope {
     /// Restore the parser's recursion budget and consume the scope.
     #[inline]
     fn exit(self, parser: &mut Parser<'_>) {
-        parser.options.max_recursion_depth += 1;
+        parser.depth_remaining += 1;
         #[cfg(debug_assertions)]
         {
             let mut bomb = self.bomb;
