@@ -234,9 +234,9 @@ preserving the original rule name.
 
 To test rules, Ruff uses the mdtest framework, initially developed for ty. Mdtests are written as
 Markdown files with Python code and TOML configuration blocks alongside prose
-descriptions. Generally, there will be one file per linter (e.g. `flake8-bandit.md` for the `S`
-rules) with top-level headings for each rule (e.g. `S704` for `unsafe-markup-use`). Within these
-top-level sections, you can define additional sections to group related tests and their settings
+descriptions. Generally, there will be one directory per linter (e.g. `flake8-bandit` for the `S`
+rules) with nested files for each rule (e.g. `unsafe-markup-use.md` for `S704`). Within these
+files, you can define additional Markdown sections to group related tests and their settings
 together.
 
 You can see [the ty_test
@@ -252,7 +252,7 @@ For example, a minimal mdtest for `module-import-not-at-top-of-file` (`E402`) wo
 like this:
 
 ````markdown
-<!-- crates/ruff_linter/resources/mdtest/pycodestyle.md -->
+<!-- crates/ruff_linter/resources/mdtest/pycodestyle/module-import-not-at-top-of-file.md -->
 
 # `module-import-not-at-top-of-file` (`E402`)
 
