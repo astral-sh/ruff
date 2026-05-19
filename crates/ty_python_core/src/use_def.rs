@@ -249,6 +249,7 @@ use thin_vec::ThinVec;
 
 use crate::ast_ids::ScopedUseId;
 use crate::definition::{Definition, DefinitionState};
+use crate::frozen::FrozenSalsaMap;
 use crate::member::ScopedMemberId;
 use crate::narrowing_constraints::{ConstraintKey, ScopedNarrowingConstraint};
 use crate::place::{PlaceExprRef, ScopedPlaceId};
@@ -465,7 +466,7 @@ pub struct UseDefMap<'db> {
     /// If the definition is both a declaration and a binding -- `x: int = 1` for example -- then
     /// we don't actually need anything here, all we'll need to validate is that our own RHS is a
     /// valid assignment to our own annotation.
-    declarations_by_binding: FxHashMap<Definition<'db>, InternedDeclarationsId>,
+    declarations_by_binding: FrozenSalsaMap<Definition<'db>, InternedDeclarationsId>,
 
     /// If the definition is a declaration (only) -- `x: int` for example -- then we need
     /// [`Bindings`] to know whether this declaration is consistent with the previously
@@ -477,7 +478,7 @@ pub struct UseDefMap<'db> {
     ///
     /// If we see a binding to a `Final`-qualified symbol, we also need this map to find previous
     /// bindings to that symbol. If there are any, the assignment is invalid.
-    bindings_by_definition: FxHashMap<Definition<'db>, InternedBindingsId>,
+    bindings_by_definition: FrozenSalsaMap<Definition<'db>, InternedBindingsId>,
 
     /// Retained [`PlaceState`] values for each symbol.
     symbol_states: FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates<InternedPlaceStateId>>,
@@ -893,7 +894,7 @@ impl<'db> UseDefMap<'db> {
 #[derive(get_size2::GetSize)]
 pub(crate) struct ScopedEnclosingSnapshotId;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, get_size2::GetSize)]
 pub(crate) struct EnclosingSnapshotKey {
     /// The enclosing scope containing the bindings
     pub(crate) enclosing_scope: FileScopeId,
@@ -1952,31 +1953,29 @@ impl<'db> UseDefMapBuilder<'db> {
     fn intern_bindings_by_definition(
         bindings_by_definition: FxHashMap<Definition<'db>, Bindings>,
         place_state_interner: &mut PlaceStateInterner,
-    ) -> FxHashMap<Definition<'db>, InternedBindingsId> {
-        let mut interned_ids_by_definition: FxHashMap<Definition<'db>, InternedBindingsId> =
-            FxHashMap::with_capacity_and_hasher(bindings_by_definition.len(), FxBuildHasher);
+    ) -> FrozenSalsaMap<Definition<'db>, InternedBindingsId> {
+        let mut interned_ids_by_definition = Vec::with_capacity(bindings_by_definition.len());
 
         for (definition, bindings) in bindings_by_definition {
             let interned_id = place_state_interner.intern_bindings(bindings);
-            interned_ids_by_definition.insert(definition, interned_id);
+            interned_ids_by_definition.push((definition, interned_id));
         }
 
-        interned_ids_by_definition
+        FrozenSalsaMap::from_entries(interned_ids_by_definition)
     }
 
     fn intern_declarations_by_binding(
         declarations_by_binding: FxHashMap<Definition<'db>, Declarations>,
         place_state_interner: &mut PlaceStateInterner,
-    ) -> FxHashMap<Definition<'db>, InternedDeclarationsId> {
-        let mut interned_ids_by_binding: FxHashMap<Definition<'db>, InternedDeclarationsId> =
-            FxHashMap::with_capacity_and_hasher(declarations_by_binding.len(), FxBuildHasher);
+    ) -> FrozenSalsaMap<Definition<'db>, InternedDeclarationsId> {
+        let mut interned_ids_by_binding = Vec::with_capacity(declarations_by_binding.len());
 
         for (binding, declarations) in declarations_by_binding {
             let interned_id = place_state_interner.intern_declarations(declarations);
-            interned_ids_by_binding.insert(binding, interned_id);
+            interned_ids_by_binding.push((binding, interned_id));
         }
 
-        interned_ids_by_binding
+        FrozenSalsaMap::from_entries(interned_ids_by_binding)
     }
 
     fn intern_bindings_by_use(

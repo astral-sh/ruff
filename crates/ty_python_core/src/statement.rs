@@ -58,7 +58,9 @@ impl<'db> StatementInner<'db> {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
+#[derive(
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, salsa::Update, get_size2::GetSize,
+)]
 pub struct StatementNodeKey(NodeKey);
 
 impl From<&ast::Stmt> for StatementNodeKey {

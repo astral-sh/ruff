@@ -1495,7 +1495,9 @@ impl<'db> LoopHeaderDefinitionKind<'db> {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
+#[derive(
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, salsa::Update, get_size2::GetSize,
+)]
 pub struct DefinitionNodeKey(NodeKey);
 
 impl DefinitionNodeKey {
