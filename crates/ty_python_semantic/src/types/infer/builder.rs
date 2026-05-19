@@ -6162,14 +6162,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             } else if let Type::Union(union) = annotation {
                 let union_elements = union.elements(self.db());
-                let typed_dicts = union_elements
-                    .iter()
-                    .filter_map(|element| element.resolve_type_alias(self.db()).as_typed_dict())
-                    .collect_vec();
-                let has_dict_compatible_fallback = union_elements.iter().any(|element| {
+                let mut typed_dicts = Vec::new();
+                let mut has_dict_compatible_fallback = false;
+
+                for element in union_elements {
                     let element = element.resolve_type_alias(self.db());
-                    !element.is_typed_dict() && element.is_instance_of(self.db(), KnownClass::Dict)
-                });
+
+                    if let Some(typed_dict) = element.as_typed_dict() {
+                        typed_dicts.push(typed_dict);
+                    } else if element.is_instance_of(self.db(), KnownClass::Dict) {
+                        has_dict_compatible_fallback = true;
+                    }
+                }
 
                 if let [typed_dict] = typed_dicts.as_slice()
                     && !has_dict_compatible_fallback
