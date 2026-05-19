@@ -520,6 +520,20 @@ class OrderedGrandchild2(OrderedParent4):  # error: [subclass-of-dataclass-with-
     z: float
 ```
 
+This also applies if the intermediate subclass is not itself a dataclass:
+
+```py
+@dataclass(order=True)
+class OrderedGrandparent2:
+    x: int
+
+class OrderedParent5(OrderedGrandparent2):  # error: [subclass-of-dataclass-with-order]
+    pass
+
+class OrderedGrandchild3(OrderedParent5):  # error: [subclass-of-dataclass-with-order]
+    pass
+```
+
 If the parent dataclass does not have `order=True`, no warning is emitted:
 
 ```py

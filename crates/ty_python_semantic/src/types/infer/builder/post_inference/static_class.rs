@@ -9,7 +9,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
 use crate::{
-    TypeQualifiers,
+    Db, TypeQualifiers,
     diagnostic::format_enumeration,
     place::{place_from_bindings, place_from_declarations},
     types::{
@@ -383,7 +383,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             );
         }
 
-        if base_class.has_dataclass_param(db, DataclassFlags::ORDER)
+        if let Some(ordered_base_class) = ordered_dataclass_base_class(db, base_class)
             && let Some(node) = source_node
         {
             // Suppress the diagnostic if the child class manually overrides all comparison
@@ -394,7 +394,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Class `{}` inherits from dataclass `{}` which has `order=True`",
                     class.name(db),
-                    base_class.name(db),
+                    ordered_base_class.name(db),
                 ));
                 diagnostic.info(
                     "Comparison of instances of the child class with instances \
@@ -1068,6 +1068,26 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     class.validate_members(context);
+}
+
+fn ordered_dataclass_base_class<'db>(
+    db: &'db dyn Db,
+    base_class: ClassType<'db>,
+) -> Option<ClassType<'db>> {
+    for ancestor in base_class.iter_mro(db).filter_map(ClassBase::into_class) {
+        if ancestor.has_dataclass_param(db, DataclassFlags::ORDER) {
+            return Some(ancestor);
+        }
+
+        if ancestor
+            .static_class_literal(db)
+            .is_some_and(|(ancestor, _)| ancestor.has_own_comparison_methods(db))
+        {
+            return None;
+        }
+    }
+
+    None
 }
 
 /// Check that a `@final` class does not have unimplemented abstract methods.
