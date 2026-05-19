@@ -2,6 +2,7 @@ use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use regex_automata::dfa;
 use regex_automata::dfa::Automaton;
 use regex_automata::util::pool::Pool;
+use regex_automata::util::primitives::StateID;
 use ruff_db::system::SystemPath;
 use std::fmt::Formatter;
 use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
@@ -38,14 +39,22 @@ pub(crate) struct IncludeFilter {
     original_patterns: Box<[Box<str>]>,
     literal_pattern_indices: Box<[usize]>,
     #[get_size(size_fn = dfa_memory_usage)]
-    dfa: Option<dfa::dense::DFA<Vec<u32>>>,
+    dfa: Option<DirectoryPrefilterDfa>,
     #[get_size(ignore)]
     matches: Arc<Pool<Vec<usize>>>,
 }
 
 #[expect(clippy::ref_option)]
-fn dfa_memory_usage(dfa: &Option<dfa::dense::DFA<Vec<u32>>>) -> usize {
-    dfa.as_ref().map(dfa::dense::DFA::memory_usage).unwrap_or(0)
+fn dfa_memory_usage(dfa: &Option<DirectoryPrefilterDfa>) -> usize {
+    dfa.as_ref()
+        .map(|prefilter| prefilter.dfa.memory_usage())
+        .unwrap_or(0)
+}
+
+#[derive(Clone)]
+struct DirectoryPrefilterDfa {
+    dfa: dfa::dense::DFA<Vec<u32>>,
+    start_state: StateID,
 }
 
 impl IncludeFilter {
@@ -68,7 +77,11 @@ impl IncludeFilter {
             MatchFile::No
         } else {
             for match_index in matches.iter() {
-                if self.literal_pattern_indices.contains(match_index) {
+                if self
+                    .literal_pattern_indices
+                    .binary_search(match_index)
+                    .is_ok()
+                {
                     return MatchFile::Literal;
                 }
             }
@@ -85,18 +98,17 @@ impl IncludeFilter {
     }
 
     fn match_directory_impl(&self, path: &SystemPath) -> bool {
-        let Some(dfa) = &self.dfa else {
+        let Some(prefilter) = &self.dfa else {
             return true;
         };
+        let dfa = &prefilter.dfa;
 
         // Allow the root path
         if path == SystemPath::new("") {
             return true;
         }
 
-        let config_anchored =
-            regex_automata::util::start::Config::new().anchored(regex_automata::Anchored::Yes);
-        let mut state = dfa.start_state(&config_anchored).unwrap();
+        let mut state = prefilter.start_state;
 
         let byte_path = path
             .as_str()
@@ -280,7 +292,10 @@ impl IncludeFilterBuilder {
             )
             .build_many(&self.regexes);
         let dfa = if let Ok(dfa) = dfa_builder {
-            Some(dfa)
+            let config_anchored =
+                regex_automata::util::start::Config::new().anchored(regex_automata::Anchored::Yes);
+            let start_state = dfa.start_state(&config_anchored).unwrap();
+            Some(DirectoryPrefilterDfa { dfa, start_state })
         } else {
             // TODO(konsti): `regex_automata::dfa::dense::BuildError` should allow asking whether
             // is a size error
