@@ -1,15 +1,17 @@
-//! `woa_transcode_harvest` — per-route transcode bundle harvester for the
-//! WoA (Python/Flask) → woa-rs (Rust/axum) port.
+//! `ruff_python_dto_check` — config-driven extractor over
+//! `ruff_python_parser` that harvests structured DTO/route/handler facts
+//! from a Python source tree into JSON bundles, with a preflight subcommand
+//! that proposes a config from the tree itself.
 //!
-//! This crate is **additive** to ruff: it depends on `ruff_python_parser`
-//! and `ruff_python_ast` but does not modify any other crate. Ruff itself
-//! continues to work as the upstream linter.
+//! This crate is **additive** to ruff: it depends on `ruff_python_parser`,
+//! `ruff_python_ast`, and `ruff_source_file` but does not modify any other
+//! crate. Ruff and ty continue to work unchanged.
 //!
-//! Reference RFC: `AdaWorldAPI/woa-rs:rfcs/v02-005-ruff-transcode-harvester.md`
-//! Canonical schema: `AdaWorldAPI/woa-rs:rfcs/v02-005-bundle-schema.md`
+//! Originally landed as `woa_transcode_harvest` (Flask-only, WoA-shaped).
+//! Renamed and being generalized so any Python project (and any reading
+//! Claude Code session) can point it at a tree and get useful bundles.
 //!
-//! Phase 0 (current): emit identity, source range, body, decorator raw strings.
-//! Phases 1–5 will fill in auth, ORM, templates, helpers, traps, port_status.
+//! Reference design RFC: `AdaWorldAPI/woa-rs:rfcs/v02-005-ruff-transcode-harvester.md`.
 
 pub mod bundle;
 pub mod extractors;

@@ -41,7 +41,7 @@ pub struct Harvester {
 impl Harvester {
     pub fn new() -> Self {
         Self {
-            name: "woa_transcode_harvest",
+            name: "ruff_python_dto_check",
             version: HARVESTER_VERSION,
             schema_version: SCHEMA_VERSION,
         }

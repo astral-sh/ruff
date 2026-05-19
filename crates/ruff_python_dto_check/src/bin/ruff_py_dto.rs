@@ -1,21 +1,21 @@
-//! `woa-transcode` — CLI driver for the `woa_transcode_harvest` crate.
+//! `ruff-py-dto` — CLI driver for the `ruff_python_dto_check` crate.
 //!
-//! Usage:
-//!   woa-transcode harvest <WoA-root> [-o <out-dir>]
-//!   woa-transcode harvest-one <file.py>     (stdout JSON, no out-dir)
+//! Usage (current, Flask-harvest profile — generic config path lands next):
+//!   ruff-py-dto harvest <python-root> [-o <out-dir>]
+//!   ruff-py-dto harvest-one <file.py>     (stdout JSON, no out-dir)
 
 use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-use woa_transcode_harvest::{harvest_module, harvest_tree};
+use ruff_python_dto_check::{harvest_module, harvest_tree};
 
 #[derive(Parser)]
 #[command(
-    name = "woa-transcode",
-    about = "Per-route transcode bundle harvester for WoA -> woa-rs.",
-    long_about = "Reads WoA's Python sources via the ruff_python_parser and emits one JSON bundle per Flask route. See AdaWorldAPI/woa-rs:rfcs/v02-005-ruff-transcode-harvester.md."
+    name = "ruff-py-dto",
+    about = "Config-driven Python AST fact extractor (uses ruff_python_parser).",
+    long_about = "Walks a Python source tree and emits JSON bundles describing structured facts (decorated routes, class-based views, DTO-shaped classes, etc.). Today this binary runs a hardcoded Flask-route extraction profile equivalent to the original woa_transcode_harvest behavior; a generic config-driven path and a preflight subcommand are landing next."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -24,12 +24,12 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Walk an entire WoA repo root, emit one JSON per route under <out>.
+    /// Walk a Python repo root, emit one JSON per matched item under <out>.
     Harvest {
-        /// WoA repo root (the directory containing app.py / models.py).
+        /// Python repo root.
         root: PathBuf,
-        /// Output directory. One subdir per family, one JSON per route.
-        #[arg(short, long, default_value = "woa-transcode-bundles")]
+        /// Output directory. One subdir per family, one JSON per item.
+        #[arg(short, long, default_value = "ruff-py-dto-bundles")]
         out: PathBuf,
     },
     /// Harvest a single Python file and print its bundles as JSON to stdout.

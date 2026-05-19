@@ -3362,6 +3362,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruff_python_dto_check"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_source_file",
+ "ruff_text_size",
+ "serde",
+ "serde_json",
+ "walkdir",
+]
+
+[[package]]
 name = "ruff_python_formatter"
 version = "0.0.0"
 dependencies = [
@@ -5622,21 +5637,6 @@ dependencies = [
  "serde_json",
  "unicode-xid",
  "wasmparser",
-]
-
-[[package]]
-name = "woa_transcode_harvest"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "ruff_python_ast",
- "ruff_python_parser",
- "ruff_source_file",
- "ruff_text_size",
- "serde",
- "serde_json",
- "walkdir",
 ]
 
 [[package]]

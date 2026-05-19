@@ -2,7 +2,7 @@
 //! fields are extracted correctly. Extractor depth grows with later
 //! phases — this test grows with it.
 
-use woa_transcode_harvest::{bundle::DecoratorKind, harvest_module};
+use ruff_python_dto_check::{bundle::DecoratorKind, harvest_module};
 
 #[test]
 fn wo_list_identity() {
