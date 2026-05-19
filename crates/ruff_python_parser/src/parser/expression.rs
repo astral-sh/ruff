@@ -300,18 +300,22 @@ impl<'src> Parser<'src> {
                 BinaryLikeOperator::Binary(bin_op) => {
                     self.bump(TokenKind::from(bin_op));
 
-                    // The right operand is parsed by a recursive call. For
-                    // right-associative operators (`**`) this recursion is
-                    // unbounded in `a**a**a**...`, and it bypasses the guard
-                    // in `parse_lhs_expression` (that scope is exited once
-                    // the atom is parsed). Guard the recursion here too.
-                    let right = if let Some(scope) = self.enter_recursion() {
-                        let right = self.parse_binary_expression_or_higher(new_precedence, context);
-                        scope.exit(self);
-                        right
+                    let right = if new_precedence.is_right_associative() {
+                        // For right-associative operators (`**`), the right
+                        // operand recursion is unbounded in `a**a**a**...`,
+                        // and it bypasses the guard in `parse_lhs_expression`
+                        // (that scope is exited once the atom is parsed).
+                        if let Some(scope) = self.enter_recursion() {
+                            let right =
+                                self.parse_binary_expression_or_higher(new_precedence, context);
+                            scope.exit(self);
+                            right
+                        } else {
+                            self.report_recursion_limit_exceeded(self.current_token_range());
+                            self.recursion_recovery_expr()
+                        }
                     } else {
-                        self.report_recursion_limit_exceeded(self.current_token_range());
-                        self.recursion_recovery_expr()
+                        self.parse_binary_expression_or_higher(new_precedence, context)
                     };
 
                     Expr::BinOp(ast::ExprBinOp {
@@ -366,7 +370,6 @@ impl<'src> Parser<'src> {
                     | TokenKind::Await
                     | TokenKind::Lambda
                     | TokenKind::Yield
-                    | TokenKind::String
                     | TokenKind::FStringStart
                     | TokenKind::TStringStart
                     | TokenKind::Lpar
