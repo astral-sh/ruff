@@ -1,5 +1,5 @@
 //! Bundle data model — serialized JSON shape matches
-//! `WoA/.claude/v0.2/PER_ROUTE_BUNDLE_SCHEMA.md` v1.
+//! `AdaWorldAPI/woa-rs:rfcs/v02-005-bundle-schema.md` v1.
 
 use serde::Serialize;
 

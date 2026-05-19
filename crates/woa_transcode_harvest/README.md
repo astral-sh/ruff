@@ -19,7 +19,7 @@ Building the harvester here means:
 ## Spec
 
 - RFC: `AdaWorldAPI/woa-rs:rfcs/v02-005-ruff-transcode-harvester.md`
-- Schema: `AdaWorldAPI/WoA:.claude/v0.2/PER_ROUTE_BUNDLE_SCHEMA.md`
+- Schema: `AdaWorldAPI/woa-rs:rfcs/v02-005-bundle-schema.md`
 
 ## Quickstart
 

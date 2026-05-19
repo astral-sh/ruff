@@ -6,7 +6,7 @@
 //! continues to work as the upstream linter.
 //!
 //! Reference RFC: `AdaWorldAPI/woa-rs:rfcs/v02-005-ruff-transcode-harvester.md`
-//! Canonical schema: `AdaWorldAPI/WoA:.claude/v0.2/PER_ROUTE_BUNDLE_SCHEMA.md`
+//! Canonical schema: `AdaWorldAPI/woa-rs:rfcs/v02-005-bundle-schema.md`
 //!
 //! Phase 0 (current): emit identity, source range, body, decorator raw strings.
 //! Phases 1–5 will fill in auth, ORM, templates, helpers, traps, port_status.
