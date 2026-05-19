@@ -87,7 +87,7 @@ assert True, (x := 1)  # error: [redundant-assert] "Assert condition is always t
 # error: [unresolved-reference]
 reveal_type(x)  # revealed: Unknown
 
-assert False, (y := 1)  # error: [redundant-assert] "Assert condition is always false"
+assert False, (y := 1)
 
 # The `assert` statement is terminal if `test` resolves to `False`,
 # so even though we know the `msg` branch will have been taken here

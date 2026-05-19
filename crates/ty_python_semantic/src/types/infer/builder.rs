@@ -4726,6 +4726,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
 
+        if Self::is_explicit_falsy_assert(test) {
+            self.infer_optional_expression(msg.as_deref(), TypeContext::default());
+            return;
+        }
+
         if Self::is_sys_version_info_or_platform_assert(test) {
             self.infer_optional_expression(msg.as_deref(), TypeContext::default());
             return;
@@ -4752,6 +4757,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         self.infer_optional_expression(msg.as_deref(), TypeContext::default());
+    }
+
+    fn is_explicit_falsy_assert(expr: &ast::Expr) -> bool {
+        match expr {
+            ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => !value,
+            ast::Expr::NoneLiteral(_) => true,
+            ast::Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
+            ast::Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.is_empty(),
+            ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
+                ast::Number::Int(int) => *int == 0,
+                ast::Number::Float(float) => *float == 0.0,
+                ast::Number::Complex { real, imag } => *real == 0.0 && *imag == 0.0,
+            },
+            ast::Expr::Tuple(ast::ExprTuple { elts, .. })
+            | ast::Expr::List(ast::ExprList { elts, .. })
+            | ast::Expr::Set(ast::ExprSet { elts, .. }) => elts.is_empty(),
+            ast::Expr::Dict(ast::ExprDict { items, .. }) => items.is_empty(),
+            _ => false,
+        }
     }
 
     fn is_sys_version_info_or_platform_assert(expr: &ast::Expr) -> bool {

@@ -47,6 +47,24 @@ assert x == 5  # error: [redundant-assert] "Assert condition is always true"
 assert x == 6  # error: [redundant-assert] "Assert condition is always false"
 ```
 
+## Assert statements with explicit falsy literals
+
+These assertions are commonly used as unreachable code markers or abstract method bodies, so we
+don't emit `redundant-assert` for them.
+
+```py
+assert False
+assert 0
+assert 0.0
+assert 0j
+assert None
+assert ""
+assert b""
+assert ()
+assert []
+assert {}
+```
+
 ## Assert statements for version and platform checks
 
 These assertions are often used as compatibility guards for type checkers or generated modules, so
