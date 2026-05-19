@@ -1,7 +1,6 @@
 use std::cmp::Ordering;
 
 use bitflags::bitflags;
-#[cfg(debug_assertions)]
 use drop_bomb::DebugDropBomb;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{AtomicNodeIndex, Mod, ModExpression, ModModule};
@@ -758,7 +757,6 @@ impl<'src> Parser<'src> {
 /// RAII guard returned by [`Parser::enter_recursion`].
 #[must_use = "RecursionScope must be defused with `RecursionScope::exit`"]
 struct RecursionScope {
-    #[cfg(debug_assertions)]
     bomb: DebugDropBomb,
 }
 
@@ -766,7 +764,6 @@ impl RecursionScope {
     #[inline]
     fn new() -> Self {
         Self {
-            #[cfg(debug_assertions)]
             bomb: DebugDropBomb::new(
                 "RecursionScope must be defused with `RecursionScope::exit` so the parser's depth counter is restored.",
             ),
@@ -777,11 +774,8 @@ impl RecursionScope {
     #[inline]
     fn exit(self, parser: &mut Parser<'_>) {
         parser.depth_remaining += 1;
-        #[cfg(debug_assertions)]
-        {
-            let mut bomb = self.bomb;
-            bomb.defuse();
-        }
+        let mut bomb = self.bomb;
+        bomb.defuse();
     }
 }
 
