@@ -1,4 +1,5 @@
 use crate::db::{Db, ProjectDatabase};
+use crate::ignore::IgnoreFiles;
 use crate::metadata::options::ProjectOptionsOverrides;
 use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
 use crate::{ProjectMetadata, ProjectReloadResult};
@@ -7,7 +8,7 @@ use std::collections::BTreeSet;
 use crate::walk::ProjectFilesWalker;
 use ruff_db::Db as _;
 use ruff_db::file_revision::FileRevision;
-use ruff_db::files::{File, FileRootKind, Files};
+use ruff_db::files::{File, FileRootKind, Files, system_path_to_file};
 use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
 use salsa::Setter;
@@ -63,6 +64,11 @@ impl ProjectDatabase {
         let mut removed_paths = BTreeSet::default();
         let mut reload_project = false;
         let mut reload_project_files = false;
+        let mut ignore_files = project
+            .settings(self)
+            .src()
+            .respect_ignore_files
+            .then(|| IgnoreFiles::new(project.included_paths_or_root(self)));
 
         for change in changes {
             tracing::debug!("Handling file watcher change event: {:?}", change);
@@ -94,7 +100,11 @@ impl ProjectDatabase {
                                 "Reloading project files for changed ignore file at or above included path"
                             );
                             reload_project_files = true;
-                        } else if project.is_directory_included(self, directory) {
+                        } else if project.is_directory_included(self, directory)
+                            && ignore_files.as_mut().is_none_or(|ignore_files| {
+                                !ignore_files.is_ignored(self.system(), directory, true)
+                            })
+                        {
                             tracing::debug!(
                                 ignore_file = %path,
                                 directory = %directory,
@@ -110,7 +120,7 @@ impl ProjectDatabase {
                             tracing::debug!(
                                 ignore_file = %path,
                                 directory = %directory,
-                                "Ignoring changed ignore file because it doesn't affect project paths"
+                                "Ignoring changed ignore file because it doesn't affect indexed project paths"
                             );
                         }
                     }
@@ -171,24 +181,25 @@ impl ProjectDatabase {
                         }
                     }
 
-                    // Unlike other files, it's not only important to update the status of existing
-                    // and known `File`s (`sync_recursively`), it's also important to discover new files
-                    // that were added in the project's root (or any of the paths included for checking).
-                    //
-                    // This is important because `Project::check` iterates over all included files.
-                    // The code below walks the `added_paths` and adds all files that
-                    // should be included in the project. We can skip this check for
-                    // paths that aren't part of the project or shouldn't be included
-                    // when checking the project.
-                    if self.system().is_file(path) {
-                        if project.is_file_included(self, path) {
-                            // Add the parent directory because `walkdir`
-                            // always visits explicitly passed files even if
-                            // they match an exclude filter.
-                            added_paths.insert(path.parent().unwrap().to_path_buf());
+                    if !project.file_set(self).is_lazy() {
+                        if self.system().is_file(path) {
+                            if project.is_file_included_for_indexing(self, path)
+                                && ignore_files.as_mut().is_none_or(|ignore_files| {
+                                    !ignore_files.is_ignored(self.system(), path, false)
+                                })
+                                && let Ok(file) = system_path_to_file(self, path)
+                            {
+                                project.add_file(self, file);
+                            }
+                        } else if project.is_directory_included(self, path)
+                            && ignore_files.as_mut().is_none_or(|ignore_files| {
+                                !ignore_files.is_ignored(self.system(), path, true)
+                            })
+                        {
+                            // Unlike a new file, a new directory needs walking to discover
+                            // project files that exist below it.
+                            added_paths.insert(path.clone());
                         }
-                    } else if project.is_directory_included(self, path) {
-                        added_paths.insert(path.clone());
                     }
                 }
 
@@ -381,7 +392,7 @@ impl ProjectDatabase {
             }
         }
 
-        project.remove_files_under(self, deduplicate_nested_paths(removed_paths));
+        project.remove_files_under(self, removed_paths);
 
         let diagnostics = if !project.file_set(self).is_lazy()
             && let Some(walker) = ProjectFilesWalker::incremental(self, added_paths)

@@ -17,7 +17,8 @@ use ruff_db::diagnostic::{
 };
 use ruff_db::files::{File, FileRootKind};
 use ruff_db::parsed::parsed_module;
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
+use ruff_python_ast::PySourceType;
 use rustc_hash::FxHashSet;
 use salsa::{Database, Durability, Setter};
 use std::backtrace::BacktraceStatus;
@@ -30,6 +31,7 @@ use ty_python_semantic::lint::RuleSelection;
 mod db;
 mod files;
 pub mod glob;
+mod ignore;
 pub mod metadata;
 mod walk;
 pub mod watch;
@@ -240,6 +242,22 @@ impl Project {
                 .is_directory_included(path, GlobFilterCheckMode::Adhoc),
             IncludeResult::Included { .. }
         )
+    }
+
+    /// Returns `true` if `path` passes the file inclusion and source-type checks used by indexing.
+    pub(crate) fn is_file_included_for_indexing(self, db: &dyn Db, path: &SystemPath) -> bool {
+        let IncludeResult::Included { literal_match } = ProjectFilesFilter::from_project(db, self)
+            .is_file_included(path, GlobFilterCheckMode::Adhoc)
+        else {
+            return false;
+        };
+
+        literal_match == Some(true)
+            || path
+                .extension()
+                .and_then(PySourceType::try_from_extension)
+                .or_else(|| db.system().source_type(path))
+                .is_some()
     }
 
     /// Reload the project after its metadata or settings have changed.
@@ -602,10 +620,12 @@ impl Project {
         I: IntoIterator<Item = P>,
         P: AsRef<SystemPath>,
     {
-        let paths = paths
-            .into_iter()
-            .map(|path| SystemPath::absolute(path, db.system().current_directory()))
-            .collect::<BTreeSet<_>>();
+        let paths = deduplicate_nested_paths(
+            paths
+                .into_iter()
+                .map(|path| SystemPath::absolute(path, db.system().current_directory())),
+        )
+        .collect::<BTreeSet<_>>();
 
         if paths.is_empty() {
             return;
@@ -622,9 +642,10 @@ impl Project {
                 .copied()
                 .filter(|file| {
                     file.path(db).as_system_path().is_some_and(|file_path| {
-                        file_path
-                            .ancestors()
-                            .any(|ancestor| paths.contains(ancestor))
+                        paths
+                            .range(..=file_path.to_path_buf())
+                            .next_back()
+                            .is_some_and(|path| file_path.starts_with(path))
                     })
                 })
                 .collect::<Vec<_>>()
@@ -867,6 +888,7 @@ where
 mod tests {
     use crate::ProjectMetadata;
     use crate::check_file_impl;
+    use crate::db::Db as _;
     use crate::db::tests::TestDb;
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
@@ -918,5 +940,18 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn indexing_inclusion_skips_non_python_files() {
+        let root = SystemPathBuf::from("/project");
+        let project = ProjectMetadata::new(Name::new_static("test"), root.clone());
+        let db = TestDb::new(project);
+        let project = db.project();
+
+        let non_python_file = root.join("README.md");
+
+        assert!(project.is_file_included(&db, &non_python_file));
+        assert!(!project.is_file_included_for_indexing(&db, &non_python_file));
     }
 }
