@@ -281,7 +281,7 @@ fn recursion_limit_first_error_is_recursion_not_noise() {
     // When the limit is hit the outer parser frames will emit secondary
     // errors as they unwind. Callers read the first error via `into_result`
     // / `Parsed::errors()`, so `RecursionLimitExceeded` must come first, and
-    // the drain-to-EOF inside `enter_recursion` should keep the total count
+    // the drain-to-EOF after reporting the recursion limit should keep the total count
     // small rather than producing one noisy error per unwound frame.
     let src = format!("{}1{}", "(".repeat(2_000), ")".repeat(2_000));
     let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(50);

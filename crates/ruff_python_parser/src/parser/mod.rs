@@ -1,7 +1,6 @@
 use std::cmp::Ordering;
 
 use bitflags::bitflags;
-use drop_bomb::DebugDropBomb;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{AtomicNodeIndex, Mod, ModExpression, ModModule};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -95,14 +94,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Call before entering a recursive parsing function. Returns [`Some`]
-    /// holding a [`RecursionScope`] guard when the caller may recurse, and
-    /// [`None`] when the recursion limit has been hit and the caller must abort
-    /// and return a placeholder instead.
-    ///
-    /// Every returned [`RecursionScope`] must be defused with
-    /// [`RecursionScope::exit`] before being dropped. The [`DebugDropBomb`]
-    /// catches missed restores in debug builds.
+    /// Runs `f` if the recursive parser depth limit has not been hit.
     ///
     /// # Note
     ///
@@ -110,13 +102,15 @@ impl<'src> Parser<'src> {
     /// fix is to refactor the parser to avoid recursive calls.
     #[must_use]
     #[inline]
-    fn enter_recursion(&mut self) -> Option<RecursionScope> {
+    fn with_recursion<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> Option<T> {
         if self.depth_remaining == 0 {
             return None;
         }
 
         self.depth_remaining -= 1;
-        Some(RecursionScope::new())
+        let result = f(self);
+        self.depth_remaining += 1;
+        Some(result)
     }
 
     #[inline]
@@ -761,31 +755,6 @@ impl<'src> Parser<'src> {
         self.current_token_id = current_token_id;
         self.prev_token_end = prev_token_end;
         self.recovery_context = recovery_context;
-    }
-}
-
-/// RAII guard returned by [`Parser::enter_recursion`].
-#[must_use = "RecursionScope must be defused with `RecursionScope::exit`"]
-struct RecursionScope {
-    bomb: DebugDropBomb,
-}
-
-impl RecursionScope {
-    #[inline]
-    fn new() -> Self {
-        Self {
-            bomb: DebugDropBomb::new(
-                "RecursionScope must be defused with `RecursionScope::exit` so the parser's depth counter is restored.",
-            ),
-        }
-    }
-
-    /// Restore the parser's recursion budget and consume the scope.
-    #[inline]
-    fn exit(self, parser: &mut Parser<'_>) {
-        parser.depth_remaining += 1;
-        let mut bomb = self.bomb;
-        bomb.defuse();
     }
 }
 
