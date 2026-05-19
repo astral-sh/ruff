@@ -38,13 +38,6 @@ str(encoding="utf-8", object=b"M\xc3\xbcsli")
 str(b"", errors="replace")
 ```
 
-### `map(str, range(...))`
-
-```py
-reveal_type(list(map(str, range(3))))  # revealed: list[str]
-reveal_type("".join(map(str, range(3))))  # revealed: str
-```
-
 ### `range` as an ordinary `range` value
 
 ```py
