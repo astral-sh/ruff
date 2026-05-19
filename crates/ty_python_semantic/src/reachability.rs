@@ -1152,6 +1152,12 @@ pub(crate) trait DeclarationsIteratorExtension<'db> {
         db: &'db dyn Db,
         predicate: impl FnMut(DefinitionState<'db>) -> bool,
     ) -> bool;
+
+    fn first_reachable_declaration_order(
+        self,
+        db: &'db dyn Db,
+        predicate: impl FnMut(DefinitionState<'db>) -> bool,
+    ) -> Option<u32>;
 }
 
 impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
@@ -1167,11 +1173,35 @@ impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
             |DeclarationWithConstraint {
                  declaration,
                  reachability_constraint,
+                 ..
              }| {
                 predicate(declaration)
                     && !reachability_constraints
                         .evaluate(db, predicates, reachability_constraint)
                         .is_always_false()
+            },
+        )
+    }
+
+    fn first_reachable_declaration_order(
+        mut self,
+        db: &'db dyn Db,
+        mut predicate: impl FnMut(DefinitionState<'db>) -> bool,
+    ) -> Option<u32> {
+        let predicates = self.predicates();
+        let reachability_constraints = self.reachability_constraints();
+
+        self.find_map(
+            |DeclarationWithConstraint {
+                 declaration,
+                 declaration_order,
+                 reachability_constraint,
+             }| {
+                (predicate(declaration)
+                    && !reachability_constraints
+                        .evaluate(db, predicates, reachability_constraint)
+                        .is_always_false())
+                .then_some(declaration_order)
             },
         )
     }

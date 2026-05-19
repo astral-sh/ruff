@@ -1845,8 +1845,9 @@ impl<'db> StaticClassLiteral<'db> {
     ///     y: str = "hello"
     ///     z: float = field(kw_only=False, default=1.0)
     /// ```
-    /// we return a map `{"x": Field, "y": Field, "z": Field}` where each `Field` contains
-    /// the annotated type, default value (if any), and field properties.
+    /// we return a map `{"x": Field, "y": Field, "z": Field}` in class-body declaration order,
+    /// where each `Field` contains the annotated type, default value (if any), and field
+    /// properties.
     ///
     /// **Important**: The returned `Field` objects represent our full understanding of the fields,
     /// including properties inherited from class-level dataclass parameters (like `kw_only=True`)
@@ -1863,8 +1864,6 @@ impl<'db> StaticClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind<'db>,
     ) -> FxIndexMap<Name, Field<'db>> {
-        let mut attributes = FxIndexMap::default();
-
         let class_body_scope = self.body_scope(db);
         let table = place_table(db, class_body_scope);
 
@@ -1874,6 +1873,7 @@ impl<'db> StaticClassLiteral<'db> {
         let dataclass_kw_only_default = matches!(field_policy, CodeGeneratorKind::DataclassLike(_))
             .then(|| self.has_dataclass_param(db, field_policy, DataclassFlags::KW_ONLY));
         let mut kw_only_sentinel_field_seen = false;
+        let mut field_declarations = Vec::new();
 
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
             // Here, we exclude all declarations that are not annotated assignments. We need this because
@@ -1894,9 +1894,31 @@ impl<'db> StaticClassLiteral<'db> {
                 continue;
             }
 
-            let symbol = table.symbol(symbol_id);
+            // Field contents come from the declarations live at end of scope, but field order is
+            // anchored to the first reachable annotated declaration in the class body.
+            let Some(first_declaration_order) = use_def
+                .reachable_symbol_declarations(symbol_id)
+                .first_reachable_declaration_order(db, |declaration| {
+                    declaration.is_defined_and(|declaration| {
+                        matches!(
+                            declaration.kind(db),
+                            DefinitionKind::AnnotatedAssignment(..)
+                        )
+                    })
+                })
+            else {
+                continue;
+            };
 
             let result = place_from_declarations(db, declarations.clone());
+            field_declarations.push((first_declaration_order, symbol_id, result));
+        }
+
+        field_declarations.sort_by_key(|(first_declaration_order, _, _)| *first_declaration_order);
+
+        let mut attributes = FxIndexMap::default();
+        for (_, symbol_id, result) in field_declarations {
+            let symbol = table.symbol(symbol_id);
             let first_declaration = result.first_declaration;
             let attr = result.ignore_conflicting_declarations();
             if attr.is_class_var() {

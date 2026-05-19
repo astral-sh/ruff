@@ -863,6 +863,8 @@ impl<'map, 'db> DeclarationsIterator<'map, 'db> {
 #[derive(Debug, Clone)]
 pub struct DeclarationWithConstraint<'db> {
     pub declaration: DefinitionState<'db>,
+    /// Stable declaration order within the containing scope.
+    pub declaration_order: u32,
     pub reachability_constraint: ScopedReachabilityConstraintId,
 }
 
@@ -877,6 +879,7 @@ impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
              }| {
                 DeclarationWithConstraint {
                     declaration: self.all_definitions[*declaration],
+                    declaration_order: declaration.as_u32(),
                     reachability_constraint: *reachability_constraint,
                 }
             },
