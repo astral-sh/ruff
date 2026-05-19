@@ -113,11 +113,6 @@ impl<'src> Parser<'src> {
         Some(result)
     }
 
-    #[inline]
-    fn current_nesting_exceeds_recursion_limit(&self) -> bool {
-        self.tokens.nesting() > self.max_nesting_depth
-    }
-
     #[cold]
     #[inline(never)]
     fn report_recursion_limit_exceeded<R: Ranged>(&mut self, ranged: R) {

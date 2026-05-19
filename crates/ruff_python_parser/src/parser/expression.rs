@@ -732,14 +732,14 @@ impl<'src> Parser<'src> {
         loop {
             lhs = match self.current_token_kind() {
                 TokenKind::Lpar => {
-                    if self.current_nesting_exceeds_recursion_limit() {
+                    if self.tokens.nesting() > self.max_nesting_depth {
                         self.report_recursion_limit_exceeded(self.current_token_range());
                         break lhs;
                     }
                     Expr::Call(self.parse_call_expression(lhs, start))
                 }
                 TokenKind::Lsqb => {
-                    if self.current_nesting_exceeds_recursion_limit() {
+                    if self.tokens.nesting() > self.max_nesting_depth {
                         self.report_recursion_limit_exceeded(self.current_token_range());
                         break lhs;
                     }
