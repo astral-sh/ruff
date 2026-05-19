@@ -203,6 +203,12 @@ d5_dict: dict[Hashable, Callable[..., object]] = dict(x=lambda: 1)
 
 d6_dict: TD = {"x": 1} | {"x": 2}
 
+type IntFloatDict = dict[int, float]
+type TypedDictOrDictAlias = TD | IntFloatDict
+
+# The `dict[int, float]` fallback should still win when it is wrapped in an alias.
+d7_alias_fallback: TypedDictOrDictAlias = {1: 5.2}
+
 def return_literal() -> TD:
     return {"x": 1}
 
