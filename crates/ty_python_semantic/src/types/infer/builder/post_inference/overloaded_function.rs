@@ -9,10 +9,11 @@ use crate::{
     Db,
     place::{DefinedPlace, Definedness, Place, place_from_bindings},
     types::{
-        KnownClass, Type, binding_type,
+        KnownClass, Type,
         context::InferContext,
         diagnostic::INVALID_OVERLOAD,
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
+        infer::original_class_type,
         signatures::{ParameterConsistency, ReturnTypeConsistency},
     },
 };
@@ -134,13 +135,12 @@ pub(crate) fn check_overloaded_function<'db>(
             )
         }) {
             implementation_required = false;
-        } else if let NodeWithScopeKind::Class(class_node_ref) = scope {
-            let class = binding_type(
+        } else if let NodeWithScopeKind::Class(class_node_ref) = scope
+            && let Some(class) = original_class_type(
                 db,
                 index.expect_single_definition(class_node_ref.node(context.module())),
             )
-            .expect_class_literal();
-
+        {
             if class.is_protocol(db)
                 || (Type::ClassLiteral(class)
                     .is_subtype_of(db, KnownClass::ABCMeta.to_instance(db))

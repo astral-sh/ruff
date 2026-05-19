@@ -1411,6 +1411,7 @@ impl<'db> Type<'db> {
         }
     }
 
+    #[cfg(test)]
     #[track_caller]
     pub(crate) const fn expect_class_literal(self) -> ClassLiteral<'db> {
         self.as_class_literal()

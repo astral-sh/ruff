@@ -14,6 +14,7 @@ use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
     Solutions,
 };
+use crate::types::infer::original_class_type;
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
@@ -346,9 +347,7 @@ impl<'db> GenericContext<'db> {
         match node {
             NodeWithScopeKind::Class(class) => {
                 let definition = index.expect_single_definition(class);
-                binding_type(db, definition)
-                    .as_class_literal()?
-                    .generic_context(db)
+                original_class_type(db, definition)?.generic_context(db)
             }
             NodeWithScopeKind::Function(function) => {
                 let definition = index.expect_single_definition(function);
