@@ -471,7 +471,7 @@ class OrderedChild(Parent):  # error: [subclass-of-dataclass-with-order]
     y: str
 ```
 
-If the child class manually overrides all comparison methods, the diagnostic is also suppressed:
+If the child class manually overrides all comparison methods, the diagnostic is suppressed:
 
 ```py
 class ManualChild(Parent):  # No warning - all comparison methods overridden

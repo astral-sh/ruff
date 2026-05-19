@@ -858,7 +858,14 @@ class OrderedChild(OrderedParent):  # error: [subclass-of-dataclass-with-order]
     y: str
 ```
 
-If the child class manually overrides all comparison methods, the diagnostic is also suppressed:
+Descendants of an ordered dataclass-like child are warned as well:
+
+```py
+class Grandchild(OrderedChild):  # error: [subclass-of-dataclass-with-order]
+    pass
+```
+
+If the child class manually overrides all comparison methods, the diagnostic is suppressed:
 
 ```py
 class ManualChild(OrderedParent):
