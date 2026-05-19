@@ -2,7 +2,7 @@ use itertools::Itertools;
 use ruff_python_ast::{self as ast, HasNodeIndex};
 use rustc_hash::FxHashMap;
 
-use super::{ArgExpr, TypeInferenceBuilder};
+use super::{ArgExpr, TypeInferenceBuilder, TypedDictUnionElements};
 use crate::types::typed_dict::{
     extract_unpacked_typed_dict_keys_from_value_type, infer_unpacked_keyword_types,
     validate_typed_dict_constructor,
@@ -23,11 +23,33 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Fast-path dict(...) in TypedDict context: infer keyword values against fields,
         // then validate and return the TypedDict type. This also covers `dict(**src)` when `src`
         // is `TypedDict`-shaped.
-        if let Some(tcx) = call_expression_tcx.annotation
-            && let Some(typed_dict) = tcx
-                .filter_union(self.db(), Type::is_typed_dict)
-                .as_typed_dict()
-        {
+        let typed_dict = call_expression_tcx.annotation.and_then(|annotation| {
+            match annotation.resolve_type_alias(self.db()) {
+                Type::TypedDict(typed_dict) => Some(typed_dict),
+                Type::Union(union) => {
+                    let union_elements =
+                        TypedDictUnionElements::from_union(self, union, |builder, element| {
+                            // Suppress the TypedDict fast path only if this dict call is assignable
+                            // to the non-TypedDict arm of the union.
+                            let mut speculative_builder = builder.speculate();
+                            speculative_builder
+                                .infer_keyword_only_dict_call(
+                                    func,
+                                    arguments,
+                                    TypeContext::new(Some(element)),
+                                )
+                                .is_some_and(|ty| {
+                                    ty.is_assignable_to(speculative_builder.db(), element)
+                                })
+                        });
+
+                    union_elements.single_typed_dict_without_fallback()
+                }
+                _ => None,
+            }
+        });
+
+        if let Some(typed_dict) = typed_dict {
             // Only speculate the `**kwargs` applicability check. Assignability handles inputs that
             // are already valid for the target, including gradual and bottom types. The additional
             // TypedDict-shape check keeps invalid-but-analyzable unpacks on this path so validation
