@@ -4979,6 +4979,21 @@ class Foo(TypedDict("Foo", {"x": int, "y": str})):
     pass
 ```
 
+Other class decorators can replace the public TypedDict binding:
+
+```py
+from typing import TypedDict
+
+class ReplacesClass:
+    def __init__(self, cls: type[object]) -> None: ...
+
+@ReplacesClass
+class Decorated(TypedDict):
+    name: str
+
+reveal_type(Decorated)  # revealed: ReplacesClass
+```
+
 ## Class header validation
 
 <!-- snapshot-diagnostics -->
