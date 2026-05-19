@@ -2,8 +2,8 @@ use std::fmt;
 
 use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::Decorator;
 use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::{self as ast, Decorator, Expr};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -112,20 +112,24 @@ impl fmt::Display for KnownDecorator {
 }
 
 fn classify_decorator(checker: &Checker, decorator: &Decorator) -> Option<KnownDecorator> {
-    let qualified_name = checker
-        .semantic()
-        .resolve_qualified_name(map_callable(&decorator.expression))?;
+    let callable = map_callable(&decorator.expression);
+
+    // `@x.setter` / `.getter` / `.deleter` return a `property` object.
+    if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = callable
+        && matches!(attr.as_str(), "setter" | "getter" | "deleter")
+    {
+        return Some(KnownDecorator::Property);
+    }
+
+    let qualified_name = checker.semantic().resolve_qualified_name(callable)?;
+    // `abc.abstractproperty` / `abstractclassmethod` / `abstractstaticmethod`
+    // are intentionally omitted: they are themselves abstract, so wrapping
+    // with `@abstractmethod` is redundant but not an error.
     match qualified_name.segments() {
         ["abc", "abstractmethod"] => Some(KnownDecorator::AbstractMethod),
-        ["" | "builtins", "property"] | ["abc", "abstractproperty"] => {
-            Some(KnownDecorator::Property)
-        }
-        ["" | "builtins", "classmethod"] | ["abc", "abstractclassmethod"] => {
-            Some(KnownDecorator::ClassMethod)
-        }
-        ["" | "builtins", "staticmethod"] | ["abc", "abstractstaticmethod"] => {
-            Some(KnownDecorator::StaticMethod)
-        }
+        ["" | "builtins", "property"] => Some(KnownDecorator::Property),
+        ["" | "builtins", "classmethod"] => Some(KnownDecorator::ClassMethod),
+        ["" | "builtins", "staticmethod"] => Some(KnownDecorator::StaticMethod),
         ["contextlib", "contextmanager"] => Some(KnownDecorator::ContextManager),
         ["contextlib", "asynccontextmanager"] => Some(KnownDecorator::AsyncContextManager),
         ["functools", "cache"] => Some(KnownDecorator::FunctoolsCache),
@@ -146,7 +150,7 @@ fn is_incorrect_order(outer: KnownDecorator, inner: KnownDecorator) -> bool {
         | (KnownDecorator::ContextManager | KnownDecorator::AsyncContextManager, KnownDecorator::ClassMethod)
         // Caching decorators must not wrap descriptors
         | (KnownDecorator::FunctoolsCache | KnownDecorator::FunctoolsLruCache, KnownDecorator::Property | KnownDecorator::ClassMethod | KnownDecorator::FunctoolsCachedProperty)
-        // @classmethod conflicts with @cached_property
-        | (KnownDecorator::ClassMethod, KnownDecorator::FunctoolsCachedProperty)
+        // @cached_property outside @abstractmethod silently empties `__abstractmethods__`
+        | (KnownDecorator::FunctoolsCachedProperty, KnownDecorator::AbstractMethod)
     )
 }

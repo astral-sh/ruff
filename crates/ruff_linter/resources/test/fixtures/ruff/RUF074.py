@@ -69,11 +69,6 @@ class LruCacheAboveCachedProperty:
     @cached_property
     def foo(self): ...
 
-class ClassmethodAboveCachedProperty:
-    @classmethod  # RUF074
-    @cached_property
-    def foo(cls): ...
-
 # --- Qualified imports ---
 
 class QualifiedAbstractAboveProperty:
@@ -85,23 +80,6 @@ class QualifiedLruCacheAboveProperty:
     @functools.lru_cache  # RUF074
     @property
     def foo(self): ...
-
-# --- Deprecated abc forms ---
-
-class DeprecatedAbstractPropertyBelowAbstractmethod:
-    @abstractmethod  # RUF074
-    @abstractproperty
-    def foo(self): ...
-
-class DeprecatedAbstractClassmethodBelowAbstractmethod:
-    @abstractmethod  # RUF074
-    @abstractclassmethod
-    def foo(cls): ...
-
-class DeprecatedAbstractStaticmethodBelowAbstractmethod:
-    @abstractmethod  # RUF074
-    @abstractstaticmethod
-    def foo(): ...
 
 # --- Decorator call form ---
 
@@ -123,6 +101,29 @@ class MultipleViolations:
     @contextmanager  # RUF074
     @classmethod
     def foo(cls): ...
+
+class CachedPropertyAboveAbstractmethod:
+    @cached_property  # RUF074
+    @abstractmethod
+    def foo(self): ...
+
+class AbstractAbovePropertySetter:
+    @property
+    @abstractmethod
+    def foo(self): ...
+
+    @abstractmethod  # RUF074
+    @foo.setter
+    def foo(self, val): ...
+
+class AbstractAbovePropertyDeleter:
+    @property
+    @abstractmethod
+    def foo(self): ...
+
+    @abstractmethod  # RUF074
+    @foo.deleter
+    def foo(self): ...
 
 # ===== No errors =====
 
@@ -178,11 +179,6 @@ class CorrectAbstractmethodAboveCachedProperty:
     @cached_property
     def foo(self): ...
 
-class CachedPropertyAboveAbstractmethod:
-    @cached_property
-    @abstractmethod
-    def foo(self): ...
-
 # --- Non-adjacent known-bad pair (only adjacent pairs are checked) ---
 
 class InterleavedDecorator:
@@ -225,3 +221,32 @@ class WrapsWithAnything:
     @abstractmethod
     @wraps(some_func)
     def bar(self): ...
+
+class ClassmethodAboveCachedProperty:
+    @classmethod
+    @cached_property
+    def foo(cls): ...
+
+class DeprecatedAbstractPropertyBelowAbstractmethod:
+    @abstractmethod
+    @abstractproperty
+    def foo(self): ...
+
+class DeprecatedAbstractClassmethodBelowAbstractmethod:
+    @abstractmethod
+    @abstractclassmethod
+    def foo(cls): ...
+
+class DeprecatedAbstractStaticmethodBelowAbstractmethod:
+    @abstractmethod
+    @abstractstaticmethod
+    def foo(): ...
+
+class CorrectPropertySetterAboveAbstractmethod:
+    @property
+    @abstractmethod
+    def foo(self): ...
+
+    @foo.setter
+    @abstractmethod
+    def foo(self, val): ...
