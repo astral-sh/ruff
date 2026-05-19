@@ -1379,6 +1379,28 @@ pub(crate) fn evaluate_reachability_with_cache<'db>(
     }
 }
 
+/// Returns the reachability graph size to use for loop-header exactness cutoffs.
+///
+/// `IsNonEmptyIterable` predicates are emitted for every `for` loop because deciding whether the
+/// iterable is a known `range` is semantic, not syntactic. They do not narrow any places, and for
+/// non-`range` iterables they collapse to the ambiguous branch during reachability evaluation, so
+/// they should not by themselves force loop-header inference to fall back to `Unknown`.
+pub(crate) fn loop_header_reachability_node_count(use_def: &UseDefMap) -> usize {
+    let predicates = use_def.predicates();
+
+    use_def
+        .reachability_constraints()
+        .used_interiors()
+        .iter()
+        .filter(|node| {
+            !matches!(
+                predicates[node.atom()].node,
+                PredicateNode::IsNonEmptyIterable(_)
+            )
+        })
+        .count()
+}
+
 pub(crate) trait DeclarationsIteratorExtension<'db> {
     fn any_reachable(
         self,

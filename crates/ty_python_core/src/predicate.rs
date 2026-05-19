@@ -130,6 +130,10 @@ pub enum PredicateNode<'db> {
     /// positives.
     IsNonTerminalCall(CallableAndCallExpr<'db>),
     /// A `for` iterable that may be statically known to be non-empty.
+    ///
+    /// This is resolved semantically during type checking. The semantic index records it for
+    /// every `for` loop because it cannot know whether the iterable expression is a known
+    /// non-empty `range`.
     IsNonEmptyIterable(Expression<'db>),
     Pattern(PatternPredicate<'db>),
     SubjectElementPattern(SubjectElementPatternPredicate<'db>),
