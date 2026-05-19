@@ -6164,9 +6164,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let union_elements = union.elements(self.db());
                 let typed_dicts = union_elements
                     .iter()
-                    .filter_map(|element| element.as_typed_dict())
+                    .filter_map(|element| element.resolve_type_alias(self.db()).as_typed_dict())
                     .collect_vec();
                 let has_dict_compatible_fallback = union_elements.iter().any(|element| {
+                    let element = element.resolve_type_alias(self.db());
                     !element.is_typed_dict() && element.is_instance_of(self.db(), KnownClass::Dict)
                 });
 
