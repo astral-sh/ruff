@@ -13,7 +13,6 @@ use crate::{
             InferenceFlags, TypeInferenceBuilder,
             builder::{BoundOrConstraintsNodes, DeclaredAndInferredType, DeferredExpressionState},
         },
-        todo_type,
         typevar::{
             TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
             TypeVarIdentity, TypeVarInstance,
@@ -659,16 +658,320 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ast::TypeParamTypeVarTuple {
             range: _,
             node_index: _,
-            name: _,
+            name,
             default,
         } = node;
-        self.infer_optional_expression(default.as_deref(), TypeContext::default());
-        let pep_695_todo = todo_type!("PEP-695 TypeVarTuple definition types");
+
+        let db = self.db();
+
+        if default.is_some() {
+            self.deferred.insert(definition);
+        }
+        let identity = TypeVarIdentity::new(
+            db,
+            &name.id,
+            Some(definition),
+            TypeVarKind::Pep695TypeVarTuple,
+        );
+        let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
+            db,
+            identity,
+            None,
+            None, // explicit_variance
+            default.as_deref().map(|_| TypeVarDefaultEvaluation::Lazy),
+        )));
         self.add_declaration_with_binding(
             node.into(),
             definition,
-            &DeclaredAndInferredType::are_the_same_type(pep_695_todo),
+            &DeclaredAndInferredType::are_the_same_type(ty),
         );
+    }
+
+    pub(super) fn infer_typevartuple_deferred(&mut self, node: &ast::TypeParamTypeVarTuple) {
+        let ast::TypeParamTypeVarTuple {
+            range: _,
+            node_index: _,
+            name,
+            default: Some(default),
+        } = node
+        else {
+            return;
+        };
+        let previous_deferred_state =
+            std::mem::replace(&mut self.deferred_state, DeferredExpressionState::Deferred);
+        self.infer_typevartuple_default(default, Some(&name.id));
+        self.deferred_state = previous_deferred_state;
+    }
+
+    pub(super) fn infer_typevartuple_default(
+        &mut self,
+        default_expr: &ast::Expr,
+        typevartuple_name: Option<&str>,
+    ) {
+        let previously_in_valid_unpack_context = self
+            .context
+            .inference_flags
+            .replace(InferenceFlags::IN_VALID_UNPACK_CONTEXT, true);
+        let default_ty = self.infer_type_expression(default_expr);
+        self.context.inference_flags.set(
+            InferenceFlags::IN_VALID_UNPACK_CONTEXT,
+            previously_in_valid_unpack_context,
+        );
+
+        if let Some(name) = typevartuple_name
+            && self.check_default_for_outer_scope_typevars(default_ty, default_expr, name)
+        {
+            return;
+        }
+
+        if default_ty.exact_tuple_instance_spec(self.db()).is_none()
+            && !matches!(
+                default_ty,
+                Type::TypeVar(typevar) if typevar.is_typevartuple(self.db())
+            )
+            && let Some(builder) = self
+                .context
+                .report_lint(&INVALID_LEGACY_TYPE_VARIABLE, default_expr)
+        {
+            builder.into_diagnostic(
+                "The default value for `TypeVarTuple` must be an unpacked tuple type \
+                    or another TypeVarTuple",
+            );
+        }
+    }
+
+    pub(super) fn infer_legacy_typevartuple(
+        &mut self,
+        target: &ast::Expr,
+        call_expr: &ast::ExprCall,
+        definition: Definition<'db>,
+    ) -> Type<'db> {
+        fn error<'db>(
+            context: &InferContext<'db, '_>,
+            message: impl std::fmt::Display,
+            node: impl Ranged,
+        ) -> Type<'db> {
+            if let Some(builder) = context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, node) {
+                builder.into_diagnostic(message);
+            }
+            KnownClass::TypeVarTuple.to_instance(context.db())
+        }
+
+        let db = self.db();
+        let arguments = &call_expr.arguments;
+        let python_version = Program::get(db).python_version(db);
+
+        let mut default = None;
+        let mut covariant = false;
+        let mut contravariant = false;
+        let mut infer_variance = false;
+        let mut name_param_ty = None;
+        let mut name_param_node = None;
+
+        if arguments.args.len() > 1 {
+            return error(
+                &self.context,
+                "`TypeVarTuple` can only have one positional argument",
+                call_expr,
+            );
+        }
+
+        if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
+            return error(
+                &self.context,
+                "Starred arguments are not supported in `TypeVarTuple` creation",
+                starred,
+            );
+        }
+
+        for kwarg in &arguments.keywords {
+            let Some(identifier) = kwarg.arg.as_ref() else {
+                return error(
+                    &self.context,
+                    "Starred arguments are not supported in `TypeVarTuple` creation",
+                    kwarg,
+                );
+            };
+            match identifier.id().as_str() {
+                "name" => {
+                    if !arguments.args.is_empty() {
+                        return error(
+                            &self.context,
+                            "The `name` parameter of `TypeVarTuple` can only be provided once",
+                            kwarg,
+                        );
+                    }
+                    name_param_node = Some(&kwarg.value);
+                    name_param_ty =
+                        Some(self.infer_expression(&kwarg.value, TypeContext::default()));
+                }
+                "default" => {
+                    if python_version < PythonVersion::PY313 && !self.in_stub() {
+                        error(
+                            &self.context,
+                            "The `default` parameter of `typing.TypeVarTuple` was added in Python 3.13",
+                            kwarg,
+                        );
+                    }
+                    default = Some(TypeVarDefaultEvaluation::Lazy);
+                }
+                "bound" => {
+                    return error(
+                        &self.context,
+                        "The `bound` argument for `TypeVarTuple` is not supported",
+                        call_expr,
+                    );
+                }
+                "covariant" => {
+                    match self
+                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .bool(db)
+                    {
+                        Truthiness::AlwaysTrue => covariant = true,
+                        Truthiness::AlwaysFalse => {}
+                        Truthiness::Ambiguous => {
+                            return error(
+                                &self.context,
+                                "The `covariant` parameter of `TypeVarTuple` \
+                                cannot have an ambiguous truthiness",
+                                &kwarg.value,
+                            );
+                        }
+                    }
+                }
+                "contravariant" => {
+                    match self
+                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .bool(db)
+                    {
+                        Truthiness::AlwaysTrue => contravariant = true,
+                        Truthiness::AlwaysFalse => {}
+                        Truthiness::Ambiguous => {
+                            return error(
+                                &self.context,
+                                "The `contravariant` parameter of `TypeVarTuple` \
+                                cannot have an ambiguous truthiness",
+                                &kwarg.value,
+                            );
+                        }
+                    }
+                }
+                "infer_variance" => {
+                    if python_version < PythonVersion::PY312 && !self.in_stub() {
+                        error(
+                            &self.context,
+                            "The `infer_variance` parameter of `typing.TypeVarTuple` was added in Python 3.12",
+                            kwarg,
+                        );
+                    }
+                    match self
+                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .bool(db)
+                    {
+                        Truthiness::AlwaysTrue => infer_variance = true,
+                        Truthiness::AlwaysFalse => {}
+                        Truthiness::Ambiguous => {
+                            return error(
+                                &self.context,
+                                "The `infer_variance` parameter of `TypeVarTuple` \
+                                cannot have an ambiguous truthiness",
+                                &kwarg.value,
+                            );
+                        }
+                    }
+                }
+                name => {
+                    error(
+                        &self.context,
+                        format_args!(
+                            "Unknown keyword argument `{name}` in `TypeVarTuple` creation"
+                        ),
+                        kwarg,
+                    );
+                    self.infer_expression(&kwarg.value, TypeContext::default());
+                }
+            }
+        }
+
+        let variance = match (covariant, contravariant, infer_variance) {
+            (true, true, _) => {
+                return error(
+                    &self.context,
+                    "A `TypeVarTuple` cannot be both covariant and contravariant",
+                    call_expr,
+                );
+            }
+            (true, false, true) | (false, true, true) => {
+                return error(
+                    &self.context,
+                    "A `TypeVarTuple` cannot specify variance when `infer_variance=True`",
+                    call_expr,
+                );
+            }
+            (true, false, false) => Some(TypeVarVariance::Covariant),
+            (false, true, false) => Some(TypeVarVariance::Contravariant),
+            (false, false, false) => Some(TypeVarVariance::Invariant),
+            (false, false, true) => None,
+        };
+
+        let Some(name_param_ty) = name_param_ty.or_else(|| {
+            arguments
+                .find_positional(0)
+                .map(|arg| self.infer_expression(arg, TypeContext::default()))
+        }) else {
+            return error(
+                &self.context,
+                "The `name` parameter of `TypeVarTuple` is required.",
+                call_expr,
+            );
+        };
+
+        let Some(name_param) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
+            return error(
+                &self.context,
+                "The first argument to `TypeVarTuple` must be a string literal",
+                call_expr,
+            );
+        };
+        let name_param_node = name_param_node.or_else(|| arguments.find_positional(0));
+
+        let ast::Expr::Name(ast::ExprName {
+            id: target_name, ..
+        }) = target
+        else {
+            return error(
+                &self.context,
+                "A `TypeVarTuple` definition must be a simple variable assignment",
+                target,
+            );
+        };
+
+        if name_param != target_name {
+            report_mismatched_type_name(
+                &self.context,
+                name_param_node
+                    .map(Ranged::range)
+                    .unwrap_or_else(|| call_expr.range()),
+                "TypeVarTuple",
+                target_name,
+                Some(name_param),
+                name_param_ty,
+            );
+        }
+
+        if default.is_some() {
+            self.deferred.insert(definition);
+        }
+
+        let identity = TypeVarIdentity::new(
+            db,
+            target_name.clone(),
+            Some(definition),
+            TypeVarKind::TypeVarTuple,
+        );
+        Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
+            db, identity, None, variance, default,
+        )))
     }
 
     pub(super) fn infer_legacy_paramspec(

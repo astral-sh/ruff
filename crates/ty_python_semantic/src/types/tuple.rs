@@ -1132,6 +1132,32 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> TupleSpec<'db> {
+        if let Type::TypeVar(typevar) = self.variable()
+            && typevar.is_typevartuple(db)
+        {
+            let prefix = self
+                .prefix_elements()
+                .iter()
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+            let suffix = self
+                .suffix_elements()
+                .iter()
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+            let mapped =
+                Type::TypeVar(typevar).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+            if let Some(mapped_tuple) = mapped.exact_tuple_instance_spec(db) {
+                let mut builder = TupleSpecBuilder::with_capacity(self.elements.len());
+                for element in prefix {
+                    builder.push(element);
+                }
+                builder = builder.concat(db, &mapped_tuple);
+                for element in suffix {
+                    builder.push(element);
+                }
+                return builder.build();
+            }
+        }
+
         Self::mixed(
             self.prefix_elements()
                 .iter()
@@ -1706,6 +1732,15 @@ impl<'db> TupleSpecBuilder<'db> {
             TupleSpecBuilder::Fixed(elements) => elements.push(element),
             TupleSpecBuilder::Variable { suffix, .. } => suffix.push(element),
         }
+    }
+
+    pub(crate) fn concat_variadic_typevar(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> Self {
+        let other = VariableLengthTuple::mixed([], Type::TypeVar(typevar), []);
+        self.concat(db, &other)
     }
 
     /// Concatenates another tuple to the end of this tuple, returning a new tuple.

@@ -30,6 +30,7 @@ use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
+use crate::types::tuple::Tuple;
 use crate::types::typed_dict::{
     UnpackedTypedDictKey, extract_unpacked_typed_dict_keys_from_kwargs_annotation,
     extract_unpacked_typed_dict_keys_from_value_type,
@@ -3573,12 +3574,69 @@ impl<'db> Parameters<'db> {
         // Parameters are in contravariant position, so we need to flip the type mapping.
         let type_mapping = type_mapping.flip();
 
+        if !self
+            .value
+            .iter()
+            .any(|param| param.is_variadic() && param.has_starred_annotation())
+        {
+            return Self {
+                value: self
+                    .value
+                    .iter()
+                    .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
+                    .collect(),
+                kind: self.kind,
+            };
+        }
+
+        let mut expanded = false;
+        let mut value = Vec::with_capacity(self.value.len());
+        for param in &self.value {
+            let mapped = param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor);
+            if mapped.is_variadic()
+                && mapped.has_starred_annotation()
+                && let Some(tuple) = mapped.annotated_type().exact_tuple_instance_spec(db)
+            {
+                expanded = true;
+                match tuple.as_ref() {
+                    Tuple::Fixed(tuple) => {
+                        value.extend(
+                            tuple
+                                .iter_all_elements()
+                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
+                        );
+                    }
+                    Tuple::Variable(variable) => {
+                        value.extend(
+                            variable
+                                .iter_prefix_elements()
+                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
+                        );
+                        let name = mapped
+                            .name()
+                            .cloned()
+                            .unwrap_or_else(|| Name::new_static("args"));
+                        value.push(
+                            Parameter::variadic(name).with_annotated_type(variable.variable()),
+                        );
+                        value.extend(
+                            variable
+                                .iter_suffix_elements()
+                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
+                        );
+                    }
+                }
+            } else {
+                value.push(mapped);
+            }
+        }
+
+        if expanded {
+            return Self::new(db, value);
+        }
+
         Self {
-            value: self
-                .value
-                .iter()
-                .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
-                .collect(),
+            value,
             kind: self.kind,
         }
     }
@@ -3841,6 +3899,11 @@ impl<'db> Parameter<'db> {
         self
     }
 
+    pub(crate) fn with_starred_annotation(mut self) -> Self {
+        self.annotation_kind = ParameterAnnotationKind::Starred;
+        self
+    }
+
     pub(crate) fn with_default_type(mut self, default: Type<'db>) -> Self {
         match &mut self.kind {
             ParameterKind::PositionalOnly { default_type, .. }
@@ -3999,28 +4062,29 @@ impl<'db> Parameter<'db> {
         let index = semantic_index(db, function_definition.file(db));
         let definition = Some(index.expect_single_definition(parameter));
 
-        let (annotated_type, inferred_annotation, has_starred_annotation) =
+        let (annotated_type, inferred_annotation, annotation_flags, has_starred_annotation) =
             if let Some(annotation) = parameter.annotation() {
                 (
                     function_signature_expression_type(db, function_definition, annotation),
                     false,
+                    function_signature_type_expression_flags(db, function_definition, annotation),
                     annotation.is_starred_expr(),
                 )
             } else {
-                (Type::unknown(), true, false)
+                (Type::unknown(), true, TypeExpressionFlags::empty(), false)
             };
+        let has_unpacked_variadic_annotation = matches!(&kind, ParameterKind::Variadic { .. })
+            && annotation_flags.contains(TypeExpressionFlags::UNPACK);
         let is_unpacked_typed_dict_kwargs = matches!(&kind, ParameterKind::KeywordVariadic { .. })
-            && parameter.annotation().is_some_and(|annotation| {
-                extract_unpacked_typed_dict_keys_from_kwargs_annotation(
-                    db,
-                    annotated_type,
-                    function_signature_type_expression_flags(db, function_definition, annotation),
-                )
-                .is_some()
-            });
+            && extract_unpacked_typed_dict_keys_from_kwargs_annotation(
+                db,
+                annotated_type,
+                annotation_flags,
+            )
+            .is_some();
         let annotation_kind = if is_unpacked_typed_dict_kwargs {
             ParameterAnnotationKind::UnpackedTypedDictKwargs
-        } else if has_starred_annotation {
+        } else if has_starred_annotation || has_unpacked_variadic_annotation {
             ParameterAnnotationKind::Starred
         } else {
             ParameterAnnotationKind::Normal
@@ -4110,8 +4174,9 @@ impl<'db> Parameter<'db> {
         self.definition
     }
 
-    /// Return `true` if this parameter has a starred annotation,
-    /// e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...], bytes]`
+    /// Return `true` if this parameter has an unpacked variadic annotation,
+    /// e.g. `*args: *Ts`, `*args: Unpack[Ts]`, or
+    /// `*args: *tuple[int, *tuple[str, ...], bytes]`.
     pub(crate) fn has_starred_annotation(&self) -> bool {
         matches!(self.annotation_kind, ParameterAnnotationKind::Starred)
     }

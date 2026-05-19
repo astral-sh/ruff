@@ -23,7 +23,7 @@ use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
 use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
-use crate::types::tuple::{Tuple, TupleType};
+use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType};
 use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::{
     BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
@@ -337,6 +337,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     return Type::KnownInstance(KnownInstanceType::Callable(callable));
                 }
+                SpecialFormType::Unpack => {
+                    self.store_type_expression_flags(
+                        ast::ExprRef::from(subscript),
+                        TypeExpressionFlags::UNPACK,
+                    );
+
+                    let previously_in_unpack_type_argument = self
+                        .context
+                        .inference_flags
+                        .replace(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT, true);
+                    let inner_ty = self.infer_type_expression(slice);
+                    self.context.inference_flags.set(
+                        InferenceFlags::IN_UNPACK_TYPE_ARGUMENT,
+                        previously_in_unpack_type_argument,
+                    );
+
+                    return if matches!(
+                        inner_ty,
+                        Type::TypeVar(typevar) if typevar.is_typevartuple(db)
+                    ) || inner_ty.exact_tuple_instance_spec(db).is_some()
+                    {
+                        inner_ty
+                    } else {
+                        todo_type!("`Unpack[]` special form")
+                    };
+                }
                 SpecialFormType::LegacyStdlibAlias(alias) => {
                     let AliasSpec {
                         class,
@@ -513,6 +539,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         /// A type argument after expanding any allowed `Unpack[tuple[...]]` syntax.
+        #[derive(Clone, Copy)]
         struct TypeArgument<'ast, 'db> {
             /// The source expression used for diagnostics and deferred inference.
             node: &'ast ast::Expr,
@@ -541,11 +568,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let typevars = generic_context.variables(db).collect::<Vec<_>>();
         let typevars_len = typevars.len();
+        let typevartuple_index = typevars
+            .iter()
+            .position(|typevar| typevar.is_typevartuple(db));
 
         let mut expanded_type_arguments = Vec::with_capacity(type_arguments.len());
 
         for (source_index, expr) in type_arguments.iter().enumerate() {
-            let typevar = typevars.get(expanded_type_arguments.len()).copied();
+            let typevar = if let Some(typevartuple_index) = typevartuple_index {
+                let suffix_len = typevars_len - typevartuple_index - 1;
+                let suffix_source_start = type_arguments.len().saturating_sub(suffix_len);
+                if suffix_len > 0
+                    && type_arguments.len() >= typevartuple_index + suffix_len
+                    && source_index >= suffix_source_start
+                {
+                    let suffix_index = source_index - suffix_source_start;
+                    typevars
+                        .get(typevars_len - suffix_len + suffix_index)
+                        .copied()
+                } else {
+                    typevars.get(expanded_type_arguments.len()).copied()
+                }
+            } else {
+                typevars.get(expanded_type_arguments.len()).copied()
+            };
             if exactly_one_paramspec || typevar.is_some_and(|typevar| typevar.is_paramspec(db)) {
                 expanded_type_arguments.push(TypeArgument {
                     node: expr,
@@ -611,6 +657,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .types(db)
                                 .contains(&Type::Dynamic(DynamicType::TodoTypeVarTuple))
                     )
+                    && typevartuple_index.is_none()
                     && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, expr)
                 {
                     builder.into_diagnostic(
@@ -625,6 +672,76 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 });
             }
         }
+
+        let expanded_type_arguments = if let Some(typevartuple_index) = typevartuple_index {
+            let suffix_len = typevars_len - typevartuple_index - 1;
+            let typevartuple_end = expanded_type_arguments
+                .len()
+                .saturating_sub(suffix_len)
+                .max(typevartuple_index);
+            let mut packed = Vec::with_capacity(typevars_len);
+
+            packed.extend_from_slice(
+                &expanded_type_arguments[..expanded_type_arguments.len().min(typevartuple_index)],
+            );
+
+            let mut tuple_builder = TupleSpecBuilder::with_capacity(
+                typevartuple_end.saturating_sub(typevartuple_index),
+            );
+            let typevartuple_start = expanded_type_arguments.len().min(typevartuple_index);
+            for type_argument in &expanded_type_arguments
+                [typevartuple_start..expanded_type_arguments.len().min(typevartuple_end)]
+            {
+                let provided_type = type_argument.ty.unwrap_or_else(|| {
+                    let previously_in_valid_unpack_context = self
+                        .context
+                        .inference_flags
+                        .replace(InferenceFlags::IN_VALID_UNPACK_CONTEXT, true);
+                    let provided_type = self.infer_type_expression(type_argument.node);
+                    self.context.inference_flags.set(
+                        InferenceFlags::IN_VALID_UNPACK_CONTEXT,
+                        previously_in_valid_unpack_context,
+                    );
+                    inferred_type_arguments[type_argument.source_index] = Some(provided_type);
+                    provided_type
+                });
+                let is_unpack = self
+                    .type_expression_flags(type_argument.node)
+                    .contains(TypeExpressionFlags::UNPACK);
+                if is_unpack && let Some(tuple) = provided_type.exact_tuple_instance_spec(db) {
+                    tuple_builder = tuple_builder.concat(db, &tuple);
+                } else if is_unpack
+                    && let Type::TypeVar(typevar) = provided_type
+                    && typevar.is_typevartuple(db)
+                {
+                    tuple_builder = tuple_builder.concat_variadic_typevar(db, typevar);
+                } else {
+                    tuple_builder.push(provided_type);
+                }
+            }
+
+            if expanded_type_arguments.len() >= typevartuple_index {
+                packed.push(TypeArgument {
+                    node: expanded_type_arguments
+                        .get(typevartuple_index)
+                        .map_or(slice_node, |argument| argument.node),
+                    ty: Some(Type::tuple(TupleType::new(db, &tuple_builder.build()))),
+                    source_index: expanded_type_arguments
+                        .get(typevartuple_index)
+                        .map_or(0, |argument| argument.source_index),
+                });
+            }
+
+            if suffix_len > 0 && expanded_type_arguments.len() >= typevartuple_index + suffix_len {
+                packed.extend_from_slice(
+                    &expanded_type_arguments[expanded_type_arguments.len() - suffix_len..],
+                );
+            }
+
+            packed
+        } else {
+            expanded_type_arguments
+        };
 
         let mut specialization_types = Vec::with_capacity(typevars_len);
         let mut typevar_with_defaults = 0;
@@ -899,6 +1016,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .map(|typevar| {
                         Some(if typevar.is_paramspec(db) {
                             Type::paramspec_value_callable(db, Parameters::unknown())
+                        } else if typevar.is_typevartuple(db) {
+                            Type::homogeneous_tuple(db, Type::unknown())
                         } else {
                             Type::unknown()
                         })
@@ -2046,11 +2165,23 @@ fn legacy_generic_class_context<'db>(
 ) -> Result<GenericContext<'db>, LegacyGenericContextError<'db>> {
     let typevars_class_tuple_spec = typevars.exact_tuple_instance_spec(db);
 
+    let unpacked_typevars;
     let typevars = if let Some(tuple_spec) = typevars_class_tuple_spec.as_deref() {
         match tuple_spec {
             Tuple::Fixed(typevars) => typevars.elements_slice(),
-            Tuple::Variable(_) => {
-                return Err(LegacyGenericContextError::VariadicTupleArguments);
+            Tuple::Variable(variable) => {
+                if let Type::TypeVar(typevartuple) = variable.variable()
+                    && typevartuple.is_typevartuple(db)
+                {
+                    unpacked_typevars = variable
+                        .iter_prefix_elements()
+                        .chain(std::iter::once(Type::TypeVar(typevartuple)))
+                        .chain(variable.iter_suffix_elements())
+                        .collect::<Vec<_>>();
+                    &unpacked_typevars
+                } else {
+                    return Err(LegacyGenericContextError::VariadicTupleArguments);
+                }
             }
         }
     } else {
@@ -2063,10 +2194,19 @@ fn legacy_generic_class_context<'db>(
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = argument_ty {
             let bound = bind_typevar(db, index, file_scope_id, typevar_binding_context, typevar)
                 .ok_or(LegacyGenericContextError::InvalidArgument(argument_ty))?;
+            if bound.is_typevartuple(db) {
+                return Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked);
+            }
             if !validated_typevars.insert(bound) {
                 return Err(LegacyGenericContextError::DuplicateTypevar(
                     typevar.name(db),
                 ));
+            }
+        } else if let Type::TypeVar(bound) = argument_ty
+            && bound.is_typevartuple(db)
+        {
+            if !validated_typevars.insert(bound) {
+                return Err(LegacyGenericContextError::DuplicateTypevar(bound.name(db)));
             }
         } else if let Type::NominalInstance(instance) = argument_ty
             && instance.has_known_class(db, KnownClass::TypeVarTuple)

@@ -5481,6 +5481,16 @@ impl<'db> Type<'db> {
                             fallback_type: Type::unknown(),
                         });
                     }
+                    if !inference_flags.contains(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT)
+                        && typevar.is_typevartuple(db)
+                    {
+                        return Err(InvalidTypeExpressionError {
+                            invalid_expressions: smallvec_inline![
+                                InvalidTypeExpression::InvalidBareTypeVarTuple(*typevar)
+                            ],
+                            fallback_type: Type::unknown(),
+                        });
+                    }
                     let index = semantic_index(db, scope_id.file(db));
                     Ok(bind_typevar(
                         db,
@@ -6138,6 +6148,14 @@ impl<'db> Type<'db> {
         let matching_typevar = |bound_typevar: &BoundTypeVarInstance<'db>| {
             match bound_typevar.typevar(db).kind(db) {
                 TypeVarKind::Legacy | TypeVarKind::Pep613Alias | TypeVarKind::TypingSelf
+                    if binding_context.is_none_or(|binding_context| {
+                        bound_typevar.binding_context(db)
+                            == BindingContext::Definition(binding_context)
+                    }) =>
+                {
+                    Some(*bound_typevar)
+                }
+                TypeVarKind::TypeVarTuple
                     if binding_context.is_none_or(|binding_context| {
                         bound_typevar.binding_context(db)
                             == BindingContext::Definition(binding_context)
@@ -7466,6 +7484,7 @@ enum InvalidTypeExpression<'db> {
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>, ScopeId<'db>),
     InvalidBareParamSpec(TypeVarInstance<'db>),
+    InvalidBareTypeVarTuple(TypeVarInstance<'db>),
 }
 
 impl<'db> InvalidTypeExpression<'db> {
@@ -7587,6 +7606,11 @@ impl<'db> InvalidTypeExpression<'db> {
                         "Bare ParamSpec `{}` is not valid in this context in a {location}",
                         paramspec.name(self.db)
                     ),
+                    InvalidTypeExpression::InvalidBareTypeVarTuple(typevartuple) => write!(
+                        f,
+                        "Bare TypeVarTuple `{}` is not valid in this context in a {location}",
+                        typevartuple.name(self.db)
+                    ),
                     InvalidTypeExpression::Concatenate => write!(
                         f,
                         "`typing.Concatenate` is not allowed in this context in a {location}",
@@ -7665,6 +7689,8 @@ impl<'db> InvalidTypeExpression<'db> {
             diagnostic.info(" - as the default type for another ParamSpec");
             diagnostic.info(" - as part of a type parameter list when defining a generic class");
             diagnostic.info(" - or as part of an argument list when specializing a generic class");
+        } else if matches!(self, InvalidTypeExpression::InvalidBareTypeVarTuple(_)) {
+            diagnostic.info("A TypeVarTuple must be unpacked with `*` or `Unpack[]`.");
         } else if matches!(self, InvalidTypeExpression::Concatenate) {
             diagnostic.info("`typing.Concatenate` is only valid:");
             diagnostic.info(" - as the first argument to `Callable`");

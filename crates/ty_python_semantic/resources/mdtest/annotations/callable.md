@@ -435,9 +435,8 @@ from typing_extensions import Callable, TypeVarTuple
 
 Ts = TypeVarTuple("Ts")
 
-def _(c: Callable[[int, *Ts], int]):
-    # TODO: Should reveal the correct signature
-    reveal_type(c)  # revealed: (...) -> int
+def unpack_operator(c: Callable[[int, *Ts], int]):
+    reveal_type(c)  # revealed: (int, /, *Ts@unpack_operator) -> int
 ```
 
 And, using the legacy syntax using `Unpack`:
@@ -445,9 +444,8 @@ And, using the legacy syntax using `Unpack`:
 ```py
 from typing_extensions import Unpack
 
-def _(c: Callable[[int, Unpack[Ts]], int]):
-    # TODO: Should reveal the correct signature
-    reveal_type(c)  # revealed: (...) -> int
+def unpack_special_form(c: Callable[[int, Unpack[Ts]], int]):
+    reveal_type(c)  # revealed: (int, /, *Ts@unpack_special_form) -> int
 ```
 
 ## Member lookup

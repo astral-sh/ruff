@@ -6,6 +6,7 @@ use std::fmt::Display;
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 use rustc_hash::{FxHashMap, FxHashSet};
+use smallvec::SmallVec;
 
 use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
@@ -19,9 +20,10 @@ use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
 use crate::types::signatures::{
-    CallableSignature, Parameters, ReturnCallableTypeVarScope, SignatureRelationVisitor,
+    CallableSignature, Parameter, Parameters, ReturnCallableTypeVarScope, Signature,
+    SignatureRelationVisitor,
 };
-use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
+use crate::types::tuple::{TupleSpec, TupleSpecBuilder, TupleType, walk_tuple_type};
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
@@ -542,8 +544,15 @@ impl<'db> GenericContext<'db> {
                 };
                 Some(typevar.with_binding_context(db, binding_context))
             }
-            // TODO: Support this!
-            ast::TypeParam::TypeVarTuple(_) => None,
+            ast::TypeParam::TypeVarTuple(node) => {
+                let definition = index.expect_single_definition(node);
+                let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
+                    declaration_type(db, definition).inner_type()
+                else {
+                    return None;
+                };
+                Some(typevar.with_binding_context(db, binding_context))
+            }
         }
     }
 
@@ -856,9 +865,21 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         match self.len(db) {
             0 => self.specialize(db, &[]),
-            1 => self.specialize(db, &[Type::unknown(); 1]),
-            2 => self.specialize(db, &[Type::unknown(); 2]),
-            len => self.specialize(db, vec![Type::unknown(); len]),
+            len => self.specialize(
+                db,
+                self.variables(db)
+                    .take(len)
+                    .map(|typevar| {
+                        if typevar.is_typevartuple(db) {
+                            Type::homogeneous_tuple(db, Type::unknown())
+                        } else if typevar.is_paramspec(db) {
+                            Type::paramspec_value_callable(db, Parameters::unknown())
+                        } else {
+                            Type::unknown()
+                        }
+                    })
+                    .collect::<Vec<_>>(),
+            ),
         }
     }
 
@@ -999,6 +1020,8 @@ impl<'db> GenericContext<'db> {
         for typevar in variables.clone() {
             if typevar.is_paramspec(db) {
                 expanded.push(Type::paramspec_value_callable(db, Parameters::unknown()));
+            } else if typevar.is_typevartuple(db) {
+                expanded.push(Type::homogeneous_tuple(db, Type::unknown()));
             } else {
                 expanded.push(Type::unknown());
             }
@@ -1888,7 +1911,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         if generic_context
             .variables_inner(self.db)
             .values()
-            .any(|typevar| typevar.is_paramspec(self.db))
+            .any(|typevar| typevar.is_paramspec(self.db) || typevar.is_typevartuple(self.db))
         {
             return self.solve_hash_map_with(generic_context, choose);
         }
@@ -2162,6 +2185,26 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     return;
                 }
 
+                if bound_typevar.is_typevartuple(self.db) {
+                    let accumulator = entry.get_mut();
+                    let existing = accumulator.get_or_build(self.db);
+                    let Some(existing_tuple) = existing.exact_tuple_instance_spec(self.db) else {
+                        return;
+                    };
+                    let Some(new_tuple) = ty.exact_tuple_instance_spec(self.db) else {
+                        return;
+                    };
+                    if existing_tuple.len() != new_tuple.len() {
+                        return;
+                    }
+                    let unioned = TupleSpecBuilder::from(existing_tuple.as_ref())
+                        .union(self.db, &new_tuple)
+                        .build();
+                    *accumulator =
+                        UnionAccumulator::new(Type::tuple(TupleType::new(self.db, &unioned)));
+                    return;
+                }
+
                 entry.get_mut().add(self.db, ty);
             }
             Entry::Vacant(entry) => {
@@ -2327,6 +2370,70 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             .then_some(mapping_when)
     }
 
+    fn infer_typevartuple_from_callable_parameters(
+        &mut self,
+        formal_signature: &Signature<'db>,
+        variadic_index: usize,
+        typevartuple: BoundTypeVarInstance<'db>,
+        actual_signature: &Signature<'db>,
+    ) {
+        let formal_parameters = formal_signature.parameters().as_slice();
+        let suffix_len = formal_parameters.len() - variadic_index - 1;
+        if !formal_parameters[..variadic_index]
+            .iter()
+            .chain(&formal_parameters[variadic_index + 1..])
+            .all(Parameter::is_positional)
+        {
+            return;
+        }
+
+        let actual_parameters = actual_signature.parameters().as_slice();
+        if actual_parameters
+            .iter()
+            .any(|parameter| !parameter.is_positional())
+            || actual_parameters.len() < variadic_index + suffix_len
+        {
+            return;
+        }
+
+        let middle_end = actual_parameters.len() - suffix_len;
+        let tuple = Type::heterogeneous_tuple(
+            self.db,
+            actual_parameters[variadic_index..middle_end]
+                .iter()
+                .map(Parameter::annotated_type),
+        );
+        self.add_type_mapping(typevartuple, tuple, TypeVarVariance::Contravariant);
+
+        let _ = self.infer_map_impl(
+            formal_signature.return_ty,
+            actual_signature.return_ty,
+            TypeVarVariance::Covariant,
+            &mut FxHashSet::default(),
+        );
+    }
+
+    fn typevartuple_variadic_parameter(
+        &self,
+        signature: &Signature<'db>,
+    ) -> Option<(usize, BoundTypeVarInstance<'db>)> {
+        signature
+            .parameters()
+            .as_slice()
+            .iter()
+            .find_position(|parameter| {
+                parameter.is_variadic() && parameter.has_starred_annotation()
+            })
+            .and_then(|(index, parameter)| {
+                let Type::TypeVar(typevartuple) = parameter.annotated_type() else {
+                    return None;
+                };
+                typevartuple
+                    .is_typevartuple(self.db)
+                    .then_some((index, typevartuple))
+            })
+    }
+
     /// Infer type mappings by comparing formal callable signatures against actual callables.
     fn infer_from_callable_signature(
         &mut self,
@@ -2334,6 +2441,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         actual_callables: &CallableTypes<'db>,
     ) -> Result<(), ()> {
         let formal_is_single_paramspec = formal_signature.is_single_paramspec().is_some();
+        let typevartuple_formal_overloads: SmallVec<[_; 1]> = formal_signature
+            .iter()
+            .filter_map(|formal_overload| {
+                self.typevartuple_variadic_parameter(formal_overload).map(
+                    |(variadic_index, typevartuple)| {
+                        (formal_overload, variadic_index, typevartuple)
+                    },
+                )
+            })
+            .collect();
 
         for actual_callable in actual_callables.as_slice() {
             if formal_is_single_paramspec {
@@ -2353,6 +2470,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     .overloads
                     .iter()
                     .filter_map(|actual_signature| {
+                        for (formal_overload, variadic_index, typevartuple) in
+                            &typevartuple_formal_overloads
+                        {
+                            self.infer_typevartuple_from_callable_parameters(
+                                formal_overload,
+                                *variadic_index,
+                                *typevartuple,
+                                actual_signature,
+                            );
+                        }
+
                         let when = actual_signature.when_constraint_set_assignable_to_signatures(
                             db,
                             formal_signature,
@@ -2805,6 +2933,46 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     formal.tuple_instance_spec(self.db),
                     actual_nominal.tuple_spec(self.db),
                 ) {
+                    if let TupleSpec::Variable(formal_variable) = formal_tuple.as_ref()
+                        && let Type::TypeVar(typevartuple) = formal_variable.variable()
+                        && typevartuple.is_typevartuple(self.db)
+                        && let TupleSpec::Fixed(actual_fixed) = actual_tuple.as_ref()
+                    {
+                        let prefix_len = formal_variable.prefix_elements().len();
+                        let suffix_len = formal_variable.suffix_elements().len();
+                        let actual_len = actual_fixed.len();
+                        let Some(middle_end) = actual_len.checked_sub(suffix_len) else {
+                            return Ok(());
+                        };
+                        if middle_end < prefix_len {
+                            return Ok(());
+                        }
+
+                        let actual_elements = actual_fixed.elements_slice();
+                        let variance = TypeVarVariance::Covariant.compose(polarity);
+                        for (formal_element, actual_element) in formal_variable
+                            .prefix_elements()
+                            .iter()
+                            .zip(&actual_elements[..prefix_len])
+                        {
+                            self.infer_map_impl(*formal_element, *actual_element, variance, seen)?;
+                        }
+                        for (formal_element, actual_element) in formal_variable
+                            .suffix_elements()
+                            .iter()
+                            .zip(&actual_elements[middle_end..])
+                        {
+                            self.infer_map_impl(*formal_element, *actual_element, variance, seen)?;
+                        }
+
+                        let packed = Type::heterogeneous_tuple(
+                            self.db,
+                            actual_elements[prefix_len..middle_end].iter().copied(),
+                        );
+                        self.add_type_mapping(typevartuple, packed, variance);
+                        return Ok(());
+                    }
+
                     let Some(most_precise_length) =
                         formal_tuple.len().most_precise(actual_tuple.len())
                     else {

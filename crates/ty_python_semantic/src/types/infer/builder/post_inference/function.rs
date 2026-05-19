@@ -125,7 +125,10 @@ fn check_legacy_typevar_defaults<'db>(
         // by `check_default_for_outer_scope_typevars` in the type parameter scope.
         if !matches!(
             typevar.kind(db),
-            TypeVarKind::Legacy | TypeVarKind::Pep613Alias | TypeVarKind::ParamSpec
+            TypeVarKind::Legacy
+                | TypeVarKind::Pep613Alias
+                | TypeVarKind::ParamSpec
+                | TypeVarKind::TypeVarTuple
         ) {
             continue;
         }
@@ -250,7 +253,10 @@ fn check_legacy_typevar_ordering<'db>(
         // Only check legacy TypeVars; PEP 695 ordering is validated by the parser.
         if !matches!(
             typevar.kind(db),
-            TypeVarKind::Legacy | TypeVarKind::Pep613Alias | TypeVarKind::ParamSpec
+            TypeVarKind::Legacy
+                | TypeVarKind::Pep613Alias
+                | TypeVarKind::ParamSpec
+                | TypeVarKind::TypeVarTuple
         ) {
             continue;
         }

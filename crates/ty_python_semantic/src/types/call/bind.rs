@@ -51,7 +51,7 @@ use crate::types::signatures::{
     CallableSignature, Parameter, ParameterForm, ParameterKind, Parameters, ParametersKind,
     PartialApplication, PartialSignatureApplication,
 };
-use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
+use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType};
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
@@ -4998,11 +4998,94 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> bool {
         let parameters = self.signature.parameters();
+        let starred_typevartuple_declared_type = |parameter: &Parameter<'db>| {
+            if !parameter.has_starred_annotation() {
+                return None;
+            }
+            if let Type::TypeVar(typevar) = parameter.annotated_type()
+                && typevar.is_typevartuple(self.db)
+            {
+                return Some(Type::tuple(TupleType::new(
+                    self.db,
+                    &TupleSpecBuilder::with_capacity(0)
+                        .concat_variadic_typevar(self.db, typevar)
+                        .build(),
+                )));
+            }
+            let tuple = parameter
+                .annotated_type()
+                .exact_tuple_instance_spec(self.db)?;
+            let TupleSpec::Variable(variable) = tuple.as_ref() else {
+                return None;
+            };
+            if matches!(
+                variable.variable(),
+                Type::TypeVar(typevar) if typevar.is_typevartuple(self.db)
+            ) {
+                Some(parameter.annotated_type())
+            } else {
+                None
+            }
+        };
+
+        let mut starred_typevartuple_declared_types = None;
+        for (parameter_index, parameter) in parameters.iter().enumerate() {
+            let Some(declared_type) = starred_typevartuple_declared_type(parameter) else {
+                continue;
+            };
+            let declared_types = starred_typevartuple_declared_types
+                .get_or_insert_with(|| vec![None; parameters.len()]);
+            declared_types[parameter_index] = Some(declared_type);
+        }
+
+        let mut starred_typevartuple_arguments: FxHashMap<usize, Vec<Type<'db>>> =
+            FxHashMap::default();
+        if let Some(starred_typevartuple_declared_types) = &starred_typevartuple_declared_types {
+            for (argument_index, _, _, argument_types) in self.enumerate_argument_types() {
+                for (parameter_index, _) in self.argument_matches[argument_index].iter() {
+                    if starred_typevartuple_declared_types[parameter_index].is_some() {
+                        starred_typevartuple_arguments
+                            .entry(parameter_index)
+                            .or_default()
+                            .push(argument_types.get_default().unwrap_or(Type::unknown()));
+                    }
+                }
+            }
+            for (parameter_index, declared_type) in
+                starred_typevartuple_declared_types.iter().enumerate()
+            {
+                if declared_type.is_some() {
+                    starred_typevartuple_arguments
+                        .entry(parameter_index)
+                        .or_default();
+                }
+            }
+        }
+
+        for (parameter_index, argument_types) in &starred_typevartuple_arguments {
+            let declared_type = starred_typevartuple_declared_types
+                .as_ref()
+                .and_then(|declared_types| declared_types[*parameter_index])
+                .unwrap_or_else(Type::unknown);
+            let argument_type = Type::heterogeneous_tuple(self.db, argument_types.iter().copied());
+            let specialization_result = builder.infer(declared_type, argument_type);
+
+            if let Err(error) = specialization_result {
+                specialization_errors.push(BindingError::SpecializationError {
+                    error,
+                    argument_index: None,
+                });
+            }
+        }
+
         for (argument_index, adjusted_argument_index, _, argument_types) in
             self.enumerate_argument_types()
         {
             for matched_parameter in self.argument_matches[argument_index].iter() {
                 let parameter_index = matched_parameter.index;
+                if starred_typevartuple_arguments.contains_key(&parameter_index) {
+                    continue;
+                }
                 if self.is_gradual_variadic_parameter(parameter_index) {
                     continue;
                 }

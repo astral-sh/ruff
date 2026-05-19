@@ -1,5 +1,6 @@
 use itertools::Either;
 use ruff_python_ast::helpers::is_dotted_name;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::Ranged;
 
@@ -849,8 +850,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ctx: _,
         } = starred;
 
+        self.store_type_expression_flags(ast::ExprRef::from(starred), TypeExpressionFlags::UNPACK);
+
+        let previously_in_unpack_type_argument = self
+            .context
+            .inference_flags
+            .replace(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT, true);
         let starred_type = self.infer_type_expression(value);
-        if starred_type.exact_tuple_instance_spec(self.db()).is_some() {
+        self.context.inference_flags.set(
+            InferenceFlags::IN_UNPACK_TYPE_ARGUMENT,
+            previously_in_unpack_type_argument,
+        );
+
+        if starred_type.exact_tuple_instance_spec(self.db()).is_some()
+            || matches!(
+                starred_type,
+                Type::TypeVar(typevar) if typevar.is_typevartuple(self.db())
+            )
+        {
             starred_type
         } else {
             Type::Dynamic(DynamicType::TodoStarredExpression)
@@ -1069,6 +1086,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             if inner_tuple.is_variadic() {
                                 report_too_many_unpacked_tuples();
                             }
+                        } else if let Type::TypeVar(typevar) = element_ty
+                            && typevar.is_typevartuple(self.db())
+                        {
+                            report_too_many_unpacked_tuples();
+                            element_types =
+                                element_types.concat_variadic_typevar(self.db(), typevar);
                         } else if self.expression_type(unpack_inner)
                             == Type::Dynamic(DynamicType::TodoTypeVarTuple)
                         {
@@ -1119,8 +1142,35 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     InferenceFlags::IN_VALID_UNPACK_CONTEXT,
                     previously_in_valid_unpack_context,
                 );
-                if element_could_alter_type_of_whole_tuple(single_element, single_element_ty, self)
+                let single_element_is_unpack = if let ast::Expr::Starred(_) = single_element {
+                    true
+                } else if let ast::Expr::Subscript(ast::ExprSubscript { value, .. }) =
+                    single_element
                 {
+                    self.expression_type(value) == Type::SpecialForm(SpecialFormType::Unpack)
+                } else {
+                    false
+                };
+                if single_element_is_unpack
+                    && let Some(inner_tuple) =
+                        single_element_ty.exact_tuple_instance_spec(self.db())
+                {
+                    TupleType::new(self.db(), &inner_tuple)
+                } else if single_element_is_unpack
+                    && let Type::TypeVar(typevar) = single_element_ty
+                    && typevar.is_typevartuple(self.db())
+                {
+                    TupleType::new(
+                        self.db(),
+                        &TupleSpecBuilder::with_capacity(0)
+                            .concat_variadic_typevar(self.db(), typevar)
+                            .build(),
+                    )
+                } else if element_could_alter_type_of_whole_tuple(
+                    single_element,
+                    single_element_ty,
+                    self,
+                ) {
                     Some(TupleType::homogeneous(
                         self.db(),
                         Type::Dynamic(DynamicType::TodoTypeVarTuple),
@@ -2348,7 +2398,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // However, we still need a Todo type for things like
                 // `def f(*args: Unpack[tuple[int, Unpack[tuple[str, ...]]]]): ...`,
                 // which we don't yet support.
-                if self
+                if matches!(
+                    inner_ty,
+                    Type::TypeVar(typevar) if typevar.is_typevartuple(self.db())
+                ) {
+                    inner_ty
+                } else if self
                     .inference_flags()
                     .contains(InferenceFlags::IN_VARARG_ANNOTATION)
                     || inner_ty.exact_tuple_instance_spec(self.db()).is_none()
@@ -2593,7 +2648,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return None;
                 }
 
-                let mut parameter_types = Vec::with_capacity(params.len());
+                let mut parameters = Vec::with_capacity(params.len());
 
                 // Whether to infer `Todo` for the parameters
                 let mut return_todo = false;
@@ -2610,7 +2665,34 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // `*tuple[int, str]`, `Unpack[]`, etc. are not yet supported.
                     return_todo |= param_type.is_todo()
                         && matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_));
-                    parameter_types.push(param_type);
+                    let is_unpack = self
+                        .type_expression_flags(param)
+                        .contains(TypeExpressionFlags::UNPACK);
+
+                    if is_unpack {
+                        if let Type::TypeVar(typevar) = param_type
+                            && typevar.is_typevartuple(self.db())
+                        {
+                            parameters.push(
+                                Parameter::variadic(Name::new_static("args"))
+                                    .with_annotated_type(Type::TypeVar(typevar))
+                                    .with_starred_annotation(),
+                            );
+                            continue;
+                        }
+
+                        if param_type.exact_tuple_instance_spec(self.db()).is_some() {
+                            parameters.push(
+                                Parameter::variadic(Name::new_static("args"))
+                                    .with_annotated_type(param_type)
+                                    .with_starred_annotation(),
+                            );
+                            continue;
+                        }
+                    }
+
+                    parameters
+                        .push(Parameter::positional_only(None).with_annotated_type(param_type));
                 }
                 self.context.inference_flags.set(
                     InferenceFlags::IN_VALID_UNPACK_CONTEXT,
@@ -2621,12 +2703,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // TODO: `Unpack`
                     Parameters::todo()
                 } else {
-                    Parameters::new(
-                        self.db(),
-                        parameter_types.iter().map(|param_type| {
-                            Parameter::positional_only(None).with_annotated_type(*param_type)
-                        }),
-                    )
+                    Parameters::new(self.db(), parameters)
                 });
             }
             ast::Expr::Subscript(subscript) => {
