@@ -417,7 +417,7 @@ fn render_markdown(docstring: &str) -> String {
             // except we need to find and parse it anyway to do this escaping properly! :(
             // For now we assume `inline code` does not span a line (I'm not even sure if can).
             //
-            // Things that need to be escaped: underscores and raw HTML tags.
+            // Things that need to be escaped: underscores and HTML-sensitive characters.
             //
             // e.g. we want __init__ => \_\_init\_\_ but `__init__` => `__init__`
             let escape = |input: &str| {
