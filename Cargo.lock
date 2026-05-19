@@ -5625,6 +5625,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "woa_transcode_harvest"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_source_file",
+ "ruff_text_size",
+ "serde",
+ "serde_json",
+ "walkdir",
+]
+
+[[package]]
 name = "writeable"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
