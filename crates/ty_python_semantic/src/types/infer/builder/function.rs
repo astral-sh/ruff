@@ -415,6 +415,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             function_decorators,
             deprecated,
             dataclass_transformer_params,
+            function.returns.is_some(),
         );
         let function_literal = FunctionLiteral {
             last_definition: overload_literal,

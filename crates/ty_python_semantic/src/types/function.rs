@@ -273,6 +273,9 @@ pub struct OverloadLiteral<'db> {
     /// The arguments to `dataclass_transformer`, if this function was annotated
     /// with `@dataclass_transformer(...)`.
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams<'db>>,
+
+    /// Whether this overload or implementation has an explicit return annotation.
+    pub(crate) has_explicit_return_annotation: bool,
 }
 
 // The Salsa heap is tracked separately.
@@ -293,6 +296,7 @@ impl<'db> OverloadLiteral<'db> {
             self.decorators(db),
             self.deprecated(db),
             Some(params),
+            self.has_explicit_return_annotation(db),
         )
     }
 
@@ -1228,7 +1232,7 @@ impl<'db> FunctionType<'db> {
     /// ```
     pub(crate) fn has_explicit_return_annotation(self, db: &'db dyn Db) -> bool {
         self.iter_overloads_and_implementation(db)
-            .any(|overload| overload.spans(db).return_type.is_some())
+            .any(|overload| overload.has_explicit_return_annotation(db))
     }
 
     /// Returns all of the overload signatures and the implementation definition, if any, of this
