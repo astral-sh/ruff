@@ -925,14 +925,14 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Parse a URL into 6 components:  <HB>
+        Parse a URL into 6 components:<HB>
         &lt;scheme&gt;://&lt;netloc&gt;/&lt;path&gt;;&lt;params&gt;?&lt;query&gt;#&lt;fragment&gt;<HB>
         <HB>
-        Markdown code fences keep literal HTML:  <HB>
+        Markdown code fences keep literal HTML:<HB>
         <HB>
         ```text
         <tag attr="value">content</tag>
-        ```
+        ```<HB>
         <HB>
         So does `inline <code>`.
         "#);

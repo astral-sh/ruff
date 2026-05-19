@@ -4641,17 +4641,17 @@ def function():
         def urlparse() -> Unknown
         ```
         ---
-        Parse a URL into components:  <HB>
+        Parse a URL into components:<HB>
         &lt;scheme&gt;://&lt;netloc&gt;/&lt;path&gt;;&lt;params&gt;?&lt;query&gt;#&lt;fragment&gt;
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:2:5
           |
         2 | def urlparse():
-          |     ^^^-
-          |     ||||
-          |     |||Cursor offset
-          |     ||source
+          |     ^^^-^^^^
+          |     |  |
+          |     |  Cursor offset
+          |     source
           |
         "#);
     }
