@@ -114,6 +114,11 @@ impl<'src> Parser<'src> {
         Some(RecursionScope::new())
     }
 
+    #[inline]
+    fn current_nesting_exceeds_recursion_limit(&self) -> bool {
+        self.tokens.nesting() > u32::from(self.options.max_recursion_depth.saturating_sub(2))
+    }
+
     #[cold]
     #[inline(never)]
     fn report_recursion_limit_exceeded<R: Ranged>(&mut self, ranged: R) {

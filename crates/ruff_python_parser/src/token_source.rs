@@ -49,6 +49,11 @@ impl<'src> TokenSource<'src> {
         self.lexer.current_range()
     }
 
+    /// Returns the current parenthesis, bracket, and brace nesting level.
+    pub(crate) fn nesting(&self) -> u32 {
+        self.lexer.nesting()
+    }
+
     /// Returns the flags for the current token.
     pub(crate) fn current_flags(&self) -> TokenFlags {
         self.lexer.current_flags()

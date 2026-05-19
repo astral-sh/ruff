@@ -733,24 +733,18 @@ impl<'src> Parser<'src> {
         loop {
             lhs = match self.current_token_kind() {
                 TokenKind::Lpar => {
-                    if let Some(scope) = self.enter_recursion() {
-                        let expr = Expr::Call(self.parse_call_expression(lhs, start));
-                        scope.exit(self);
-                        expr
-                    } else {
+                    if self.current_nesting_exceeds_recursion_limit() {
                         self.report_recursion_limit_exceeded(self.current_token_range());
                         break lhs;
                     }
+                    Expr::Call(self.parse_call_expression(lhs, start))
                 }
                 TokenKind::Lsqb => {
-                    if let Some(scope) = self.enter_recursion() {
-                        let expr = Expr::Subscript(self.parse_subscript_expression(lhs, start));
-                        scope.exit(self);
-                        expr
-                    } else {
+                    if self.current_nesting_exceeds_recursion_limit() {
                         self.report_recursion_limit_exceeded(self.current_token_range());
                         break lhs;
                     }
+                    Expr::Subscript(self.parse_subscript_expression(lhs, start))
                 }
                 TokenKind::Dot => Expr::Attribute(self.parse_attribute_expression(lhs, start)),
                 _ => break lhs,
