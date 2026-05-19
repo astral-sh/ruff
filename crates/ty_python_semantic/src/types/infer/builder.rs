@@ -4980,7 +4980,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .any(|overload| overload.signature.generic_context.is_some());
 
         // If the type context is a union, attempt to narrow to a specific element.
-        let narrow_targets: &[_] = match call_expression_tcx.annotation {
+        let narrow_targets: &[_] = match call_expression_tcx
+            .annotation
+            .map(|ty| ty.resolve_type_alias(db))
+        {
             // TODO: We could theoretically attempt to narrow to every element of
             // the power set of this union. However, this leads to an exponential
             // explosion of inference attempts, and is rarely needed in practice.
@@ -5972,7 +5975,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         // If the type context is a union, attempt to narrow to a specific element.
-        let narrow_targets: &[_] = match tcx.annotation {
+        let narrow_targets: &[_] = match tcx.annotation.map(|ty| ty.resolve_type_alias(db)) {
             Some(Type::Union(union)) => union.elements(db),
             _ => &[],
         };
