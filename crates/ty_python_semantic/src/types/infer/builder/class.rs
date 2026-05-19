@@ -646,6 +646,8 @@ impl ClassDecoratorUnknownResultPolicy {
                 Self::known_from_decorator(db, alias.value_type(db))
                     .unwrap_or(Self::ReplaceBinding),
             ),
+            // TODO: We preserve the class binding for every `Callable` decorator today. Figure out
+            // which of these cases should instead let an unknown decorator result replace it.
             Type::Callable(_) => Some(Self::PreserveBinding),
             _ => None,
         }
