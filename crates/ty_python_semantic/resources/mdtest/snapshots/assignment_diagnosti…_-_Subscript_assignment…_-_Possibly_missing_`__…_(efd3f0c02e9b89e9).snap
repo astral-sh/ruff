@@ -23,7 +23,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_dia
 error[invalid-assignment]: Cannot assign to a subscript on an object of type `None`
  --> src/mdtest_snippet.py:2:5
   |
-1 | def _(config: dict[str, int] | None) -> None:
 2 |     config["retries"] = 3  # error: [invalid-assignment]
   |     ^^^^^^^^^^^^^^^^^
   |

@@ -23,6 +23,31 @@ alice.role = "moderator"
 bob = Member(name="Bob", tag="VIP")
 ```
 
+## `Any` annotations preserve field specifier metadata
+
+Even when a field is explicitly annotated as `Any`, `field(...)` should still be recognized as a
+dataclass field specifier. The synthesized field metadata comes from the right-hand side, not from
+the declared type.
+
+```py
+from dataclasses import dataclass, field
+from typing import Any
+
+@dataclass
+class AnyFieldSpecifier:
+    proto: Any = field(repr=False)
+    key: str | None
+
+reveal_type(AnyFieldSpecifier.__init__)  # revealed: (self: AnyFieldSpecifier, proto: Any, key: str | None) -> None
+
+@dataclass
+class AnyInitFalseField:
+    key: str | None
+    proto: Any = field(init=False)
+
+reveal_type(AnyInitFalseField.__init__)  # revealed: (self: AnyInitFalseField, key: str | None) -> None
+```
+
 ## Inheritance with defaults
 
 ```py

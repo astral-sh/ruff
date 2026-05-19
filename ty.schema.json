@@ -620,6 +620,16 @@
             }
           ]
         },
+        "invalid-attribute-override": {
+          "title": "detects attribute overrides that change class-variable or instance-variable behavior",
+          "description": "## What it does\nDetects attribute overrides that change whether an inherited attribute\nis a class variable or an instance variable.\n\nThis rule currently only covers class-variable and instance-variable\ncategory changes.\n\n## Why is this bad?\nPure class variables and instance variables have different access and\nassignment behavior. Overriding one with the other violates the\n[Liskov Substitution Principle] (\"LSP\"), because code that is valid for\nthe superclass may no longer be valid for the subclass.\n\n## Example\n```python\nfrom typing import ClassVar\n\nclass Base:\n    instance_attr: int\n    class_attr: ClassVar[int]\n\nclass Sub(Base):\n    instance_attr: ClassVar[int]  # error: [invalid-attribute-override]\n    class_attr: int  # error: [invalid-attribute-override]\n```\n\n[Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-await": {
           "title": "detects awaiting on types that don't support it",
           "description": "## What it does\nChecks for `await` being used with types that are not [Awaitable].\n\n## Why is this bad?\nSuch expressions will lead to `TypeError` being raised at runtime.\n\n## Examples\n```python\nimport asyncio\n\nclass InvalidAwait:\n    def __await__(self) -> int:\n        return 5\n\nasync def main() -> None:\n    await InvalidAwait()  # error: [invalid-await]\n    await 42  # error: [invalid-await]\n\nasyncio.run(main())\n```\n\n[Awaitable]: https://docs.python.org/3/library/collections.abc.html#collections.abc.Awaitable",
@@ -752,7 +762,7 @@
         },
         "invalid-key": {
           "title": "detects invalid subscript accesses or TypedDict literal keys",
-          "description": "## What it does\nChecks for subscript accesses with invalid keys and `TypedDict` construction with an\nunknown key.\n\n## Why is this bad?\nSubscripting with an invalid key will raise a `KeyError` at runtime.\n\nCreating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is\n`closed=true` it also violates the expectations of the type.\n\n## Examples\n```python\nfrom typing import TypedDict\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\nalice = Person(name=\"Alice\", age=30)\nalice[\"height\"]  # KeyError: 'height'\n\nbob: Person = { \"namee\": \"Bob\", \"age\": 30 }  # typo!\n\ncarol = Person(name=\"Carol\", aeg=25)  # typo!\n```",
+          "description": "## What it does\nChecks for subscript accesses with invalid keys and `TypedDict` construction with an\nunknown key.\n\n## Why is this bad?\nSubscripting with an invalid key will raise a `KeyError` at runtime.\n\nCreating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is\n`closed=true` it also violates the expectations of the type.\n\n## Examples\n```python\nfrom typing import TypedDict\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\nalice = Person(name=\"Alice\", age=30)\nalice[\"height\"]  # KeyError: 'height'\n\nbob: Person = { \"nickname\": \"Bob\", \"age\": 30 }  # typo!\n\ncarol = Person(name=\"Carol\", aeg=25)  # typo!\n```",
           "default": "error",
           "oneOf": [
             {
@@ -814,6 +824,16 @@
           "title": "detects invalid `NamedTuple` class definitions",
           "description": "## What it does\nChecks for invalidly defined `NamedTuple` classes.\n\n## Why is this bad?\nAn invalidly defined `NamedTuple` class may lead to the type checker\ndrawing incorrect conclusions. It may also lead to `TypeError`s or\n`AttributeError`s at runtime.\n\n## Examples\nA class definition cannot combine `NamedTuple` with other base classes\nin multiple inheritance; doing so raises a `TypeError` at runtime. The sole\nexception to this rule is `Generic[]`, which can be used alongside `NamedTuple`\nin a class's bases list.\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple, object): ...\nTypeError: can only inherit from a NamedTuple type and Generic\n```\n\nFurther, `NamedTuple` field names cannot start with an underscore:\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple):\n...     _bar: int\nValueError: Field names cannot start with an underscore: '_bar'\n```\n\n`NamedTuple` classes also have certain synthesized attributes (like `_asdict`, `_make`,\n`_replace`, etc.) that cannot be overwritten. Attempting to assign to these attributes\nwithout a type annotation will raise an `AttributeError` at runtime.\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple):\n...     x: int\n...     _asdict = 42\nAttributeError: Cannot overwrite NamedTuple attribute _asdict\n```",
           "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-named-tuple-override": {
+          "title": "detects subclass members that override inherited `NamedTuple` fields",
+          "description": "## What it does\nChecks for subclass members that override inherited `NamedTuple` fields.\n\n## Why is this bad?\nReusing an inherited `NamedTuple` field name in a subclass creates a\nclass where tuple indexing and `repr()` still reflect the original\nfield, while attribute access follows the subclass member.\n\n## Default level\nThis rule is a warning by default because these overrides do not make\nthe class invalid at runtime.\n\n## Examples\n```python\nfrom typing import NamedTuple\n\nclass User(NamedTuple):\n    name: str\n\nclass Admin(User):\n    name = \"shadowed\"  # error: [invalid-named-tuple-override]\n\nadmin = Admin(\"Alice\")\nadmin.name  # \"shadowed\"\nadmin[0]  # \"Alice\"\n```",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"

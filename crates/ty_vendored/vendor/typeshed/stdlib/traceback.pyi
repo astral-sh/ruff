@@ -267,7 +267,7 @@ def walk_tb(tb: TracebackType | None) -> Iterator[tuple[FrameType, int]]:
 if sys.version_info >= (3, 11):
     class _ExceptionPrintContext:
         def indent(self) -> str: ...
-        def emit(self, text_gen: str | Iterable[str], margin_char: str | None = None) -> Generator[str, None, None]: ...
+        def emit(self, text_gen: str | Iterable[str], margin_char: str | None = None) -> Generator[str]: ...
 
 class TracebackException:
     """An exception ready for rendering.
@@ -430,7 +430,7 @@ class TracebackException:
     def __eq__(self, other: object) -> bool: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
     if sys.version_info >= (3, 11):
-        def format(self, *, chain: bool = True, _ctx: _ExceptionPrintContext | None = None) -> Generator[str, None, None]:
+        def format(self, *, chain: bool = True, _ctx: _ExceptionPrintContext | None = None) -> Generator[str]:
             """Format the exception.
 
             If chain is not *True*, *__cause__* and *__context__* will not be formatted.
@@ -443,7 +443,7 @@ class TracebackException:
             string in the output.
             """
     else:
-        def format(self, *, chain: bool = True) -> Generator[str, None, None]:
+        def format(self, *, chain: bool = True) -> Generator[str]:
             """Format the exception.
 
             If chain is not *True*, *__cause__* and *__context__* will not be formatted.
@@ -456,7 +456,7 @@ class TracebackException:
             string in the output.
             """
     if sys.version_info >= (3, 13):
-        def format_exception_only(self, *, show_group: bool = False, _depth: int = 0) -> Generator[str, None, None]:
+        def format_exception_only(self, *, show_group: bool = False, _depth: int = 0) -> Generator[str]:
             """Format the exception part of the traceback.
 
             The return value is a generator of strings, each ending in a newline.
@@ -474,7 +474,7 @@ class TracebackException:
             well, recursively, with indentation relative to their nesting depth.
             """
     else:
-        def format_exception_only(self) -> Generator[str, None, None]:
+        def format_exception_only(self) -> Generator[str]:
             """Format the exception part of the traceback.
 
             The return value is a generator of strings, each ending in a newline.

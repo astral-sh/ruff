@@ -878,9 +878,8 @@ python-version = "3.9"
 from dataclasses import dataclass
 from ty_extensions import static_assert, has_member
 
-# TODO: these parameters don't exist on Python 3.9;
-# we should emit a diagnostic (or two)
-@dataclass(slots=True, weakref_slot=True)
+# These parameters don't exist on Python 3.9.
+@dataclass(slots=True, weakref_slot=True)  # error: [no-matching-overload]
 class F: ...
 
 static_assert(not has_member(F, "__slots__"))

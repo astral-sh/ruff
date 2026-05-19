@@ -58,10 +58,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let previous_deferred_state = std::mem::replace(&mut self.deferred_state, state);
         let previous_check_unbound_typevars = self
+            .context
             .inference_flags
             .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, true);
         let annotation_ty = self.infer_annotation_expression_impl(annotation, pep_613_policy);
-        self.inference_flags.set(
+        self.context.inference_flags.set(
             InferenceFlags::CHECK_UNBOUND_TYPEVARS,
             previous_check_unbound_typevars,
         );
@@ -196,13 +197,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     self.db(),
                                     self.scope(),
                                     None,
-                                    self.inference_flags,
+                                    self.inference_flags(),
                                 )
                                 .unwrap_or_else(|err| {
                                     err.into_fallback_type(
                                         &self.context,
                                         subscript,
-                                        self.inference_flags,
+                                        self.inference_flags(),
                                     )
                                 });
                             TypeAndQualifiers::declared(in_type_expression)
@@ -324,7 +325,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         string: &ast::ExprStringLiteral,
     ) -> TypeAndQualifiers<'db> {
-        match parse_string_annotation(&self.context, self.inference_flags, string) {
+        match parse_string_annotation(&self.context, self.inference_flags(), string) {
             Some(parsed) => {
                 self.string_annotations
                     .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());

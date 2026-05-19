@@ -2,12 +2,20 @@
 
 ## `__getitem__` unbound
 
-<!-- snapshot-diagnostics -->
-
 ```py
 class NotSubscriptable: ...
 
-a = NotSubscriptable()[0]  # error: [not-subscriptable]
+# snapshot: not-subscriptable
+a = NotSubscriptable()[0]
+```
+
+```snapshot
+error[not-subscriptable]: Cannot subscript object of type `NotSubscriptable` with no `__getitem__` method
+ --> src/mdtest_snippet.py:4:5
+  |
+4 | a = NotSubscriptable()[0]
+  |     ^^^^^^^^^^^^^^^^^^^^^
+  |
 ```
 
 ## `__getitem__` not callable
@@ -48,6 +56,73 @@ def _(flag: bool):
                 return str(index)
 
     reveal_type(Identity()[0])  # revealed: int | str
+```
+
+## Enum complement as overloaded `__getitem__` receiver
+
+`overloaded.pyi`:
+
+```pyi
+from enum import Enum
+from typing import Literal, overload
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+    @overload
+    def __getitem__(self: Literal[Color.GREEN], index: int) -> int: ...
+    @overload
+    def __getitem__(self: Literal[Color.BLUE], index: int) -> str: ...
+```
+
+```py
+from overloaded import Color
+
+def _(color: Color):
+    if color is Color.RED:
+        return
+    reveal_type(color[0])  # revealed: int | str
+```
+
+## Enum complement as overloaded subscript mutation receiver
+
+`overloaded.pyi`:
+
+```pyi
+from enum import Enum
+from typing import Literal, overload
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+    @overload
+    def __setitem__(self: Literal[Color.GREEN], index: int, value: int) -> None: ...
+    @overload
+    def __setitem__(self: Literal[Color.BLUE], index: int, value: int) -> None: ...
+    @overload
+    def __delitem__(self: Literal[Color.GREEN], index: int) -> None: ...
+    @overload
+    def __delitem__(self: Literal[Color.BLUE], index: int) -> None: ...
+```
+
+```py
+from typing import Literal
+
+from overloaded import Color
+
+def narrowed(color: Color):
+    if color is Color.RED:
+        return
+    color[0] = 1
+    del color[0]
+
+def explicit(color: Literal[Color.GREEN, Color.BLUE]):
+    color[0] = 1
+    del color[0]
 ```
 
 ## `__getitem__` with invalid index argument

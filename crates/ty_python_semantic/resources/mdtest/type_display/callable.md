@@ -111,8 +111,7 @@ class Bar:
     def g(self, x: Scalar | ArrayNd) -> None:
         pass
 
-# TODO: should be `bound method Bar.g(x: Scalar | ArrayNd) -> None`
-reveal_type(Bar().g)  # revealed: bound method Bar.g(x: Scalar | list[Any] | tuple[Any]) -> None
+reveal_type(Bar().g)  # revealed: bound method Bar.g(x: Scalar | ArrayNd) -> None
 
 type GenericArray1d[T] = list[T] | tuple[T]
 

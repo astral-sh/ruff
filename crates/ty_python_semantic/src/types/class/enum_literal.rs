@@ -125,7 +125,12 @@ impl<'db> DynamicEnumLiteral<'db> {
     #[salsa::tracked(
         returns(ref),
         heap_size=ruff_memory_usage::heap_size,
-        cycle_initial=dynamic_enum_try_mro_cycle_initial
+        cycle_initial=|db, _, self_: DynamicEnumLiteral<'db>| {
+            Ok(Mro::from([
+                ClassBase::Class(ClassType::NonGeneric(ClassLiteral::DynamicEnum(self_))),
+                ClassBase::object(db),
+            ]))
+        }
     )]
     pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
         Mro::of_dynamic_enum(db, self)
@@ -231,16 +236,4 @@ impl<'db> DynamicEnumLiteral<'db> {
     pub(super) fn own_instance_member(self, _db: &'db dyn Db, _name: &str) -> Member<'db> {
         Member::unbound()
     }
-}
-
-#[expect(clippy::unnecessary_wraps)]
-fn dynamic_enum_try_mro_cycle_initial<'db>(
-    db: &'db dyn Db,
-    _id: salsa::Id,
-    self_: DynamicEnumLiteral<'db>,
-) -> Result<Mro<'db>, DynamicMroError<'db>> {
-    Ok(Mro::from([
-        ClassBase::Class(ClassType::NonGeneric(self_.into())),
-        ClassBase::object(db),
-    ]))
 }

@@ -106,17 +106,25 @@ impl ProjectDatabase {
         //   we may want to have a dedicated method for this?
 
         // Initialize the `Program` singleton
-        let program_settings = strategy.to_anyhow(project_metadata.to_program_settings(
-            db.system(),
-            db.vendored(),
-            strategy,
-        ))?;
+        let (program_settings, program_settings_diagnostics) = strategy.to_anyhow(
+            project_metadata.to_program_settings(db.system(), db.vendored(), strategy),
+        )?;
         Program::from_settings(&db, program_settings);
 
-        db.project = Some(strategy.map_err(
-            Project::from_metadata(&db, project_metadata, strategy),
+        let (settings, settings_diagnostics) = strategy.map_err(
+            project_metadata
+                .options()
+                .to_settings(&db, project_metadata.root(), strategy),
             |error| anyhow::anyhow!("{}", error.pretty(&db)),
-        )?);
+        )?;
+
+        db.project = Some(Project::from_metadata(
+            &db,
+            project_metadata,
+            settings,
+            settings_diagnostics,
+            program_settings_diagnostics,
+        ));
 
         Ok(db)
     }
@@ -498,6 +506,10 @@ impl ty_module_resolver::Db for ProjectDatabase {
 
 #[salsa::db]
 impl SemanticDb for ProjectDatabase {
+    fn check_file(&self, file: File) -> Vec<Diagnostic> {
+        ProjectDatabase::check_file(self, file)
+    }
+
     fn rule_selection(&self, file: File) -> &RuleSelection {
         let settings = file_settings(self, file);
         settings.rules(self)
@@ -514,6 +526,10 @@ impl SemanticDb for ProjectDatabase {
 
     fn verbose(&self) -> bool {
         self.project().verbose(self)
+    }
+
+    fn dyn_clone(&self) -> Box<dyn SemanticDb> {
+        Box::new(self.clone())
     }
 }
 
@@ -578,7 +594,8 @@ pub(crate) mod tests {
     use std::sync::{Arc, Mutex};
 
     use ruff_db::Db as SourceDb;
-    use ruff_db::files::{FileRootKind, Files};
+    use ruff_db::diagnostic::Diagnostic;
+    use ruff_db::files::{File, FileRootKind, Files};
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_python_ast::PythonVersion;
@@ -622,7 +639,12 @@ pub(crate) mod tests {
                 project: None,
             };
 
-            let project = Project::from_metadata(&db, project, &FallibleStrategy).unwrap();
+            let (settings, settings_diagnostics) = project
+                .options()
+                .to_settings(&db, project.root(), &FallibleStrategy)
+                .unwrap();
+            let project =
+                Project::from_metadata(&db, project, settings, settings_diagnostics, Vec::new());
             db.project = Some(project);
             db
         }
@@ -713,6 +735,11 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl ty_python_semantic::Db for TestDb {
+        #[inline]
+        fn check_file(&self, file: File) -> Vec<Diagnostic> {
+            self.project().check_file(self, file)
+        }
+
         fn rule_selection(&self, _file: ruff_db::files::File) -> &RuleSelection {
             self.project().rules(self)
         }
@@ -727,6 +754,10 @@ pub(crate) mod tests {
 
         fn verbose(&self) -> bool {
             false
+        }
+
+        fn dyn_clone(&self) -> Box<dyn ty_python_semantic::Db> {
+            Box::new(self.clone())
         }
     }
 

@@ -900,6 +900,12 @@ pub(super) struct FlowSnapshot {
     reachability: ScopedReachabilityConstraintId,
 }
 
+impl FlowSnapshot {
+    pub(super) fn is_always_unreachable(&self) -> bool {
+        self.reachability == ScopedReachabilityConstraintId::ALWAYS_FALSE
+    }
+}
+
 /// A snapshot of the state of a single symbol (e.g. `obj`) and all of its associated members
 /// (e.g. `obj.attr`, `obj["key"]`).
 pub(super) struct SingleSymbolSnapshot {

@@ -46,12 +46,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
 error[invalid-typed-dict-statement]: invalid statement in TypedDict class body
   --> src/mdtest_snippet.py:17:5
    |
-15 |     a: int
-16 |     # error: [invalid-typed-dict-statement] "invalid statement in TypedDict class body"
 17 |     42
    |     ^^
-18 |     # error: [invalid-typed-dict-statement] "TypedDict item cannot have a value"
-19 |     b: str = "hello"
    |
 info: Only annotated declarations (`<name>: <type>`) are allowed.
 
@@ -61,12 +57,8 @@ info: Only annotated declarations (`<name>: <type>`) are allowed.
 error[invalid-typed-dict-statement]: TypedDict item cannot have a value
   --> src/mdtest_snippet.py:19:14
    |
-17 |     42
-18 |     # error: [invalid-typed-dict-statement] "TypedDict item cannot have a value"
 19 |     b: str = "hello"
    |              ^^^^^^^
-20 |     # error: [invalid-typed-dict-statement] "TypedDict class cannot have methods"
-21 |     def bar(self): ...
    |
 
 ```
@@ -75,12 +67,8 @@ error[invalid-typed-dict-statement]: TypedDict item cannot have a value
 error[invalid-typed-dict-statement]: TypedDict class cannot have methods
   --> src/mdtest_snippet.py:21:5
    |
-19 |     b: str = "hello"
-20 |     # error: [invalid-typed-dict-statement] "TypedDict class cannot have methods"
 21 |     def bar(self): ...
    |     ^^^^^^^^^^^^^^^^^^
-22 | class Baz(Bar):
-23 |     # error: [invalid-typed-dict-statement]
    |
 
 ```
@@ -89,8 +77,6 @@ error[invalid-typed-dict-statement]: TypedDict class cannot have methods
 error[invalid-typed-dict-statement]: TypedDict class cannot have methods
   --> src/mdtest_snippet.py:24:5
    |
-22 |   class Baz(Bar):
-23 |       # error: [invalid-typed-dict-statement]
 24 | /     def baz(self):
 25 | |         pass
    | |____________^

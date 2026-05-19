@@ -4,28 +4,28 @@ This repository contains both Ruff (a Python linter and formatter) and ty (a Pyt
 
 ## Running Tests
 
-Run all tests (using `nextest` for faster execution, setting `CARGO_PROFILE_DEV_OPT_LEVEL=1` to enable optimizations while retaining debug info, and setting `INSTA_FORCE_PASS=1 INSTA_UPDATE=always` to ensure all snapshots are updated):
+Run all tests (using `nextest` for faster execution, setting `CARGO_PROFILE_DEV_OPT_LEVEL=1 CARGO_PROFILE_DEV_DEBUG="line-tables-only"` to enable optimizations while retaining some debug info, and setting `INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1` to ensure all snapshots are updated):
 
 ```sh
-CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always cargo nextest run
+CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run
 ```
 
 Run tests for a specific crate:
 
 ```sh
-CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always cargo nextest run -p ty_python_semantic
+CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic
 ```
 
 Run a single mdtest file. The path to the mdtest file should be relative to the `crates/ty_python_semantic/resources/mdtest` folder:
 
 ```sh
-CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always cargo nextest run -p ty_python_semantic -- mdtest::<path/to/mdtest_file.md>
+CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic -- mdtest::<path/to/mdtest_file.md>
 ```
 
 To run a specific mdtest within a file, use a substring of the Markdown header text as `MDTEST_TEST_FILTER`. Only use this if it's necessary to isolate a single test case:
 
 ```sh
-MDTEST_TEST_FILTER="<filter>" CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always cargo nextest run -p ty_python_semantic -- mdtest::<path/to/mdtest_file.md>
+MDTEST_TEST_FILTER="<filter>" CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic -- mdtest::<path/to/mdtest_file.md>
 ```
 
 After running the tests, always review the contents of any snapshots that have been added or updated.
@@ -74,7 +74,7 @@ When working on ty, PR titles should start with `[ty]` and be tagged with the `t
 - Get your tests to pass. If you didn't run the tests, your code does not work.
 - Follow existing code style. Check neighboring files for patterns.
 - Rust imports should always go at the top of the file, never locally in functions.
-- Always run `uvx prek run -a` at the end of a task, after every rebase, after addressing any review comment, and before pushing any code.
+- Run `uvx prek` at the end of a task if you changed files in the repo. This includes changes such as rebases or addressing review comments. Prefer a branch-scoped run like `uvx prek run --from-ref '@{upstream}'`, which checks files changed relative to the current branch's configured upstream. If the branch has no configured upstream, use the intended base branch explicitly, usually `uvx prek run --from-ref main`. Use `uvx prek run -a` when a full-repository hook sweep is specifically needed.
 - Avoid writing significant amounts of new code. This is often a sign that we're missing an existing method or mechanism that could help solve the problem. Look for existing utilities first.
 - Try hard to avoid patterns that require `panic!`, `unreachable!`, or `.unwrap()`. Instead, try to encode those constraints in the type system. Don't be afraid to write code that's more verbose or requires largeish refactors if it enables you to avoid these unsafe calls.
 - Prefer let chains (`if let` combined with `&&`) over nested `if let` statements to reduce indentation and improve readability. At the end of a task, always check your work to see if you missed opportunities to use `let` chains.

@@ -125,6 +125,7 @@ pub(crate) enum SubscriptErrorKind<'db> {
     InvalidTypedDictKey {
         typed_dict: TypedDictType<'db>,
         slice_ty: Type<'db>,
+        full_object_ty: Option<Type<'db>>,
     },
     /// The type does not support subscripting via the expected dunder.
     NotSubscriptable {
@@ -184,6 +185,21 @@ impl<'db> SubscriptError<'db> {
 }
 
 impl<'db> SubscriptErrorKind<'db> {
+    fn with_full_object_ty(self, full_object_ty: Type<'db>) -> Self {
+        match self {
+            Self::InvalidTypedDictKey {
+                typed_dict,
+                slice_ty,
+                ..
+            } => Self::InvalidTypedDictKey {
+                typed_dict,
+                slice_ty,
+                full_object_ty: Some(full_object_ty),
+            },
+            other => other,
+        }
+    }
+
     fn report_diagnostic(
         &self,
         context: &InferContext<'db, '_>,
@@ -289,6 +305,7 @@ impl<'db> SubscriptErrorKind<'db> {
             Self::InvalidTypedDictKey {
                 typed_dict,
                 slice_ty,
+                full_object_ty,
             } => {
                 let typed_dict_ty = Type::TypedDict(*typed_dict);
                 report_invalid_key_on_typed_dict(
@@ -296,7 +313,7 @@ impl<'db> SubscriptErrorKind<'db> {
                     value_node.into(),
                     slice_node.into(),
                     typed_dict_ty,
-                    None,
+                    *full_object_ty,
                     *slice_ty,
                     typed_dict.items(db),
                 );
@@ -361,8 +378,14 @@ where
                 builder = builder.add(result);
             }
             Err(error) => {
+                let full_object_ty = Type::Union(union);
                 builder = builder.add(error.result_type());
-                errors.extend(error.into_errors());
+                errors.extend(
+                    error
+                        .into_errors()
+                        .into_iter()
+                        .map(|error| error.with_full_object_ty(full_object_ty)),
+                );
             }
         }
     }
@@ -384,6 +407,10 @@ fn map_intersection_subscript<'db, F>(
 where
     F: FnMut(Type<'db>) -> Result<Type<'db>, SubscriptError<'db>>,
 {
+    if let Some(alternatives) = intersection.finite_alternative_union(db) {
+        return map_fn(alternatives);
+    }
+
     let mut results = Vec::new();
     let mut errors = Vec::new();
 
@@ -413,15 +440,21 @@ where
 
     let mut builder = IntersectionBuilder::new(db);
     let mut collected_errors = Vec::new();
+    let full_object_ty = Type::Intersection(intersection);
 
     for error in errors {
         if !any_has_method || error.any_method_available() {
             builder = builder.add_positive(error.result_type());
             let error_iter = error.into_errors().into_iter();
             if any_has_method {
-                collected_errors.extend(error_iter.filter(SubscriptErrorKind::method_available));
+                collected_errors.extend(
+                    error_iter
+                        .filter(SubscriptErrorKind::method_available)
+                        .map(|error| error.with_full_object_ty(full_object_ty)),
+                );
             } else {
-                collected_errors.extend(error_iter);
+                collected_errors
+                    .extend(error_iter.map(|error| error.with_full_object_ty(full_object_ty)));
             }
         }
     }
@@ -457,6 +490,7 @@ fn typed_dict_subscript<'db>(
             SubscriptErrorKind::InvalidTypedDictKey {
                 typed_dict,
                 slice_ty,
+                full_object_ty: None,
             },
         ));
     };
@@ -468,6 +502,7 @@ fn typed_dict_subscript<'db>(
                 SubscriptErrorKind::InvalidTypedDictKey {
                     typed_dict,
                     slice_ty,
+                    full_object_ty: None,
                 },
             ))
         },
@@ -510,6 +545,14 @@ impl<'db> Type<'db> {
             (_, Type::Union(union)) => Some(map_union_subscript(db, union, |element| {
                 value_ty.subscript(db, element, expr_context)
             })),
+
+            (Type::EnumComplement(complement), _) => {
+                Some(complement.remaining_literal_union(db).subscript(db, slice_ty, expr_context))
+            }
+
+            (_, Type::EnumComplement(complement)) => {
+                Some(value_ty.subscript(db, complement.remaining_literal_union(db), expr_context))
+            }
 
             (Type::Intersection(intersection), _) => {
                 Some(map_intersection_subscript(db, intersection, |element| {
@@ -768,7 +811,7 @@ impl<'db> Type<'db> {
             Ok(outcome) => {
                 return Ok(outcome.return_type(db));
             }
-            Err(CallDunderError::PossiblyUnbound(bindings)) => {
+            Err(CallDunderError::PossiblyUnbound { bindings, .. }) => {
                 return Err(SubscriptError::new(
                     bindings.return_type(db),
                     SubscriptErrorKind::DunderPossiblyUnbound {
@@ -814,7 +857,7 @@ impl<'db> Type<'db> {
                 Ok(bindings) => {
                     return Ok(bindings.return_type(db));
                 }
-                Err(CallDunderError::PossiblyUnbound(bindings)) => {
+                Err(CallDunderError::PossiblyUnbound { bindings, .. }) => {
                     return Err(SubscriptError::new(
                         bindings.return_type(db),
                         SubscriptErrorKind::DunderPossiblyUnbound {

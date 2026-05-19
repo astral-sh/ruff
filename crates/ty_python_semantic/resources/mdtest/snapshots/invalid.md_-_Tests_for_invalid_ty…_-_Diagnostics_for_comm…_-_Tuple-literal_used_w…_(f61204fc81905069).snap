@@ -33,11 +33,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/invalid.md
 error[invalid-type-form]: Tuple literals are not allowed in this context in a parameter annotation
  --> src/mdtest_snippet.py:2:8
   |
-1 | def _(
 2 |     x: (),  # error: [invalid-type-form]
   |        ^^ Did you mean `tuple[()]`?
-3 | ) -> ():  # error: [invalid-type-form]
-4 |     return x
   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
@@ -48,12 +45,8 @@ info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotat
 error[invalid-type-form]: Tuple literals are not allowed in this context in a return type annotation
  --> src/mdtest_snippet.py:3:6
   |
-1 | def _(
-2 |     x: (),  # error: [invalid-type-form]
 3 | ) -> ():  # error: [invalid-type-form]
   |      ^^ Did you mean `tuple[()]`?
-4 |     return x
-5 | def _(
   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
@@ -64,12 +57,8 @@ info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotat
 error[invalid-type-form]: Tuple literals are not allowed in this context in a parameter annotation
  --> src/mdtest_snippet.py:6:8
   |
-4 |     return x
-5 | def _(
 6 |     x: (int,),  # error: [invalid-type-form]
   |        ^^^^^^ Did you mean `tuple[int]`?
-7 | ) -> (int,):  # error: [invalid-type-form]
-8 |     return x
   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
@@ -80,12 +69,8 @@ info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotat
 error[invalid-type-form]: Tuple literals are not allowed in this context in a return type annotation
  --> src/mdtest_snippet.py:7:6
   |
-5 | def _(
-6 |     x: (int,),  # error: [invalid-type-form]
 7 | ) -> (int,):  # error: [invalid-type-form]
   |      ^^^^^^ Did you mean `tuple[int]`?
-8 |     return x
-9 | def _(
   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
@@ -96,12 +81,8 @@ info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotat
 error[invalid-type-form]: Tuple literals are not allowed in this context in a parameter annotation
   --> src/mdtest_snippet.py:10:8
    |
- 8 |     return x
- 9 | def _(
 10 |     x: (int, str),  # error: [invalid-type-form]
    |        ^^^^^^^^^^ Did you mean `tuple[int, str]`?
-11 | ) -> (int, str):  # error: [invalid-type-form]
-12 |     return x
    |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
@@ -112,11 +93,8 @@ info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotat
 error[invalid-type-form]: Tuple literals are not allowed in this context in a return type annotation
   --> src/mdtest_snippet.py:11:6
    |
- 9 | def _(
-10 |     x: (int, str),  # error: [invalid-type-form]
 11 | ) -> (int, str):  # error: [invalid-type-form]
    |      ^^^^^^^^^^ Did you mean `tuple[int, str]`?
-12 |     return x
    |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions

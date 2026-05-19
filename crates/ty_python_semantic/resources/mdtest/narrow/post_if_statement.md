@@ -95,6 +95,29 @@ def _(x: A | B | C | D):
     reveal_type(x)  # revealed: (C & ~A) | (B & ~A & ~C)
 ```
 
+## Opaque branch predicates should not manufacture narrowing
+
+If a boolean flag is set by an opaque branch predicate, checking that flag later should not make an
+unknown value look more precise than it really is just because other branches contained narrowing
+checks.
+
+```py
+def cond(x) -> bool:
+    return bool(x)
+
+def _(x):
+    flag = False
+    if cond(x):
+        flag = True
+    elif isinstance(x, float):
+        return
+    elif isinstance(x, int):
+        return
+
+    if flag:
+        reveal_type(x)  # revealed: Unknown
+```
+
 ## Multiple sequential if-statements don't leak narrowing
 
 After a complete if/else where both branches flow through (no terminal), narrowing should be

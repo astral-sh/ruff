@@ -25,7 +25,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/legacy_typev
 warning[mismatched-type-name]: The name passed to `TypeVar` must match the variable it is assigned to
  --> src/mdtest_snippet.py:4:13
   |
-3 | # error: [mismatched-type-name]
 4 | T = TypeVar("Q")
   |             ^^^ Expected "T", got "Q"
   |

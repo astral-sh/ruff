@@ -35,8 +35,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.m
 error[parameter-already-assigned]: Multiple values provided for parameter `name` of function `f1`
   --> src/mdtest_snippet.py:14:18
    |
-12 |     # error: [parameter-already-assigned]
-13 |     # error: [unknown-argument]
 14 |     y = f("foo", name="bar", unknown="quux")
    |                  ^^^^^^^^^^
    |
@@ -49,8 +47,6 @@ info: Attempted to call union type `(def f1(name: str) -> int) | (def any(...) -
 error[unknown-argument]: Argument `unknown` does not match any known parameter of function `f1`
   --> src/mdtest_snippet.py:14:30
    |
-12 |     # error: [parameter-already-assigned]
-13 |     # error: [unknown-argument]
 14 |     y = f("foo", name="bar", unknown="quux")
    |                              ^^^^^^^^^^^^^^
    |

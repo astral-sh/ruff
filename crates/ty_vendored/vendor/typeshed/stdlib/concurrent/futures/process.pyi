@@ -141,7 +141,7 @@ class _SafeQueue(Queue[Future[Any]]):
 
     def _on_queue_feeder_error(self, e: Exception, obj: _CallItem) -> None: ...
 
-def _get_chunks(*iterables: Any, chunksize: int) -> Generator[tuple[Any, ...], None, None]:
+def _get_chunks(*iterables: Any, chunksize: int) -> Generator[tuple[Any, ...]]:
     """Iterates over zip()ed iterables in chunks."""
 
 def _process_chunk(fn: Callable[..., _T], chunk: Iterable[tuple[Any, ...]]) -> list[_T]:

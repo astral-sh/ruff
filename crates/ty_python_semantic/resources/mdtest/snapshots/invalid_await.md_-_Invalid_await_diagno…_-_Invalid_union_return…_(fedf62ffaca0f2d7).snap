@@ -35,7 +35,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_awai
 error[invalid-await]: `UnawaitableUnion` is not awaitable
   --> src/mdtest_snippet.py:14:11
    |
-13 | async def main() -> None:
 14 |     await UnawaitableUnion()  # error: [invalid-await]
    |           ^^^^^^^^^^^^^^^^^^
    |

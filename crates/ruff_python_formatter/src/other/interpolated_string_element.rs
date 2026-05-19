@@ -133,9 +133,9 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
             write!(
                 f,
                 [
-                    NormalizedDebugText(&debug_text.leading),
+                    NormalizedDebugText(debug_text.leading()),
                     verbatim_text(expression),
-                    NormalizedDebugText(&debug_text.trailing),
+                    NormalizedDebugText(debug_text.trailing()),
                 ]
             )?;
 

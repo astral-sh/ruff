@@ -84,6 +84,50 @@ c.flexible_int = None  # not okay
 reveal_type(c.flexible_int)  # revealed: int | None
 ```
 
+### Enum complement as descriptor mutation receiver
+
+`overloaded.pyi`:
+
+```pyi
+from enum import Enum
+from typing import Literal, overload
+
+class Marker:
+    @overload
+    def __set__(self, instance: "Literal[Color.GREEN]", value: int) -> None: ...
+    @overload
+    def __set__(self, instance: "Literal[Color.BLUE]", value: int) -> None: ...
+    def __set__(self, instance, value: int) -> None: ...
+    @overload
+    def __delete__(self, instance: "Literal[Color.GREEN]") -> None: ...
+    @overload
+    def __delete__(self, instance: "Literal[Color.BLUE]") -> None: ...
+    def __delete__(self, instance) -> None: ...
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+    marker: Marker
+```
+
+```py
+from typing import Literal
+
+from overloaded import Color
+
+def narrowed(color: Color):
+    if color is Color.RED:
+        return
+    color.marker = 1
+    del color.marker
+
+def explicit(color: Literal[Color.GREEN, Color.BLUE]):
+    color.marker = 1
+    del color.marker
+```
+
 ### Data and non-data descriptors
 
 Descriptors that define `__set__` or `__delete__` are called *data descriptors*. An example of a
@@ -568,8 +612,6 @@ class Derived(Base):
 
 ### Properties with no setters
 
-<!-- snapshot-diagnostics -->
-
 If a property has no setter, we emit a bespoke error message when a user attempts to set that
 attribute, since this is a common error.
 
@@ -578,8 +620,21 @@ class DontAssignToMe:
     @property
     def immutable(self): ...
 
-# error: [invalid-assignment]
+# snapshot: invalid-assignment
 DontAssignToMe().immutable = "the properties, they are a-changing"
+```
+
+```snapshot
+error[invalid-assignment]: Cannot assign to read-only property `immutable` on object of type `DontAssignToMe`
+ --> src/mdtest_snippet.py:3:9
+  |
+3 |     def immutable(self): ...
+  |         --------- Property `DontAssignToMe.immutable` defined here with no setter
+4 |
+5 | # snapshot: invalid-assignment
+6 | DontAssignToMe().immutable = "the properties, they are a-changing"
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Attempted assignment to `DontAssignToMe.immutable` here
+  |
 ```
 
 ### Built-in `classmethod` descriptor
@@ -896,6 +951,33 @@ class C:
     d: Descriptor1 = Descriptor1()
 
 reveal_type(C.d)  # revealed: int
+```
+
+### Descriptors with `Concatenate` self-types on `__get__`
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3289>.
+
+```py
+from typing import Any, Callable, Concatenate, Generic, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+P2 = ParamSpec("P2")
+T = TypeVar("T")
+
+class FunctionWrapper(Generic[P]):
+    def __get__(
+        self: "FunctionWrapper[Concatenate[T, P2]]",
+        instance: T,
+    ) -> None:
+        raise NotImplementedError
+
+def wrapper(fn: Callable[P, Any]) -> FunctionWrapper[P]:
+    raise NotImplementedError
+
+class Example:
+    @wrapper
+    def __call__(self) -> None:
+        pass
 ```
 
 [descriptors]: https://docs.python.org/3/howto/descriptor.html

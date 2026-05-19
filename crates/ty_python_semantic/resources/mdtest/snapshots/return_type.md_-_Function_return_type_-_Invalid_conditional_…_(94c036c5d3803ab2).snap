@@ -43,8 +43,6 @@ error[invalid-return-type]: Return type does not match returned value
 5 |         # error: [invalid-return-type]
 6 |         return 1
   |                ^ expected `str`, found `Literal[1]`
-7 |
-8 | def f(cond: bool) -> str:
   |
 
 ```
@@ -53,16 +51,12 @@ error[invalid-return-type]: Return type does not match returned value
 error[invalid-return-type]: Return type does not match returned value
   --> src/mdtest_snippet.py:8:22
    |
- 6 |         return 1
- 7 |
  8 | def f(cond: bool) -> str:
    |                      --- Expected `str` because of return type
  9 |     if cond:
 10 |         # error: [invalid-return-type]
 11 |         return 1
    |                ^ expected `str`, found `Literal[1]`
-12 |     else:
-13 |         # error: [invalid-return-type]
    |
 
 ```
@@ -71,19 +65,13 @@ error[invalid-return-type]: Return type does not match returned value
 error[invalid-return-type]: Return type does not match returned value
   --> src/mdtest_snippet.py:14:16
    |
-12 |     else:
-13 |         # error: [invalid-return-type]
 14 |         return 2
    |                ^ expected `str`, found `Literal[2]`
    |
   ::: src/mdtest_snippet.py:8:22
    |
- 6 |         return 1
- 7 |
  8 | def f(cond: bool) -> str:
    |                      --- Expected `str` because of return type
- 9 |     if cond:
-10 |         # error: [invalid-return-type]
    |
 
 ```

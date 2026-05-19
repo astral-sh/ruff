@@ -136,7 +136,7 @@ impl Client {
                 method.to_string(),
                 Value::Null,
             )))
-            .map_err(|error| anyhow!("Failed to send notification (method={method}): {error}",))
+            .map_err(|error| anyhow!("Failed to send notification (method={method}): {error}"))
     }
 
     /// Sends a response to the client for a given request ID.

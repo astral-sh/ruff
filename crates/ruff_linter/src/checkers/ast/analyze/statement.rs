@@ -342,6 +342,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::PytestParameterWithDefaultArgument) {
                 flake8_pytest_style::rules::parameter_with_default_argument(checker, function_def);
             }
+            if checker.is_rule_enabled(Rule::AirflowTaskBranchAsShortCircuit) {
+                airflow::rules::task_branch_as_short_circuit(checker, function_def);
+            }
+            if checker.is_rule_enabled(Rule::AirflowTaskImplicitMultipleOutputs) {
+                airflow::rules::task_implicit_multiple_outputs(checker, function_def);
+            }
             if checker.is_rule_enabled(Rule::Airflow3Removal) {
                 airflow::rules::airflow_3_removal_function_def(checker, function_def);
             }
@@ -1328,6 +1334,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
         ) => {
             if checker.is_rule_enabled(Rule::TooManyNestedBlocks) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
+            }
+            if checker.is_rule_enabled(Rule::TooManyStatementsInTryClause) {
+                pylint::rules::too_many_try_statements(
+                    checker,
+                    stmt,
+                    body,
+                    checker.settings().pylint.max_statements_in_try,
+                );
             }
             if checker.is_rule_enabled(Rule::JumpStatementInFinally) {
                 flake8_bugbear::rules::jump_statement_in_finally(checker, finalbody);

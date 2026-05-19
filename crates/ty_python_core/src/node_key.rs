@@ -3,7 +3,7 @@ use ruff_python_ast::{HasNodeIndex, NodeIndex};
 use crate::ast_node_ref::AstNodeRef;
 
 /// Compact key for a node for use in a hash map.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, get_size2::GetSize)]
 pub struct NodeKey(NodeIndex);
 
 impl NodeKey {

@@ -17,7 +17,6 @@ doctest = false
 [dependencies]
 ruff_cache = { workspace = true }
 ruff_db = { workspace = true, features = ["cache", "serde"] }
-ruff_diagnostics = { workspace = true }
 ruff_macros = { workspace = true }
 ruff_memory_usage = { workspace = true }
 ruff_options_metadata = { workspace = true }
@@ -57,7 +56,6 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing"] }
-ruff_python_trivia = { workspace = true }
 
 insta = { workspace = true, features = ["redactions", "ron"] }
 

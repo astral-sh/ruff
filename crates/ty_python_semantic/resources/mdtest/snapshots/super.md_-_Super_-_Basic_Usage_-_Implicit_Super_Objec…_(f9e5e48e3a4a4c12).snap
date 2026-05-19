@@ -164,11 +164,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
 error[invalid-super-argument]: `S@method7` is not an instance or subclass of `<class 'Foo'>` in `super(<class 'Foo'>, S@method7)` call
   --> src/mdtest_snippet.py:82:21
    |
-80 |         # error: [invalid-super-argument]
-81 |         # revealed: Unknown
 82 |         reveal_type(super())
    |                     ^^^^^^^
-83 |         return self
    |
 info: Type variable `S` has `object` as its implicit upper bound
 info: `object` is not an instance or subclass of `<class 'Foo'>`
@@ -180,11 +177,8 @@ help: Consider adding an upper bound to type variable `S`
 error[invalid-super-argument]: `S@method8` is not an instance or subclass of `<class 'Foo'>` in `super(<class 'Foo'>, S@method8)` call
   --> src/mdtest_snippet.py:88:21
    |
-86 |         # error: [invalid-super-argument]
-87 |         # revealed: Unknown
 88 |         reveal_type(super())
    |                     ^^^^^^^
-89 |         return self
    |
 info: Type variable `S` has upper bound `int`
 info: `int` is not an instance or subclass of `<class 'Foo'>`
@@ -195,11 +189,8 @@ info: `int` is not an instance or subclass of `<class 'Foo'>`
 error[invalid-super-argument]: `S@method9` is not an instance or subclass of `<class 'Foo'>` in `super(<class 'Foo'>, S@method9)` call
   --> src/mdtest_snippet.py:94:21
    |
-92 |         # error: [invalid-super-argument]
-93 |         # revealed: Unknown
 94 |         reveal_type(super())
    |                     ^^^^^^^
-95 |         return self
    |
 info: Type variable `S` has constraints `int, str`
 info: `int | str` is not an instance or subclass of `<class 'Foo'>`
@@ -210,12 +201,8 @@ info: `int | str` is not an instance or subclass of `<class 'Foo'>`
 error[invalid-super-argument]: `S@method10` is a type variable with an abstract/structural type as its bounds or constraints, in `super(<class 'Foo'>, S@method10)` call
    --> src/mdtest_snippet.py:100:21
     |
- 98 |         # error: [invalid-super-argument]
- 99 |         # revealed: Unknown
 100 |         reveal_type(super())
     |                     ^^^^^^^
-101 |         return self
-102 |     # TypeVar bounded by `type[Foo]` rather than `Foo`
     |
 info: Type variable `S` has upper bound `(...) -> str`
 

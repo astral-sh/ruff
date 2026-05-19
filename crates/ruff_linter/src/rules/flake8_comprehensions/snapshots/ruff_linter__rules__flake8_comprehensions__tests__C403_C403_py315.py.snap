@@ -1,0 +1,17 @@
+---
+source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
+---
+C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
+ --> C403_py315.py:3:1
+  |
+1 | xs = [[1], [2]]
+2 |
+3 | set([*x for x in xs])
+  | ^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Rewrite as a set comprehension
+1 | xs = [[1], [2]]
+2 |
+  - set([*x for x in xs])
+3 + {*x for x in xs}
+note: This is an unsafe fix and may change runtime behavior
