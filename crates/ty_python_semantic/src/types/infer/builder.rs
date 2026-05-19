@@ -6169,13 +6169,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let union_elements = union.elements(self.db());
                 let mut typed_dicts = Vec::new();
                 let mut has_dict_compatible_fallback = false;
+                let dict_fallback = KnownClass::Dict
+                    .to_specialized_instance(self.db(), &[Type::unknown(), Type::unknown()]);
+                let mapping_fallback = KnownClass::Mapping
+                    .to_specialized_instance(self.db(), &[Type::unknown(), Type::unknown()]);
 
                 for element in union_elements {
                     let element = element.resolve_type_alias(self.db());
 
                     if let Some(typed_dict) = element.as_typed_dict() {
                         typed_dicts.push(typed_dict);
-                    } else if element.is_instance_of(self.db(), KnownClass::Dict) {
+                    } else if dict_fallback.is_assignable_to(self.db(), element)
+                        && element.is_assignable_to(self.db(), mapping_fallback)
+                    {
                         has_dict_compatible_fallback = true;
                     }
                 }
