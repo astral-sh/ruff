@@ -309,6 +309,17 @@ mod tests {
     }
 
     #[test]
+    fn incorrect_decorator_order_py312() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF074.py"),
+            &settings::LinterSettings::for_rule(Rule::IncorrectDecoratorOrder)
+                .with_target_version(PythonVersion::PY312),
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn access_annotations_from_class_dict_py39_no_typing_extensions() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF063.py"),

@@ -3,7 +3,7 @@ use std::fmt;
 use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::{self as ast, Decorator, Expr};
+use ruff_python_ast::{self as ast, Decorator, Expr, PythonVersion};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -70,7 +70,7 @@ pub(crate) fn incorrect_decorator_order(checker: &Checker, decorator_list: &[Dec
         ) else {
             continue;
         };
-        if is_incorrect_order(outer, inner) {
+        if is_incorrect_order(outer, inner, checker) {
             checker.report_diagnostic(
                 IncorrectDecoratorOrder {
                     outer_decorator: outer,
@@ -140,17 +140,35 @@ fn classify_decorator(checker: &Checker, decorator: &Decorator) -> Option<KnownD
 }
 
 /// Returns `true` if `outer` above `inner` is a known-bad ordering.
-fn is_incorrect_order(outer: KnownDecorator, inner: KnownDecorator) -> bool {
-    matches!(
-        (outer, inner),
+fn is_incorrect_order(outer: KnownDecorator, inner: KnownDecorator, checker: &Checker) -> bool {
+    match (outer, inner) {
         // @abstractmethod must be innermost when combined with descriptors
-        (KnownDecorator::AbstractMethod, KnownDecorator::Property | KnownDecorator::ClassMethod | KnownDecorator::StaticMethod)
+        (
+            KnownDecorator::AbstractMethod,
+            KnownDecorator::Property | KnownDecorator::ClassMethod | KnownDecorator::StaticMethod,
+        ) => true,
         // @contextmanager / @asynccontextmanager must wrap the raw function,
         // not a classmethod descriptor
-        | (KnownDecorator::ContextManager | KnownDecorator::AsyncContextManager, KnownDecorator::ClassMethod)
+        (
+            KnownDecorator::ContextManager | KnownDecorator::AsyncContextManager,
+            KnownDecorator::ClassMethod,
+        ) => true,
         // Caching decorators must not wrap descriptors
-        | (KnownDecorator::FunctoolsCache | KnownDecorator::FunctoolsLruCache, KnownDecorator::Property | KnownDecorator::ClassMethod | KnownDecorator::FunctoolsCachedProperty)
+        (
+            KnownDecorator::FunctoolsCache | KnownDecorator::FunctoolsLruCache,
+            KnownDecorator::Property
+            | KnownDecorator::ClassMethod
+            | KnownDecorator::FunctoolsCachedProperty,
+        ) => true,
         // @cached_property outside @abstractmethod silently empties `__abstractmethods__`
-        | (KnownDecorator::FunctoolsCachedProperty, KnownDecorator::AbstractMethod)
-    )
+        (KnownDecorator::FunctoolsCachedProperty, KnownDecorator::AbstractMethod) => true,
+        // CPython 3.13 fixed `@classmethod` outside `@cached_property`; earlier
+        // versions raise `TypeError` on attribute access.
+        (KnownDecorator::ClassMethod, KnownDecorator::FunctoolsCachedProperty)
+            if checker.target_version() < PythonVersion::PY313 =>
+        {
+            true
+        }
+        _ => false,
+    }
 }
