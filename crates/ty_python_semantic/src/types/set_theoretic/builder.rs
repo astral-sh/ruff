@@ -776,10 +776,12 @@ impl<'db> UnionBuilder<'db> {
                     }
                     LiteralValueTypeKind::Enum(enum_member_to_add) => {
                         let enum_class = enum_member_to_add.enum_class(self.db);
-                        let metadata = enum_metadata(self.db, enum_class)
-                            .expect("Class of enum literal is an enum");
+                        // Metadata is only needed for enum-wide simplifications; class identity
+                        // is enough to preserve a precise set of enum literals during cycle
+                        // recovery.
+                        let metadata = enum_metadata(self.db, enum_class);
 
-                        if metadata.members.len() == 1 {
+                        if metadata.is_some_and(|metadata| metadata.members.len() == 1) {
                             self.add_in_place_impl(
                                 enum_member_to_add.enum_class_instance(self.db),
                                 seen_aliases,
@@ -840,7 +842,9 @@ impl<'db> UnionBuilder<'db> {
                                 ordermap::map::Entry::Vacant(entry) => {
                                     entry.insert(literal.is_promotable());
 
-                                    if found.len() == metadata.members.len() {
+                                    if metadata.is_some_and(|metadata| {
+                                        found.len() == metadata.members.len()
+                                    }) {
                                         self.add_in_place_impl(
                                             enum_member_to_add.enum_class_instance(self.db),
                                             seen_aliases,
