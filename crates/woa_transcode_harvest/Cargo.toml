@@ -1,0 +1,30 @@
+[package]
+name = "woa_transcode_harvest"
+version = "0.1.0"
+publish = false
+edition = "2024"
+rust-version = "1.86"
+description = "Per-route transcode bundle harvester for WoA -> woa-rs port. Additive consumer of ruff_python_parser / ruff_python_ast. See RFC-v02-005 in AdaWorldAPI/woa-rs."
+license = "MIT"
+
+[lib]
+name = "woa_transcode_harvest"
+
+[[bin]]
+name = "woa-transcode"
+path = "src/bin/woa_transcode.rs"
+
+[dependencies]
+ruff_python_ast = { workspace = true }
+ruff_python_parser = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
+
+anyhow = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+walkdir = { workspace = true }
+
+[lints]
+workspace = true
