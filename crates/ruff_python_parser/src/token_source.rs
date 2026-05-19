@@ -50,8 +50,7 @@ impl<'src> TokenSource<'src> {
     }
 
     /// Returns the current parenthesis, bracket, and brace nesting level.
-    #[expect(clippy::inline_always, reason = "parser recursion guard hot path")]
-    #[inline(always)]
+    #[inline]
     pub(crate) fn nesting(&self) -> u32 {
         self.lexer.nesting()
     }
