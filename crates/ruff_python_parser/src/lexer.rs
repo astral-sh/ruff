@@ -132,7 +132,8 @@ impl<'src> Lexer<'src> {
     }
 
     /// Returns the current parenthesis, bracket, and brace nesting level.
-    #[inline]
+    #[expect(clippy::inline_always, reason = "parser recursion guard hot path")]
+    #[inline(always)]
     pub(crate) const fn nesting(&self) -> u32 {
         self.nesting
     }

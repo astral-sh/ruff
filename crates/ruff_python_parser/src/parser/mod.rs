@@ -113,7 +113,8 @@ impl<'src> Parser<'src> {
         Some(result)
     }
 
-    #[inline]
+    #[expect(clippy::inline_always, reason = "parser recursion guard hot path")]
+    #[inline(always)]
     fn current_nesting_exceeds_recursion_limit(&self) -> bool {
         self.tokens.nesting() > self.max_nesting_depth
     }
