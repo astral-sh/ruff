@@ -136,4 +136,10 @@ warning[redundant-cast]: Value is already of type `int`
 7 | cast(val=secrets.randbelow(10), typ=int)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
+help: Remove the redundant `cast`
+4 | # snapshot: redundant-cast
+5 | cast(int, secrets.randbelow(10))
+6 | # snapshot: redundant-cast
+  - cast(val=secrets.randbelow(10), typ=int)
+7 + secrets.randbelow(10)
 ```

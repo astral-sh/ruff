@@ -2233,7 +2233,9 @@ impl KnownFunction {
                                 "`{casted_display}` is equivalent to `{source_display}`",
                             ));
                         }
-                        if let Some(source_expr) = call_expression.arguments.args.get(1) {
+                        if let Some(source_expr) =
+                            call_expression.arguments.find_argument_value("val", 1)
+                        {
                             diagnostic.help("Remove the redundant `cast`");
                             diagnostic.set_fix(Fix::safe_edits(
                                 Edit::deletion(call_expression.start(), source_expr.start()),
