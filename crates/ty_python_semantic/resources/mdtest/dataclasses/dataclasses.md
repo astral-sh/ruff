@@ -457,12 +457,8 @@ class Child(Parent):  # error: [subclass-of-dataclass-with-order]
 This also applies when the child class is also a dataclass:
 
 ```py
-@dataclass(order=True)
-class OrderedParent:
-    x: int
-
 @dataclass
-class OrderedChild(OrderedParent):  # error: [subclass-of-dataclass-with-order]
+class DataclassChild(Parent):  # error: [subclass-of-dataclass-with-order]
     y: str
 ```
 
@@ -471,66 +467,42 @@ comparisons with the parent class still raise `TypeError` at runtime:
 
 ```py
 @dataclass(order=True)
-class OrderedParent2:
-    x: int
-
-@dataclass(order=True)
-class OrderedChild2(OrderedParent2):  # error: [subclass-of-dataclass-with-order]
+class OrderedChild(Parent):  # error: [subclass-of-dataclass-with-order]
     y: str
 ```
 
 If the child class manually overrides all comparison methods, the diagnostic is also suppressed:
 
 ```py
-@dataclass(order=True)
-class OrderedParent3:
-    x: int
-
-class ManualChild(OrderedParent3):  # No warning - all comparison methods overridden
-    def __lt__(self, other: OrderedParent3) -> bool:
+class ManualChild(Parent):  # No warning - all comparison methods overridden
+    def __lt__(self, other: Parent) -> bool:
         return True
 
-    def __le__(self, other: OrderedParent3) -> bool:
+    def __le__(self, other: Parent) -> bool:
         return True
 
-    def __gt__(self, other: OrderedParent3) -> bool:
+    def __gt__(self, other: Parent) -> bool:
         return True
 
-    def __ge__(self, other: OrderedParent3) -> bool:
+    def __ge__(self, other: Parent) -> bool:
         return True
 ```
 
-If a parent dataclass has `order=True` and a child also has `order=True`, both the child and a
-grandchild are warned:
+Descendants of an ordered dataclass child are warned as well:
 
 ```py
-@dataclass(order=True)
-class OrderedGrandparent:
-    x: int
-
-@dataclass(order=True)
-class OrderedParent4(OrderedGrandparent):  # error: [subclass-of-dataclass-with-order]
-    y: str
-
-class OrderedGrandchild(OrderedParent4):  # error: [subclass-of-dataclass-with-order]
+class Grandchild(OrderedChild):  # error: [subclass-of-dataclass-with-order]
     pass
 
 @dataclass(order=True)
-class OrderedGrandchild2(OrderedParent4):  # error: [subclass-of-dataclass-with-order]
+class OrderedGrandchild(OrderedChild):  # error: [subclass-of-dataclass-with-order]
     z: float
 ```
 
 This also applies if the intermediate subclass is not itself a dataclass:
 
 ```py
-@dataclass(order=True)
-class OrderedGrandparent2:
-    x: int
-
-class OrderedParent5(OrderedGrandparent2):  # error: [subclass-of-dataclass-with-order]
-    pass
-
-class OrderedGrandchild3(OrderedParent5):  # error: [subclass-of-dataclass-with-order]
+class IndirectGrandchild(Child):  # error: [subclass-of-dataclass-with-order]
     pass
 ```
 
