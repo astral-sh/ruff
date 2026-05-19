@@ -135,7 +135,7 @@ pub enum KnownInstanceType<'db> {
     /// the remaining callable signature after binding some arguments.
     FunctoolsPartial(FunctoolsPartialInstance<'db>),
 
-    /// A `range(...)` call result where we could determine whether it is empty.
+    /// A `range(...)` call result where we could determine whether it is non-empty.
     Range { is_non_empty: bool },
 }
 
