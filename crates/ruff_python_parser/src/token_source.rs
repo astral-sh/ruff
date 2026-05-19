@@ -50,6 +50,7 @@ impl<'src> TokenSource<'src> {
     }
 
     /// Returns the current parenthesis, bracket, and brace nesting level.
+    #[inline]
     pub(crate) fn nesting(&self) -> u32 {
         self.lexer.nesting()
     }

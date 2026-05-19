@@ -59,6 +59,9 @@ pub(crate) struct Parser<'src> {
 
     /// Current parser recursion depth remaining before the depth limit is exceeded.
     depth_remaining: u16,
+
+    /// Maximum lexer nesting depth before postfix calls and subscripts should stop recursing.
+    max_nesting_depth: u32,
 }
 
 impl<'src> Parser<'src> {
@@ -75,6 +78,7 @@ impl<'src> Parser<'src> {
     ) -> Self {
         let tokens = TokenSource::from_source(source, options.mode, start_offset);
         let depth_remaining = options.max_recursion_depth;
+        let max_nesting_depth = u32::from(options.max_recursion_depth.saturating_sub(2));
 
         Parser {
             options,
@@ -87,6 +91,7 @@ impl<'src> Parser<'src> {
             start_offset,
             current_token_id: TokenId::default(),
             depth_remaining,
+            max_nesting_depth,
         }
     }
 
@@ -116,7 +121,7 @@ impl<'src> Parser<'src> {
 
     #[inline]
     fn current_nesting_exceeds_recursion_limit(&self) -> bool {
-        self.tokens.nesting() > u32::from(self.options.max_recursion_depth.saturating_sub(2))
+        self.tokens.nesting() > self.max_nesting_depth
     }
 
     #[cold]

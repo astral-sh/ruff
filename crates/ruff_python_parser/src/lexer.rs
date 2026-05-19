@@ -132,6 +132,7 @@ impl<'src> Lexer<'src> {
     }
 
     /// Returns the current parenthesis, bracket, and brace nesting level.
+    #[inline]
     pub(crate) const fn nesting(&self) -> u32 {
         self.nesting
     }
