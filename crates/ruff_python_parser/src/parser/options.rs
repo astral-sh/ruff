@@ -11,7 +11,7 @@ use crate::{AsMode, Mode};
 /// The default value mirrors CPython's `MAXSTACK` of 200 nested parentheses
 /// (`Parser/parser.c`): a one-statement module of the form `((((1))))` at
 /// depth 200 must parse, and one at depth 201 must fail. Each nesting level
-/// costs one `with_recursion` call, plus two framing calls (one for the
+/// costs one `enter_recursion` call, plus two framing calls (one for the
 /// surrounding statement and one for the innermost atom), so the cap is set
 /// to `200 + 2`.
 const DEFAULT_MAX_RECURSION_DEPTH: u16 = 202;

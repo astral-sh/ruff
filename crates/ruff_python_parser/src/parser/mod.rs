@@ -94,7 +94,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Runs `f` if the recursive parser depth limit has not been hit.
+    /// Enters a recursive parsing function if the parser depth limit has not been hit.
     ///
     /// # Note
     ///
@@ -102,15 +102,18 @@ impl<'src> Parser<'src> {
     /// fix is to refactor the parser to avoid recursive calls.
     #[must_use]
     #[inline]
-    fn with_recursion<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> Option<T> {
+    fn enter_recursion(&mut self) -> bool {
         if self.depth_remaining == 0 {
-            return None;
+            return false;
         }
 
         self.depth_remaining -= 1;
-        let result = f(self);
+        true
+    }
+
+    #[inline]
+    fn exit_recursion(&mut self) {
         self.depth_remaining += 1;
-        Some(result)
     }
 
     #[inline]
