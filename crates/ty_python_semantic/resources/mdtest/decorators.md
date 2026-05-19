@@ -307,8 +307,6 @@ class AcceptsType:
     def __init__(self, cls: type) -> None:
         self.cls = cls
 
-# Decorator call is validated, but the type transformation isn't applied yet.
-# TODO: Class decorator return types should transform the class binding type.
 @AcceptsType
 class MyClass: ...
 
@@ -445,6 +443,8 @@ reveal_type(IntThenDataclass)  # revealed: Unknown
 @WrapBackend
 class InvalidWrappedBase(1): ...  # error: [invalid-base]
 
+reveal_type(InvalidWrappedBase)  # revealed: WrapBackend
+
 @WrapBackend
 class GenericCacheClient(Generic[T]):
     value: T
@@ -457,10 +457,11 @@ reveal_type(GenericCacheClient)  # revealed: WrapBackend
 @WrapBackend
 class OverloadedCacheClient:
     @overload
-    # error: [invalid-overload] "Overloads for function `get` must be followed by a non-`@overload`-decorated implementation function"
     def get(self, key: str) -> bytes: ...
     @overload
     def get(self, key: bytes) -> bytes: ...
+    def get(self, key: str | bytes) -> bytes:
+        return b""
 ```
 
 Unannotated class decorators are assumed to preserve the class binding. We do not infer returned
@@ -527,6 +528,13 @@ explicit_return_decorator = ExplicitReturnDecorator()
 class ExplicitReturnCallableInstanceDecorated: ...
 
 reveal_type(ExplicitReturnCallableInstanceDecorated)  # revealed: Unknown
+
+specialized_explicit_return_decorator = ExplicitReturnDecorator[int]()
+
+@specialized_explicit_return_decorator
+class SpecializedExplicitReturnCallableInstanceDecorated: ...
+
+reveal_type(SpecializedExplicitReturnCallableInstanceDecorated)  # revealed: int
 ```
 
 An unknown class decorator still makes the class binding unknown:

@@ -4979,6 +4979,21 @@ class Foo(TypedDict("Foo", {"x": int, "y": str})):
     pass
 ```
 
+Other class decorators can replace the public TypedDict binding:
+
+```py
+from typing import TypedDict
+
+class ReplacesClass:
+    def __init__(self, cls: type[object]) -> None: ...
+
+@ReplacesClass
+class Decorated(TypedDict):
+    name: str
+
+reveal_type(Decorated)  # revealed: ReplacesClass
+```
+
 ## Class header validation
 
 <!-- snapshot-diagnostics -->
@@ -5326,14 +5341,6 @@ class B(TypedDict, extra_items=ReadOnly[int]):
 
 # error: [invalid-type-form] "Type qualifier `typing.Required` is not valid in a TypedDict `extra_items` argument"
 class C(TypedDict, extra_items=Required[int]):
-    name: str
-
-class ReplacesClass:
-    def __init__(self, cls: type[object]) -> None: ...
-
-@ReplacesClass
-# error: [invalid-type-form] "Type qualifier `typing.Required` is not valid in a TypedDict `extra_items` argument"
-class DecoratedC(TypedDict, extra_items=Required[int]):
     name: str
 
 # error: [invalid-type-form] "Type qualifier `typing.NotRequired` is not valid in a TypedDict `extra_items` argument"
