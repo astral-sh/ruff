@@ -260,7 +260,7 @@ except ValueError as err:
         );
 
         assert_snapshot!(test.references(), @"
-        info[references]: Found 4 references
+        info[references]: Found 5 references
           --> main.py:4:29
            |
          4 | except ZeroDivisionError as err:
@@ -273,6 +273,7 @@ except ValueError as err:
          8 | try:
          9 |     y = 2 / 0
         10 | except ValueError as err:
+           |                      ---
         11 |     print(f'Different error: {err}')
            |                               ---
            |
