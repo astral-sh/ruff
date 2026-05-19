@@ -37,7 +37,10 @@ use crate::place::{
     place_from_bindings_with_reachability_cache, place_from_declarations_with_reachability_cache,
     typing_extensions_symbol,
 };
-use crate::reachability::{ReachabilityEvaluationCache, evaluate_reachability_with_cache};
+use crate::reachability::{
+    ReachabilityConstraintsExtension, ReachabilityEvaluationCache, evaluate_reachability_with_cache,
+    loop_header_reachability_node_count,
+};
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
@@ -2270,9 +2273,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Loop-header types are an approximation point for loop fixpoint analysis. Inferring the
         // exact union of every visible loop-back binding can recursively force inference of large
         // boolean expressions and explode on real-world loops.
-        if use_def.reachability_constraints().used_interiors().len()
-            > MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES
-        {
+        if loop_header_reachability_node_count(use_def) > MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES {
             self.bindings.insert(definition, Type::unknown());
             return;
         }

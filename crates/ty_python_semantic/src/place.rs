@@ -8,7 +8,8 @@ use ty_module_resolver::{
 
 use crate::dunder_all::dunder_all_names;
 use crate::reachability::{
-    ReachabilityEvaluationCache, evaluate_reachability, evaluate_reachability_with_cache,
+    ReachabilityConstraintsExtension, ReachabilityEvaluationCache, evaluate_reachability,
+    evaluate_reachability_with_cache, loop_header_reachability_node_count,
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
@@ -1374,8 +1375,8 @@ fn loop_header_reachability_impl<'db>(
     let mut deleted_reachability = Truthiness::AlwaysFalse;
     let mut reachable_bindings = FxIndexSet::default();
     let live_bindings: Vec<_> = loop_header.bindings_for_place(place).collect();
-    let use_exact_reachability = use_def.reachability_constraints().used_interiors().len()
-        <= MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES;
+    let use_exact_reachability =
+        loop_header_reachability_node_count(use_def) <= MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES;
 
     for live_binding in live_bindings {
         let reachability = if is_cycle_initial {

@@ -1281,8 +1281,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 source_sentinel.is_same_sentinel(db, target_sentinel),
             ),
 
-            // Do not make a `range(0)` assignment a permanently empty-range target type. The
-            // known instance only carries truthiness information for the value expression itself.
+            // A `range(0)` initializer can become the inferred target type for later assignments,
+            // but the emptiness refinement only applies to the original value expression.
             (_, Type::KnownInstance(known_instance @ KnownInstanceType::Range { .. })) => {
                 self.check_type_pair(db, source, known_instance.instance_fallback(db))
             }
@@ -1885,13 +1885,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             {
                 self.check_type_pair(db, KnownClass::Type.to_instance(db), target)
             }
-
-            // `KnownInstanceType::Range` only refines the truthiness of a `range(...)` call; it
-            // still satisfies structural protocols through the ordinary nominal `range` instance.
-            (
-                Type::KnownInstance(known_instance @ KnownInstanceType::Range { .. }),
-                Type::ProtocolInstance(_),
-            ) => self.check_type_pair(db, known_instance.instance_fallback(db), target),
 
             (_, Type::ProtocolInstance(target_proto)) => {
                 self.with_recursion_guard(source, target, || {
