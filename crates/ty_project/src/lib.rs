@@ -17,7 +17,7 @@ use ruff_db::diagnostic::{
 };
 use ruff_db::files::{File, FileRootKind};
 use ruff_db::parsed::parsed_module;
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
 use salsa::{Database, Durability, Setter};
 use std::backtrace::BacktraceStatus;
@@ -602,10 +602,12 @@ impl Project {
         I: IntoIterator<Item = P>,
         P: AsRef<SystemPath>,
     {
-        let paths = paths
-            .into_iter()
-            .map(|path| SystemPath::absolute(path, db.system().current_directory()))
-            .collect::<BTreeSet<_>>();
+        let paths = deduplicate_nested_paths(
+            paths
+                .into_iter()
+                .map(|path| SystemPath::absolute(path, db.system().current_directory())),
+        )
+        .collect::<BTreeSet<_>>();
 
         if paths.is_empty() {
             return;
@@ -622,9 +624,10 @@ impl Project {
                 .copied()
                 .filter(|file| {
                     file.path(db).as_system_path().is_some_and(|file_path| {
-                        file_path
-                            .ancestors()
-                            .any(|ancestor| paths.contains(ancestor))
+                        paths
+                            .range(..=file_path.to_path_buf())
+                            .next_back()
+                            .is_some_and(|path| file_path.starts_with(path))
                     })
                 })
                 .collect::<Vec<_>>()
@@ -679,7 +682,7 @@ impl Project {
                         .entered();
                 let start = ruff_db::Instant::now();
 
-                let walker = ProjectFilesWalker::new(db);
+                let walker = ProjectFilesWalker::full();
                 let (files, diagnostics) = walker.collect_set(db);
 
                 tracing::info!(

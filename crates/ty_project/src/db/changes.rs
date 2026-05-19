@@ -182,10 +182,7 @@ impl ProjectDatabase {
                     // when checking the project.
                     if self.system().is_file(path) {
                         if project.is_file_included(self, path) {
-                            // Add the parent directory because `walkdir`
-                            // always visits explicitly passed files even if
-                            // they match an exclude filter.
-                            added_paths.insert(path.parent().unwrap().to_path_buf());
+                            added_paths.insert(path.to_path_buf());
                         }
                     } else if project.is_directory_included(self, path) {
                         added_paths.insert(path.clone());
@@ -381,12 +378,11 @@ impl ProjectDatabase {
             }
         }
 
-        project.remove_files_under(self, deduplicate_nested_paths(removed_paths));
+        project.remove_files_under(self, removed_paths);
 
-        let diagnostics = if !project.file_set(self).is_lazy()
-            && let Some(walker) = ProjectFilesWalker::incremental(self, added_paths)
-        {
+        let diagnostics = if !project.file_set(self).is_lazy() {
             // Use directory walking to discover newly added files.
+            let walker = ProjectFilesWalker::incremental(added_paths);
             let (files, diagnostics) = walker.collect_vec(self);
 
             for file in files {
