@@ -234,9 +234,7 @@ impl<'db> KnownInstanceType<'db> {
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Self::Callable),
             Self::NewType(newtype) => newtype
-                .try_map_base_class_type(db, |class_type| {
-                    class_type.recursive_type_normalized_impl(db, div, true)
-                })
+                .recursive_type_normalized_impl(db, div, true)
                 .map(Self::NewType),
             Self::Sentinel(sentinel) => Some(Self::Sentinel(sentinel)),
             Self::GenericContext(generic) => Some(Self::GenericContext(generic)),
