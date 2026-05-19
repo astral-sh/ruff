@@ -346,31 +346,35 @@ impl<'src> Parser<'src> {
         context: ExpressionContext,
     ) -> ParsedExpr {
         let token = self.current_token_kind();
-        match token {
-            TokenKind::Plus
-            | TokenKind::Minus
-            | TokenKind::Tilde
-            | TokenKind::Not
-            | TokenKind::Star
-            | TokenKind::Await
-            | TokenKind::Lambda
-            | TokenKind::Yield
-            | TokenKind::FStringStart
-            | TokenKind::TStringStart
-            | TokenKind::Lpar
-            | TokenKind::Lsqb
-            | TokenKind::Lbrace => {
-                if let Some(result) = self.with_recursion(|parser| {
-                    parser.parse_lhs_expression_inner(left_precedence, context, token)
-                }) {
-                    result
-                } else {
-                    self.report_recursion_limit_exceeded(self.current_token_range());
-                    self.recursion_recovery_expr()
-                }
-            }
-            _ => self.parse_lhs_expression_inner(left_precedence, context, token),
+        if !Self::token_starts_recursive_lhs(token) {
+            return self.parse_lhs_expression_inner(left_precedence, context, token);
         }
+
+        if let Some(result) = self.with_recursion(|parser| {
+            parser.parse_lhs_expression_inner(left_precedence, context, token)
+        }) {
+            result
+        } else {
+            self.report_recursion_limit_exceeded(self.current_token_range());
+            self.recursion_recovery_expr()
+        }
+    }
+
+    #[inline]
+    fn token_starts_recursive_lhs(token: TokenKind) -> bool {
+        token.as_unary_operator().is_some()
+            || matches!(
+                token,
+                TokenKind::Star
+                    | TokenKind::Await
+                    | TokenKind::Lambda
+                    | TokenKind::Yield
+                    | TokenKind::FStringStart
+                    | TokenKind::TStringStart
+                    | TokenKind::Lpar
+                    | TokenKind::Lsqb
+                    | TokenKind::Lbrace
+            )
     }
 
     /// The standard expression-recovery node returned when the recursion
