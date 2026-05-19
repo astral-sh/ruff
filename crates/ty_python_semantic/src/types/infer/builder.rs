@@ -32,9 +32,9 @@ use crate::diagnostic::format_enumeration;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
     TypeOrigin, builtins_module_scope, builtins_symbol, class_body_implicit_symbol,
-    explicit_global_symbol, global_symbol, loop_header_reachability,
-    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
-    place_from_bindings, place_from_declarations, typing_extensions_symbol,
+    explicit_global_symbol, loop_header_reachability, module_type_implicit_global_declaration,
+    module_type_implicit_global_symbol, place, place_from_bindings, place_from_declarations,
+    typing_extensions_symbol,
 };
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
@@ -8258,6 +8258,84 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Resolve a load that has fallen through to the module's explicit global scope.
+    ///
+    /// For eager nested scopes, this uses the global enclosing snapshot instead of the completed
+    /// module scope, so a class body cannot see a class name that is bound only after the body
+    /// finishes:
+    ///
+    /// ```python
+    /// class A:
+    ///     A = A
+    /// ```
+    ///
+    /// `symbol_name` is only needed when no snapshot is available: snapshots can resolve complex
+    /// places like `a.x`, but the fallback global query only works for bare symbols. `assume_bound`
+    /// preserves the class-body fallback behavior for names that are also local to the class body.
+    fn infer_explicit_global_symbol_load(
+        &self,
+        place_expr: PlaceExprRef,
+        symbol_name: Option<&str>,
+        current_scope_id: FileScopeId,
+        constraint_keys: &mut Vec<(FileScopeId, ConstraintKey)>,
+        assume_bound: bool,
+    ) -> PlaceAndQualifiers<'db> {
+        let db = self.db();
+
+        if current_scope_id.is_global() {
+            return Place::Undefined.into();
+        }
+
+        if !self.is_deferred() {
+            match self
+                .index
+                .enclosing_snapshot(FileScopeId::global(), place_expr, current_scope_id)
+            {
+                EnclosingSnapshotResult::FoundConstraint(constraint) => {
+                    constraint_keys.push((
+                        FileScopeId::global(),
+                        ConstraintKey::NarrowingConstraint(constraint),
+                    ));
+                    // Reaching here means that no bindings are found in any scope.
+                    // Since `explicit_global_symbol` may return a cycle initial value, we return `Place::Undefined` here.
+                    return Place::Undefined.into();
+                }
+                EnclosingSnapshotResult::FoundBindings(bindings) => {
+                    let mut place_and_qualifiers = place_from_bindings(db, bindings);
+                    if assume_bound && let Place::Defined(defined) = place_and_qualifiers.place {
+                        place_and_qualifiers.place =
+                            Place::Defined(defined.with_definedness(Definedness::AlwaysDefined));
+                    }
+                    let place = place_and_qualifiers.place.map_type(|ty| {
+                        self.narrow_place_with_applicable_constraints(
+                            place_expr,
+                            ty,
+                            constraint_keys,
+                        )
+                    });
+                    constraint_keys.push((
+                        FileScopeId::global(),
+                        ConstraintKey::NestedScope(current_scope_id),
+                    ));
+                    return place.into();
+                }
+                // There are no visible bindings / constraint here.
+                EnclosingSnapshotResult::NotFound => {
+                    return Place::Undefined.into();
+                }
+                EnclosingSnapshotResult::NoLongerInEagerContext => {}
+            }
+        }
+
+        let Some(symbol_name) = symbol_name else {
+            return Place::Undefined.into();
+        };
+
+        explicit_global_symbol(db, self.file(), symbol_name).map_type(|ty| {
+            self.narrow_place_with_applicable_constraints(place_expr, ty, constraint_keys)
+        })
+    }
+
     /// Infer the type of a place expression from definitions, assuming a load context.
     /// This method also returns the [`ConstraintKey`]s for each scope associated with `expr`,
     /// which is used to narrow by condition rather than by assignment.
@@ -8290,13 +8368,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let fallback_to_global =
                     scope.node(db).scope_kind().is_class() && symbol_resolves_locally;
                 if self.skip_non_global_scopes(file_scope_id, symbol_id) || fallback_to_global {
-                    return global_symbol(self.db(), self.file(), symbol.name()).map_type(|ty| {
-                        self.narrow_place_with_applicable_constraints(
-                            place_expr,
-                            ty,
-                            &constraint_keys,
-                        )
-                    });
+                    return self.infer_explicit_global_symbol_load(
+                        place_expr,
+                        Some(symbol.name()),
+                        file_scope_id,
+                        &mut constraint_keys,
+                        fallback_to_global,
+                    );
                 }
             }
 
@@ -8515,59 +8593,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // No nonlocal binding? Check the module's explicit globals.
                 // Avoid infinite recursion if `self.scope` already is the module's global scope.
                 .or_fall_back_to(db, || {
-                    if file_scope_id.is_global() {
-                        return Place::Undefined.into();
-                    }
-
-                    if !self.is_deferred() {
-                        match self.index.enclosing_snapshot(
-                            FileScopeId::global(),
-                            place_expr,
-                            file_scope_id,
-                        ) {
-                            EnclosingSnapshotResult::FoundConstraint(constraint) => {
-                                constraint_keys.push((
-                                    FileScopeId::global(),
-                                    ConstraintKey::NarrowingConstraint(constraint),
-                                ));
-                                // Reaching here means that no bindings are found in any scope.
-                                // Since `explicit_global_symbol` may return a cycle initial value, we return `Place::Undefined` here.
-                                return Place::Undefined.into();
-                            }
-                            EnclosingSnapshotResult::FoundBindings(bindings) => {
-                                let place =
-                                    place_from_bindings(db, bindings).place.map_type(|ty| {
-                                        self.narrow_place_with_applicable_constraints(
-                                            place_expr,
-                                            ty,
-                                            &constraint_keys,
-                                        )
-                                    });
-                                constraint_keys.push((
-                                    FileScopeId::global(),
-                                    ConstraintKey::NestedScope(file_scope_id),
-                                ));
-                                return place.into();
-                            }
-                            // There are no visible bindings / constraint here.
-                            EnclosingSnapshotResult::NotFound => {
-                                return Place::Undefined.into();
-                            }
-                            EnclosingSnapshotResult::NoLongerInEagerContext => {}
-                        }
-                    }
-
-                    let Some(symbol) = place_expr.as_symbol() else {
-                        return Place::Undefined.into();
-                    };
-
-                    explicit_global_symbol(db, self.file(), symbol.name()).map_type(|ty| {
-                        self.narrow_place_with_applicable_constraints(
-                            place_expr,
-                            ty,
-                            &constraint_keys,
-                        )
-                    })
+                    self.infer_explicit_global_symbol_load(
+                        place_expr,
+                        place_expr.as_symbol().map(|symbol| symbol.name().as_str()),
+                        file_scope_id,
+                        &mut constraint_keys,
+                        false,
+                    )
                 })
         });
 
