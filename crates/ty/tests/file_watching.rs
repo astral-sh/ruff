@@ -577,6 +577,64 @@ fn new_ignored_file() -> anyhow::Result<()> {
 }
 
 #[test]
+fn new_file_in_ignored_directory() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_project_file("bar.py", "")?;
+        context.write_project_file(".ignore", "build/\n")?;
+        std::fs::create_dir(context.join_project_path("build").as_std_path())?;
+        Ok(())
+    })?;
+    let bar_path = case.project_path("bar.py");
+    let bar_file = case.system_file(&bar_path).unwrap();
+    let bad_path = case.project_path("build/bad.py");
+
+    assert_eq!(case.system_file(&bad_path), Err(FileError::NotFound));
+    case.assert_indexed_project_files([bar_file]);
+
+    std::fs::write(bad_path.as_std_path(), "x: int = 'bad'\n")?;
+
+    let changes = case.stop_watch(event_for_file("bad.py"));
+
+    case.apply_changes(&changes, None);
+
+    assert!(case.system_file(&bad_path).is_ok());
+    case.assert_indexed_project_files([bar_file]);
+
+    Ok(())
+}
+
+#[test]
+fn new_ignore_file_in_ignored_directory() -> anyhow::Result<()> {
+    let mut case = setup([
+        ("bar.py", ""),
+        (".ignore", "build/\n"),
+        ("build/bad.py", "x: int = 'bad'\n"),
+    ])?;
+    let bar_path = case.project_path("bar.py");
+    let bar_file = case.system_file(&bar_path).unwrap();
+    let bad_path = case.project_path("build/bad.py");
+    let nested_ignore_path = case.project_path("build/.gitignore");
+
+    assert!(case.system_file(&bad_path).is_ok());
+    assert_eq!(
+        case.system_file(&nested_ignore_path),
+        Err(FileError::NotFound)
+    );
+    case.assert_indexed_project_files([bar_file]);
+
+    std::fs::write(nested_ignore_path.as_std_path(), "# harmless\n")?;
+
+    let changes = case.stop_watch(event_for_file(".gitignore"));
+
+    case.apply_changes(&changes, None);
+
+    assert!(case.system_file(&nested_ignore_path).is_ok());
+    case.assert_indexed_project_files([bar_file]);
+
+    Ok(())
+}
+
+#[test]
 fn ignore_file_change_reloads_files_not_project_metadata() -> anyhow::Result<()> {
     let mut case = setup([("bar.py", ""), ("foo.py", ""), (".ignore", "foo.py")])?;
     let bar = case.system_file(case.project_path("bar.py"))?;
