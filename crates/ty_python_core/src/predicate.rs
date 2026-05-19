@@ -11,6 +11,7 @@ use ruff_db::files::File;
 use ruff_index::{FrozenIndexVec, Idx, IndexVec};
 use ruff_python_ast::{Singleton, name::Name};
 
+use crate::ast_ids::ExpressionNodeKey;
 use crate::db::Db;
 use crate::expression::Expression;
 use crate::global_scope;
@@ -129,11 +130,10 @@ pub enum PredicateNode<'db> {
     /// call is `Unknown`/`Any`, because that would result in too many false
     /// positives.
     IsNonTerminalCall(CallableAndCallExpr<'db>),
-    /// A `for` iterable that may be statically known to be non-empty.
+    /// A direct `range(...)` call used as a `for` iterable.
     ///
-    /// This is resolved semantically during type checking. The semantic index records it for
-    /// every `for` loop because it cannot know whether the iterable expression is a known
-    /// non-empty `range`.
+    /// This is resolved semantically during type checking, so shadowed `range` calls stay
+    /// ambiguous.
     IsNonEmptyIterable(Expression<'db>),
     Pattern(PatternPredicate<'db>),
     SubjectElementPattern(SubjectElementPatternPredicate<'db>),

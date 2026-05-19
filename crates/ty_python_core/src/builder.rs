@@ -3340,13 +3340,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
 
-                let after_iter = self.flow_snapshot();
+                let non_empty_range_constraint = if is_direct_range_call(iter) {
+                    let after_iter = self.flow_snapshot();
+                    let constraint = self.record_reachability_constraint(
+                        PredicateOrLiteral::Predicate(Predicate {
+                            node: PredicateNode::IsNonEmptyIterable(iter_expr),
+                            is_positive: true,
+                        }),
+                    );
 
-                let non_empty_iterable_constraint =
-                    self.record_reachability_constraint(PredicateOrLiteral::Predicate(Predicate {
-                        node: PredicateNode::IsNonEmptyIterable(iter_expr),
-                        is_positive: true,
-                    }));
+                    Some((after_iter, constraint))
+                } else {
+                    self.record_ambiguous_reachability();
+                    None
+                };
+
+                let pre_loop = self.flow_snapshot();
 
                 // Pre-walk the loop to collect all the bound places, then create a loop header
                 // definition for each bound place. See `struct LoopHeader` for more on this. Loop
@@ -3385,12 +3394,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // We may execute the `else` clause without ever executing the body, so merge in a
                 // zero-iteration state before visiting `else`.
-                let post_loop_body = self.flow_snapshot();
-                self.flow_restore(after_iter);
-                self.record_negated_reachability_constraint(non_empty_iterable_constraint);
-                let no_iteration = self.flow_snapshot();
-                self.flow_restore(post_loop_body);
-                self.flow_merge(no_iteration);
+                if let Some((after_iter, non_empty_range_constraint)) = non_empty_range_constraint {
+                    let post_loop_body = self.flow_snapshot();
+                    self.flow_restore(after_iter);
+                    self.record_negated_reachability_constraint(non_empty_range_constraint);
+                    let no_iteration = self.flow_snapshot();
+                    self.flow_restore(post_loop_body);
+                    self.flow_merge(no_iteration);
+                } else {
+                    self.flow_merge(pre_loop);
+                }
                 self.visit_body(orelse);
 
                 // Breaking out of a `for` loop bypasses the `else` clause, so merge in the break
@@ -4792,6 +4805,19 @@ fn dunder_all_extend_argument(value: &ast::Expr) -> Option<&ast::Expr> {
     let ast::ExprAttribute { value, attr, .. } = single_argument.as_attribute_expr()?;
 
     (attr == "__all__").then_some(value)
+}
+
+/// Returns `true` for syntactically direct `range(...)` calls.
+///
+/// This avoids adding reachability predicates for every `for` loop target to the TDD graph. We only
+/// emit the predicate for syntactically direct `range(...)` calls; type checking later verifies that
+/// the callee resolves to the built-in `range` and determines whether the range is statically
+/// non-empty.
+fn is_direct_range_call(expr: &ast::Expr) -> bool {
+    expr.expression_value()
+        .as_call_expr()
+        .and_then(|call| call.func.as_name_expr())
+        .is_some_and(|name| name.id == "range")
 }
 
 /// Builds an interval-map that matches expressions (by their node index) to their enclosing scopes.

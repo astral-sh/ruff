@@ -197,9 +197,7 @@ pub(crate) fn infer_narrowing_constraints<'db>(
         }
         PredicateNode::IsNonTerminalCall(_)
         | PredicateNode::IsNonEmptyIterable(_)
-        | PredicateNode::StarImportPlaceholder(_) => {
-            (None, None)
-        }
+        | PredicateNode::StarImportPlaceholder(_) => (None, None),
     };
 
     if predicate.is_positive {
