@@ -200,9 +200,9 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, SpecialFormType,
+        CallableTypes, EnumClassLiteral, IntersectionBuilder, NarrowingConstraint, SpecialFormType,
         Type, TypeContext, UnionType, callable_pattern_type, definite_match_pattern_type,
-        enum_metadata, equality_truthiness, expand_type, infer_narrowing_constraints,
+        equality_truthiness, expand_type, infer_narrowing_constraints,
         infer_same_file_expression_type, mapping_pattern_type, sequence_pattern_type_builder,
         singleton_pattern_type,
     },
@@ -286,15 +286,15 @@ fn type_narrowed_by_pattern<'db>(
 fn enum_literal_subject_names<'db>(
     db: &'db dyn Db,
     subject_ty: Type<'db>,
-) -> Option<(ClassLiteral<'db>, FxHashSet<Name>)> {
+) -> Option<(EnumClassLiteral<'db>, FxHashSet<Name>)> {
     fn add_enum_literal<'db>(
         db: &'db dyn Db,
-        enum_class: &mut Option<ClassLiteral<'db>>,
+        enum_class: &mut Option<EnumClassLiteral<'db>>,
         names: &mut FxHashSet<Name>,
         ty: Type<'db>,
     ) -> Option<()> {
         let enum_literal = ty.as_enum_literal()?;
-        let class = enum_literal.enum_class(db);
+        let class = enum_literal.enum_class_literal(db);
 
         if let Some(existing_class) = *enum_class {
             if existing_class != class {
@@ -304,9 +304,8 @@ fn enum_literal_subject_names<'db>(
             *enum_class = Some(class);
         }
 
-        let metadata = enum_metadata(db, class)?;
         let name = enum_literal.name(db);
-        let canonical_name = metadata.resolve_member(name).unwrap_or(name);
+        let canonical_name = class.resolve_member(db, name)?;
         names.insert(canonical_name.clone());
         Some(())
     }
@@ -337,18 +336,17 @@ fn enum_literal_subject_names<'db>(
 /// canonical member names before returning.
 fn enum_member_pattern_name<'db>(
     db: &'db dyn Db,
-    enum_class: ClassLiteral<'db>,
+    enum_class: EnumClassLiteral<'db>,
     kind: &PatternPredicateKind<'db>,
 ) -> Option<Name> {
     let value_ty = definite_match_pattern_type(db, kind);
     let enum_literal = value_ty.as_enum_literal()?;
-    if enum_literal.enum_class(db) != enum_class {
+    if enum_literal.enum_class_literal(db) != enum_class {
         return None;
     }
 
-    let metadata = enum_metadata(db, enum_class)?;
     let name = enum_literal.name(db);
-    let canonical_name = metadata.resolve_member(name).unwrap_or(name);
+    let canonical_name = enum_class.resolve_member(db, name)?;
     Some(canonical_name.clone())
 }
 
@@ -367,7 +365,7 @@ struct EnumMemberPatternCoverage {
 /// produces only a lower bound: it definitely matches `Color.GREEN`, but can match other members.
 fn enum_member_pattern_coverage<'db>(
     db: &'db dyn Db,
-    enum_class: ClassLiteral<'db>,
+    enum_class: EnumClassLiteral<'db>,
     kind: &PatternPredicateKind<'db>,
 ) -> EnumMemberPatternCoverage {
     let mut coverage = EnumMemberPatternCoverage {

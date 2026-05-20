@@ -646,8 +646,6 @@ fn enum_literal_constraint<'db>(
     let LiteralValueTypeKind::Enum(right) = right.as_literal_value_kind()? else {
         return None;
     };
-    let enum_class = right.enum_class(db);
-
     if !is_same_enum_domain(db, left, right)
         || KnownComparisonSemantics::of_instance(db, right.enum_class_instance(db), operator)
             .is_none()
@@ -655,9 +653,11 @@ fn enum_literal_constraint<'db>(
         return None;
     }
 
-    let metadata = enum_metadata(db, enum_class)?;
-    let name = metadata.resolve_member(right.name(db))?.clone();
-    let equal_to_right = Type::enum_literal(EnumLiteralType::new(db, enum_class, name));
+    let enum_class_literal = right.enum_class_literal(db);
+    let name = enum_class_literal
+        .resolve_member(db, right.name(db))?
+        .clone();
+    let equal_to_right = Type::enum_literal(EnumLiteralType::new(db, enum_class_literal, name));
     Some(equal_to_right.negate_if(db, !condition_expects_equality))
 }
 
@@ -1373,8 +1373,9 @@ fn known_literal_equality<'db>(
 ///
 /// Custom enum construction can replace the declared value, so members of such enums return `None`.
 fn enum_literal_value<'db>(db: &'db dyn Db, literal: EnumLiteralType<'db>) -> Option<Type<'db>> {
-    let metadata = enum_metadata(db, literal.enum_class(db))?;
-    let name = metadata.resolve_member(literal.name(db))?;
+    let enum_class_literal = literal.enum_class_literal(db);
+    let metadata = enum_metadata(db, enum_class_literal.class_literal(db))?;
+    let name = enum_class_literal.resolve_member(db, literal.name(db))?;
     if metadata.member_value_may_be_transformed(name) {
         return None;
     }
@@ -1391,11 +1392,10 @@ fn same_enum_member<'db>(
     left: EnumLiteralType<'db>,
     right: EnumLiteralType<'db>,
 ) -> bool {
-    if left.enum_class(db) != right.enum_class(db) {
+    let enum_class_literal = left.enum_class_literal(db);
+    if enum_class_literal != right.enum_class_literal(db) {
         return false;
     }
-    let Some(metadata) = enum_metadata(db, left.enum_class(db)) else {
-        return left == right;
-    };
-    metadata.resolve_member(left.name(db)) == metadata.resolve_member(right.name(db))
+    enum_class_literal.resolve_member(db, left.name(db))
+        == enum_class_literal.resolve_member(db, right.name(db))
 }
