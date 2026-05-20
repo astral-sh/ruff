@@ -162,7 +162,7 @@ def bad_yield_in_except_with_trailing_code():
 
 ## Non-terminal `yield` in an `except` arm
 
-A `yield` inside an `except` handler that is followed by cleanup *inside* the same handler is
+A `yield` inside an `except` handler that is followed by cleanup _inside_ the same handler is
 also unprotected: the handler body itself doesn't catch exceptions raised by the `yield`.
 
 ```py
@@ -486,6 +486,13 @@ def good_with_code_after_with_block():
     with other_cm():
         yield
     print("after with")
+
+
+@contextmanager
+def good_yield_in_with_before_return():
+    with other_cm() as value:
+        yield value
+        return
 ```
 
 ## Imports and decorator forms

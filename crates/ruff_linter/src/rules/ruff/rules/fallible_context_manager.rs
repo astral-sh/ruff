@@ -265,8 +265,18 @@ impl YieldFinallyVisitor<'_, '_> {
 
         let parent_terminal = self.in_terminal_position;
 
-        // Non-last statements: not terminal
-        self.visit_body_with_terminal(rest, false);
+        // Iterate `rest` but look up in `body` so a yield at the end of
+        // `rest` can still see a trailing `Return` as `last`.
+        for (i, stmt) in rest.iter().enumerate() {
+            let is_yield_before_return = Self::is_yield_statement(stmt)
+                && body
+                    .get(i + 1)
+                    .is_some_and(|next| matches!(next, Stmt::Return(_)));
+            let prev = self.in_terminal_position;
+            self.in_terminal_position = is_yield_before_return;
+            self.visit_stmt(stmt);
+            self.in_terminal_position = prev;
+        }
 
         // Last statement: inherit terminal from parent, set with-last-statement if yield
         let prev_terminal = self.in_terminal_position;
