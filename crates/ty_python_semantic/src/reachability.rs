@@ -665,7 +665,20 @@ impl ProjectedNarrowingGraph<'_> {
         id
     }
 
-    /// Returns the projected nodes reached from multiple parent nodes.
+    /// Returns the projected nodes that join multiple incoming paths.
+    ///
+    /// Projection interns equivalent subgraphs, so the projected graph is a DAG rather than a
+    /// tree. For example, two alternatives can share the same projected suffix:
+    ///
+    /// ```text
+    /// root --if_true--> left  --...--> suffix
+    ///      --if_false-> right --...--^
+    /// ```
+    ///
+    /// Evaluating both paths independently would re-evaluate `suffix`. A node is therefore a join
+    /// when it is reached from more than one parent while walking the nodes reachable from `root`.
+    /// The returned flags let the narrowing evaluator cache that shared suffix at its boundary and
+    /// apply each incoming prefix constraint afterward.
     fn joins(&self, root: ProjectedNarrowingNodeId) -> Vec<bool> {
         let mut referenced = vec![false; self.nodes.len()];
         let mut joins = vec![false; self.nodes.len()];
@@ -866,7 +879,15 @@ struct ProjectedNarrowingContext<'a, 'db> {
     db: &'db dyn Db,
     base_ty: Type<'db>,
     graph: &'a ProjectedNarrowingGraph<'db>,
+    /// Marks projected nodes that are reached from multiple parents.
+    ///
+    /// These nodes are join boundaries: their suffix can be narrowed once and reused for each
+    /// incoming projected path.
     joins: Vec<bool>,
+    /// Caches the narrowed type of each join from its boundary.
+    ///
+    /// Incoming prefix constraints are applied after the cached suffix is evaluated so that
+    /// replacement narrowing keeps the same order as a full path evaluation.
     join_cache: FxHashMap<ProjectedNarrowingNodeId, Type<'db>>,
 }
 
