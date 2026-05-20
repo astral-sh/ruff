@@ -3,7 +3,7 @@ use crate::types::{
     CallArguments, DataclassParams, KnownClass, KnownInstanceType, MemberLookupPolicy,
     SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext,
     call::CallError,
-    callable::CallableTypeKind,
+    callable::CallableFunctionProvenance,
     function::KnownFunction,
     infer::{
         TypeInferenceBuilder,
@@ -663,21 +663,44 @@ impl ClassDecoratorUnknownResultPolicy {
                 Self::known_from_decorator(db, alias.value_type(db), decorator_result_ty)
                     .unwrap_or(Self::ReplaceBinding),
             ),
-            Type::Callable(callable) if callable.has_explicit_function_return_annotation(db) => {
-                Some(Self::ReplaceBinding)
-            }
-            Type::Callable(callable) => Some(match callable.kind(db) {
-                CallableTypeKind::FunctionLike
-                | CallableTypeKind::StaticMethodLike
-                | CallableTypeKind::ClassMethodLike => Self::PreserveBinding,
-                CallableTypeKind::Regular | CallableTypeKind::ParamSpecValue
-                    if is_unknown_class_object_decorator_result(db, decorator_result_ty) =>
-                {
+            Type::Callable(callable) => Some(match callable.provenance(db) {
+                // An unannotated function preserves the class binding when applying it loses the
+                // concrete return type:
+                // ```python
+                // decorator = lambda cls: cls
+                //
+                // @decorator
+                // class C: ...
+                // ```
+                Some(CallableFunctionProvenance::ImplicitReturn) => Self::PreserveBinding,
+                // An explicit return annotation can intentionally replace the class binding:
+                // ```python
+                // def decorator[T](cls) -> T: ...
+                //
+                // @decorator
+                // class C: ...
+                // ```
+                Some(CallableFunctionProvenance::ExplicitReturn) => Self::ReplaceBinding,
+                // Generic class-preserving decorator factories can lose the concrete class in
+                // their returned `Callable`, while still producing an unknown class-object result:
+                // ```python
+                // def identity_factory[T]() -> Callable[[type[T]], type[T]]: ...
+                //
+                // @identity_factory()
+                // class C: ...
+                // ```
+                None if is_unknown_class_object_decorator_result(db, decorator_result_ty) => {
                     Self::PreserveBinding
                 }
-                CallableTypeKind::Regular | CallableTypeKind::ParamSpecValue => {
-                    Self::ReplaceBinding
-                }
+                // An ordinary `Callable` replacement result has no function provenance to justify
+                // the unannotated-function preservation fallback:
+                // ```python
+                // def replacement_factory[T]() -> Callable[[type[object]], T]: ...
+                //
+                // @replacement_factory()
+                // class C: ...
+                // ```
+                None => Self::ReplaceBinding,
             }),
             _ => None,
         }

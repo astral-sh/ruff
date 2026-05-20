@@ -65,7 +65,7 @@ use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module
 
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
 use crate::types::call::{Binding, CallArguments};
-use crate::types::callable::CallableTypeKind;
+use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::cyclic::ActiveRecursionDetector;
@@ -1356,7 +1356,9 @@ impl<'db> FunctionType<'db> {
             db,
             self.signature(db),
             self.callable_type_kind(db),
-            self.has_explicit_return_annotation(db),
+            Some(CallableFunctionProvenance::from_function_return_annotation(
+                self.has_explicit_return_annotation(db),
+            )),
         )
     }
 

@@ -681,7 +681,7 @@ impl<'db> GenericContext<'db> {
                             db,
                             signatures,
                             callable.kind(db),
-                            callable.has_explicit_function_return_annotation(db),
+                            callable.provenance(db),
                         );
 
                         Some((callable, replacement))

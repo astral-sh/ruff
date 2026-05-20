@@ -550,7 +550,7 @@ impl<'db> ProtocolMemberKind<'db> {
                     db,
                     normalized,
                     curr.kind(db),
-                    curr.has_explicit_function_return_annotation(db),
+                    curr.provenance(db),
                 ))
             }
             (Self::Property(curr), Self::Property(prev)) => {
@@ -1100,7 +1100,7 @@ fn protocol_bind_self<'db>(
         db,
         callable.signatures(db).bind_self(db, self_type),
         CallableTypeKind::Regular,
-        callable.has_explicit_function_return_annotation(db),
+        callable.provenance(db),
     )
 }
 
