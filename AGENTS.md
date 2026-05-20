@@ -73,6 +73,7 @@ When working on ty, PR titles should start with `[ty]` and be tagged with the `t
 - Look to see if your tests could go in an existing file before adding a new file for your tests.
 - Get your tests to pass. If you didn't run the tests, your code does not work.
 - Follow existing code style. Check neighboring files for patterns.
+- Prefer narrow visibility by default because this workspace is generally its own consumer. However, do not add workarounds solely to avoid `pub`: make an item public when another workspace crate needs it and that produces the cleaner implementation.
 - Rust imports should always go at the top of the file, never locally in functions.
 - Run `uvx prek` at the end of a task if you changed files in the repo. This includes changes such as rebases or addressing review comments. Prefer a branch-scoped run like `uvx prek run --from-ref '@{upstream}'`, which checks files changed relative to the current branch's configured upstream. If the branch has no configured upstream, use the intended base branch explicitly, usually `uvx prek run --from-ref main`. Use `uvx prek run -a` when a full-repository hook sweep is specifically needed.
 - Avoid writing significant amounts of new code. This is often a sign that we're missing an existing method or mechanism that could help solve the problem. Look for existing utilities first.
