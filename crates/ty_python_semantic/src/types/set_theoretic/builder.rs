@@ -776,9 +776,14 @@ impl<'db> UnionBuilder<'db> {
                     }
                     LiteralValueTypeKind::Enum(enum_member_to_add) => {
                         let enum_class = enum_member_to_add.enum_class(self.db);
-                        // Metadata is only needed for enum-wide simplifications; class identity
-                        // is enough to preserve a precise set of enum literals during cycle
-                        // recovery.
+
+                        // We generally expect that a `Type::LiteralValue(LiteralValueTypeKind::Enum)`
+                        // value is in fact in enum, i.e., that `enum_metadata` returns `Some(...)`.
+                        // However, during cycle recovery, it's possible (empirically) to end up
+                        // in an inconsistent state. The metadata is only required for simplification
+                        // and not for correctness, so we treat it as optional here.
+                        // TODO: Come up with a design, either to enum metadata or the cycle
+                        // handling more broadly, that avoids this inconsistency.
                         let metadata = enum_metadata(self.db, enum_class);
 
                         if metadata.is_some_and(|metadata| metadata.members.len() == 1) {
