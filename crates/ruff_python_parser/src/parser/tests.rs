@@ -11,6 +11,142 @@ fn test_modes() {
 }
 
 #[test]
+fn deeply_nested_parens() {
+    let source = format!("{}1{}", "(".repeat(1_000), ")".repeat(1_000));
+
+    parse_module(&source).unwrap();
+}
+
+#[test]
+fn deeply_nested_parens_continuations() {
+    for source in [
+        "((1) + 2)",
+        "((1) if True else 2)",
+        "((x), y)",
+        "((x) for x in y)",
+        "((f)(1).x[0])",
+    ] {
+        parse_expression(source).unwrap();
+    }
+}
+
+#[test]
+fn nested_expression_continuations() {
+    for source in [
+        "f(g(1), 2)",
+        "f(g(1) for _ in xs)",
+        "f(g(1) + 2)",
+        "a[b[c], d]",
+        "a[b[c]:d]",
+        "a[b[c] + d]",
+        "1 + (2 + (3) * 4)",
+        "(1 + (lambda: 2))",
+    ] {
+        parse_expression(source).unwrap();
+    }
+}
+
+#[test]
+fn moderately_nested_parens() {
+    // 50 levels is well above what real-world Python ever produces. The parser should handle it
+    // without taking the nested parenthesized-expression slow path into exceptional behavior.
+    let src = format!("x = {}1{}", "(".repeat(50), ")".repeat(50));
+    parse_module(&src).unwrap();
+}
+
+#[test]
+fn deeply_nested_def_blocks() {
+    let depth = 400;
+    let mut src = String::new();
+    for i in 0..depth {
+        src.push_str(&"\t".repeat(i));
+        src.push_str("def f():\n");
+    }
+    src.push_str(&"\t".repeat(depth));
+    src.push_str("pass\n");
+    parse_module(&src).unwrap();
+}
+
+#[test]
+fn deeply_nested_lists() {
+    let src = format!("{}1{}", "[".repeat(1_000), "]".repeat(1_000));
+    parse_module(&src).unwrap();
+}
+
+#[test]
+fn nested_calls() {
+    let src = format!("x = {}1{}", "f(".repeat(1_000), ")".repeat(1_000));
+    parse_module(&src).unwrap();
+}
+
+#[test]
+fn deeply_nested_subscripts() {
+    let src = format!("x = {}1{}", "a[".repeat(1_000), "]".repeat(1_000));
+    parse_module(&src).unwrap();
+}
+
+#[test]
+fn deeply_nested_match_patterns() {
+    let mut src = String::from("match x:\n case ");
+    for _ in 0..600 {
+        src.push('(');
+    }
+    src.push('y');
+    for _ in 0..600 {
+        src.push(')');
+    }
+    src.push_str(": pass\n");
+    parse_module(&src).unwrap();
+}
+
+#[test]
+fn binary_paren_interplay() {
+    let depth = 2_000;
+    let mut src = String::new();
+    for _ in 0..depth {
+        src.push_str("1+(");
+    }
+    src.push('1');
+    for _ in 0..depth {
+        src.push(')');
+    }
+    parse_module(&src).unwrap();
+}
+
+#[test]
+fn deeply_nested_right_assoc_pow_chain() {
+    let depth = 2_000;
+    let mut src = String::with_capacity(depth * 3 + 1);
+    for _ in 0..depth {
+        src.push_str("1**");
+    }
+    src.push('1');
+    parse_module(&src).unwrap();
+}
+
+#[test]
+fn deeply_nested_ternary_else_chain() {
+    let depth = 2_000;
+    let mut src = String::with_capacity(depth * 12 + 1);
+    for _ in 0..depth {
+        src.push_str("1 if 1 else ");
+    }
+    src.push('1');
+    parse_module(&src).unwrap();
+}
+
+#[test]
+fn deeply_nested_lambda_chain() {
+    let depth = 2_000;
+    let mut src = String::from("x = ");
+    for _ in 0..depth {
+        src.push_str("lambda: ");
+    }
+    src.push('1');
+    parse_module(&src).unwrap();
+}
+
+#[test]
 fn test_expr_mode_invalid_syntax1() {
     let source = "first second";
     let error = parse_expression(source).unwrap_err();

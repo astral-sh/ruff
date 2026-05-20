@@ -182,6 +182,45 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         let parsed_expr = self.parse_conditional_expression_or_higher_impl(context);
 
+        self.parse_named_expression_or_higher_from_expression(parsed_expr, start)
+    }
+
+    fn parse_named_expression_or_higher_from_lhs(
+        &mut self,
+        lhs: ParsedExpr,
+        start: TextSize,
+        context: ExpressionContext,
+    ) -> ParsedExpr {
+        let lhs = ParsedExpr {
+            expr: self.parse_postfix_expression(lhs.expr, start),
+            is_parenthesized: lhs.is_parenthesized,
+        };
+        self.parse_named_expression_or_higher_from_simple_lhs(lhs, start, context)
+    }
+
+    fn parse_named_expression_or_higher_from_simple_lhs(
+        &mut self,
+        lhs: ParsedExpr,
+        start: TextSize,
+        context: ExpressionContext,
+    ) -> ParsedExpr {
+        let parsed_expr = self.parse_binary_expression_or_higher_recursive(
+            lhs,
+            OperatorPrecedence::None,
+            context,
+            start,
+        );
+        let parsed_expr =
+            self.parse_conditional_expression_or_higher_from_simple_expression(parsed_expr, start);
+
+        self.parse_named_expression_or_higher_from_expression(parsed_expr, start)
+    }
+
+    fn parse_named_expression_or_higher_from_expression(
+        &mut self,
+        parsed_expr: ParsedExpr,
+        start: TextSize,
+    ) -> ParsedExpr {
         if self.at(TokenKind::ColonEqual) {
             Expr::Named(self.parse_named_expression(parsed_expr.expr, start)).into()
         } else {
@@ -215,11 +254,19 @@ impl<'src> Parser<'src> {
             let start = self.node_start();
             let parsed_expr = self.parse_simple_expression(context);
 
-            if self.at(TokenKind::If) {
-                Expr::If(self.parse_if_expression(parsed_expr.expr, start)).into()
-            } else {
-                parsed_expr
-            }
+            self.parse_conditional_expression_or_higher_from_simple_expression(parsed_expr, start)
+        }
+    }
+
+    fn parse_conditional_expression_or_higher_from_simple_expression(
+        &mut self,
+        parsed_expr: ParsedExpr,
+        start: TextSize,
+    ) -> ParsedExpr {
+        if self.at(TokenKind::If) {
+            Expr::If(self.parse_if_expression(parsed_expr.expr, start)).into()
+        } else {
+            parsed_expr
         }
     }
 
@@ -249,6 +296,20 @@ impl<'src> Parser<'src> {
     ) -> ParsedExpr {
         let start = self.node_start();
         let lhs = self.parse_lhs_expression(left_precedence, context);
+        self.parse_binary_expression_or_higher_recursive(lhs, left_precedence, context, start)
+    }
+
+    fn parse_binary_expression_or_higher_from_lhs(
+        &mut self,
+        lhs: ParsedExpr,
+        left_precedence: OperatorPrecedence,
+        context: ExpressionContext,
+        start: TextSize,
+    ) -> ParsedExpr {
+        let lhs = ParsedExpr {
+            expr: self.parse_postfix_expression(lhs.expr, start),
+            is_parenthesized: lhs.is_parenthesized,
+        };
         self.parse_binary_expression_or_higher_recursive(lhs, left_precedence, context, start)
     }
 
@@ -766,6 +827,10 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#calls>
     pub(super) fn parse_call_expression(&mut self, func: Expr, start: TextSize) -> ast::ExprCall {
+        if matches!(self.peek2(), (TokenKind::Name, TokenKind::Lpar)) {
+            return self.parse_nested_call_expression(func, start);
+        }
+
         let arguments = self.parse_arguments();
 
         ast::ExprCall {
@@ -774,6 +839,69 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
+    }
+
+    fn parse_nested_call_expression(&mut self, func: Expr, start: TextSize) -> ast::ExprCall {
+        let mut calls = vec![PendingCall {
+            func,
+            start,
+            arguments_start: self.node_start(),
+        }];
+
+        loop {
+            self.bump(TokenKind::Lpar);
+
+            if !matches!(self.current_token_kind(), TokenKind::Name)
+                || self.peek() != TokenKind::Lpar
+            {
+                break;
+            }
+
+            let start = self.node_start();
+            let func = self.parse_atom().expr;
+            calls.push(PendingCall {
+                func,
+                start,
+                arguments_start: self.node_start(),
+            });
+        }
+
+        let innermost = calls
+            .pop()
+            .expect("nested calls always include the outer call");
+        let arguments = self.parse_arguments_after_lpar(innermost.arguments_start);
+        let mut expr = Expr::Call(ast::ExprCall {
+            func: Box::new(innermost.func),
+            arguments,
+            range: self.node_range(innermost.start),
+            node_index: AtomicNodeIndex::NONE,
+        });
+
+        while let Some(call) = calls.pop() {
+            let argument_start = expr.range().start();
+            let parsed_expr = self.parse_named_expression_or_higher_from_lhs(
+                expr.into(),
+                argument_start,
+                ExpressionContext::starred_conditional(),
+            );
+            let arguments = self.parse_arguments_after_first_positional(
+                call.arguments_start,
+                argument_start,
+                parsed_expr,
+            );
+
+            expr = Expr::Call(ast::ExprCall {
+                func: Box::new(call.func),
+                arguments,
+                range: self.node_range(call.start),
+                node_index: AtomicNodeIndex::NONE,
+            });
+        }
+
+        let Expr::Call(call) = expr else {
+            unreachable!("nested call parsing always builds a call expression");
+        };
+        call
     }
 
     /// Parses an argument list.
@@ -787,131 +915,183 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lpar);
 
-        let mut args = vec![];
-        let mut keywords = vec![];
-        let mut seen_keyword_argument = false; // foo = 1
-        let mut seen_keyword_unpacking = false; // **foo
+        self.parse_arguments_after_lpar(start)
+    }
+
+    fn parse_arguments_after_lpar(&mut self, start: TextSize) -> ast::Arguments {
+        let mut state = ArgumentParsingState::default();
 
         let has_trailing_comma =
             self.parse_comma_separated_list(RecoveryContextKind::Arguments, |parser| {
-                let argument_start = parser.node_start();
-                if parser.eat(TokenKind::DoubleStar) {
-                    let value = parser.parse_conditional_expression_or_higher();
-
-                    keywords.push(ast::Keyword {
-                        arg: None,
-                        value: value.expr,
-                        range: parser.node_range(argument_start),
-                        node_index: AtomicNodeIndex::NONE,
-                    });
-
-                    seen_keyword_unpacking = true;
-                } else {
-                    let start = parser.node_start();
-                    let mut parsed_expr = parser
-                        .parse_named_expression_or_higher(ExpressionContext::starred_conditional());
-
-                    match parser.current_token_kind() {
-                        TokenKind::Async | TokenKind::For => {
-                            if parsed_expr.is_unparenthesized_starred_expr() {
-                                parser.add_unsupported_syntax_error(
-                                    UnsupportedSyntaxErrorKind::UnpackingInComprehension(
-                                        ComprehensionUnpackingKind::IterableInGenerator,
-                                    ),
-                                    parsed_expr.range(),
-                                );
-                            }
-
-                            parsed_expr = Expr::Generator(parser.parse_generator_expression(
-                                parsed_expr.expr,
-                                start,
-                                Parenthesized::No,
-                            ))
-                            .into();
-                        }
-                        _ => {
-                            if seen_keyword_unpacking
-                                && parsed_expr.is_unparenthesized_starred_expr()
-                            {
-                                parser.add_error(
-                                    ParseErrorType::InvalidArgumentUnpackingOrder,
-                                    &parsed_expr,
-                                );
-                            }
-                        }
-                    }
-
-                    let arg_range = parser.node_range(start);
-                    if parser.eat(TokenKind::Equal) {
-                        seen_keyword_argument = true;
-                        let arg = if let ParsedExpr {
-                            expr: Expr::Name(ident_expr),
-                            is_parenthesized,
-                        } = parsed_expr
-                        {
-                            // test_ok parenthesized_kwarg_py37
-                            // # parse_options: {"target-version": "3.7"}
-                            // f((a)=1)
-
-                            // test_err parenthesized_kwarg_py38
-                            // # parse_options: {"target-version": "3.8"}
-                            // f((a)=1)
-                            // f((a) = 1)
-                            // f( ( a ) = 1)
-
-                            if is_parenthesized {
-                                parser.add_unsupported_syntax_error(
-                                    UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
-                                    arg_range,
-                                );
-                            }
-
-                            ast::Identifier {
-                                id: ident_expr.id,
-                                range: ident_expr.range,
-                                node_index: AtomicNodeIndex::NONE,
-                            }
-                        } else {
-                            // TODO(dhruvmanila): Parser shouldn't drop the `parsed_expr` if it's
-                            // not a name expression. We could add the expression into `args` but
-                            // that means the error is a missing comma instead.
-                            parser.add_error(
-                                ParseErrorType::OtherError("Expected a parameter name".to_string()),
-                                &parsed_expr,
-                            );
-                            ast::Identifier {
-                                id: Name::empty(),
-                                range: parsed_expr.range(),
-                                node_index: AtomicNodeIndex::NONE,
-                            }
-                        };
-
-                        let value = parser.parse_conditional_expression_or_higher();
-
-                        keywords.push(ast::Keyword {
-                            arg: Some(arg),
-                            value: value.expr,
-                            range: parser.node_range(argument_start),
-                            node_index: AtomicNodeIndex::NONE,
-                        });
-                    } else {
-                        if !parsed_expr.is_unparenthesized_starred_expr() {
-                            if seen_keyword_unpacking {
-                                parser.add_error(
-                                    ParseErrorType::PositionalAfterKeywordUnpacking,
-                                    &parsed_expr,
-                                );
-                            } else if seen_keyword_argument {
-                                parser.add_error(
-                                    ParseErrorType::PositionalAfterKeywordArgument,
-                                    &parsed_expr,
-                                );
-                            }
-                        }
-                        args.push(parsed_expr.expr);
-                    }
-                }
+                parser.parse_argument(&mut state);
             });
+
+        self.finish_arguments(start, state, has_trailing_comma)
+    }
+
+    fn parse_arguments_after_first_positional(
+        &mut self,
+        start: TextSize,
+        argument_start: TextSize,
+        parsed_expr: ParsedExpr,
+    ) -> ast::Arguments {
+        let mut state = ArgumentParsingState::default();
+        self.parse_argument_from_expression(
+            &mut state,
+            argument_start,
+            argument_start,
+            parsed_expr,
+        );
+
+        let has_trailing_comma = if self.eat(TokenKind::Comma) {
+            if self.at(TokenKind::Rpar) {
+                true
+            } else {
+                self.parse_comma_separated_list(RecoveryContextKind::Arguments, |parser| {
+                    parser.parse_argument(&mut state);
+                })
+            }
+        } else if self.at(TokenKind::Rpar) {
+            false
+        } else {
+            self.expect(TokenKind::Comma);
+            self.parse_comma_separated_list(RecoveryContextKind::Arguments, |parser| {
+                parser.parse_argument(&mut state);
+            })
+        };
+
+        self.finish_arguments(start, state, has_trailing_comma)
+    }
+
+    fn parse_argument(&mut self, state: &mut ArgumentParsingState) {
+        let argument_start = self.node_start();
+        if self.eat(TokenKind::DoubleStar) {
+            let value = self.parse_conditional_expression_or_higher();
+
+            state.keywords.push(ast::Keyword {
+                arg: None,
+                value: value.expr,
+                range: self.node_range(argument_start),
+                node_index: AtomicNodeIndex::NONE,
+            });
+
+            state.seen_keyword_unpacking = true;
+        } else {
+            let start = self.node_start();
+            let parsed_expr =
+                self.parse_named_expression_or_higher(ExpressionContext::starred_conditional());
+
+            self.parse_argument_from_expression(state, argument_start, start, parsed_expr);
+        }
+    }
+
+    fn parse_argument_from_expression(
+        &mut self,
+        state: &mut ArgumentParsingState,
+        argument_start: TextSize,
+        start: TextSize,
+        mut parsed_expr: ParsedExpr,
+    ) {
+        match self.current_token_kind() {
+            TokenKind::Async | TokenKind::For => {
+                if parsed_expr.is_unparenthesized_starred_expr() {
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                            ComprehensionUnpackingKind::IterableInGenerator,
+                        ),
+                        parsed_expr.range(),
+                    );
+                }
+
+                parsed_expr = Expr::Generator(self.parse_generator_expression(
+                    parsed_expr.expr,
+                    start,
+                    Parenthesized::No,
+                ))
+                .into();
+            }
+            _ => {
+                if state.seen_keyword_unpacking && parsed_expr.is_unparenthesized_starred_expr() {
+                    self.add_error(ParseErrorType::InvalidArgumentUnpackingOrder, &parsed_expr);
+                }
+            }
+        }
+
+        let arg_range = self.node_range(start);
+        if self.eat(TokenKind::Equal) {
+            state.seen_keyword_argument = true;
+            let arg = if let ParsedExpr {
+                expr: Expr::Name(ident_expr),
+                is_parenthesized,
+            } = parsed_expr
+            {
+                // test_ok parenthesized_kwarg_py37
+                // # parse_options: {"target-version": "3.7"}
+                // f((a)=1)
+
+                // test_err parenthesized_kwarg_py38
+                // # parse_options: {"target-version": "3.8"}
+                // f((a)=1)
+                // f((a) = 1)
+                // f( ( a ) = 1)
+
+                if is_parenthesized {
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
+                        arg_range,
+                    );
+                }
+
+                ast::Identifier {
+                    id: ident_expr.id,
+                    range: ident_expr.range,
+                    node_index: AtomicNodeIndex::NONE,
+                }
+            } else {
+                // TODO(dhruvmanila): Parser shouldn't drop the `parsed_expr` if it's
+                // not a name expression. We could add the expression into `args` but
+                // that means the error is a missing comma instead.
+                self.add_error(
+                    ParseErrorType::OtherError("Expected a parameter name".to_string()),
+                    &parsed_expr,
+                );
+                ast::Identifier {
+                    id: Name::empty(),
+                    range: parsed_expr.range(),
+                    node_index: AtomicNodeIndex::NONE,
+                }
+            };
+
+            let value = self.parse_conditional_expression_or_higher();
+
+            state.keywords.push(ast::Keyword {
+                arg: Some(arg),
+                value: value.expr,
+                range: self.node_range(argument_start),
+                node_index: AtomicNodeIndex::NONE,
+            });
+        } else {
+            if !parsed_expr.is_unparenthesized_starred_expr() {
+                if state.seen_keyword_unpacking {
+                    self.add_error(
+                        ParseErrorType::PositionalAfterKeywordUnpacking,
+                        &parsed_expr,
+                    );
+                } else if state.seen_keyword_argument {
+                    self.add_error(ParseErrorType::PositionalAfterKeywordArgument, &parsed_expr);
+                }
+            }
+            state.args.push(parsed_expr.expr);
+        }
+    }
+
+    fn finish_arguments(
+        &mut self,
+        start: TextSize,
+        state: ArgumentParsingState,
+        has_trailing_comma: bool,
+    ) -> ast::Arguments {
+        let ArgumentParsingState { args, keywords, .. } = state;
 
         self.expect(TokenKind::Rpar);
 
@@ -934,19 +1114,76 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `[` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#subscriptions>
-    fn parse_subscript_expression(
+    fn parse_subscript_expression(&mut self, value: Expr, start: TextSize) -> ast::ExprSubscript {
+        if matches!(self.peek2(), (TokenKind::Name, TokenKind::Lsqb)) {
+            return self.parse_nested_subscript_expression(value, start);
+        }
+
+        self.bump(TokenKind::Lsqb);
+
+        let slice_start = self.node_start();
+        self.parse_subscript_expression_after_lsqb(value, start, slice_start)
+    }
+
+    fn parse_nested_subscript_expression(
+        &mut self,
+        mut value: Expr,
+        mut start: TextSize,
+    ) -> ast::ExprSubscript {
+        let mut subscripts = Vec::new();
+
+        let mut expr = loop {
+            self.bump(TokenKind::Lsqb);
+
+            let slice_start = self.node_start();
+            if !self.at(TokenKind::Name) || self.peek() != TokenKind::Lsqb {
+                break Expr::Subscript(self.parse_subscript_expression_after_lsqb(
+                    value,
+                    start,
+                    slice_start,
+                ));
+            }
+
+            subscripts.push(PendingSubscript {
+                value,
+                start,
+                slice_start,
+            });
+
+            start = self.node_start();
+            value = self.parse_atom().expr;
+        };
+
+        while let Some(subscript) = subscripts.pop() {
+            let lower = self.parse_named_expression_or_higher_from_lhs(
+                expr.into(),
+                subscript.slice_start,
+                ExpressionContext::starred_conditional(),
+            );
+            let slice = self.parse_slice_from_lower(subscript.slice_start, lower);
+            expr = Expr::Subscript(self.finish_subscript_expression(
+                subscript.value,
+                subscript.start,
+                subscript.slice_start,
+                slice,
+            ));
+        }
+
+        let Expr::Subscript(subscript) = expr else {
+            unreachable!("nested subscript parsing always builds a subscript expression");
+        };
+        subscript
+    }
+
+    fn parse_subscript_expression_after_lsqb(
         &mut self,
         mut value: Expr,
         start: TextSize,
+        slice_start: TextSize,
     ) -> ast::ExprSubscript {
-        self.bump(TokenKind::Lsqb);
-
         // To prevent the `value` context from being `Del` within a `del` statement,
         // we set the context as `Load` here.
         helpers::set_expr_ctx(&mut value, ExprContext::Load);
-
-        // Slice range doesn't include the `[` token.
-        let slice_start = self.node_start();
 
         // Create an error when receiving an empty slice to parse, e.g. `x[]`
         if self.eat(TokenKind::Rsqb) {
@@ -967,8 +1204,17 @@ impl<'src> Parser<'src> {
             };
         }
 
-        let mut slice = self.parse_slice();
+        let slice = self.parse_slice();
+        self.finish_subscript_expression(value, start, slice_start, slice)
+    }
 
+    fn finish_subscript_expression(
+        &mut self,
+        value: Expr,
+        start: TextSize,
+        slice_start: TextSize,
+        mut slice: Expr,
+    ) -> ast::ExprSubscript {
         // If there are more than one element in the slice, we need to create a tuple
         // expression to represent it.
         if self.eat(TokenKind::Comma) {
@@ -1051,12 +1297,6 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#slicings>
     fn parse_slice(&mut self) -> Expr {
-        const UPPER_END_SET: TokenSet =
-            TokenSet::new([TokenKind::Comma, TokenKind::Colon, TokenKind::Rsqb])
-                .union(NEWLINE_EOF_SET);
-        const STEP_END_SET: TokenSet =
-            TokenSet::new([TokenKind::Comma, TokenKind::Rsqb]).union(NEWLINE_EOF_SET);
-
         // test_err named_expr_slice
         // # even after 3.9, an unparenthesized named expression is not allowed in a slice
         // lst[x:=1:-1]
@@ -1070,51 +1310,62 @@ impl<'src> Parser<'src> {
 
         let start = self.node_start();
 
-        let lower = if self.at_expr() {
+        if self.at_expr() {
             let lower =
                 self.parse_named_expression_or_higher(ExpressionContext::starred_conditional());
-
-            // This means we're in a subscript.
-            if self.at_ts(NEWLINE_EOF_SET.union([TokenKind::Rsqb, TokenKind::Comma].into())) {
-                // test_ok parenthesized_named_expr_index_py38
-                // # parse_options: {"target-version": "3.8"}
-                // lst[(x:=1)]
-
-                // test_ok unparenthesized_named_expr_index_py39
-                // # parse_options: {"target-version": "3.9"}
-                // lst[x:=1]
-
-                // test_err unparenthesized_named_expr_index_py38
-                // # parse_options: {"target-version": "3.8"}
-                // lst[x:=1]
-                if lower.is_unparenthesized_named_expr() {
-                    self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
-                            UnparenthesizedNamedExprKind::SequenceIndex,
-                        ),
-                        lower.range(),
-                    );
-                }
-                return lower.expr;
-            }
-
-            // Now we know we're in a slice.
-            if !lower.is_parenthesized {
-                match lower.expr {
-                    Expr::Starred(_) => {
-                        self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &lower);
-                    }
-                    Expr::Named(_) => {
-                        self.add_error(ParseErrorType::UnparenthesizedNamedExpression, &lower);
-                    }
-                    _ => {}
-                }
-            }
-
-            Some(lower.expr)
+            self.parse_slice_from_lower(start, lower)
         } else {
-            None
-        };
+            self.finish_slice(start, None)
+        }
+    }
+
+    fn parse_slice_from_lower(&mut self, start: TextSize, lower: ParsedExpr) -> Expr {
+        // This means we're in a subscript.
+        if self.at_ts(NEWLINE_EOF_SET.union([TokenKind::Rsqb, TokenKind::Comma].into())) {
+            // test_ok parenthesized_named_expr_index_py38
+            // # parse_options: {"target-version": "3.8"}
+            // lst[(x:=1)]
+
+            // test_ok unparenthesized_named_expr_index_py39
+            // # parse_options: {"target-version": "3.9"}
+            // lst[x:=1]
+
+            // test_err unparenthesized_named_expr_index_py38
+            // # parse_options: {"target-version": "3.8"}
+            // lst[x:=1]
+            if lower.is_unparenthesized_named_expr() {
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
+                        UnparenthesizedNamedExprKind::SequenceIndex,
+                    ),
+                    lower.range(),
+                );
+            }
+            return lower.expr;
+        }
+
+        // Now we know we're in a slice.
+        if !lower.is_parenthesized {
+            match lower.expr {
+                Expr::Starred(_) => {
+                    self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &lower);
+                }
+                Expr::Named(_) => {
+                    self.add_error(ParseErrorType::UnparenthesizedNamedExpression, &lower);
+                }
+                _ => {}
+            }
+        }
+
+        self.finish_slice(start, Some(lower.expr))
+    }
+
+    fn finish_slice(&mut self, start: TextSize, lower: Option<Expr>) -> Expr {
+        const UPPER_END_SET: TokenSet =
+            TokenSet::new([TokenKind::Comma, TokenKind::Colon, TokenKind::Rsqb])
+                .union(NEWLINE_EOF_SET);
+        const STEP_END_SET: TokenSet =
+            TokenSet::new([TokenKind::Comma, TokenKind::Rsqb]).union(NEWLINE_EOF_SET);
 
         self.expect(TokenKind::Colon);
 
@@ -2344,6 +2595,185 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lpar);
 
+        self.report_unclosed_parenthesis();
+
+        // Return an empty `TupleExpr` when finding a `)` right after the `(`
+        if self.eat(TokenKind::Rpar) {
+            return self.empty_parenthesized_tuple(start);
+        }
+
+        // The parser used to recurse once for every nested group. Keep the common case above on
+        // its direct path and unroll only when the first parenthesized expression is another one.
+        if self.at(TokenKind::Lpar) {
+            return self.parse_nested_parenthesized_expression(start);
+        }
+
+        let context = ExpressionContext::yield_or_starred_bitwise_or();
+
+        if !self.at(TokenKind::Lambda) {
+            let expression_start = self.node_start();
+            let lhs = self.parse_lhs_expression(OperatorPrecedence::None, context);
+
+            if self.parenthesized_binary_operator().is_some() {
+                return self.parse_nested_parenthesized_binary_expression(
+                    lhs,
+                    expression_start,
+                    start,
+                    context,
+                );
+            }
+
+            let parsed_expr = self.parse_named_expression_or_higher_from_simple_lhs(
+                lhs,
+                expression_start,
+                context,
+            );
+            return self.finish_parenthesized_expression(parsed_expr, start);
+        }
+
+        // Use the more general rule of the three to parse the first element
+        // and limit it later.
+        let parsed_expr = self.parse_named_expression_or_higher(context);
+
+        self.finish_parenthesized_expression(parsed_expr, start)
+    }
+
+    fn parse_nested_parenthesized_expression(&mut self, outer_start: TextSize) -> ParsedExpr {
+        let mut starts = vec![outer_start];
+
+        let mut parsed_expr = loop {
+            let start = self.node_start();
+            self.bump(TokenKind::Lpar);
+
+            self.report_unclosed_parenthesis();
+
+            if self.eat(TokenKind::Rpar) {
+                let empty_tuple = self.empty_parenthesized_tuple(start);
+                break self.parse_named_expression_or_higher_from_lhs(
+                    empty_tuple,
+                    start,
+                    ExpressionContext::yield_or_starred_bitwise_or(),
+                );
+            }
+
+            starts.push(start);
+
+            if !self.at(TokenKind::Lpar) {
+                break self.parse_named_expression_or_higher(
+                    ExpressionContext::yield_or_starred_bitwise_or(),
+                );
+            }
+        };
+
+        while let Some(start) = starts.pop() {
+            parsed_expr = self.finish_parenthesized_expression(parsed_expr, start);
+
+            if !starts.is_empty() {
+                parsed_expr = self.parse_named_expression_or_higher_from_lhs(
+                    parsed_expr,
+                    start,
+                    ExpressionContext::yield_or_starred_bitwise_or(),
+                );
+            }
+        }
+
+        parsed_expr
+    }
+
+    fn parenthesized_binary_operator(&mut self) -> Option<Operator> {
+        let BinaryLikeOperator::Binary(operator) =
+            BinaryLikeOperator::try_from_tokens(self.current_token_kind(), self.peek())?
+        else {
+            return None;
+        };
+
+        (self.peek() == TokenKind::Lpar).then_some(operator)
+    }
+
+    fn parse_nested_parenthesized_binary_expression(
+        &mut self,
+        mut lhs: ParsedExpr,
+        mut expression_start: TextSize,
+        mut parenthesis_start: TextSize,
+        context: ExpressionContext,
+    ) -> ParsedExpr {
+        let mut expressions = Vec::new();
+
+        let mut parsed_expr = loop {
+            let operator = self
+                .parenthesized_binary_operator()
+                .expect("nested parenthesized binary parsing starts at a binary operator");
+            self.bump(TokenKind::from(operator));
+
+            let right_start = self.node_start();
+            self.bump(TokenKind::Lpar);
+            self.report_unclosed_parenthesis();
+
+            expressions.push(PendingParenthesizedBinaryExpression {
+                left: lhs.expr,
+                op: operator,
+                expression_start,
+                parenthesis_start,
+                right_start,
+            });
+
+            if self.eat(TokenKind::Rpar) {
+                break self.empty_parenthesized_tuple(right_start);
+            }
+
+            if self.at(TokenKind::Lpar) {
+                break self.parse_nested_parenthesized_expression(right_start);
+            }
+
+            expression_start = self.node_start();
+            parenthesis_start = right_start;
+
+            if self.at(TokenKind::Lambda) {
+                let parsed_expr = self.parse_named_expression_or_higher(context);
+                break self.finish_parenthesized_expression(parsed_expr, parenthesis_start);
+            }
+
+            lhs = self.parse_lhs_expression(OperatorPrecedence::None, context);
+
+            if self.parenthesized_binary_operator().is_none() {
+                let parsed_expr = self.parse_named_expression_or_higher_from_simple_lhs(
+                    lhs,
+                    expression_start,
+                    context,
+                );
+                break self.finish_parenthesized_expression(parsed_expr, parenthesis_start);
+            }
+        };
+
+        while let Some(expression) = expressions.pop() {
+            let right = self.parse_binary_expression_or_higher_from_lhs(
+                parsed_expr,
+                OperatorPrecedence::from(expression.op),
+                context,
+                expression.right_start,
+            );
+
+            parsed_expr = Expr::BinOp(ast::ExprBinOp {
+                left: Box::new(expression.left),
+                op: expression.op,
+                right: Box::new(right.expr),
+                range: self.node_range(expression.expression_start),
+                node_index: AtomicNodeIndex::NONE,
+            })
+            .into();
+            parsed_expr = self.parse_named_expression_or_higher_from_simple_lhs(
+                parsed_expr,
+                expression.expression_start,
+                context,
+            );
+            parsed_expr =
+                self.finish_parenthesized_expression(parsed_expr, expression.parenthesis_start);
+        }
+
+        parsed_expr
+    }
+
+    fn report_unclosed_parenthesis(&mut self) {
         // Nice error message when having a unclosed open parenthesis `(`
         if self.at_ts(NEWLINE_EOF_SET) {
             let range = self.current_token_range();
@@ -2352,24 +2782,24 @@ impl<'src> Parser<'src> {
                 range,
             );
         }
+    }
 
-        // Return an empty `TupleExpr` when finding a `)` right after the `(`
-        if self.eat(TokenKind::Rpar) {
-            return Expr::Tuple(ast::ExprTuple {
-                elts: vec![],
-                ctx: ExprContext::Load,
-                range: self.node_range(start),
-                node_index: AtomicNodeIndex::NONE,
-                parenthesized: true,
-            })
-            .into();
-        }
+    fn empty_parenthesized_tuple(&self, start: TextSize) -> ParsedExpr {
+        Expr::Tuple(ast::ExprTuple {
+            elts: vec![],
+            ctx: ExprContext::Load,
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+            parenthesized: true,
+        })
+        .into()
+    }
 
-        // Use the more general rule of the three to parse the first element
-        // and limit it later.
-        let mut parsed_expr =
-            self.parse_named_expression_or_higher(ExpressionContext::yield_or_starred_bitwise_or());
-
+    fn finish_parenthesized_expression(
+        &mut self,
+        mut parsed_expr: ParsedExpr,
+        start: TextSize,
+    ) -> ParsedExpr {
         match self.current_token_kind() {
             TokenKind::Comma => {
                 // grammar: `tuple`
@@ -3144,6 +3574,34 @@ impl Ranged for ParsedExpr {
     fn range(&self) -> TextRange {
         self.expr.range()
     }
+}
+
+struct PendingCall {
+    func: Expr,
+    start: TextSize,
+    arguments_start: TextSize,
+}
+
+#[derive(Default)]
+struct ArgumentParsingState {
+    args: Vec<Expr>,
+    keywords: Vec<ast::Keyword>,
+    seen_keyword_argument: bool,
+    seen_keyword_unpacking: bool,
+}
+
+struct PendingParenthesizedBinaryExpression {
+    left: Expr,
+    op: Operator,
+    expression_start: TextSize,
+    parenthesis_start: TextSize,
+    right_start: TextSize,
+}
+
+struct PendingSubscript {
+    value: Expr,
+    start: TextSize,
+    slice_start: TextSize,
 }
 
 #[derive(Debug)]
