@@ -1,3 +1,5 @@
+use ruff_python_ast::Stmt;
+
 use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
 
 #[test]
@@ -195,6 +197,28 @@ fn recursion_limit_normal_python_unaffected() {
     // reject ordinary input.
     let src = format!("x = {}1{}", "(".repeat(50), ")".repeat(50));
     parse_module(&src).unwrap();
+}
+
+#[test]
+fn recursion_limit_preserves_prior_statements() {
+    // Recursion-limit recovery is limited for now: we drain the rest of the file but keep the
+    // statements parsed before the overflowing statement.
+    // TODO: Recover at the next newline so the trailing statement is preserved too.
+    let src = format!(
+        "before = 1\n{}1{}\nafter = 2\n",
+        "(".repeat(1_000),
+        ")".repeat(1_000),
+    );
+    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
+    let parsed = crate::parse_unchecked(&src, opts)
+        .try_into_module()
+        .unwrap();
+
+    assert!(matches!(
+        parsed.errors().first().map(|error| &error.error),
+        Some(ParseErrorType::RecursionLimitExceeded)
+    ));
+    assert!(matches!(parsed.suite().first(), Some(Stmt::Assign(_))));
 }
 
 #[test]
