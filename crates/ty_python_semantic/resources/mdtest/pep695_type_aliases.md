@@ -218,10 +218,18 @@ already contains the same type alias:
 def f(condition: bool):
     type Left = int
     alias = Left
+    reveal_type(alias)  # revealed: TypeAliasType
 
     while condition:
         type Right = str
         alias |= Right
+        reveal_type(alias)  # revealed: <types.UnionType special-form 'int | str'>
+
+    reveal_type(alias)  # revealed: TypeAliasType | <types.UnionType special-form 'int | str'>
+
+    # it would be okay to emit an `invalid-type-form` error here
+    def inner(x: alias):
+        reveal_type(x)  # revealed: int | str
 ```
 
 ## Multiple layers of union aliases
