@@ -10,7 +10,10 @@ pub fn classify(raw: &str) -> DecoratorKind {
     // strip arguments — `bp.route('/x')` -> `bp.route`
     let head = s.split('(').next().unwrap_or(s);
 
-    if head.ends_with(".route") || head == "route" {
+    // Matching Python decorator attribute name, not a file extension.
+    #[expect(clippy::case_sensitive_file_extension_comparisons)]
+    let is_route = head.ends_with(".route") || head == "route";
+    if is_route {
         return DecoratorKind::Route;
     }
     if matches!(

@@ -1,0 +1,29 @@
+{
+  "$schema": "../schemas/ruff-py-dto.config.schema.json",
+  "root": ".",
+  "include": ["woa/blueprints/**/*.py"],
+  "exclude": ["**/tests/**", "**/__pycache__/**", "**/.venv/**"],
+  "match": [
+    {
+      "id": "flask_route",
+      "kind": "function_with_decorator",
+      "decorator": {
+        "attribute": "route",
+        "min_positional_args": 1
+      },
+      "emit": {
+        "url":            "decorator.args[0]",
+        "methods":        "decorator.kwargs.methods",
+        "function_name":  "def.name",
+        "signature":      "def.params",
+        "body_source":    "def.body.source",
+        "decorators_all": "def.decorators"
+      }
+    }
+  ],
+  "group": {
+    "family_from_filename": {
+      "regex": "^(?P<family>[a-z_]+?)(?:_ops|_bp|_routes)?\\.py$"
+    }
+  }
+}

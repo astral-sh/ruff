@@ -1,4 +1,4 @@
-//! Phase-0 golden test: parse the wo_list fixture, assert the identity
+//! Phase-0 golden test: parse the `wo_list` fixture, assert the identity
 //! fields are extracted correctly. Extractor depth grows with later
 //! phases — this test grows with it.
 

@@ -22,8 +22,11 @@ ruff_text_size = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { workspace = true }
+globset = { workspace = true }
+regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+sha2 = { version = "0.10.9" }
 walkdir = { workspace = true }
 
 [lints]

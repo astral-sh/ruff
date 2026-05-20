@@ -14,7 +14,12 @@
 //! Reference design RFC: `AdaWorldAPI/woa-rs:rfcs/v02-005-ruff-transcode-harvester.md`.
 
 pub mod bundle;
+pub mod config;
+pub mod emit;
 pub mod extractors;
+pub mod matcher;
+pub mod observations;
+pub mod preflight;
 
 use std::path::Path;
 
@@ -28,7 +33,7 @@ pub use bundle::{Bundle, Decorator as BundleDecorator, Harvester, Source};
 
 /// Schema version. Bumped when the JSON shape changes in a
 /// non-backwards-compatible way.
-pub const SCHEMA_VERSION: u32 = 1;
+pub const SCHEMA_VERSION: u32 = 2;
 
 /// Harvester version. Bumped on every release of this crate.
 pub const HARVESTER_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -39,16 +44,15 @@ pub struct ModuleHarvest {
     /// Repository-relative path of the source file (e.g.
     /// `woa/blueprints/vorgaenge_ops.py`).
     pub source_file: String,
-    /// One bundle per route detected in the module.
+    /// One bundle per matched function in the module.
     pub bundles: Vec<Bundle>,
 }
 
-/// Parse one Python source file and emit one [`Bundle`] per detected route.
+/// Parse one Python source file and emit one [`Bundle`] per matched function.
 ///
-/// Detection is currently scoped to top-level functions decorated with a
-/// route registrar — `@bp.route(...)`, `@app.route(...)`, or
-/// `@<blueprint>.route(...)`. Methods inside classes are not yet harvested
-/// (WoA uses module-level routes; classes appear in `models.py` only).
+/// Uses the config-driven matcher. Falls back to the legacy Flask route
+/// detector when no config is supplied so the `wo_list_identity` golden test
+/// keeps passing.
 pub fn harvest_module(source_file: &str, source: &str) -> Result<ModuleHarvest> {
     let parsed =
         parse_module(source).with_context(|| format!("parsing {source_file}"))?;
@@ -76,13 +80,12 @@ pub fn harvest_tree(root: &Path) -> Result<Vec<ModuleHarvest>> {
     for entry in walkdir::WalkDir::new(root)
         .follow_links(false)
         .into_iter()
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
     {
         let path = entry.path();
         if !path.is_file() || path.extension().is_none_or(|e| e != "py") {
             continue;
         }
-        // Skip the obvious ignore-this directories.
         let rel = path
             .strip_prefix(root)
             .unwrap_or(path)
@@ -99,8 +102,6 @@ pub fn harvest_tree(root: &Path) -> Result<Vec<ModuleHarvest>> {
         }
         let source = std::fs::read_to_string(path)
             .with_context(|| format!("reading {}", path.display()))?;
-        // Skip on parse error; the orchestrator's existing Python AST tools
-        // already report syntactic breakage. We only emit clean bundles.
         let Ok(harvest) = harvest_module(&rel, &source) else {
             continue;
         };
@@ -176,7 +177,6 @@ fn decorator_raw(source: &str, d: &Decorator) -> BundleDecorator {
 }
 
 fn family_from_path(source_file: &str) -> String {
-    // `woa/blueprints/vorgaenge_ops.py` -> "vorgaenge_ops"
     Path::new(source_file)
         .file_stem()
         .and_then(|s| s.to_str())
