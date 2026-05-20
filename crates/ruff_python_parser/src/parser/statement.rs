@@ -2836,10 +2836,16 @@ impl<'src> Parser<'src> {
                 if let Some(stmt) = self.with_recursion(Self::parse_statement) {
                     stmt
                 } else {
-                    let range = self.current_token_range();
-                    self.report_recursion_limit_exceeded(range);
-                    Stmt::Pass(ast::StmtPass {
+                    let range = self.node_range(async_start);
+                    self.add_error(ParseErrorType::RecursionLimitExceeded, range);
+                    Stmt::Expr(ast::StmtExpr {
                         range,
+                        value: Box::new(Expr::Name(ast::ExprName {
+                            range,
+                            id: Name::new_static("async"),
+                            ctx: ExprContext::Invalid,
+                            node_index: AtomicNodeIndex::NONE,
+                        })),
                         node_index: AtomicNodeIndex::NONE,
                     })
                 }

@@ -93,13 +93,17 @@ impl Parser<'_> {
         {
             result
         } else {
-            let range = self.current_token_range();
-            self.report_recursion_limit_exceeded(range);
-            // Wildcard-style placeholder so the caller always gets a valid `Pattern`.
-            Pattern::MatchAs(ast::PatternMatchAs {
+            let range = self.missing_node_range();
+            self.report_recursion_limit_exceeded(self.current_token_range());
+            let invalid_node = Expr::Name(ast::ExprName {
                 range,
-                name: None,
-                pattern: None,
+                id: Name::empty(),
+                ctx: ExprContext::Invalid,
+                node_index: AtomicNodeIndex::NONE,
+            });
+            Pattern::MatchValue(ast::PatternMatchValue {
+                range: invalid_node.range(),
+                value: Box::new(invalid_node),
                 node_index: AtomicNodeIndex::NONE,
             })
         }
