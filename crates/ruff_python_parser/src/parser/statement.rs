@@ -1400,6 +1400,15 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-if-statement>
     fn parse_if_statement(&mut self) -> ast::StmtIf {
+        let statement = PendingBodyStatement::If(self.parse_if_statement_header());
+        let Stmt::If(statement) = self.parse_body_statement(statement) else {
+            unreachable!("parsing a pending if statement always returns an if statement");
+        };
+
+        statement
+    }
+
+    fn parse_if_statement_header(&mut self) -> ast::StmtIf {
         let start = self.node_start();
         self.bump(TokenKind::If);
 
@@ -1419,80 +1428,25 @@ impl<'src> Parser<'src> {
         // a = 1
         self.expect(TokenKind::Colon);
 
-        let statement = PendingIfStatement {
-            start,
-            test: test.expr,
-        };
-
-        if self.at(TokenKind::Newline) && self.peek2() == (TokenKind::Indent, TokenKind::If) {
-            return self.parse_nested_if_statement(statement);
+        ast::StmtIf {
+            test: Box::new(test.expr),
+            body: vec![],
+            elif_else_clauses: vec![],
+            range: TextRange::empty(start),
+            node_index: AtomicNodeIndex::NONE,
         }
-
-        self.parse_if_statement_after_header(statement)
-    }
-
-    fn parse_nested_if_statement(&mut self, outer: PendingIfStatement) -> ast::StmtIf {
-        let mut statements = vec![outer];
-
-        loop {
-            self.bump(TokenKind::Newline);
-            self.bump(TokenKind::Indent);
-
-            statements.push(self.parse_if_statement_header());
-
-            if !self.at(TokenKind::Newline) || self.peek2() != (TokenKind::Indent, TokenKind::If) {
-                break;
-            }
-        }
-
-        let inner = statements
-            .pop()
-            .expect("nested if parsing always includes the outer if statement");
-        let mut statement = self.parse_if_statement_after_header(inner);
-
-        while let Some(outer) = statements.pop() {
-            let mut body = vec![Stmt::If(statement)];
-            body.extend(
-                self.parse_list_into_vec(
-                    RecoveryContextKind::BlockStatements,
-                    Self::parse_statement,
-                ),
-            );
-            self.expect(TokenKind::Dedent);
-
-            statement = self.parse_if_statement_with_body(outer, body);
-        }
-
-        statement
-    }
-
-    fn parse_if_statement_header(&mut self) -> PendingIfStatement {
-        let start = self.node_start();
-        self.bump(TokenKind::If);
-
-        let test = self.parse_named_expression_or_higher(ExpressionContext::default());
-        self.expect(TokenKind::Colon);
-
-        PendingIfStatement {
-            start,
-            test: test.expr,
-        }
-    }
-
-    fn parse_if_statement_after_header(&mut self, statement: PendingIfStatement) -> ast::StmtIf {
-        // test_err if_stmt_empty_body
-        // if True:
-        // 1 + 1
-        let body = self.parse_body(Clause::If);
-
-        self.parse_if_statement_with_body(statement, body)
     }
 
     fn parse_if_statement_with_body(
         &mut self,
-        statement: PendingIfStatement,
+        mut statement: ast::StmtIf,
         body: Vec<Stmt>,
     ) -> ast::StmtIf {
+        // test_err if_stmt_empty_body
+        // if True:
+        // 1 + 1
+        statement.body = body;
+
         // test_err if_stmt_misspelled_elif
         // if True:
         //     pass
@@ -1508,13 +1462,9 @@ impl<'src> Parser<'src> {
             elif_else_clauses.push(self.parse_elif_or_else_clause(ElifOrElse::Else));
         }
 
-        ast::StmtIf {
-            test: Box::new(statement.test),
-            body,
-            elif_else_clauses,
-            range: self.node_range(statement.start),
-            node_index: AtomicNodeIndex::NONE,
-        }
+        statement.elif_else_clauses = elif_else_clauses;
+        statement.range = self.node_range(statement.range.start());
+        statement
     }
 
     /// Parses an `elif` or `else` clause.
@@ -1569,13 +1519,28 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-try-statement>
     fn parse_try_statement(&mut self) -> ast::StmtTry {
+        let statement = PendingBodyStatement::Try(self.parse_try_statement_header());
+        let Stmt::Try(statement) = self.parse_body_statement(statement) else {
+            unreachable!("parsing a pending try statement always returns a try statement");
+        };
+
+        statement
+    }
+
+    fn parse_try_statement_header(&mut self) -> TextSize {
         let try_start = self.node_start();
         self.bump(TokenKind::Try);
         self.expect(TokenKind::Colon);
 
-        let mut is_star: Option<bool> = None;
+        try_start
+    }
 
-        let try_body = self.parse_body(Clause::Try);
+    fn parse_try_statement_with_body(
+        &mut self,
+        try_start: TextSize,
+        try_body: Vec<Stmt>,
+    ) -> ast::StmtTry {
+        let mut is_star: Option<bool> = None;
 
         let has_except = self.at(TokenKind::Except);
 
@@ -1874,6 +1839,15 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-for-statement>
     fn parse_for_statement(&mut self, start: TextSize) -> ast::StmtFor {
+        let statement = PendingBodyStatement::For(self.parse_for_statement_header(start));
+        let Stmt::For(statement) = self.parse_body_statement(statement) else {
+            unreachable!("parsing a pending for statement always returns a for statement");
+        };
+
+        statement
+    }
+
+    fn parse_for_statement_header(&mut self, start: TextSize) -> ast::StmtFor {
         self.bump(TokenKind::For);
 
         // test_err for_stmt_missing_target
@@ -1953,7 +1927,23 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Colon);
 
-        let body = self.parse_body(Clause::For);
+        ast::StmtFor {
+            target: Box::new(target.expr),
+            iter: Box::new(iter.expr),
+            is_async: false,
+            body: vec![],
+            orelse: vec![],
+            range: TextRange::empty(start),
+            node_index: AtomicNodeIndex::NONE,
+        }
+    }
+
+    fn parse_for_statement_with_body(
+        &mut self,
+        mut statement: ast::StmtFor,
+        body: Vec<Stmt>,
+    ) -> ast::StmtFor {
+        statement.body = body;
 
         let orelse = if self.eat(TokenKind::Else) {
             self.expect(TokenKind::Colon);
@@ -1962,15 +1952,9 @@ impl<'src> Parser<'src> {
             vec![]
         };
 
-        ast::StmtFor {
-            target: Box::new(target.expr),
-            iter: Box::new(iter.expr),
-            is_async: false,
-            body,
-            orelse,
-            range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
-        }
+        statement.orelse = orelse;
+        statement.range = self.node_range(statement.range.start());
+        statement
     }
 
     /// Parses a `while` statement.
@@ -1981,6 +1965,15 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-while-statement>
     fn parse_while_statement(&mut self) -> ast::StmtWhile {
+        let statement = PendingBodyStatement::While(self.parse_while_statement_header());
+        let Stmt::While(statement) = self.parse_body_statement(statement) else {
+            unreachable!("parsing a pending while statement always returns a while statement");
+        };
+
+        statement
+    }
+
+    fn parse_while_statement_header(&mut self) -> ast::StmtWhile {
         let start = self.node_start();
         self.bump(TokenKind::While);
 
@@ -2003,7 +1996,21 @@ impl<'src> Parser<'src> {
         //     pass
         self.expect(TokenKind::Colon);
 
-        let body = self.parse_body(Clause::While);
+        ast::StmtWhile {
+            test: Box::new(test.expr),
+            body: vec![],
+            orelse: vec![],
+            range: TextRange::empty(start),
+            node_index: AtomicNodeIndex::NONE,
+        }
+    }
+
+    fn parse_while_statement_with_body(
+        &mut self,
+        mut statement: ast::StmtWhile,
+        body: Vec<Stmt>,
+    ) -> ast::StmtWhile {
+        statement.body = body;
 
         let orelse = if self.eat(TokenKind::Else) {
             self.expect(TokenKind::Colon);
@@ -2012,13 +2019,9 @@ impl<'src> Parser<'src> {
             vec![]
         };
 
-        ast::StmtWhile {
-            test: Box::new(test.expr),
-            body,
-            orelse,
-            range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
-        }
+        statement.orelse = orelse;
+        statement.range = self.node_range(statement.range.start());
+        statement
     }
 
     /// Parses a function definition.
@@ -2034,6 +2037,23 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#function-definitions>
     fn parse_function_definition(
+        &mut self,
+        decorator_list: Vec<ast::Decorator>,
+        start: TextSize,
+    ) -> ast::StmtFunctionDef {
+        let statement = PendingBodyStatement::FunctionDef(
+            self.parse_function_definition_header(decorator_list, start),
+        );
+        let Stmt::FunctionDef(statement) = self.parse_body_statement(statement) else {
+            unreachable!(
+                "parsing a pending function definition always returns a function definition"
+            );
+        };
+
+        statement
+    }
+
+    fn parse_function_definition_header(
         &mut self,
         decorator_list: Vec<ast::Decorator>,
         start: TextSize,
@@ -2136,19 +2156,27 @@ impl<'src> Parser<'src> {
         // def foo():
         // def foo() -> int:
         // x = 42
-        let body = self.parse_body(Clause::FunctionDef);
-
         ast::StmtFunctionDef {
             name,
             type_params: type_params.map(Box::new),
             parameters: Box::new(parameters),
-            body,
+            body: vec![],
             decorator_list,
             is_async: false,
             returns,
-            range: self.node_range(start),
+            range: TextRange::empty(start),
             node_index: AtomicNodeIndex::NONE,
         }
+    }
+
+    fn parse_function_definition_with_body(
+        &mut self,
+        mut statement: ast::StmtFunctionDef,
+        body: Vec<Stmt>,
+    ) -> ast::StmtFunctionDef {
+        statement.body = body;
+        statement.range = self.node_range(statement.range.start());
+        statement
     }
 
     /// Parses a class definition.
@@ -2162,6 +2190,21 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-classdef>
     fn parse_class_definition(
+        &mut self,
+        decorator_list: Vec<ast::Decorator>,
+        start: TextSize,
+    ) -> ast::StmtClassDef {
+        let statement = PendingBodyStatement::ClassDef(
+            self.parse_class_definition_header(decorator_list, start),
+        );
+        let Stmt::ClassDef(statement) = self.parse_body_statement(statement) else {
+            unreachable!("parsing a pending class definition always returns a class definition");
+        };
+
+        statement
+    }
+
+    fn parse_class_definition_header(
         &mut self,
         decorator_list: Vec<ast::Decorator>,
         start: TextSize,
@@ -2208,17 +2251,25 @@ impl<'src> Parser<'src> {
         // class Foo:
         // class Foo():
         // x = 42
-        let body = self.parse_body(Clause::Class);
-
         ast::StmtClassDef {
-            range: self.node_range(start),
+            range: TextRange::empty(start),
             decorator_list,
             name,
             type_params: type_params.map(Box::new),
             arguments,
-            body,
+            body: vec![],
             node_index: AtomicNodeIndex::NONE,
         }
+    }
+
+    fn parse_class_definition_with_body(
+        &mut self,
+        mut statement: ast::StmtClassDef,
+        body: Vec<Stmt>,
+    ) -> ast::StmtClassDef {
+        statement.body = body;
+        statement.range = self.node_range(statement.range.start());
+        statement
     }
 
     /// Parses a `with` statement
@@ -2232,20 +2283,37 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-with-statement>
     fn parse_with_statement(&mut self, start: TextSize) -> ast::StmtWith {
+        let statement = PendingBodyStatement::With(self.parse_with_statement_header(start));
+        let Stmt::With(statement) = self.parse_body_statement(statement) else {
+            unreachable!("parsing a pending with statement always returns a with statement");
+        };
+
+        statement
+    }
+
+    fn parse_with_statement_header(&mut self, start: TextSize) -> ast::StmtWith {
         self.bump(TokenKind::With);
 
         let items = self.parse_with_items();
         self.expect(TokenKind::Colon);
 
-        let body = self.parse_body(Clause::With);
-
         ast::StmtWith {
             items,
-            body,
+            body: vec![],
             is_async: false,
-            range: self.node_range(start),
+            range: TextRange::empty(start),
             node_index: AtomicNodeIndex::NONE,
         }
+    }
+
+    fn parse_with_statement_with_body(
+        &mut self,
+        mut statement: ast::StmtWith,
+        body: Vec<Stmt>,
+    ) -> ast::StmtWith {
+        statement.body = body;
+        statement.range = self.node_range(statement.range.start());
+        statement
     }
 
     /// Parses a list of with items.
@@ -2640,6 +2708,19 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-match-statement>
     fn parse_match_statement(&mut self) -> ast::StmtMatch {
+        let statement = match self.parse_match_statement_header() {
+            BodyStatementHeader::Pending(statement) => self.parse_body_statement(statement),
+            BodyStatementHeader::Statement(statement) => statement,
+        };
+
+        let Stmt::Match(statement) = statement else {
+            unreachable!("parsing a match statement header always returns a match statement");
+        };
+
+        statement
+    }
+
+    fn parse_match_statement_header(&mut self) -> BodyStatementHeader {
         let start = self.node_start();
         self.bump(TokenKind::Match);
 
@@ -2648,8 +2729,81 @@ impl<'src> Parser<'src> {
         let subject = self.parse_match_subject_expression();
         self.expect(TokenKind::Colon);
 
-        let cases = self.parse_match_body();
+        let statement = ast::StmtMatch {
+            subject: Box::new(subject),
+            cases: vec![],
+            range: TextRange::empty(start),
+            node_index: AtomicNodeIndex::NONE,
+        };
 
+        self.parse_match_body_header(statement, match_range)
+    }
+
+    fn parse_match_body_header(
+        &mut self,
+        mut statement: ast::StmtMatch,
+        match_range: TextRange,
+    ) -> BodyStatementHeader {
+        self.expect(TokenKind::Newline);
+
+        // Use `eat` instead of `expect` for better error message.
+        if !self.eat(TokenKind::Indent) {
+            self.add_error(
+                ParseErrorType::OtherError(
+                    "Expected an indented block after `match` statement".to_string(),
+                ),
+                self.current_token_range(),
+            );
+        }
+
+        if !self.at(TokenKind::Case) {
+            self.add_error(
+                ParseErrorType::OtherError("Expected `case` block".to_string()),
+                self.current_token_range(),
+            );
+
+            self.expect(TokenKind::Dedent);
+            statement.range = self.node_range(statement.range.start());
+            self.check_match_syntax(match_range);
+            return BodyStatementHeader::Statement(Stmt::Match(statement));
+        }
+
+        let first_case = self.parse_match_case_header();
+        BodyStatementHeader::Pending(PendingBodyStatement::Match(PendingMatchStatement {
+            statement,
+            match_range,
+            first_case,
+        }))
+    }
+
+    fn parse_match_statement_with_first_case_body(
+        &mut self,
+        pending: PendingMatchStatement,
+        body: Vec<Stmt>,
+    ) -> ast::StmtMatch {
+        let PendingMatchStatement {
+            mut statement,
+            match_range,
+            first_case,
+        } = pending;
+
+        let mut cases = vec![self.parse_match_case_with_body(first_case, body)];
+        let mut progress = ParserProgress::default();
+
+        while self.at(TokenKind::Case) {
+            progress.assert_progressing(self);
+            cases.push(self.parse_match_case());
+        }
+
+        self.expect(TokenKind::Dedent);
+
+        statement.cases = cases;
+        statement.range = self.node_range(statement.range.start());
+        self.check_match_syntax(match_range);
+        statement
+    }
+
+    fn check_match_syntax(&mut self, match_range: TextRange) {
         // test_err match_before_py310
         // # parse_options: { "target-version": "3.9" }
         // match 2:
@@ -2663,13 +2817,6 @@ impl<'src> Parser<'src> {
         //         pass
 
         self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::Match, match_range);
-
-        ast::StmtMatch {
-            subject: Box::new(subject),
-            cases,
-            range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
-        }
     }
 
     /// Parses the subject expression for a `match` statement.
@@ -2789,6 +2936,18 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-case_block>
     fn parse_match_case(&mut self) -> ast::MatchCase {
+        let case = self.parse_match_case_header();
+
+        // test_err case_expect_indented_block
+        // match subject:
+        //     case 1:
+        //     case 2: ...
+        let body = self.parse_body(Clause::Case);
+
+        self.parse_match_case_with_body(case, body)
+    }
+
+    fn parse_match_case_header(&mut self) -> ast::MatchCase {
         let start = self.node_start();
         self.bump(TokenKind::Case);
 
@@ -2836,19 +2995,23 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Colon);
 
-        // test_err case_expect_indented_block
-        // match subject:
-        //     case 1:
-        //     case 2: ...
-        let body = self.parse_body(Clause::Case);
-
         ast::MatchCase {
             pattern,
             guard,
-            body,
-            range: self.node_range(start),
+            body: vec![],
+            range: TextRange::empty(start),
             node_index: AtomicNodeIndex::NONE,
         }
+    }
+
+    fn parse_match_case_with_body(
+        &mut self,
+        mut case: ast::MatchCase,
+        body: Vec<Stmt>,
+    ) -> ast::MatchCase {
+        case.body = body;
+        case.range = self.node_range(case.range.start());
+        case
     }
 
     /// Parses a statement that is valid after an `async` token.
@@ -2861,6 +3024,13 @@ impl<'src> Parser<'src> {
     /// - <https://docs.python.org/3/reference/compound_stmts.html#the-async-for-statement>
     /// - <https://docs.python.org/3/reference/compound_stmts.html#coroutine-function-definition>
     fn parse_async_statement(&mut self) -> Stmt {
+        match self.parse_async_statement_header() {
+            BodyStatementHeader::Pending(statement) => self.parse_body_statement(statement),
+            BodyStatementHeader::Statement(statement) => statement,
+        }
+    }
+
+    fn parse_async_statement_header(&mut self) -> BodyStatementHeader {
         let mut async_start = self.node_start();
         self.bump(TokenKind::Async);
 
@@ -2877,24 +3047,27 @@ impl<'src> Parser<'src> {
         match self.current_token_kind() {
             // test_ok async_function_definition
             // async def foo(): ...
-            TokenKind::Def => Stmt::FunctionDef(ast::StmtFunctionDef {
-                is_async: true,
-                ..self.parse_function_definition(vec![], async_start)
-            }),
+            TokenKind::Def => {
+                let mut statement = self.parse_function_definition_header(vec![], async_start);
+                statement.is_async = true;
+                BodyStatementHeader::Pending(PendingBodyStatement::FunctionDef(statement))
+            }
 
             // test_ok async_with_statement
             // async with item: ...
-            TokenKind::With => Stmt::With(ast::StmtWith {
-                is_async: true,
-                ..self.parse_with_statement(async_start)
-            }),
+            TokenKind::With => {
+                let mut statement = self.parse_with_statement_header(async_start);
+                statement.is_async = true;
+                BodyStatementHeader::Pending(PendingBodyStatement::With(statement))
+            }
 
             // test_ok async_for_statement
             // async for target in iter: ...
-            TokenKind::For => Stmt::For(ast::StmtFor {
-                is_async: true,
-                ..self.parse_for_statement(async_start)
-            }),
+            TokenKind::For => {
+                let mut statement = self.parse_for_statement_header(async_start);
+                statement.is_async = true;
+                BodyStatementHeader::Pending(PendingBodyStatement::For(statement))
+            }
 
             kind => {
                 // test_err async_unexpected_token
@@ -2912,22 +3085,24 @@ impl<'src> Parser<'src> {
                 // Although this statement is not a valid `async` statement,
                 // we still parse it. Guard the recursive recovery path so
                 // `async async async ...` cannot overflow the parser stack.
-                if let Some(stmt) = self.with_recursion(Self::parse_statement) {
-                    stmt
-                } else {
-                    let range = self.node_range(async_start);
-                    self.add_error(ParseErrorType::RecursionLimitExceeded, range);
-                    Stmt::Expr(ast::StmtExpr {
-                        range,
-                        value: Box::new(Expr::Name(ast::ExprName {
+                BodyStatementHeader::Statement(
+                    if let Some(stmt) = self.with_recursion(Self::parse_statement) {
+                        stmt
+                    } else {
+                        let range = self.node_range(async_start);
+                        self.add_error(ParseErrorType::RecursionLimitExceeded, range);
+                        Stmt::Expr(ast::StmtExpr {
                             range,
-                            id: Name::new_static("async"),
-                            ctx: ExprContext::Invalid,
+                            value: Box::new(Expr::Name(ast::ExprName {
+                                range,
+                                id: Name::new_static("async"),
+                                ctx: ExprContext::Invalid,
+                                node_index: AtomicNodeIndex::NONE,
+                            })),
                             node_index: AtomicNodeIndex::NONE,
-                        })),
-                        node_index: AtomicNodeIndex::NONE,
-                    })
-                }
+                        })
+                    },
+                )
             }
         }
     }
@@ -2936,6 +3111,13 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-decorators>
     fn parse_decorators(&mut self) -> Stmt {
+        match self.parse_decorated_statement_header() {
+            BodyStatementHeader::Pending(statement) => self.parse_body_statement(statement),
+            BodyStatementHeader::Statement(statement) => statement,
+        }
+    }
+
+    fn parse_decorated_statement_header(&mut self) -> BodyStatementHeader {
         let start = self.node_start();
 
         let mut decorators = vec![];
@@ -3060,18 +3242,21 @@ impl<'src> Parser<'src> {
         }
 
         match self.current_token_kind() {
-            TokenKind::Def => Stmt::FunctionDef(self.parse_function_definition(decorators, start)),
-            TokenKind::Class => Stmt::ClassDef(self.parse_class_definition(decorators, start)),
+            TokenKind::Def => BodyStatementHeader::Pending(PendingBodyStatement::FunctionDef(
+                self.parse_function_definition_header(decorators, start),
+            )),
+            TokenKind::Class => BodyStatementHeader::Pending(PendingBodyStatement::ClassDef(
+                self.parse_class_definition_header(decorators, start),
+            )),
             TokenKind::Async if self.peek() == TokenKind::Def => {
                 self.bump(TokenKind::Async);
 
                 // test_ok decorator_async_function
                 // @decorator
                 // async def foo(): ...
-                Stmt::FunctionDef(ast::StmtFunctionDef {
-                    is_async: true,
-                    ..self.parse_function_definition(decorators, start)
-                })
+                let mut statement = self.parse_function_definition_header(decorators, start);
+                statement.is_async = true;
+                BodyStatementHeader::Pending(PendingBodyStatement::FunctionDef(statement))
             }
             _ => {
                 // test_err decorator_unexpected_token
@@ -3088,25 +3273,131 @@ impl<'src> Parser<'src> {
 
                 let range = self.node_range(start);
 
-                ast::StmtFunctionDef {
-                    node_index: AtomicNodeIndex::default(),
-                    range,
-                    is_async: false,
-                    decorator_list: decorators,
-                    name: ast::Identifier {
-                        id: Name::empty(),
-                        range: self.missing_node_range(),
-                        node_index: AtomicNodeIndex::NONE,
-                    },
-                    type_params: None,
-                    parameters: Box::new(ast::Parameters {
-                        range: self.missing_node_range(),
-                        ..ast::Parameters::default()
-                    }),
-                    returns: None,
-                    body: vec![],
+                BodyStatementHeader::Statement(
+                    ast::StmtFunctionDef {
+                        node_index: AtomicNodeIndex::default(),
+                        range,
+                        is_async: false,
+                        decorator_list: decorators,
+                        name: ast::Identifier {
+                            id: Name::empty(),
+                            range: self.missing_node_range(),
+                            node_index: AtomicNodeIndex::NONE,
+                        },
+                        type_params: None,
+                        parameters: Box::new(ast::Parameters {
+                            range: self.missing_node_range(),
+                            ..ast::Parameters::default()
+                        }),
+                        returns: None,
+                        body: vec![],
+                    }
+                    .into(),
+                )
+            }
+        }
+    }
+
+    /// Parses the body of a statement that can contain another statement body.
+    fn parse_body_statement(&mut self, mut pending: PendingBodyStatement) -> Stmt {
+        let mut parents = Vec::new();
+
+        let mut statement = loop {
+            if !self.body_starts_with_pending_body_statement() {
+                let body = self.parse_body(pending.clause());
+                break pending.with_body(self, body);
+            }
+
+            self.bump(TokenKind::Newline);
+            self.bump(TokenKind::Indent);
+            parents.push(pending);
+
+            match self.parse_body_statement_header() {
+                BodyStatementHeader::Pending(statement) => pending = statement,
+                BodyStatementHeader::Statement(statement) => break statement,
+            }
+        };
+
+        while let Some(parent) = parents.pop() {
+            let mut body = vec![statement];
+            body.extend(
+                self.parse_list_into_vec(
+                    RecoveryContextKind::BlockStatements,
+                    Self::parse_statement,
+                ),
+            );
+            self.expect(TokenKind::Dedent);
+
+            statement = parent.with_body(self, body);
+        }
+
+        statement
+    }
+
+    fn body_starts_with_pending_body_statement(&mut self) -> bool {
+        self.at(TokenKind::Newline)
+            && matches!(
+                self.peek2(),
+                (
+                    TokenKind::Indent,
+                    TokenKind::If
+                        | TokenKind::For
+                        | TokenKind::While
+                        | TokenKind::Try
+                        | TokenKind::Def
+                        | TokenKind::Class
+                        | TokenKind::With
+                        | TokenKind::Async
+                        | TokenKind::Match
+                        | TokenKind::At
+                )
+            )
+    }
+
+    fn parse_body_statement_header(&mut self) -> BodyStatementHeader {
+        let start = self.node_start();
+
+        match self.current_token_kind() {
+            TokenKind::If => BodyStatementHeader::Pending(PendingBodyStatement::If(
+                self.parse_if_statement_header(),
+            )),
+            TokenKind::For => BodyStatementHeader::Pending(PendingBodyStatement::For(
+                self.parse_for_statement_header(start),
+            )),
+            TokenKind::While => BodyStatementHeader::Pending(PendingBodyStatement::While(
+                self.parse_while_statement_header(),
+            )),
+            TokenKind::Try => BodyStatementHeader::Pending(PendingBodyStatement::Try(
+                self.parse_try_statement_header(),
+            )),
+            TokenKind::Def => BodyStatementHeader::Pending(PendingBodyStatement::FunctionDef(
+                self.parse_function_definition_header(vec![], start),
+            )),
+            TokenKind::Class => BodyStatementHeader::Pending(PendingBodyStatement::ClassDef(
+                self.parse_class_definition_header(vec![], start),
+            )),
+            TokenKind::With => BodyStatementHeader::Pending(PendingBodyStatement::With(
+                self.parse_with_statement_header(start),
+            )),
+            TokenKind::Async => self.parse_async_statement_header(),
+            TokenKind::Match => self.parse_match_body_statement_header(),
+            TokenKind::At => self.parse_decorated_statement_header(),
+            _ => unreachable!("body statement headers are limited by lookahead"),
+        }
+    }
+
+    fn parse_match_body_statement_header(&mut self) -> BodyStatementHeader {
+        match self.classify_match_token() {
+            MatchTokenKind::Keyword => self.parse_match_statement_header(),
+            MatchTokenKind::KeywordOrIdentifier => {
+                if let Some(statement) = self.try_parse_match_statement() {
+                    BodyStatementHeader::Statement(Stmt::Match(statement))
+                } else {
+                    BodyStatementHeader::Statement(self.parse_single_simple_statement())
                 }
-                .into()
+            }
+            MatchTokenKind::Identifier => {
+                BodyStatementHeader::Statement(self.parse_single_simple_statement())
             }
         }
     }
@@ -4081,9 +4372,70 @@ enum Clause {
     Finally,
 }
 
-struct PendingIfStatement {
-    start: TextSize,
-    test: Expr,
+enum BodyStatementHeader {
+    Pending(PendingBodyStatement),
+    Statement(Stmt),
+}
+
+enum PendingBodyStatement {
+    If(ast::StmtIf),
+    For(ast::StmtFor),
+    While(ast::StmtWhile),
+    Try(TextSize),
+    FunctionDef(ast::StmtFunctionDef),
+    ClassDef(ast::StmtClassDef),
+    With(ast::StmtWith),
+    Match(PendingMatchStatement),
+}
+
+struct PendingMatchStatement {
+    statement: ast::StmtMatch,
+    match_range: TextRange,
+    first_case: ast::MatchCase,
+}
+
+impl PendingBodyStatement {
+    fn clause(&self) -> Clause {
+        match self {
+            PendingBodyStatement::If(_) => Clause::If,
+            PendingBodyStatement::For(_) => Clause::For,
+            PendingBodyStatement::While(_) => Clause::While,
+            PendingBodyStatement::Try(_) => Clause::Try,
+            PendingBodyStatement::FunctionDef(_) => Clause::FunctionDef,
+            PendingBodyStatement::ClassDef(_) => Clause::Class,
+            PendingBodyStatement::With(_) => Clause::With,
+            PendingBodyStatement::Match(_) => Clause::Case,
+        }
+    }
+
+    fn with_body(self, parser: &mut Parser<'_>, body: Vec<Stmt>) -> Stmt {
+        match self {
+            PendingBodyStatement::If(statement) => {
+                Stmt::If(parser.parse_if_statement_with_body(statement, body))
+            }
+            PendingBodyStatement::For(statement) => {
+                Stmt::For(parser.parse_for_statement_with_body(statement, body))
+            }
+            PendingBodyStatement::While(statement) => {
+                Stmt::While(parser.parse_while_statement_with_body(statement, body))
+            }
+            PendingBodyStatement::Try(start) => {
+                Stmt::Try(parser.parse_try_statement_with_body(start, body))
+            }
+            PendingBodyStatement::FunctionDef(statement) => {
+                Stmt::FunctionDef(parser.parse_function_definition_with_body(statement, body))
+            }
+            PendingBodyStatement::ClassDef(statement) => {
+                Stmt::ClassDef(parser.parse_class_definition_with_body(statement, body))
+            }
+            PendingBodyStatement::With(statement) => {
+                Stmt::With(parser.parse_with_statement_with_body(statement, body))
+            }
+            PendingBodyStatement::Match(statement) => {
+                Stmt::Match(parser.parse_match_statement_with_first_case_body(statement, body))
+            }
+        }
+    }
 }
 
 impl Display for Clause {

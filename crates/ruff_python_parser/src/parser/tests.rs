@@ -90,6 +90,77 @@ fn deeply_nested_if_blocks() {
 }
 
 #[test]
+fn deeply_nested_compound_statement_blocks() {
+    const HEADERS: &[&str] = &[
+        "if x:\n",
+        "for x in xs:\n",
+        "while x:\n",
+        "try:\n",
+        "def f():\n",
+        "class C:\n",
+        "with x:\n",
+        "async def f():\n",
+        "async for x in xs:\n",
+        "async with x:\n",
+    ];
+
+    let depth = 3_000;
+    let mut src = String::new();
+    for i in 0..depth {
+        src.push_str(&"\t".repeat(i));
+        src.push_str(HEADERS[i % HEADERS.len()]);
+    }
+    src.push_str(&"\t".repeat(depth));
+    src.push_str("pass\n");
+
+    for i in (0..depth).rev() {
+        if HEADERS[i % HEADERS.len()] == "try:\n" {
+            src.push_str(&"\t".repeat(i));
+            src.push_str("except Exception:\n");
+            src.push_str(&"\t".repeat(i + 1));
+            src.push_str("pass\n");
+        }
+    }
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
+}
+
+#[test]
+fn deeply_nested_match_statement_blocks() {
+    let depth = 3_000;
+    let mut src = String::new();
+    for i in 0..depth {
+        src.push_str(&"\t".repeat(i * 2));
+        src.push_str("match x:\n");
+        src.push_str(&"\t".repeat(i * 2 + 1));
+        src.push_str("case _:\n");
+    }
+    src.push_str(&"\t".repeat(depth * 2));
+    src.push_str("pass\n");
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
+}
+
+#[test]
+fn deeply_nested_decorated_def_blocks() {
+    let depth = 3_000;
+    let mut src = String::new();
+    for i in 0..depth {
+        src.push_str(&"\t".repeat(i));
+        src.push_str("@decorator\n");
+        src.push_str(&"\t".repeat(i));
+        src.push_str("def f():\n");
+    }
+    src.push_str(&"\t".repeat(depth));
+    src.push_str("pass\n");
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
+}
+
+#[test]
 fn deeply_nested_lists() {
     let src = format!("{}1{}", "[".repeat(5_000), "]".repeat(5_000));
 
