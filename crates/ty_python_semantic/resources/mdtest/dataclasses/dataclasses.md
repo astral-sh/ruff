@@ -1705,6 +1705,19 @@ error[too-many-positional-arguments]: Too many positional arguments: expected 1,
    |
 ```
 
+Declaration order still controls `KW_ONLY` when a later field name was already referenced by an
+earlier annotation:
+
+```py
+@dataclass
+class ShadowedOrder:
+    x: int
+    _: KW_ONLY
+    int: int
+
+reveal_type(ShadowedOrder.__init__)  # revealed: (self: ShadowedOrder, x: int, *, int: int) -> None
+```
+
 Using `KW_ONLY` to annotate more than one field in a dataclass causes a `TypeError` to be raised at
 runtime:
 

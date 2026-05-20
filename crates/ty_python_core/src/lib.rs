@@ -29,7 +29,8 @@ use scope::{NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, Scope
 use symbol::ScopedSymbolId;
 pub use use_def::{
     ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
-    DeclarationWithConstraint, DeclarationsIterator, LiveBinding, NarrowingEvaluator, UseDefMap,
+    DeclarationWithConstraint, DeclarationsIterator, LiveBinding, NarrowingEvaluator,
+    ScopedDefinitionId, UseDefMap,
 };
 use use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId};
 

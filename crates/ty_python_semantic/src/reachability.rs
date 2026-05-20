@@ -208,7 +208,7 @@ use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
-    SemanticIndex, Truthiness, UseDefMap,
+    ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
     definition::DefinitionState,
     place::ScopedPlaceId,
     place_table,
@@ -1152,6 +1152,13 @@ pub(crate) trait DeclarationsIteratorExtension<'db> {
         db: &'db dyn Db,
         predicate: impl FnMut(DefinitionState<'db>) -> bool,
     ) -> bool;
+
+    /// Return the first reachable declaration that matches the passed in predicate function.
+    fn first_reachable_declaration_order(
+        self,
+        db: &'db dyn Db,
+        predicate: impl FnMut(DefinitionState<'db>) -> bool,
+    ) -> Option<ScopedDefinitionId>;
 }
 
 impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
@@ -1167,11 +1174,35 @@ impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
             |DeclarationWithConstraint {
                  declaration,
                  reachability_constraint,
+                 ..
              }| {
                 predicate(declaration)
                     && !reachability_constraints
                         .evaluate(db, predicates, reachability_constraint)
                         .is_always_false()
+            },
+        )
+    }
+
+    fn first_reachable_declaration_order(
+        mut self,
+        db: &'db dyn Db,
+        mut predicate: impl FnMut(DefinitionState<'db>) -> bool,
+    ) -> Option<ScopedDefinitionId> {
+        let reachability_predicates = self.predicates();
+        let reachability_constraints = self.reachability_constraints();
+
+        self.find_map(
+            |DeclarationWithConstraint {
+                 declaration,
+                 declaration_order,
+                 reachability_constraint,
+             }| {
+                (predicate(declaration)
+                    && !reachability_constraints
+                        .evaluate(db, reachability_predicates, reachability_constraint)
+                        .is_always_false())
+                .then_some(declaration_order)
             },
         )
     }
