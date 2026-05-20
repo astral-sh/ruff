@@ -13,9 +13,9 @@ use crate::{
     diagnostic::format_enumeration,
     place::{place_from_bindings, place_from_declarations},
     types::{
-        CallArguments, ClassBase, ClassLiteral, ClassType, DataclassFlags, GenericAlias,
-        KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, Parameters, Signature,
-        SpecialFormType, StaticClassLiteral, Type, binding_type,
+        CallArguments, ClassBase, ClassLiteral, ClassType, GenericAlias, KnownInstanceType,
+        MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
+        StaticClassLiteral, Type, binding_type,
         call::Argument,
         class::{
             AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind,
@@ -1075,14 +1075,15 @@ fn ordered_dataclass_base_class<'db>(
     base_class: ClassType<'db>,
 ) -> Option<ClassType<'db>> {
     for ancestor in base_class.iter_mro(db).filter_map(ClassBase::into_class) {
-        if ancestor.has_dataclass_param(db, DataclassFlags::ORDER) {
+        let Some((ancestor_literal, _)) = ancestor.static_class_literal(db) else {
+            continue;
+        };
+
+        if ancestor_literal.is_ordered_dataclass(db) {
             return Some(ancestor);
         }
 
-        if ancestor
-            .static_class_literal(db)
-            .is_some_and(|(ancestor, _)| ancestor.has_own_comparison_methods(db))
-        {
+        if ancestor_literal.has_own_comparison_methods(db) {
             return None;
         }
     }

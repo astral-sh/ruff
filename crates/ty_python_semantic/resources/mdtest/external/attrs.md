@@ -25,31 +25,6 @@ reveal_type(user.id)  # revealed: int
 reveal_type(user.name)  # revealed: str
 ```
 
-## Ordered `attr.s` base classes
-
-Legacy `@attr.s` classes generate ordering methods by default. A plain subclass does not regenerate
-them, so comparisons between base and child instances raise `TypeError` at runtime.
-
-```py
-import attr
-
-@attr.s
-class OrderedBase:
-    value: int = attr.ib()
-
-class Child(OrderedBase):  # error: [subclass-of-dataclass-with-order]
-    ...
-```
-
-Decorating the child class with `@attr.s` regenerates the ordering methods, so comparisons use the
-child implementation instead of inheriting the base implementation unchanged.
-
-```py
-@attr.s
-class AttrsChild(OrderedBase):
-    extra: int = attr.ib()
-```
-
 ## Basic class (`define`)
 
 ```py

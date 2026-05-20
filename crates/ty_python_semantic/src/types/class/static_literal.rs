@@ -137,6 +137,14 @@ impl<'db> StaticClassLiteral<'db> {
         )
     }
 
+    /// Returns `true` if this class is decorated with `@dataclass(order=True)`.
+    pub(crate) fn is_ordered_dataclass(self, db: &'db dyn Db) -> bool {
+        self.find_dataclass_decorator_position(db).is_some()
+            && self
+                .dataclass_params(db)
+                .is_some_and(|params| params.flags(db).contains(DataclassFlags::ORDER))
+    }
+
     /// Returns a new [`StaticClassLiteral`] with the given dataclass params, preserving all other fields.
     pub(crate) fn with_dataclass_params(
         self,
@@ -549,25 +557,23 @@ impl<'db> StaticClassLiteral<'db> {
             .filter_map(|decorator| decorator.known(db))
     }
 
-    /// Iterate through the decorators on this class, returning the position of the first one
-    /// that matches the given predicate.
-    pub(super) fn find_decorator_position(
-        self,
-        db: &'db dyn Db,
-        predicate: impl Fn(Type<'db>) -> bool,
-    ) -> Option<usize> {
-        self.decorators(db)
-            .iter()
-            .position(|decorator| predicate(*decorator))
-    }
-
     /// Iterate through the decorators on this class, returning the index of the first one
     /// that is either `@dataclass` or `@dataclass(...)`.
     pub(crate) fn find_dataclass_decorator_position(self, db: &'db dyn Db) -> Option<usize> {
-        self.find_decorator_position(db, |ty| match ty {
-            Type::FunctionLiteral(function) => function.is_known(db, KnownFunction::Dataclass),
-            Type::DataclassDecorator(_) => true,
-            _ => false,
+        let module = parsed_module(db, self.file(db)).load(db);
+        let class_stmt = self.node(db, &module);
+        let class_definition =
+            semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
+
+        class_stmt.decorator_list.iter().position(|decorator| {
+            let decorator_callable = decorator
+                .expression
+                .as_call_expr()
+                .map_or(&decorator.expression, |call| &call.func);
+
+            definition_expression_type(db, class_definition, decorator_callable)
+                .as_function_literal()
+                .is_some_and(|function| function.is_known(db, KnownFunction::Dataclass))
         })
     }
 
