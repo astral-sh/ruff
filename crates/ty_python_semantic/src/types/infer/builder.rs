@@ -6175,8 +6175,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     if let Some(typed_dict) = element.as_typed_dict() {
                         typed_dicts.push(typed_dict);
-                    } else if element.is_instance_of(self.db(), KnownClass::Dict) {
-                        has_dict_compatible_fallback = true;
+                    } else if !has_dict_compatible_fallback {
+                        // Suppress `TypedDict` diagnostics only if this literal is assignable to
+                        // the non-`TypedDict` arm of the union.
+                        let mut speculative_builder = self.speculate();
+                        has_dict_compatible_fallback = speculative_builder
+                            .infer_dict_expression(dict, TypeContext::new(Some(element)))
+                            .is_assignable_to(self.db(), element);
                     }
                 }
 
