@@ -966,6 +966,7 @@ impl<'db> StaticClassLiteral<'db> {
                     db,
                     callable_ty.signatures(db),
                     CallableTypeKind::FunctionLike,
+                    callable_ty.has_explicit_function_return_annotation(db),
                 )),
                 Type::Union(union) => {
                     union.map(db, |element| into_function_like_callable(db, *element))
@@ -1191,7 +1192,7 @@ impl<'db> StaticClassLiteral<'db> {
                         )
                     }),
                 );
-                CallableType::new(db, signatures, CallableTypeKind::FunctionLike)
+                CallableType::new(db, signatures, CallableTypeKind::FunctionLike, false)
             });
 
             return Some(synthesized_callables.into_type(db));
@@ -1601,6 +1602,7 @@ impl<'db> StaticClassLiteral<'db> {
             db,
             CallableSignature::from_overloads(overloads),
             CallableTypeKind::FunctionLike,
+            false,
         )))
     }
 

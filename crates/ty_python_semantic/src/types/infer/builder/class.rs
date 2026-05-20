@@ -536,6 +536,18 @@ fn is_unknown_decorator_result<'db>(db: &'db dyn crate::Db, ty: Type<'db>) -> bo
 }
 
 /// Return true if applying a class decorator produced an unknown class-object type.
+///
+/// Besides plain `Unknown`, class decorators can produce unknown class-object types such as
+/// `type[Any]`. Those are represented as a `SubclassOf` dynamic type, but they should trigger the
+/// same preservation fallback as an unknown result:
+/// ```python
+/// from typing import Any
+///
+/// def decorator(cls) -> type[Any]: ...
+///
+/// @decorator
+/// class C: ...
+/// ```
 fn is_unknown_class_object_decorator_result<'db>(db: &'db dyn crate::Db, ty: Type<'db>) -> bool {
     let Type::SubclassOf(subclass_of) = ty.resolve_type_alias(db) else {
         return false;
@@ -651,10 +663,10 @@ impl ClassDecoratorUnknownResultPolicy {
                 Self::known_from_decorator(db, alias.value_type(db), decorator_result_ty)
                     .unwrap_or(Self::ReplaceBinding),
             ),
+            Type::Callable(callable) if callable.has_explicit_function_return_annotation(db) => {
+                Some(Self::ReplaceBinding)
+            }
             Type::Callable(callable) => Some(match callable.kind(db) {
-                // Inferred function-like callables, such as lambdas, do not retain the source-level
-                // "explicit return annotation" signal that function literals do. Keep the existing
-                // class-preserving fallback for those cases.
                 CallableTypeKind::FunctionLike
                 | CallableTypeKind::StaticMethodLike
                 | CallableTypeKind::ClassMethodLike => Self::PreserveBinding,

@@ -163,6 +163,7 @@ impl<'db> Type<'db> {
                                 db,
                                 CallableSignature::from_overloads(signatures),
                                 callable.kind(db),
+                                callable.has_explicit_function_return_annotation(db),
                             )
                         }))
                     }
@@ -183,6 +184,7 @@ impl<'db> Type<'db> {
                                     db,
                                     CallableSignature::from_overloads(signatures),
                                     callable.kind(db),
+                                    callable.has_explicit_function_return_annotation(db),
                                 ));
                             }
                         }
@@ -230,6 +232,7 @@ impl<'db> Type<'db> {
                 db,
                 CallableSignature::from_overloads(method.signatures(db)),
                 CallableTypeKind::Regular,
+                false,
             ))),
 
             Type::WrapperDescriptor(wrapper_descriptor) => {
@@ -237,6 +240,7 @@ impl<'db> Type<'db> {
                     db,
                     CallableSignature::from_overloads(wrapper_descriptor.signatures(db)),
                     CallableTypeKind::Regular,
+                    false,
                 )))
             }
 
@@ -380,6 +384,9 @@ pub struct CallableType<'db> {
     pub(crate) signatures: CallableSignature<'db>,
 
     pub(super) kind: CallableTypeKind,
+
+    /// Whether this callable came from a function with an explicit return annotation.
+    pub(crate) has_explicit_function_return_annotation: bool,
 }
 
 pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -401,6 +408,7 @@ impl<'db> CallableType<'db> {
             db,
             CallableSignature::single(signature),
             CallableTypeKind::Regular,
+            false,
         )
     }
 
@@ -409,6 +417,7 @@ impl<'db> CallableType<'db> {
             db,
             CallableSignature::single(signature),
             CallableTypeKind::FunctionLike,
+            false,
         )
     }
 
@@ -420,6 +429,7 @@ impl<'db> CallableType<'db> {
             db,
             CallableSignature::single(Signature::new(parameters, Type::unknown())),
             CallableTypeKind::ParamSpecValue,
+            false,
         )
     }
 
@@ -441,7 +451,12 @@ impl<'db> CallableType<'db> {
     }
 
     pub(crate) fn into_regular(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(db, self.signatures(db), CallableTypeKind::Regular)
+        CallableType::new(
+            db,
+            self.signatures(db),
+            CallableTypeKind::Regular,
+            self.has_explicit_function_return_annotation(db),
+        )
     }
 
     /// Returns the reduced callable produced by partially applying selected overloads.
@@ -453,6 +468,7 @@ impl<'db> CallableType<'db> {
             db,
             CallableSignature::partially_apply(db, overloads)?,
             CallableTypeKind::Regular,
+            false,
         ))
     }
 
@@ -482,6 +498,7 @@ impl<'db> CallableType<'db> {
             db,
             self.signatures(db).bind_self(db, self_type),
             self.kind(db),
+            self.has_explicit_function_return_annotation(db),
         )
     }
 
@@ -490,6 +507,7 @@ impl<'db> CallableType<'db> {
             db,
             self.signatures(db).apply_self(db, self_type),
             self.kind(db),
+            self.has_explicit_function_return_annotation(db),
         )
     }
 
@@ -498,7 +516,12 @@ impl<'db> CallableType<'db> {
     /// Specifically, this represents a callable type with a single signature:
     /// `(*args: object, **kwargs: object) -> Never`.
     pub(crate) fn bottom(db: &'db dyn Db) -> CallableType<'db> {
-        Self::new(db, CallableSignature::bottom(), CallableTypeKind::Regular)
+        Self::new(
+            db,
+            CallableSignature::bottom(),
+            CallableTypeKind::Regular,
+            false,
+        )
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -512,6 +535,7 @@ impl<'db> CallableType<'db> {
             self.signatures(db)
                 .recursive_type_normalized_impl(db, div, nested)?,
             self.kind(db),
+            self.has_explicit_function_return_annotation(db),
         ))
     }
 
@@ -531,6 +555,7 @@ impl<'db> CallableType<'db> {
             self.signatures(db)
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             self.kind(db),
+            self.has_explicit_function_return_annotation(db),
         )
     }
 
@@ -625,6 +650,7 @@ impl<'db> CallableTypes<'db> {
             db,
             CallableSignature::from_overloads(overloads),
             CallableTypeKind::Regular,
+            false,
         )
         .into_precise_functools_partial_instance(db, wrapped)
     }

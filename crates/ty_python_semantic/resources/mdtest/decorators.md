@@ -536,6 +536,18 @@ class SpecializedExplicitReturnCallableInstanceDecorated: ...
 
 reveal_type(SpecializedExplicitReturnCallableInstanceDecorated)  # revealed: int
 
+def function_decorator(func: Callable[..., T]) -> Callable[..., T]:
+    return func
+
+@function_decorator
+def explicit_return_callable_decorator(cls) -> T:
+    raise NotImplementedError
+
+@explicit_return_callable_decorator
+class ExplicitReturnCallableDecorated: ...
+
+reveal_type(ExplicitReturnCallableDecorated)  # revealed: Unknown
+
 def regular_callable_replacement_factory() -> Callable[[type[object]], T]:
     raise NotImplementedError
 

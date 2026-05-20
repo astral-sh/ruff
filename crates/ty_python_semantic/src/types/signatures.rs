@@ -1221,6 +1221,7 @@ impl<'db> Signature<'db> {
                     )
                 })),
                 CallableTypeKind::ParamSpecValue,
+                false,
             ));
             let param_spec_matches = ConstraintSet::constrain_typevar(
                 db,
@@ -1463,6 +1464,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             },
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        false,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -1515,6 +1517,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 }),
                         ),
                         CallableTypeKind::ParamSpecValue,
+                        false,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -1867,6 +1870,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        false,
                     ));
                     let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -1897,6 +1901,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        false,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -2019,6 +2024,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 Type::unknown(),
                             )),
                             CallableTypeKind::ParamSpecValue,
+                            false,
                         ));
                         let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
                             db,
@@ -2043,6 +2049,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 Type::unknown(),
                             )),
                             CallableTypeKind::ParamSpecValue,
+                            false,
                         ));
                         let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
                             db,
@@ -2077,6 +2084,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        false,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -2214,6 +2222,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        false,
                     ));
                     let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -2238,6 +2247,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        false,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -2347,6 +2357,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        false,
                     ));
                     let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
                         db,

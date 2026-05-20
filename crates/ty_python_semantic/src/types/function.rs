@@ -1339,16 +1339,25 @@ impl<'db> FunctionType<'db> {
             .last_definition_raw_signature(db, return_callable_typevar_scope)
     }
 
-    /// Convert the `FunctionType` into a [`CallableType`].
-    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
-        let kind = if self.is_classmethod(db) {
+    /// Return the kind for this function when it is converted into a [`CallableType`].
+    pub(crate) fn callable_type_kind(self, db: &'db dyn Db) -> CallableTypeKind {
+        if self.is_classmethod(db) {
             CallableTypeKind::ClassMethodLike
         } else if self.is_staticmethod(db) {
             CallableTypeKind::StaticMethodLike
         } else {
             CallableTypeKind::FunctionLike
-        };
-        CallableType::new(db, self.signature(db), kind)
+        }
+    }
+
+    /// Convert the `FunctionType` into a [`CallableType`].
+    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(
+            db,
+            self.signature(db),
+            self.callable_type_kind(db),
+            self.has_explicit_return_annotation(db),
+        )
     }
 
     /// Convert the `FunctionType` into a [`BoundMethodType`].

@@ -4995,17 +4995,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db: &'d dyn Db,
             ty: Type<'d>,
             kind: CallableTypeKind,
+            has_explicit_function_return_annotation: bool,
         ) -> Option<Type<'d>> {
             match ty {
                 Type::Callable(callable) => Some(Type::Callable(CallableType::new(
                     db,
                     callable.signatures(db),
                     kind,
+                    has_explicit_function_return_annotation,
                 ))),
-                Type::Union(union) => {
-                    union.try_map(db, |element| propagate_callable_kind(db, *element, kind))
-                }
-                Type::TypeAlias(alias) => propagate_callable_kind(db, alias.value_type(db), kind),
+                Type::Union(union) => union.try_map(db, |element| {
+                    propagate_callable_kind(
+                        db,
+                        *element,
+                        kind,
+                        has_explicit_function_return_annotation,
+                    )
+                }),
+                Type::TypeAlias(alias) => propagate_callable_kind(
+                    db,
+                    alias.value_type(db),
+                    kind,
+                    has_explicit_function_return_annotation,
+                ),
                 // Intersections are currently not handled here because that would require
                 // the decorator to be explicitly annotated as returning an intersection.
                 Type::Intersection(_) | Type::EnumComplement(_) => None,
@@ -5045,23 +5057,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // computing the signature requires evaluating those defaults which may trigger
         // deferred inference.
         let propagatable_kind = match decorated_ty {
-            Type::FunctionLiteral(func) => {
-                let db = self.db();
-                if func.is_classmethod(db) {
-                    Some(CallableTypeKind::ClassMethodLike)
-                } else if func.is_staticmethod(db) {
-                    Some(CallableTypeKind::StaticMethodLike)
-                } else {
-                    Some(CallableTypeKind::FunctionLike)
-                }
-            }
+            Type::FunctionLiteral(func) => Some((
+                func.callable_type_kind(self.db()),
+                func.has_explicit_return_annotation(self.db()),
+            )),
             _ => decorated_ty
                 .try_upcast_to_callable(self.db())
                 .and_then(CallableTypes::exactly_one)
                 .and_then(|callable| match callable.kind(self.db()) {
                     kind @ (CallableTypeKind::FunctionLike
                     | CallableTypeKind::StaticMethodLike
-                    | CallableTypeKind::ClassMethodLike) => Some(kind),
+                    | CallableTypeKind::ClassMethodLike) => Some((
+                        kind,
+                        callable.has_explicit_function_return_annotation(self.db()),
+                    )),
                     _ => None,
                 }),
         };
@@ -5081,7 +5090,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // a `Callable`-typed decorator" in `callables_as_descriptors.md` for the
         // extended explanation.
         propagatable_kind
-            .and_then(|kind| propagate_callable_kind(self.db(), return_ty, kind))
+            .and_then(|(kind, has_explicit_function_return_annotation)| {
+                propagate_callable_kind(
+                    self.db(),
+                    return_ty,
+                    kind,
+                    has_explicit_function_return_annotation,
+                )
+            })
             .unwrap_or(return_ty)
     }
 
@@ -7336,6 +7352,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     db,
                     CallableSignature::from_overloads(getitem_overloads),
                     CallableTypeKind::FunctionLike,
+                    false,
                 ),
             )],
         );
