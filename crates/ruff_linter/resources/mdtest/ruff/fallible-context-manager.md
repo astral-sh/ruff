@@ -493,6 +493,15 @@ def good_yield_in_with_before_return():
     with other_cm() as value:
         yield value
         return
+
+
+@contextmanager
+def good_yield_in_with_branches():
+    with other_cm():
+        if condition:
+            yield
+        else:
+            yield
 ```
 
 ## Imports and decorator forms

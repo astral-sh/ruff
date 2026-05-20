@@ -87,8 +87,8 @@ fn has_contextmanager_decorator(checker: &Checker, function_def: &StmtFunctionDe
 ///
 /// A `yield` is considered protected (and not flagged) if any of the following hold:
 /// - It is inside a `try` block that has `finally` or `except` handlers.
-/// - It is the last statement in a `with` block body (the context manager's `__exit__`
-///   handles cleanup).
+/// - It is in a terminal position within a `with` block body (the context manager's
+///   `__exit__` handles cleanup).
 /// - It is in a terminal position (last statement in the function body, or immediately
 ///   followed by `return`), meaning there is no cleanup code that could be skipped.
 struct YieldFinallyVisitor<'a, 'b> {
@@ -97,9 +97,6 @@ struct YieldFinallyVisitor<'a, 'b> {
     /// Whether the visitor is currently inside a `try` block that has
     /// `finally` or `except` handlers.
     in_protected_try: bool,
-    /// Whether the visitor is at the last statement in a `with` block body,
-    /// where the `with` statement's `__exit__` provides exception handling.
-    in_with_last_statement: bool,
     /// Whether the visitor is at a terminal position: the last statement in
     /// the function body, or a `yield` immediately before a `return`.
     in_terminal_position: bool,
@@ -111,7 +108,6 @@ impl<'a, 'b> YieldFinallyVisitor<'a, 'b> {
         Self {
             checker,
             in_protected_try: false,
-            in_with_last_statement: false,
             in_terminal_position: false,
         }
     }
@@ -149,7 +145,7 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
                 for item in items {
                     self.visit_expr(&item.context_expr);
                 }
-                self.visit_with_body(body);
+                self.visit_body_with_terminal(body, true);
             }
 
             Stmt::If(ast::StmtIf {
@@ -210,10 +206,7 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
     fn visit_expr(&mut self, expr: &Expr) {
         match expr {
             Expr::Yield(_) | Expr::YieldFrom(_) => {
-                if !self.in_protected_try
-                    && !self.in_with_last_statement
-                    && !self.in_terminal_position
-                {
+                if !self.in_protected_try && !self.in_terminal_position {
                     self.checker
                         .report_diagnostic(FallibleContextManager, expr.range());
                 }
@@ -254,44 +247,6 @@ impl YieldFinallyVisitor<'_, '_> {
             self.visit_stmt(stmt);
             self.in_terminal_position = prev;
         }
-    }
-
-    /// Visits the body of a `with` statement, handling the last statement specially.
-    ///
-    /// The last statement in a `with` block inherits terminal status from the parent context
-    /// and is additionally marked as a "with last statement" if it is a yield.
-    fn visit_with_body(&mut self, body: &[Stmt]) {
-        let [rest @ .., last] = body else { return };
-
-        let parent_terminal = self.in_terminal_position;
-
-        // Iterate `rest` but look up in `body` so a yield at the end of
-        // `rest` can still see a trailing `Return` as `last`.
-        for (i, stmt) in rest.iter().enumerate() {
-            let is_yield_before_return = Self::is_yield_statement(stmt)
-                && body
-                    .get(i + 1)
-                    .is_some_and(|next| matches!(next, Stmt::Return(_)));
-            let prev = self.in_terminal_position;
-            self.in_terminal_position = is_yield_before_return;
-            self.visit_stmt(stmt);
-            self.in_terminal_position = prev;
-        }
-
-        // Last statement: inherit terminal from parent, set with-last-statement if yield
-        let prev_terminal = self.in_terminal_position;
-        self.in_terminal_position = parent_terminal;
-
-        if Self::is_yield_statement(last) {
-            let prev_with = self.in_with_last_statement;
-            self.in_with_last_statement = true;
-            self.visit_stmt(last);
-            self.in_with_last_statement = prev_with;
-        } else {
-            self.visit_stmt(last);
-        }
-
-        self.in_terminal_position = prev_terminal;
     }
 
     /// Returns `true` if the statement is an expression statement containing a `yield` or `yield from`.
