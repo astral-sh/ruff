@@ -260,10 +260,46 @@ python-version = "3.12"
 from typing import Literal
 
 type Value = Literal[
-    "f00", "v01", "v02", "v03", "v04", "v05", "v06", "v07",
-    "f08", "v09", "v10", "v11", "v12", "v13", "v14", "v15",
-    "f16", "v17", "v18", "v19", "v20", "v21", "v22", "v23",
-    "f24", "v25", "v26", "v27", "v28", "v29", "v30", "v31",
+    "f00",
+    "v01",
+    "v02",
+    "v03",
+    "v04",
+    "v05",
+    "v06",
+    "v07",
+    "f08",
+    "v09",
+    "v10",
+    "v11",
+    "v12",
+    "v13",
+    "v14",
+    "v15",
+    "f16",
+    "v17",
+    "v18",
+    "v19",
+    "v20",
+    "v21",
+    "v22",
+    "v23",
+    "f24",
+    "v25",
+    "v26",
+    "v27",
+    "v28",
+    "v29",
+    "v30",
+    "v31",
+    "f32",
+    "v33",
+    "v34",
+    "v35",
+    "f36",
+    "v37",
+    "v38",
+    "v39",
 ]
 
 def _(value: Value) -> None:
@@ -332,8 +368,24 @@ def _(value: Value) -> None:
             return
         case "v31":
             return
+        case "f32":
+            pass
+        case "v33":
+            return
+        case "v34":
+            return
+        case "v35":
+            return
+        case "f36":
+            pass
+        case "v37":
+            return
+        case "v38":
+            return
+        case "v39":
+            return
 
-    reveal_type(value)  # revealed: Literal["f00", "f08", "f16", "f24"]
+    reveal_type(value)  # revealed: Literal["f00", "f08", "f16", "f24", "f32", "f36"]
 ```
 
 ## Or patterns

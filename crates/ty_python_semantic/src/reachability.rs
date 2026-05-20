@@ -545,12 +545,14 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
     ) -> Type<'db> {
         let mut projector = NarrowingProjector::new(db, self, predicates, place);
         let projected_root = projector.project(id);
-        ProjectedNarrowingContext {
+        let mut context = ProjectedNarrowingContext {
             db,
-            base_ty,
             graph: &projector.graph,
-        }
-        .narrow(projected_root, None)
+            predicates,
+            narrow_cache: FxHashMap::default(),
+            intersection_only_cache: FxHashMap::default(),
+        };
+        context.narrow_from(projected_root, base_ty)
     }
 
     /// Analyze the statically known reachability for a given constraint.
@@ -831,29 +833,79 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
 /// Evaluates narrowed types over a projected narrowing graph.
 struct ProjectedNarrowingContext<'a, 'db> {
     db: &'db dyn Db,
-    base_ty: Type<'db>,
     graph: &'a ProjectedNarrowingGraph<'db>,
+    predicates: &'a Predicates<'db>,
+    narrow_cache: FxHashMap<(ProjectedNarrowingNodeId, Type<'db>), Type<'db>>,
+    intersection_only_cache: FxHashMap<ProjectedNarrowingNodeId, bool>,
 }
 
 impl<'db> ProjectedNarrowingContext<'_, 'db> {
-    /// Narrow a positive branch, pruning path combinations that are already impossible.
+    /// Narrow a projected subgraph from an already-materialized base type.
+    fn narrow_from(&mut self, id: ProjectedNarrowingNodeId, base_ty: Type<'db>) -> Type<'db> {
+        if let Some(cached) = self.narrow_cache.get(&(id, base_ty)) {
+            return *cached;
+        }
+
+        let result = self.narrow(id, base_ty, None);
+        self.narrow_cache.insert((id, base_ty), result);
+        result
+    }
+
+    /// Return `true` if every narrowing constraint in `id`'s subgraph intersects the incoming type.
+    fn is_intersection_only(&mut self, id: ProjectedNarrowingNodeId) -> bool {
+        if id == ProjectedNarrowingNodeId::ALWAYS_FALSE
+            || id == ProjectedNarrowingNodeId::ALWAYS_TRUE
+        {
+            return true;
+        }
+
+        if let Some(cached) = self.intersection_only_cache.get(&id) {
+            return *cached;
+        }
+
+        let node = self.graph.node(id);
+        let (pos_constraint, neg_constraint) = &self.graph.predicate_constraints_cache[&node.atom];
+        let pos_is_intersection_only = pos_constraint
+            .as_ref()
+            .is_none_or(NarrowingConstraint::is_intersection_only);
+        let neg_is_intersection_only = neg_constraint
+            .as_ref()
+            .is_none_or(NarrowingConstraint::is_intersection_only);
+
+        let result = pos_is_intersection_only
+            && neg_is_intersection_only
+            && self.is_intersection_only(node.if_true)
+            && self.is_intersection_only(node.if_false);
+        self.intersection_only_cache.insert(id, result);
+        result
+    }
+
+    /// Narrow a positive branch, folding path combinations that have the same narrowed type.
     ///
     /// Projected match graphs can combine positive pattern branches that cannot all match the
-    /// same finite subject. Intersection-only constraints can never revive an impossible base type,
-    /// unlike later `TypeGuard` replacement constraints.
+    /// same finite subject, or that all leave the same gradual fallback. Intersection-only
+    /// constraints can be materialized early, while later `TypeGuard` replacement constraints
+    /// must stay deferred because they can revive an impossible base type.
     fn narrow_positive_branch(
         &mut self,
         id: ProjectedNarrowingNodeId,
+        base_ty: Type<'db>,
         accumulated: Option<NarrowingConstraint<'db>>,
+        is_pattern_predicate: bool,
     ) -> Type<'db> {
-        if accumulated.as_ref().is_some_and(|constraint| {
-            constraint.is_intersection_only()
-                && apply_accumulated_narrowing(self.db, self.base_ty, accumulated.clone())
-                    .is_never()
-        }) {
-            Type::Never
+        if is_pattern_predicate
+            && accumulated
+                .as_ref()
+                .is_some_and(NarrowingConstraint::is_intersection_only)
+        {
+            let base_ty = apply_accumulated_narrowing(self.db, base_ty, accumulated);
+            if base_ty.is_never() {
+                Type::Never
+            } else {
+                self.narrow_from(id, base_ty)
+            }
         } else {
-            self.narrow(id, accumulated)
+            self.narrow(id, base_ty, accumulated)
         }
     }
 
@@ -861,6 +913,7 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
     fn narrow(
         &mut self,
         id: ProjectedNarrowingNodeId,
+        base_ty: Type<'db>,
         accumulated: Option<NarrowingConstraint<'db>>,
     ) -> Type<'db> {
         if id == ProjectedNarrowingNodeId::ALWAYS_FALSE {
@@ -868,24 +921,45 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
         }
 
         if id == ProjectedNarrowingNodeId::ALWAYS_TRUE {
-            apply_accumulated_narrowing(self.db, self.base_ty, accumulated)
+            apply_accumulated_narrowing(self.db, base_ty, accumulated)
         } else {
             let node = self.graph.node(id);
             let (pos_constraint, neg_constraint) =
                 self.graph.predicate_constraints_cache[&node.atom].clone();
+            let is_pattern_predicate =
+                matches!(self.predicates[node.atom].node, PredicateNode::Pattern(_));
 
             if node.if_true == ProjectedNarrowingNodeId::ALWAYS_FALSE {
                 let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
-                self.narrow(node.if_false, false_accumulated)
+                self.narrow(node.if_false, base_ty, false_accumulated)
             } else if node.if_false == ProjectedNarrowingNodeId::ALWAYS_FALSE {
                 let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
-                self.narrow_positive_branch(node.if_true, true_accumulated)
+                self.narrow_positive_branch(
+                    node.if_true,
+                    base_ty,
+                    true_accumulated,
+                    is_pattern_predicate,
+                )
             } else {
                 let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
-                let true_ty = self.narrow_positive_branch(node.if_true, true_accumulated);
+                let true_ty = self.narrow_positive_branch(
+                    node.if_true,
+                    base_ty,
+                    true_accumulated,
+                    is_pattern_predicate,
+                );
+
+                if neg_constraint
+                    .as_ref()
+                    .is_none_or(NarrowingConstraint::is_intersection_only)
+                    && self.is_intersection_only(node.if_false)
+                    && true_ty == apply_accumulated_narrowing(self.db, base_ty, accumulated.clone())
+                {
+                    return true_ty;
+                }
 
                 let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
-                let false_ty = self.narrow(node.if_false, false_accumulated);
+                let false_ty = self.narrow(node.if_false, base_ty, false_accumulated);
 
                 UnionType::from_two_elements(self.db, true_ty, false_ty)
             }
