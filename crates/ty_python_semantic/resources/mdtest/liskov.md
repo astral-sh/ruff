@@ -167,6 +167,7 @@ error[invalid-method-override]: Invalid override of method `method`
  2 |     def method(self, x: int, /): ...
    |         ----------------------- `Super.method` defined here
    |
+info: unexpected extra parameter `y`
 info: This violates the Liskov Substitution Principle
 ```
 
