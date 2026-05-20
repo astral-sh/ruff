@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP051 [*] `abc.abstractclassmethod` is deprecated, use `@classmethod` with `@abc.abstractmethod`
+ --> UP051_no_abc_import.py:5:5
+  |
+4 | class Foo:
+5 |     @abstractclassmethod
+  |     ^^^^^^^^^^^^^^^^^^^^
+6 |     def from_direct_import(cls): ...
+  |
+help: Rewrite with `@classmethod` and `@abc.abstractmethod`
+  - from abc import abstractclassmethod
+1 + from abc import abstractclassmethod, abstractmethod
+2 |
+3 |
+4 | class Foo:
+  -     @abstractclassmethod
+5 +     @classmethod
+6 +     @abstractmethod
+7 |     def from_direct_import(cls): ...

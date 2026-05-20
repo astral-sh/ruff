@@ -1,0 +1,121 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP051 [*] `abc.abstractclassmethod` is deprecated, use `@classmethod` with `@abc.abstractmethod`
+  --> UP051.py:10:5
+   |
+ 9 | class Foo:
+10 |     @abc.abstractclassmethod
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+11 |     def from_module_classmethod(cls): ...
+   |
+help: Rewrite with `@classmethod` and `@abc.abstractmethod`
+7  |
+8  |
+9  | class Foo:
+   -     @abc.abstractclassmethod
+10 +     @classmethod
+11 +     @abc.abstractmethod
+12 |     def from_module_classmethod(cls): ...
+13 |
+14 |     @abstractclassmethod
+
+UP051 [*] `abc.abstractclassmethod` is deprecated, use `@classmethod` with `@abc.abstractmethod`
+  --> UP051.py:13:5
+   |
+11 |     def from_module_classmethod(cls): ...
+12 |
+13 |     @abstractclassmethod
+   |     ^^^^^^^^^^^^^^^^^^^^
+14 |     def imported_classmethod(cls): ...
+   |
+help: Rewrite with `@classmethod` and `@abc.abstractmethod`
+10 |     @abc.abstractclassmethod
+11 |     def from_module_classmethod(cls): ...
+12 |
+   -     @abstractclassmethod
+13 +     @classmethod
+14 +     @abc.abstractmethod
+15 |     def imported_classmethod(cls): ...
+16 |
+17 |     @abc.abstractstaticmethod
+
+UP051 [*] `abc.abstractstaticmethod` is deprecated, use `@staticmethod` with `@abc.abstractmethod`
+  --> UP051.py:16:5
+   |
+14 |     def imported_classmethod(cls): ...
+15 |
+16 |     @abc.abstractstaticmethod
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+17 |     def from_module_staticmethod(): ...
+   |
+help: Rewrite with `@staticmethod` and `@abc.abstractmethod`
+13 |     @abstractclassmethod
+14 |     def imported_classmethod(cls): ...
+15 |
+   -     @abc.abstractstaticmethod
+16 +     @staticmethod
+17 +     @abc.abstractmethod
+18 |     def from_module_staticmethod(): ...
+19 |
+20 |     @abstractstaticmethod
+
+UP051 [*] `abc.abstractstaticmethod` is deprecated, use `@staticmethod` with `@abc.abstractmethod`
+  --> UP051.py:19:5
+   |
+17 |     def from_module_staticmethod(): ...
+18 |
+19 |     @abstractstaticmethod
+   |     ^^^^^^^^^^^^^^^^^^^^^
+20 |     def imported_staticmethod(): ...
+   |
+help: Rewrite with `@staticmethod` and `@abc.abstractmethod`
+16 |     @abc.abstractstaticmethod
+17 |     def from_module_staticmethod(): ...
+18 |
+   -     @abstractstaticmethod
+19 +     @staticmethod
+20 +     @abc.abstractmethod
+21 |     def imported_staticmethod(): ...
+22 |
+23 |     @abc.abstractproperty
+
+UP051 [*] `abc.abstractproperty` is deprecated, use `@property` with `@abc.abstractmethod`
+  --> UP051.py:22:5
+   |
+20 |     def imported_staticmethod(): ...
+21 |
+22 |     @abc.abstractproperty
+   |     ^^^^^^^^^^^^^^^^^^^^^
+23 |     def from_module_property(self): ...
+   |
+help: Rewrite with `@property` and `@abc.abstractmethod`
+19 |     @abstractstaticmethod
+20 |     def imported_staticmethod(): ...
+21 |
+   -     @abc.abstractproperty
+22 +     @property
+23 +     @abc.abstractmethod
+24 |     def from_module_property(self): ...
+25 |
+26 |     @abstractproperty
+
+UP051 [*] `abc.abstractproperty` is deprecated, use `@property` with `@abc.abstractmethod`
+  --> UP051.py:25:5
+   |
+23 |     def from_module_property(self): ...
+24 |
+25 |     @abstractproperty
+   |     ^^^^^^^^^^^^^^^^^
+26 |     def imported_property(self): ...
+   |
+help: Rewrite with `@property` and `@abc.abstractmethod`
+22 |     @abc.abstractproperty
+23 |     def from_module_property(self): ...
+24 |
+   -     @abstractproperty
+25 +     @property
+26 +     @abc.abstractmethod
+27 |     def imported_property(self): ...
+28 |
+29 |

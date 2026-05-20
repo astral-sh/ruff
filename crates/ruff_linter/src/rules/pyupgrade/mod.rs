@@ -118,6 +118,8 @@ mod tests {
     #[test_case(Rule::PrivateTypeParameter, Path::new("UP049_0.py"))]
     #[test_case(Rule::PrivateTypeParameter, Path::new("UP049_1.py"))]
     #[test_case(Rule::UselessClassMetaclassType, Path::new("UP050.py"))]
+    #[test_case(Rule::DeprecatedAbcDecorator, Path::new("UP051.py"))]
+    #[test_case(Rule::DeprecatedAbcDecorator, Path::new("UP051_no_abc_import.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
         let diagnostics = test_path(
