@@ -5181,16 +5181,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .any(|overload| overload.signature.generic_context.is_some());
 
         // If the type context is a union, attempt to narrow to a specific element.
-        let narrow_targets: &[_] = match call_expression_tcx.annotation {
-            // TODO: We could theoretically attempt to narrow to every element of
-            // the power set of this union. However, this leads to an exponential
-            // explosion of inference attempts, and is rarely needed in practice.
-            //
+        let narrow_targets = call_expression_tcx
+            .narrow_targets(db)
             // We only need to attempt narrowing on generic calls, otherwise the type
             // context has no effect.
-            Some(Type::Union(union)) if has_generic_context => union.elements(db),
-            _ => &[],
-        };
+            .filter(|_| has_generic_context)
+            .unwrap_or_default();
 
         let mut try_narrow = |narrowed_ty: Type<'db>| {
             // Short-circuit if there is no overload with a matching return type.
@@ -6266,12 +6262,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Option<Type<'db>> {
         let db = self.db();
 
-        // If the type context is a union, attempt to narrow to a specific element.
-        let narrow_targets: &[_] = match tcx.annotation {
-            Some(Type::Union(union)) => union.elements(db),
-            _ => &[],
-        };
-
         let mut try_narrow = |narrowed_ty| {
             let mut speculative_builder = self.speculate();
 
@@ -6293,8 +6283,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Some(inferred_ty)
         };
 
-        for narrowed_ty in narrow_targets
-            .iter()
+        // If the type context is a union, attempt to narrow to a specific element.
+        for narrowed_ty in tcx
+            .narrow_targets(db)
+            .into_iter()
+            .flatten()
             .filter(|ty| ty.class_specialization(db).is_some())
         {
             if let Some(result) = try_narrow(*narrowed_ty) {
