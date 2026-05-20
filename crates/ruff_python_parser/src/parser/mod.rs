@@ -98,8 +98,7 @@ impl<'src> Parser<'src> {
     ///
     /// # Note
     ///
-    /// This recursion guard is a temporary fix for #22930. The proper
-    /// fix is to refactor the parser to avoid recursive calls.
+    /// This recursion guard is a temporary fix for #22930.
     #[must_use]
     #[inline]
     fn with_recursion<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> Option<T> {
