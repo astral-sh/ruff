@@ -56,7 +56,8 @@ use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast::{self as ast, ParameterWithDefault};
+use ruff_python_ast::find_node::covering_node;
+use ruff_python_ast::{self as ast, OperatorPrecedence, ParameterWithDefault};
 use ruff_text_size::Ranged;
 use salsa::plumbing::AsId;
 use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module};
@@ -2236,11 +2237,37 @@ impl KnownFunction {
                         if let Some(source_expr) =
                             call_expression.arguments.find_argument_value("val", 1)
                         {
+                            let module = parsed_module(db, file).load(db);
+                            let covering =
+                                covering_node(module.syntax().into(), call_expression.range());
+                            let source_precedence = OperatorPrecedence::from_expr(source_expr);
+                            let needs_parens = covering
+                                .parent()
+                                .and_then(ast::AnyNodeRef::as_expr_ref)
+                                .is_some_and(|parent| {
+                                    OperatorPrecedence::from_expr_ref(&parent) > source_precedence
+                                });
+                            let (leading, trailing) = if needs_parens {
+                                (
+                                    Edit::replacement(
+                                        "(".to_string(),
+                                        call_expression.start(),
+                                        source_expr.start(),
+                                    ),
+                                    Edit::replacement(
+                                        ")".to_string(),
+                                        source_expr.end(),
+                                        call_expression.end(),
+                                    ),
+                                )
+                            } else {
+                                (
+                                    Edit::deletion(call_expression.start(), source_expr.start()),
+                                    Edit::deletion(source_expr.end(), call_expression.end()),
+                                )
+                            };
                             diagnostic.help("Remove the redundant `cast`");
-                            diagnostic.set_fix(Fix::safe_edits(
-                                Edit::deletion(call_expression.start(), source_expr.start()),
-                                [Edit::deletion(source_expr.end(), call_expression.end())],
-                            ));
+                            diagnostic.set_fix(Fix::safe_edits(leading, [trailing]));
                         }
                     }
                 }
