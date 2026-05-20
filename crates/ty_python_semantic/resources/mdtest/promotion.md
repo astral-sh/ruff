@@ -125,7 +125,6 @@ coordinates = {
     "palm-tree": (10, 8),
 }
 reveal_type(coordinates)  # revealed: dict[str, tuple[int, int]]
-coordinates["treasure"] = (5, 6, -10)  # error: [invalid-assignment]
 ```
 
 Heterogeneous tuples are not widened.
@@ -187,15 +186,12 @@ def get_segments_by_name() -> dict[str, tuple[int, int]]:
 
 segments = [get_segment(), (1, 2), (3, 4, 5)]
 reveal_type(segments)  # revealed: list[tuple[int] | tuple[int, int, int, int] | tuple[int, int] | tuple[int, int, int]]
-segments.append((6, 7, 8, 9, 10))  # error: [invalid-argument-type]
 
 starred_segments = [*get_segments(), (1, 2), (3, 4, 5)]
 reveal_type(starred_segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
-starred_segments.append((6, 7, 8, 9))  # error: [invalid-argument-type]
 
 mapping_segments = {**get_segments_by_name(), "start": (1, 2), "end": (3, 4, 5)}
 reveal_type(mapping_segments)  # revealed: dict[str, tuple[int, int] | tuple[int, int, int]]
-mapping_segments["bad"] = (6, 7, 8, 9)  # error: [invalid-assignment]
 ```
 
 This also applies when the non-literal tuple type is hidden behind a type alias or a type variable,
@@ -225,53 +221,45 @@ def get_aliased_segment() -> Segment:
 
 aliased_segments = [get_aliased_segment(), (1, 2), (3, 4, 5)]
 reveal_type(aliased_segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
-aliased_segments.append((6, 7, 8, 9))  # error: [invalid-argument-type]
 
 def get_newtype_segment() -> NewTypeSegment:
     return NewTypeSegment((0, 1))
 
 newtype_segments = [get_newtype_segment(), (1, 2), (3, 4, 5)]
 reveal_type(newtype_segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
-newtype_segments.append((6, 7, 8, 9))  # error: [invalid-argument-type]
 
 def check_bound_typevar_segment(segment: BoundSegment) -> None:
     bound_typevar_segments = [segment, (1, 2), (3, 4, 5)]
     reveal_type(bound_typevar_segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
-    bound_typevar_segments.append((6, 7, 8, 9))  # error: [invalid-argument-type]
 
 def check_constrained_typevar_segment(segment: ConstrainedSegment) -> None:
     constrained_typevar_segments = [segment, (1, 2), (3, 4, 5)]
     # revealed: list[ConstrainedSegment@check_constrained_typevar_segment | tuple[int, int] | tuple[int, int, int]]
     reveal_type(constrained_typevar_segments)
-    constrained_typevar_segments.append((6, 7, 8, 9))  # error: [invalid-argument-type]
 
 def get_subsumed_segment() -> tuple[bool, bool]:
     return (True, False)
 
 subsumed_segments = [get_subsumed_segment(), (1, 2), (3, 4, 5)]
 reveal_type(subsumed_segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
-subsumed_segments.append((6, 7, 8, 9))  # error: [invalid-argument-type]
 
 def get_short_subsumed_segment() -> tuple[bool]:
     return (True,)
 
 short_subsumed_segments = [get_short_subsumed_segment(), (1, 2), (3, 4, 5)]
 reveal_type(short_subsumed_segments)  # revealed: list[tuple[bool] | tuple[int, int] | tuple[int, int, int]]
-short_subsumed_segments.append((6, 7, 8, 9))  # error: [invalid-argument-type]
 
 def get_heterogeneous_subsumed_segment() -> tuple[bool, int]:
     return (True, 0)
 
 heterogeneous_subsumed_segments = [get_heterogeneous_subsumed_segment(), (1, 2), (3, 4, 5)]
 reveal_type(heterogeneous_subsumed_segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
-heterogeneous_subsumed_segments.append((6, 7, 8, 9))  # error: [invalid-argument-type]
 
 def check_intersection_segment(segment: tuple[int, int]) -> None:
     if is_p(segment):
         reveal_type(segment)  # revealed: tuple[int, int] & P
         intersection_segments = [segment, (1, 2), (3, 4, 5)]
         reveal_type(intersection_segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
-        intersection_segments.append((6, 7, 8, 9))  # error: [invalid-argument-type]
 ```
 
 No promotion occurs when a covariant collection type context provides a fixed-length tuple.

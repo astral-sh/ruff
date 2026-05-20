@@ -1,4 +1,4 @@
-# Assignment with annotations
+# Assignment with annotationsannotations.md
 
 ## Annotation only transparent to local inference
 
@@ -485,9 +485,8 @@ reveal_type(x13)  # revealed: dict[str, list[str | None]]
 x14: Mapping[str, list[int | None]] | Mapping[str, list[str | None]] = {"a": ["b"]}
 reveal_type(x14)  # revealed: dict[str, list[str | None]]
 
-x15 = [{"a": [1], "b": 1}, {"a": [1]}]
-x15.append(reveal_type({"b": 1}))  # revealed: dict[str, list[int] | int]
-reveal_type(x15)  # revealed: list[dict[str, list[int] | int] | dict[str, list[int]]]
+def _(x15: list[dict[str, list[int] | int] | dict[str, list[int]]]):
+    x15.append(reveal_type({"b": 1}))  # revealed: dict[str, list[int] | int]
 
 type EitherList = list[int | str] | list[int | None]
 
@@ -936,9 +935,8 @@ reveal_type(x4)  # revealed: dict[str, list[str | None]]
 x5: Mapping[str, list[int | None]] | Mapping[str, list[str | None]] = dict([("a", ["b"])])
 reveal_type(x5)  # revealed: dict[str, list[str | None]]
 
-x6 = [dict([("a", list((1,))), ("b", 1)]), dict([("a", list((1,)))])]
-x6.append(reveal_type(dict([("b", 1)])))  # revealed: dict[str, list[int] | int]
-reveal_type(x6)  # revealed: list[dict[str, list[int] | int] | dict[str, list[int]]]
+def _(x6: list[dict[str, list[int] | int] | dict[str, list[int]]]):
+    x6.append(reveal_type(dict([("b", 1)])))  # revealed: dict[str, list[int] | int]
 
 type EitherList = list[int | str] | list[int | None]
 

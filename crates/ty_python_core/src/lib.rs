@@ -461,9 +461,9 @@ impl<'db> SemanticIndex<'db> {
         self.enclosing_lambda_statements.get(&lambda).copied()
     }
 
-    /// If this is a potentially constraining use of an unconstrained collection literal, returns
+    /// If this is a potentially constraining use of an unannotated collection literal, returns
     /// its definition.
-    pub fn unconstrained_collection_binding(
+    pub fn unannotated_collection_literal(
         &self,
         collection_use: &ast::Expr,
     ) -> Option<Definition<'db>> {

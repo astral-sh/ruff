@@ -953,6 +953,20 @@ def _(flag: bool):
     reveal_type(x22)  # revealed: list[Unknown]
 ```
 
+```py
+x23 = [None, None, None]
+x23[0] = 1
+x23[1] = "2"
+x23[2] = 3.0
+reveal_type(x23)  # revealed: list[int | str | float | None]
+```
+
+```py
+x24 = {"a": 1}
+x24[1] = "b"
+reveal_type(x24)  # revealed: dict[int | str, str | int]
+```
+
 ## Multi-inference diagnostics
 
 Diagnostics unrelated to the type-context are only reported once:

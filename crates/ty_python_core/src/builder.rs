@@ -782,9 +782,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self.ast_ids[scope_id]
     }
 
-    /// If the given expression is a use of an unconstrained collection literal, returns
+    /// If the given expression is a use of an unannotated collection literal, returns
     /// the definition of the collection literal.
-    fn unconstrained_collection_literal_binding(
+    fn unannotated_collection_literal_binding(
         &self,
         collection_use: &ast::Expr,
     ) -> Option<Definition<'db>> {
@@ -798,9 +798,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 definition
                     .kind(self.db)
                     .as_unannotated_assignment()
-                    .is_some_and(|assignment| {
-                        is_unconstrained_collection_literal(assignment.value(self.module))
-                    })
+                    .is_some_and(|assignment| is_collection_literal(assignment.value(self.module)))
             })
             // TODO: Support uses that refer to multiple definitions. This currently seems to lead to
             // cycle-related panics.
@@ -2675,9 +2673,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 self.visit_expr(&node.value);
 
-                // Unconstrained collection literals must be standalone expressions to participate
+                // Unannotated collection literals must be standalone expressions to participate
                 // in full-scope bidirectional inference.
-                if node.targets.len() == 1 && is_unconstrained_collection_literal(&node.value) {
+                if node.targets.len() == 1 && is_collection_literal(&node.value) {
                     self.add_standalone_assigned_expression(&node.value, node);
                 }
 
@@ -3493,7 +3491,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 };
 
                 if let Some((func, expr, is_await)) = call_info {
-                    // Avoid creating reachability nodes for calls on unconstrained collection
+                    // Avoid creating reachability nodes for calls on unannotated collection
                     // literals. Without this short-circuit, performing reachability analysis
                     // can lead to quadratic blowup of cycle dependencies during full-scope
                     // collection inference, as Salsa flattens the dependencies of all cycle
@@ -3509,7 +3507,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         && func
                             .as_attribute_expr()
                             .and_then(|attribute| {
-                                self.unconstrained_collection_literal_binding(&attribute.value)
+                                self.unannotated_collection_literal_binding(&attribute.value)
                             })
                             .is_none()
                     {
@@ -3753,9 +3751,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     if is_use {
                         self.record_place_use(place_id, expr);
 
-                        // Keep track of any uses of collection literals.
+                        // Keep track of any uses of unannotated collection literals.
                         if let Some(collection_def) =
-                            self.unconstrained_collection_literal_binding(expr)
+                            self.unannotated_collection_literal_binding(expr)
                             && let Some(current_statement) = self.current_statements.last_mut()
                         {
                             current_statement
@@ -4461,11 +4459,6 @@ fn is_if_not_type_checking(expr: &ast::Expr) -> bool {
     )
 }
 
-pub(crate) fn is_unconstrained_collection_literal(expr: &ast::Expr) -> bool {
-    match expr {
-        ast::Expr::List(list) => list.elts.is_empty(),
-        ast::Expr::Set(set) => set.elts.is_empty(),
-        ast::Expr::Dict(dict) => dict.items.is_empty(),
-        _ => false,
-    }
+pub(crate) fn is_collection_literal(expr: &ast::Expr) -> bool {
+    expr.is_list_expr() || expr.is_set_expr() || expr.is_dict_expr()
 }

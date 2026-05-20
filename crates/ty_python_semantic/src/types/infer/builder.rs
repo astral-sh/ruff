@@ -5723,7 +5723,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if let Some(tcx) = tcx.annotation
-            && let Some(collection_def) = self.index.unconstrained_collection_binding(expression)
+            && let Some(collection_def) = self.index.unannotated_collection_literal(expression)
         {
             self.collection_use_constraints
                 .entry(collection_def)
@@ -6538,7 +6538,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 DefinitionNodeKey::from_assignment(assignment.node(self.module())).exactly_one()
             && let Some(collection_def) = self.index.try_definition(collection_def)
         {
-            // For unconstrained collection literals, collect any constraints created by later uses
+            // For unannotated collection literals, collect any constraints created by later uses
             // of this definition in the scope.
             for (statement, use_expression) in
                 self.index.constraining_collection_uses(collection_def)
@@ -7954,11 +7954,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Record the constraints for the receiver of a bound method call, if the receiver is an
-        // unconstrained collection literal.
+        // unannotated collection literal.
         if let ast::Expr::Attribute(attribute @ ast::ExprAttribute { value, .. }) = func.as_ref() {
             let value_type = self.expression_type(value);
 
-            if let Some(collection_def) = self.index.unconstrained_collection_binding(value)
+            if let Some(collection_def) = self.index.unannotated_collection_literal(value)
                 && let Some((collection_literal, _)) = value_type.class_specialization(self.db())
             {
                 let identity_instance = Type::instance(
