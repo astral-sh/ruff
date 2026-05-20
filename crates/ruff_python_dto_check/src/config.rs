@@ -44,7 +44,9 @@ impl Config {
         let raw: serde_json::Value =
             serde_json::from_str(text).map_err(|e| ConfigError::Json(e.to_string()))?;
 
-        let obj = raw.as_object().ok_or_else(|| ConfigError::Json("root must be an object".to_string()))?;
+        let obj = raw
+            .as_object()
+            .ok_or_else(|| ConfigError::Json("root must be an object".to_string()))?;
 
         // Check for unknown top-level keys and emit did_you_mean hints.
         for key in obj.keys() {
@@ -235,14 +237,14 @@ fn validate_group(raw: RawGroupConfig) -> Result<GroupConfig, ConfigError> {
         None
     };
 
-    Ok(GroupConfig { family_from_filename })
+    Ok(GroupConfig {
+        family_from_filename,
+    })
 }
 
 /// Levenshtein-distance-based closest match for a typo hint.
 fn closest_match(key: &str, candidates: &[&str]) -> Option<String> {
-    let best = candidates
-        .iter()
-        .min_by_key(|&&c| edit_distance(key, c))?;
+    let best = candidates.iter().min_by_key(|&&c| edit_distance(key, c))?;
     Some((*best).to_string())
 }
 

@@ -60,7 +60,7 @@ pub struct RegisterBlueprintEdge {
     pub url_prefix: Option<String>,
 }
 
-/// Known body-scan patterns (§3.2 body_string_scan_hits).
+/// Known body-scan patterns (§3.2 `body_string_scan_hits`).
 const BODY_SCAN_PATTERNS: &[&str] = &[
     "g.tenant",
     "current_app.tenant",
@@ -97,7 +97,8 @@ impl PreflightScanner {
                 .unwrap_or(path)
                 .to_string_lossy()
                 .into_owned();
-            if rel.contains("__pycache__/") || rel.starts_with(".venv/") || rel.starts_with("venv/") {
+            if rel.contains("__pycache__/") || rel.starts_with(".venv/") || rel.starts_with("venv/")
+            {
                 continue;
             }
             let Ok(source) = std::fs::read_to_string(path) else {
@@ -117,7 +118,10 @@ impl PreflightScanner {
         };
         self.py_files_parseable += 1;
 
-        let filename = Path::new(rel).file_name().and_then(|s| s.to_str()).unwrap_or("");
+        let filename = Path::new(rel)
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("");
         self.record_stem_suffix(filename);
 
         let mut file_has_matched = false;
@@ -131,7 +135,11 @@ impl PreflightScanner {
                     }
                 }
                 Stmt::ImportFrom(i) => {
-                    let module = i.module.as_ref().map(|m| m.to_string()).unwrap_or_default();
+                    let module = i
+                        .module
+                        .as_ref()
+                        .map(ToString::to_string)
+                        .unwrap_or_default();
                     self.count_import(&module);
                 }
                 Stmt::FunctionDef(func) => {
@@ -140,7 +148,10 @@ impl PreflightScanner {
                     for dec in &func.decorator_list {
                         if let Some((obj, attr)) = decorator_obj_attr(dec) {
                             let attr_str = attr.clone();
-                            *self.decorator_by_attribute.entry(attr_str.clone()).or_default() += 1;
+                            *self
+                                .decorator_by_attribute
+                                .entry(attr_str.clone())
+                                .or_default() += 1;
                             let pattern = format!("{obj}.{attr}");
                             *self.decorator_by_full_pattern.entry(pattern).or_default() += 1;
                             if attr_str == "route" {
@@ -152,7 +163,10 @@ impl PreflightScanner {
                                         if let Expr::StringLiteral(s) = first {
                                             let url = s.value.to_str().to_string();
                                             for seg in extract_url_segments(&url) {
-                                                *self.url_template_segments.entry(seg).or_default() += 1;
+                                                *self
+                                                    .url_template_segments
+                                                    .entry(seg)
+                                                    .or_default() += 1;
                                             }
                                         }
                                     }
@@ -165,13 +179,20 @@ impl PreflightScanner {
                     }
 
                     // Body scan for known patterns.
-                    let body_start = func.body.first().map(|s| s.range().start().to_usize()).unwrap_or(0);
+                    let body_start = func
+                        .body
+                        .first()
+                        .map(|s| s.range().start().to_usize())
+                        .unwrap_or(0);
                     let body_end = func.range().end().to_usize();
                     if body_start < body_end && body_end <= source.len() {
                         let body_text = &source[body_start..body_end];
                         for &pattern in BODY_SCAN_PATTERNS {
                             if body_text.contains(pattern) {
-                                *self.body_string_hits.entry(pattern.to_string()).or_default() += 1;
+                                *self
+                                    .body_string_hits
+                                    .entry(pattern.to_string())
+                                    .or_default() += 1;
                             }
                         }
                     }
@@ -229,13 +250,19 @@ impl PreflightScanner {
         let mut found = false;
         for &suffix in STEM_SUFFIXES {
             if stem.ends_with(suffix) {
-                *self.stem_suffix_histogram.entry(suffix.to_string()).or_default() += 1;
+                *self
+                    .stem_suffix_histogram
+                    .entry(suffix.to_string())
+                    .or_default() += 1;
                 found = true;
                 break;
             }
         }
         if !found {
-            *self.stem_suffix_histogram.entry("(none)".to_string()).or_default() += 1;
+            *self
+                .stem_suffix_histogram
+                .entry("(none)".to_string())
+                .or_default() += 1;
         }
     }
 
@@ -266,7 +293,9 @@ impl PreflightScanner {
                 };
                 let line = {
                     // Cheap line estimation from source offset.
-                    source[..start].chars().filter(|&c| c == '\n').count() as u32 + 1
+                    u32::try_from(source[..start].chars().filter(|&c| c == '\n').count())
+                        .unwrap_or(u32::MAX)
+                        .saturating_add(1)
                 };
                 self.add_url_rule_findings.push(AddUrlRuleFinding {
                     file: rel.to_string(),
@@ -295,7 +324,12 @@ impl PreflightScanner {
                     })
                     .unwrap_or_else(|| "?".to_string());
                 let url_prefix = call.arguments.keywords.iter().find_map(|kw| {
-                    if kw.arg.as_ref().map(|a| a.id.as_str() == "url_prefix").unwrap_or(false) {
+                    if kw
+                        .arg
+                        .as_ref()
+                        .map(|a| a.id.as_str() == "url_prefix")
+                        .unwrap_or(false)
+                    {
                         if let Expr::StringLiteral(s) = &kw.value {
                             return Some(s.value.to_str().to_string());
                         }

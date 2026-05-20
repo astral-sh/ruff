@@ -182,11 +182,17 @@ pub fn write_family_bundles(
             total_bundles += 1;
 
             let key = b.function_name.clone();
-            by_family.entry(family.clone()).or_default().push(key.clone());
+            by_family
+                .entry(family.clone())
+                .or_default()
+                .push(key.clone());
 
             let dec_sig: Vec<&str> = b.all_decorators.iter().map(String::as_str).collect();
             let dec_sig_key = dec_sig.join("|");
-            by_decorator_stack.entry(dec_sig_key).or_default().push(key.clone());
+            by_decorator_stack
+                .entry(dec_sig_key)
+                .or_default()
+                .push(key.clone());
 
             if let Some(cwf) = &b.comparison_within_family {
                 let hash = cwf.ast_hash_self.clone();
@@ -223,7 +229,10 @@ pub fn write_family_bundles(
             "bundles": total_bundles
         }
     });
-    std::fs::write(out_dir.join("manifest.json"), serde_json::to_string_pretty(&manifest)?)?;
+    std::fs::write(
+        out_dir.join("manifest.json"),
+        serde_json::to_string_pretty(&manifest)?,
+    )?;
 
     Ok(())
 }

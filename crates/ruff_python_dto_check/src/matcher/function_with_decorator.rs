@@ -15,7 +15,7 @@ use serde_json::Value;
 
 use crate::bundle::EmittedBundle;
 use crate::config::{Config, DecoratorSelector, MatchRule};
-use crate::emit::{eval_path, FunctionContext};
+use crate::emit::{FunctionContext, eval_path};
 
 /// Parse one Python source file and emit one [`EmittedBundle`] per matched
 /// function-with-decorator rule combination.
@@ -72,8 +72,10 @@ fn try_match_function(
     let function_name = func.name.id.to_string();
     let family = resolve_family(source_file, config);
 
-    let line_start = line_index.line_index(func.range().start()).get() as u32;
-    let line_end = line_index.line_index(func.range().end()).get() as u32;
+    let line_start =
+        u32::try_from(line_index.line_index(func.range().start()).get()).unwrap_or(u32::MAX);
+    let line_end =
+        u32::try_from(line_index.line_index(func.range().end()).get()).unwrap_or(u32::MAX);
     let body_lines = line_end.saturating_sub(line_start) + 1;
 
     let all_decorators: Vec<String> = func
@@ -106,12 +108,9 @@ fn find_matching_decorator<'a>(
     rule: &MatchRule,
 ) -> Option<&'a Decorator> {
     let sel = rule.decorator.as_ref();
-    for dec in &func.decorator_list {
-        if decorator_matches(dec, sel) {
-            return Some(dec);
-        }
-    }
-    None
+    func.decorator_list
+        .iter()
+        .find(|&dec| decorator_matches(dec, sel))
 }
 
 /// Check if a decorator satisfies a selector.
@@ -155,7 +154,7 @@ fn decorator_has_attribute(dec: &Decorator, attr_name: &str) -> bool {
     false
 }
 
-/// `@login_required` → name = "login_required"
+/// `@login_required` → name = "`login_required`"
 fn decorator_has_bare_name(dec: &Decorator, name: &str) -> bool {
     if let Expr::Call(call) = &dec.expression
         && let Expr::Name(n) = &*call.func
@@ -173,12 +172,12 @@ fn call_has_min_positional(dec: &Decorator, min: u32) -> bool {
         return true;
     }
     if let Expr::Call(call) = &dec.expression {
-        return call.arguments.args.len() as u32 >= min;
+        return u32::try_from(call.arguments.args.len()).unwrap_or(u32::MAX) >= min;
     }
     false
 }
 
-/// Resolve family name from source_file path using the config's group rule.
+/// Resolve family name from `source_file` path using the config's group rule.
 pub fn resolve_family(source_file: &str, config: &Config) -> String {
     let filename = Path::new(source_file)
         .file_name()

@@ -54,8 +54,7 @@ pub struct ModuleHarvest {
 /// detector when no config is supplied so the `wo_list_identity` golden test
 /// keeps passing.
 pub fn harvest_module(source_file: &str, source: &str) -> Result<ModuleHarvest> {
-    let parsed =
-        parse_module(source).with_context(|| format!("parsing {source_file}"))?;
+    let parsed = parse_module(source).with_context(|| format!("parsing {source_file}"))?;
     let line_index = LineIndex::from_source_text(source);
 
     let mut bundles = Vec::new();
@@ -100,8 +99,8 @@ pub fn harvest_tree(root: &Path) -> Result<Vec<ModuleHarvest>> {
         {
             continue;
         }
-        let source = std::fs::read_to_string(path)
-            .with_context(|| format!("reading {}", path.display()))?;
+        let source =
+            std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
         let Ok(harvest) = harvest_module(&rel, &source) else {
             continue;
         };

@@ -12,8 +12,6 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-use ruff_python_dto_check::harvest_module;
-
 #[derive(Parser)]
 #[command(
     name = "ruff-py-dto",
@@ -76,25 +74,30 @@ fn main() -> Result<()> {
     }
 }
 
-fn run_harvest(config_path: &std::path::Path, out: &std::path::Path, _root: Option<&std::path::Path>) -> Result<()> {
+fn run_harvest(
+    config_path: &std::path::Path,
+    out: &std::path::Path,
+    root_override: Option<&std::path::Path>,
+) -> Result<()> {
+    use ruff_python_dto_check::bundle::write_family_bundles;
     use ruff_python_dto_check::config::Config;
     use ruff_python_dto_check::matcher::function_with_decorator::harvest_module_with_config;
-    use ruff_python_dto_check::bundle::write_family_bundles;
 
-    let cfg = Config::from_path(config_path)
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    let cfg = Config::from_path(config_path).map_err(|e| anyhow::anyhow!("{e}"))?;
 
     std::fs::create_dir_all(out)?;
 
-    let root_str = _root
+    let root_str = root_override
         .and_then(|p| p.to_str())
-        .or_else(|| cfg.root.as_deref())
+        .or(cfg.root.as_deref())
         .unwrap_or(".");
     let root = std::path::Path::new(root_str);
 
     // Collect all matches across the tree.
-    let mut family_map: std::collections::BTreeMap<String, Vec<ruff_python_dto_check::bundle::EmittedBundle>> =
-        std::collections::BTreeMap::new();
+    let mut family_map: std::collections::BTreeMap<
+        String,
+        Vec<ruff_python_dto_check::bundle::EmittedBundle>,
+    > = std::collections::BTreeMap::new();
 
     for entry in walkdir::WalkDir::new(root)
         .follow_links(false)
@@ -130,8 +133,8 @@ fn run_harvest(config_path: &std::path::Path, out: &std::path::Path, _root: Opti
 }
 
 fn run_preflight(root: &std::path::Path, out: Option<&std::path::Path>) -> Result<()> {
-    use ruff_python_dto_check::preflight::scanner::PreflightScanner;
     use ruff_python_dto_check::preflight::run_preflight as do_preflight;
+    use ruff_python_dto_check::preflight::scanner::PreflightScanner;
 
     let scanner = PreflightScanner::scan(root)?;
     do_preflight(&scanner, out)?;
@@ -142,13 +145,15 @@ fn run_harvest_one(config_path: &std::path::Path, rel: &str, file: &std::path::P
     use ruff_python_dto_check::config::Config;
     use ruff_python_dto_check::matcher::function_with_decorator::harvest_module_with_config;
 
-    let cfg = Config::from_path(config_path)
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    let cfg = Config::from_path(config_path).map_err(|e| anyhow::anyhow!("{e}"))?;
     let source = std::fs::read_to_string(file)?;
     let bundles = harvest_module_with_config(rel, &source, &cfg);
     let json = serde_json::to_string_pretty(&bundles)?;
     // Binary output to stdout is expected behavior for harvest-one subcommand.
-    #[expect(clippy::print_stdout, reason = "harvest-one is a stdout-emit subcommand")]
+    #[expect(
+        clippy::print_stdout,
+        reason = "harvest-one is a stdout-emit subcommand"
+    )]
     {
         println!("{json}");
     }
@@ -161,7 +166,10 @@ fn run_schema(out: Option<&std::path::Path>) -> Result<()> {
         std::fs::write(path, schema)?;
     } else {
         // Schema subcommand emits to stdout by design.
-        #[expect(clippy::print_stdout, reason = "schema subcommand emits to stdout by design")]
+        #[expect(
+            clippy::print_stdout,
+            reason = "schema subcommand emits to stdout by design"
+        )]
         {
             print!("{schema}");
         }

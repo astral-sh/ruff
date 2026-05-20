@@ -17,7 +17,10 @@ fn parse_flask_config_succeeds() {
     assert!(rule.emit.contains_key("url"));
     assert!(rule.emit.contains_key("function_name"));
     let group = &cfg.group;
-    let fff = group.family_from_filename.as_ref().expect("has family_from_filename");
+    let fff = group
+        .family_from_filename
+        .as_ref()
+        .expect("has family_from_filename");
     assert!(fff.regex.contains("(?P<family>"));
 }
 

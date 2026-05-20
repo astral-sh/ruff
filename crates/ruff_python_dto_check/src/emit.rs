@@ -14,7 +14,7 @@
 //! Path is emitted as `null` if absent. Type mismatches emit the raw value
 //! and a `_type_note` sibling field — never panics.
 
-use ruff_python_ast::{Expr, Keyword, StmtFunctionDef};
+use ruff_python_ast::{Expr, StmtFunctionDef};
 use ruff_source_file::LineIndex;
 use ruff_text_size::Ranged;
 use serde_json::Value;
@@ -50,12 +50,18 @@ fn eval_def_path(path: &str, ctx: &FunctionContext<'_>) -> Value {
                 .iter_non_variadic_params()
                 .map(|p| p.parameter.name.id.to_string())
                 .chain(
-                    ctx.func.parameters.vararg.as_ref()
-                        .map(|v| format!("*{}", v.name.id))
+                    ctx.func
+                        .parameters
+                        .vararg
+                        .as_ref()
+                        .map(|v| format!("*{}", v.name.id)),
                 )
                 .chain(
-                    ctx.func.parameters.kwarg.as_ref()
-                        .map(|k| format!("**{}", k.name.id))
+                    ctx.func
+                        .parameters
+                        .kwarg
+                        .as_ref()
+                        .map(|k| format!("**{}", k.name.id)),
                 )
                 .collect();
             Value::String(params.join(", "))
@@ -161,11 +167,9 @@ fn expr_to_value(expr: &Expr, source: &str) -> Value {
                     Value::String(i.to_string())
                 }
             }
-            ruff_python_ast::Number::Float(f) => {
-                serde_json::Number::from_f64(*f)
-                    .map(Value::Number)
-                    .unwrap_or(Value::Null)
-            }
+            ruff_python_ast::Number::Float(f) => serde_json::Number::from_f64(*f)
+                .map(Value::Number)
+                .unwrap_or(Value::Null),
             ruff_python_ast::Number::Complex { real, imag } => {
                 Value::String(format!("{real}+{imag}j"))
             }
@@ -195,10 +199,12 @@ fn expr_to_value(expr: &Expr, source: &str) -> Value {
 use ruff_text_size::TextRange;
 
 impl FunctionContext<'_> {
-    /// Line count of the function body (line_end - line_start + 1).
+    /// Line count of the function body (`line_end` - `line_start` + 1).
     pub fn body_line_count(&self) -> u32 {
-        let start = self.line_index.line_index(self.func.range().start()).get() as u32;
-        let end = self.line_index.line_index(self.func.range().end()).get() as u32;
+        let start = u32::try_from(self.line_index.line_index(self.func.range().start()).get())
+            .unwrap_or(u32::MAX);
+        let end = u32::try_from(self.line_index.line_index(self.func.range().end()).get())
+            .unwrap_or(u32::MAX);
         end.saturating_sub(start) + 1
     }
 

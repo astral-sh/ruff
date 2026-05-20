@@ -17,12 +17,11 @@
 //! size < 4.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Write;
 
 use sha2::{Digest, Sha256};
 
-use ruff_python_ast::{
-    Expr, ExprContext, Stmt, StmtFunctionDef,
-};
+use ruff_python_ast::{Expr, ExprContext, Stmt};
 use ruff_python_parser::parse_module;
 
 use crate::bundle::{ComparisonWithinFamily, Distribution, EmittedBundle};
@@ -35,7 +34,7 @@ pub fn attach_observations(
 ) {
     for (family, bundles) in family_map.iter_mut() {
         let observations = compute_family_observations(family, bundles, source_map);
-        for (bundle, obs) in bundles.iter_mut().zip(observations.into_iter()) {
+        for (bundle, obs) in bundles.iter_mut().zip(observations) {
             bundle.comparison_within_family = Some(obs);
         }
     }
@@ -95,14 +94,10 @@ fn compute_family_observations(
         .zip(ast_hashes.iter())
         .enumerate()
         .map(|(i, ((bundle, dec_set), hash))| {
-            let self_minus_family: Vec<String> = dec_set
-                .difference(&family_intersection)
-                .cloned()
-                .collect();
-            let family_minus_self: Vec<String> = family_intersection
-                .difference(dec_set)
-                .cloned()
-                .collect();
+            let self_minus_family: Vec<String> =
+                dec_set.difference(&family_intersection).cloned().collect();
+            let family_minus_self: Vec<String> =
+                family_intersection.difference(dec_set).cloned().collect();
 
             let collisions: Vec<String> = hash_to_names
                 .get(hash.as_str())
@@ -123,7 +118,7 @@ fn compute_family_observations(
                 family_intersection_minus_self: family_minus_self,
                 body_lines_self: bundle.body_lines,
                 body_lines_family_distribution: body_dist.clone(),
-                param_count_self: param_counts[i] as usize,
+                param_count_self: usize::try_from(param_counts[i]).unwrap_or(usize::MAX),
                 param_count_family_distribution: param_dist.clone(),
                 ast_hash_self: format!("sha256:{hash}"),
                 ast_hash_family_collisions: collisions,
@@ -195,21 +190,21 @@ fn walk_stmt(stmt: &Stmt, out: &mut String) {
             for s in &f.body {
                 walk_stmt(s, out);
             }
-            out.push_str(&format!("FunctionDef({})", f.body.len()));
+            write!(out, "FunctionDef({})", f.body.len()).ok();
         }
         Stmt::Return(r) => {
             let child = usize::from(r.value.is_some());
             if let Some(v) = &r.value {
                 walk_expr(v, out);
             }
-            out.push_str(&format!("Return({child})"));
+            write!(out, "Return({child})").ok();
         }
         Stmt::Assign(a) => {
             for t in &a.targets {
                 walk_expr(t, out);
             }
             walk_expr(&a.value, out);
-            out.push_str(&format!("Assign({})", a.targets.len() + 1));
+            write!(out, "Assign({})", a.targets.len() + 1).ok();
         }
         Stmt::AugAssign(a) => {
             walk_expr(&a.target, out);
@@ -223,7 +218,7 @@ fn walk_stmt(stmt: &Stmt, out: &mut String) {
             if let Some(val) = &a.value {
                 walk_expr(val, out);
             }
-            out.push_str(&format!("AnnAssign({})", 2 + v));
+            write!(out, "AnnAssign({})", 2 + v).ok();
         }
         Stmt::Expr(e) => {
             walk_expr(&e.value, out);
@@ -242,7 +237,7 @@ fn walk_stmt(stmt: &Stmt, out: &mut String) {
                     walk_stmt(s, out);
                 }
             }
-            out.push_str(&format!("If({})", 1 + i.body.len() + i.elif_else_clauses.len()));
+            write!(out, "If({})", 1 + i.body.len() + i.elif_else_clauses.len()).ok();
         }
         Stmt::For(f) => {
             walk_expr(&f.target, out);
@@ -250,65 +245,65 @@ fn walk_stmt(stmt: &Stmt, out: &mut String) {
             for s in &f.body {
                 walk_stmt(s, out);
             }
-            out.push_str(&format!("For({})", 2 + f.body.len()));
+            write!(out, "For({})", 2 + f.body.len()).ok();
         }
         Stmt::While(w) => {
             walk_expr(&w.test, out);
             for s in &w.body {
                 walk_stmt(s, out);
             }
-            out.push_str(&format!("While({})", 1 + w.body.len()));
+            write!(out, "While({})", 1 + w.body.len()).ok();
         }
         Stmt::With(w) => {
             for s in &w.body {
                 walk_stmt(s, out);
             }
-            out.push_str(&format!("With({})", w.body.len()));
+            write!(out, "With({})", w.body.len()).ok();
         }
         Stmt::Try(t) => {
             for s in &t.body {
                 walk_stmt(s, out);
             }
-            out.push_str(&format!("Try({})", t.body.len()));
+            write!(out, "Try({})", t.body.len()).ok();
         }
         Stmt::Raise(r) => {
             let child = usize::from(r.exc.is_some());
             if let Some(exc) = &r.exc {
                 walk_expr(exc, out);
             }
-            out.push_str(&format!("Raise({child})"));
+            write!(out, "Raise({child})").ok();
         }
         Stmt::Delete(d) => {
             for t in &d.targets {
                 walk_expr(t, out);
             }
-            out.push_str(&format!("Delete({})", d.targets.len()));
+            write!(out, "Delete({})", d.targets.len()).ok();
         }
         Stmt::Pass(_) => out.push_str("Pass(0)"),
         Stmt::Break(_) => out.push_str("Break(0)"),
         Stmt::Continue(_) => out.push_str("Continue(0)"),
         Stmt::Import(i) => {
-            out.push_str(&format!("Import({})", i.names.len()));
+            write!(out, "Import({})", i.names.len()).ok();
         }
         Stmt::ImportFrom(i) => {
-            out.push_str(&format!("ImportFrom({})", i.names.len()));
+            write!(out, "ImportFrom({})", i.names.len()).ok();
         }
         Stmt::Global(g) => {
-            out.push_str(&format!("Global({})", g.names.len()));
+            write!(out, "Global({})", g.names.len()).ok();
         }
         Stmt::Nonlocal(n) => {
-            out.push_str(&format!("Nonlocal({})", n.names.len()));
+            write!(out, "Nonlocal({})", n.names.len()).ok();
         }
         Stmt::ClassDef(c) => {
             for s in &c.body {
                 walk_stmt(s, out);
             }
-            out.push_str(&format!("ClassDef({})", c.body.len()));
+            write!(out, "ClassDef({})", c.body.len()).ok();
         }
         Stmt::TypeAlias(_) => out.push_str("TypeAlias(0)"),
         Stmt::Match(m) => {
             walk_expr(&m.subject, out);
-            out.push_str(&format!("Match({})", 1 + m.cases.len()));
+            write!(out, "Match({})", 1 + m.cases.len()).ok();
         }
         Stmt::IpyEscapeCommand(_) => out.push_str("IpyEscapeCommand(0)"),
         Stmt::Assert(a) => {
@@ -317,7 +312,7 @@ fn walk_stmt(stmt: &Stmt, out: &mut String) {
                 walk_expr(msg, out);
             }
             let n = 1 + usize::from(a.msg.is_some());
-            out.push_str(&format!("Assert({n})"));
+            write!(out, "Assert({n})").ok();
         }
     }
 }
@@ -332,7 +327,7 @@ fn walk_expr(expr: &Expr, out: &mut String) {
                 ExprContext::Del => "Del",
                 ExprContext::Invalid => "Invalid",
             };
-            out.push_str(&format!("Name({ctx})"));
+            write!(out, "Name({ctx})").ok();
         }
         Expr::Attribute(a) => {
             walk_expr(&a.value, out);
@@ -341,7 +336,7 @@ fn walk_expr(expr: &Expr, out: &mut String) {
         Expr::Call(c) => {
             walk_expr(&c.func, out);
             let n = c.arguments.args.len() + c.arguments.keywords.len();
-            out.push_str(&format!("Call({n})"));
+            write!(out, "Call({n})").ok();
         }
         Expr::BinOp(b) => {
             walk_expr(&b.left, out);
@@ -356,14 +351,14 @@ fn walk_expr(expr: &Expr, out: &mut String) {
             for v in &b.values {
                 walk_expr(v, out);
             }
-            out.push_str(&format!("BoolOp({})", b.values.len()));
+            write!(out, "BoolOp({})", b.values.len()).ok();
         }
         Expr::Compare(c) => {
             walk_expr(&c.left, out);
             for comp in &c.comparators {
                 walk_expr(comp, out);
             }
-            out.push_str(&format!("Compare({})", 1 + c.comparators.len()));
+            write!(out, "Compare({})", 1 + c.comparators.len()).ok();
         }
         Expr::If(i) => {
             walk_expr(&i.test, out);
@@ -380,19 +375,19 @@ fn walk_expr(expr: &Expr, out: &mut String) {
             for e in &t.elts {
                 walk_expr(e, out);
             }
-            out.push_str(&format!("Tuple({})", t.elts.len()));
+            write!(out, "Tuple({})", t.elts.len()).ok();
         }
         Expr::List(l) => {
             for e in &l.elts {
                 walk_expr(e, out);
             }
-            out.push_str(&format!("List({})", l.elts.len()));
+            write!(out, "List({})", l.elts.len()).ok();
         }
         Expr::Dict(d) => {
-            out.push_str(&format!("Dict({})", d.items.len()));
+            write!(out, "Dict({})", d.items.len()).ok();
         }
         Expr::Set(s) => {
-            out.push_str(&format!("Set({})", s.elts.len()));
+            write!(out, "Set({})", s.elts.len()).ok();
         }
         Expr::StringLiteral(_) => out.push_str("Str(0)"),
         Expr::BytesLiteral(_) => out.push_str("Bytes(0)"),
@@ -440,7 +435,7 @@ fn walk_expr(expr: &Expr, out: &mut String) {
             // Detailed traversal would require ruff_python_ast::TStringPart;
             // structural token is enough for the AST-hash heuristic.
             let n = t.value.iter().count();
-            out.push_str(&format!("TString({n})"));
+            write!(out, "TString({n})").ok();
         }
         Expr::Slice(s) => {
             let mut n = 0usize;
@@ -456,7 +451,7 @@ fn walk_expr(expr: &Expr, out: &mut String) {
                 walk_expr(step, out);
                 n += 1;
             }
-            out.push_str(&format!("Slice({n})"));
+            write!(out, "Slice({n})").ok();
         }
     }
 }
@@ -465,7 +460,14 @@ fn walk_expr(expr: &Expr, out: &mut String) {
 /// order statistics; nearest-rank if `values.len() < 4`.
 pub fn percentile_distribution(values: &[u64]) -> Distribution {
     if values.is_empty() {
-        return Distribution { p25: 0, p50: 0, p75: 0, p95: 0, p99: 0, max: 0 };
+        return Distribution {
+            p25: 0,
+            p50: 0,
+            p75: 0,
+            p95: 0,
+            p99: 0,
+            max: 0,
+        };
     }
     let mut sorted = values.to_vec();
     sorted.sort_unstable();
@@ -487,18 +489,68 @@ fn percentile(sorted: &[u64], p: u8) -> u64 {
     }
     if n < 4 {
         // Nearest-rank.
-        let idx = ((p as f64 / 100.0) * n as f64).ceil() as usize;
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "percentile math on histogram; usize→f64 precision loss is acceptable for rank calculation"
+        )]
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "ceil() result is a non-negative rank index bounded by n; truncation not possible in practice"
+        )]
+        #[expect(
+            clippy::cast_sign_loss,
+            reason = "value is the result of f64::ceil() on a non-negative input, always ≥ 0"
+        )]
+        let idx = ((f64::from(p) / 100.0) * n as f64).ceil() as usize;
         return sorted[idx.saturating_sub(1).min(n - 1)];
     }
     // Linear interpolation.
-    let pos = (p as f64 / 100.0) * (n as f64 - 1.0);
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "percentile math on histogram; usize→f64 precision loss is acceptable for interpolation"
+    )]
+    let pos = (f64::from(p) / 100.0) * (n as f64 - 1.0);
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "floor/ceil of a non-negative position index; truncation not possible in practice"
+    )]
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "value is the result of f64::floor/ceil() on a non-negative input, always ≥ 0"
+    )]
     let lo = pos.floor() as usize;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "floor/ceil of a non-negative position index; truncation not possible in practice"
+    )]
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "value is the result of f64::floor/ceil() on a non-negative input, always ≥ 0"
+    )]
     let hi = pos.ceil() as usize;
     if lo == hi {
         return sorted[lo];
     }
     let frac = pos - pos.floor();
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "u64 histogram value converted to f64 for interpolation arithmetic; precision loss acceptable"
+    )]
     let lo_val = sorted[lo] as f64;
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "u64 histogram value converted to f64 for interpolation arithmetic; precision loss acceptable"
+    )]
     let hi_val = sorted[hi] as f64;
-    (lo_val + frac * (hi_val - lo_val)).round() as u64
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "rounded interpolation result fits in u64 since inputs are u64 histogram values"
+    )]
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "value is the result of f64::round() on a non-negative interpolation between non-negative inputs, always ≥ 0"
+    )]
+    {
+        (lo_val + frac * (hi_val - lo_val)).round() as u64
+    }
 }

@@ -53,7 +53,9 @@ pub fn infer_action(methods: &[String]) -> String {
     if has_post && has_get {
         "form".to_string()
     } else if has_post
-        || upper.iter().any(|m| m == "PUT" || m == "DELETE" || m == "PATCH")
+        || upper
+            .iter()
+            .any(|m| m == "PUT" || m == "DELETE" || m == "PATCH")
     {
         "mutation".to_string()
     } else {
@@ -62,7 +64,11 @@ pub fn infer_action(methods: &[String]) -> String {
 }
 
 fn as_call(expr: &Expr) -> Option<&ExprCall> {
-    if let Expr::Call(c) = expr { Some(c) } else { None }
+    if let Expr::Call(c) = expr {
+        Some(c)
+    } else {
+        None
+    }
 }
 
 /// `bp.route` -> Some(("bp", "route"))
@@ -96,11 +102,7 @@ fn methods_kw(kws: &[Keyword]) -> Vec<String> {
         let Expr::List(list) = &kw.value else {
             return Vec::new();
         };
-        return list
-            .elts
-            .iter()
-            .filter_map(string_literal)
-            .collect();
+        return list.elts.iter().filter_map(string_literal).collect();
     }
     Vec::new()
 }
