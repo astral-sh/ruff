@@ -311,6 +311,14 @@ fn walk_stmt(stmt: &Stmt, out: &mut String) {
             out.push_str(&format!("Match({})", 1 + m.cases.len()));
         }
         Stmt::IpyEscapeCommand(_) => out.push_str("IpyEscapeCommand(0)"),
+        Stmt::Assert(a) => {
+            walk_expr(&a.test, out);
+            if let Some(msg) = &a.msg {
+                walk_expr(msg, out);
+            }
+            let n = 1 + usize::from(a.msg.is_some());
+            out.push_str(&format!("Assert({n})"));
+        }
     }
 }
 
@@ -427,6 +435,29 @@ fn walk_expr(expr: &Expr, out: &mut String) {
             out.push_str("Named(2)");
         }
         Expr::IpyEscapeCommand(_) => out.push_str("IpyEscape(0)"),
+        Expr::TString(t) => {
+            // Template strings (PEP 750) — emit token + part count.
+            // Detailed traversal would require ruff_python_ast::TStringPart;
+            // structural token is enough for the AST-hash heuristic.
+            let n = t.value.iter().count();
+            out.push_str(&format!("TString({n})"));
+        }
+        Expr::Slice(s) => {
+            let mut n = 0usize;
+            if let Some(lower) = &s.lower {
+                walk_expr(lower, out);
+                n += 1;
+            }
+            if let Some(upper) = &s.upper {
+                walk_expr(upper, out);
+                n += 1;
+            }
+            if let Some(step) = &s.step {
+                walk_expr(step, out);
+                n += 1;
+            }
+            out.push_str(&format!("Slice({n})"));
+        }
     }
 }
 

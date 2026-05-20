@@ -205,7 +205,7 @@ impl PreflightScanner {
             }
             // Top-level `add_url_rule` and `register_blueprint` calls.
             if let Stmt::Expr(e) = stmt {
-                if let Expr::Call(call) = &e.value {
+                if let Expr::Call(call) = &*e.value {
                     self.scan_call_for_blueprint_ops(rel, call, source);
                 }
             }
@@ -241,7 +241,7 @@ impl PreflightScanner {
 
     fn scan_for_add_url_rule(&mut self, rel: &str, stmt: &Stmt, source: &str) {
         if let Stmt::Expr(e) = stmt
-            && let Expr::Call(call) = &e.value
+            && let Expr::Call(call) = &*e.value
         {
             self.scan_call_for_blueprint_ops(rel, call, source);
         }

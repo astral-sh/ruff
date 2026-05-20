@@ -126,7 +126,9 @@ fn eval_decorator_arg(idx: usize, ctx: &FunctionContext<'_>) -> Value {
     let Expr::Call(call) = &ctx.matched_decorator.expression else {
         return Value::Null;
     };
-    let arg = call.arguments.args.get(idx)?;
+    let Some(arg) = call.arguments.args.get(idx) else {
+        return Value::Null;
+    };
     expr_to_value(arg, ctx.source)
 }
 
