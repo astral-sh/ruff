@@ -1447,24 +1447,72 @@ impl<'src> Parser<'src> {
         // 1 + 1
         statement.body = body;
 
-        // test_err if_stmt_misspelled_elif
-        // if True:
-        //     pass
-        // elf:
-        //     pass
-        // else:
-        //     pass
-        let mut elif_else_clauses = self.parse_clauses(Clause::ElIf, |p| {
-            p.parse_elif_or_else_clause(ElifOrElse::Elif)
-        });
+        self.parse_if_statement_clauses(statement)
+    }
 
-        if self.at(TokenKind::Else) {
-            elif_else_clauses.push(self.parse_elif_or_else_clause(ElifOrElse::Else));
+    fn parse_if_statement_clauses(&mut self, mut statement: ast::StmtIf) -> ast::StmtIf {
+        let mut parents = Vec::new();
+
+        loop {
+            // test_err if_stmt_misspelled_elif
+            // if True:
+            //     pass
+            // elf:
+            //     pass
+            // else:
+            //     pass
+            let mut elif_else_clauses = self.parse_clauses(Clause::ElIf, |p| {
+                p.parse_elif_or_else_clause(ElifOrElse::Elif)
+            });
+
+            if self.at(TokenKind::Else) {
+                let else_clause = self.parse_elif_or_else_clause_header(ElifOrElse::Else);
+
+                if self.body_starts_with_if_statement() {
+                    self.bump(TokenKind::Newline);
+                    self.bump(TokenKind::Indent);
+
+                    parents.push(PendingNestedElseIf {
+                        statement,
+                        elif_else_clauses,
+                        else_clause,
+                    });
+
+                    statement = self.parse_if_statement_header();
+                    statement.body = self.parse_body(Clause::If);
+                    continue;
+                }
+
+                let body = self.parse_body(Clause::Else);
+                elif_else_clauses.push(self.parse_elif_or_else_clause_with_body(else_clause, body));
+            }
+
+            statement.elif_else_clauses = elif_else_clauses;
+            statement.range = self.node_range(statement.range.start());
+
+            while let Some(mut parent) = parents.pop() {
+                let mut body = vec![Stmt::If(statement)];
+                body.extend(self.parse_list_into_vec(
+                    RecoveryContextKind::BlockStatements,
+                    Self::parse_statement,
+                ));
+                self.expect(TokenKind::Dedent);
+
+                parent
+                    .elif_else_clauses
+                    .push(self.parse_elif_or_else_clause_with_body(parent.else_clause, body));
+
+                parent.statement.elif_else_clauses = parent.elif_else_clauses;
+                parent.statement.range = self.node_range(parent.statement.range.start());
+                statement = parent.statement;
+            }
+
+            return statement;
         }
+    }
 
-        statement.elif_else_clauses = elif_else_clauses;
-        statement.range = self.node_range(statement.range.start());
-        statement
+    fn body_starts_with_if_statement(&mut self) -> bool {
+        self.at(TokenKind::Newline) && self.peek2() == (TokenKind::Indent, TokenKind::If)
     }
 
     /// Parses an `elif` or `else` clause.
@@ -1473,6 +1521,13 @@ impl<'src> Parser<'src> {
     ///
     /// If the parser isn't positioned at an `elif` or `else` token.
     fn parse_elif_or_else_clause(&mut self, kind: ElifOrElse) -> ast::ElifElseClause {
+        let clause = self.parse_elif_or_else_clause_header(kind);
+        let body = self.parse_body(kind.as_clause());
+
+        self.parse_elif_or_else_clause_with_body(clause, body)
+    }
+
+    fn parse_elif_or_else_clause_header(&mut self, kind: ElifOrElse) -> ast::ElifElseClause {
         let start = self.node_start();
         self.bump(kind.as_token_kind());
 
@@ -1501,14 +1556,22 @@ impl<'src> Parser<'src> {
         //     pass
         self.expect(TokenKind::Colon);
 
-        let body = self.parse_body(kind.as_clause());
-
         ast::ElifElseClause {
             test,
-            body,
-            range: self.node_range(start),
+            body: vec![],
+            range: TextRange::empty(start),
             node_index: AtomicNodeIndex::NONE,
         }
+    }
+
+    fn parse_elif_or_else_clause_with_body(
+        &mut self,
+        mut clause: ast::ElifElseClause,
+        body: Vec<Stmt>,
+    ) -> ast::ElifElseClause {
+        clause.body = body;
+        clause.range = self.node_range(clause.range.start());
+        clause
     }
 
     /// Parses a `try` statement.
@@ -4392,6 +4455,12 @@ struct PendingMatchStatement {
     statement: ast::StmtMatch,
     match_range: TextRange,
     first_case: ast::MatchCase,
+}
+
+struct PendingNestedElseIf {
+    statement: ast::StmtIf,
+    elif_else_clauses: Vec<ast::ElifElseClause>,
+    else_clause: ast::ElifElseClause,
 }
 
 impl PendingBodyStatement {

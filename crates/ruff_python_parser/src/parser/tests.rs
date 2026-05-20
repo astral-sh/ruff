@@ -90,6 +90,25 @@ fn deeply_nested_if_blocks() {
 }
 
 #[test]
+fn deeply_nested_else_if_blocks() {
+    let depth = 3_000;
+    let mut src = String::new();
+    for i in 0..depth {
+        src.push_str(&"\t".repeat(i));
+        src.push_str("if x:\n");
+        src.push_str(&"\t".repeat(i + 1));
+        src.push_str("pass\n");
+        src.push_str(&"\t".repeat(i));
+        src.push_str("else:\n");
+    }
+    src.push_str(&"\t".repeat(depth));
+    src.push_str("pass\n");
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
+}
+
+#[test]
 fn deeply_nested_compound_statement_blocks() {
     const HEADERS: &[&str] = &[
         "if x:\n",
