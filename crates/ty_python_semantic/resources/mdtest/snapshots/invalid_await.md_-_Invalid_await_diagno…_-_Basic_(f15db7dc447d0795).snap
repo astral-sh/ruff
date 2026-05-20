@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -26,9 +26,9 @@ error[invalid-await]: `Literal[1]` is not awaitable
   2 |     await 1  # error: [invalid-await]
     |           ^
     |
-   ::: stdlib/builtins.pyi:348:7
+   ::: stdlib/builtins.pyi:337:7
     |
-348 | class int:
+337 | class int:
     |       --- type defined here
     |
 info: `__await__` is missing

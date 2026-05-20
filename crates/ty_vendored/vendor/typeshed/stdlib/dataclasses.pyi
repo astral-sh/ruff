@@ -17,6 +17,7 @@ __all__ = [
     "Field",
     "FrozenInstanceError",
     "InitVar",
+    "KW_ONLY",
     "MISSING",
     "fields",
     "asdict",
@@ -25,9 +26,6 @@ __all__ = [
     "replace",
     "is_dataclass",
 ]
-
-if sys.version_info >= (3, 10):
-    __all__ += ["KW_ONLY"]
 
 _DataclassT = TypeVar("_DataclassT", bound=DataclassInstance)
 
@@ -60,8 +58,7 @@ class _MISSING_TYPE(enum.Enum):
 
 MISSING: Final = _MISSING_TYPE.MISSING
 
-if sys.version_info >= (3, 10):
-    class KW_ONLY: ...
+class KW_ONLY: ...
 
 @overload
 def asdict(obj: DataclassInstance) -> dict[str, Any]:
@@ -157,7 +154,7 @@ if sys.version_info >= (3, 11):
         weakref_slot: bool = False,
     ) -> Callable[[type[_T]], type[_T]]: ...
 
-elif sys.version_info >= (3, 10):
+else:
     @overload
     def dataclass(
         cls: type[_T],
@@ -204,44 +201,6 @@ elif sys.version_info >= (3, 10):
         slots: bool = False,
     ) -> Callable[[type[_T]], type[_T]]: ...
 
-else:
-    @overload
-    def dataclass(
-        cls: type[_T],
-        /,
-        *,
-        init: bool = True,
-        repr: bool = True,
-        eq: bool = True,
-        order: bool = False,
-        unsafe_hash: bool = False,
-        frozen: bool = False,
-    ) -> type[_T]:
-        """Returns the same class as was passed in, with dunder methods
-        added based on the fields defined in the class.
-
-        Examines PEP 526 __annotations__ to determine fields.
-
-        If init is true, an __init__() method is added to the class. If
-        repr is true, a __repr__() method is added. If order is true, rich
-        comparison dunder methods are added. If unsafe_hash is true, a
-        __hash__() method function is added. If frozen is true, fields may
-        not be assigned to after instance creation.
-        """
-
-    @overload
-    def dataclass(
-        cls: None = None,
-        /,
-        *,
-        init: bool = True,
-        repr: bool = True,
-        eq: bool = True,
-        order: bool = False,
-        unsafe_hash: bool = False,
-        frozen: bool = False,
-    ) -> Callable[[type[_T]], type[_T]]: ...
-
 # See https://github.com/python/mypy/issues/10750
 @type_check_only
 class _DefaultFactory(Protocol[_T_co]):
@@ -263,7 +222,7 @@ class Field(Generic[_T]):
             "doc",
             "_field_type",
         )
-    elif sys.version_info >= (3, 10):
+    else:
         __slots__ = (
             "name",
             "type",
@@ -277,8 +236,6 @@ class Field(Generic[_T]):
             "kw_only",
             "_field_type",
         )
-    else:
-        __slots__ = ("name", "type", "default", "default_factory", "repr", "hash", "init", "compare", "metadata", "_field_type")
     name: str
     type: Type[_T] | str | Any
     default: _T | Literal[_MISSING_TYPE.MISSING]
@@ -292,8 +249,7 @@ class Field(Generic[_T]):
     if sys.version_info >= (3, 14):
         doc: str | None
 
-    if sys.version_info >= (3, 10):
-        kw_only: bool | Literal[_MISSING_TYPE.MISSING]
+    kw_only: bool | Literal[_MISSING_TYPE.MISSING]
 
     if sys.version_info >= (3, 14):
         def __init__(
@@ -308,18 +264,6 @@ class Field(Generic[_T]):
             kw_only: bool,
             doc: str | None,
         ) -> None: ...
-    elif sys.version_info >= (3, 10):
-        def __init__(
-            self,
-            default: _T,
-            default_factory: Callable[[], _T],
-            init: bool,
-            repr: bool,
-            hash: bool | None,
-            compare: bool,
-            metadata: Mapping[Any, Any],
-            kw_only: bool,
-        ) -> None: ...
     else:
         def __init__(
             self,
@@ -330,6 +274,7 @@ class Field(Generic[_T]):
             hash: bool | None,
             compare: bool,
             metadata: Mapping[Any, Any],
+            kw_only: bool,
         ) -> None: ...
 
     def __set_name__(self, owner: Type[Any], name: str) -> None: ...
@@ -398,7 +343,7 @@ if sys.version_info >= (3, 14):
         doc: str | None = None,
     ) -> Any: ...
 
-elif sys.version_info >= (3, 10):
+else:
     @overload  # `default` and `default_factory` are optional and mutually exclusive.
     def field(
         *,
@@ -450,55 +395,6 @@ elif sys.version_info >= (3, 10):
         compare: bool = True,
         metadata: Mapping[Any, Any] | None = None,
         kw_only: bool | Literal[_MISSING_TYPE.MISSING] = ...,
-    ) -> Any: ...
-
-else:
-    @overload  # `default` and `default_factory` are optional and mutually exclusive.
-    def field(
-        *,
-        default: _T,
-        default_factory: Literal[_MISSING_TYPE.MISSING] = ...,
-        init: bool = True,
-        repr: bool = True,
-        hash: bool | None = None,
-        compare: bool = True,
-        metadata: Mapping[Any, Any] | None = None,
-    ) -> _T:
-        """Return an object to identify dataclass fields.
-
-        default is the default value of the field.  default_factory is a
-        0-argument function called to initialize a field's value.  If init
-        is True, the field will be a parameter to the class's __init__()
-        function.  If repr is True, the field will be included in the
-        object's repr().  If hash is True, the field will be included in
-        the object's hash().  If compare is True, the field will be used
-        in comparison functions.  metadata, if specified, must be a
-        mapping which is stored but not otherwise examined by dataclass.
-
-        It is an error to specify both default and default_factory.
-        """
-
-    @overload
-    def field(
-        *,
-        default: Literal[_MISSING_TYPE.MISSING] = ...,
-        default_factory: Callable[[], _T],
-        init: bool = True,
-        repr: bool = True,
-        hash: bool | None = None,
-        compare: bool = True,
-        metadata: Mapping[Any, Any] | None = None,
-    ) -> _T: ...
-    @overload
-    def field(
-        *,
-        default: Literal[_MISSING_TYPE.MISSING] = ...,
-        default_factory: Literal[_MISSING_TYPE.MISSING] = ...,
-        init: bool = True,
-        repr: bool = True,
-        hash: bool | None = None,
-        compare: bool = True,
-        metadata: Mapping[Any, Any] | None = None,
     ) -> Any: ...
 
 def fields(class_or_instance: DataclassInstance | type[DataclassInstance]) -> tuple[Field[Any], ...]:
@@ -663,7 +559,7 @@ elif sys.version_info >= (3, 11):
         dataclass().
         """
 
-elif sys.version_info >= (3, 10):
+else:
     def make_dataclass(
         cls_name: str,
         fields: Iterable[str | tuple[str, Any] | tuple[str, Any, Any]],
@@ -679,43 +575,6 @@ elif sys.version_info >= (3, 10):
         match_args: bool = True,
         kw_only: bool = False,
         slots: bool = False,
-    ) -> type:
-        """Return a new dynamically created dataclass.
-
-        The dataclass name will be 'cls_name'.  'fields' is an iterable
-        of either (name), (name, type) or (name, type, Field) objects. If type is
-        omitted, use the string 'typing.Any'.  Field objects are created by
-        the equivalent of calling 'field(name, type [, Field-info])'.
-
-          C = make_dataclass('C', ['x', ('y', int), ('z', int, field(init=False))], bases=(Base,))
-
-        is equivalent to:
-
-          @dataclass
-          class C(Base):
-              x: 'typing.Any'
-              y: int
-              z: int = field(init=False)
-
-        For the bases and namespace parameters, see the builtin type() function.
-
-        The parameters init, repr, eq, order, unsafe_hash, and frozen are passed to
-        dataclass().
-        """
-
-else:
-    def make_dataclass(
-        cls_name: str,
-        fields: Iterable[str | tuple[str, Any] | tuple[str, Any, Any]],
-        *,
-        bases: tuple[type, ...] = (),
-        namespace: dict[str, Any] | None = None,
-        init: bool = True,
-        repr: bool = True,
-        eq: bool = True,
-        order: bool = False,
-        unsafe_hash: bool = False,
-        frozen: bool = False,
     ) -> type:
         """Return a new dynamically created dataclass.
 

@@ -223,6 +223,7 @@ if sys.platform != "win32":
         if sys.version_info >= (3, 12):
             # Doesn't actually have ABCMeta metaclass at runtime, but mypy complains if we don't have it in the stub.
             # See discussion in #7412
+            @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
             class BaseChildWatcher(AbstractChildWatcher, metaclass=ABCMeta):
                 def close(self) -> None: ...
                 def is_active(self) -> bool: ...

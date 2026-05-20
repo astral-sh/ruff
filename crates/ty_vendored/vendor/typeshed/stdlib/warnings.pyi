@@ -5,8 +5,8 @@ import sys
 from _warnings import warn as warn, warn_explicit as warn_explicit
 from collections.abc import Sequence
 from types import ModuleType, TracebackType
-from typing import Any, Generic, Literal, TextIO, overload
-from typing_extensions import LiteralString, TypeAlias, TypeVar
+from typing import Any, Generic, Literal, TextIO, TypeAlias, overload
+from typing_extensions import LiteralString, TypeVar
 
 __all__ = [
     "warn",
@@ -83,16 +83,32 @@ class WarningMessage:
     file: TextIO | None
     line: str | None
     source: Any | None
-    def __init__(
-        self,
-        message: Warning | str,
-        category: type[Warning],
-        filename: str,
-        lineno: int,
-        file: TextIO | None = None,
-        line: str | None = None,
-        source: Any | None = None,
-    ) -> None: ...
+    if sys.version_info >= (3, 15):
+        module: str | None
+    if sys.version_info >= (3, 15):
+        def __init__(
+            self,
+            message: Warning | str,
+            category: type[Warning],
+            filename: str,
+            lineno: int,
+            file: TextIO | None = None,
+            line: str | None = None,
+            source: Any | None = None,
+            module: str | None = None,
+        ) -> None: ...
+
+    else:
+        def __init__(
+            self,
+            message: Warning | str,
+            category: type[Warning],
+            filename: str,
+            lineno: int,
+            file: TextIO | None = None,
+            line: str | None = None,
+            source: Any | None = None,
+        ) -> None: ...
 
 class catch_warnings(Generic[_W_co]):
     """A context manager that copies and restores the warnings filter upon

@@ -22,8 +22,7 @@ sophisticated high-performance network servers and clients a snap.
 import sys
 from _typeshed import FileDescriptorLike, ReadableBuffer
 from socket import socket
-from typing import Any, overload
-from typing_extensions import TypeAlias
+from typing import Any, TypeAlias, overload
 
 # cyclic dependence with asynchat
 _MapType: TypeAlias = dict[int, Any]

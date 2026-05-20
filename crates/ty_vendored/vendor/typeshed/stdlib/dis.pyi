@@ -4,8 +4,8 @@ import sys
 import types
 from collections.abc import Callable, Iterator
 from opcode import *  # `dis` re-exports it as a part of public API
-from typing import IO, Any, Final, NamedTuple, overload
-from typing_extensions import Self, TypeAlias, deprecated, disjoint_base
+from typing import IO, Any, Final, NamedTuple, TypeAlias, overload
+from typing_extensions import Self, deprecated, disjoint_base
 
 __all__ = [
     "code_info",

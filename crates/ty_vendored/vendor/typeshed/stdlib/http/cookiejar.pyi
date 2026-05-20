@@ -25,7 +25,6 @@ http://wwwsearch.sf.net/):
 
 """
 
-import sys
 from _typeshed import StrPath
 from collections.abc import Iterator, Sequence
 from http.client import HTTPResponse
@@ -175,9 +174,6 @@ class MozillaCookieJar(FileCookieJar):
     header by default (Mozilla can cope with that).
 
     """
-
-    if sys.version_info < (3, 10):
-        header: ClassVar[str]  # undocumented
 
 class LWPCookieJar(FileCookieJar):
     """

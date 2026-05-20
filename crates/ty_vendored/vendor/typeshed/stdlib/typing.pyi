@@ -38,17 +38,15 @@ from types import (
     MethodWrapperType,
     ModuleType,
     TracebackType,
+    UnionType,
     WrapperDescriptorType,
 )
-from typing_extensions import Never as _Never, ParamSpec as _ParamSpec, deprecated
+from typing_extensions import Never as _Never, deprecated
 
 if sys.version_info >= (3, 14):
     from _typeshed import EvaluateFunc
 
     from annotationlib import Format
-
-if sys.version_info >= (3, 10):
-    from types import UnionType
 
 __all__ = [
     "AbstractSet",
@@ -61,11 +59,11 @@ __all__ = [
     "AsyncIterator",
     "Awaitable",
     "BinaryIO",
-    "ByteString",
     "Callable",
     "ChainMap",
     "ClassVar",
     "Collection",
+    "Concatenate",
     "Container",
     "ContextManager",
     "Coroutine",
@@ -97,6 +95,9 @@ __all__ = [
     "NoReturn",
     "Optional",
     "OrderedDict",
+    "ParamSpec",
+    "ParamSpecArgs",
+    "ParamSpecKwargs",
     "Pattern",
     "Protocol",
     "Reversible",
@@ -114,6 +115,8 @@ __all__ = [
     "TextIO",
     "Tuple",
     "Type",
+    "TypeAlias",
+    "TypeGuard",
     "TypeVar",
     "TypedDict",
     "Union",
@@ -124,17 +127,20 @@ __all__ = [
     "get_args",
     "get_origin",
     "get_type_hints",
+    "is_typeddict",
     "no_type_check",
-    "no_type_check_decorator",
     "overload",
     "runtime_checkable",
 ]
 
+if sys.version_info < (3, 15):
+    __all__ += ["ByteString", "no_type_check_decorator"]
+
 if sys.version_info >= (3, 14):
     __all__ += ["evaluate_forward_ref"]
 
-if sys.version_info >= (3, 10):
-    __all__ += ["Concatenate", "ParamSpec", "ParamSpecArgs", "ParamSpecKwargs", "TypeAlias", "TypeGuard", "is_typeddict"]
+if sys.version_info >= (3, 15):
+    __all__ += ["NoExtraItems", "TypeForm", "disjoint_base"]
 
 if sys.version_info >= (3, 11):
     __all__ += [
@@ -309,12 +315,12 @@ class TypeVar:
             covariant: bool = False,
             contravariant: bool = False,
         ) -> None: ...
-    if sys.version_info >= (3, 10):
-        def __or__(self, right: Any, /) -> _SpecialForm:  # AnnotationForm
-            """Return self|value."""
 
-        def __ror__(self, left: Any, /) -> _SpecialForm:  # AnnotationForm
-            """Return value|self."""
+    def __or__(self, right: Any, /) -> _SpecialForm:  # AnnotationForm
+        """Return self|value."""
+
+    def __ror__(self, left: Any, /) -> _SpecialForm:  # AnnotationForm
+        """Return value|self."""
     if sys.version_info >= (3, 11):
         def __typing_subst__(self, arg: Any, /) -> Any: ...
     if sys.version_info >= (3, 13):
@@ -333,9 +339,8 @@ class TypeVar:
 class _SpecialForm(_Final):
     __slots__ = ("_name", "__doc__", "_getitem")
     def __getitem__(self, parameters: Any) -> object: ...
-    if sys.version_info >= (3, 10):
-        def __or__(self, other: Any) -> _SpecialForm: ...
-        def __ror__(self, other: Any) -> _SpecialForm: ...
+    def __or__(self, other: Any) -> _SpecialForm: ...
+    def __ror__(self, other: Any) -> _SpecialForm: ...
 
 Union: _SpecialForm
 """Represent a union type
@@ -751,13 +756,33 @@ if sys.version_info >= (3, 11):
 
         @property
         def __name__(self) -> str: ...
+        if sys.version_info >= (3, 15):
+            @property
+            def __bound__(self) -> Any | None: ...  # AnnotationForm
+            @property
+            def __covariant__(self) -> bool: ...
+            @property
+            def __contravariant__(self) -> bool: ...
+            @property
+            def __infer_variance__(self) -> bool: ...
         if sys.version_info >= (3, 13):
             @property
             def __default__(self) -> Any:  # AnnotationForm
                 """The default value for this TypeVarTuple."""
 
             def has_default(self) -> bool: ...
-        if sys.version_info >= (3, 13):
+        if sys.version_info >= (3, 15):
+            def __new__(
+                cls,
+                name: str,
+                *,
+                bound: Any | None = None,  # AnnotationForm
+                covariant: bool = False,
+                contravariant: bool = False,
+                default: Any = ...,  # AnnotationForm
+                infer_variance: bool = False,
+            ) -> Self: ...
+        elif sys.version_info >= (3, 13):
             def __new__(cls, name: str, *, default: Any = ...) -> Self: ...  # AnnotationForm
         elif sys.version_info >= (3, 12):
             def __new__(cls, name: str) -> Self: ...
@@ -773,326 +798,295 @@ if sys.version_info >= (3, 11):
             @property
             def evaluate_default(self) -> EvaluateFunc | None: ...
 
-if sys.version_info >= (3, 10):
-    @final
-    class ParamSpecArgs:
-        """The args for a ParamSpec object.
+@final
+class ParamSpecArgs:
+    """The args for a ParamSpec object.
 
-        Given a ParamSpec object P, P.args is an instance of ParamSpecArgs.
+    Given a ParamSpec object P, P.args is an instance of ParamSpecArgs.
 
-        ParamSpecArgs objects have a reference back to their ParamSpec::
+    ParamSpecArgs objects have a reference back to their ParamSpec::
 
-            >>> P = ParamSpec("P")
-            >>> P.args.__origin__ is P
-            True
+        >>> P = ParamSpec("P")
+        >>> P.args.__origin__ is P
+        True
 
-        This type is meant for runtime introspection and has no special meaning
-        to static type checkers.
-        """
-
-        @property
-        def __origin__(self) -> ParamSpec: ...
-        if sys.version_info >= (3, 12):
-            def __new__(cls, origin: ParamSpec) -> Self: ...
-        else:
-            def __init__(self, origin: ParamSpec) -> None: ...
-
-        def __eq__(self, other: object, /) -> bool: ...
-        __hash__: ClassVar[None]  # type: ignore[assignment]
-
-    @final
-    class ParamSpecKwargs:
-        """The kwargs for a ParamSpec object.
-
-        Given a ParamSpec object P, P.kwargs is an instance of ParamSpecKwargs.
-
-        ParamSpecKwargs objects have a reference back to their ParamSpec::
-
-            >>> P = ParamSpec("P")
-            >>> P.kwargs.__origin__ is P
-            True
-
-        This type is meant for runtime introspection and has no special meaning
-        to static type checkers.
-        """
-
-        @property
-        def __origin__(self) -> ParamSpec: ...
-        if sys.version_info >= (3, 12):
-            def __new__(cls, origin: ParamSpec) -> Self: ...
-        else:
-            def __init__(self, origin: ParamSpec) -> None: ...
-
-        def __eq__(self, other: object, /) -> bool: ...
-        __hash__: ClassVar[None]  # type: ignore[assignment]
-
-    @final
-    class ParamSpec:
-        """Parameter specification variable.
-
-        The preferred way to construct a parameter specification is via the
-        dedicated syntax for generic functions, classes, and type aliases,
-        where the use of '**' creates a parameter specification::
-
-            type IntFunc[**P] = Callable[P, int]
-
-        The following syntax creates a parameter specification that defaults
-        to a callable accepting two positional-only arguments of types int
-        and str:
-
-            type IntFuncDefault[**P = [int, str]] = Callable[P, int]
-
-        For compatibility with Python 3.11 and earlier, ParamSpec objects
-        can also be created as follows::
-
-            P = ParamSpec('P')
-            DefaultP = ParamSpec('DefaultP', default=[int, str])
-
-        Parameter specification variables exist primarily for the benefit of
-        static type checkers.  They are used to forward the parameter types of
-        one callable to another callable, a pattern commonly found in
-        higher-order functions and decorators.  They are only valid when used
-        in ``Concatenate``, or as the first argument to ``Callable``, or as
-        parameters for user-defined Generics. See class Generic for more
-        information on generic types.
-
-        An example for annotating a decorator::
-
-            def add_logging[**P, T](f: Callable[P, T]) -> Callable[P, T]:
-                '''A type-safe decorator to add logging to a function.'''
-                def inner(*args: P.args, **kwargs: P.kwargs) -> T:
-                    logging.info(f'{f.__name__} was called')
-                    return f(*args, **kwargs)
-                return inner
-
-            @add_logging
-            def add_two(x: float, y: float) -> float:
-                '''Add two numbers together.'''
-                return x + y
-
-        Parameter specification variables can be introspected. e.g.::
-
-            >>> P = ParamSpec("P")
-            >>> P.__name__
-            'P'
-
-        Note that only parameter specification variables defined in the global
-        scope can be pickled.
-        """
-
-        @property
-        def __name__(self) -> str: ...
-        @property
-        def __bound__(self) -> Any | None: ...  # AnnotationForm
-        @property
-        def __covariant__(self) -> bool: ...
-        @property
-        def __contravariant__(self) -> bool: ...
-        if sys.version_info >= (3, 12):
-            @property
-            def __infer_variance__(self) -> bool: ...
-        if sys.version_info >= (3, 13):
-            @property
-            def __default__(self) -> Any:  # AnnotationForm
-                """The default value for this ParamSpec."""
-        if sys.version_info >= (3, 13):
-            def __new__(
-                cls,
-                name: str,
-                *,
-                bound: Any | None = None,  # AnnotationForm
-                contravariant: bool = False,
-                covariant: bool = False,
-                infer_variance: bool = False,
-                default: Any = ...,  # AnnotationForm
-            ) -> Self: ...
-        elif sys.version_info >= (3, 12):
-            def __new__(
-                cls,
-                name: str,
-                *,
-                bound: Any | None = None,  # AnnotationForm
-                contravariant: bool = False,
-                covariant: bool = False,
-                infer_variance: bool = False,
-            ) -> Self: ...
-        elif sys.version_info >= (3, 11):
-            def __new__(
-                cls,
-                name: str,
-                *,
-                bound: Any | None = None,  # AnnotationForm
-                contravariant: bool = False,
-                covariant: bool = False,
-            ) -> Self: ...
-        else:
-            def __init__(
-                self,
-                name: str,
-                *,
-                bound: Any | None = None,  # AnnotationForm
-                contravariant: bool = False,
-                covariant: bool = False,
-            ) -> None: ...
-
-        @property
-        def args(self) -> ParamSpecArgs:
-            """Represents positional arguments."""
-
-        @property
-        def kwargs(self) -> ParamSpecKwargs:
-            """Represents keyword arguments."""
-        if sys.version_info >= (3, 11):
-            def __typing_subst__(self, arg: Any, /) -> Any: ...
-            def __typing_prepare_subst__(self, alias: Any, args: Any, /) -> tuple[Any, ...]: ...
-
-        def __or__(self, right: Any, /) -> _SpecialForm:
-            """Return self|value."""
-
-        def __ror__(self, left: Any, /) -> _SpecialForm:
-            """Return value|self."""
-        if sys.version_info >= (3, 13):
-            def has_default(self) -> bool: ...
-        if sys.version_info >= (3, 14):
-            @property
-            def evaluate_default(self) -> EvaluateFunc | None: ...
-
-    Concatenate: _SpecialForm
-    """Special form for annotating higher-order functions.
-
-    ``Concatenate`` can be used in conjunction with ``ParamSpec`` and
-    ``Callable`` to represent a higher-order function which adds, removes or
-    transforms the parameters of a callable.
-
-    For example::
-
-        Callable[Concatenate[int, P], int]
-
-    See PEP 612 for detailed information.
+    This type is meant for runtime introspection and has no special meaning
+    to static type checkers.
     """
 
-    TypeAlias: _SpecialForm
-    """Special form for marking type aliases.
+    @property
+    def __origin__(self) -> ParamSpec: ...
+    if sys.version_info >= (3, 12):
+        def __new__(cls, origin: ParamSpec) -> Self: ...
+    else:
+        def __init__(self, origin: ParamSpec) -> None: ...
 
-    Use TypeAlias to indicate that an assignment should
-    be recognized as a proper type alias definition by type
-    checkers.
+    def __eq__(self, other: object, /) -> bool: ...
+    __hash__: ClassVar[None]  # type: ignore[assignment]
 
-    For example::
+@final
+class ParamSpecKwargs:
+    """The kwargs for a ParamSpec object.
 
-        Predicate: TypeAlias = Callable[..., bool]
+    Given a ParamSpec object P, P.kwargs is an instance of ParamSpecKwargs.
 
-    It's invalid when used anywhere except as in the example above.
+    ParamSpecKwargs objects have a reference back to their ParamSpec::
+
+        >>> P = ParamSpec("P")
+        >>> P.kwargs.__origin__ is P
+        True
+
+    This type is meant for runtime introspection and has no special meaning
+    to static type checkers.
     """
 
-    TypeGuard: _SpecialForm
-    """Special typing construct for marking user-defined type predicate functions.
+    @property
+    def __origin__(self) -> ParamSpec: ...
+    if sys.version_info >= (3, 12):
+        def __new__(cls, origin: ParamSpec) -> Self: ...
+    else:
+        def __init__(self, origin: ParamSpec) -> None: ...
 
-    ``TypeGuard`` can be used to annotate the return type of a user-defined
-    type predicate function.  ``TypeGuard`` only accepts a single type argument.
-    At runtime, functions marked this way should return a boolean.
+    def __eq__(self, other: object, /) -> bool: ...
+    __hash__: ClassVar[None]  # type: ignore[assignment]
 
-    ``TypeGuard`` aims to benefit *type narrowing* -- a technique used by static
-    type checkers to determine a more precise type of an expression within a
-    program's code flow.  Usually type narrowing is done by analyzing
-    conditional code flow and applying the narrowing to a block of code.  The
-    conditional expression here is sometimes referred to as a "type predicate".
+@final
+class ParamSpec:
+    """Parameter specification variable.
 
-    Sometimes it would be convenient to use a user-defined boolean function
-    as a type predicate.  Such a function should use ``TypeGuard[...]`` or
-    ``TypeIs[...]`` as its return type to alert static type checkers to
-    this intention. ``TypeGuard`` should be used over ``TypeIs`` when narrowing
-    from an incompatible type (e.g., ``list[object]`` to ``list[int]``) or when
-    the function does not return ``True`` for all instances of the narrowed type.
+    The preferred way to construct a parameter specification is via the
+    dedicated syntax for generic functions, classes, and type aliases,
+    where the use of '**' creates a parameter specification::
 
-    Using  ``-> TypeGuard[NarrowedType]`` tells the static type checker that
-    for a given function:
+        type IntFunc[**P] = Callable[P, int]
 
-    1. The return value is a boolean.
-    2. If the return value is ``True``, the type of its argument
-       is ``NarrowedType``.
+    The following syntax creates a parameter specification that defaults
+    to a callable accepting two positional-only arguments of types int
+    and str:
 
-    For example::
+        type IntFuncDefault[**P = [int, str]] = Callable[P, int]
 
-         def is_str_list(val: list[object]) -> TypeGuard[list[str]]:
-             '''Determines whether all objects in the list are strings'''
-             return all(isinstance(x, str) for x in val)
+    For compatibility with Python 3.11 and earlier, ParamSpec objects
+    can also be created as follows::
 
-         def func1(val: list[object]):
-             if is_str_list(val):
-                 # Type of ``val`` is narrowed to ``list[str]``.
-                 print(" ".join(val))
-             else:
-                 # Type of ``val`` remains as ``list[object]``.
-                 print("Not a list of strings!")
+        P = ParamSpec('P')
+        DefaultP = ParamSpec('DefaultP', default=[int, str])
 
-    Strict type narrowing is not enforced -- ``TypeB`` need not be a narrower
-    form of ``TypeA`` (it can even be a wider form) and this may lead to
-    type-unsafe results.  The main reason is to allow for things like
-    narrowing ``list[object]`` to ``list[str]`` even though the latter is not
-    a subtype of the former, since ``list`` is invariant.  The responsibility of
-    writing type-safe type predicates is left to the user.
+    Parameter specification variables exist primarily for the benefit of
+    static type checkers.  They are used to forward the parameter types of
+    one callable to another callable, a pattern commonly found in
+    higher-order functions and decorators.  They are only valid when used
+    in ``Concatenate``, or as the first argument to ``Callable``, or as
+    parameters for user-defined Generics. See class Generic for more
+    information on generic types.
 
-    ``TypeGuard`` also works with type variables.  For more information, see
-    PEP 647 (User-Defined Type Guards).
+    An example for annotating a decorator::
+
+        def add_logging[**P, T](f: Callable[P, T]) -> Callable[P, T]:
+            '''A type-safe decorator to add logging to a function.'''
+            def inner(*args: P.args, **kwargs: P.kwargs) -> T:
+                logging.info(f'{f.__name__} was called')
+                return f(*args, **kwargs)
+            return inner
+
+        @add_logging
+        def add_two(x: float, y: float) -> float:
+            '''Add two numbers together.'''
+            return x + y
+
+    Parameter specification variables can be introspected. e.g.::
+
+        >>> P = ParamSpec("P")
+        >>> P.__name__
+        'P'
+
+    Note that only parameter specification variables defined in the global
+    scope can be pickled.
     """
 
-    class NewType:
-        """NewType creates simple unique types with almost zero runtime overhead.
+    @property
+    def __name__(self) -> str: ...
+    @property
+    def __bound__(self) -> Any | None: ...  # AnnotationForm
+    @property
+    def __covariant__(self) -> bool: ...
+    @property
+    def __contravariant__(self) -> bool: ...
+    if sys.version_info >= (3, 12):
+        @property
+        def __infer_variance__(self) -> bool: ...
+    if sys.version_info >= (3, 13):
+        @property
+        def __default__(self) -> Any:  # AnnotationForm
+            """The default value for this ParamSpec."""
+    if sys.version_info >= (3, 13):
+        def __new__(
+            cls,
+            name: str,
+            *,
+            bound: Any | None = None,  # AnnotationForm
+            contravariant: bool = False,
+            covariant: bool = False,
+            infer_variance: bool = False,
+            default: Any = ...,  # AnnotationForm
+        ) -> Self: ...
+    elif sys.version_info >= (3, 12):
+        def __new__(
+            cls,
+            name: str,
+            *,
+            bound: Any | None = None,  # AnnotationForm
+            contravariant: bool = False,
+            covariant: bool = False,
+            infer_variance: bool = False,
+        ) -> Self: ...
+    elif sys.version_info >= (3, 11):
+        def __new__(
+            cls, name: str, *, bound: Any | None = None, contravariant: bool = False, covariant: bool = False  # AnnotationForm
+        ) -> Self: ...
+    else:
+        def __init__(
+            self, name: str, *, bound: Any | None = None, contravariant: bool = False, covariant: bool = False  # AnnotationForm
+        ) -> None: ...
 
-        NewType(name, tp) is considered a subtype of tp
-        by static type checkers. At runtime, NewType(name, tp) returns
-        a dummy callable that simply returns its argument.
+    @property
+    def args(self) -> ParamSpecArgs:
+        """Represents positional arguments."""
 
-        Usage::
+    @property
+    def kwargs(self) -> ParamSpecKwargs:
+        """Represents keyword arguments."""
+    if sys.version_info >= (3, 11):
+        def __typing_subst__(self, arg: Any, /) -> Any: ...
+        def __typing_prepare_subst__(self, alias: Any, args: Any, /) -> tuple[Any, ...]: ...
 
-            UserId = NewType('UserId', int)
+    def __or__(self, right: Any, /) -> _SpecialForm:
+        """Return self|value."""
 
-            def name_by_id(user_id: UserId) -> str:
-                ...
+    def __ror__(self, left: Any, /) -> _SpecialForm:
+        """Return value|self."""
+    if sys.version_info >= (3, 13):
+        def has_default(self) -> bool: ...
+    if sys.version_info >= (3, 14):
+        @property
+        def evaluate_default(self) -> EvaluateFunc | None: ...
 
-            UserId('user')          # Fails type check
+Concatenate: _SpecialForm
+"""Special form for annotating higher-order functions.
 
-            name_by_id(42)          # Fails type check
-            name_by_id(UserId(42))  # OK
+``Concatenate`` can be used in conjunction with ``ParamSpec`` and
+``Callable`` to represent a higher-order function which adds, removes or
+transforms the parameters of a callable.
 
-            num = UserId(5) + 1     # type: int
-        """
+For example::
 
-        def __init__(self, name: str, tp: Any) -> None: ...  # AnnotationForm
-        if sys.version_info >= (3, 11):
-            @staticmethod
-            def __call__(x: _T, /) -> _T: ...
-        else:
-            def __call__(self, x: _T) -> _T: ...
+    Callable[Concatenate[int, P], int]
 
-        def __or__(self, other: Any) -> _SpecialForm: ...
-        def __ror__(self, other: Any) -> _SpecialForm: ...
-        __supertype__: type | NewType
-        __name__: str
+See PEP 612 for detailed information.
+"""
 
-else:
-    def NewType(name: str, tp: Any) -> Any:
-        """NewType creates simple unique types with almost zero
-        runtime overhead. NewType(name, tp) is considered a subtype of tp
-        by static type checkers. At runtime, NewType(name, tp) returns
-        a dummy function that simply returns its argument. Usage::
+TypeAlias: _SpecialForm
+"""Special form for marking type aliases.
 
-            UserId = NewType('UserId', int)
+Use TypeAlias to indicate that an assignment should
+be recognized as a proper type alias definition by type
+checkers.
 
-            def name_by_id(user_id: UserId) -> str:
-                ...
+For example::
 
-            UserId('user')          # Fails type check
+    Predicate: TypeAlias = Callable[..., bool]
 
-            name_by_id(42)          # Fails type check
-            name_by_id(UserId(42))  # OK
+It's invalid when used anywhere except as in the example above.
+"""
 
-            num = UserId(5) + 1     # type: int
-        """
+TypeGuard: _SpecialForm
+"""Special typing construct for marking user-defined type predicate functions.
+
+``TypeGuard`` can be used to annotate the return type of a user-defined
+type predicate function.  ``TypeGuard`` only accepts a single type argument.
+At runtime, functions marked this way should return a boolean.
+
+``TypeGuard`` aims to benefit *type narrowing* -- a technique used by static
+type checkers to determine a more precise type of an expression within a
+program's code flow.  Usually type narrowing is done by analyzing
+conditional code flow and applying the narrowing to a block of code.  The
+conditional expression here is sometimes referred to as a "type predicate".
+
+Sometimes it would be convenient to use a user-defined boolean function
+as a type predicate.  Such a function should use ``TypeGuard[...]`` or
+``TypeIs[...]`` as its return type to alert static type checkers to
+this intention. ``TypeGuard`` should be used over ``TypeIs`` when narrowing
+from an incompatible type (e.g., ``list[object]`` to ``list[int]``) or when
+the function does not return ``True`` for all instances of the narrowed type.
+
+Using  ``-> TypeGuard[NarrowedType]`` tells the static type checker that
+for a given function:
+
+1. The return value is a boolean.
+2. If the return value is ``True``, the type of its argument
+   is ``NarrowedType``.
+
+For example::
+
+     def is_str_list(val: list[object]) -> TypeGuard[list[str]]:
+         '''Determines whether all objects in the list are strings'''
+         return all(isinstance(x, str) for x in val)
+
+     def func1(val: list[object]):
+         if is_str_list(val):
+             # Type of ``val`` is narrowed to ``list[str]``.
+             print(" ".join(val))
+         else:
+             # Type of ``val`` remains as ``list[object]``.
+             print("Not a list of strings!")
+
+Strict type narrowing is not enforced -- ``TypeB`` need not be a narrower
+form of ``TypeA`` (it can even be a wider form) and this may lead to
+type-unsafe results.  The main reason is to allow for things like
+narrowing ``list[object]`` to ``list[str]`` even though the latter is not
+a subtype of the former, since ``list`` is invariant.  The responsibility of
+writing type-safe type predicates is left to the user.
+
+``TypeGuard`` also works with type variables.  For more information, see
+PEP 647 (User-Defined Type Guards).
+"""
+
+class NewType:
+    """NewType creates simple unique types with almost zero runtime overhead.
+
+    NewType(name, tp) is considered a subtype of tp
+    by static type checkers. At runtime, NewType(name, tp) returns
+    a dummy callable that simply returns its argument.
+
+    Usage::
+
+        UserId = NewType('UserId', int)
+
+        def name_by_id(user_id: UserId) -> str:
+            ...
+
+        UserId('user')          # Fails type check
+
+        name_by_id(42)          # Fails type check
+        name_by_id(UserId(42))  # OK
+
+        num = UserId(5) + 1     # type: int
+    """
+
+    def __init__(self, name: str, tp: Any) -> None: ...  # AnnotationForm
+    if sys.version_info >= (3, 11):
+        @staticmethod
+        def __call__(x: _T, /) -> _T: ...
+    else:
+        def __call__(self, x: _T) -> _T: ...
+
+    def __or__(self, other: Any) -> _SpecialForm: ...
+    def __ror__(self, other: Any) -> _SpecialForm: ...
+    __supertype__: type | NewType
+    __name__: str
 
 _F = TypeVar("_F", bound=Callable[..., Any])
-_P = _ParamSpec("_P")
+_P = ParamSpec("_P")
 _T = TypeVar("_T")
 
 _FT = TypeVar("_FT", bound=Callable[..., Any] | type)
@@ -1148,7 +1142,7 @@ def no_type_check(arg: _F) -> _F:
     This mutates the function(s) or class(es) in place.
     """
 
-if sys.version_info >= (3, 13):
+if sys.version_info < (3, 15):
     @deprecated("Deprecated since Python 3.13; removed in Python 3.15.")
     def no_type_check_decorator(decorator: Callable[_P, _T]) -> Callable[_P, _T]:
         """Decorator to give another decorator the @no_type_check effect.
@@ -1157,13 +1151,8 @@ if sys.version_info >= (3, 13):
         function in @no_type_check.
         """
 
-else:
-    def no_type_check_decorator(decorator: Callable[_P, _T]) -> Callable[_P, _T]:
-        """Decorator to give another decorator the @no_type_check effect.
-
-        This wraps the decorator with something that wraps the decorated
-        function in @no_type_check.
-        """
+if sys.version_info >= (3, 15):
+    def disjoint_base(cls: _TC) -> _TC: ...
 
 # This itself is only available during type checking
 def type_check_only(func_or_cls: _FT) -> _FT: ...
@@ -1250,6 +1239,14 @@ underlying type::
   only one type should be passed to Annotated.
 """
 
+if sys.version_info >= (3, 15):
+    @type_check_only
+    class _NoExtraItemsType: ...
+
+    NoExtraItems: _NoExtraItemsType
+
+    TypeForm: _SpecialForm
+
 # Predefined type variables.
 AnyStr = TypeVar("AnyStr", str, bytes)  # noqa: Y001
 
@@ -1258,12 +1255,8 @@ class _Generic:
     if sys.version_info < (3, 12):
         __slots__ = ()
 
-    if sys.version_info >= (3, 10):
-        @classmethod
-        def __class_getitem__(cls, args: TypeVar | ParamSpec | tuple[TypeVar | ParamSpec, ...]) -> _Final: ...
-    else:
-        @classmethod
-        def __class_getitem__(cls, args: TypeVar | tuple[TypeVar, ...]) -> _Final: ...
+    @classmethod
+    def __class_getitem__(cls, args: TypeVar | ParamSpec | tuple[TypeVar | ParamSpec, ...]) -> _Final: ...
 
 Generic: type[_Generic]
 """Abstract base class for generic types.
@@ -2100,32 +2093,8 @@ def get_args(tp: Any) -> tuple[Any, ...]:  # AnnotationForm
         >>> assert get_args(Callable[[], T][int]) == ([], int)
     """
 
-if sys.version_info >= (3, 10):
-    @overload
-    def get_origin(tp: ParamSpecArgs | ParamSpecKwargs) -> ParamSpec:
-        """Get the unsubscripted version of a type.
-
-        This supports generic types, Callable, Tuple, Union, Literal, Final, ClassVar,
-        Annotated, and others. Return None for unsupported types.
-
-        Examples::
-
-            >>> P = ParamSpec('P')
-            >>> assert get_origin(Literal[42]) is Literal
-            >>> assert get_origin(int) is None
-            >>> assert get_origin(ClassVar[int]) is ClassVar
-            >>> assert get_origin(Generic) is Generic
-            >>> assert get_origin(Generic[T]) is Generic
-            >>> assert get_origin(Union[T, int]) is Union
-            >>> assert get_origin(List[Tuple[T, T]][int]) is list
-            >>> assert get_origin(P.args) is P
-        """
-
-    @overload
-    def get_origin(tp: UnionType) -> type[UnionType]: ...
-
 @overload
-def get_origin(tp: GenericAlias) -> type:
+def get_origin(tp: ParamSpecArgs | ParamSpecKwargs) -> ParamSpec:
     """Get the unsubscripted version of a type.
 
     This supports generic types, Callable, Tuple, Union, Literal, Final, ClassVar,
@@ -2144,6 +2113,10 @@ def get_origin(tp: GenericAlias) -> type:
         >>> assert get_origin(P.args) is P
     """
 
+@overload
+def get_origin(tp: UnionType) -> type[UnionType]: ...
+@overload
+def get_origin(tp: GenericAlias) -> type: ...
 @overload
 def get_origin(tp: Any) -> Any | None: ...  # AnnotationForm
 @overload
@@ -2470,22 +2443,21 @@ else:
             def __or__(self, other: Any) -> _SpecialForm: ...
             def __ror__(self, other: Any) -> _SpecialForm: ...
 
-if sys.version_info >= (3, 10):
-    def is_typeddict(tp: object) -> bool:
-        """Check if an annotation is a TypedDict class.
+def is_typeddict(tp: object) -> bool:
+    """Check if an annotation is a TypedDict class.
 
-        For example::
+    For example::
 
-            >>> from typing import TypedDict
-            >>> class Film(TypedDict):
-            ...     title: str
-            ...     year: int
-            ...
-            >>> is_typeddict(Film)
-            True
-            >>> is_typeddict(dict)
-            False
-        """
+        >>> from typing import TypedDict
+        >>> class Film(TypedDict):
+        ...     title: str
+        ...     year: int
+        ...
+        >>> is_typeddict(Film)
+        True
+        >>> is_typeddict(dict)
+        False
+    """
 
 def _type_repr(obj: object) -> str:
     """Return the repr() of an object, special-casing types (internal helper).
@@ -2567,6 +2539,9 @@ if sys.version_info >= (3, 12):
         def __parameters__(self) -> tuple[Any, ...]: ...  # AnnotationForm
         @property
         def __name__(self) -> str: ...
+        if sys.version_info >= (3, 15):
+            @property
+            def __qualname__(self) -> str: ...
         # It's writable on types, but not on instances of TypeAliasType.
         @property
         def __module__(self) -> str | None: ...  # type: ignore[override]
@@ -2579,6 +2554,9 @@ if sys.version_info >= (3, 12):
         def __ror__(self, left: Any, /) -> _SpecialForm:
             """Return value|self."""
         if sys.version_info >= (3, 14):
+            def __iter__(self) -> Any:  # Unpack[Self]
+                """Implement iter(self)."""
+
             @property
             def evaluate_value(self) -> EvaluateFunc: ...
 

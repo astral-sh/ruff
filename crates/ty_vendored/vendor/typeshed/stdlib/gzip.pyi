@@ -8,8 +8,8 @@ import sys
 import zlib
 from _typeshed import ReadableBuffer, SizedBuffer, StrOrBytesPath, WriteableBuffer
 from io import FileIO, TextIOWrapper
-from typing import Final, Literal, Protocol, overload, type_check_only
-from typing_extensions import TypeAlias, deprecated
+from typing import Final, Literal, Protocol, TypeAlias, overload, type_check_only
+from typing_extensions import deprecated
 
 if sys.version_info >= (3, 14):
     from compression._common._streams import BaseStream, DecompressReader
@@ -256,7 +256,10 @@ class GzipFile(BaseStream):
 class _GzipReader(DecompressReader):
     def __init__(self, fp: _ReadableFileobj) -> None: ...
 
-if sys.version_info >= (3, 14):
+if sys.version_info >= (3, 15):
+    def compress(data: SizedBuffer, compresslevel: int = 6, *, mtime: float = 0) -> bytes: ...
+
+elif sys.version_info >= (3, 14):
     def compress(data: SizedBuffer, compresslevel: int = 9, *, mtime: float = 0) -> bytes:
         """Compress data in one shot and return the compressed string.
 

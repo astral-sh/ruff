@@ -21,8 +21,8 @@ from _typeshed import (
 )
 from collections.abc import Callable, Container, Iterable, MutableMapping, MutableSequence, Sequence
 from operator import attrgetter as attrgetter, itemgetter as itemgetter, methodcaller as methodcaller
-from typing import Any, AnyStr, Protocol, SupportsAbs, SupportsIndex, TypeVar, overload, type_check_only
-from typing_extensions import ParamSpec, TypeAlias, TypeIs
+from typing import Any, AnyStr, ParamSpec, Protocol, SupportsAbs, SupportsIndex, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import TypeIs
 
 _R = TypeVar("_R")
 _T = TypeVar("_T")

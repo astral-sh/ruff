@@ -88,15 +88,13 @@ the value to a string, when the values are set dictionary-style.
 Finis.
 """
 
-from _typeshed import MaybeNone
-from collections.abc import Iterable, Mapping
+from _typeshed import MaybeNone, SupportsItems, SupportsKeysAndGetItem
+from collections.abc import Container, Iterable
 from types import GenericAlias
 from typing import Any, Generic, TypeVar, overload
-from typing_extensions import TypeAlias
 
 __all__ = ["CookieError", "BaseCookie", "SimpleCookie"]
 
-_DataType: TypeAlias = str | Mapping[str, str | Morsel[Any]]
 _T = TypeVar("_T")
 
 @overload
@@ -136,15 +134,12 @@ class Morsel(dict[str, Any], Generic[_T]):
     def set(self, key: str, val: str, coded_val: _T) -> None: ...
     def setdefault(self, key: str, val: str | None = None) -> str: ...
     # The dict update can also get a keywords argument so this is incompatible
-    @overload  # type: ignore[override]
-    def update(self, values: Mapping[str, str]) -> None: ...
-    @overload
-    def update(self, values: Iterable[tuple[str, str]]) -> None: ...
+    def update(self, values: Iterable[tuple[str, str]] | SupportsKeysAndGetItem[str, str]) -> None: ...  # type: ignore[override]
     def isReservedKey(self, K: str) -> bool: ...
-    def output(self, attrs: list[str] | None = None, header: str = "Set-Cookie:") -> str: ...
+    def output(self, attrs: Container[str] | None = None, header: str = "Set-Cookie:") -> str: ...
     __str__ = output
-    def js_output(self, attrs: list[str] | None = None) -> str: ...
-    def OutputString(self, attrs: list[str] | None = None) -> str: ...
+    def js_output(self, attrs: Container[str] | None = None) -> str: ...
+    def OutputString(self, attrs: Container[str] | None = None) -> str: ...
     def __eq__(self, morsel: object) -> bool: ...
     def __setitem__(self, K: str, V: Any) -> None: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
@@ -156,7 +151,7 @@ class Morsel(dict[str, Any], Generic[_T]):
 class BaseCookie(dict[str, Morsel[_T]], Generic[_T]):
     """A container class for a set of Morsels."""
 
-    def __init__(self, input: _DataType | None = None) -> None: ...
+    def __init__(self, input: str | SupportsItems[str, str | Morsel[Any]] | None = None) -> None: ...
     def value_decode(self, val: str) -> tuple[_T, str]:
         """real_value, coded_value = value_decode(STRING)
         Called prior to setting a cookie's value from the network
@@ -172,13 +167,13 @@ class BaseCookie(dict[str, Morsel[_T]], Generic[_T]):
         Override this function to modify the behavior of cookies.
         """
 
-    def output(self, attrs: list[str] | None = None, header: str = "Set-Cookie:", sep: str = "\r\n") -> str:
+    def output(self, attrs: Container[str] | None = None, header: str = "Set-Cookie:", sep: str = "\r\n") -> str:
         """Return a string suitable for HTTP."""
     __str__ = output
-    def js_output(self, attrs: list[str] | None = None) -> str:
+    def js_output(self, attrs: Container[str] | None = None) -> str:
         """Return a string suitable for JavaScript."""
 
-    def load(self, rawdata: _DataType) -> None:
+    def load(self, rawdata: str | SupportsItems[str, str | Morsel[Any]]) -> None:
         """Load cookies from a string (presumably HTTP_COOKIE) or
         from a dictionary.  Loading cookies from a dictionary 'd'
         is equivalent to calling:

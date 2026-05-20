@@ -10,8 +10,7 @@ from _asyncio import (
     _unregister_task as _unregister_task,
 )
 from collections.abc import AsyncIterator, Awaitable, Coroutine, Generator, Iterable, Iterator
-from typing import Any, Final, Literal, Protocol, TypeVar, overload, type_check_only
-from typing_extensions import TypeAlias
+from typing import Any, Final, Literal, Protocol, TypeAlias, TypeVar, overload, type_check_only
 
 from . import _CoroutineLike
 from .events import AbstractEventLoop
@@ -90,9 +89,9 @@ ALL_COMPLETED: Final = concurrent.futures.ALL_COMPLETED
 
 if sys.version_info >= (3, 13):
     @type_check_only
-    class _SyncAndAsyncIterator(Iterator[_T_co], AsyncIterator[_T_co], Protocol[_T_co]): ...
+    class _SyncAndAsyncIterator(Iterator[Coroutine[Any, Any, _T]], AsyncIterator[Future[_T]], Protocol[_T]): ...
 
-    def as_completed(fs: Iterable[_FutureLike[_T]], *, timeout: float | None = None) -> _SyncAndAsyncIterator[Future[_T]]:
+    def as_completed(fs: Iterable[_FutureLike[_T]], *, timeout: float | None = None) -> _SyncAndAsyncIterator[_T]:
         """Create an iterator of awaitables or their results in completion order.
 
         Run the supplied awaitables concurrently. The returned object can be
@@ -139,30 +138,8 @@ if sys.version_info >= (3, 13):
         by the coroutines yielded during plain iteration.
         """
 
-elif sys.version_info >= (3, 10):
-    def as_completed(fs: Iterable[_FutureLike[_T]], *, timeout: float | None = None) -> Iterator[Future[_T]]:
-        """Return an iterator whose values are coroutines.
-
-        When waiting for the yielded coroutines you'll get the results (or
-        exceptions!) of the original Futures (or coroutines), in the order
-        in which and as soon as they complete.
-
-        This differs from PEP 3148; the proper way to use this is:
-
-            for f in as_completed(fs):
-                result = await f  # The 'await' may raise.
-                # Use result.
-
-        If a timeout is specified, the 'await' will raise
-        TimeoutError when the timeout occurs before all Futures are done.
-
-        Note: The futures 'f' are not necessarily members of fs.
-        """
-
 else:
-    def as_completed(
-        fs: Iterable[_FutureLike[_T]], *, loop: AbstractEventLoop | None = None, timeout: float | None = None
-    ) -> Iterator[Future[_T]]:
+    def as_completed(fs: Iterable[_FutureLike[_T]], *, timeout: float | None = None) -> Iterator[Future[_T]]:
         """Return an iterator whose values are coroutines.
 
         When waiting for the yielded coroutines you'll get the results (or
@@ -197,303 +174,145 @@ def ensure_future(coro_or_future: Awaitable[_T], *, loop: AbstractEventLoop | No
 # typing PR #1550 for discussion.
 #
 # N.B. Having overlapping overloads is the only way to get acceptable type inference in all edge cases.
-if sys.version_info >= (3, 10):
-    @overload
-    def gather(coro_or_future1: _FutureLike[_T1], /, *, return_exceptions: Literal[False] = False) -> Future[tuple[_T1]]:  # type: ignore[overload-overlap]
-        """Return a future aggregating results from the given coroutines/futures.
+@overload
+def gather(coro_or_future1: _FutureLike[_T1], /, *, return_exceptions: Literal[False] = False) -> Future[tuple[_T1]]:  # type: ignore[overload-overlap]
+    """Return a future aggregating results from the given coroutines/futures.
 
-        Coroutines will be wrapped in a future and scheduled in the event
-        loop. They will not necessarily be scheduled in the same order as
-        passed in.
+    Coroutines will be wrapped in a future and scheduled in the event
+    loop. They will not necessarily be scheduled in the same order as
+    passed in.
 
-        All futures must share the same event loop.  If all the tasks are
-        done successfully, the returned future's result is the list of
-        results (in the order of the original sequence, not necessarily
-        the order of results arrival).  If *return_exceptions* is True,
-        exceptions in the tasks are treated the same as successful
-        results, and gathered in the result list; otherwise, the first
-        raised exception will be immediately propagated to the returned
-        future.
+    All futures must share the same event loop.  If all the tasks are
+    done successfully, the returned future's result is the list of
+    results (in the order of the original sequence, not necessarily
+    the order of results arrival).  If *return_exceptions* is True,
+    exceptions in the tasks are treated the same as successful
+    results, and gathered in the result list; otherwise, the first
+    raised exception will be immediately propagated to the returned
+    future.
 
-        Cancellation: if the outer Future is cancelled, all children (that
-        have not completed yet) are also cancelled.  If any child is
-        cancelled, this is treated as if it raised CancelledError --
-        the outer Future is *not* cancelled in this case.  (This is to
-        prevent the cancellation of one child to cause other children to
-        be cancelled.)
+    Cancellation: if the outer Future is cancelled, all children (that
+    have not completed yet) are also cancelled.  If any child is
+    cancelled, this is treated as if it raised CancelledError --
+    the outer Future is *not* cancelled in this case.  (This is to
+    prevent the cancellation of one child to cause other children to
+    be cancelled.)
 
-        If *return_exceptions* is False, cancelling gather() after it
-        has been marked done won't cancel any submitted awaitables.
-        For instance, gather can be marked done after propagating an
-        exception to the caller, therefore, calling ``gather.cancel()``
-        after catching an exception (raised by one of the awaitables) from
-        gather won't cancel any other awaitables.
-        """
+    If *return_exceptions* is False, cancelling gather() after it
+    has been marked done won't cancel any submitted awaitables.
+    For instance, gather can be marked done after propagating an
+    exception to the caller, therefore, calling ``gather.cancel()``
+    after catching an exception (raised by one of the awaitables) from
+    gather won't cancel any other awaitables.
+    """
 
-    @overload
-    def gather(  # type: ignore[overload-overlap]
-        coro_or_future1: _FutureLike[_T1], coro_or_future2: _FutureLike[_T2], /, *, return_exceptions: Literal[False] = False
-    ) -> Future[tuple[_T1, _T2]]: ...
-    @overload
-    def gather(  # type: ignore[overload-overlap]
-        coro_or_future1: _FutureLike[_T1],
-        coro_or_future2: _FutureLike[_T2],
-        coro_or_future3: _FutureLike[_T3],
-        /,
-        *,
-        return_exceptions: Literal[False] = False,
-    ) -> Future[tuple[_T1, _T2, _T3]]: ...
-    @overload
-    def gather(  # type: ignore[overload-overlap]
-        coro_or_future1: _FutureLike[_T1],
-        coro_or_future2: _FutureLike[_T2],
-        coro_or_future3: _FutureLike[_T3],
-        coro_or_future4: _FutureLike[_T4],
-        /,
-        *,
-        return_exceptions: Literal[False] = False,
-    ) -> Future[tuple[_T1, _T2, _T3, _T4]]: ...
-    @overload
-    def gather(  # type: ignore[overload-overlap]
-        coro_or_future1: _FutureLike[_T1],
-        coro_or_future2: _FutureLike[_T2],
-        coro_or_future3: _FutureLike[_T3],
-        coro_or_future4: _FutureLike[_T4],
-        coro_or_future5: _FutureLike[_T5],
-        /,
-        *,
-        return_exceptions: Literal[False] = False,
-    ) -> Future[tuple[_T1, _T2, _T3, _T4, _T5]]: ...
-    @overload
-    def gather(  # type: ignore[overload-overlap]
-        coro_or_future1: _FutureLike[_T1],
-        coro_or_future2: _FutureLike[_T2],
-        coro_or_future3: _FutureLike[_T3],
-        coro_or_future4: _FutureLike[_T4],
-        coro_or_future5: _FutureLike[_T5],
-        coro_or_future6: _FutureLike[_T6],
-        /,
-        *,
-        return_exceptions: Literal[False] = False,
-    ) -> Future[tuple[_T1, _T2, _T3, _T4, _T5, _T6]]: ...
-    @overload
-    def gather(*coros_or_futures: _FutureLike[_T], return_exceptions: Literal[False] = False) -> Future[list[_T]]: ...  # type: ignore[overload-overlap]
-    @overload
-    def gather(coro_or_future1: _FutureLike[_T1], /, *, return_exceptions: bool) -> Future[tuple[_T1 | BaseException]]: ...
-    @overload
-    def gather(
-        coro_or_future1: _FutureLike[_T1], coro_or_future2: _FutureLike[_T2], /, *, return_exceptions: bool
-    ) -> Future[tuple[_T1 | BaseException, _T2 | BaseException]]: ...
-    @overload
-    def gather(
-        coro_or_future1: _FutureLike[_T1],
-        coro_or_future2: _FutureLike[_T2],
-        coro_or_future3: _FutureLike[_T3],
-        /,
-        *,
-        return_exceptions: bool,
-    ) -> Future[tuple[_T1 | BaseException, _T2 | BaseException, _T3 | BaseException]]: ...
-    @overload
-    def gather(
-        coro_or_future1: _FutureLike[_T1],
-        coro_or_future2: _FutureLike[_T2],
-        coro_or_future3: _FutureLike[_T3],
-        coro_or_future4: _FutureLike[_T4],
-        /,
-        *,
-        return_exceptions: bool,
-    ) -> Future[tuple[_T1 | BaseException, _T2 | BaseException, _T3 | BaseException, _T4 | BaseException]]: ...
-    @overload
-    def gather(
-        coro_or_future1: _FutureLike[_T1],
-        coro_or_future2: _FutureLike[_T2],
-        coro_or_future3: _FutureLike[_T3],
-        coro_or_future4: _FutureLike[_T4],
-        coro_or_future5: _FutureLike[_T5],
-        /,
-        *,
-        return_exceptions: bool,
-    ) -> Future[
-        tuple[_T1 | BaseException, _T2 | BaseException, _T3 | BaseException, _T4 | BaseException, _T5 | BaseException]
-    ]: ...
-    @overload
-    def gather(
-        coro_or_future1: _FutureLike[_T1],
-        coro_or_future2: _FutureLike[_T2],
-        coro_or_future3: _FutureLike[_T3],
-        coro_or_future4: _FutureLike[_T4],
-        coro_or_future5: _FutureLike[_T5],
-        coro_or_future6: _FutureLike[_T6],
-        /,
-        *,
-        return_exceptions: bool,
-    ) -> Future[
-        tuple[
-            _T1 | BaseException,
-            _T2 | BaseException,
-            _T3 | BaseException,
-            _T4 | BaseException,
-            _T5 | BaseException,
-            _T6 | BaseException,
-        ]
-    ]: ...
-    @overload
-    def gather(*coros_or_futures: _FutureLike[_T], return_exceptions: bool) -> Future[list[_T | BaseException]]: ...
-
-else:
-    @overload
-    def gather(  # type: ignore[overload-overlap]
-        coro_or_future1: _FutureLike[_T1], /, *, loop: AbstractEventLoop | None = None, return_exceptions: Literal[False] = False
-    ) -> Future[tuple[_T1]]:
-        """Return a future aggregating results from the given coroutines/futures.
-
-        Coroutines will be wrapped in a future and scheduled in the event
-        loop. They will not necessarily be scheduled in the same order as
-        passed in.
-
-        All futures must share the same event loop.  If all the tasks are
-        done successfully, the returned future's result is the list of
-        results (in the order of the original sequence, not necessarily
-        the order of results arrival).  If *return_exceptions* is True,
-        exceptions in the tasks are treated the same as successful
-        results, and gathered in the result list; otherwise, the first
-        raised exception will be immediately propagated to the returned
-        future.
-
-        Cancellation: if the outer Future is cancelled, all children (that
-        have not completed yet) are also cancelled.  If any child is
-        cancelled, this is treated as if it raised CancelledError --
-        the outer Future is *not* cancelled in this case.  (This is to
-        prevent the cancellation of one child to cause other children to
-        be cancelled.)
-
-        If *return_exceptions* is False, cancelling gather() after it
-        has been marked done won't cancel any submitted awaitables.
-        For instance, gather can be marked done after propagating an
-        exception to the caller, therefore, calling ``gather.cancel()``
-        after catching an exception (raised by one of the awaitables) from
-        gather won't cancel any other awaitables.
-        """
-
-    @overload
-    def gather(  # type: ignore[overload-overlap]
-        coro_or_future1: _FutureLike[_T1],
-        coro_or_future2: _FutureLike[_T2],
-        /,
-        *,
-        loop: AbstractEventLoop | None = None,
-        return_exceptions: Literal[False] = False,
-    ) -> Future[tuple[_T1, _T2]]: ...
-    @overload
-    def gather(  # type: ignore[overload-overlap]
-        coro_or_future1: _FutureLike[_T1],
-        coro_or_future2: _FutureLike[_T2],
-        coro_or_future3: _FutureLike[_T3],
-        /,
-        *,
-        loop: AbstractEventLoop | None = None,
-        return_exceptions: Literal[False] = False,
-    ) -> Future[tuple[_T1, _T2, _T3]]: ...
-    @overload
-    def gather(  # type: ignore[overload-overlap]
-        coro_or_future1: _FutureLike[_T1],
-        coro_or_future2: _FutureLike[_T2],
-        coro_or_future3: _FutureLike[_T3],
-        coro_or_future4: _FutureLike[_T4],
-        /,
-        *,
-        loop: AbstractEventLoop | None = None,
-        return_exceptions: Literal[False] = False,
-    ) -> Future[tuple[_T1, _T2, _T3, _T4]]: ...
-    @overload
-    def gather(  # type: ignore[overload-overlap]
-        coro_or_future1: _FutureLike[_T1],
-        coro_or_future2: _FutureLike[_T2],
-        coro_or_future3: _FutureLike[_T3],
-        coro_or_future4: _FutureLike[_T4],
-        coro_or_future5: _FutureLike[_T5],
-        /,
-        *,
-        loop: AbstractEventLoop | None = None,
-        return_exceptions: Literal[False] = False,
-    ) -> Future[tuple[_T1, _T2, _T3, _T4, _T5]]: ...
-    @overload
-    def gather(  # type: ignore[overload-overlap]
-        coro_or_future1: _FutureLike[_T1],
-        coro_or_future2: _FutureLike[_T2],
-        coro_or_future3: _FutureLike[_T3],
-        coro_or_future4: _FutureLike[_T4],
-        coro_or_future5: _FutureLike[_T5],
-        coro_or_future6: _FutureLike[_T6],
-        /,
-        *,
-        loop: AbstractEventLoop | None = None,
-        return_exceptions: Literal[False] = False,
-    ) -> Future[tuple[_T1, _T2, _T3, _T4, _T5, _T6]]: ...
-    @overload
-    def gather(  # type: ignore[overload-overlap]
-        *coros_or_futures: _FutureLike[_T], loop: AbstractEventLoop | None = None, return_exceptions: Literal[False] = False
-    ) -> Future[list[_T]]: ...
-    @overload
-    def gather(  # type: ignore[overload-overlap]
-        coro_or_future1: _FutureLike[_T1], /, *, loop: AbstractEventLoop | None = None, return_exceptions: bool
-    ) -> Future[tuple[_T1 | BaseException]]: ...
-    @overload
-    def gather(  # type: ignore[overload-overlap]
-        coro_or_future1: _FutureLike[_T1],
-        coro_or_future2: _FutureLike[_T2],
-        /,
-        *,
-        loop: AbstractEventLoop | None = None,
-        return_exceptions: bool,
-    ) -> Future[tuple[_T1 | BaseException, _T2 | BaseException]]: ...
-    @overload
-    def gather(  # type: ignore[overload-overlap]
-        coro_or_future1: _FutureLike[_T1],
-        coro_or_future2: _FutureLike[_T2],
-        coro_or_future3: _FutureLike[_T3],
-        /,
-        *,
-        loop: AbstractEventLoop | None = None,
-        return_exceptions: bool,
-    ) -> Future[tuple[_T1 | BaseException, _T2 | BaseException, _T3 | BaseException]]: ...
-    @overload
-    def gather(  # type: ignore[overload-overlap]
-        coro_or_future1: _FutureLike[_T1],
-        coro_or_future2: _FutureLike[_T2],
-        coro_or_future3: _FutureLike[_T3],
-        coro_or_future4: _FutureLike[_T4],
-        /,
-        *,
-        loop: AbstractEventLoop | None = None,
-        return_exceptions: bool,
-    ) -> Future[tuple[_T1 | BaseException, _T2 | BaseException, _T3 | BaseException, _T4 | BaseException]]: ...
-    @overload
-    def gather(  # type: ignore[overload-overlap]
-        coro_or_future1: _FutureLike[_T1],
-        coro_or_future2: _FutureLike[_T2],
-        coro_or_future3: _FutureLike[_T3],
-        coro_or_future4: _FutureLike[_T4],
-        coro_or_future5: _FutureLike[_T5],
-        coro_or_future6: _FutureLike[_T6],
-        /,
-        *,
-        loop: AbstractEventLoop | None = None,
-        return_exceptions: bool,
-    ) -> Future[
-        tuple[
-            _T1 | BaseException,
-            _T2 | BaseException,
-            _T3 | BaseException,
-            _T4 | BaseException,
-            _T5 | BaseException,
-            _T6 | BaseException,
-        ]
-    ]: ...
-    @overload
-    def gather(
-        *coros_or_futures: _FutureLike[_T], loop: AbstractEventLoop | None = None, return_exceptions: bool
-    ) -> Future[list[_T | BaseException]]: ...
+@overload
+def gather(  # type: ignore[overload-overlap]
+    coro_or_future1: _FutureLike[_T1], coro_or_future2: _FutureLike[_T2], /, *, return_exceptions: Literal[False] = False
+) -> Future[tuple[_T1, _T2]]: ...
+@overload
+def gather(  # type: ignore[overload-overlap]
+    coro_or_future1: _FutureLike[_T1],
+    coro_or_future2: _FutureLike[_T2],
+    coro_or_future3: _FutureLike[_T3],
+    /,
+    *,
+    return_exceptions: Literal[False] = False,
+) -> Future[tuple[_T1, _T2, _T3]]: ...
+@overload
+def gather(  # type: ignore[overload-overlap]
+    coro_or_future1: _FutureLike[_T1],
+    coro_or_future2: _FutureLike[_T2],
+    coro_or_future3: _FutureLike[_T3],
+    coro_or_future4: _FutureLike[_T4],
+    /,
+    *,
+    return_exceptions: Literal[False] = False,
+) -> Future[tuple[_T1, _T2, _T3, _T4]]: ...
+@overload
+def gather(  # type: ignore[overload-overlap]
+    coro_or_future1: _FutureLike[_T1],
+    coro_or_future2: _FutureLike[_T2],
+    coro_or_future3: _FutureLike[_T3],
+    coro_or_future4: _FutureLike[_T4],
+    coro_or_future5: _FutureLike[_T5],
+    /,
+    *,
+    return_exceptions: Literal[False] = False,
+) -> Future[tuple[_T1, _T2, _T3, _T4, _T5]]: ...
+@overload
+def gather(  # type: ignore[overload-overlap]
+    coro_or_future1: _FutureLike[_T1],
+    coro_or_future2: _FutureLike[_T2],
+    coro_or_future3: _FutureLike[_T3],
+    coro_or_future4: _FutureLike[_T4],
+    coro_or_future5: _FutureLike[_T5],
+    coro_or_future6: _FutureLike[_T6],
+    /,
+    *,
+    return_exceptions: Literal[False] = False,
+) -> Future[tuple[_T1, _T2, _T3, _T4, _T5, _T6]]: ...
+@overload
+def gather(*coros_or_futures: _FutureLike[_T], return_exceptions: Literal[False] = False) -> Future[list[_T]]: ...  # type: ignore[overload-overlap]
+@overload
+def gather(coro_or_future1: _FutureLike[_T1], /, *, return_exceptions: bool) -> Future[tuple[_T1 | BaseException]]: ...
+@overload
+def gather(
+    coro_or_future1: _FutureLike[_T1], coro_or_future2: _FutureLike[_T2], /, *, return_exceptions: bool
+) -> Future[tuple[_T1 | BaseException, _T2 | BaseException]]: ...
+@overload
+def gather(
+    coro_or_future1: _FutureLike[_T1],
+    coro_or_future2: _FutureLike[_T2],
+    coro_or_future3: _FutureLike[_T3],
+    /,
+    *,
+    return_exceptions: bool,
+) -> Future[tuple[_T1 | BaseException, _T2 | BaseException, _T3 | BaseException]]: ...
+@overload
+def gather(
+    coro_or_future1: _FutureLike[_T1],
+    coro_or_future2: _FutureLike[_T2],
+    coro_or_future3: _FutureLike[_T3],
+    coro_or_future4: _FutureLike[_T4],
+    /,
+    *,
+    return_exceptions: bool,
+) -> Future[tuple[_T1 | BaseException, _T2 | BaseException, _T3 | BaseException, _T4 | BaseException]]: ...
+@overload
+def gather(
+    coro_or_future1: _FutureLike[_T1],
+    coro_or_future2: _FutureLike[_T2],
+    coro_or_future3: _FutureLike[_T3],
+    coro_or_future4: _FutureLike[_T4],
+    coro_or_future5: _FutureLike[_T5],
+    /,
+    *,
+    return_exceptions: bool,
+) -> Future[tuple[_T1 | BaseException, _T2 | BaseException, _T3 | BaseException, _T4 | BaseException, _T5 | BaseException]]: ...
+@overload
+def gather(
+    coro_or_future1: _FutureLike[_T1],
+    coro_or_future2: _FutureLike[_T2],
+    coro_or_future3: _FutureLike[_T3],
+    coro_or_future4: _FutureLike[_T4],
+    coro_or_future5: _FutureLike[_T5],
+    coro_or_future6: _FutureLike[_T6],
+    /,
+    *,
+    return_exceptions: bool,
+) -> Future[
+    tuple[
+        _T1 | BaseException,
+        _T2 | BaseException,
+        _T3 | BaseException,
+        _T4 | BaseException,
+        _T5 | BaseException,
+        _T6 | BaseException,
+    ]
+]: ...
+@overload
+def gather(*coros_or_futures: _FutureLike[_T], return_exceptions: bool) -> Future[list[_T | BaseException]]: ...
 
 # unlike some asyncio apis, This does strict runtime checking of actually being a coroutine, not of any future-like.
 def run_coroutine_threadsafe(coro: Coroutine[Any, Any, _T], loop: AbstractEventLoop) -> concurrent.futures.Future[_T]:
@@ -502,111 +321,62 @@ def run_coroutine_threadsafe(coro: Coroutine[Any, Any, _T], loop: AbstractEventL
     Return a concurrent.futures.Future to access the result.
     """
 
-if sys.version_info >= (3, 10):
-    def shield(arg: _FutureLike[_T]) -> Future[_T]:
-        """Wait for a future, shielding it from cancellation.
+def shield(arg: _FutureLike[_T]) -> Future[_T]:
+    """Wait for a future, shielding it from cancellation.
 
-        The statement
+    The statement
 
-            task = asyncio.create_task(something())
+        task = asyncio.create_task(something())
+        res = await shield(task)
+
+    is exactly equivalent to the statement
+
+        res = await something()
+
+    *except* that if the coroutine containing it is cancelled, the
+    task running in something() is not cancelled.  From the POV of
+    something(), the cancellation did not happen.  But its caller is
+    still cancelled, so the yield-from expression still raises
+    CancelledError.  Note: If something() is cancelled by other means
+    this will still cancel shield().
+
+    If you want to completely ignore cancellation (not recommended)
+    you can combine shield() with a try/except clause, as follows:
+
+        task = asyncio.create_task(something())
+        try:
             res = await shield(task)
+        except CancelledError:
+            res = None
 
-        is exactly equivalent to the statement
+    Save a reference to tasks passed to this function, to avoid
+    a task disappearing mid-execution. The event loop only keeps
+    weak references to tasks. A task that isn't referenced elsewhere
+    may get garbage collected at any time, even before it's done.
+    """
 
-            res = await something()
+@overload
+async def sleep(delay: float) -> None:
+    """Coroutine that completes after a given time (in seconds)."""
 
-        *except* that if the coroutine containing it is cancelled, the
-        task running in something() is not cancelled.  From the POV of
-        something(), the cancellation did not happen.  But its caller is
-        still cancelled, so the yield-from expression still raises
-        CancelledError.  Note: If something() is cancelled by other means
-        this will still cancel shield().
+@overload
+async def sleep(delay: float, result: _T) -> _T: ...
+async def wait_for(fut: _FutureLike[_T], timeout: float | None) -> _T:
+    """Wait for the single Future or coroutine to complete, with timeout.
 
-        If you want to completely ignore cancellation (not recommended)
-        you can combine shield() with a try/except clause, as follows:
+    Coroutine will be wrapped in Task.
 
-            task = asyncio.create_task(something())
-            try:
-                res = await shield(task)
-            except CancelledError:
-                res = None
+    Returns result of the Future or coroutine.  When a timeout occurs,
+    it cancels the task and raises TimeoutError.  To avoid the task
+    cancellation, wrap it in shield().
 
-        Save a reference to tasks passed to this function, to avoid
-        a task disappearing mid-execution. The event loop only keeps
-        weak references to tasks. A task that isn't referenced elsewhere
-        may get garbage collected at any time, even before it's done.
-        """
+    If the wait is cancelled, the task is also cancelled.
 
-    @overload
-    async def sleep(delay: float) -> None:
-        """Coroutine that completes after a given time (in seconds)."""
+    If the task suppresses the cancellation and returns a value instead,
+    that value is returned.
 
-    @overload
-    async def sleep(delay: float, result: _T) -> _T: ...
-    async def wait_for(fut: _FutureLike[_T], timeout: float | None) -> _T:
-        """Wait for the single Future or coroutine to complete, with timeout.
-
-        Coroutine will be wrapped in Task.
-
-        Returns result of the Future or coroutine.  When a timeout occurs,
-        it cancels the task and raises TimeoutError.  To avoid the task
-        cancellation, wrap it in shield().
-
-        If the wait is cancelled, the task is also cancelled.
-
-        If the task suppresses the cancellation and returns a value instead,
-        that value is returned.
-
-        This function is a coroutine.
-        """
-
-else:
-    def shield(arg: _FutureLike[_T], *, loop: AbstractEventLoop | None = None) -> Future[_T]:
-        """Wait for a future, shielding it from cancellation.
-
-        The statement
-
-            res = await shield(something())
-
-        is exactly equivalent to the statement
-
-            res = await something()
-
-        *except* that if the coroutine containing it is cancelled, the
-        task running in something() is not cancelled.  From the POV of
-        something(), the cancellation did not happen.  But its caller is
-        still cancelled, so the yield-from expression still raises
-        CancelledError.  Note: If something() is cancelled by other means
-        this will still cancel shield().
-
-        If you want to completely ignore cancellation (not recommended)
-        you can combine shield() with a try/except clause, as follows:
-
-            try:
-                res = await shield(something())
-            except CancelledError:
-                res = None
-        """
-
-    @overload
-    async def sleep(delay: float, *, loop: AbstractEventLoop | None = None) -> None:
-        """Coroutine that completes after a given time (in seconds)."""
-
-    @overload
-    async def sleep(delay: float, result: _T, *, loop: AbstractEventLoop | None = None) -> _T: ...
-    async def wait_for(fut: _FutureLike[_T], timeout: float | None, *, loop: AbstractEventLoop | None = None) -> _T:
-        """Wait for the single Future or coroutine to complete, with timeout.
-
-        Coroutine will be wrapped in Task.
-
-        Returns result of the Future or coroutine.  When a timeout occurs,
-        it cancels the task and raises TimeoutError.  To avoid the task
-        cancellation, wrap it in shield().
-
-        If the wait is cancelled, the task is also cancelled.
-
-        This function is a coroutine.
-        """
+    This function is a coroutine.
+    """
 
 if sys.version_info >= (3, 11):
     async def wait(
@@ -626,7 +396,7 @@ if sys.version_info >= (3, 11):
         when the timeout occurs are returned in the second set.
         """
 
-elif sys.version_info >= (3, 10):
+else:
     @overload
     async def wait(  # type: ignore[overload-overlap]
         fs: Iterable[_FT], *, timeout: float | None = None, return_when: str = "ALL_COMPLETED"
@@ -650,40 +420,6 @@ elif sys.version_info >= (3, 10):
     @overload
     async def wait(
         fs: Iterable[Awaitable[_T]], *, timeout: float | None = None, return_when: str = "ALL_COMPLETED"
-    ) -> tuple[set[Task[_T]], set[Task[_T]]]: ...
-
-else:
-    @overload
-    async def wait(  # type: ignore[overload-overlap]
-        fs: Iterable[_FT],
-        *,
-        loop: AbstractEventLoop | None = None,
-        timeout: float | None = None,
-        return_when: str = "ALL_COMPLETED",
-    ) -> tuple[set[_FT], set[_FT]]:
-        """Wait for the Futures and coroutines given by fs to complete.
-
-        The fs iterable must not be empty.
-
-        Coroutines will be wrapped in Tasks.
-
-        Returns two sets of Future: (done, pending).
-
-        Usage:
-
-            done, pending = await asyncio.wait(fs)
-
-        Note: This does not raise TimeoutError! Futures that aren't done
-        when the timeout occurs are returned in the second set.
-        """
-
-    @overload
-    async def wait(
-        fs: Iterable[Awaitable[_T]],
-        *,
-        loop: AbstractEventLoop | None = None,
-        timeout: float | None = None,
-        return_when: str = "ALL_COMPLETED",
     ) -> tuple[set[Task[_T]], set[Task[_T]]]: ...
 
 if sys.version_info >= (3, 12):

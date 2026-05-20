@@ -3,8 +3,7 @@ from collections.abc import Mapping
 from compression._common import _streams
 from compression.zstd import ZstdDict
 from io import TextIOWrapper, _WrappedBuffer
-from typing import Literal, Protocol, overload, type_check_only
-from typing_extensions import TypeAlias
+from typing import Literal, Protocol, TypeAlias, overload, type_check_only
 
 from _zstd import ZstdCompressor, _ZstdCompressorFlushBlock, _ZstdCompressorFlushFrame
 

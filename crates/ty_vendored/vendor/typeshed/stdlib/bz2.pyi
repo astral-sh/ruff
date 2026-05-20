@@ -9,8 +9,8 @@ from _bz2 import BZ2Compressor as BZ2Compressor, BZ2Decompressor as BZ2Decompres
 from _typeshed import ReadableBuffer, StrOrBytesPath, WriteableBuffer
 from collections.abc import Iterable
 from io import TextIOWrapper
-from typing import IO, Literal, Protocol, SupportsIndex, overload, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing import IO, Literal, Protocol, SupportsIndex, TypeAlias, overload, type_check_only
+from typing_extensions import Self
 
 if sys.version_info >= (3, 14):
     from compression._common._streams import BaseStream, _Reader

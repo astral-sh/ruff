@@ -8,8 +8,8 @@ from abc import abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from ctypes import CDLL, ArgumentError as ArgumentError, c_void_p
 from types import GenericAlias
-from typing import Any, ClassVar, Final, Generic, Literal, SupportsIndex, TypeVar, final, overload, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing import Any, ClassVar, Final, Generic, Literal, SupportsIndex, TypeAlias, TypeVar, final, overload, type_check_only
+from typing_extensions import Self
 
 _T = TypeVar("_T")
 _CT = TypeVar("_CT", bound=_CData)
@@ -314,17 +314,10 @@ else:
     class _CField(Generic[_CT, _GetT, _SetT]):
         offset: int
         size: int
-        if sys.version_info >= (3, 10):
-            @overload
-            def __get__(self, instance: None, owner: type[Any] | None = None, /) -> Self: ...
-            @overload
-            def __get__(self, instance: Any, owner: type[Any] | None = None, /) -> _GetT: ...
-        else:
-            @overload
-            def __get__(self, instance: None, owner: type[Any] | None, /) -> Self: ...
-            @overload
-            def __get__(self, instance: Any, owner: type[Any] | None, /) -> _GetT: ...
-
+        @overload
+        def __get__(self, instance: None, owner: type[Any] | None = None, /) -> Self: ...
+        @overload
+        def __get__(self, instance: Any, owner: type[Any] | None = None, /) -> _GetT: ...
         def __set__(self, instance: Any, value: _SetT, /) -> None: ...
 
 # This class is not exposed. It calls itself _ctypes.UnionType.

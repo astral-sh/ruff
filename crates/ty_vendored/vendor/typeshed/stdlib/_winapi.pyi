@@ -127,22 +127,21 @@ if sys.platform == "win32":
     WAIT_OBJECT_0: Final = 0
     WAIT_TIMEOUT: Final = 258
 
-    if sys.version_info >= (3, 10):
-        LOCALE_NAME_INVARIANT: Final[str]
-        LOCALE_NAME_MAX_LENGTH: Final[int]
-        LOCALE_NAME_SYSTEM_DEFAULT: Final[str]
-        LOCALE_NAME_USER_DEFAULT: Final[str | None]
+    LOCALE_NAME_INVARIANT: Final[str]
+    LOCALE_NAME_MAX_LENGTH: Final[int]
+    LOCALE_NAME_SYSTEM_DEFAULT: Final[str]
+    LOCALE_NAME_USER_DEFAULT: Final[str | None]
 
-        LCMAP_FULLWIDTH: Final[int]
-        LCMAP_HALFWIDTH: Final[int]
-        LCMAP_HIRAGANA: Final[int]
-        LCMAP_KATAKANA: Final[int]
-        LCMAP_LINGUISTIC_CASING: Final[int]
-        LCMAP_LOWERCASE: Final[int]
-        LCMAP_SIMPLIFIED_CHINESE: Final[int]
-        LCMAP_TITLECASE: Final[int]
-        LCMAP_TRADITIONAL_CHINESE: Final[int]
-        LCMAP_UPPERCASE: Final[int]
+    LCMAP_FULLWIDTH: Final[int]
+    LCMAP_HALFWIDTH: Final[int]
+    LCMAP_HIRAGANA: Final[int]
+    LCMAP_KATAKANA: Final[int]
+    LCMAP_LINGUISTIC_CASING: Final[int]
+    LCMAP_LOWERCASE: Final[int]
+    LCMAP_SIMPLIFIED_CHINESE: Final[int]
+    LCMAP_TITLECASE: Final[int]
+    LCMAP_TRADITIONAL_CHINESE: Final[int]
+    LCMAP_UPPERCASE: Final[int]
 
     if sys.version_info >= (3, 12):
         COPYFILE2_CALLBACK_CHUNK_STARTED: Final = 1
@@ -299,10 +298,8 @@ if sys.platform == "win32":
     ) -> int: ...
     def OpenProcess(desired_access: int, inherit_handle: bool, process_id: int, /) -> int: ...
     def PeekNamedPipe(handle: int, size: int = 0, /) -> tuple[int, int] | tuple[bytes, int, int]: ...
-    if sys.version_info >= (3, 10):
-        def LCMapStringEx(locale: str, flags: int, src: str) -> str: ...
-        def UnmapViewOfFile(address: int, /) -> None: ...
-
+    def LCMapStringEx(locale: str, flags: int, src: str) -> str: ...
+    def UnmapViewOfFile(address: int, /) -> None: ...
     @overload
     def ReadFile(handle: int, size: int, overlapped: Literal[True]) -> tuple[Overlapped, int]: ...
     @overload

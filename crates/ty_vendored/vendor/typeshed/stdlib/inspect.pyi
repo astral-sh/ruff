@@ -1,7 +1,7 @@
 """Get useful information from live Python objects.
 
 This module encapsulates the interface provided by the internal special
-attributes (co_*, im_*, tb_*, etc.) in a friendlier fashion.
+attributes (co_*, tb_*, etc.) in a friendlier fashion.
 It also provides some help for examining source code and class layout.
 
 Here are some of the useful functions provided by this module:
@@ -53,8 +53,21 @@ from types import (
     TracebackType,
     WrapperDescriptorType,
 )
-from typing import Any, ClassVar, Final, Literal, NamedTuple, Protocol, TypeVar, overload, type_check_only
-from typing_extensions import ParamSpec, Self, TypeAlias, TypeGuard, TypeIs, deprecated, disjoint_base
+from typing import (
+    Any,
+    ClassVar,
+    Final,
+    Literal,
+    NamedTuple,
+    ParamSpec,
+    Protocol,
+    TypeAlias,
+    TypeGuard,
+    TypeVar,
+    overload,
+    type_check_only,
+)
+from typing_extensions import Self, TypeIs, deprecated, disjoint_base
 
 if sys.version_info >= (3, 14):
     from annotationlib import Format
@@ -527,13 +540,18 @@ def getblock(lines: list[str]) -> list[str]:
 def getblock(lines: tuple[str, ...]) -> tuple[str, ...]: ...
 @overload
 def getblock(lines: Sequence[str]) -> Sequence[str]: ...
-def getdoc(object: object) -> str | None:
-    """Get the documentation string for an object.
 
-    All tabs are expanded to spaces.  To clean up docstrings that are
-    indented to line up with blocks of code, any whitespace than can be
-    uniformly removed from the second line onwards is removed.
-    """
+if sys.version_info >= (3, 15):
+    def getdoc(object: object, *, inherit_class_doc: bool = True, fallback_to_class_doc: bool = True) -> str | None: ...
+
+else:
+    def getdoc(object: object) -> str | None:
+        """Get the documentation string for an object.
+
+        All tabs are expanded to spaces.  To clean up docstrings that are
+        indented to line up with blocks of code, any whitespace than can be
+        uniformly removed from the second line onwards is removed.
+        """
 
 def getcomments(object: object) -> str | None:
     """Get lines of comments immediately preceding an object's source code.
@@ -597,7 +615,7 @@ if sys.version_info >= (3, 14):
     ) -> Signature:
         """Get a signature object for the passed callable."""
 
-elif sys.version_info >= (3, 10):
+else:
     def signature(
         obj: _IntrospectableCallable,
         *,
@@ -606,10 +624,6 @@ elif sys.version_info >= (3, 10):
         locals: Mapping[str, Any] | None = None,
         eval_str: bool = False,
     ) -> Signature:
-        """Get a signature object for the passed callable."""
-
-else:
-    def signature(obj: _IntrospectableCallable, *, follow_wrapped: bool = True) -> Signature:
         """Get a signature object for the passed callable."""
 
 class _void:
@@ -684,7 +698,7 @@ class Signature:
             annotation_format: Format = Format.VALUE,  # noqa: Y011
         ) -> Self:
             """Constructs Signature for the given callable object."""
-    elif sys.version_info >= (3, 10):
+    else:
         @classmethod
         def from_callable(
             cls,
@@ -695,10 +709,6 @@ class Signature:
             locals: Mapping[str, Any] | None = None,
             eval_str: bool = False,
         ) -> Self:
-            """Constructs Signature for the given callable object."""
-    else:
-        @classmethod
-        def from_callable(cls, obj: _IntrospectableCallable, *, follow_wrapped: bool = True) -> Self:
             """Constructs Signature for the given callable object."""
     if sys.version_info >= (3, 14):
         def format(self, *, max_width: int | None = None, quote_annotation_strings: bool = True) -> str:
@@ -729,7 +739,7 @@ class Signature:
 
 if sys.version_info >= (3, 14):
     from annotationlib import get_annotations as get_annotations
-elif sys.version_info >= (3, 10):
+else:
     def get_annotations(
         obj: Callable[..., object] | type[object] | ModuleType,  # any callable, class, or module
         *,
@@ -995,22 +1005,26 @@ class FullArgSpec(NamedTuple):
     kwonlydefaults: dict[str, Any] | None
     annotations: dict[str, Any]
 
-def getfullargspec(func: object) -> FullArgSpec:
-    """Get the names and default values of a callable object's parameters.
+if sys.version_info >= (3, 15):
+    def getfullargspec(func: object, *, annotation_format: Format = Format.VALUE) -> FullArgSpec: ...  # noqa: Y011
 
-    A tuple of seven things is returned:
-    (args, varargs, varkw, defaults, kwonlyargs, kwonlydefaults, annotations).
-    'args' is a list of the parameter names.
-    'varargs' and 'varkw' are the names of the * and ** parameters or None.
-    'defaults' is an n-tuple of the default values of the last n parameters.
-    'kwonlyargs' is a list of keyword-only parameter names.
-    'kwonlydefaults' is a dictionary mapping names from kwonlyargs to defaults.
-    'annotations' is a dictionary mapping parameter names to annotations.
+else:
+    def getfullargspec(func: object) -> FullArgSpec:
+        """Get the names and default values of a callable object's parameters.
 
-    Notable differences from inspect.signature():
-      - the "self" parameter is always reported, even for bound methods
-      - wrapper chains defined by __wrapped__ *not* unwrapped automatically
-    """
+        A tuple of seven things is returned:
+        (args, varargs, varkw, defaults, kwonlyargs, kwonlydefaults, annotations).
+        'args' is a list of the parameter names.
+        'varargs' and 'varkw' are the names of the * and ** parameters or None.
+        'defaults' is an n-tuple of the default values of the last n parameters.
+        'kwonlyargs' is a list of keyword-only parameter names.
+        'kwonlydefaults' is a dictionary mapping names from kwonlyargs to defaults.
+        'annotations' is a dictionary mapping parameter names to annotations.
+
+        Notable differences from inspect.signature():
+          - the "self" parameter is always reported, even for bound methods
+          - wrapper chains defined by __wrapped__ *not* unwrapped automatically
+        """
 
 class ArgInfo(NamedTuple):
     """ArgInfo(args, varargs, keywords, locals)"""

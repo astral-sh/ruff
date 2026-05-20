@@ -1119,9 +1119,9 @@ error[invalid-method-override]: Invalid override of method `__eq__`
   3 |     def __eq__(self, other: "Bad") -> bool:  # snapshot: invalid-method-override
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `object.__eq__`
     |
-   ::: stdlib/builtins.pyi:142:9
+   ::: stdlib/builtins.pyi:134:9
     |
-142 |     def __eq__(self, value: object, /) -> bool: ...
+134 |     def __eq__(self, value: object, /) -> bool: ...
     |         -------------------------------------- `object.__eq__` defined here
     |
 info: parameter `value` has an incompatible type: `object` is not assignable to `Bad`

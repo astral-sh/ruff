@@ -4,8 +4,8 @@ from _typeshed import ReadableBuffer
 from builtins import type as Type  # alias to avoid name clashes with property named "type"
 from collections.abc import Iterable
 from types import TracebackType
-from typing import Any, BinaryIO, NoReturn, overload
-from typing_extensions import TypeAlias, deprecated
+from typing import Any, BinaryIO, NoReturn, TypeAlias, overload
+from typing_extensions import deprecated
 
 # These are based in socket, maybe move them out into _typeshed.pyi or such
 _Address: TypeAlias = socket._Address

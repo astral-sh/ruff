@@ -1,9 +1,8 @@
 import _tkinter
 import itertools
-import sys
 import tkinter
-from typing import Any, ClassVar, Final, Literal, TypedDict, overload, type_check_only
-from typing_extensions import TypeAlias, Unpack
+from typing import Any, ClassVar, Final, Literal, TypeAlias, TypedDict, overload, type_check_only
+from typing_extensions import Unpack
 
 __all__ = ["NORMAL", "ROMAN", "BOLD", "ITALIC", "nametofont", "Font", "families", "names"]
 
@@ -152,10 +151,5 @@ def families(root: tkinter.Misc | None = None, displayof: tkinter.Misc | None = 
 def names(root: tkinter.Misc | None = None) -> tuple[str, ...]:
     """Get names of defined fonts (as a tuple)"""
 
-if sys.version_info >= (3, 10):
-    def nametofont(name: str, root: tkinter.Misc | None = None) -> Font:
-        """Given the name of a tk named font, returns a Font representation."""
-
-else:
-    def nametofont(name: str) -> Font:
-        """Given the name of a tk named font, returns a Font representation."""
+def nametofont(name: str, root: tkinter.Misc | None = None) -> Font:
+    """Given the name of a tk named font, returns a Font representation."""

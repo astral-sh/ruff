@@ -5,8 +5,7 @@ defined by the C standard.
 import sys
 from _typeshed import SupportsMul, SupportsRMul
 from collections.abc import Iterable
-from typing import Any, Final, Literal, Protocol, SupportsFloat, SupportsIndex, TypeVar, overload, type_check_only
-from typing_extensions import TypeAlias
+from typing import Any, Final, Literal, Protocol, SupportsFloat, SupportsIndex, TypeAlias, TypeVar, overload, type_check_only
 
 _T = TypeVar("_T")
 _T_co = TypeVar("_T_co", covariant=True)
@@ -153,6 +152,10 @@ def fmod(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float:
     x % y may differ.
     """
 
+if sys.version_info >= (3, 15):
+    def fmax(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float: ...
+    def fmin(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float: ...
+
 def frexp(x: _SupportsFloatOrIndex, /) -> tuple[float, int]:
     """Return the mantissa and exponent of x, as pair (m, e).
 
@@ -221,6 +224,10 @@ def isfinite(x: _SupportsFloatOrIndex, /) -> bool:
 
 def isnan(x: _SupportsFloatOrIndex, /) -> bool:
     """Return True if x is a NaN (not a number), and False otherwise."""
+
+if sys.version_info >= (3, 15):
+    def isnormal(x: _SupportsFloatOrIndex, /) -> bool: ...
+    def issubnormal(x: _SupportsFloatOrIndex, /) -> bool: ...
 
 def isqrt(n: SupportsIndex, /) -> int:
     """Return the integer part of the square root of the input."""
@@ -337,6 +344,9 @@ def remainder(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float:
 
 def sin(x: _SupportsFloatOrIndex, /) -> float:
     """Return the sine of x (measured in radians)."""
+
+if sys.version_info >= (3, 15):
+    def signbit(x: _SupportsFloatOrIndex, /) -> bool: ...
 
 def sinh(x: _SupportsFloatOrIndex, /) -> float:
     """Return the hyperbolic sine of x."""

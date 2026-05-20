@@ -209,6 +209,29 @@ def f(x: IntOrStr, y: str | bytes):
     reveal_type(z)  # revealed: (int & ~AlwaysFalsy) | str | bytes
 ```
 
+## Loop-carried augmented unions
+
+PEP 604 unions created by augmented assignment should converge when the previous loop iteration
+already contains the same type alias:
+
+```py
+def f(condition: bool):
+    type Left = int
+    alias = Left
+    reveal_type(alias)  # revealed: TypeAliasType
+
+    while condition:
+        type Right = str
+        alias |= Right
+        reveal_type(alias)  # revealed: <types.UnionType special-form 'int | str'>
+
+    reveal_type(alias)  # revealed: TypeAliasType | <types.UnionType special-form 'int | str'>
+
+    # it would be okay to emit an `invalid-type-form` error here
+    def inner(x: alias):
+        reveal_type(x)  # revealed: int | str
+```
+
 ## Multiple layers of union aliases
 
 ```py

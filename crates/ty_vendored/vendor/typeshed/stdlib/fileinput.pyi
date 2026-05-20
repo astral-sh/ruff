@@ -69,8 +69,8 @@ import sys
 from _typeshed import AnyStr_co, StrOrBytesPath
 from collections.abc import Callable, Iterable
 from types import GenericAlias, TracebackType
-from typing import IO, Any, AnyStr, Generic, Literal, Protocol, overload, type_check_only
-from typing_extensions import Self, TypeAlias, deprecated
+from typing import IO, Any, AnyStr, Generic, Literal, Protocol, TypeAlias, overload, type_check_only
+from typing_extensions import Self, deprecated
 
 __all__ = [
     "input",
@@ -97,86 +97,47 @@ class _HasReadlineAndFileno(Protocol[AnyStr_co]):
     def readline(self) -> AnyStr_co: ...
     def fileno(self) -> int: ...
 
-if sys.version_info >= (3, 10):
-    # encoding and errors are added
-    @overload
-    def input(
-        files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
-        inplace: bool = False,
-        backup: str = "",
-        *,
-        mode: _TextMode = "r",
-        openhook: Callable[[StrOrBytesPath, str], _HasReadlineAndFileno[str]] | None = None,
-        encoding: str | None = None,
-        errors: str | None = None,
-    ) -> FileInput[str]:
-        """Return an instance of the FileInput class, which can be iterated.
+# encoding and errors are added
+@overload
+def input(
+    files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
+    inplace: bool = False,
+    backup: str = "",
+    *,
+    mode: _TextMode = "r",
+    openhook: Callable[[StrOrBytesPath, str], _HasReadlineAndFileno[str]] | None = None,
+    encoding: str | None = None,
+    errors: str | None = None,
+) -> FileInput[str]:
+    """Return an instance of the FileInput class, which can be iterated.
 
-        The parameters are passed to the constructor of the FileInput class.
-        The returned instance, in addition to being an iterator,
-        keeps global state for the functions of this module,.
-        """
+    The parameters are passed to the constructor of the FileInput class.
+    The returned instance, in addition to being an iterator,
+    keeps global state for the functions of this module,.
+    """
 
-    @overload
-    def input(
-        files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
-        inplace: bool = False,
-        backup: str = "",
-        *,
-        mode: Literal["rb"],
-        openhook: Callable[[StrOrBytesPath, str], _HasReadlineAndFileno[bytes]] | None = None,
-        encoding: None = None,
-        errors: None = None,
-    ) -> FileInput[bytes]: ...
-    @overload
-    def input(
-        files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
-        inplace: bool = False,
-        backup: str = "",
-        *,
-        mode: str,
-        openhook: Callable[[StrOrBytesPath, str], _HasReadlineAndFileno[Any]] | None = None,
-        encoding: str | None = None,
-        errors: str | None = None,
-    ) -> FileInput[Any]: ...
-
-else:
-    # bufsize is dropped and mode and openhook become keyword-only
-    @overload
-    def input(
-        files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
-        inplace: bool = False,
-        backup: str = "",
-        *,
-        mode: _TextMode = "r",
-        openhook: Callable[[StrOrBytesPath, str], _HasReadlineAndFileno[str]] | None = None,
-    ) -> FileInput[str]:
-        """Return an instance of the FileInput class, which can be iterated.
-
-        The parameters are passed to the constructor of the FileInput class.
-        The returned instance, in addition to being an iterator,
-        keeps global state for the functions of this module,.
-        """
-
-    @overload
-    def input(
-        files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
-        inplace: bool = False,
-        backup: str = "",
-        *,
-        mode: Literal["rb"],
-        openhook: Callable[[StrOrBytesPath, str], _HasReadlineAndFileno[bytes]] | None = None,
-    ) -> FileInput[bytes]: ...
-    @overload
-    def input(
-        files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
-        inplace: bool = False,
-        backup: str = "",
-        *,
-        mode: str,
-        openhook: Callable[[StrOrBytesPath, str], _HasReadlineAndFileno[Any]] | None = None,
-    ) -> FileInput[Any]: ...
-
+@overload
+def input(
+    files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
+    inplace: bool = False,
+    backup: str = "",
+    *,
+    mode: Literal["rb"],
+    openhook: Callable[[StrOrBytesPath, str], _HasReadlineAndFileno[bytes]] | None = None,
+    encoding: None = None,
+    errors: None = None,
+) -> FileInput[bytes]: ...
+@overload
+def input(
+    files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
+    inplace: bool = False,
+    backup: str = "",
+    *,
+    mode: str,
+    openhook: Callable[[StrOrBytesPath, str], _HasReadlineAndFileno[Any]] | None = None,
+    encoding: str | None = None,
+    errors: str | None = None,
+) -> FileInput[Any]: ...
 def close() -> None:
     """Close the sequence."""
 
@@ -242,78 +203,43 @@ class FileInput(Generic[AnyStr]):
     sequential order; random access and readline() cannot be mixed.
     """
 
-    if sys.version_info >= (3, 10):
-        # encoding and errors are added
-        @overload
-        def __init__(
-            self: FileInput[str],
-            files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
-            inplace: bool = False,
-            backup: str = "",
-            *,
-            mode: _TextMode = "r",
-            openhook: Callable[[StrOrBytesPath, str], _HasReadlineAndFileno[str]] | None = None,
-            encoding: str | None = None,
-            errors: str | None = None,
-        ) -> None: ...
-        @overload
-        def __init__(
-            self: FileInput[bytes],
-            files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
-            inplace: bool = False,
-            backup: str = "",
-            *,
-            mode: Literal["rb"],
-            openhook: Callable[[StrOrBytesPath, str], _HasReadlineAndFileno[bytes]] | None = None,
-            encoding: None = None,
-            errors: None = None,
-        ) -> None: ...
-        @overload
-        def __init__(
-            self: FileInput[Any],
-            files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
-            inplace: bool = False,
-            backup: str = "",
-            *,
-            mode: str,
-            openhook: Callable[[StrOrBytesPath, str], _HasReadlineAndFileno[Any]] | None = None,
-            encoding: str | None = None,
-            errors: str | None = None,
-        ) -> None: ...
-
-    else:
-        # bufsize is dropped and mode and openhook become keyword-only
-        @overload
-        def __init__(
-            self: FileInput[str],
-            files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
-            inplace: bool = False,
-            backup: str = "",
-            *,
-            mode: _TextMode = "r",
-            openhook: Callable[[StrOrBytesPath, str], _HasReadlineAndFileno[str]] | None = None,
-        ) -> None: ...
-        @overload
-        def __init__(
-            self: FileInput[bytes],
-            files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
-            inplace: bool = False,
-            backup: str = "",
-            *,
-            mode: Literal["rb"],
-            openhook: Callable[[StrOrBytesPath, str], _HasReadlineAndFileno[bytes]] | None = None,
-        ) -> None: ...
-        @overload
-        def __init__(
-            self: FileInput[Any],
-            files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
-            inplace: bool = False,
-            backup: str = "",
-            *,
-            mode: str,
-            openhook: Callable[[StrOrBytesPath, str], _HasReadlineAndFileno[Any]] | None = None,
-        ) -> None: ...
-
+    # encoding and errors are added
+    @overload
+    def __init__(
+        self: FileInput[str],
+        files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
+        inplace: bool = False,
+        backup: str = "",
+        *,
+        mode: _TextMode = "r",
+        openhook: Callable[[StrOrBytesPath, str], _HasReadlineAndFileno[str]] | None = None,
+        encoding: str | None = None,
+        errors: str | None = None,
+    ) -> None: ...
+    @overload
+    def __init__(
+        self: FileInput[bytes],
+        files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
+        inplace: bool = False,
+        backup: str = "",
+        *,
+        mode: Literal["rb"],
+        openhook: Callable[[StrOrBytesPath, str], _HasReadlineAndFileno[bytes]] | None = None,
+        encoding: None = None,
+        errors: None = None,
+    ) -> None: ...
+    @overload
+    def __init__(
+        self: FileInput[Any],
+        files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
+        inplace: bool = False,
+        backup: str = "",
+        *,
+        mode: str,
+        openhook: Callable[[StrOrBytesPath, str], _HasReadlineAndFileno[Any]] | None = None,
+        encoding: str | None = None,
+        errors: str | None = None,
+    ) -> None: ...
     def __del__(self) -> None: ...
     def close(self) -> None: ...
     def __enter__(self) -> Self: ...
@@ -339,17 +265,8 @@ class FileInput(Generic[AnyStr]):
         E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
         """
 
-if sys.version_info >= (3, 10):
-    def hook_compressed(
-        filename: StrOrBytesPath, mode: str, *, encoding: str | None = None, errors: str | None = None
-    ) -> IO[Any]: ...
-
-else:
-    def hook_compressed(filename: StrOrBytesPath, mode: str) -> IO[Any]: ...
-
-if sys.version_info >= (3, 10):
-    @deprecated("Deprecated since Python 3.10. Use `fileinput.input` or `fileinput.FileInput` instead.")
-    def hook_encoded(encoding: str, errors: str | None = None) -> Callable[[StrOrBytesPath, str], IO[Any]]: ...
-
-else:
-    def hook_encoded(encoding: str, errors: str | None = None) -> Callable[[StrOrBytesPath, str], IO[Any]]: ...
+def hook_compressed(
+    filename: StrOrBytesPath, mode: str, *, encoding: str | None = None, errors: str | None = None
+) -> IO[Any]: ...
+@deprecated("Deprecated since Python 3.10. Use `fileinput.input` or `fileinput.FileInput` instead.")
+def hook_encoded(encoding: str, errors: str | None = None) -> Callable[[StrOrBytesPath, str], IO[Any]]: ...

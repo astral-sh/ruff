@@ -37,8 +37,22 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from tkinter.constants import *
 from tkinter.font import _FontDescription
 from types import GenericAlias, TracebackType
-from typing import Any, ClassVar, Final, Generic, Literal, NamedTuple, Protocol, TypedDict, TypeVar, overload, type_check_only
-from typing_extensions import TypeAlias, TypeVarTuple, Unpack, deprecated, disjoint_base
+from typing import (
+    Any,
+    ClassVar,
+    Final,
+    Generic,
+    Literal,
+    NamedTuple,
+    ParamSpec,
+    Protocol,
+    TypeAlias,
+    TypedDict,
+    TypeVar,
+    overload,
+    type_check_only,
+)
+from typing_extensions import TypeVarTuple, Unpack, deprecated, disjoint_base
 
 if sys.version_info >= (3, 11):
     from enum import StrEnum
@@ -377,6 +391,9 @@ class Event(Generic[_W_co]):
     type: EventType
     widget: _W_co
     delta: int
+    if sys.version_info >= (3, 15):
+        detail: str
+        user_data: str
     if sys.version_info >= (3, 14):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
@@ -436,96 +453,53 @@ class Variable:
 
     def trace_info(self) -> list[tuple[tuple[Literal["array", "read", "write", "unset"], ...], str]]:
         """Return all trace callback information."""
-    if sys.version_info >= (3, 14):
-        @deprecated("Deprecated since Python 3.14. Use `trace_add()` instead.")
-        def trace(self, mode, callback) -> str:
-            """Define a trace callback for the variable.
 
-            MODE is one of "r", "w", "u" for read, write, undefine.
-            CALLBACK must be a function which is called when
-            the variable is read, written or undefined.
+    @deprecated("Deprecated since Python 3.14. Use `trace_add()` instead.")
+    def trace(self, mode, callback) -> str:
+        """Define a trace callback for the variable.
 
-            Return the name of the callback.
+        MODE is one of "r", "w", "u" for read, write, undefine.
+        CALLBACK must be a function which is called when
+        the variable is read, written or undefined.
 
-            This deprecated method wraps a deprecated Tcl method removed
-            in Tcl 9.0.  Use trace_add() instead.
-            """
+        Return the name of the callback.
 
-        @deprecated("Deprecated since Python 3.14. Use `trace_add()` instead.")
-        def trace_variable(self, mode, callback) -> str:
-            """Define a trace callback for the variable.
+        This deprecated method wraps a deprecated Tcl method removed
+        in Tcl 9.0.  Use trace_add() instead.
+        """
 
-            MODE is one of "r", "w", "u" for read, write, undefine.
-            CALLBACK must be a function which is called when
-            the variable is read, written or undefined.
+    @deprecated("Deprecated since Python 3.14. Use `trace_add()` instead.")
+    def trace_variable(self, mode, callback) -> str:
+        """Define a trace callback for the variable.
 
-            Return the name of the callback.
+        MODE is one of "r", "w", "u" for read, write, undefine.
+        CALLBACK must be a function which is called when
+        the variable is read, written or undefined.
 
-            This deprecated method wraps a deprecated Tcl method removed
-            in Tcl 9.0.  Use trace_add() instead.
-            """
+        Return the name of the callback.
 
-        @deprecated("Deprecated since Python 3.14. Use `trace_remove()` instead.")
-        def trace_vdelete(self, mode, cbname) -> None:
-            """Delete the trace callback for a variable.
+        This deprecated method wraps a deprecated Tcl method removed
+        in Tcl 9.0.  Use trace_add() instead.
+        """
 
-            MODE is one of "r", "w", "u" for read, write, undefine.
-            CBNAME is the name of the callback returned from trace_variable or trace.
+    @deprecated("Deprecated since Python 3.14. Use `trace_remove()` instead.")
+    def trace_vdelete(self, mode, cbname) -> None:
+        """Delete the trace callback for a variable.
 
-            This deprecated method wraps a deprecated Tcl method removed
-            in Tcl 9.0.  Use trace_remove() instead.
-            """
+        MODE is one of "r", "w", "u" for read, write, undefine.
+        CBNAME is the name of the callback returned from trace_variable or trace.
 
-        @deprecated("Deprecated since Python 3.14. Use `trace_info()` instead.")
-        def trace_vinfo(self) -> list[Incomplete]:
-            """Return all trace callback information.
+        This deprecated method wraps a deprecated Tcl method removed
+        in Tcl 9.0.  Use trace_remove() instead.
+        """
 
-            This deprecated method wraps a deprecated Tcl method removed
-            in Tcl 9.0.  Use trace_info() instead.
-            """
-    else:
-        def trace(self, mode, callback) -> str:
-            """Define a trace callback for the variable.
+    @deprecated("Deprecated since Python 3.14. Use `trace_info()` instead.")
+    def trace_vinfo(self) -> list[Incomplete]:
+        """Return all trace callback information.
 
-            MODE is one of "r", "w", "u" for read, write, undefine.
-            CALLBACK must be a function which is called when
-            the variable is read, written or undefined.
-
-            Return the name of the callback.
-
-            This deprecated method wraps a deprecated Tcl method that will
-            likely be removed in the future.  Use trace_add() instead.
-            """
-
-        def trace_variable(self, mode, callback) -> str:
-            """Define a trace callback for the variable.
-
-            MODE is one of "r", "w", "u" for read, write, undefine.
-            CALLBACK must be a function which is called when
-            the variable is read, written or undefined.
-
-            Return the name of the callback.
-
-            This deprecated method wraps a deprecated Tcl method that will
-            likely be removed in the future.  Use trace_add() instead.
-            """
-
-        def trace_vdelete(self, mode, cbname) -> None:
-            """Delete the trace callback for a variable.
-
-            MODE is one of "r", "w", "u" for read, write, undefine.
-            CBNAME is the name of the callback returned from trace_variable or trace.
-
-            This deprecated method wraps a deprecated Tcl method that will
-            likely be removed in the future.  Use trace_remove() instead.
-            """
-
-        def trace_vinfo(self) -> list[Incomplete]:
-            """Return all trace callback information.
-
-            This deprecated method wraps a deprecated Tcl method that will
-            likely be removed in the future.  Use trace_info() instead.
-            """
+        This deprecated method wraps a deprecated Tcl method removed
+        in Tcl 9.0.  Use trace_info() instead.
+        """
 
     def __eq__(self, other: object) -> bool: ...
     def __del__(self) -> None:
@@ -622,6 +596,7 @@ def getboolean(s) -> bool:
     """Convert Tcl object to True or False."""
 
 _Ts = TypeVarTuple("_Ts")
+_P = ParamSpec("_P")
 
 @type_check_only
 class _GridIndexInfo(TypedDict, total=False):
@@ -765,24 +740,44 @@ class Misc:
 
     def tk_focusPrev(self) -> Misc | None:
         """Return previous widget in the focus order. See tk_focusNext for details."""
-    # .after() can be called without the "func" argument, but it is basically never what you want.
-    # It behaves like time.sleep() and freezes the GUI app.
-    def after(self, ms: int | Literal["idle"], func: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts]) -> str:
-        """Call function once after given time.
+    if sys.version_info >= (3, 14):
+        # .after() can be called without the "func" argument, but it is basically never what you want.
+        # It behaves like time.sleep() and freezes the GUI app.
+        def after(self, ms: int | Literal["idle"], func: Callable[_P, object], *args: _P.args, **kwargs: _P.kwargs) -> str:
+            """Call function once after given time.
 
-        MS specifies the time in milliseconds. FUNC gives the
-        function which shall be called. Additional parameters
-        are given as parameters to the function call.  Return
-        identifier to cancel scheduling with after_cancel.
-        """
-    # after_idle is essentially partialmethod(after, "idle")
-    def after_idle(self, func: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts]) -> str:
-        """Call FUNC once if the Tcl main loop has no event to
-        process.
+            MS specifies the time in milliseconds. FUNC gives the
+            function which shall be called. Additional parameters
+            are given as parameters to the function call.  Return
+            identifier to cancel scheduling with after_cancel.
+            """
+        # after_idle is essentially partialmethod(after, "idle")
+        def after_idle(self, func: Callable[_P, object], *args: _P.args, **kwargs: _P.kwargs) -> str:
+            """Call FUNC once if the Tcl main loop has no event to
+            process.
 
-        Return an identifier to cancel the scheduling with
-        after_cancel.
-        """
+            Return an identifier to cancel the scheduling with
+            after_cancel.
+            """
+    else:
+        # .after() can be called without the "func" argument, but it is basically never what you want.
+        # It behaves like time.sleep() and freezes the GUI app.
+        def after(self, ms: int | Literal["idle"], func: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts]) -> str:
+            """Call function once after given time.
+
+            MS specifies the time in milliseconds. FUNC gives the
+            function which shall be called. Additional parameters
+            are given as parameters to the function call.  Return
+            identifier to cancel scheduling with after_cancel.
+            """
+        # after_idle is essentially partialmethod(after, "idle")
+        def after_idle(self, func: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts]) -> str:
+            """Call FUNC once if the Tcl main loop has no event to
+            process.
+
+            Return an identifier to cancel the scheduling with
+            after_cancel.
+            """
 
     def after_cancel(self, id: str) -> None:
         """Cancel scheduling of function identified with ID.
@@ -1478,6 +1473,12 @@ class Misc:
         the container.
         """
     slaves = pack_slaves
+    if sys.version_info >= (3, 15):
+        def pack_content(self) -> list[Widget]: ...
+        def grid_content(self, row: int | None = None, column: int | None = None) -> list[Widget]: ...
+        def place_content(self) -> list[Widget]: ...
+        content = pack_content
+
     def event_add(self, virtual: str, *sequences: str) -> None:
         """Bind a virtual event VIRTUAL (of the form <<Name>>)
         to an event SEQUENCE such that the virtual event is triggered
@@ -1555,8 +1556,7 @@ class Misc:
         is specified, then modify the widget option(s) to have the given
         value(s).
         """
-    # TODO: config is an alias of configure, but adding that here creates
-    # conflict with the type of config in the subclasses. See #13149
+    config = configure
 
 class CallWrapper:
     """Internal class. Stores function to call when some user
@@ -5935,24 +5935,58 @@ class Text(Widget, XView, YView):
         difference between X and Y and the coordinates given in
         scan_mark.
         """
-
-    def search(
-        self,
-        pattern: str,
-        index: str | float | _tkinter.Tcl_Obj | Widget,
-        stopindex: str | float | _tkinter.Tcl_Obj | Widget | None = None,
-        forwards: bool | None = None,
-        backwards: bool | None = None,
-        exact: bool | None = None,
-        regexp: bool | None = None,
-        nocase: bool | None = None,
-        count: Variable | None = None,
-        elide: bool | None = None,
-    ) -> str:  # returns empty string for not found
-        """Search PATTERN beginning from INDEX until STOPINDEX.
-        Return the index of the first character of a match or an
-        empty string.
-        """
+    if sys.version_info >= (3, 15):
+        def search(
+            self,
+            pattern: str,
+            index: str | float | _tkinter.Tcl_Obj | Widget,
+            stopindex: str | float | _tkinter.Tcl_Obj | Widget | None = None,
+            forwards: bool | None = None,
+            backwards: bool | None = None,
+            exact: bool | None = None,
+            regexp: bool | None = None,
+            nocase: bool | None = None,
+            count: Variable | None = None,
+            elide: bool | None = None,
+            *,
+            nolinestop: bool | None = None,
+            strictlimits: bool | None = None,
+        ) -> str: ...  # returns empty string for not found
+        def search_all(
+            self,
+            pattern: str,
+            index: str | float | _tkinter.Tcl_Obj | Widget,
+            stopindex: str | float | _tkinter.Tcl_Obj | Widget | None = None,
+            *,
+            forwards: bool | None = None,
+            backwards: bool | None = None,
+            exact: bool | None = None,
+            regexp: bool | None = None,
+            nocase: bool | None = None,
+            count: Variable | None = None,
+            elide: bool | None = None,
+            nolinestop: bool | None = None,
+            overlap: bool | None = None,
+            strictlimits: bool | None = None,
+        ) -> tuple[_tkinter.Tcl_Obj, ...]: ...
+    else:
+        def search(
+            self,
+            pattern: str,
+            index: str | float | _tkinter.Tcl_Obj | Widget,
+            stopindex: str | float | _tkinter.Tcl_Obj | Widget | None = None,
+            forwards: bool | None = None,
+            backwards: bool | None = None,
+            exact: bool | None = None,
+            regexp: bool | None = None,
+            nocase: bool | None = None,
+            count: Variable | None = None,
+            elide: bool | None = None,
+        ) -> str:  # returns empty string for not found
+            """Search PATTERN beginning from INDEX until STOPINDEX.
+            Return the index of the first character of a match or an
+            empty string.
+            """
 
     def see(self, index: str | float | _tkinter.Tcl_Obj | Widget) -> None:
         """Scroll such that the character at INDEX is visible."""
@@ -6150,21 +6184,37 @@ class OptionMenu(Menubutton):
     """OptionMenu which allows the user to select a value from a menu."""
 
     menuname: Incomplete
-    def __init__(
-        # differs from other widgets
-        self,
-        master: Misc | None,
-        variable: StringVar,
-        value: str,
-        *values: str,
-        # kwarg only from now on
-        command: Callable[[StringVar], object] | None = ...,
-    ) -> None:
-        """Construct an optionmenu widget with the parent MASTER, with
-        the option textvariable set to VARIABLE, the initially selected
-        value VALUE, the other menu values VALUES and an additional
-        keyword argument command.
-        """
+    if sys.version_info >= (3, 14):
+        def __init__(
+            # differs from other widgets
+            self,
+            master: Misc | None,
+            variable: StringVar,
+            value: str,
+            *values: str,
+            command: Callable[[StringVar], object] | None = ...,
+            name: str | None = None,
+        ) -> None:
+            """Construct an optionmenu widget with the parent MASTER, with
+            the option textvariable set to VARIABLE, the initially selected
+            value VALUE, the other menu values VALUES and an additional
+            keyword argument command.
+            """
+    else:
+        def __init__(
+            # differs from other widgets
+            self,
+            master: Misc | None,
+            variable: StringVar,
+            value: str,
+            *values: str,
+            command: Callable[[StringVar], object] | None = ...,
+        ) -> None:
+            """Construct an optionmenu widget with the parent MASTER, with
+            the option textvariable set to VARIABLE, the initially selected
+            value VALUE, the other menu values VALUES and an additional
+            keyword argument command.
+            """
     # configure, config, cget are inherited from Menubutton
     # destroy and __getitem__ are overridden, signature does not change
 

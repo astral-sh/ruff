@@ -9,8 +9,21 @@ from collections.abc import Callable, Container, Iterable, Mapping, Sequence, Se
 from contextlib import AbstractContextManager
 from re import Pattern
 from types import GenericAlias, TracebackType
-from typing import Any, AnyStr, Final, Generic, NoReturn, Protocol, SupportsAbs, SupportsRound, TypeVar, overload, type_check_only
-from typing_extensions import Never, ParamSpec, Self
+from typing import (
+    Any,
+    AnyStr,
+    Final,
+    Generic,
+    NoReturn,
+    ParamSpec,
+    Protocol,
+    SupportsAbs,
+    SupportsRound,
+    TypeVar,
+    overload,
+    type_check_only,
+)
+from typing_extensions import Never, Self
 from unittest._log import _AssertLogsContext, _LoggingWatcher
 from warnings import WarningMessage
 
@@ -88,7 +101,7 @@ class SkipTest(Exception):
     instead of raising this directly.
     """
 
-    def __init__(self, reason: str) -> None: ...
+    def __init__(self, reason: str, /) -> None: ...
 
 @type_check_only
 class _SupportsAbsAndDunderGE(SupportsDunderGE[Any], SupportsAbs[Any], Protocol): ...
@@ -373,37 +386,45 @@ class TestCase:
     def assertWarnsRegex(
         self, expected_warning: type[Warning] | tuple[type[Warning], ...], expected_regex: str | Pattern[str], *, msg: Any = ...
     ) -> _AssertWarnsContext: ...
-    def assertLogs(
-        self, logger: str | logging.Logger | None = None, level: int | str | None = None
-    ) -> _AssertLogsContext[_LoggingWatcher]:
-        """Fail unless a log message of level *level* or higher is emitted
-        on *logger_name* or its children.  If omitted, *level* defaults to
-        INFO and *logger* defaults to the root logger.
-
-        This method must be used as a context manager, and will yield
-        a recording object with two attributes: `output` and `records`.
-        At the end of the context manager, the `output` attribute will
-        be a list of the matching formatted log messages and the
-        `records` attribute will be a list of the corresponding LogRecord
-        objects.
-
-        Example::
-
-            with self.assertLogs('foo', level='INFO') as cm:
-                logging.getLogger('foo').info('first message')
-                logging.getLogger('foo.bar').error('second message')
-            self.assertEqual(cm.output, ['INFO:foo:first message',
-                                         'ERROR:foo.bar:second message'])
-        """
-    if sys.version_info >= (3, 10):
-        def assertNoLogs(
+    if sys.version_info >= (3, 15):
+        def assertLogs(
+            self,
+            logger: str | logging.Logger | None = None,
+            level: int | str | None = None,
+            formatter: logging.Formatter | None = None,
+        ) -> _AssertLogsContext[_LoggingWatcher]: ...
+    else:
+        def assertLogs(
             self, logger: str | logging.Logger | None = None, level: int | str | None = None
-        ) -> _AssertLogsContext[None]:
-            """Fail unless no log messages of level *level* or higher are emitted
-            on *logger_name* or its children.
+        ) -> _AssertLogsContext[_LoggingWatcher]:
+            """Fail unless a log message of level *level* or higher is emitted
+            on *logger_name* or its children.  If omitted, *level* defaults to
+            INFO and *logger* defaults to the root logger.
 
-            This method must be used as a context manager.
+            This method must be used as a context manager, and will yield
+            a recording object with two attributes: `output` and `records`.
+            At the end of the context manager, the `output` attribute will
+            be a list of the matching formatted log messages and the
+            `records` attribute will be a list of the corresponding LogRecord
+            objects.
+
+            Example::
+
+                with self.assertLogs('foo', level='INFO') as cm:
+                    logging.getLogger('foo').info('first message')
+                    logging.getLogger('foo.bar').error('second message')
+                self.assertEqual(cm.output, ['INFO:foo:first message',
+                                             'ERROR:foo.bar:second message'])
             """
+
+    def assertNoLogs(
+        self, logger: str | logging.Logger | None = None, level: int | str | None = None
+    ) -> _AssertLogsContext[None]:
+        """Fail unless no log messages of level *level* or higher are emitted
+        on *logger_name* or its children.
+
+        This method must be used as a context manager.
+        """
 
     @overload
     def assertAlmostEqual(self, first: _S, second: _S, places: None, msg: Any, delta: _SupportsAbsAndDunderGE) -> None:
@@ -653,9 +674,8 @@ class TestCase:
         assertRaisesRegexp = assertRaisesRegex
         def assertDictContainsSubset(self, subset: Mapping[Any, Any], dictionary: Mapping[Any, Any], msg: object = None) -> None:
             """Checks whether dictionary is a superset of subset."""
-    if sys.version_info >= (3, 10):
-        # Runtime has *args, **kwargs, but will error if any are supplied
-        def __init_subclass__(cls, *args: Never, **kwargs: Never) -> None: ...
+    # Runtime has *args, **kwargs, but will error if any are supplied
+    def __init_subclass__(cls, *args: Never, **kwargs: Never) -> None: ...
 
     if sys.version_info >= (3, 14):
         def assertIsSubclass(self, cls: type, superclass: type | tuple[type, ...], msg: Any = None) -> None: ...

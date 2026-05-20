@@ -2,11 +2,9 @@
 General functions for HTML manipulation.
 """
 
-from typing import AnyStr
-
 __all__ = ["escape", "unescape"]
 
-def escape(s: AnyStr, quote: bool = True) -> AnyStr:
+def escape(s: str, quote: bool = True) -> str:
     """
     Replace special characters "&", "<" and ">" to HTML-safe sequences.
     If the optional flag quote is true (the default), the quotation mark
@@ -14,7 +12,7 @@ def escape(s: AnyStr, quote: bool = True) -> AnyStr:
     translated.
     """
 
-def unescape(s: AnyStr) -> AnyStr:
+def unescape(s: str) -> str:
     """
     Convert all named and numeric character references (e.g. &gt;, &#62;,
     &x3e;) in the string s to the corresponding unicode characters.

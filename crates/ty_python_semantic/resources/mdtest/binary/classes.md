@@ -2,33 +2,13 @@
 
 ## Union of two classes
 
-Unioning two classes via the `|` operator is only available in Python 3.10 and later.
-
-```toml
-[environment]
-python-version = "3.10"
-```
+Unioning two classes via the `|` operator:
 
 ```py
 class A: ...
 class B: ...
 
 reveal_type(A | B)  # revealed: <types.UnionType special-form 'A | B'>
-```
-
-## Union of two classes (prior to 3.10)
-
-```toml
-[environment]
-python-version = "3.9"
-```
-
-```py
-class A: ...
-class B: ...
-
-# error: "Operator `|` is not supported between objects of type `<class 'A'>` and `<class 'B'>`"
-reveal_type(A | B)  # revealed: Unknown
 ```
 
 ## Other binary operations resulting in `UnionType`

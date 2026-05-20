@@ -3,8 +3,8 @@
 from _typeshed import ReadableBuffer, SupportsWrite
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from pickle import PickleBuffer as PickleBuffer
-from typing import Any, Protocol, type_check_only
-from typing_extensions import TypeAlias, disjoint_base
+from typing import Any, Protocol, TypeAlias, type_check_only
+from typing_extensions import disjoint_base
 
 @type_check_only
 class _ReadableFileobj(Protocol):

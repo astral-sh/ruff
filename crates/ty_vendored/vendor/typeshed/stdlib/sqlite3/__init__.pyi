@@ -96,11 +96,14 @@ from sqlite3.dbapi2 import (
     threadsafety as threadsafety,
 )
 from types import TracebackType
-from typing import Any, Literal, Protocol, SupportsIndex, TypeVar, final, overload, type_check_only
-from typing_extensions import Self, TypeAlias, disjoint_base
+from typing import Any, Literal, Protocol, SupportsIndex, TypeAlias, TypeVar, final, overload, type_check_only
+from typing_extensions import Self, disjoint_base
 
 if sys.version_info < (3, 14):
     from sqlite3.dbapi2 import version_info as version_info
+
+if sys.version_info >= (3, 15):
+    from sqlite3.dbapi2 import SQLITE_KEYWORDS as SQLITE_KEYWORDS
 
 if sys.version_info >= (3, 12):
     from sqlite3.dbapi2 import (
@@ -245,9 +248,6 @@ if sys.version_info >= (3, 11):
 if sys.version_info < (3, 12):
     from sqlite3.dbapi2 import enable_shared_cache as enable_shared_cache, version as version
 
-if sys.version_info < (3, 10):
-    from sqlite3.dbapi2 import OptimizedUnicode as OptimizedUnicode
-
 _CursorT = TypeVar("_CursorT", bound=Cursor)
 _SqliteData: TypeAlias = str | ReadableBuffer | int | float | None
 # Data that is passed through adapters can be of any type accepted by an adapter.
@@ -391,15 +391,17 @@ class Connection:
 
         If there is no open transaction, this method is a no-op.
         """
+    if sys.version_info >= (3, 15):
+        def create_aggregate(self, name: str, n_arg: int, aggregate_class: Callable[[], _AggregateProtocol], /) -> None: ...
+    else:
+        def create_aggregate(self, name: str, n_arg: int, aggregate_class: Callable[[], _AggregateProtocol]) -> None:
+            """Creates a new aggregate.
 
-    def create_aggregate(self, name: str, n_arg: int, aggregate_class: Callable[[], _AggregateProtocol]) -> None:
-        """Creates a new aggregate.
-
-        Note: Passing keyword arguments 'name', 'n_arg' and 'aggregate_class'
-        to _sqlite3.Connection.create_aggregate() is deprecated. Parameters
-        'name', 'n_arg' and 'aggregate_class' will become positional-only in
-        Python 3.15.
-        """
+            Note: Passing keyword arguments 'name', 'n_arg' and 'aggregate_class'
+            to _sqlite3.Connection.create_aggregate() is deprecated. Parameters
+            'name', 'n_arg' and 'aggregate_class' will become positional-only in
+            Python 3.15.
+            """
     if sys.version_info >= (3, 11):
         # num_params determines how many params will be passed to the aggregate class. We provide an overload
         # for the case where num_params = 1, which is expected to be the common case.
@@ -430,16 +432,20 @@ class Connection:
 
     def create_collation(self, name: str, callback: Callable[[str, str], SupportsIndex] | None, /) -> None:
         """Creates a collation function."""
+    if sys.version_info >= (3, 15):
+        def create_function(
+            self, name: str, narg: int, func: Callable[..., _SqliteData] | None, /, *, deterministic: bool = False
+        ) -> None: ...
+    else:
+        def create_function(
+            self, name: str, narg: int, func: Callable[..., _SqliteData] | None, *, deterministic: bool = False
+        ) -> None:
+            """Creates a new function.
 
-    def create_function(
-        self, name: str, narg: int, func: Callable[..., _SqliteData] | None, *, deterministic: bool = False
-    ) -> None:
-        """Creates a new function.
-
-        Note: Passing keyword arguments 'name', 'narg' and 'func' to
-        _sqlite3.Connection.create_function() is deprecated. Parameters
-        'name', 'narg' and 'func' will become positional-only in Python 3.15.
-        """
+            Note: Passing keyword arguments 'name', 'narg' and 'func' to
+            _sqlite3.Connection.create_function() is deprecated. Parameters
+            'name', 'narg' and 'func' will become positional-only in Python 3.15.
+            """
 
     @overload
     def cursor(self, factory: None = None) -> Cursor:
@@ -474,42 +480,48 @@ class Connection:
 
         If there is no open transaction, this method is a no-op.
         """
+    if sys.version_info >= (3, 15):
+        def set_authorizer(
+            self, authorizer_callback: Callable[[int, str | None, str | None, str | None, str | None], int] | None, /
+        ) -> None: ...
+        def set_progress_handler(self, progress_handler: Callable[[], int | None] | None, /, n: int) -> None: ...
+        def set_trace_callback(self, trace_callback: Callable[[str], object] | None, /) -> None: ...
+    else:
+        def set_authorizer(
+            self, authorizer_callback: Callable[[int, str | None, str | None, str | None, str | None], int] | None
+        ) -> None:
+            """Set authorizer callback.
 
-    def set_authorizer(
-        self, authorizer_callback: Callable[[int, str | None, str | None, str | None, str | None], int] | None
-    ) -> None:
-        """Set authorizer callback.
+            Note: Passing keyword argument 'authorizer_callback' to
+            _sqlite3.Connection.set_authorizer() is deprecated. Parameter
+            'authorizer_callback' will become positional-only in Python 3.15.
+            """
 
-        Note: Passing keyword argument 'authorizer_callback' to
-        _sqlite3.Connection.set_authorizer() is deprecated. Parameter
-        'authorizer_callback' will become positional-only in Python 3.15.
-        """
+        def set_progress_handler(self, progress_handler: Callable[[], int | None] | None, n: int) -> None:
+            """Set progress handler callback.
 
-    def set_progress_handler(self, progress_handler: Callable[[], int | None] | None, n: int) -> None:
-        """Set progress handler callback.
+              progress_handler
+                A callable that takes no arguments.
+                If the callable returns non-zero, the current query is terminated,
+                and an exception is raised.
+              n
+                The number of SQLite virtual machine instructions that are
+                executed between invocations of 'progress_handler'.
 
-          progress_handler
-            A callable that takes no arguments.
-            If the callable returns non-zero, the current query is terminated,
-            and an exception is raised.
-          n
-            The number of SQLite virtual machine instructions that are
-            executed between invocations of 'progress_handler'.
+            If 'progress_handler' is None or 'n' is 0, the progress handler is disabled.
 
-        If 'progress_handler' is None or 'n' is 0, the progress handler is disabled.
+            Note: Passing keyword argument 'progress_handler' to
+            _sqlite3.Connection.set_progress_handler() is deprecated. Parameter
+            'progress_handler' will become positional-only in Python 3.15.
+            """
 
-        Note: Passing keyword argument 'progress_handler' to
-        _sqlite3.Connection.set_progress_handler() is deprecated. Parameter
-        'progress_handler' will become positional-only in Python 3.15.
-        """
+        def set_trace_callback(self, trace_callback: Callable[[str], object] | None) -> None:
+            """Set a trace callback called for each SQL statement (passed as unicode).
 
-    def set_trace_callback(self, trace_callback: Callable[[str], object] | None) -> None:
-        """Set a trace callback called for each SQL statement (passed as unicode).
-
-        Note: Passing keyword argument 'trace_callback' to
-        _sqlite3.Connection.set_trace_callback() is deprecated. Parameter
-        'trace_callback' will become positional-only in Python 3.15.
-        """
+            Note: Passing keyword argument 'trace_callback' to
+            _sqlite3.Connection.set_trace_callback() is deprecated. Parameter
+            'trace_callback' will become positional-only in Python 3.15.
+            """
     # enable_load_extension and load_extension is not available on python distributions compiled
     # without sqlite3 loadable extension support. see footnotes https://docs.python.org/3/library/sqlite3.html#f1
     def enable_load_extension(self, enable: bool, /) -> None:

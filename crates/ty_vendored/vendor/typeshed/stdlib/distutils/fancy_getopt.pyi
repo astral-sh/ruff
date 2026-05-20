@@ -11,8 +11,7 @@ additional features:
 from collections.abc import Iterable, Mapping
 from getopt import _SliceableT, _StrSequenceT_co
 from re import Pattern
-from typing import Any, Final, overload
-from typing_extensions import TypeAlias
+from typing import Any, Final, TypeAlias, overload
 
 _Option: TypeAlias = tuple[str, str | None, str]
 

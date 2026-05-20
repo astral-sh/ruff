@@ -14,8 +14,8 @@ from collections.abc import (
     Set as AbstractSet,
 )
 from types import GenericAlias, TracebackType
-from typing import Any, AnyStr, ClassVar, Generic, SupportsIndex, TypeVar, overload
-from typing_extensions import Self, TypeAlias
+from typing import Any, AnyStr, ClassVar, Generic, SupportsIndex, TypeAlias, TypeVar, overload
+from typing_extensions import Self
 
 from . import pool
 from .connection import Connection, _Address
@@ -286,16 +286,10 @@ class Server:
         """
 
     def accepter(self) -> None: ...
-    if sys.version_info >= (3, 10):
-        def handle_request(self, conn: _ServerConnection) -> None:
-            """
-            Handle a new connection
-            """
-    else:
-        def handle_request(self, c: _ServerConnection) -> None:
-            """
-            Handle a new connection
-            """
+    def handle_request(self, conn: _ServerConnection) -> None:
+        """
+        Handle a new connection
+        """
 
     def serve_client(self, conn: _ServerConnection) -> None:
         """
