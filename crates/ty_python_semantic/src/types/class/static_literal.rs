@@ -1914,7 +1914,8 @@ impl<'db> StaticClassLiteral<'db> {
             field_declarations.push((first_declaration_order, symbol_id, result));
         }
 
-        field_declarations.sort_by_key(|(first_declaration_order, _, _)| *first_declaration_order);
+        field_declarations
+            .sort_unstable_by_key(|(first_declaration_order, _, _)| *first_declaration_order);
 
         let mut attributes = FxIndexMap::default();
         for (_, symbol_id, result) in field_declarations {
