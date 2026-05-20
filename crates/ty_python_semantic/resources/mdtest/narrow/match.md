@@ -257,7 +257,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Literal
+from typing import Any, Literal, TypeGuard
 
 type Value = Literal[
     "f00",
@@ -301,6 +301,9 @@ type Value = Literal[
     "v38",
     "v39",
 ]
+
+def keep_value(value: object) -> TypeGuard[Value]:
+    return True
 
 def _(value: Value) -> None:
     match value:
@@ -386,6 +389,91 @@ def _(value: Value) -> None:
             return
 
     reveal_type(value)  # revealed: Literal["f00", "f08", "f16", "f24", "f32", "f36"]
+
+def _(value: Value | Any) -> None:
+    match value:
+        case "f00" if keep_value(value):
+            pass
+        case "v01":
+            return
+        case "v02":
+            return
+        case "v03":
+            return
+        case "v04":
+            return
+        case "v05":
+            return
+        case "v06":
+            return
+        case "v07":
+            return
+        case "f08":
+            pass
+        case "v09":
+            return
+        case "v10":
+            return
+        case "v11":
+            return
+        case "v12":
+            return
+        case "v13":
+            return
+        case "v14":
+            return
+        case "v15":
+            return
+        case "f16":
+            pass
+        case "v17":
+            return
+        case "v18":
+            return
+        case "v19":
+            return
+        case "v20":
+            return
+        case "v21":
+            return
+        case "v22":
+            return
+        case "v23":
+            return
+        case "f24":
+            pass
+        case "v25":
+            return
+        case "v26":
+            return
+        case "v27":
+            return
+        case "v28":
+            return
+        case "v29":
+            return
+        case "v30":
+            return
+        case "v31":
+            return
+        case "f32":
+            pass
+        case "v33":
+            return
+        case "v34":
+            return
+        case "v35":
+            return
+        case "f36":
+            pass
+        case "v37":
+            return
+        case "v38":
+            return
+        case "v39":
+            return
+
+    repr(value)
 ```
 
 ## Or patterns

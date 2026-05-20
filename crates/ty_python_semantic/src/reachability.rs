@@ -545,14 +545,22 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
     ) -> Type<'db> {
         let mut projector = NarrowingProjector::new(db, self, predicates, place);
         let projected_root = projector.project(id);
-        let mut context = ProjectedNarrowingContext {
-            db,
-            graph: &projector.graph,
-            predicates,
-            narrow_cache: FxHashMap::default(),
-            intersection_only_cache: FxHashMap::default(),
-        };
-        context.narrow_from(projected_root, base_ty)
+        if projector.graph.has_pattern_predicate {
+            ProjectedNarrowingContext {
+                db,
+                graph: &projector.graph,
+            }
+            .narrow(projected_root, base_ty)
+        } else {
+            let mut context = RecursiveProjectedNarrowingContext {
+                db,
+                graph: &projector.graph,
+                predicates,
+                narrow_cache: FxHashMap::default(),
+                intersection_only_cache: FxHashMap::default(),
+            };
+            context.narrow_from(projected_root, base_ty)
+        }
     }
 
     /// Analyze the statically known reachability for a given constraint.
@@ -641,6 +649,7 @@ struct ProjectedNarrowingGraph<'db> {
             Option<NarrowingConstraint<'db>>,
         ),
     >,
+    has_pattern_predicate: bool,
 }
 
 impl ProjectedNarrowingGraph<'_> {
@@ -808,6 +817,10 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         }
                     }
                 } else {
+                    if matches!(predicate.node, PredicateNode::Pattern(_)) {
+                        self.graph.has_pattern_predicate = true;
+                    }
+
                     let if_true = self.project(node.if_true());
                     let if_false = self.project(node.if_false());
                     let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom());
@@ -834,12 +847,71 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
 struct ProjectedNarrowingContext<'a, 'db> {
     db: &'db dyn Db,
     graph: &'a ProjectedNarrowingGraph<'db>,
+}
+
+impl<'db> ProjectedNarrowingContext<'_, 'db> {
+    /// Narrow by propagating materialized types through the projected graph.
+    ///
+    /// The graph can share a tail among many reachability paths. Merging the types that arrive at
+    /// each projected node avoids walking that shared tail once for every path combination.
+    fn narrow(&self, root: ProjectedNarrowingNodeId, base_ty: Type<'db>) -> Type<'db> {
+        if root == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+            return Type::Never;
+        }
+        if root == ProjectedNarrowingNodeId::ALWAYS_TRUE {
+            return base_ty;
+        }
+
+        let mut inputs = vec![None; self.graph.nodes.len()];
+        inputs[root.0] = Some(base_ty);
+        let mut output = Type::Never;
+
+        for (index, node) in self.graph.nodes.iter().copied().enumerate().rev() {
+            let Some(base_ty) = inputs[index] else {
+                continue;
+            };
+
+            let (pos_constraint, neg_constraint) =
+                self.graph.predicate_constraints_cache[&node.atom].clone();
+
+            for (next, constraint) in [
+                (node.if_true, pos_constraint),
+                (node.if_false, neg_constraint),
+            ] {
+                if next == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+                    continue;
+                }
+
+                let narrowed = apply_accumulated_narrowing(self.db, base_ty, constraint);
+                if next == ProjectedNarrowingNodeId::ALWAYS_TRUE {
+                    output = UnionType::from_two_elements(self.db, output, narrowed);
+                    continue;
+                }
+
+                debug_assert!(next.0 < index);
+                let old_input = inputs[next.0];
+                let new_input = match old_input {
+                    Some(old_input) => UnionType::from_two_elements(self.db, old_input, narrowed),
+                    None => narrowed,
+                };
+                inputs[next.0] = Some(new_input);
+            }
+        }
+
+        output
+    }
+}
+
+/// Evaluates non-pattern projected narrowing graphs while preserving deferred constraint order.
+struct RecursiveProjectedNarrowingContext<'a, 'db> {
+    db: &'db dyn Db,
+    graph: &'a ProjectedNarrowingGraph<'db>,
     predicates: &'a Predicates<'db>,
     narrow_cache: FxHashMap<(ProjectedNarrowingNodeId, Type<'db>), Type<'db>>,
     intersection_only_cache: FxHashMap<ProjectedNarrowingNodeId, bool>,
 }
 
-impl<'db> ProjectedNarrowingContext<'_, 'db> {
+impl<'db> RecursiveProjectedNarrowingContext<'_, 'db> {
     /// Narrow a projected subgraph from an already-materialized base type.
     fn narrow_from(&mut self, id: ProjectedNarrowingNodeId, base_ty: Type<'db>) -> Type<'db> {
         if let Some(cached) = self.narrow_cache.get(&(id, base_ty)) {
@@ -881,11 +953,6 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
     }
 
     /// Narrow a positive branch, folding path combinations that have the same narrowed type.
-    ///
-    /// Projected match graphs can combine positive pattern branches that cannot all match the
-    /// same finite subject, or that all leave the same gradual fallback. Intersection-only
-    /// constraints can be materialized early, while later `TypeGuard` replacement constraints
-    /// must stay deferred because they can revive an impossible base type.
     fn narrow_positive_branch(
         &mut self,
         id: ProjectedNarrowingNodeId,
