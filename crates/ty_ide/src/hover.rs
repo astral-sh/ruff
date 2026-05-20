@@ -4619,6 +4619,44 @@ def function():
     }
 
     #[test]
+    fn hover_func_docstring_escapes_html_in_markdown() {
+        let test = hover_test(
+            r#"
+        def url<CURSOR>parse():
+            """Parse a URL into components:
+            <scheme>://<netloc>/<path>;<params>?<query>#<fragment>
+            """
+            return
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        def urlparse() -> Unknown
+        ---------------------------------------------
+        Parse a URL into components:
+        <scheme>://<netloc>/<path>;<params>?<query>#<fragment>
+
+        ---------------------------------------------
+        ```python
+        def urlparse() -> Unknown
+        ```
+        ---
+        Parse a URL into components:<HB>
+        &lt;scheme&gt;://&lt;netloc&gt;/&lt;path&gt;;&lt;params&gt;?&lt;query&gt;#&lt;fragment&gt;
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:5
+          |
+        2 | def urlparse():
+          |     ^^^-^^^^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        "#);
+    }
+
+    #[test]
     fn hover_func_with_plus_docstring() {
         let test = hover_test(
             r#"
