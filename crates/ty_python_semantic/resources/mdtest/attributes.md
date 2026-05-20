@@ -868,6 +868,19 @@ reveal_type(C.variable_with_class_default1)  # revealed: Literal["overwritten on
 reveal_type(c_instance.variable_with_class_default1)  # revealed: Literal["value set on instance"]
 ```
 
+#### Singleton class defaults are widened after visible instance assignments are unioned
+
+```py
+class C:
+    x = None
+
+    def method(self) -> None:
+        self.x = "foo"
+
+reveal_type(C.x)  # revealed: None | Unknown
+reveal_type(C().x)  # revealed: None | str
+```
+
 #### Descriptor attributes as class variables
 
 Whether they are explicitly qualified as `ClassVar`, or just have a class level default, we treat
