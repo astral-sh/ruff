@@ -535,6 +535,14 @@ specialized_explicit_return_decorator = ExplicitReturnDecorator[int]()
 class SpecializedExplicitReturnCallableInstanceDecorated: ...
 
 reveal_type(SpecializedExplicitReturnCallableInstanceDecorated)  # revealed: int
+
+def regular_callable_replacement_factory() -> Callable[[type[object]], T]:
+    raise NotImplementedError
+
+@regular_callable_replacement_factory()
+class RegularCallableReplacementDecorated: ...
+
+reveal_type(RegularCallableReplacementDecorated)  # revealed: Unknown
 ```
 
 An unknown class decorator still makes the class binding unknown:
