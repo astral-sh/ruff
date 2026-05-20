@@ -130,16 +130,18 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
                 ..
             }) => {
                 // Only the `try` body itself catches exceptions. Yields in
-                // `except` / `else` / `finally` are unprotected.
+                // `except` / `else` / `finally` are unprotected, but they
+                // inherit the surrounding terminal position because the
+                // `try` statement itself sits in that slot.
                 let prev = self.in_protected_try;
                 let terminal = self.in_terminal_position;
                 self.in_protected_try = true;
                 self.visit_body(body);
                 self.in_protected_try = prev;
                 for handler in handlers {
-                    self.visit_except_handler(handler);
+                    self.visit_except_handler_with_terminal(handler, terminal);
                 }
-                self.visit_body(orelse);
+                self.visit_body_with_terminal(orelse, terminal);
                 self.visit_body_with_terminal(finalbody, terminal);
             }
 
@@ -223,6 +225,22 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
 }
 
 impl YieldFinallyVisitor<'_, '_> {
+    /// Visits an `except` handler, propagating the surrounding `terminal` flag into its body.
+    fn visit_except_handler_with_terminal(
+        &mut self,
+        handler: &ast::ExceptHandler,
+        terminal: bool,
+    ) {
+        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+            type_, body, ..
+        }) = handler;
+
+        if let Some(type_) = type_ {
+            self.visit_expr(type_);
+        }
+        self.visit_body_with_terminal(body, terminal);
+    }
+
     /// Visits each statement in `body`, tracking whether each is in a terminal position.
     ///
     /// A statement is considered terminal if it is the last in the body (when `terminal` is true)

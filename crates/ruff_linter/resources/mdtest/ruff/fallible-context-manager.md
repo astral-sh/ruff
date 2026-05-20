@@ -17,8 +17,17 @@ from contextlib import contextmanager
 @contextmanager
 def bad():
     print("start")
-    yield  # error: [fallible-context-manager]
+    yield  # snapshot: fallible-context-manager
     print("cleanup")
+```
+
+```snapshot
+error[RUF075]: Context manager does not catch exceptions
+ --> src/mdtest_snippet.py:7:5
+  |
+7 |     yield  # snapshot: fallible-context-manager
+  |     ^^^^^
+  |
 ```
 
 ## Yield inside a nested `with`, not last
@@ -149,6 +158,44 @@ def bad_yield_in_except_with_trailing_code():
     except Exception:
         yield  # error: [fallible-context-manager]
     cleanup_after_try()
+```
+
+## Non-terminal `yield` in an `except` arm
+
+A `yield` inside an `except` handler that is followed by cleanup *inside* the same handler is
+also unprotected: the handler body itself doesn't catch exceptions raised by the `yield`.
+
+```py
+from contextlib import contextmanager
+
+
+@contextmanager
+def bad_yield_in_except_with_cleanup():
+    try:
+        setup()
+    except Exception:
+        yield  # error: [fallible-context-manager]
+        cleanup()
+```
+
+## Non-terminal `yield` in an `else` arm
+
+A `yield` inside an `else` arm is not protected by the surrounding `try`, so trailing cleanup
+inside the `else` body is skipped if the `yield` raises.
+
+```py
+from contextlib import contextmanager
+
+
+@contextmanager
+def bad_yield_in_else_with_cleanup():
+    try:
+        setup()
+    except Exception:
+        recover()
+    else:
+        yield  # error: [fallible-context-manager]
+        cleanup()
 ```
 
 ## Yield in a `match` guard expression
@@ -462,14 +509,20 @@ def good_attribute_import():
 
 ## Non-`@contextmanager` functions are ignored
 
+The bodies below would be flagged if the function were decorated with `@contextmanager`
+(a non-terminal `yield` followed by cleanup), so this section actually exercises the
+decorator gate rather than the `yield`-position check.
+
 ```py
 def not_a_context_manager():
     yield
+    cleanup()
 
 
 @some_other_decorator
 def other_decorator():
     yield
+    cleanup()
 ```
 
 ## Nested definitions don't trigger
@@ -513,13 +566,14 @@ def good_with_class():
         print("cleanup")
 
 
-# Lambdas can't syntactically contain `yield`, but the visitor short-circuits
-# on them to avoid recursing into their bodies. This exercises that path.
+# A `yield` inside a lambda belongs to the lambda's own (inner) generator,
+# not to the surrounding `@contextmanager` function — so the visitor
+# short-circuits on lambdas instead of recursing into them.
 @contextmanager
 def good_with_lambda():
-    helper = lambda x: x + 1
+    make_gen = lambda: (yield 1)
     try:
-        yield helper(42)
+        yield make_gen
     finally:
         cleanup()
 ```
