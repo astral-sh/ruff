@@ -81,6 +81,7 @@ def namedtuple(
 
 class UserDict(MutableMapping[_KT, _VT]):
     data: dict[_KT, _VT]
+
     # __init__ should be kept roughly in line with `dict.__init__`, which has the same semantics
     @overload
     def __init__(self, dict: None = None, /) -> None: ...
@@ -110,6 +111,7 @@ class UserDict(MutableMapping[_KT, _VT]):
     def __init__(self: UserDict[str, str], iterable: Iterable[list[str]], /) -> None: ...
     @overload
     def __init__(self: UserDict[bytes, bytes], iterable: Iterable[list[bytes]], /) -> None: ...
+
     def __len__(self) -> int: ...
     def __getitem__(self, key: _KT) -> _VT: ...
     def __setitem__(self, key: _KT, item: _VT) -> None: ...
@@ -128,19 +130,23 @@ class UserDict(MutableMapping[_KT, _VT]):
     @classmethod
     @overload
     def fromkeys(cls, iterable: Iterable[_T], value: _S) -> UserDict[_T, _S]: ...
+
     @overload
     def __or__(self, other: UserDict[_KT, _VT] | dict[_KT, _VT]) -> Self: ...
     @overload
     def __or__(self, other: UserDict[_T1, _T2] | dict[_T1, _T2]) -> UserDict[_KT | _T1, _VT | _T2]: ...
+
     @overload
     def __ror__(self, other: UserDict[_KT, _VT] | dict[_KT, _VT]) -> Self: ...
     @overload
     def __ror__(self, other: UserDict[_T1, _T2] | dict[_T1, _T2]) -> UserDict[_KT | _T1, _VT | _T2]: ...
+
     # UserDict.__ior__ should be kept roughly in line with MutableMapping.update()
     @overload  # type: ignore[misc]
     def __ior__(self, other: SupportsKeysAndGetItem[_KT, _VT]) -> Self: ...
     @overload
     def __ior__(self, other: Iterable[tuple[_KT, _VT]]) -> Self: ...
+
     if sys.version_info >= (3, 12):
         @overload
         def get(self, key: _KT, default: None = None) -> _VT | None: ...
@@ -153,10 +159,12 @@ class UserList(MutableSequence[_T]):
     """A more or less complete user-defined wrapper around list objects."""
 
     data: list[_T]
+
     @overload
     def __init__(self, initlist: None = None) -> None: ...
     @overload
     def __init__(self, initlist: Iterable[_T]) -> None: ...
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __lt__(self, other: list[_T] | UserList[_T]) -> bool: ...
     def __le__(self, other: list[_T] | UserList[_T]) -> bool: ...
@@ -165,14 +173,17 @@ class UserList(MutableSequence[_T]):
     def __eq__(self, other: object) -> bool: ...
     def __contains__(self, item: object) -> bool: ...
     def __len__(self) -> int: ...
+
     @overload
     def __getitem__(self, i: SupportsIndex) -> _T: ...
     @overload
     def __getitem__(self, i: slice[SupportsIndex | None]) -> Self: ...
+
     @overload
     def __setitem__(self, i: SupportsIndex, item: _T) -> None: ...
     @overload
     def __setitem__(self, i: slice[SupportsIndex | None], item: Iterable[_T]) -> None: ...
+
     def __delitem__(self, i: SupportsIndex | slice[SupportsIndex | None]) -> None: ...
     def __add__(self, other: Iterable[_T]) -> Self: ...
     def __radd__(self, other: Iterable[_T]) -> Self: ...
@@ -191,11 +202,13 @@ class UserList(MutableSequence[_T]):
     # to `list.index`. In order to give more precise types, we pretend that the
     # `item` argument is positional-only.
     def index(self, item: _T, start: SupportsIndex = 0, stop: SupportsIndex = sys.maxsize, /) -> int: ...
+
     # All arguments are passed to `list.sort` at runtime, so the signature should be kept in line with `list.sort`.
     @overload
     def sort(self: UserList[SupportsRichComparisonT], *, key: None = None, reverse: bool = False) -> None: ...
     @overload
     def sort(self, *, key: Callable[[_T], SupportsRichComparison], reverse: bool = False) -> None: ...
+
     def extend(self, other: Iterable[_T]) -> None: ...
 
 class UserString(Sequence[UserString]):
@@ -282,6 +295,7 @@ class deque(MutableSequence[_T]):
     def __init__(self, *, maxlen: int | None = None) -> None: ...
     @overload
     def __init__(self, iterable: Iterable[_T], maxlen: int | None = None) -> None: ...
+
     def append(self, x: _T, /) -> None:
         """Add an element to the right side of the deque."""
 
@@ -420,13 +434,13 @@ class Counter(dict[_T, int], Generic[_T]):
         >>> c = Counter(a=4, b=2)                   # a new counter from keyword args
 
         """
-
     @overload
     def __init__(self: Counter[str], iterable: None = None, /, **kwargs: int) -> None: ...
     @overload
     def __init__(self, mapping: SupportsKeysAndGetItem[_T, int], /) -> None: ...
     @overload
     def __init__(self, iterable: Iterable[_T], /) -> None: ...
+
     def copy(self) -> Self:
         """Return a shallow copy."""
 
@@ -460,6 +474,7 @@ class Counter(dict[_T, int], Generic[_T]):
 
     @classmethod
     def fromkeys(cls, iterable: Any, v: int | None = None) -> NoReturn: ...  # type: ignore[override]
+
     @overload
     def subtract(self, iterable: None = None, /) -> None:
         """Like dict.update() but subtracts counts instead of replacing them.
@@ -477,11 +492,11 @@ class Counter(dict[_T, int], Generic[_T]):
         -1
 
         """
-
     @overload
     def subtract(self, mapping: Mapping[_T, int], /) -> None: ...
     @overload
     def subtract(self, iterable: Iterable[_T], /) -> None: ...
+
     # Unlike dict.update(), use Mapping instead of SupportsKeysAndGetItem for the first overload
     # (source code does an `isinstance(other, Mapping)` check)
     #
@@ -502,11 +517,11 @@ class Counter(dict[_T, int], Generic[_T]):
         4
 
         """
-
     @overload
     def update(self, iterable: Iterable[_T], /, **kwargs: int) -> None: ...
     @overload
     def update(self, iterable: None = None, /, **kwargs: int) -> None: ...
+
     def total(self) -> int:
         """Sum of the counts"""
 
@@ -674,6 +689,7 @@ class OrderedDict(dict[_KT, _VT]):
     def keys(self) -> _odict_keys[_KT, _VT]: ...
     def items(self) -> _odict_items[_KT, _VT]: ...
     def values(self) -> _odict_values[_KT, _VT]: ...
+
     # The signature of OrderedDict.fromkeys should be kept in line with `dict.fromkeys`, modulo positional-only differences.
     # Like dict.fromkeys, its true signature is not expressible in the current type system.
     # See #3800 & https://github.com/python/typing/issues/548#issuecomment-683336963.
@@ -681,10 +697,10 @@ class OrderedDict(dict[_KT, _VT]):
     @overload
     def fromkeys(cls, iterable: Iterable[_T], value: None = None) -> OrderedDict[_T, Any | None]:
         """Create a new ordered dictionary with keys from iterable and values set to value."""
-
     @classmethod
     @overload
     def fromkeys(cls, iterable: Iterable[_T], value: _S) -> OrderedDict[_T, _S]: ...
+
     # Keep OrderedDict.setdefault in line with MutableMapping.setdefault, modulo positional-only differences.
     @overload
     def setdefault(self: OrderedDict[_KT, _T | None], key: _KT, default: None = None) -> _T | None:
@@ -692,9 +708,9 @@ class OrderedDict(dict[_KT, _VT]):
 
         Return the value for key if key is in the dictionary, else default.
         """
-
     @overload
     def setdefault(self, key: _KT, default: _VT) -> _VT: ...
+
     # Same as dict.pop, but accepts keyword arguments
     @overload
     def pop(self, key: _KT) -> _VT:
@@ -703,17 +719,19 @@ class OrderedDict(dict[_KT, _VT]):
         If the key is not found, return the default if given; otherwise,
         raise a KeyError.
         """
-
     @overload
     def pop(self, key: _KT, default: _VT) -> _VT: ...
     @overload
     def pop(self, key: _KT, default: _T) -> _VT | _T: ...
+
     def __eq__(self, value: object, /) -> bool: ...
+
     if sys.version_info >= (3, 15):
         @overload
         def __or__(self, value: dict[_KT, _VT] | frozendict[_KT, _VT], /) -> Self: ...
         @overload
         def __or__(self, value: dict[_T1, _T2] | frozendict[_T1, _T2], /) -> OrderedDict[_KT | _T1, _VT | _T2]: ...
+
         @overload  # type: ignore[override]
         def __ror__(self, value: dict[_KT, _VT] | frozendict[_KT, _VT], /) -> Self: ...  # type: ignore[override,misc]
         @overload
@@ -724,13 +742,12 @@ class OrderedDict(dict[_KT, _VT]):
         @overload
         def __or__(self, value: dict[_KT, _VT], /) -> Self:
             """Return self|value."""
-
         @overload
         def __or__(self, value: dict[_T1, _T2], /) -> OrderedDict[_KT | _T1, _VT | _T2]: ...
+
         @overload
         def __ror__(self, value: dict[_KT, _VT], /) -> Self:
             """Return value|self."""
-
         @overload
         def __ror__(self, value: dict[_T1, _T2], /) -> OrderedDict[_KT | _T1, _VT | _T2]: ...  # type: ignore[misc]
 
@@ -781,6 +798,7 @@ class defaultdict(dict[_KT, _VT]):
         /,
         **kwargs: _VT,
     ) -> None: ...
+
     def __missing__(self, key: _KT, /) -> _VT:
         """__missing__(key) # Called by __getitem__ for missing key; pseudo-code:
         if self.default_factory is None: raise KeyError((key,))
@@ -793,18 +811,18 @@ class defaultdict(dict[_KT, _VT]):
 
     def copy(self) -> Self:
         """D.copy() -> a shallow copy of D."""
+
     # defaultdict rejects frozendict in its direct __or__/__ror__ methods, even though dict accepts it.
     # See https://github.com/python/cpython/issues/149534.
     @overload  # type: ignore[override]
     def __or__(self, value: dict[_KT, _VT], /) -> Self:
         """Return self|value."""
-
     @overload
     def __or__(self, value: dict[_T1, _T2], /) -> defaultdict[_KT | _T1, _VT | _T2]: ...
+
     @overload  # type: ignore[override]
     def __ror__(self, value: dict[_KT, _VT], /) -> Self:
         """Return value|self."""
-
     @overload
     def __ror__(self, value: dict[_T1, _T2], /) -> defaultdict[_KT | _T1, _VT | _T2]: ...  # type: ignore[misc]
 
@@ -845,29 +863,32 @@ class ChainMap(MutableMapping[_KT, _VT]):
     def __iter__(self) -> Iterator[_KT]: ...
     def __len__(self) -> int: ...
     def __contains__(self, key: object) -> bool: ...
+
     @overload
     def get(self, key: _KT, default: None = None) -> _VT | None: ...
     @overload
     def get(self, key: _KT, default: _VT) -> _VT: ...
     @overload
     def get(self, key: _KT, default: _T) -> _VT | _T: ...
+
     def __missing__(self, key: _KT) -> _VT: ...  # undocumented
     def __bool__(self) -> bool: ...
+
     # Keep ChainMap.setdefault in line with MutableMapping.setdefault, modulo positional-only differences.
     @overload
     def setdefault(self: ChainMap[_KT, _T | None], key: _KT, default: None = None) -> _T | None:
         """D.setdefault(k[,d]) -> D.get(k,d), also set D[k]=d if k not in D"""
-
     @overload
     def setdefault(self, key: _KT, default: _VT) -> _VT: ...
+
     @overload
     def pop(self, key: _KT) -> _VT:
         """Remove *key* from maps[0] and return its value. Raise KeyError if *key* not in maps[0]."""
-
     @overload
     def pop(self, key: _KT, default: _VT) -> _VT: ...
     @overload
     def pop(self, key: _KT, default: _T) -> _VT | _T: ...
+
     def copy(self) -> Self:
         """New ChainMap or subclass with a new copy of maps[0] and refs to maps[1:]"""
     __copy__ = copy
@@ -889,18 +910,20 @@ class ChainMap(MutableMapping[_KT, _VT]):
     # Special-case None: the user probably wants to add non-None values later.
     def fromkeys(cls, iterable: Iterable[_T], value: None, /) -> ChainMap[_T, Any | None]:
         """Create a new ChainMap with keys from iterable and values set to value."""
-
     @classmethod
     @overload
     def fromkeys(cls, iterable: Iterable[_T], value: _S, /) -> ChainMap[_T, _S]: ...
+
     @overload
     def __or__(self, other: Mapping[_KT, _VT]) -> Self: ...
     @overload
     def __or__(self, other: Mapping[_T1, _T2]) -> ChainMap[_KT | _T1, _VT | _T2]: ...
+
     @overload
     def __ror__(self, other: Mapping[_KT, _VT]) -> Self: ...
     @overload
     def __ror__(self, other: Mapping[_T1, _T2]) -> ChainMap[_KT | _T1, _VT | _T2]: ...
+
     # ChainMap.__ior__ should be kept roughly in line with MutableMapping.update()
     @overload  # type: ignore[misc]
     def __ior__(self, other: SupportsKeysAndGetItem[_KT, _VT]) -> Self: ...

@@ -59,9 +59,9 @@ if sys.version_info >= (3, 14):
         If 'limit' is 0, the call stack is not captured at all, only
         "awaited by" information is present.
         """
-
     @overload
     def capture_call_graph(future: Future[Any], /, *, depth: int = 1, limit: int | None = None) -> FutureCallGraph | None: ...
+
     def format_call_graph(future: Future[Any] | None = None, /, *, depth: int = 1, limit: int | None = None) -> str:
         """Return the async call graph as a string for `future`.
 

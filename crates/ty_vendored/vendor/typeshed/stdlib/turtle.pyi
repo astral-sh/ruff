@@ -258,10 +258,12 @@ if sys.version_info >= (3, 12):
 
         def __new__(cls, x: float, y: float) -> Self: ...
         def __add__(self, other: tuple[float, float]) -> Vec2D: ...  # type: ignore[override]
+
         @overload  # type: ignore[override]
         def __mul__(self, other: Vec2D) -> float: ...
         @overload
         def __mul__(self, other: float) -> Vec2D: ...
+
         def __rmul__(self, other: float) -> Vec2D: ...  # type: ignore[override]
         def __sub__(self, other: tuple[float, float]) -> Vec2D: ...
         def __neg__(self) -> Vec2D: ...
@@ -288,10 +290,12 @@ else:
 
         def __new__(cls, x: float, y: float) -> Self: ...
         def __add__(self, other: tuple[float, float]) -> Vec2D: ...  # type: ignore[override]
+
         @overload  # type: ignore[override]
         def __mul__(self, other: Vec2D) -> float: ...
         @overload
         def __mul__(self, other: float) -> Vec2D: ...
+
         def __rmul__(self, other: float) -> Vec2D: ...  # type: ignore[override]
         def __sub__(self, other: tuple[float, float]) -> Vec2D: ...
         def __neg__(self) -> Vec2D: ...
@@ -467,9 +471,9 @@ class TurtleScreen(TurtleScreenBase):
         >>> mode()
         'logo'
         """
-
     @overload
     def mode(self, mode: Literal["standard", "logo", "world"]) -> None: ...
+
     def setworldcoordinates(self, llx: float, lly: float, urx: float, ury: float) -> None:
         """Set up a user defined coordinate-system.
 
@@ -536,9 +540,9 @@ class TurtleScreen(TurtleScreenBase):
         >>> screen.colormode(255)
         >>> pencolor(240,160,80)
         """
-
     @overload
     def colormode(self, cmode: float) -> None: ...
+
     def reset(self) -> None:
         """Reset all Turtles on the Screen to their initial state.
 
@@ -587,11 +591,11 @@ class TurtleScreen(TurtleScreenBase):
         >>> screen.bgcolor()
         (128.0, 0.0, 128.0)
         """
-
     @overload
     def bgcolor(self, color: _Color) -> None: ...
     @overload
     def bgcolor(self, r: float, g: float, b: float) -> None: ...
+
     @overload
     def tracer(self, n: None = None) -> int:
         """Turns turtle animation on/off and set delay for update drawings.
@@ -612,9 +616,9 @@ class TurtleScreen(TurtleScreenBase):
         ...     rt(90)
         ...     dist += 2
         """
-
     @overload
     def tracer(self, n: int, delay: int | None = None) -> None: ...
+
     @overload
     def delay(self, delay: None = None) -> int:
         """Return or set the drawing delay in milliseconds.
@@ -627,9 +631,9 @@ class TurtleScreen(TurtleScreenBase):
         >>> screen.delay()
         15
         """
-
     @overload
     def delay(self, delay: int) -> None: ...
+
     if sys.version_info >= (3, 14):
         @contextmanager
         def no_animation(self) -> Generator[None]:
@@ -774,9 +778,9 @@ class TurtleScreen(TurtleScreenBase):
         >>> screen.bgpic()
         'landscape.gif'
         """
-
     @overload
     def bgpic(self, picname: str) -> None: ...
+
     @overload
     def screensize(self, canvwidth: None = None, canvheight: None = None, bg: None = None) -> tuple[int, int]:
         """Resize the canvas the turtles are drawing on.
@@ -798,6 +802,7 @@ class TurtleScreen(TurtleScreenBase):
     # Looks like if self.cv is not a ScrolledCanvas, this could return a tuple as well
     @overload
     def screensize(self, canvwidth: int, canvheight: int, bg: _Color | None = None) -> None: ...
+
     if sys.version_info >= (3, 14):
         def save(self, filename: StrPath, *, overwrite: bool = False) -> None:
             """Save the drawing as a PostScript file
@@ -1050,9 +1055,9 @@ class TNavigator:
         >>> turtle.pos()
         (0.00,0.00)
         """
-
     @overload
     def goto(self, x: float, y: float) -> None: ...
+
     def home(self) -> None:
         """Move turtle to the origin - coordinates (0,0).
 
@@ -1122,9 +1127,9 @@ class TNavigator:
         >>> turtle.distance(pen)
         77.0
         """
-
     @overload
     def distance(self, x: float, y: float) -> float: ...
+
     @overload
     def towards(self, x: TNavigator | tuple[float, float], y: None = None) -> float:
         """Return the angle of the line from the turtle's position to (x, y).
@@ -1148,9 +1153,9 @@ class TNavigator:
         >>> turtle.towards(0,0)
         225.0
         """
-
     @overload
     def towards(self, x: float, y: float) -> float: ...
+
     def heading(self) -> float:
         """Return the turtle's current heading.
 
@@ -1235,6 +1240,7 @@ class TPen:
     """
 
     def __init__(self, resizemode: Literal["auto", "user", "noresize"] = "noresize") -> None: ...
+
     @overload
     def resizemode(self, rmode: None = None) -> str:
         """Set resizemode to one of the values: "auto", "user", "noresize".
@@ -1258,9 +1264,9 @@ class TPen:
         >>> turtle.resizemode()
         'noresize'
         """
-
     @overload
     def resizemode(self, rmode: Literal["auto", "user", "noresize"]) -> None: ...
+
     @overload
     def pensize(self, width: None = None) -> int:
         """Set or return the line thickness.
@@ -1280,9 +1286,9 @@ class TPen:
         1
         >>> turtle.pensize(10)   # from here on lines of width 10 are drawn
         """
-
     @overload
     def pensize(self, width: int) -> None: ...
+
     def penup(self) -> None:
         """Pull the pen up -- no drawing when moving.
 
@@ -1347,9 +1353,9 @@ class TPen:
         Example (for a Turtle instance named turtle):
         >>> turtle.speed(3)
         """
-
     @overload
     def speed(self, speed: _Speed) -> None: ...
+
     @overload
     def pencolor(self) -> _AnyColor:
         """Return or set the pencolor.
@@ -1384,11 +1390,11 @@ class TPen:
         >>> turtle.pencolor()
         (50.0, 193.0, 143.0)
         """
-
     @overload
     def pencolor(self, color: _Color) -> None: ...
     @overload
     def pencolor(self, r: float, g: float, b: float) -> None: ...
+
     @overload
     def fillcolor(self) -> _AnyColor:
         """Return or set the fillcolor.
@@ -1423,11 +1429,11 @@ class TPen:
         >>> turtle.fillcolor()
         (255.0, 255.0, 255.0)
         """
-
     @overload
     def fillcolor(self, color: _Color) -> None: ...
     @overload
     def fillcolor(self, r: float, g: float, b: float) -> None: ...
+
     @overload
     def color(self) -> tuple[_AnyColor, _AnyColor]:
         """Return or set the pencolor and fillcolor.
@@ -1459,13 +1465,13 @@ class TPen:
         >>> color()
         ((40.0, 80.0, 120.0), (160.0, 200.0, 240.0))
         """
-
     @overload
     def color(self, color: _Color) -> None: ...
     @overload
     def color(self, r: float, g: float, b: float) -> None: ...
     @overload
     def color(self, color1: _Color, color2: _Color) -> None: ...
+
     if sys.version_info >= (3, 12):
         def teleport(self, x: float | None = None, y: float | None = None, *, fill_gap: bool = False) -> None:
             """To be overwritten by child class RawTurtle.
@@ -1509,6 +1515,7 @@ class TPen:
         >>> print(turtle.isvisible())
         False
         """
+
     # Note: signatures 1 and 2 overlap unsafely when no arguments are provided
     @overload
     def pen(self) -> _PenState:
@@ -1558,7 +1565,6 @@ class TPen:
         'pencolor': 'red', 'pendown': True, 'fillcolor': 'green',
         'stretchfactor': (1,1), 'speed': 3, 'shearfactor': 0.0}
         """
-
     @overload
     def pen(
         self,
@@ -1575,6 +1581,7 @@ class TPen:
         outline: int = ...,
         tilt: float = ...,
     ) -> None: ...
+
     width = pensize
     up = penup
     pu = penup
@@ -1690,9 +1697,9 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.shape()
         'turtle'
         """
-
     @overload
     def shape(self, name: str) -> None: ...
+
     # Unsafely overlaps when no arguments are provided
     @overload
     def shapesize(self) -> tuple[float, float, float]:
@@ -1716,11 +1723,11 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.shapesize(5, 5, 12)
         >>> turtle.shapesize(outline=8)
         """
-
     @overload
     def shapesize(
         self, stretch_wid: float | None = None, stretch_len: float | None = None, outline: float | None = None
     ) -> None: ...
+
     @overload
     def shearfactor(self, shear: None = None) -> float:
         """Set or return the current shearfactor.
@@ -1741,9 +1748,9 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.shearfactor()
         >>> 0.5
         """
-
     @overload
     def shearfactor(self, shear: float) -> None: ...
+
     # Unsafely overlaps when no arguments are provided
     @overload
     def shapetransform(self) -> tuple[float, float, float, float]:
@@ -1766,11 +1773,11 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.shapetransform()
         (4.0, -1.0, -0.0, 2.0)
         """
-
     @overload
     def shapetransform(
         self, t11: float | None = None, t12: float | None = None, t21: float | None = None, t22: float | None = None
     ) -> None: ...
+
     def get_shapepoly(self) -> _PolygonCoords | None:
         """Return the current shape polygon as tuple of coordinate pairs.
 
@@ -1836,9 +1843,9 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.stamp()
         >>> turtle.fd(50)
         """
-
     @overload
     def tiltangle(self, angle: float) -> None: ...
+
     def tilt(self, angle: float) -> None:
         """Rotate the turtleshape by angle.
 
@@ -1972,11 +1979,11 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.dot()
         >>> turtle.fd(50); turtle.dot(20, "blue"); turtle.fd(50)
         """
-
     @overload
     def dot(self, size: int | None, color: _Color, /) -> None: ...
     @overload
     def dot(self, size: int | None, r: float, g: float, b: float, /) -> None: ...
+
     def write(
         self, arg: object, move: bool = False, align: str = "left", font: tuple[str, int, str] = ("Arial", 8, "normal")
     ) -> None:
@@ -2349,9 +2356,9 @@ def mode(mode: None = None) -> str:
     >>> mode()
     'logo'
     """
-
 @overload
 def mode(mode: Literal["standard", "logo", "world"]) -> None: ...
+
 def setworldcoordinates(llx: float, lly: float, urx: float, ury: float) -> None:
     """Set up a user defined coordinate-system.
 
@@ -2418,9 +2425,9 @@ def colormode(cmode: None = None) -> float:
     >>> colormode(255)
     >>> pencolor(240,160,80)
     """
-
 @overload
 def colormode(cmode: float) -> None: ...
+
 def reset() -> None:
     """Delete the turtle's drawings and restore its default values.
 
@@ -2480,11 +2487,11 @@ def bgcolor() -> _AnyColor:
     >>> bgcolor()
     (128.0, 0.0, 128.0)
     """
-
 @overload
 def bgcolor(color: _Color) -> None: ...
 @overload
 def bgcolor(r: float, g: float, b: float) -> None: ...
+
 @overload
 def tracer(n: None = None) -> int:
     """Turns turtle animation on/off and set delay for update drawings.
@@ -2505,9 +2512,9 @@ def tracer(n: None = None) -> int:
     ...     rt(90)
     ...     dist += 2
     """
-
 @overload
 def tracer(n: int, delay: int | None = None) -> None: ...
+
 @overload
 def delay(delay: None = None) -> int:
     """Return or set the drawing delay in milliseconds.
@@ -2520,7 +2527,6 @@ def delay(delay: None = None) -> int:
     >>> delay()
     15
     """
-
 @overload
 def delay(delay: int) -> None: ...
 
@@ -2671,9 +2677,9 @@ def bgpic(picname: None = None) -> str:
     >>> bgpic()
     'landscape.gif'
     """
-
 @overload
 def bgpic(picname: str) -> None: ...
+
 @overload
 def screensize(canvwidth: None = None, canvheight: None = None, bg: None = None) -> tuple[int, int]:
     """Resize the canvas the turtles are drawing on.
@@ -2692,7 +2698,6 @@ def screensize(canvwidth: None = None, canvheight: None = None, bg: None = None)
     >>> turtle.screensize(2000,1500)
     >>> # e.g. to search for an erroneously escaped turtle ;-)
     """
-
 @overload
 def screensize(canvwidth: int, canvheight: int, bg: _Color | None = None) -> None: ...
 
@@ -3006,9 +3011,9 @@ def goto(x: tuple[float, float], y: None = None) -> None:
     >>> pos()
     (0.00,0.00)
     """
-
 @overload
 def goto(x: float, y: float) -> None: ...
+
 def home() -> None:
     """Move turtle to the origin - coordinates (0,0).
 
@@ -3078,9 +3083,9 @@ def distance(x: TNavigator | tuple[float, float], y: None = None) -> float:
     >>> distance(pen)
     77.0
     """
-
 @overload
 def distance(x: float, y: float) -> float: ...
+
 @overload
 def towards(x: TNavigator | tuple[float, float], y: None = None) -> float:
     """Return the angle of the line from the turtle's position to (x, y).
@@ -3104,9 +3109,9 @@ def towards(x: TNavigator | tuple[float, float], y: None = None) -> float:
     >>> towards(0,0)
     225.0
     """
-
 @overload
 def towards(x: float, y: float) -> float: ...
+
 def heading() -> float:
     """Return the turtle's current heading.
 
@@ -3207,9 +3212,9 @@ def resizemode(rmode: None = None) -> str:
     >>> resizemode()
     'noresize'
     """
-
 @overload
 def resizemode(rmode: Literal["auto", "user", "noresize"]) -> None: ...
+
 @overload
 def pensize(width: None = None) -> int:
     """Set or return the line thickness.
@@ -3229,9 +3234,9 @@ def pensize(width: None = None) -> int:
     1
     >>> pensize(10)   # from here on lines of width 10 are drawn
     """
-
 @overload
 def pensize(width: int) -> None: ...
+
 def penup() -> None:
     """Pull the pen up -- no drawing when moving.
 
@@ -3296,9 +3301,9 @@ def speed(speed: None = None) -> int:
     Example:
     >>> speed(3)
     """
-
 @overload
 def speed(speed: _Speed) -> None: ...
+
 @overload
 def pencolor() -> _AnyColor:
     """Return or set the pencolor.
@@ -3333,11 +3338,11 @@ def pencolor() -> _AnyColor:
     >>> pencolor()
     (50.0, 193.0, 143.0)
     """
-
 @overload
 def pencolor(color: _Color) -> None: ...
 @overload
 def pencolor(r: float, g: float, b: float) -> None: ...
+
 @overload
 def fillcolor() -> _AnyColor:
     """Return or set the fillcolor.
@@ -3372,11 +3377,11 @@ def fillcolor() -> _AnyColor:
     >>> fillcolor()
     (255.0, 255.0, 255.0)
     """
-
 @overload
 def fillcolor(color: _Color) -> None: ...
 @overload
 def fillcolor(r: float, g: float, b: float) -> None: ...
+
 @overload
 def color() -> tuple[_AnyColor, _AnyColor]:
     """Return or set the pencolor and fillcolor.
@@ -3408,13 +3413,13 @@ def color() -> tuple[_AnyColor, _AnyColor]:
     >>> color()
     ((40.0, 80.0, 120.0), (160.0, 200.0, 240.0))
     """
-
 @overload
 def color(color: _Color) -> None: ...
 @overload
 def color(r: float, g: float, b: float) -> None: ...
 @overload
 def color(color1: _Color, color2: _Color) -> None: ...
+
 def showturtle() -> None:
     """Makes the turtle visible.
 
@@ -3502,7 +3507,6 @@ def pen() -> _PenState:
     'pencolor': 'red', 'pendown': True, 'fillcolor': 'green',
     'stretchfactor': (1,1), 'speed': 3, 'shearfactor': 0.0}
     """
-
 @overload
 def pen(
     pen: _PenState | None = None,
@@ -3575,7 +3579,6 @@ def shape(name: None = None) -> str:
     >>> shape()
     'turtle'
     """
-
 @overload
 def shape(name: str) -> None: ...
 
@@ -3639,9 +3642,9 @@ def shapesize() -> tuple[float, float, float]:
     >>> shapesize(5, 5, 12)
     >>> shapesize(outline=8)
     """
-
 @overload
 def shapesize(stretch_wid: float | None = None, stretch_len: float | None = None, outline: float | None = None) -> None: ...
+
 @overload
 def shearfactor(shear: None = None) -> float:
     """Set or return the current shearfactor.
@@ -3662,7 +3665,6 @@ def shearfactor(shear: None = None) -> float:
     >>> shearfactor()
     >>> 0.5
     """
-
 @overload
 def shearfactor(shear: float) -> None: ...
 
@@ -3688,11 +3690,11 @@ def shapetransform() -> tuple[float, float, float, float]:
     >>> shapetransform()
     (4.0, -1.0, -0.0, 2.0)
     """
-
 @overload
 def shapetransform(
     t11: float | None = None, t12: float | None = None, t21: float | None = None, t22: float | None = None
 ) -> None: ...
+
 def get_shapepoly() -> _PolygonCoords | None:
     """Return the current shape polygon as tuple of coordinate pairs.
 
@@ -3759,9 +3761,9 @@ def tiltangle(angle: None = None) -> float:
     >>> stamp()
     >>> fd(50)
     """
-
 @overload
 def tiltangle(angle: float) -> None: ...
+
 def tilt(angle: float) -> None:
     """Rotate the turtleshape by angle.
 
@@ -3897,11 +3899,11 @@ def dot(size: int | _Color | None = None) -> None:
     >>> dot()
     >>> fd(50); dot(20, "blue"); fd(50)
     """
-
 @overload
 def dot(size: int | None, color: _Color, /) -> None: ...
 @overload
 def dot(size: int | None, r: float, g: float, b: float, /) -> None: ...
+
 def write(arg: object, move: bool = False, align: str = "left", font: tuple[str, int, str] = ("Arial", 8, "normal")) -> None:
     """Write text at the current turtle position.
 

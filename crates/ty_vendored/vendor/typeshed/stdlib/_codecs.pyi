@@ -77,11 +77,11 @@ def encode(obj: ReadableBuffer, encoding: _BytesToBytesEncoding, errors: str = "
     and 'backslashreplace' as well as any other name registered with
     codecs.register_error that can handle ValueErrors.
     """
-
 @overload
 def encode(obj: str, encoding: _StrToStrEncoding, errors: str = "strict") -> str: ...  # type: ignore[overload-overlap]
 @overload
 def encode(obj: str, encoding: str = "utf-8", errors: str = "strict") -> bytes: ...
+
 @overload
 def decode(obj: ReadableBuffer, encoding: _BytesToBytesEncoding, errors: str = "strict") -> bytes:  # type: ignore[overload-overlap]
     """Decodes obj using the codec registered for encoding.
@@ -92,7 +92,6 @@ def decode(obj: ReadableBuffer, encoding: _BytesToBytesEncoding, errors: str = "
     and 'backslashreplace' as well as any other name registered with
     codecs.register_error that can handle ValueErrors.
     """
-
 @overload
 def decode(obj: str, encoding: _StrToStrEncoding, errors: str = "strict") -> str: ...
 
@@ -109,6 +108,7 @@ def decode(
 def decode(obj: str, encoding: Literal["hex", "hex_codec"], errors: str = "strict") -> bytes: ...
 @overload
 def decode(obj: ReadableBuffer, encoding: str = "utf-8", errors: str = "strict") -> str: ...
+
 def lookup(encoding: str, /) -> codecs.CodecInfo:
     """Looks up a codec tuple in the Python codec registry and returns a CodecInfo object."""
 

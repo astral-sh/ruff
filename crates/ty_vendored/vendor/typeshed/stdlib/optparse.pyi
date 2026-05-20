@@ -324,12 +324,12 @@ class OptionContainer:
     def _check_conflict(self, option: Option) -> None: ...
     def _create_option_mappings(self) -> None: ...
     def _share_option_mappings(self, parser: OptionParser) -> None: ...
+
     @overload
     def add_option(self, opt: Option, /) -> Option:
         """add_option(Option)
         add_option(opt_str, ..., kwarg=val, ...)
         """
-
     @overload
     def add_option(
         self,
@@ -350,6 +350,7 @@ class OptionContainer:
         metavar: str | None = None,
         **kwargs: Any,  # Allow arbitrary keyword arguments for user defined option_class
     ) -> Option: ...
+
     def add_options(self, option_list: Iterable[Option]) -> None: ...
     def destroy(self) -> None:
         """see OptionParser.destroy()."""
@@ -524,10 +525,12 @@ class OptionParser(OptionContainer):
 
     def _process_long_opt(self, rargs: list[str], values: Values) -> None: ...
     def _process_short_opts(self, rargs: list[str], values: Values) -> None: ...
+
     @overload
     def add_option_group(self, opt_group: OptionGroup, /) -> OptionGroup: ...
     @overload
     def add_option_group(self, title: str, /, description: str | None = None) -> OptionGroup: ...
+
     def check_values(self, values: Values, args: list[str]) -> tuple[Values, list[str]]:
         """
         check_values(values : Values, args : [string])

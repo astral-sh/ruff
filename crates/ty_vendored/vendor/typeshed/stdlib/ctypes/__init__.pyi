@@ -53,11 +53,11 @@ if sys.version_info >= (3, 14):
         Pointer types are cached and reused internally,
         so calling this function repeatedly is cheap.
         """
-
     @overload
     def POINTER(cls: None) -> type[c_void_p]: ...
     @overload
     def POINTER(cls: type[_CT]) -> type[_Pointer[_CT]]: ...
+
     def pointer(obj: _CT) -> _Pointer[_CT]:
         """Create a new pointer instance, pointing to 'obj'.
 

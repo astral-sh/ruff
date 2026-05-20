@@ -547,6 +547,7 @@ class IMAP4_SSL(IMAP4):
             ssl_context: None = None,
             timeout: float | None = None,
         ) -> None: ...
+
         keyfile: StrOrBytesPath | None
         certfile: StrOrBytesPath | None
     sslobj: SSLSocket

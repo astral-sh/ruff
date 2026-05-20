@@ -253,7 +253,6 @@ def open(
     handling behavior, and line ending(s).
 
     """
-
 @overload
 def open(
     filename: _PathOrFile,
@@ -306,6 +305,7 @@ def open(
     errors: str | None = None,
     newline: str | None = None,
 ) -> LZMAFile | TextIOWrapper: ...
+
 def compress(
     data: ReadableBuffer, format: int = 1, check: int = -1, preset: int | None = None, filters: _FilterChain | None = None
 ) -> bytes:

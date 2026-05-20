@@ -103,9 +103,9 @@ def abs(a: SupportsAbs[_T], /) -> _T:
 @overload
 def add(a: SupportsAdd[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a + b."""
-
 @overload
 def add(a: _T_contra, b: SupportsRAdd[_T_contra, _T_co], /) -> _T_co: ...
+
 def and_(a, b, /):
     """Same as a & b."""
 
@@ -127,15 +127,15 @@ def lshift(a, b, /):
 @overload
 def mod(a: SupportsMod[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a % b."""
-
 @overload
 def mod(a: _T_contra, b: SupportsRMod[_T_contra, _T_co], /) -> _T_co: ...
+
 @overload
 def mul(a: SupportsMul[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a * b."""
-
 @overload
 def mul(a: _T_contra, b: SupportsRMul[_T_contra, _T_co], /) -> _T_co: ...
+
 def matmul(a, b, /):
     """Same as a @ b."""
 
@@ -157,9 +157,9 @@ def rshift(a, b, /):
 @overload
 def sub(a: SupportsSub[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a - b."""
-
 @overload
 def sub(a: _T_contra, b: SupportsRSub[_T_contra, _T_co], /) -> _T_co: ...
+
 def truediv(a, b, /):
     """Same as a / b."""
 
@@ -178,28 +178,28 @@ def countOf(a: Iterable[object], b: object, /) -> int:
 @overload
 def delitem(a: MutableSequence[Any], b: int, /) -> None:
     """Same as del a[b]."""
-
 @overload
 def delitem(a: MutableSequence[Any], b: slice[int | None], /) -> None: ...
 @overload
 def delitem(a: MutableMapping[_K, Any], b: _K, /) -> None: ...
+
 @overload
 def getitem(a: Sequence[_T], b: slice[int | None], /) -> Sequence[_T]:
     """Same as a[b]."""
-
 @overload
 def getitem(a: SupportsGetItem[_K, _V], b: _K, /) -> _V: ...
+
 def indexOf(a: Iterable[_T], b: _T, /) -> int:
     """Return the first index of b in a."""
 
 @overload
 def setitem(a: MutableSequence[_T], b: int, c: _T, /) -> None:
     """Same as a[b] = c."""
-
 @overload
 def setitem(a: MutableSequence[_T], b: slice[int | None], c: Sequence[_T], /) -> None: ...
 @overload
 def setitem(a: MutableMapping[_K, _V], b: _K, c: _V, /) -> None: ...
+
 def length_hint(obj: object, default: int = 0, /) -> int:
     """Return an estimate of the number of items in obj.
 

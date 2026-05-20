@@ -64,7 +64,6 @@ class ZstdFile(_streams.BaseStream):
         *zstd_dict* is an optional ZstdDict object, a pre-trained Zstandard
         dictionary. See train_dict() to train ZstdDict on sample data.
         """
-
     @overload
     def __init__(
         self,
@@ -76,6 +75,7 @@ class ZstdFile(_streams.BaseStream):
         options: Mapping[int, int] | None = None,
         zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
     ) -> None: ...
+
     def write(self, data: ReadableBuffer, /) -> int:
         """Write a bytes-like object *data* to the file.
 
@@ -201,7 +201,6 @@ def open(
     io.TextIOWrapper instance with the specified encoding, error handling
     behavior, and line ending(s).
     """
-
 @overload
 def open(
     file: StrOrBytesPath | _FileBinaryWrite,

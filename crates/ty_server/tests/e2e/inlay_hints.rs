@@ -56,11 +56,11 @@ y = foo(1)
               "uri": "file://<typeshed>/stdlib/builtins.pyi",
               "range": {
                 "start": {
-                  "line": 336,
+                  "line": 343,
                   "character": 6
                 },
                 "end": {
-                  "line": 336,
+                  "line": 343,
                   "character": 9
                 }
               }

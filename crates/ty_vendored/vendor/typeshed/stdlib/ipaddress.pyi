@@ -914,13 +914,13 @@ def summarize_address_range(first: IPv4Address, last: IPv4Address) -> Iterator[I
             If the version of the first address is not 4 or 6.
 
     """
-
 @overload
 def summarize_address_range(first: IPv6Address, last: IPv6Address) -> Iterator[IPv6Network]: ...
 @overload
 def summarize_address_range(
     first: IPv4Address | IPv6Address, last: IPv4Address | IPv6Address
 ) -> Iterator[IPv4Network] | Iterator[IPv6Network]: ...
+
 def collapse_addresses(addresses: Iterable[_N]) -> Iterator[_N]:
     """Collapse a list of IP objects.
 
@@ -959,7 +959,6 @@ def get_mixed_type_key(obj: _A) -> tuple[int, _A]:
       appropriate key.
 
     """
-
 @overload
 def get_mixed_type_key(obj: IPv4Network) -> tuple[int, IPv4Address, IPv4Address]: ...
 @overload

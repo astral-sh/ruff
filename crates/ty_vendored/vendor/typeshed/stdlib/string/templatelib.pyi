@@ -57,6 +57,5 @@ class Interpolation(Generic[_T]):
 @overload
 def convert(obj: _T, /, conversion: None) -> _T:
     """Convert *obj* using formatted string literal semantics."""
-
 @overload
 def convert(obj: object, /, conversion: Literal["r", "s", "a"]) -> str: ...

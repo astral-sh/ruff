@@ -36,7 +36,6 @@ def new(key: bytes | bytearray, msg: ReadableBuffer | None, digestmod: _DigestMo
     method, and can ask for the hash value at any time by calling its digest()
     or hexdigest() methods.
     """
-
 @overload
 def new(key: bytes | bytearray, *, digestmod: _DigestMod) -> HMAC: ...
 

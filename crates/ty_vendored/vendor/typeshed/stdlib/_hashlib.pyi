@@ -136,9 +136,9 @@ def compare_digest(a: ReadableBuffer, b: ReadableBuffer, /) -> bool:
     a timing attack could theoretically reveal information about the
     types and lengths of a and b--but not their values.
     """
-
 @overload
 def compare_digest(a: AnyStr, b: AnyStr, /) -> bool: ...
+
 def get_fips_mode() -> int:
     """Determine the OpenSSL FIPS mode of operation.
 

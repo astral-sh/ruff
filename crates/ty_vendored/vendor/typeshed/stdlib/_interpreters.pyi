@@ -178,7 +178,6 @@ def capture_exception(exc: BaseException) -> types.SimpleNamespace:
 
     The returned snapshot is the same as what _interpreters.exec() returns.
     """
-
 @overload
 def capture_exception(exc: None = None) -> types.SimpleNamespace | None: ...
 

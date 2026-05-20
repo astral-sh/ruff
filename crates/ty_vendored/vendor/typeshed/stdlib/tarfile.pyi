@@ -519,7 +519,6 @@ class TarFile:
             'w|xz'       open an lzma compressed stream for writing
             'w|zst'      open a zstd compressed stream for writing
             """
-
         @overload
         @classmethod
         def open(
@@ -658,6 +657,7 @@ class TarFile:
         errorlevel: Literal[0, 1, 2] | None = None,  # default 1
         compresslevel: int = 9,
     ) -> Self: ...
+
     @classmethod
     def taropen(
         cls,
@@ -698,7 +698,6 @@ class TarFile:
         """Open gzip compressed tar archive name for reading or writing.
         Appending is not allowed.
         """
-
     @overload
     @classmethod
     def gzopen(
@@ -717,6 +716,7 @@ class TarFile:
         debug: Literal[0, 1, 2, 3] | None = None,  # default 0
         errorlevel: Literal[0, 1, 2] | None = None,  # default 1
     ) -> Self: ...
+
     @overload
     @classmethod
     def bz2open(
@@ -738,7 +738,6 @@ class TarFile:
         """Open bzip2 compressed tar archive name for reading or writing.
         Appending is not allowed.
         """
-
     @overload
     @classmethod
     def bz2open(
@@ -757,6 +756,7 @@ class TarFile:
         debug: Literal[0, 1, 2, 3] | None = None,  # default 0
         errorlevel: Literal[0, 1, 2] | None = None,  # default 1
     ) -> Self: ...
+
     @classmethod
     def xzopen(
         cls,
@@ -801,7 +801,6 @@ class TarFile:
             """Open zstd compressed tar archive name for reading or writing.
             Appending is not allowed.
             """
-
         @overload
         @classmethod
         def zstopen(
@@ -1166,6 +1165,7 @@ class TarInfo:
     @tarfile.setter
     @deprecated("Deprecated since Python 3.13; will be removed in Python 3.16.")
     def tarfile(self, tarfile: TarFile | None) -> None: ...
+
     @classmethod
     def frombuf(cls, buf: bytes | bytearray, encoding: str, errors: str) -> Self:
         """Construct a TarInfo object from a 512 byte bytes object.
@@ -1183,9 +1183,9 @@ class TarInfo:
     @property
     def linkpath(self) -> str:
         """In pax headers, "linkname" is called "linkpath"."""
-
     @linkpath.setter
     def linkpath(self, linkname: str) -> None: ...
+
     def replace(
         self,
         *,

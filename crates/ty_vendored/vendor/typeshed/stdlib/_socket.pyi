@@ -903,9 +903,9 @@ class socket:
         If a nonzero buffersize argument is given, the return value is a
         string of that length; otherwise it is an integer.
         """
-
     @overload
     def getsockopt(self, level: int, optname: int, buflen: int, /) -> bytes: ...
+
     def getblocking(self) -> bool:
         """getblocking()
 
@@ -1060,9 +1060,9 @@ class socket:
         Like send(data, flags) but allows specifying the destination address.
         For IP sockets, the address is a pair (hostaddr, port).
         """
-
     @overload
     def sendto(self, data: ReadableBuffer, flags: int, address: _Address, /) -> int: ...
+
     if sys.platform != "win32":
         def sendmsg(
             self,
@@ -1125,9 +1125,9 @@ class socket:
         The value argument can either be an integer, a string buffer, or
         None, optlen.
         """
-
     @overload
     def setsockopt(self, level: int, optname: int, value: None, optlen: int, /) -> None: ...
+
     if sys.platform == "win32":
         def share(self, process_id: int, /) -> bytes:
             """share(process_id) -> bytes

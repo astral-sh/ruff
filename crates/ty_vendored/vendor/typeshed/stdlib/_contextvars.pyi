@@ -16,9 +16,11 @@ class ContextVar(Generic[_T]):
     def __new__(cls, name: str) -> Self: ...
     @overload
     def __new__(cls, name: str, *, default: _T) -> Self: ...
+
     def __hash__(self) -> int: ...
     @property
     def name(self) -> str: ...
+
     @overload
     def get(self) -> _T:
         """Return a value for the context variable for the current context.
@@ -29,11 +31,11 @@ class ContextVar(Generic[_T]):
            with one; or
          * raise a LookupError.
         """
-
     @overload
     def get(self, default: _T, /) -> _T: ...
     @overload
     def get(self, default: _D, /) -> _D | _T: ...
+
     def set(self, value: _T, /) -> Token[_T]:
         """Call to set a new value for the context variable in the current context.
 
@@ -79,6 +81,7 @@ def copy_context() -> Context: ...
 @final
 class Context(Mapping[ContextVar[Any], Any]):
     def __init__(self) -> None: ...
+
     @overload
     def get(self, key: ContextVar[_T], default: None = None, /) -> _T | None:
         """Return the value for `key` if `key` has the value in the context object.
@@ -86,11 +89,11 @@ class Context(Mapping[ContextVar[Any], Any]):
         If `key` does not exist, return `default`. If `default` is not given,
         return None.
         """
-
     @overload
     def get(self, key: ContextVar[_T], default: _T, /) -> _T: ...
     @overload
     def get(self, key: ContextVar[_T], default: _D, /) -> _T | _D: ...
+
     def run(self, callable: Callable[_P, _T], *args: _P.args, **kwargs: _P.kwargs) -> _T: ...
     def copy(self) -> Context:
         """Return a shallow copy of the context object."""

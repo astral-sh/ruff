@@ -200,6 +200,8 @@ __all__ = [
 if sys.version_info >= (3, 14):
     # reload_environ was added to __all__ in Python 3.14.1
     __all__ += ["readinto", "reload_environ"]
+if sys.platform == "linux" and sys.version_info >= (3, 15):
+    __all__ += ["_clearenv"]
 if sys.platform == "darwin" and sys.version_info >= (3, 12):
     __all__ += ["PRIO_DARWIN_BG", "PRIO_DARWIN_NONUI", "PRIO_DARWIN_PROCESS", "PRIO_DARWIN_THREAD"]
 if sys.platform == "darwin":
@@ -250,6 +252,31 @@ if sys.platform == "linux":
     ]
 if sys.platform == "linux" and sys.version_info >= (3, 14):
     __all__ += ["SCHED_DEADLINE", "SCHED_NORMAL"]
+if sys.platform == "linux" and sys.version_info >= (3, 15):
+    __all__ += [
+        "AT_NO_AUTOMOUNT",
+        "AT_STATX_DONT_SYNC",
+        "AT_STATX_FORCE_SYNC",
+        "AT_STATX_SYNC_AS_STAT",
+        "STATX_ATIME",
+        "STATX_BASIC_STATS",
+        "STATX_BLOCKS",
+        "STATX_BTIME",
+        "STATX_CTIME",
+        "STATX_DIOALIGN",
+        "STATX_GID",
+        "STATX_INO",
+        "STATX_MNT_ID",
+        "STATX_MNT_ID_UNIQUE",
+        "STATX_MODE",
+        "STATX_MTIME",
+        "STATX_NLINK",
+        "STATX_SIZE",
+        "STATX_TYPE",
+        "STATX_UID",
+        "statx",
+        "statx_result",
+    ]
 if sys.platform == "linux" and sys.version_info >= (3, 13):
     __all__ += [
         "POSIX_SPAWN_CLOSEFROM",
@@ -695,6 +722,28 @@ if sys.platform == "darwin":
 if sys.platform != "win32" and sys.version_info >= (3, 15):
     NODEV: Final[int]
 
+if sys.platform == "linux" and sys.version_info >= (3, 15):
+    AT_NO_AUTOMOUNT: Final[int]
+    AT_STATX_DONT_SYNC: Final[int]
+    AT_STATX_FORCE_SYNC: Final[int]
+    AT_STATX_SYNC_AS_STAT: Final[int]
+    STATX_ATIME: Final[int]
+    STATX_BASIC_STATS: Final[int]
+    STATX_BLOCKS: Final[int]
+    STATX_BTIME: Final[int]
+    STATX_CTIME: Final[int]
+    STATX_DIOALIGN: Final[int]
+    STATX_GID: Final[int]
+    STATX_INO: Final[int]
+    STATX_MNT_ID: Final[int]
+    STATX_MNT_ID_UNIQUE: Final[int]
+    STATX_MODE: Final[int]
+    STATX_MTIME: Final[int]
+    STATX_NLINK: Final[int]
+    STATX_SIZE: Final[int]
+    STATX_TYPE: Final[int]
+    STATX_UID: Final[int]
+
 if sys.platform != "win32":
     O_FSYNC: Final[int]
 
@@ -742,24 +791,25 @@ class _Environ(MutableMapping[AnyStr, AnyStr], Generic[AnyStr]):
         encodevalue: _EnvironCodeFunc[AnyStr],
         decodevalue: _EnvironCodeFunc[AnyStr],
     ) -> None: ...
+
     @overload
     def get(self, key: AnyStr, default: None = None) -> AnyStr | None:
         """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."""
-
     @overload
     def get(self, key: AnyStr, default: AnyStr) -> AnyStr: ...
     @overload
     def get(self, key: AnyStr, default: _T) -> AnyStr | _T: ...
+
     @overload
     def pop(self, key: AnyStr) -> AnyStr:
         """D.pop(k[,d]) -> v, remove specified key and return the corresponding value.
         If key is not found, d is returned if given, otherwise KeyError is raised.
         """
-
     @overload
     def pop(self, key: AnyStr, default: AnyStr) -> AnyStr: ...
     @overload
     def pop(self, key: AnyStr, default: _T) -> AnyStr | _T: ...
+
     def setdefault(self, key: AnyStr, value: AnyStr) -> AnyStr: ...
     def copy(self) -> dict[AnyStr, AnyStr]: ...
     def __delitem__(self, key: AnyStr) -> None: ...
@@ -769,6 +819,7 @@ class _Environ(MutableMapping[AnyStr, AnyStr], Generic[AnyStr]):
     def __len__(self) -> int: ...
     def __or__(self, other: Mapping[_T1, _T2]) -> dict[AnyStr | _T1, AnyStr | _T2]: ...
     def __ror__(self, other: Mapping[_T1, _T2]) -> dict[AnyStr | _T1, AnyStr | _T2]: ...
+
     # We use @overload instead of a Union for reasons similar to those given for
     # overloading MutableMapping.update in stdlib/typing.pyi
     # The type: ignore is needed due to incompatible __or__/__ior__ signatures
@@ -783,6 +834,9 @@ if sys.platform != "win32":
 
 if sys.version_info >= (3, 14):
     def reload_environ() -> None: ...
+
+if sys.platform == "linux" and sys.version_info >= (3, 15):
+    def _clearenv() -> None: ...
 
 if sys.version_info >= (3, 11) or sys.platform != "win32":
     EX_OK: Final[int]
@@ -986,11 +1040,11 @@ On some platforms, path may also be specified as an open file descriptor;\\
 The list is in arbitrary order.  It does not include the special
 entries '.' and '..' even if they are present in the directory.
 """
-
 @overload
 def listdir(path: BytesPath) -> list[bytes]: ...
 @overload
 def listdir(path: int) -> list[str]: ...
+
 @final
 class DirEntry(Generic[AnyStr]):
     # This is what the scandir iterator yields
@@ -1098,11 +1152,11 @@ def fspath(path: str) -> str:
     object defines __fspath__(), then return the result of that method. All other
     types raise a TypeError.
     """
-
 @overload
 def fspath(path: bytes) -> bytes: ...
 @overload
 def fspath(path: PathLike[AnyStr]) -> AnyStr: ...
+
 def get_exec_path(env: Mapping[str, str] | None = None) -> list[str]:
     """Returns the sequence of directories that will be searched for the
     named executable (similar to a shell) when launching a process.
@@ -1269,7 +1323,6 @@ def getenv(key: str) -> str | None:
     The optional second argument can specify an alternate default.
     key, default and the result are str.
     """
-
 @overload
 def getenv(key: str, default: _T) -> str | _T: ...
 
@@ -1280,9 +1333,9 @@ if sys.platform != "win32":
         The optional second argument can specify an alternate default.
         key, default and the result are bytes.
         """
-
     @overload
     def getenvb(key: bytes, default: _T) -> bytes | _T: ...
+
     def putenv(name: StrOrBytesPath, value: StrOrBytesPath, /) -> None:
         """Change or add an environment variable."""
 
@@ -1375,6 +1428,7 @@ def fdopen(
     closefd: bool = True,
     opener: _Opener | None = None,
 ) -> IO[Any]: ...
+
 def close(fd: int) -> None:
     """Close a file descriptor."""
 
@@ -2046,11 +2100,11 @@ def scandir(path: None = None) -> _ScandirIterator[str]:
 
     If path is None, uses the path='.'.
     """
-
 @overload
 def scandir(path: int) -> _ScandirIterator[str]: ...
 @overload
 def scandir(path: GenericPath[AnyStr]) -> _ScandirIterator[AnyStr]: ...
+
 def stat(path: FileDescriptorOrPath, *, dir_fd: int | None = None, follow_symlinks: bool = True) -> stat_result:
     """Perform a stat system call on the given path.
 
@@ -2082,6 +2136,70 @@ if sys.platform != "win32":
         On some platforms, path may also be specified as an open file descriptor.
           If this functionality is unavailable, using it raises an exception.
         """
+
+if sys.platform == "linux" and sys.version_info >= (3, 15):
+    @final
+    class statx_result:
+        @property
+        def stx_mask(self) -> int: ...
+        @property
+        def stx_blksize(self) -> int: ...
+        @property
+        def stx_attributes(self) -> int: ...
+        @property
+        def stx_attributes_mask(self) -> int: ...
+        @property
+        def stx_rdev_major(self) -> int: ...
+        @property
+        def stx_rdev_minor(self) -> int: ...
+        @property
+        def stx_rdev(self) -> int: ...
+        @property
+        def stx_dev_major(self) -> int: ...
+        @property
+        def stx_dev_minor(self) -> int: ...
+        @property
+        def stx_dev(self) -> int: ...
+        @property
+        def stx_mode(self) -> int | None: ...
+        @property
+        def stx_nlink(self) -> int | None: ...
+        @property
+        def stx_uid(self) -> int | None: ...
+        @property
+        def stx_gid(self) -> int | None: ...
+        @property
+        def stx_ino(self) -> int | None: ...
+        @property
+        def stx_size(self) -> int | None: ...
+        @property
+        def stx_blocks(self) -> int | None: ...
+        @property
+        def stx_atime(self) -> float | None: ...
+        @property
+        def stx_atime_ns(self) -> int | None: ...
+        @property
+        def stx_btime(self) -> float | None: ...
+        @property
+        def stx_btime_ns(self) -> int | None: ...
+        @property
+        def stx_ctime(self) -> float | None: ...
+        @property
+        def stx_ctime_ns(self) -> int | None: ...
+        @property
+        def stx_mtime(self) -> float | None: ...
+        @property
+        def stx_mtime_ns(self) -> int | None: ...
+        @property
+        def stx_mnt_id(self) -> int | None: ...
+        @property
+        def stx_dio_mem_align(self) -> int | None: ...
+        @property
+        def stx_dio_offset_align(self) -> int | None: ...
+
+    def statx(
+        path: FileDescriptorOrPath, mask: int, *, flags: int = 0, dir_fd: int | None = None, follow_symlinks: bool = True
+    ) -> statx_result: ...
 
 def symlink(src: StrOrBytesPath, dst: StrOrBytesPath, target_is_directory: bool = False, *, dir_fd: int | None = None) -> None:
     """Create a symbolic link pointing to src named dst.
@@ -2257,7 +2375,6 @@ if sys.platform != "win32":
             if '__pycache__' in dirs:
                 dirs.remove('__pycache__')  # don't visit __pycache__ directories
         """
-
     @overload
     def fwalk(
         top: BytesPath,
@@ -2267,6 +2384,7 @@ if sys.platform != "win32":
         follow_symlinks: bool = False,
         dir_fd: int | None = None,
     ) -> Iterator[tuple[bytes, list[bytes], list[bytes], int]]: ...
+
     if sys.platform == "linux":
         def getxattr(path: FileDescriptorOrPath, attribute: StrOrBytesPath, *, follow_symlinks: bool = True) -> bytes:
             """Return the value of extended attribute attribute on path.
@@ -2503,7 +2621,6 @@ if sys.platform != "win32":
         If mode == P_WAIT return the process's exit code if it exits normally;
         otherwise return -SIG, where SIG is the signal that killed it.
         """
-
 else:
     @deprecated("Soft deprecated. Use the subprocess module instead.")
     def spawnv(mode: int, path: StrOrBytesPath, argv: _ExecVArgs, /) -> int:

@@ -216,6 +216,7 @@ if sys.platform == "linux":
             "Use `os.set_inheritable()` to make the file descriptor inheritable."
         )
         def __new__(self, sizehint: int = -1, flags: int = 0) -> Self: ...
+
         def __enter__(self) -> Self: ...
         def __exit__(
             self,

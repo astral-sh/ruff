@@ -126,6 +126,7 @@ class array(MutableSequence[_T]):
     def __new__(cls, typecode: str, initializer: Iterable[_T], /) -> Self: ...
     @overload
     def __new__(cls, typecode: str, initializer: bytes | bytearray = ..., /) -> Self: ...
+
     def append(self, v: _T, /) -> None:
         """Append new value v to the end of the array."""
 
@@ -210,15 +211,15 @@ class array(MutableSequence[_T]):
     @overload
     def __getitem__(self, key: SupportsIndex, /) -> _T:
         """Return self[key]."""
-
     @overload
     def __getitem__(self, key: slice[SupportsIndex | None], /) -> array[_T]: ...
+
     @overload  # type: ignore[override]
     def __setitem__(self, key: SupportsIndex, value: _T, /) -> None:
         """Set self[key] to value."""
-
     @overload
     def __setitem__(self, key: slice[SupportsIndex | None], value: array[_T], /) -> None: ...
+
     def __delitem__(self, key: SupportsIndex | slice[SupportsIndex | None], /) -> None:
         """Delete self[key]."""
 

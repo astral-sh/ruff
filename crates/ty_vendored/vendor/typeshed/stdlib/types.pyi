@@ -146,7 +146,6 @@ class FunctionType:
     @overload
     def __get__(self, instance: None, owner: type, /) -> FunctionType:
         """Return an attribute of instance, which is of type owner."""
-
     @overload
     def __get__(self, instance: object, owner: type | None = None, /) -> MethodType: ...
 
@@ -332,11 +331,11 @@ class MappingProxyType(Mapping[_KT_co, _VT_co]):  # type: ignore[type-var]  # py
     @overload
     def get(self, key: _KT_co, /) -> _VT_co | None:  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
         """Return the value for key if key is in the mapping, else default."""
-
     @overload
     def get(self, key: _KT_co, default: _VT_co, /) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
     @overload
     def get(self, key: _KT_co, default: _T2, /) -> _VT_co | _T2: ...  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
+
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """See PEP 585"""
 
@@ -479,9 +478,9 @@ class GeneratorType(Generator[_YieldT_co, _SendT_contra, _ReturnT_co]):
         the (type, val, tb) signature is deprecated,
         and may be removed in a future version of Python.
         """
-
     @overload
     def throw(self, typ: BaseException, val: None = None, tb: TracebackType | None = ..., /) -> _YieldT_co: ...
+
     if sys.version_info >= (3, 13):
         def __class_getitem__(cls, item: Any, /) -> Any:
             """See PEP 585"""
@@ -531,9 +530,9 @@ class AsyncGeneratorType(AsyncGenerator[_YieldT_co, _SendT_contra]):
         the (type, val, tb) signature is deprecated,
         and may be removed in a future version of Python.
         """
-
     @overload
     async def athrow(self, typ: BaseException, val: None = None, tb: TracebackType | None = ..., /) -> _YieldT_co: ...
+
     def aclose(self) -> Coroutine[Any, Any, None]:
         """aclose() -> raise GeneratorExit inside generator."""
 
@@ -592,9 +591,9 @@ class CoroutineType(Coroutine[_YieldT_co, _SendT_nd_contra, _ReturnT_nd_co]):
         the (type, val, tb) signature is deprecated,
         and may be removed in a future version of Python.
         """
-
     @overload
     def throw(self, typ: BaseException, val: None = None, tb: TracebackType | None = ..., /) -> _YieldT_co: ...
+
     if sys.version_info >= (3, 13):
         def __class_getitem__(cls, item: Any, /) -> Any:
             """See PEP 585"""
@@ -752,6 +751,7 @@ class FrameType:
         @property
         def f_locals(self) -> dict[str, Any]:
             """Return the mapping used by the frame to look up local variables."""
+
     f_trace: Callable[[FrameType, str, Any], Any] | None
     """Return the trace function for this frame, or None if no trace function is set."""
 
@@ -916,9 +916,9 @@ _P = ParamSpec("_P")
 @overload
 def coroutine(func: Callable[_P, Generator[Any, Any, _R]]) -> Callable[_P, Awaitable[_R]]:
     """Convert regular generator function to a coroutine."""
-
 @overload
 def coroutine(func: _Fn) -> _Fn: ...
+
 @disjoint_base
 class GenericAlias:
     """Represent a PEP 585 generic type

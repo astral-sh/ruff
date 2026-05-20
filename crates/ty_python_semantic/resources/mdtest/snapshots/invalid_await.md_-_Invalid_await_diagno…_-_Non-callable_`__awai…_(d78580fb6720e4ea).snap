@@ -29,9 +29,9 @@ error[invalid-await]: `NonCallableAwait` is not awaitable
   5 |     await NonCallableAwait()  # error: [invalid-await]
     |           ^^^^^^^^^^^^^^^^^^
     |
-   ::: stdlib/builtins.pyi:337:7
+   ::: stdlib/builtins.pyi:344:7
     |
-337 | class int:
+344 | class int:
     |       --- attribute defined here
     |
 info: `__await__` is not callable

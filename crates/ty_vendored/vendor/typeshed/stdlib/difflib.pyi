@@ -155,7 +155,6 @@ class SequenceMatcher(Generic[_T]):
         "automatic junk heuristic" that treats popular elements as junk
         (see module documentation for more information).
         """
-
     @overload
     def __init__(self, *, a: Sequence[_T], b: Sequence[_T], autojunk: bool = True) -> None: ...
     @overload
@@ -166,6 +165,7 @@ class SequenceMatcher(Generic[_T]):
         b: Sequence[str] = "",
         autojunk: bool = True,
     ) -> None: ...
+
     def set_seqs(self, a: Sequence[_T], b: Sequence[_T]) -> None:
         """Set the two sequences to be compared.
 
@@ -407,7 +407,6 @@ def get_close_matches(word: AnyStr, possibilities: Iterable[AnyStr], n: int = 3,
     >>> get_close_matches("accept", _keyword.kwlist)
     ['except']
     """
-
 @overload
 def get_close_matches(
     word: Sequence[_T], possibilities: Iterable[Sequence[_T]], n: int = 3, cutoff: float = 0.6

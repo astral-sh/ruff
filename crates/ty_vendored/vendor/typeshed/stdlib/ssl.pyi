@@ -429,10 +429,12 @@ class SSLSocket(socket.socket):
     ) -> tuple[int, socket._RetAddress]: ...
     def send(self, data: ReadableBuffer, flags: int = 0) -> int: ...
     def sendall(self, data: ReadableBuffer, flags: int = 0) -> None: ...
+
     @overload
     def sendto(self, data: ReadableBuffer, flags_or_addr: socket._Address, addr: None = None) -> int: ...
     @overload
     def sendto(self, data: ReadableBuffer, flags_or_addr: int, addr: socket._Address) -> int: ...
+
     def shutdown(self, how: int) -> None: ...
     @deprecated("Deprecated since Python 3.6. Use `SSLSocket.recv` method instead.")
     def read(self, len: int = 1024, buffer: WriteableBuffer | None = None) -> bytes:
@@ -457,11 +459,11 @@ class SSLSocket(socket.socket):
         Return None if no certificate was provided, {} if a certificate was
         provided, but not validated.
         """
-
     @overload
     def getpeercert(self, binary_form: Literal[True]) -> bytes | None: ...
     @overload
     def getpeercert(self, binary_form: bool) -> _PeerCertRetType: ...
+
     def cipher(self) -> tuple[str, str, int] | None:
         """Return the currently selected cipher as a 3-tuple ``(name,
         ssl_version, secret_bits)``.
@@ -635,6 +637,7 @@ class SSLContext(_SSLContext):
     @overload
     @deprecated("Deprecated since Python 3.10. Use a specific version of the SSL protocol.")
     def __new__(cls, protocol: None = None, *args: Any, **kwargs: Any) -> Self: ...
+
     def load_default_certs(self, purpose: Purpose = Purpose.SERVER_AUTH) -> None: ...
     def load_verify_locations(
         self,
@@ -642,6 +645,7 @@ class SSLContext(_SSLContext):
         capath: StrOrBytesPath | None = None,
         cadata: str | ReadableBuffer | None = None,
     ) -> None: ...
+
     @overload
     def get_ca_certs(self, binary_form: Literal[False] = False) -> list[_PeerCertRetDictType]:
         """Returns a list of dicts with information of loaded CA certs.
@@ -652,11 +656,11 @@ class SSLContext(_SSLContext):
         NOTE: Certificates in a capath directory aren't loaded unless they have
         been used at least once.
         """
-
     @overload
     def get_ca_certs(self, binary_form: Literal[True]) -> list[bytes]: ...
     @overload
     def get_ca_certs(self, binary_form: bool = False) -> Any: ...
+
     def get_ciphers(self) -> list[_Cipher]: ...
     if sys.version_info >= (3, 15):
         def set_ciphersuites(self, ciphersuites: str, /) -> None: ...
@@ -785,11 +789,11 @@ class SSLObject:
         Return None if no certificate was provided, {} if a certificate was
         provided, but not validated.
         """
-
     @overload
     def getpeercert(self, binary_form: Literal[True]) -> bytes | None: ...
     @overload
     def getpeercert(self, binary_form: bool) -> _PeerCertRetType: ...
+
     def selected_alpn_protocol(self) -> str | None:
         """Return the currently selected ALPN protocol as a string, or ``None``
         if a next protocol was not negotiated or if ALPN is not supported by one

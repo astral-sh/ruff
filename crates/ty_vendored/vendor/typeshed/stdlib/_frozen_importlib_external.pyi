@@ -54,9 +54,9 @@ def cache_from_source(path: StrPath, debug_override: bool, *, optimization: None
     If sys.implementation.cache_tag is None then NotImplementedError is raised.
 
     """
-
 @overload
 def cache_from_source(path: StrPath, debug_override: None = None, *, optimization: Any | None = None) -> str: ...
+
 def source_from_cache(path: StrPath) -> str:
     """Given the path to a .pyc. file, return the path to its .py file.
 
