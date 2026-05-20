@@ -498,33 +498,13 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
 
         if let Some(unary_op) = token.as_unary_operator() {
-            let expr = self.parse_unary_expression(unary_op, context);
-
-            if matches!(unary_op, UnaryOp::Not) {
-                if left_precedence > OperatorPrecedence::Not {
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "Boolean 'not' expression cannot be used here".to_string(),
-                        ),
-                        &expr,
-                    );
-                }
+            let expr = if self.peek().as_unary_operator().is_some() {
+                self.parse_nested_unary_expression(context)
             } else {
-                if left_precedence > OperatorPrecedence::PosNegBitNot
-                    // > The power operator `**` binds less tightly than an arithmetic
-                    // > or bitwise unary operator on its right, that is, 2**-1 is 0.5.
-                    //
-                    // Reference: https://docs.python.org/3/reference/expressions.html#id21
-                    && left_precedence != OperatorPrecedence::Exponent
-                {
-                    self.add_error(
-                        ParseErrorType::OtherError(format!(
-                            "Unary '{unary_op}' expression cannot be used here",
-                        )),
-                        &expr,
-                    );
-                }
-            }
+                self.parse_unary_expression(unary_op, context)
+            };
+
+            self.validate_unary_expression(&expr, left_precedence);
 
             return Expr::UnaryOp(expr).into();
         }
@@ -582,6 +562,72 @@ impl<'src> Parser<'src> {
         ParsedExpr {
             expr: self.parse_postfix_expression(lhs.expr, start),
             is_parenthesized: lhs.is_parenthesized,
+        }
+    }
+
+    fn parse_nested_unary_expression(&mut self, context: ExpressionContext) -> ast::ExprUnaryOp {
+        let mut expressions = Vec::new();
+
+        while let Some(op) = self.current_token_kind().as_unary_operator() {
+            let start = self.node_start();
+            self.bump(TokenKind::from(op));
+
+            expressions.push(PendingUnaryExpression {
+                op,
+                start,
+                operand_start: self.node_start(),
+            });
+        }
+
+        let innermost = expressions
+            .pop()
+            .expect("nested unary parsing always includes the outer unary expression");
+        let operand =
+            self.parse_binary_expression_or_higher(OperatorPrecedence::from(innermost.op), context);
+        let mut expression = self.unary_expression(innermost.op, operand.expr, innermost.start);
+
+        while let Some(outer) = expressions.pop() {
+            self.validate_unary_expression(&expression, OperatorPrecedence::from(outer.op));
+
+            let operand = self.parse_binary_expression_or_higher_recursive(
+                Expr::UnaryOp(expression).into(),
+                OperatorPrecedence::from(outer.op),
+                context,
+                outer.operand_start,
+            );
+            expression = self.unary_expression(outer.op, operand.expr, outer.start);
+        }
+
+        expression
+    }
+
+    fn validate_unary_expression(
+        &mut self,
+        expression: &ast::ExprUnaryOp,
+        left_precedence: OperatorPrecedence,
+    ) {
+        let op = expression.op;
+
+        if matches!(op, UnaryOp::Not) {
+            if left_precedence > OperatorPrecedence::Not {
+                self.add_error(
+                    ParseErrorType::OtherError(
+                        "Boolean 'not' expression cannot be used here".to_string(),
+                    ),
+                    expression,
+                );
+            }
+        } else if left_precedence > OperatorPrecedence::PosNegBitNot
+            // > The power operator `**` binds less tightly than an arithmetic
+            // > or bitwise unary operator on its right, that is, 2**-1 is 0.5.
+            //
+            // Reference: https://docs.python.org/3/reference/expressions.html#id21
+            && left_precedence != OperatorPrecedence::Exponent
+        {
+            self.add_error(
+                ParseErrorType::OtherError(format!("Unary '{op}' expression cannot be used here")),
+                expression,
+            );
         }
     }
 
@@ -1609,9 +1655,13 @@ impl<'src> Parser<'src> {
 
         let operand = self.parse_binary_expression_or_higher(OperatorPrecedence::from(op), context);
 
+        self.unary_expression(op, operand.expr, start)
+    }
+
+    fn unary_expression(&self, op: UnaryOp, operand: Expr, start: TextSize) -> ast::ExprUnaryOp {
         ast::ExprUnaryOp {
             op,
-            operand: Box::new(operand.expr),
+            operand: Box::new(operand),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -3931,6 +3981,12 @@ struct PendingSubscript {
     value: Expr,
     start: TextSize,
     slice_start: TextSize,
+}
+
+struct PendingUnaryExpression {
+    op: UnaryOp,
+    start: TextSize,
+    operand_start: TextSize,
 }
 
 #[derive(Debug)]

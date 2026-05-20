@@ -89,6 +89,14 @@ fn deeply_nested_sets() {
 }
 
 #[test]
+fn deeply_nested_unary() {
+    let src = format!("{}1", "+".repeat(20_000));
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_expression(&src).unwrap());
+}
+
+#[test]
 fn nested_calls() {
     let src = format!("x = {}1{}", "f(".repeat(1_000), ")".repeat(1_000));
     parse_module(&src).unwrap();
