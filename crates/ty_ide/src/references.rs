@@ -545,11 +545,7 @@ impl<'a> LocalReferencesFinder<'a> {
             return;
         };
 
-        if !self
-            .target_definitions
-            .iter()
-            .any(|definition| definition == &current_definition)
-        {
+        if !self.target_definitions.contains(&current_definition) {
             return;
         }
 
@@ -594,11 +590,7 @@ impl<'a> LocalReferencesFinder<'a> {
             return;
         };
 
-        if !self
-            .target_definitions
-            .iter()
-            .any(|definition| definition == &current_definition)
-        {
+        if !self.target_definitions.contains(&current_definition) {
             return;
         }
 

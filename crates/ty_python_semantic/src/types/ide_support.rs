@@ -5,13 +5,13 @@ use crate::place::builtins_module_scope;
 use crate::reachability::is_range_reachable;
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::class::{
-    ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor,
+    CodeGeneratorKind, DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor,
 };
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::signatures::{ParameterForm, ParametersKind, Signature};
 use crate::types::{
-    CallDunderError, CallableTypes, ClassBase, ClassType, KnownClass, KnownUnion, Type,
-    TypeContext, UnionType,
+    CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownUnion,
+    Type, TypeContext, UnionType,
 };
 use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticModel};
 use itertools::Either;

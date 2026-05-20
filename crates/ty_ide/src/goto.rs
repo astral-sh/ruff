@@ -418,6 +418,10 @@ impl<'db> Definitions<'db> {
         self.iter().any(|definition| other.0.contains(definition))
     }
 
+    pub(crate) fn contains(&self, definition: &ResolvedDefinition<'db>) -> bool {
+        self.0.contains(definition)
+    }
+
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, ResolvedDefinition<'db>> {
         self.0.iter()
     }
@@ -971,11 +975,8 @@ impl GotoTarget<'_> {
                         literal_key: key,
                     });
                 }
-                if let Some(target) = named_tuple_field_target(model, subscript) {
-                    return Some(GotoTarget::SubscriptNamedTupleField {
-                        subscript,
-                        field_name: target.name.to_string(),
-                    });
+                if let Some(target) = named_tuple_subscript_target(model, subscript) {
+                    return Some(target);
                 }
                 return Some(GotoTarget::Expression(subscript.into()));
             }
@@ -989,11 +990,8 @@ impl GotoTarget<'_> {
                 && unary_op.operand.range() == expr.range()
                 && let Some(subscript) = enclosing_subscript_with_slice_range(unary_op.range())
             {
-                if let Some(target) = named_tuple_field_target(model, subscript) {
-                    return Some(GotoTarget::SubscriptNamedTupleField {
-                        subscript,
-                        field_name: target.name.to_string(),
-                    });
+                if let Some(target) = named_tuple_subscript_target(model, subscript) {
+                    return Some(target);
                 }
                 return Some(GotoTarget::Expression(subscript.into()));
             }
@@ -1323,6 +1321,17 @@ impl Ranged for GotoTarget<'_> {
             GotoTarget::SubscriptNamedTupleField { subscript, .. } => subscript.slice.range(),
         }
     }
+}
+
+fn named_tuple_subscript_target<'a>(
+    model: &SemanticModel,
+    subscript: &'a ast::ExprSubscript,
+) -> Option<GotoTarget<'a>> {
+    let target = named_tuple_field_target(model, subscript)?;
+    Some(GotoTarget::SubscriptNamedTupleField {
+        subscript,
+        field_name: target.name.to_string(),
+    })
 }
 
 fn typed_dict_dict_literal_key_target<'a>(
