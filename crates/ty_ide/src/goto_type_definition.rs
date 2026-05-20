@@ -638,9 +638,9 @@ mod tests {
           | ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:904:7
+           --> stdlib/builtins.pyi:914:7
             |
-        904 | class str(Sequence[str]):
+        914 | class str(Sequence[str]):
             |       ---
             |
         ");
@@ -661,9 +661,9 @@ mod tests {
           |          ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:904:7
+           --> stdlib/builtins.pyi:914:7
             |
-        904 | class str(Sequence[str]):
+        914 | class str(Sequence[str]):
             |       ---
             |
         "#);
@@ -1511,9 +1511,9 @@ mod tests {
           |      ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:904:7
+           --> stdlib/builtins.pyi:914:7
             |
-        904 | class str(Sequence[str]):
+        914 | class str(Sequence[str]):
             |       ---
             |
         "#);
@@ -1540,9 +1540,9 @@ mod tests {
           |      ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:337:7
+           --> stdlib/builtins.pyi:344:7
             |
-        337 | class int:
+        344 | class int:
             |       ---
             |
         ");
@@ -1568,9 +1568,9 @@ f(**kwargs<CURSOR>)
           |     ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-            --> stdlib/builtins.pyi:2960:7
+            --> stdlib/builtins.pyi:2986:7
              |
-        2960 | class dict(MutableMapping[_KT, _VT]):
+        2986 | class dict(MutableMapping[_KT, _VT]):
              |       ----
              |
         ");
@@ -1601,9 +1601,9 @@ def outer():
           |                ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:904:7
+           --> stdlib/builtins.pyi:914:7
             |
-        904 | class str(Sequence[str]):
+        914 | class str(Sequence[str]):
             |       ---
             |
         ");
@@ -1651,9 +1651,9 @@ def function():
           |            ^^^^^^^^^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:904:7
+           --> stdlib/builtins.pyi:914:7
             |
-        904 | class str(Sequence[str]):
+        914 | class str(Sequence[str]):
             |       ---
             |
         ");
@@ -1693,9 +1693,9 @@ def function():
           |     ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:904:7
+           --> stdlib/builtins.pyi:914:7
             |
-        904 | class str(Sequence[str]):
+        914 | class str(Sequence[str]):
             |       ---
             |
         ");
@@ -1774,9 +1774,9 @@ def function():
           |               ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:904:7
+           --> stdlib/builtins.pyi:914:7
             |
-        904 | class str(Sequence[str]):
+        914 | class str(Sequence[str]):
             |       ---
             |
         ");
@@ -1799,9 +1799,9 @@ def function():
           |     ^ Clicking here
           |
         info: Found 2 type definitions
-           --> stdlib/builtins.pyi:904:7
+           --> stdlib/builtins.pyi:914:7
             |
-        904 | class str(Sequence[str]):
+        914 | class str(Sequence[str]):
             |       ---
             |
            ::: stdlib/types.pyi:959:7
@@ -2022,9 +2022,9 @@ def function():
           |                     ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:337:7
+           --> stdlib/builtins.pyi:344:7
             |
-        337 | class int:
+        344 | class int:
             |       ---
             |
         ");
@@ -2058,9 +2058,9 @@ def function():
           |     ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:337:7
+           --> stdlib/builtins.pyi:344:7
             |
-        337 | class int:
+        344 | class int:
             |       ---
             |
         ");
