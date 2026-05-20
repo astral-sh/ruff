@@ -207,18 +207,12 @@ fn lambda_has_expected_arity(lambda: &ExprLambda) -> bool {
     let Some(parameters) = lambda.parameters.as_deref() else {
         return false;
     };
-
+    if parameters.len() != 1 {
+        return false;
+    }
     let [parameter] = &*parameters.args else {
         return false;
     };
-
-    // Reject lambdas that also declare positional-only parameters, e.g. `lambda x, /, y: ...`.
-    // Such a lambda requires two arguments; `map()` over a single iterable is already broken
-    // at runtime and must not be rewritten as a comprehension.
-    if !parameters.posonlyargs.is_empty() {
-        return false;
-    }
-
     if parameter.default.is_some() {
         return false;
     }
