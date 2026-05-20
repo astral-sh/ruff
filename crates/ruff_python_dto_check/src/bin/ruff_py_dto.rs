@@ -7,10 +7,12 @@
 //! ruff-py-dto schema     [--out <path>]
 //! ```
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use globset::{Glob, GlobSet, GlobSetBuilder};
 
 #[derive(Parser)]
 #[command(
@@ -82,6 +84,7 @@ fn run_harvest(
     use ruff_python_dto_check::bundle::write_family_bundles;
     use ruff_python_dto_check::config::Config;
     use ruff_python_dto_check::matcher::function_with_decorator::harvest_module_with_config;
+    use ruff_python_dto_check::observations::attach_observations;
 
     let cfg = Config::from_path(config_path).map_err(|e| anyhow::anyhow!("{e}"))?;
 
@@ -93,11 +96,14 @@ fn run_harvest(
         .unwrap_or(".");
     let root = std::path::Path::new(root_str);
 
-    // Collect all matches across the tree.
-    let mut family_map: std::collections::BTreeMap<
-        String,
-        Vec<ruff_python_dto_check::bundle::EmittedBundle>,
-    > = std::collections::BTreeMap::new();
+    let include_set = build_glob_set(&cfg.include).context("compiling include globs")?;
+    let exclude_set = build_glob_set(&cfg.exclude).context("compiling exclude globs")?;
+
+    // Collect all matches across the tree, plus a source map so the
+    // observation pass can re-parse for AST hashes and parameter counts.
+    let mut family_map: BTreeMap<String, Vec<ruff_python_dto_check::bundle::EmittedBundle>> =
+        BTreeMap::new();
+    let mut source_map: BTreeMap<String, String> = BTreeMap::new();
 
     for entry in walkdir::WalkDir::new(root)
         .follow_links(false)
@@ -113,23 +119,59 @@ fn run_harvest(
             .unwrap_or(path)
             .to_string_lossy()
             .into_owned();
+        if !path_passes_filters(&rel, include_set.as_ref(), exclude_set.as_ref()) {
+            continue;
+        }
         let Ok(source) = std::fs::read_to_string(path) else {
             continue;
         };
         let bundles = harvest_module_with_config(&rel, &source, &cfg);
-        for b in bundles {
-            family_map.entry(b.family.clone()).or_default().push(b);
+        if !bundles.is_empty() {
+            source_map.insert(rel.clone(), source);
+            for b in bundles {
+                family_map.entry(b.family.clone()).or_default().push(b);
+            }
         }
     }
 
-    // Sort each family by function_name ascending.
+    // Sort each family by function_name ascending before computing the
+    // comparison_within_family block so output ordering matches NDJSON.
     for bundles in family_map.values_mut() {
         bundles.sort_by(|a, b| a.function_name.cmp(&b.function_name));
     }
 
+    attach_observations(&mut family_map, &source_map);
+
     write_family_bundles(&family_map, out)?;
 
     Ok(())
+}
+
+/// Build a [`GlobSet`] from the patterns, or `None` if `patterns` is empty.
+/// Empty list means "no filter" — distinct from an empty set that matches nothing.
+fn build_glob_set(patterns: &[String]) -> Result<Option<GlobSet>> {
+    if patterns.is_empty() {
+        return Ok(None);
+    }
+    let mut builder = GlobSetBuilder::new();
+    for p in patterns {
+        builder.add(Glob::new(p).with_context(|| format!("invalid glob: {p}"))?);
+    }
+    Ok(Some(builder.build()?))
+}
+
+fn path_passes_filters(rel: &str, include: Option<&GlobSet>, exclude: Option<&GlobSet>) -> bool {
+    if let Some(inc) = include
+        && !inc.is_match(rel)
+    {
+        return false;
+    }
+    if let Some(exc) = exclude
+        && exc.is_match(rel)
+    {
+        return false;
+    }
+    true
 }
 
 fn run_preflight(root: &std::path::Path, out: Option<&std::path::Path>) -> Result<()> {
@@ -175,4 +217,68 @@ fn run_schema(out: Option<&std::path::Path>) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_patterns_compile_to_none() {
+        assert!(build_glob_set(&[]).unwrap().is_none());
+    }
+
+    #[test]
+    fn invalid_glob_errors() {
+        assert!(build_glob_set(&["[unclosed".to_string()]).is_err());
+    }
+
+    #[test]
+    fn include_filter_admits_matching_paths() {
+        let inc = build_glob_set(&["**/blueprints/**/*.py".to_string()])
+            .unwrap()
+            .unwrap();
+        assert!(path_passes_filters(
+            "app/blueprints/orders.py",
+            Some(&inc),
+            None
+        ));
+        assert!(!path_passes_filters("app/models.py", Some(&inc), None));
+    }
+
+    #[test]
+    fn exclude_filter_drops_matching_paths() {
+        let exc = build_glob_set(&["**/tests/**".to_string()])
+            .unwrap()
+            .unwrap();
+        assert!(path_passes_filters(
+            "app/blueprints/orders.py",
+            None,
+            Some(&exc)
+        ));
+        assert!(!path_passes_filters(
+            "app/tests/test_orders.py",
+            None,
+            Some(&exc)
+        ));
+    }
+
+    #[test]
+    fn exclude_wins_over_include() {
+        let inc = build_glob_set(&["**/*.py".to_string()]).unwrap().unwrap();
+        let exc = build_glob_set(&["**/__pycache__/**".to_string()])
+            .unwrap()
+            .unwrap();
+        assert!(path_passes_filters("app/views.py", Some(&inc), Some(&exc)));
+        assert!(!path_passes_filters(
+            "app/__pycache__/views.cpython.py",
+            Some(&inc),
+            Some(&exc)
+        ));
+    }
+
+    #[test]
+    fn no_filters_admits_everything() {
+        assert!(path_passes_filters("anywhere/foo.py", None, None));
+    }
 }
