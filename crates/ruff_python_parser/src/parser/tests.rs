@@ -43,6 +43,7 @@ fn nested_expression_continuations() {
         "[[1] for _ in xs]",
         "{{1}.pop()}",
         "{{1} for _ in xs}",
+        "{{**0}}",
         "1 + (2 + (3) * 4)",
         "(1 + (lambda: 2))",
     ] {
