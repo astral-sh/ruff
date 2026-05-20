@@ -4629,7 +4629,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // tension between type context preferences and argument constraints. If the combined set
         // is unsatisfiable, we will fall back to argument constraints alone (which the current
         // code does via `assignable_to_declared_type`).
-        let preferred_type_mappings = return_with_tcx
+        let mut preferred_type_mappings = return_with_tcx
             .and_then(|(return_ty, tcx)| {
                 if !tcx
                     .filter_union(self.db, |ty| ty.may_prefer_declared_type(self.db))
@@ -4749,10 +4749,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         if !assignable_to_declared_type {
             builder = SpecializationBuilder::new(self.db, constraints, self.inferable_typevars);
             specialization_errors.clear();
+            preferred_type_mappings.clear();
 
             self.infer_argument_constraints(
                 &mut builder,
-                &FxHashMap::default(),
+                &preferred_type_mappings,
                 &FxHashSet::default(),
                 &mut specialization_errors,
             );

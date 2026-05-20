@@ -1057,6 +1057,7 @@ x2: list[A | bool] = [{"bar": 1}, 1]
 However, the declared type should be ignored if the specialization is not solvable:
 
 ```py
+from collections import defaultdict
 from typing import Any, Callable
 
 def g[T](x: list[T]) -> T:
@@ -1075,6 +1076,10 @@ def make_callable[T](x: T) -> Callable[[T], bool]:
 def _(a: int | None):
     # error: [invalid-assignment] "Object of type `(int | None, /) -> bool` is not assignable to `(str, /) -> bool`"
     x1: Callable[[str], bool] = make_callable(a)
+
+def _():
+    # error: [invalid-assignment] "Object of type `defaultdict[int, int | None]` is not assignable to `defaultdict[int, int]`"
+    x1: defaultdict[int, int] = defaultdict(lambda: None)
 ```
 
 ## Forward annotation with unclosed string literal
