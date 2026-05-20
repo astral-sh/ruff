@@ -7736,7 +7736,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Type::FunctionLiteral(function_literal) => {
                         if let Some(known_function) = function_literal.known(self.db()) {
                             known_function.check_call(
-                                
                                 &self.context,
                                 overload,
                                 &call_arguments,
