@@ -129,15 +129,18 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
                 finalbody,
                 ..
             }) => {
+                // Only the `try` body itself catches exceptions. Yields in
+                // `except` / `else` / `finally` are unprotected.
                 let prev = self.in_protected_try;
+                let terminal = self.in_terminal_position;
                 self.in_protected_try = true;
                 self.visit_body(body);
+                self.in_protected_try = prev;
                 for handler in handlers {
                     self.visit_except_handler(handler);
                 }
                 self.visit_body(orelse);
-                self.in_protected_try = prev;
-                self.visit_body(finalbody);
+                self.visit_body_with_terminal(finalbody, terminal);
             }
 
             Stmt::With(ast::StmtWith { items, body, .. }) => {
