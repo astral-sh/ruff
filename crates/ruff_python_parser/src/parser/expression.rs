@@ -182,7 +182,11 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         let parsed_expr = self.parse_conditional_expression_or_higher_impl(context);
 
-        self.parse_named_expression_or_higher_from_expression(parsed_expr, start)
+        if self.at(TokenKind::ColonEqual) {
+            Expr::Named(self.parse_named_expression(parsed_expr.expr, start)).into()
+        } else {
+            parsed_expr
+        }
     }
 
     fn parse_named_expression_or_higher_from_lhs(
@@ -254,7 +258,11 @@ impl<'src> Parser<'src> {
             let start = self.node_start();
             let parsed_expr = self.parse_simple_expression(context);
 
-            self.parse_conditional_expression_or_higher_from_simple_expression(parsed_expr, start)
+            if self.at(TokenKind::If) {
+                Expr::If(self.parse_if_expression(parsed_expr.expr, start)).into()
+            } else {
+                parsed_expr
+            }
         }
     }
 
@@ -1161,16 +1169,6 @@ impl<'src> Parser<'src> {
                 is_parenthesized,
             } = parsed_expr
             {
-                // test_ok parenthesized_kwarg_py37
-                // # parse_options: {"target-version": "3.7"}
-                // f((a)=1)
-
-                // test_err parenthesized_kwarg_py38
-                // # parse_options: {"target-version": "3.8"}
-                // f((a)=1)
-                // f((a) = 1)
-                // f( ( a ) = 1)
-
                 if is_parenthesized {
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
@@ -2937,11 +2935,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parenthesized_binary_operator(&mut self) -> Option<Operator> {
-        let BinaryLikeOperator::Binary(operator) =
-            BinaryLikeOperator::try_from_tokens(self.current_token_kind(), self.peek())?
-        else {
-            return None;
-        };
+        let operator = self.current_token_kind().as_binary_operator()?;
 
         (self.peek() == TokenKind::Lpar).then_some(operator)
     }
