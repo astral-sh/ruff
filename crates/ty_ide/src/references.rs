@@ -19,9 +19,12 @@ use ruff_python_ast::{
     self as ast, AnyNodeRef,
     visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 use ty_python_core::definition::{Definition, DefinitionState};
 use ty_python_core::scope::ScopeKind;
+use ty_python_semantic::types::ide_support::{
+    named_tuple_field_target, typed_dict_dict_literal_key_definition, typed_dict_key_definition,
+};
 use ty_python_semantic::{ImportAliasResolution, ResolvedDefinition, SemanticModel};
 
 /// Mode for references search behavior
@@ -449,6 +452,8 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                 self.check_declaration_identifier(&param_var.name);
             }
             AnyNodeRef::ExprStringLiteral(string_expr) => {
+                self.check_typed_dict_string_literal_key(string_expr);
+
                 // Highlight the sub-AST of a string annotation
                 if let Some((sub_ast, sub_model)) = self.model.enter_string_annotation(string_expr)
                 {
@@ -463,6 +468,9 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                     };
                     sub_finder.visit_expr(sub_ast.expr());
                 }
+            }
+            AnyNodeRef::ExprNumberLiteral(number_expr) => {
+                self.check_named_tuple_subscript_index(number_expr);
             }
             AnyNodeRef::Alias(alias) => {
                 // Handle import alias declarations
@@ -523,6 +531,101 @@ impl<'a> LocalReferencesFinder<'a> {
     /// Checks an identifier that's part of a declaration, e.g. the name of the class.
     fn check_declaration_identifier(&mut self, identifier: &ast::Identifier) {
         self.check_identifier(identifier, OccurrenceKind::Declaration);
+    }
+
+    fn check_typed_dict_string_literal_key(&mut self, string_expr: &ast::ExprStringLiteral) {
+        let key = string_expr.value.to_str();
+        if key != self.target_text {
+            return;
+        }
+
+        let Some(current_definition) =
+            self.typed_dict_key_definition_for_string_literal(string_expr, key)
+        else {
+            return;
+        };
+
+        if !self
+            .target_definitions
+            .iter()
+            .any(|definition| definition == &current_definition)
+        {
+            return;
+        }
+
+        self.references.push(ReferenceTarget::new(
+            self.model.file(),
+            string_expr.range(),
+            ReferenceKind::Read,
+        ));
+    }
+
+    fn typed_dict_key_definition_for_string_literal(
+        &self,
+        string_expr: &ast::ExprStringLiteral,
+        key: &str,
+    ) -> Option<ResolvedDefinition<'a>> {
+        self.ancestors
+            .iter()
+            .rev()
+            .find_map(|ancestor| match ancestor {
+                AnyNodeRef::ExprSubscript(subscript)
+                    if subscript.slice.range() == string_expr.range() =>
+                {
+                    typed_dict_key_definition(self.model, subscript, key)
+                }
+                AnyNodeRef::ExprDict(dict)
+                    if dict.items.iter().any(|item| {
+                        item.key
+                            .as_ref()
+                            .is_some_and(|item_key| item_key.range() == string_expr.range())
+                    }) =>
+                {
+                    typed_dict_dict_literal_key_definition(self.model, dict, key)
+                }
+                _ => None,
+            })
+    }
+
+    fn check_named_tuple_subscript_index(&mut self, number_expr: &ast::ExprNumberLiteral) {
+        let Some((current_definition, range)) =
+            self.named_tuple_field_definition_for_number_literal(number_expr)
+        else {
+            return;
+        };
+
+        if !self
+            .target_definitions
+            .iter()
+            .any(|definition| definition == &current_definition)
+        {
+            return;
+        }
+
+        self.references.push(ReferenceTarget::new(
+            self.model.file(),
+            range,
+            ReferenceKind::Read,
+        ));
+    }
+
+    fn named_tuple_field_definition_for_number_literal(
+        &self,
+        number_expr: &ast::ExprNumberLiteral,
+    ) -> Option<(ResolvedDefinition<'a>, TextRange)> {
+        self.ancestors.iter().rev().find_map(|ancestor| {
+            let AnyNodeRef::ExprSubscript(subscript) = ancestor else {
+                return None;
+            };
+            if !subscript.slice.range().contains_range(number_expr.range()) {
+                return None;
+            }
+            let target = named_tuple_field_target(self.model, subscript)?;
+            Some((
+                ResolvedDefinition::Definition(target.definition),
+                subscript.slice.range(),
+            ))
+        })
     }
 
     fn check_identifier(&mut self, identifier: &ast::Identifier, kind: OccurrenceKind) {

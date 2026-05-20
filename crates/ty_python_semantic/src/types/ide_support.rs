@@ -4,12 +4,14 @@ use crate::FxIndexSet;
 use crate::place::builtins_module_scope;
 use crate::reachability::is_range_reachable;
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
-use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
+use crate::types::class::{
+    ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor,
+};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::signatures::{ParameterForm, ParametersKind, Signature};
 use crate::types::{
-    CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownUnion,
-    Type, TypeContext, UnionType,
+    CallDunderError, CallableTypes, ClassBase, ClassType, KnownClass, KnownUnion, Type,
+    TypeContext, UnionType,
 };
 use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticModel};
 use itertools::Either;
@@ -437,6 +439,11 @@ pub struct TypedDictKeyHover<'db> {
     pub docstring: Option<String>,
 }
 
+pub struct NamedTupleFieldTarget<'db> {
+    pub name: Name,
+    pub definition: Definition<'db>,
+}
+
 pub fn typed_dict_key_definition<'db>(
     model: &SemanticModel<'db>,
     subscript: &ast::ExprSubscript,
@@ -444,6 +451,17 @@ pub fn typed_dict_key_definition<'db>(
 ) -> Option<ResolvedDefinition<'db>> {
     let value_ty = subscript.value.inferred_type(model)?;
     let typed_dict = value_ty.as_typed_dict()?;
+    let field = typed_dict.items(model.db()).get(key)?;
+    let definition = field.first_declaration()?;
+    Some(ResolvedDefinition::Definition(definition))
+}
+
+pub fn typed_dict_dict_literal_key_definition<'db>(
+    model: &SemanticModel<'db>,
+    dict: &ast::ExprDict,
+    key: &str,
+) -> Option<ResolvedDefinition<'db>> {
+    let typed_dict = dict.inferred_type(model)?.as_typed_dict()?;
     let field = typed_dict.items(model.db()).get(key)?;
     let definition = field.first_declaration()?;
     Some(ResolvedDefinition::Definition(definition))
@@ -471,6 +489,72 @@ pub fn typed_dict_key_hover<'db>(
         declared_ty: field.declared_ty,
         docstring,
     })
+}
+
+pub fn named_tuple_field_target<'db>(
+    model: &SemanticModel<'db>,
+    subscript: &ast::ExprSubscript,
+) -> Option<NamedTupleFieldTarget<'db>> {
+    let index = named_tuple_field_index(model, subscript)?;
+    let value_ty = subscript.value.inferred_type(model)?;
+    let instance = value_ty.as_nominal_instance()?;
+    let class = instance.class(model.db());
+    let (class_literal, specialization) = class.class_literal_and_specialization(model.db());
+
+    match class_literal {
+        ClassLiteral::Static(class) => {
+            if !CodeGeneratorKind::NamedTuple.matches(model.db(), class.into(), specialization) {
+                return None;
+            }
+
+            let (name, field) = class
+                .fields(model.db(), specialization, CodeGeneratorKind::NamedTuple)
+                .iter()
+                .nth(index)?;
+            Some(NamedTupleFieldTarget {
+                name: name.clone(),
+                definition: field.first_declaration?,
+            })
+        }
+        ClassLiteral::DynamicNamedTuple(named_tuple) => {
+            let field = named_tuple.field_at_index(model.db(), index)?;
+            Some(NamedTupleFieldTarget {
+                name: field.name.clone(),
+                definition: field.definition?,
+            })
+        }
+        ClassLiteral::Dynamic(_)
+        | ClassLiteral::DynamicTypedDict(_)
+        | ClassLiteral::DynamicEnum(_) => None,
+    }
+}
+
+fn named_tuple_field_index(
+    model: &SemanticModel<'_>,
+    subscript: &ast::ExprSubscript,
+) -> Option<usize> {
+    let index = subscript.slice.inferred_type(model)?.as_int_literal()?;
+    let tuple_len = subscript
+        .value
+        .inferred_type(model)?
+        .as_nominal_instance()?
+        .tuple_spec(model.db())?
+        .len();
+    let (field_count, Some(max_field_count)) = tuple_len.size_hint() else {
+        return None;
+    };
+    if field_count != max_field_count {
+        return None;
+    }
+
+    let normalized = if index < 0 {
+        i64::try_from(field_count).ok()? + index
+    } else {
+        index
+    };
+    usize::try_from(normalized)
+        .ok()
+        .filter(|index| *index < field_count)
 }
 
 /// Returns definitions for a keyword argument in a call expression.

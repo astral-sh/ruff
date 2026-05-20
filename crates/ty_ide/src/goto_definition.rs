@@ -2201,6 +2201,39 @@ TD(f<CURSOR>=1)
     }
 
     #[test]
+    fn goto_definition_typeddict_dict_literal_key() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+from typing import TypedDict
+
+class TD(TypedDict):
+    f: int
+    g: str
+
+td: TD = {"f<CURSOR>": 1, "g": ""}
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+         --> main.py:8:11
+          |
+        8 | td: TD = {"f": 1, "g": ""}
+          |           ^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:5:5
+          |
+        5 |     f: int
+          |     -
+          |
+        "#);
+    }
+
+    #[test]
     fn goto_definition_keyword_argument_typeddict_update() {
         let test = CursorTest::builder()
             .source(
@@ -2297,6 +2330,74 @@ NT(f<CURSOR>=1)
          --> main.py:5:5
           |
         5 |     f: int
+          |     -
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_namedtuple_index() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from typing import NamedTuple
+
+class Point(NamedTuple):
+    x: int
+    y: int
+
+point = Point(x=1, y=2)
+print(point[0<CURSOR>])
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:9:13
+          |
+        9 | print(point[0])
+          |             ^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:5:5
+          |
+        5 |     x: int
+          |     -
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_namedtuple_negative_index() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from typing import NamedTuple
+
+class Point(NamedTuple):
+    x: int
+    y: int
+
+point = Point(x=1, y=2)
+print(point[-1<CURSOR>])
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:9:13
+          |
+        9 | print(point[-1])
+          |             ^^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:6:5
+          |
+        6 |     y: int
           |     -
           |
         ");

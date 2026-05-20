@@ -19,7 +19,7 @@ use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
     call_signature_details, call_type_simplified_by_overloads, constructor_signature,
     definitions_and_overloads_for_function, definitions_for_keyword_argument,
-    typed_dict_key_definition,
+    named_tuple_field_target, typed_dict_dict_literal_key_definition, typed_dict_key_definition,
 };
 use ty_python_semantic::{
     HasDefinition, HasType, ImportAliasResolution, SemanticModel, TypeQualifiers,
@@ -238,6 +238,19 @@ pub(crate) enum GotoTarget<'a> {
     SubscriptStringLiteralKey {
         subscript: &'a ast::ExprSubscript,
         literal_key: &'a str,
+    },
+
+    /// Go to on a string-literal key in a `TypedDict` dict literal (e.g. `{"name": "Alice"}`).
+    DictStringLiteralKey {
+        dict: &'a ast::ExprDict,
+        literal_key: &'a str,
+        key_range: TextRange,
+    },
+
+    /// Go to on an integer-literal subscript for a `NamedTuple` field (e.g. `point[0]`).
+    SubscriptNamedTupleField {
+        subscript: &'a ast::ExprSubscript,
+        field_name: String,
     },
 }
 
@@ -508,6 +521,10 @@ impl GotoTarget<'_> {
                 Some(ty)
             }
             GotoTarget::SubscriptStringLiteralKey { subscript, .. } => {
+                subscript.inferred_type(model)
+            }
+            GotoTarget::DictStringLiteralKey { .. } => None,
+            GotoTarget::SubscriptNamedTupleField { subscript, .. } => {
                 subscript.inferred_type(model)
             }
             // TODO: Support identifier targets
@@ -801,6 +818,14 @@ impl GotoTarget<'_> {
                 literal_key,
             } => typed_dict_key_definition(model, subscript, literal_key)
                 .map(|definition| vec![definition]),
+            GotoTarget::DictStringLiteralKey {
+                dict, literal_key, ..
+            } => typed_dict_dict_literal_key_definition(model, dict, literal_key)
+                .map(|definition| vec![definition]),
+            GotoTarget::SubscriptNamedTupleField { subscript, .. } => {
+                named_tuple_field_target(model, subscript)
+                    .map(|target| vec![ResolvedDefinition::Definition(target.definition)])
+            }
         };
         definitions.map(Definitions::new)
     }
@@ -866,9 +891,16 @@ impl GotoTarget<'_> {
             }
             GotoTarget::NonLocal { identifier, .. } => Some(Cow::Borrowed(identifier.as_str())),
             GotoTarget::Globals { identifier, .. } => Some(Cow::Borrowed(identifier.as_str())),
-            GotoTarget::BinOp { .. }
-            | GotoTarget::UnaryOp { .. }
-            | GotoTarget::SubscriptStringLiteralKey { .. } => None,
+            GotoTarget::SubscriptNamedTupleField { field_name, .. } => {
+                Some(Cow::Borrowed(field_name.as_str()))
+            }
+            GotoTarget::SubscriptStringLiteralKey { literal_key, .. } => {
+                Some(Cow::Borrowed(literal_key))
+            }
+            GotoTarget::DictStringLiteralKey { literal_key, .. } => {
+                Some(Cow::Borrowed(literal_key))
+            }
+            GotoTarget::BinOp { .. } | GotoTarget::UnaryOp { .. } => None,
         }
     }
 
@@ -939,6 +971,12 @@ impl GotoTarget<'_> {
                         literal_key: key,
                     });
                 }
+                if let Some(target) = named_tuple_field_target(model, subscript) {
+                    return Some(GotoTarget::SubscriptNamedTupleField {
+                        subscript,
+                        field_name: target.name.to_string(),
+                    });
+                }
                 return Some(GotoTarget::Expression(subscript.into()));
             }
 
@@ -951,6 +989,12 @@ impl GotoTarget<'_> {
                 && unary_op.operand.range() == expr.range()
                 && let Some(subscript) = enclosing_subscript_with_slice_range(unary_op.range())
             {
+                if let Some(target) = named_tuple_field_target(model, subscript) {
+                    return Some(GotoTarget::SubscriptNamedTupleField {
+                        subscript,
+                        field_name: target.name.to_string(),
+                    });
+                }
                 return Some(GotoTarget::Expression(subscript.into()));
             }
 
@@ -1201,6 +1245,10 @@ impl GotoTarget<'_> {
                         }
                         _ => node.as_expr_ref().map(GotoTarget::Expression),
                     }
+                } else if let Some(target) =
+                    typed_dict_dict_literal_key_target(model, covering_node, string_expr)
+                {
+                    Some(target)
                 } else {
                     node.as_expr_ref().map(GotoTarget::Expression)
                 }
@@ -1271,8 +1319,39 @@ impl Ranged for GotoTarget<'_> {
             GotoTarget::BinOp { operator_range, .. }
             | GotoTarget::UnaryOp { operator_range, .. } => *operator_range,
             GotoTarget::SubscriptStringLiteralKey { subscript, .. } => subscript.slice.range(),
+            GotoTarget::DictStringLiteralKey { key_range, .. } => *key_range,
+            GotoTarget::SubscriptNamedTupleField { subscript, .. } => subscript.slice.range(),
         }
     }
+}
+
+fn typed_dict_dict_literal_key_target<'a>(
+    model: &SemanticModel,
+    covering_node: &CoveringNode<'a>,
+    string_expr: &'a ast::ExprStringLiteral,
+) -> Option<GotoTarget<'a>> {
+    let dict = covering_node.ancestors().find_map(|ancestor| {
+        let AnyNodeRef::ExprDict(dict) = ancestor else {
+            return None;
+        };
+        dict.items
+            .iter()
+            .any(|item| {
+                item.key
+                    .as_ref()
+                    .is_some_and(|key| key.range() == string_expr.range())
+            })
+            .then_some(dict)
+    })?;
+
+    let key = string_expr.value.to_str();
+    typed_dict_dict_literal_key_definition(model, dict, key)?;
+
+    Some(GotoTarget::DictStringLiteralKey {
+        dict,
+        literal_key: key,
+        key_range: string_expr.range(),
+    })
 }
 
 /// If a function is a property setter or deleter (e.g., decorated with

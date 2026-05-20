@@ -446,6 +446,15 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         self.fields(db).iter().find(|field| field.name == *name)
     }
 
+    /// Returns the field declared directly at the given index on this dynamic named tuple, if any.
+    pub(crate) fn field_at_index(
+        self,
+        db: &'db dyn Db,
+        index: usize,
+    ) -> Option<&'db NamedTupleField<'db>> {
+        self.fields(db).get(index)
+    }
+
     pub(super) fn has_known_fields(self, db: &'db dyn Db) -> bool {
         self.spec(db).has_known_fields(db)
     }
