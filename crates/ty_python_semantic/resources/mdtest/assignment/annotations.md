@@ -435,7 +435,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Literal, Sequence
+from typing import Literal, Mapping, Sequence
 
 def f[T](x: T) -> list[T]:
     return [x]
@@ -482,9 +482,20 @@ reveal_type(x12)  # revealed: list[str | None]
 x13: dict[str, list[int | None]] | dict[str, list[str | None]] = {"a": ["b"]}
 reveal_type(x13)  # revealed: dict[str, list[str | None]]
 
-x14 = [{"a": [1], "b": 1}, {"a": [1]}]
-x14.append(reveal_type({"b": 1}))  # revealed: dict[str, list[int] | int]
-reveal_type(x14)  # revealed: list[dict[str, list[int] | int] | dict[str, list[int]]]
+x14: Mapping[str, list[int | None]] | Mapping[str, list[str | None]] = {"a": ["b"]}
+reveal_type(x14)  # revealed: dict[str, list[str | None]]
+
+x15 = [{"a": [1], "b": 1}, {"a": [1]}]
+x15.append(reveal_type({"b": 1}))  # revealed: dict[str, list[int] | int]
+reveal_type(x15)  # revealed: list[dict[str, list[int] | int] | dict[str, list[int]]]
+
+type EitherList = list[int | str] | list[int | None]
+
+x16: EitherList = [None, None]
+reveal_type(x16)  # revealed: list[int | None]
+
+x17: EitherList = ["1", "2", "3"]
+reveal_type(x17)  # revealed: list[int | str]
 ```
 
 ## Annotations influence generic call argument inference
@@ -855,7 +866,7 @@ x19: dict[int, dict[str, int]] = defaultdict(dict)
 reveal_type(x19)  # revealed: defaultdict[int, dict[str, int]]
 ```
 
-## Narrow generic unions
+## Narrow union declared type for generic calls
 
 ```toml
 [environment]
@@ -905,6 +916,37 @@ def _(target: TargetWithTD):
 
     target = identity(make_callable({"x": 1}))
     reveal_type(target)  # revealed: (TD, /) -> None
+```
+
+```py
+from typing import Mapping, Sequence
+
+x1: list[int | str] | list[int | None] = list((1, 2, 3))
+reveal_type(x1)  # revealed: list[int | str]
+
+x2: Sequence[int | str] | Sequence[int | None] = list((1, 2, 3))
+reveal_type(x2)  # revealed: list[int]
+
+x3: list[int] | list[int | None] | list[str | None] = list(("1", "2"))
+reveal_type(x3)  # revealed: list[str | None]
+
+x4: dict[str, list[int | None]] | dict[str, list[str | None]] = dict([("a", ["b"])])
+reveal_type(x4)  # revealed: dict[str, list[str | None]]
+
+x5: Mapping[str, list[int | None]] | Mapping[str, list[str | None]] = dict([("a", ["b"])])
+reveal_type(x5)  # revealed: dict[str, list[str | None]]
+
+x6 = [dict([("a", list((1,))), ("b", 1)]), dict([("a", list((1,)))])]
+x6.append(reveal_type(dict([("b", 1)])))  # revealed: dict[str, list[int] | int]
+reveal_type(x6)  # revealed: list[dict[str, list[int] | int] | dict[str, list[int]]]
+
+type EitherList = list[int | str] | list[int | None]
+
+x7: EitherList = list((None, None))
+reveal_type(x7)  # revealed: list[int | None]
+
+x8: EitherList = list(("1", "2", "3"))
+reveal_type(x8)  # revealed: list[int | str]
 ```
 
 ## Prefer the inferred type of non-generic classes

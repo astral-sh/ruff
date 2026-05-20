@@ -590,8 +590,8 @@ impl<'db> TypeContext<'db> {
         Self { annotation }
     }
 
-    // If the type annotation is a specialized instance of the given `KnownClass`, returns the
-    // specialization.
+    /// If the type annotation is a specialized instance of the given `KnownClass`, returns the
+    /// specialization.
     fn known_specialization(
         &self,
         db: &'db dyn Db,
@@ -610,6 +610,16 @@ impl<'db> TypeContext<'db> {
     pub(crate) fn is_typealias(&self) -> bool {
         self.annotation
             .is_some_and(|ty| ty.is_typealias_special_form())
+    }
+
+    /// If the type annotation is a union, returns the target elements that it can be narrowed to.
+    pub(crate) fn narrow_targets(&self, db: &'db dyn Db) -> Option<&[Type<'db>]> {
+        self.annotation
+            .and_then(|ty| ty.as_union_like(db))
+            // TODO: We could theoretically attempt to narrow to every element of
+            // the power set of this union. However, this leads to an exponential
+            // explosion of inference attempts, and is rarely needed in practice.
+            .map(|union| union.elements(db))
     }
 }
 
