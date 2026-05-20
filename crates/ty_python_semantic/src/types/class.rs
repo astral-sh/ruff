@@ -1,7 +1,8 @@
 use std::fmt::Write;
 
 pub(crate) use self::dynamic_literal::{
-    DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict, dynamic_class_bases_argument,
+    DynamicClassAnchor, DynamicClassLiteral, DynamicClassMember, DynamicMetaclassConflict,
+    dynamic_class_bases_argument,
 };
 pub(super) use self::enum_literal::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec};
 pub use self::known::KnownClass;
