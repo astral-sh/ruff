@@ -29,21 +29,21 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
 # Diagnostics
 
 ```
-warning[redundant-cast]: Value is already of type `Foo2`
-  --> src/mdtest_snippet.py:10:5
+warning[redundant-cast]: Redundant cast to type `Foo2`
+  --> src/mdtest_snippet.py:10:16
    |
 10 | _ = cast(Foo2, foo)  # error: [redundant-cast]
-   |     ^^^^^^^^^^^^^^^
+   |                ^^^ Value is already of type `Foo2`
    |
 
 ```
 
 ```
-warning[redundant-cast]: Value is already of type `Bar2`
-  --> src/mdtest_snippet.py:11:5
+warning[redundant-cast]: Redundant cast to type `Bar2`
+  --> src/mdtest_snippet.py:11:16
    |
 11 | _ = cast(Bar2, foo)  # error: [redundant-cast]
-   |     ^^^^^^^^^^^^^^^
+   |                ^^^ Value is already of type `Bar2`
    |
 info: `Bar2` is equivalent to `Foo2`
 
