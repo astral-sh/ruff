@@ -176,6 +176,10 @@ def _(a: A):
     else:
         reveal_type(a.x)  # revealed: int
 
+    class Inner:
+        if is_none:
+            reveal_type(a.x)  # revealed: None
+
 def _(a: A):
     # Attribute targets are not treated as aliases.
     # It is difficult to track them accurately.
@@ -196,6 +200,10 @@ def _(l: list[int | None]):
         reveal_type(l[0])  # revealed: None
     else:
         reveal_type(l[0])  # revealed: int
+
+    class Inner:
+        if is_none:
+            reveal_type(l[0])  # revealed: None
 
 def _(l: list[int | None], lb: list[bool]):
     # Same as attributes: subscript targets are not treated as aliases.
@@ -265,8 +273,6 @@ def _(x: int | None):
 
 ## Nested scope can preserve alias
 
-> TODO: This feature is not supported yet.
-
 Aliases defined in the outer scope behave the same way across nested scope boundaries as if the
 target had been directly narrowed (see also: [`conditionals/nested.md`](./conditionals/nested.md)).
 
@@ -283,23 +289,19 @@ def _(x: int | None):
 
     class EagerScope:
         if is_none:
-            # TODO: should be `None`
-            reveal_type(x)  # revealed: int | None
+            reveal_type(x)  # revealed: None
 
         def lazy_scope():
             if is_none:
-                # TODO: should be `None`
-                reveal_type(x)  # revealed: int | None
+                reveal_type(x)  # revealed: None
 
     def inner2():
         if is_none:
-            # TODO: should be `None`
-            reveal_type(x)  # revealed: int | None
+            reveal_type(x)  # revealed: None
 
         class Inner2:
             if is_none:
-                # TODO: should be `None`
-                reveal_type(x)  # revealed: int | None
+                reveal_type(x)  # revealed: None
 
 class A:
     x: int | None
@@ -313,23 +315,19 @@ def _(a: A):
 
     class Inner:
         if is_none:
-            # TODO: should be `None`
-            reveal_type(a.x)  # revealed: int | None
+            reveal_type(a.x)  # revealed: None
 
         def inner():
             if is_none:
-                # TODO: should be `None`
-                reveal_type(a.x)  # revealed: int | None
+                reveal_type(a.x)  # revealed: None
 
     def inner2():
         if is_none:
-            # TODO: should be `None`
-            reveal_type(a.x)  # revealed: int | None
+            reveal_type(a.x)  # revealed: None
 
         class Inner2:
             if is_none:
-                # TODO: should be `None`
-                reveal_type(a.x)  # revealed: int | None
+                reveal_type(a.x)  # revealed: None
 ```
 
 ## Cross-scope invalidation
@@ -351,16 +349,14 @@ def _(x: int | None):
         def f():
             reveal_type(x)  # revealed: int | None
             if is_none:
-                # TODO: should be `None`
-                reveal_type(x)  # revealed: int | None
+                reveal_type(x)  # revealed: None
 
         class Inner2:
             if is_none:
                 # `x` here refers to the function scope variable, not the class-scope `x`.
                 # Python's name resolution skips class scopes for nested scopes, so the alias
                 # remains valid.
-                # TODO: should be `None`
-                reveal_type(x)  # revealed: int | None
+                reveal_type(x)  # revealed: None
 
     if is_none:
         reveal_type(x)  # revealed: None
@@ -419,8 +415,7 @@ def _(x: int | None):
             # `is_none = True`. Python's name resolution skips class scopes for nested
             # scopes, so the alias remains valid.
             if is_none:
-                # TODO: should be `None`
-                reveal_type(x)  # revealed: int | None
+                reveal_type(x)  # revealed: None
 
     if is_none:
         reveal_type(x)  # revealed: None
@@ -464,8 +459,6 @@ def _(x: int | None):
 
 ## Chained aliases
 
-> TODO: This feature is not supported yet.
-
 ### Basic
 
 ```py
@@ -473,18 +466,15 @@ def _(x: int | None):
     is_none = x is None
     is_none_alias = is_none
     if is_none_alias:
-        # TODO: should be `None`
-        reveal_type(x)  # revealed: int | None
+        reveal_type(x)  # revealed: None
 
     class Inner:
         if is_none_alias:
-            # TODO: should be `None`
-            reveal_type(x)  # revealed: int | None
+            reveal_type(x)  # revealed: None
 
     def inner():
         if is_none_alias:
-            # TODO: should be `None`
-            reveal_type(x)  # revealed: int | None
+            reveal_type(x)  # revealed: None
 
 def _(x: int | None):
     is_none = x is None
@@ -519,60 +509,50 @@ def _(x: int | None):
         if is_none_alias:
             reveal_type(x)  # revealed: int | None
         if is_none:
-            # TODO: should be `None`
-            reveal_type(x)  # revealed: int | None
+            reveal_type(x)  # revealed: None
 
         class Inner2:
             if is_none_alias:
-                # TODO: should be `None`
-                reveal_type(x)  # revealed: int | None
+                reveal_type(x)  # revealed: None
             if is_none:
-                # TODO: should be `None`
-                reveal_type(x)  # revealed: int | None
+                reveal_type(x)  # revealed: None
 
     class Inner2:
         is_none = True
         if is_none_alias:
-            # TODO: should be `None`
-            reveal_type(x)  # revealed: int | None
+            reveal_type(x)  # revealed: None
         if is_none:
             reveal_type(x)  # revealed: int | None
 
         class Inner3:
             if is_none_alias:
-                # TODO: should be `None`
-                reveal_type(x)  # revealed: int | None
+                reveal_type(x)  # revealed: None
             if is_none:
-                # TODO: should be `None`
-                reveal_type(x)  # revealed: int | None
+                reveal_type(x)  # revealed: None
 
     def inner():
         is_none_alias = True
         if is_none_alias:
             reveal_type(x)  # revealed: int | None
         if is_none:
-            # TODO: should be `None`
-            reveal_type(x)  # revealed: int | None
+            reveal_type(x)  # revealed: None
 
         def inner2():
             if is_none_alias:
                 reveal_type(x)  # revealed: int | None
             if is_none:
-                # TODO: should be `None`
-                reveal_type(x)  # revealed: int | None
+                reveal_type(x)  # revealed: None
 
     def inner2():
         is_none = True
         if is_none_alias:
-            # TODO: should be `None`
-            reveal_type(x)  # revealed: int | None
+            reveal_type(x)  # revealed: None
         if is_none:
             reveal_type(x)  # revealed: int | None
 
         def inner3():
             if is_none_alias:
-                # TODO: should be `None`
-                reveal_type(x)  # revealed: int | None
+                reveal_type(x)  # revealed: None
             if is_none:
                 reveal_type(x)  # revealed: int | None
 ```
@@ -586,14 +566,12 @@ def _(x: int | None):
     class Inner:
         is_none_alias = is_none
         if is_none_alias:
-            # TODO: should be `None`
-            reveal_type(x)  # revealed: int | None
+            reveal_type(x)  # revealed: None
 
     def inner():
         is_none_alias = is_none
         if is_none_alias:
-            # TODO: should be `None`
-            reveal_type(x)  # revealed: int | None
+            reveal_type(x)  # revealed: None
 
 is_none = True
 
@@ -638,25 +616,21 @@ def _(x: int | None):
     is_none = x is None
     is_not_none = not is_none
     if is_not_none:
-        # TODO: should be `int`
-        reveal_type(x)  # revealed: int | None
+        reveal_type(x)  # revealed: int
 
     class Inner:
         if is_not_none:
-            # TODO: should be `int`
-            reveal_type(x)  # revealed: int | None
+            reveal_type(x)  # revealed: int
 
     def inner():
         if is_not_none:
-            # TODO: should be `int`
-            reveal_type(x)  # revealed: int | None
+            reveal_type(x)  # revealed: int
 
 def _(x: int | None):
     is_none = x is None
     is_not_none = not is_none
     if is_not_none:
-        # TODO: should be `int`
-        reveal_type(x)  # revealed: int | None
+        reveal_type(x)  # revealed: int
 
     class Inner:
         x = 42
@@ -674,20 +648,17 @@ def _(x: int | None):
 
     is_none = True
     if is_not_none:
-        # TODO: should be `int`
-        reveal_type(x)  # revealed: int | None
+        reveal_type(x)  # revealed: int
 
     class Inner:
         is_none = True
         if is_not_none:
-            # TODO: should be `int`
-            reveal_type(x)  # revealed: int | None
+            reveal_type(x)  # revealed: int
 
     def inner():
         is_none = True
         if is_not_none:
-            # TODO: should be `int`
-            reveal_type(x)  # revealed: int | None
+            reveal_type(x)  # revealed: int
 ```
 
 ### Boolean-operated chained alias
@@ -698,36 +669,30 @@ def _(x: int | None):
     is_int = isinstance(x, int)
     is_none_and_int = is_none and is_int
     if is_none_and_int:
-        # TODO: should be `Never`
-        reveal_type(x)  # revealed: int | None
+        reveal_type(x)  # revealed: Never
 
     class Inner:
         if is_none_and_int:
-            # TODO: should be `Never`
-            reveal_type(x)  # revealed: int | None
+            reveal_type(x)  # revealed: Never
 
     def inner():
         if is_none_and_int:
-            # TODO: should be `Never`
-            reveal_type(x)  # revealed: int | None
+            reveal_type(x)  # revealed: Never
 
 def _(x: str | int | None):
     is_none = x is None
     is_int = isinstance(x, int)
     is_int_or_none = is_int or is_none
     if is_int_or_none:
-        # TODO: should be `int | None`
-        reveal_type(x)  # revealed: str | int | None
+        reveal_type(x)  # revealed: int | None
 
     class Inner:
         if is_int_or_none:
-            # TODO: should be `int | None`
-            reveal_type(x)  # revealed: str | int | None
+            reveal_type(x)  # revealed: int | None
 
     def inner():
         if is_int_or_none:
-            # TODO: should be `int | None`
-            reveal_type(x)  # revealed: str | int | None
+            reveal_type(x)  # revealed: int | None
 ```
 
 ## Simple name aliases do not have a narrowing effect

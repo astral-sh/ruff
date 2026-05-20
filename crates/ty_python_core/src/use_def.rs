@@ -811,6 +811,14 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
 
 impl std::iter::FusedIterator for BindingWithConstraintsIterator<'_, '_> {}
 
+impl BindingWithConstraintsIterator<'_, '_> {
+    pub fn same_bindings_as(self, other: Self) -> bool {
+        self.inner
+            .map(LiveBinding::binding)
+            .eq(other.inner.map(LiveBinding::binding))
+    }
+}
+
 pub struct BindingWithConstraints<'map, 'db> {
     pub binding: DefinitionState<'db>,
     pub narrowing_constraint: NarrowingEvaluator<'map, 'db>,
