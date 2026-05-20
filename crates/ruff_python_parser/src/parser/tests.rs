@@ -1,6 +1,8 @@
 use ruff_python_ast::Stmt;
 
-use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
+use crate::{
+    Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module, parse_unchecked,
+};
 
 #[test]
 fn test_modes() {
@@ -73,6 +75,21 @@ fn deeply_nested_def_blocks() {
 }
 
 #[test]
+fn deeply_nested_if_blocks() {
+    let depth = 3_000;
+    let mut src = String::new();
+    for i in 0..depth {
+        src.push_str(&"\t".repeat(i));
+        src.push_str("if x:\n");
+    }
+    src.push_str(&"\t".repeat(depth));
+    src.push_str("pass\n");
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
+}
+
+#[test]
 fn deeply_nested_lists() {
     let src = format!("{}1{}", "[".repeat(5_000), "]".repeat(5_000));
 
@@ -94,6 +111,13 @@ fn deeply_nested_unary() {
 
     // Keep this focused on parser recursion rather than recursive AST destruction.
     std::mem::forget(parse_expression(&src).unwrap());
+}
+
+#[test]
+fn deeply_nested_invalid_async_prefixes() {
+    let src = format!("{}def f(): pass\n", "async ".repeat(20_000));
+
+    std::mem::forget(parse_unchecked(&src, ParseOptions::from(Mode::Module)));
 }
 
 #[test]

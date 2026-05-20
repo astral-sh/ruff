@@ -1419,11 +1419,80 @@ impl<'src> Parser<'src> {
         // a = 1
         self.expect(TokenKind::Colon);
 
+        let statement = PendingIfStatement {
+            start,
+            test: test.expr,
+        };
+
+        if self.at(TokenKind::Newline) && self.peek2() == (TokenKind::Indent, TokenKind::If) {
+            return self.parse_nested_if_statement(statement);
+        }
+
+        self.parse_if_statement_after_header(statement)
+    }
+
+    fn parse_nested_if_statement(&mut self, outer: PendingIfStatement) -> ast::StmtIf {
+        let mut statements = vec![outer];
+
+        loop {
+            self.bump(TokenKind::Newline);
+            self.bump(TokenKind::Indent);
+
+            statements.push(self.parse_if_statement_header());
+
+            if !self.at(TokenKind::Newline) || self.peek2() != (TokenKind::Indent, TokenKind::If) {
+                break;
+            }
+        }
+
+        let inner = statements
+            .pop()
+            .expect("nested if parsing always includes the outer if statement");
+        let mut statement = self.parse_if_statement_after_header(inner);
+
+        while let Some(outer) = statements.pop() {
+            let mut body = vec![Stmt::If(statement)];
+            body.extend(
+                self.parse_list_into_vec(
+                    RecoveryContextKind::BlockStatements,
+                    Self::parse_statement,
+                ),
+            );
+            self.expect(TokenKind::Dedent);
+
+            statement = self.parse_if_statement_with_body(outer, body);
+        }
+
+        statement
+    }
+
+    fn parse_if_statement_header(&mut self) -> PendingIfStatement {
+        let start = self.node_start();
+        self.bump(TokenKind::If);
+
+        let test = self.parse_named_expression_or_higher(ExpressionContext::default());
+        self.expect(TokenKind::Colon);
+
+        PendingIfStatement {
+            start,
+            test: test.expr,
+        }
+    }
+
+    fn parse_if_statement_after_header(&mut self, statement: PendingIfStatement) -> ast::StmtIf {
         // test_err if_stmt_empty_body
         // if True:
         // 1 + 1
         let body = self.parse_body(Clause::If);
 
+        self.parse_if_statement_with_body(statement, body)
+    }
+
+    fn parse_if_statement_with_body(
+        &mut self,
+        statement: PendingIfStatement,
+        body: Vec<Stmt>,
+    ) -> ast::StmtIf {
         // test_err if_stmt_misspelled_elif
         // if True:
         //     pass
@@ -1440,10 +1509,10 @@ impl<'src> Parser<'src> {
         }
 
         ast::StmtIf {
-            test: Box::new(test.expr),
+            test: Box::new(statement.test),
             body,
             elif_else_clauses,
-            range: self.node_range(start),
+            range: self.node_range(statement.start),
             node_index: AtomicNodeIndex::NONE,
         }
     }
@@ -2792,8 +2861,18 @@ impl<'src> Parser<'src> {
     /// - <https://docs.python.org/3/reference/compound_stmts.html#the-async-for-statement>
     /// - <https://docs.python.org/3/reference/compound_stmts.html#coroutine-function-definition>
     fn parse_async_statement(&mut self) -> Stmt {
-        let async_start = self.node_start();
+        let mut async_start = self.node_start();
         self.bump(TokenKind::Async);
+
+        while self.at(TokenKind::Async) {
+            self.add_error(
+                ParseErrorType::UnexpectedTokenAfterAsync(TokenKind::Async),
+                self.current_token_range(),
+            );
+
+            async_start = self.node_start();
+            self.bump(TokenKind::Async);
+        }
 
         match self.current_token_kind() {
             // test_ok async_function_definition
@@ -4000,6 +4079,11 @@ enum Clause {
     Try,
     Except,
     Finally,
+}
+
+struct PendingIfStatement {
+    start: TextSize,
+    test: Expr,
 }
 
 impl Display for Clause {
