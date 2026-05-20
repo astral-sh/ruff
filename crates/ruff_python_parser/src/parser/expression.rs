@@ -827,11 +827,14 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#calls>
     pub(super) fn parse_call_expression(&mut self, func: Expr, start: TextSize) -> ast::ExprCall {
-        if matches!(self.peek2(), (TokenKind::Name, TokenKind::Lpar)) {
-            return self.parse_nested_call_expression(func, start);
+        let arguments_start = self.node_start();
+        self.bump(TokenKind::Lpar);
+
+        if self.at(TokenKind::Name) && self.peek() == TokenKind::Lpar {
+            return self.parse_nested_call_expression(func, start, arguments_start);
         }
 
-        let arguments = self.parse_arguments();
+        let arguments = self.parse_arguments_after_lpar(arguments_start);
 
         ast::ExprCall {
             func: Box::new(func),
@@ -841,22 +844,19 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_nested_call_expression(&mut self, func: Expr, start: TextSize) -> ast::ExprCall {
+    fn parse_nested_call_expression(
+        &mut self,
+        func: Expr,
+        start: TextSize,
+        arguments_start: TextSize,
+    ) -> ast::ExprCall {
         let mut calls = vec![PendingCall {
             func,
             start,
-            arguments_start: self.node_start(),
+            arguments_start,
         }];
 
         loop {
-            self.bump(TokenKind::Lpar);
-
-            if !matches!(self.current_token_kind(), TokenKind::Name)
-                || self.peek() != TokenKind::Lpar
-            {
-                break;
-            }
-
             let start = self.node_start();
             let func = self.parse_atom().expr;
             calls.push(PendingCall {
@@ -864,6 +864,12 @@ impl<'src> Parser<'src> {
                 start,
                 arguments_start: self.node_start(),
             });
+
+            self.bump(TokenKind::Lpar);
+
+            if !self.at(TokenKind::Name) || self.peek() != TokenKind::Lpar {
+                break;
+            }
         }
 
         let innermost = calls
@@ -919,14 +925,144 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_arguments_after_lpar(&mut self, start: TextSize) -> ast::Arguments {
-        let mut state = ArgumentParsingState::default();
+        let mut args = vec![];
+        let mut keywords = vec![];
+        let mut seen_keyword_argument = false; // foo = 1
+        let mut seen_keyword_unpacking = false; // **foo
 
         let has_trailing_comma =
             self.parse_comma_separated_list(RecoveryContextKind::Arguments, |parser| {
-                parser.parse_argument(&mut state);
+                let argument_start = parser.node_start();
+                if parser.eat(TokenKind::DoubleStar) {
+                    let value = parser.parse_conditional_expression_or_higher();
+
+                    keywords.push(ast::Keyword {
+                        arg: None,
+                        value: value.expr,
+                        range: parser.node_range(argument_start),
+                        node_index: AtomicNodeIndex::NONE,
+                    });
+
+                    seen_keyword_unpacking = true;
+                } else {
+                    let start = parser.node_start();
+                    let mut parsed_expr = parser
+                        .parse_named_expression_or_higher(ExpressionContext::starred_conditional());
+
+                    match parser.current_token_kind() {
+                        TokenKind::Async | TokenKind::For => {
+                            if parsed_expr.is_unparenthesized_starred_expr() {
+                                parser.add_unsupported_syntax_error(
+                                    UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                                        ComprehensionUnpackingKind::IterableInGenerator,
+                                    ),
+                                    parsed_expr.range(),
+                                );
+                            }
+
+                            parsed_expr = Expr::Generator(parser.parse_generator_expression(
+                                parsed_expr.expr,
+                                start,
+                                Parenthesized::No,
+                            ))
+                            .into();
+                        }
+                        _ => {
+                            if seen_keyword_unpacking
+                                && parsed_expr.is_unparenthesized_starred_expr()
+                            {
+                                parser.add_error(
+                                    ParseErrorType::InvalidArgumentUnpackingOrder,
+                                    &parsed_expr,
+                                );
+                            }
+                        }
+                    }
+
+                    let arg_range = parser.node_range(start);
+                    if parser.eat(TokenKind::Equal) {
+                        seen_keyword_argument = true;
+                        let arg = if let ParsedExpr {
+                            expr: Expr::Name(ident_expr),
+                            is_parenthesized,
+                        } = parsed_expr
+                        {
+                            // test_ok parenthesized_kwarg_py37
+                            // # parse_options: {"target-version": "3.7"}
+                            // f((a)=1)
+
+                            // test_err parenthesized_kwarg_py38
+                            // # parse_options: {"target-version": "3.8"}
+                            // f((a)=1)
+                            // f((a) = 1)
+                            // f( ( a ) = 1)
+
+                            if is_parenthesized {
+                                parser.add_unsupported_syntax_error(
+                                    UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
+                                    arg_range,
+                                );
+                            }
+
+                            ast::Identifier {
+                                id: ident_expr.id,
+                                range: ident_expr.range,
+                                node_index: AtomicNodeIndex::NONE,
+                            }
+                        } else {
+                            // TODO(dhruvmanila): Parser shouldn't drop the `parsed_expr` if it's
+                            // not a name expression. We could add the expression into `args` but
+                            // that means the error is a missing comma instead.
+                            parser.add_error(
+                                ParseErrorType::OtherError("Expected a parameter name".to_string()),
+                                &parsed_expr,
+                            );
+                            ast::Identifier {
+                                id: Name::empty(),
+                                range: parsed_expr.range(),
+                                node_index: AtomicNodeIndex::NONE,
+                            }
+                        };
+
+                        let value = parser.parse_conditional_expression_or_higher();
+
+                        keywords.push(ast::Keyword {
+                            arg: Some(arg),
+                            value: value.expr,
+                            range: parser.node_range(argument_start),
+                            node_index: AtomicNodeIndex::NONE,
+                        });
+                    } else {
+                        if !parsed_expr.is_unparenthesized_starred_expr() {
+                            if seen_keyword_unpacking {
+                                parser.add_error(
+                                    ParseErrorType::PositionalAfterKeywordUnpacking,
+                                    &parsed_expr,
+                                );
+                            } else if seen_keyword_argument {
+                                parser.add_error(
+                                    ParseErrorType::PositionalAfterKeywordArgument,
+                                    &parsed_expr,
+                                );
+                            }
+                        }
+                        args.push(parsed_expr.expr);
+                    }
+                }
             });
 
-        self.finish_arguments(start, state, has_trailing_comma)
+        self.expect(TokenKind::Rpar);
+
+        let arguments = ast::Arguments {
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+            args: args.into_boxed_slice(),
+            keywords: keywords.into_boxed_slice(),
+        };
+
+        self.validate_arguments(&arguments, has_trailing_comma);
+
+        arguments
     }
 
     fn parse_arguments_after_first_positional(
@@ -1115,13 +1251,13 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#subscriptions>
     fn parse_subscript_expression(&mut self, value: Expr, start: TextSize) -> ast::ExprSubscript {
-        if matches!(self.peek2(), (TokenKind::Name, TokenKind::Lsqb)) {
-            return self.parse_nested_subscript_expression(value, start);
-        }
-
         self.bump(TokenKind::Lsqb);
 
         let slice_start = self.node_start();
+        if self.at(TokenKind::Name) && self.peek() == TokenKind::Lsqb {
+            return self.parse_nested_subscript_expression(value, start, slice_start);
+        }
+
         self.parse_subscript_expression_after_lsqb(value, start, slice_start)
     }
 
@@ -1129,13 +1265,11 @@ impl<'src> Parser<'src> {
         &mut self,
         mut value: Expr,
         mut start: TextSize,
+        mut slice_start: TextSize,
     ) -> ast::ExprSubscript {
         let mut subscripts = Vec::new();
 
         let mut expr = loop {
-            self.bump(TokenKind::Lsqb);
-
-            let slice_start = self.node_start();
             if !self.at(TokenKind::Name) || self.peek() != TokenKind::Lsqb {
                 break Expr::Subscript(self.parse_subscript_expression_after_lsqb(
                     value,
@@ -1152,6 +1286,8 @@ impl<'src> Parser<'src> {
 
             start = self.node_start();
             value = self.parse_atom().expr;
+            self.bump(TokenKind::Lsqb);
+            slice_start = self.node_start();
         };
 
         while let Some(subscript) = subscripts.pop() {
