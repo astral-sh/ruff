@@ -1,6 +1,6 @@
 # Plan: Migrate SpecializationBuilder from type_mappings HashMap to ConstraintSet
 
-## Status: In progress (Phases 1–4 complete; Phase 5.1–5.7 complete)
+## Status: In progress (first PR stabilization; Phases 1–4 complete; Phase 5.1–5.7 implemented with Step 5.4 follow-up; Phase 5.8 deferred)
 
 ## Overview
 
@@ -9,9 +9,9 @@ in a hybrid state:
 
 - **Old solver**: Most match arms in `infer_map_impl` walk formal/actual types manually, find
     typevar assignments, and add them to a `FxHashMap<BoundTypeVarIdentity, Type>` (`self.types`).
-    When a typevar gets multiple assignments, the old solver combines them via union. (This is correct
-    when the typevar assignment appears in a contravariant position. If the assignment appears in
-    covariant position, we should use intersection!)
+    When a typevar gets multiple assignments, the old solver combines them via union. (This is
+    correct for covariant lower-bound inference. Contravariant upper-bound inference should use
+    intersection, and invariant inference should require consistency.)
 
 - **New solver**: A couple of match arms (callables and protocols) create a `ConstraintSet` via the
     constraint set machinery, then immediately extract solutions and add them back to the old
@@ -31,6 +31,91 @@ that you can always identify the frontier of available work. Status markers indi
 and phases have already been completed. When resuming a plan that a previous agent created, read
 through other files in the repo as necessary to validate that the status markers are accurate.
 
+## Current PR scope: reviewable checkpoint before Phase 5.8
+
+Status: Active stabilization work. We are intentionally **not** proceeding to Step 5.8 in this
+PR. The current dual-write / pending-solve state after Step 5.7 should be reviewed and merged as a
+separate first PR. Removing the legacy HashMap state and old code paths is deferred to follow-on
+PRs.
+
+Before opening the current PR for review, address these stabilization items:
+
+### Stabilization task A — protocol-union pending-set dual-write
+
+Status: Needs code change or an explicit written justification before review.
+
+Current finding: in `crates/ty_python_semantic/src/types/generics.rs`, the
+`(formal @ Type::ProtocolInstance(_), actual @ Type::Union(_))` arm computes
+`actual.when_constraint_set_assignable_to_owned(self.db, formal)` and calls
+`add_type_mappings_from_owned_constraint_set(when)`, but it does **not** intersect that constraint
+set into `self.pending`. Other constraint-set-based inference paths added in Step 5.4 dual-write
+into `self.pending` when the local set is satisfiable.
+
+Correct next step: treat this as a likely missed dual-write edge. Preserve the existing non-fatal
+behavior for unsatisfiable protocol inference, but when `add_type_mappings_from_constraint_set(...)`
+returns `Ok(())`, also intersect the loaded constraint set into `self.pending`. If investigation
+finds that this arm must intentionally avoid pending-set inference, document the invariant here and
+add a targeted regression test.
+
+Validation focus: protocol-over-union inference, callable-wrapper patterns, and the normal
+`ty_python_semantic` / `ty_ide` test set.
+
+### Stabilization task B — new `argument_type_context` builder call site
+
+Status: Must be addressed before review. If this call site had existed when Phase 3 started, it
+would have been in scope for the Pattern 3 migration, so it should not remain as a temporary
+`SpecializationBuilder` use in the checkpoint PR.
+
+Current finding: after merging current `main`, `crates/ty_python_semantic/src/types/call/bind.rs`
+contains a `SpecializationBuilder` use in `argument_type_context`. It builds an intermediate
+specialization from the call expression's return type context so that parameter types can provide
+bidirectional inference context. This is a Pattern 3-style use: it is not the main specialization
+of the call, and unsolved typevars are explicitly replaced with
+`DynamicType::UnspecializedTypeVar`.
+
+Correct next step: migrate this call site in the current PR to the standalone query shape used by
+other Pattern 3 sites:
+`return_ty.assignable_solutions_with_inferable(db, declared_return_ty, generic_context.inferable_typevars(db))`
+plus `PathBounds::solve(...)`, followed by `GenericContext::specialize_recursive(...)` with
+`UnspecializedTypeVar` for unsolved typevars. Preserve the current behavior for missing,
+unconstrained, or unsatisfiable return type context by leaving all relevant typevars as
+`UnspecializedTypeVar`. Pay particular attention to generic contexts that contain `ParamSpec`,
+since the transitional `SpecializationBuilder::solve_pending_with` currently falls back to the
+legacy HashMap path for ParamSpec-specialized contexts.
+
+### Stabilization task C — stale `assignable_solutions` helper references
+
+Status: Complete for this plan update; no code change required. Current code only exposes
+`Type::assignable_solutions_with_inferable(...)`; older plan references to
+`Type::assignable_solutions(...)` were stale.
+
+Correct next step: future implementation notes should refer to
+`assignable_solutions_with_inferable(...)`. No code change is required unless we decide to add a
+convenience wrapper later.
+
+### Stabilization task D — Expression ecosystem performance regression
+
+Status: Needs investigation and, ideally, a fix before review.
+
+CI reported a large regression on the `Expression` ecosystem project, from roughly `0.09s` to
+`4.07s` (>40×). A local ecosystem run from this worktree reproduced the same order of regression,
+though with different absolute numbers:
+
+```sh
+eco -o $HOME/.pi/tmp/expression-feature.json Expression   # Expression: 2.646s
+eco -m -o $HOME/.pi/tmp/expression-main.json Expression   # Expression: 0.078s
+```
+
+Correct next step: profile before changing semantics. First localize the hot path (for example by
+profiling the `ty check` run on the cached Expression checkout and/or by checking project subsets),
+then decide whether the fix belongs in the current PR. Suspect areas include the new pending-set
+solve path in `SpecializationBuilder::build_with`, repeated `remove_noninferable` /
+`ConstraintSet::solutions_with` / `PathBounds::compute` work, and any cases where the dual-write
+transition now solves large constraint sets even though the legacy HashMap state already has the
+needed answer. Possible fixes to evaluate include cheap `pending.is_always_satisfied(...)` guards,
+avoiding repeated solves for unconstrained builders, or narrowing when the pending-set path is used
+in this checkpoint PR.
+
 ## Three-pattern framework
 
 Every call site that reaches into the builder's pending state falls into one of three patterns:
@@ -45,7 +130,7 @@ Every call site that reaches into the builder's pending state falls into one of 
     `SpecializationBuilder` purely to query per-typevar information — it never calls `build_with()`
     to produce the final specialization (or only builds an intermediate one for downstream use).
     In the new world, these cases **bypass `SpecializationBuilder` entirely**, typically via
-    `Type::assignable_solutions(_with_inferable)` plus `PathBounds::{solve, solve_with}`.
+    `Type::assignable_solutions_with_inferable(...)` plus `PathBounds::{solve, solve_with}`.
 
 Patterns 1 and 2 apply to the call sites that actually *build a specialization*. Pattern 3
 applies to temporary builders that are just used as query mechanisms. The distinction matters
@@ -135,39 +220,51 @@ Pattern: 2 (solution extraction hook)
 **Builds a specialization**: Yes — same builder as #1, this is the specialization-construction
 step.
 
-**Current behavior**: After inference, `build_with` is called. Because the builder is still
-HashMap-backed, the hook currently sees *synthetic equality bounds* `(mapped_ty, mapped_ty)` for
-mapped typevars only. `maybe_promote` checks the typevar's variance in the return type and its
-declared bounds, and may promote literals (e.g. `Literal[1] → int`).
+**Current behavior**: After inference, `build_with` is called. After Step 5.7, the hook sees real
+per-path lower/upper bounds from the pending constraint set when that path is satisfiable.
+`maybe_promote` checks the typevar's variance in the return type and its declared bounds, and may
+promote literals (e.g. `Literal[1] → int`).
 
-**New approach**: Once the builder's pending state becomes a `ConstraintSet`, the same hook
-should run against the real per-path lower/upper bounds coming out of the pending set. If the
-lower bound is a literal type, the typevar appears in a non-covariant position in the return
-type, and the promoted type still fits inside the upper bound, choose the promoted type.
+**Completed approach**: When the lower bound is a literal type, the typevar appears in a
+non-covariant position in the return type, and the promoted type still fits inside the upper bound,
+choose the promoted type.
 
-**Feasibility**: Straightforward.
+**Feasibility**: Done.
 
 **Already eliminated**: `mapped()`.
 
-### 3. Bidirectional argument inference (`infer/builder.rs`)
+### 3. Bidirectional / argument-context inference
 
 Pattern: 3 (standalone constraint set query)
+
+#### 3a. Historical bidirectional argument inference (`infer/builder.rs`)
 
 **Builds a specialization**: Technically yes, but only as an intermediate — it creates a partial
 specialization to apply to parameter types for downstream bidirectional inference. It is not the
 main specialization of the call.
 
-**Current behavior**: This migration is complete. The code now:
+**Current behavior**: This migration was completed. The historical site used a cached standalone
+query (`return_ty.assignable_solutions_with_inferable(...)`), solved the resulting `PathBounds`,
+and created the intermediate specialization with `GenericContext::specialize_recursive`, using
+`UnspecializedTypeVar` for unsolved typevars. No `SpecializationBuilder` is involved in that
+historical path anymore.
 
-1. `return_ty.assignable_solutions(db, declared_return_ty)`
-1. solves the cached `PathBounds` via `PathBounds::solve(...)`
-1. builds `tcx_mappings` from the resulting solutions
-1. creates the intermediate specialization with `GenericContext::specialize_recursive`, using
-    `UnspecializedTypeVar` for unsolved typevars
+#### 3b. Generic-call argument type context (`call/bind.rs::argument_type_context`)
 
-No `SpecializationBuilder` is involved anymore.
+**Builds a specialization**: Technically yes, but only as an intermediate used to compute a
+bidirectional type context for one argument of a generic call.
 
-**Feasibility**: Done.
+**Current behavior**: This is a new/current call site introduced by changes merged from `main`
+during the migration. It still uses `SpecializationBuilder`: it infers from the call expression's
+return type context (`return_ty ≤ declared_return_ty`, encoded today as
+`builder.infer(declared_return_ty, return_ty)`) and then calls `build_with`, substituting
+`DynamicType::UnspecializedTypeVar` for unsolved typevars.
+
+**Correct next step**: Migrate this call site in the current checkpoint PR. It should use the
+standalone query shape:
+`return_ty.assignable_solutions_with_inferable(db, declared_return_ty, inferable)` plus
+`PathBounds::solve(...)`, then `GenericContext::specialize_recursive(...)`, preserving the current
+`UnspecializedTypeVar` fallback for unsolved typevars.
 
 ### 4. `infer_reverse_map_impl`'s internal builder (`generics.rs`)
 
@@ -247,7 +344,7 @@ from the pending constraint set instead of synthetic equality bounds.
 The solution-extraction refactor has since settled into two surfaces:
 
 - **Standalone `Type ≤ Type` queries** use cached `PathBounds`, via
-    `Type::assignable_solutions(...)` and `Type::assignable_solutions_with_inferable(...)`
+    `Type::assignable_solutions_with_inferable(...)`
 - **Builder-internal constraint sets** still use `ConstraintSet::solutions_with(...)`
 
 `PathBounds::default_solve(...)` is the default “pick a representative type from these bounds”
@@ -267,8 +364,7 @@ FnMut(
 // SpecializationBuilder::build_with
 FnMut(
     BoundTypeVarInstance<'db>,
-    Type<'db>,
-    Type<'db>,
+    Option<(Type<'db>, Type<'db>)>,
 ) -> Option<Type<'db>>
 ```
 
@@ -276,9 +372,10 @@ Notes:
 
 - `Ok(None)` means “fall back to `PathBounds::default_solve` for this path”
 - `Err(())` invalidates the current path
-- `SpecializationBuilder::build_with` still has the simpler hook shape because the builder is
-    HashMap-backed today; it only exposes synthetic lower/upper bounds for already-mapped
-    typevars
+- `SpecializationBuilder::build_with` has the simpler hook shape because it does not expose
+    path-local variance to callers. It now passes `Some((lower, upper))` for solved pending-set
+    bounds and `None` for unsolved/unconstrained typevars, allowing callers such as
+    `argument_type_context` to provide an alternative default.
 
 **Multi-path BDD handling**: Keep the current per-path behavior. Run the hook per path, then
 combine the chosen per-path results via union. This matches the current hybrid behavior of
@@ -286,45 +383,55 @@ combine the chosen per-path results via union. This matches the current hybrid b
 
 ## Feasibility summary
 
-| Call site                                | Pattern   | Feasible?  | Risk/Concern                                                   |
-| ---------------------------------------- | --------- | ---------- | -------------------------------------------------------------- |
-| `preferred_type_mappings` + callback     | 1         | Yes        | `partially_specialized_declared_type` still needs a clean exit |
-| `maybe_promote` via `build_with`         | 2         | Yes        | Must keep working when `build_with` sees real bounds           |
-| Bidirectional argument inference         | 3         | Done       | Already uses cached `PathBounds`                               |
-| `infer_reverse_map_impl` internal        | Goes away | Done       | —                                                              |
-| Historical `types.rs` site               | 3         | Done       | No current caller remains                                      |
-| `infer_collection_literal` TCX query     | 3         | Done       | Variance now comes from path bounds                            |
-| `infer_collection_literal` final builder | 1 + 2     | Mostly yes | Preserve singleton-promotion hook across the Phase 5 switch    |
+| Call site                                   | Pattern    | Feasible?  | Risk/Concern                                                                  |
+| ------------------------------------------- | ---------- | ---------- | ----------------------------------------------------------------------------- |
+| `preferred_type_mappings` + callback        | 1          | Yes        | `partially_specialized_declared_type` still needs a clean exit                |
+| `maybe_promote` via `build_with`            | 2          | Yes        | Must keep working when `build_with` sees real bounds                          |
+| Historical bidirectional argument inference | 3          | Done       | Already uses cached `PathBounds`                                              |
+| Generic-call argument type context          | 3          | Open       | New/current intermediate-builder site from `main`; must migrate before review |
+| `infer_reverse_map_impl` internal           | Goes away  | Done       | —                                                                             |
+| Historical `types.rs` site                  | 3          | Done       | No current caller remains                                                     |
+| `infer_collection_literal` TCX query        | 3          | Done       | Variance now comes from path bounds                                           |
+| `infer_collection_literal` final builder    | 1 + 2      | Mostly yes | Preserve singleton-promotion hook across the Phase 5 switch                   |
+| Expression ecosystem performance            | Validation | Open       | Large slowdown must be investigated before review                             |
 
 No fundamental blockers. Main design challenges *for the remaining work*:
 
-1. Switching `build_with` from synthetic equality bounds to real per-path bounds from
-    `self.pending`
-1. Preserving or eliminating the `partially_specialized_declared_type` heuristic cleanly
+1. Stabilizing the current checkpoint PR: close the Step 5.4 protocol-union dual-write gap and
+    resolve the `Expression` performance regression.
+1. Preserving or eliminating the `partially_specialized_declared_type` heuristic cleanly.
 1. Behavioral differences from HashMap union vs constraint conjunction (especially invariant /
-    contravariant cases)
+    contravariant cases).
+1. Later, removing the legacy HashMap path in Step 5.8 without losing ParamSpec first-wins
+    semantics.
 
 ## Completeness verification
 
 The current public `SpecializationBuilder` API is much smaller than when this plan was first
-written:
+written. Current callers from the latest inspection (line numbers are approximate; use `rg` when
+resuming):
 
-| Method             | Current callers                                                                             | Plan coverage         |
-| ------------------ | ------------------------------------------------------------------------------------------- | --------------------- |
-| `new`              | `call/bind.rs:3917,4060`; `infer/builder.rs:6239`                                           | Call sites #1 and #6  |
-| `build_with`       | `call/bind.rs:4121`; `infer/builder.rs:6363`                                                | Call sites #2 and #6b |
-| `add_type_mapping` | `call/bind.rs` preferred-type seeding; `infer/builder.rs` TCX injection; internal inference | Call sites #1 and #6b |
-| `infer`            | `infer/builder.rs:6297,6300,6346`                                                           | Call site #6b         |
+| Method             | Current callers                                                                                                                                            | Plan coverage             |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `new`              | `call/bind.rs` main specialization and retry; `call/bind.rs::argument_type_context` (to migrate in Step 3.4); `infer/builder.rs::infer_collection_literal` | Call sites #1/#2, #3b, #6 |
+| `build_with`       | `call/bind.rs` main specialization; `call/bind.rs::argument_type_context` (to migrate in Step 3.4); `infer/builder.rs::infer_collection_literal`           | Call sites #2, #3b, #6b   |
+| `add_type_mapping` | `call/bind.rs` preferred-type seeding; `infer/builder.rs` TCX injection; internal inference                                                                | Call sites #1 and #6b     |
+| `infer`            | `call/bind.rs::infer_argument_constraints`; `call/bind.rs::argument_type_context` (to migrate in Step 3.4); `infer/builder.rs::infer_collection_literal`   | Call sites #1, #3b, #6b   |
 
 Removed APIs such as `mapped`, `with_default`, `infer_reverse`, `infer_reverse_map`,
 `infer_map`, `into_type_mappings`, the dedicated `insert_type_mapping` entry point, and the old
 `build()` entry point are already covered by completed Phases 1–5.
 
-All former `infer_reverse` / `infer_reverse_map` callers remain accounted for. The surviving
-standalone-query sites now use the cached `PathBounds` helpers:
+All former `infer_reverse` / `infer_reverse_map` callers remain accounted for. The migrated
+standalone-query sites use the cached `PathBounds` helper
+`Type::assignable_solutions_with_inferable(...)`; the new/current Pattern 3 site is called out
+separately:
 
-- **Bidirectional argument inference** (`infer/builder.rs`): uses
-    `return_ty.assignable_solutions(...)`, then `PathBounds::solve(...)`
+- **Historical bidirectional argument inference** (`infer/builder.rs`): migrated to a standalone
+    query and no longer uses `SpecializationBuilder` in that historical path
+- **Generic-call argument type context** (`call/bind.rs::argument_type_context`): current/new
+    Pattern 3-style intermediate builder call site; tracked as call site #3b and must be migrated
+    before review
 - **`infer_specialization` preferred types** (`call/bind.rs`): uses
     `return_ty.assignable_solutions_with_inferable(...)`, then `solve_with(...)`; variance and
     filtering are driven by the solved path bounds
@@ -344,8 +451,10 @@ standalone-query sites now use the cached `PathBounds` helpers:
 - **`infer_specialization`** (call sites #1, #2):
     `crates/ty_python_semantic/src/types/call/bind.rs`
 - **`infer_argument_constraints`**: same file
-- **Bidirectional argument inference** (call site #3):
-    `crates/ty_python_semantic/src/types/infer/builder.rs`
+- **Bidirectional / argument-context inference** (call site #3):
+    historical path in `crates/ty_python_semantic/src/types/infer/builder.rs`; current
+    `argument_type_context` builder call site in
+    `crates/ty_python_semantic/src/types/call/bind.rs` (must migrate in Step 3.4)
 - **`infer_collection_literal`** (call site #6): same file
 
 ## Validation
@@ -369,6 +478,11 @@ cargo nextest run -p ty_python_semantic -p ty_ide --cargo-profile fast-test
 For deeper validation (especially Phases 5–6), run ecosystem analyses using the
 `local-ecosystem` skill on `aiortc`, `sympy`, `static-frame`, and `vision`, and compare
 diagnostics against a `main` baseline to ensure no regressions.
+
+For the current checkpoint PR, also include the `Expression` ecosystem project in performance
+validation. CI reported it as the worst regression, and a local run reproduced a large slowdown
+(current branch `2.646s` vs `main` `0.078s` in one run). Do not open the PR for review until this
+has been investigated and either fixed or explicitly accepted.
 
 If tests fail due to behavioral changes from CSA (usually more precise types), **do not update
 test expectations without confirming with @dcreager first**. Document which tests changed and
@@ -444,8 +558,7 @@ cached standalone `PathBounds` queries for `Type ≤ Type` checks, and
 **Step 1.2 ✅**: Designed and implemented the hook surface used today:
 
 - `ConstraintSet::solutions_with(...)` for builder-internal constraint sets
-- `Type::assignable_solutions(...)` / `assignable_solutions_with_inferable(...)` for cached
-    standalone queries
+- `Type::assignable_solutions_with_inferable(...)` for cached standalone queries
 - Hook signature at the constraint/path-bounds layer:
     `FnMut(BoundTypeVarInstance, TypeVarVariance, Type, Type) -> Result<Option<Type>, ()>`
     - Receives the typevar, its path-local variance, and materialized lower/upper bounds
@@ -456,11 +569,13 @@ cached standalone `PathBounds` queries for `Type ≤ Type` checks, and
     solution cache; standalone queries now cache `PathBounds` instead
 
 **Step 1.3 ✅**: Implemented `build_with` on `SpecializationBuilder` as the
-specialization-construction entry point. It is still HashMap-backed today:
+specialization-construction entry point. Initially this was HashMap-backed; after Step 5.7 it now
+uses the pending constraint set when possible:
 
-- the hook is called only for mapped typevars
-- mapped typevars are exposed as synthetic equality bounds `(mapped_ty, mapped_ty)`
-- unsolved typevars are left as `None` so `specialize_recursive` can fill in defaults
+- the hook receives `Some((lower, upper))` for solved pending-set bounds
+- the hook receives `None` for unsolved/unconstrained typevars so callers can provide an
+    alternative default when needed
+- unsolved typevars are otherwise left as `None` so `specialize_recursive` can fill in defaults
 - there is no separate `build()` method anymore; all current callers use `build_with`
 
 ### Phase 2: Migrate Pattern 2 call sites (solution extraction hooks)
@@ -476,42 +591,52 @@ API exists.
 to override or `None` to keep the default. The hook closure captures `self` for access to the
 return type, call expression TCX, and typevar bound/constraint info.
 
-Also fixed `build_with` to only call the hook for *mapped* typevars (those with entries in the
-type mappings). Unmapped typevars are passed through as `None` to `specialize_recursive` so they
-get filled in with defaults. The original implementation called the hook for all typevars
-including unmapped ones (with synthetic `Never`/`object` bounds), which caused hooks like
-`maybe_promote` to produce `Some(Never)` for unmapped typevars instead of leaving them as `None`.
+At this stage, also fixed the then-HashMap-backed `build_with` to only call the hook for *mapped*
+typevars (those with entries in the type mappings). Unmapped typevars were passed through as
+`None` to `specialize_recursive` so they got filled in with defaults. The original implementation
+called the hook for all typevars including unmapped ones (with synthetic `Never`/`object` bounds),
+which caused hooks like `maybe_promote` to produce `Some(Never)` for unmapped typevars instead of
+leaving them as `None`. Step 5.7 later changed the current hook behavior to use
+`Option<(lower, upper)>` from the pending constraint set.
 
 **Step 2.2 ✅**: Removed `mapped()` from `SpecializationBuilder`'s public API.
 
 ### Phase 3: Migrate Pattern 3 call sites (standalone constraint set queries)
 
-Status: Complete ✅
+Status: Original Phase 3 sites complete ✅; new/current Step 3.4 must be completed during checkpoint stabilization
 **Difficulty: Easy–Medium per step** — each is self-contained. Step 3.2 is the hardest due to
 variance tracking.
 **Dependencies: None** — can start immediately, in parallel with Phase 1.
 
-These sites no longer use temporary `SpecializationBuilder` instances. The preferred
-standalone-query surface is now `Type::assignable_solutions(_with_inferable)` plus
+The historical Phase 3 sites no longer use temporary `SpecializationBuilder` instances. The
+preferred standalone-query surface is now `Type::assignable_solutions_with_inferable(...)` plus
 `PathBounds::{solve, solve_with}`.
 
 These were good early migration targets because they were self-contained — changing them didn't
-affect the `SpecializationBuilder` API or its remaining callers.
+affect the `SpecializationBuilder` API or its remaining callers. A new/current Pattern 3-style
+call site in `call/bind.rs::argument_type_context` was merged from `main` later; it is tracked in
+Stabilization task B and call site #3b above, and must be migrated before review.
 
 **Step 3.1 ✅**: Historical `types.rs` site. This migration was completed, and the surrounding
 code path has since disappeared from the current call graph. Keep this step as historical context
 only.
 
-**Step 3.3 ✅**: Migrated bidirectional argument inference (`infer/builder.rs`):
+**Step 3.3 ✅**: Migrated historical bidirectional argument inference (`infer/builder.rs`):
 
 - Replaced `infer_reverse(declared_return_ty, return_ty)` with the cached standalone query
-    `return_ty.assignable_solutions(db, declared_return_ty)`
+    `return_ty.assignable_solutions_with_inferable(db, declared_return_ty, inferable)`
 - Solved via `PathBounds::solve(db, &constraints)` and built `tcx_mappings` from the resulting
     solutions
 - Created the intermediate specialization via `GenericContext::specialize_recursive`, using
     `Some(mapped_ty)` for solved typevars and
     `Some(Type::Dynamic(DynamicType::UnspecializedTypeVar))` for unsolved ones
 - Removed the temporary `SpecializationBuilder` and `with_default` call
+
+**Step 3.4 ⏳**: Migrate the current `argument_type_context` intermediate builder
+(`call/bind.rs`). This call site was introduced by changes merged from `main` after the original
+Phase 3 work. Because it is a Pattern 3 temporary-builder query, it is in scope for the current
+checkpoint PR and should be migrated to the same standalone `PathBounds` query shape before
+review.
 
 **Step 3.2 ✅**: Migrated the TCX query in `infer_collection_literal` (`infer/builder.rs`):
 
@@ -610,7 +735,7 @@ Test expectation updated.
 
 ### Phase 5: Switch internal representation to ConstraintSet
 
-Status: In progress (Steps 5.1–5.7 complete)
+Status: In progress (Steps 5.1–5.7 implemented; Step 5.4 follow-up and Step 5.7a stabilization active; Step 5.8 deferred to a follow-on PR)
 **Difficulty: Medium–Hard** — the mechanical changes are straightforward, but behavioral
 differences in how constraints combine (vs HashMap union) may cause test changes.
 **Dependencies: Phase 4** (callers must be migrated so that `infer_reverse` is gone).
@@ -807,16 +932,19 @@ only the `add_type_mapping` path is dual-written so far.
 - `cargo nextest run -p ty_python_semantic -p ty_ide --cargo-profile fast-test`
 - `/home/dcreager/bin/jpk run -a`
 
-**Step 5.4 ✅**: Added direct pending-set conjunction for constraint-set-based inference, while
+**Step 5.4 ⚠️**: Added direct pending-set conjunction for constraint-set-based inference, while
 keeping the existing HashMap extraction path.
+
+Status note: mostly complete, but Stabilization task A found one likely missed pending-set
+intersection in the protocol-union branch that must be resolved before review.
 
 Implementation details:
 
 1. `add_type_mappings_from_constraint_set` still performs the existing
     extract-solutions-then-reinsert logic for the HashMap-backed specialization state, and still
     returns only `Result<(), ()>`.
-1. Callers now dual-write into `self.pending` by intersecting the same local constraint sets that
-    were passed into that helper:
+1. Covered callers dual-write into `self.pending` by intersecting the same local constraint sets
+    that were passed into that helper:
     - non-overloaded / single-ParamSpec cases intersect the single local set directly
     - overloaded callable cases OR together all satisfiable overload-local sets, then intersect the
         combined set into `self.pending`
@@ -897,15 +1025,31 @@ Implementation details:
     paths rather than synthetic equality bounds from the HashMap.
 1. The resulting specialization still leaves unsolved typevars as `None` so that
     `specialize_recursive` can fill in defaults.
-1. Both current callers were validated:
+1. The original two solution-selection hook callers were validated:
     - `maybe_promote` in `bind.rs`
     - the collection-literal singleton-promotion hook in `infer/builder.rs`
+1. The current tree also has the `argument_type_context` intermediate-specialization hook in
+    `bind.rs`; this was introduced by changes merged from `main` and must be migrated off
+    `SpecializationBuilder` as Step 3.4 during checkpoint stabilization.
 1. Mdtest expectations were updated for the resulting behavior changes, including cases where the
     pending-set path now preserves correlated solutions or avoids former false-positive errors.
 
-**Step 5.8**: Remove the HashMap field and old code paths.
+**Step 5.7a ⏳**: Stabilize the current checkpoint PR before review/merge.
 
-Once tests pass with the constraint-set-based `build_with`:
+Do **not** start Step 5.8 in this PR. First complete the stabilization tasks listed in
+"Current PR scope" above:
+
+- [ ] Fix or explicitly justify the protocol-union pending-set dual-write gap.
+- [ ] Migrate the new `call/bind.rs::argument_type_context` builder use to a standalone
+    `PathBounds` query in this PR.
+- [x] Keep stale `assignable_solutions(...)` references out of this plan and future notes; current
+    code uses `assignable_solutions_with_inferable(...)`.
+- [ ] Investigate and ideally fix the `Expression` ecosystem performance regression before review.
+
+**Step 5.8 (deferred)**: Remove the HashMap field and old code paths.
+
+This is intentionally deferred to a follow-on PR. Once tests pass with the constraint-set-based
+`build_with` and the first PR has been reviewed/merged:
 
 - Remove the `types: FxHashMap` field
 - Remove the HashMap update code from `add_type_mapping`
