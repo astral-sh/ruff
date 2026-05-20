@@ -556,6 +556,11 @@ impl<'db> NarrowingConstraint<'db> {
         }
     }
 
+    /// Return `true` if later narrowing cannot replace a previously impossible type.
+    pub(crate) fn is_intersection_only(&self) -> bool {
+        self.replacement_disjuncts.is_empty()
+    }
+
     /// Evaluate the type this effectively constrains to
     ///
     /// Forgets whether each constraint originated from a `replacement` disjunct or not

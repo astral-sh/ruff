@@ -836,6 +836,27 @@ struct ProjectedNarrowingContext<'a, 'db> {
 }
 
 impl<'db> ProjectedNarrowingContext<'_, 'db> {
+    /// Narrow a positive branch, pruning path combinations that are already impossible.
+    ///
+    /// Projected match graphs can combine positive pattern branches that cannot all match the
+    /// same finite subject. Intersection-only constraints can never revive an impossible base type,
+    /// unlike later `TypeGuard` replacement constraints.
+    fn narrow_positive_branch(
+        &mut self,
+        id: ProjectedNarrowingNodeId,
+        accumulated: Option<NarrowingConstraint<'db>>,
+    ) -> Type<'db> {
+        if accumulated.as_ref().is_some_and(|constraint| {
+            constraint.is_intersection_only()
+                && apply_accumulated_narrowing(self.db, self.base_ty, accumulated.clone())
+                    .is_never()
+        }) {
+            Type::Never
+        } else {
+            self.narrow(id, accumulated)
+        }
+    }
+
     /// Recursively evaluates a projected path while accumulating narrowing constraints.
     fn narrow(
         &mut self,
@@ -858,10 +879,10 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
                 self.narrow(node.if_false, false_accumulated)
             } else if node.if_false == ProjectedNarrowingNodeId::ALWAYS_FALSE {
                 let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
-                self.narrow(node.if_true, true_accumulated)
+                self.narrow_positive_branch(node.if_true, true_accumulated)
             } else {
                 let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
-                let true_ty = self.narrow(node.if_true, true_accumulated);
+                let true_ty = self.narrow_positive_branch(node.if_true, true_accumulated);
 
                 let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
                 let false_ty = self.narrow(node.if_false, false_accumulated);

@@ -246,6 +246,96 @@ def _(x: Literal["foo", b"bar"] | int):
             pass
 ```
 
+## Value patterns with fallthrough
+
+Non-terminal match arms should keep their pattern narrowing after the `match` statement without
+requiring ty to enumerate all of the terminal arms.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+
+type Value = Literal[
+    "f00", "v01", "v02", "v03", "v04", "v05", "v06", "v07",
+    "f08", "v09", "v10", "v11", "v12", "v13", "v14", "v15",
+    "f16", "v17", "v18", "v19", "v20", "v21", "v22", "v23",
+    "f24", "v25", "v26", "v27", "v28", "v29", "v30", "v31",
+]
+
+def _(value: Value) -> None:
+    match value:
+        case "f00":
+            pass
+        case "v01":
+            return
+        case "v02":
+            return
+        case "v03":
+            return
+        case "v04":
+            return
+        case "v05":
+            return
+        case "v06":
+            return
+        case "v07":
+            return
+        case "f08":
+            pass
+        case "v09":
+            return
+        case "v10":
+            return
+        case "v11":
+            return
+        case "v12":
+            return
+        case "v13":
+            return
+        case "v14":
+            return
+        case "v15":
+            return
+        case "f16":
+            pass
+        case "v17":
+            return
+        case "v18":
+            return
+        case "v19":
+            return
+        case "v20":
+            return
+        case "v21":
+            return
+        case "v22":
+            return
+        case "v23":
+            return
+        case "f24":
+            pass
+        case "v25":
+            return
+        case "v26":
+            return
+        case "v27":
+            return
+        case "v28":
+            return
+        case "v29":
+            return
+        case "v30":
+            return
+        case "v31":
+            return
+
+    reveal_type(value)  # revealed: Literal["f00", "f08", "f16", "f24"]
+```
+
 ## Or patterns
 
 ```py
