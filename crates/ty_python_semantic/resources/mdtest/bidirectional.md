@@ -574,6 +574,13 @@ reveal_type(f4)  # revealed: (x: str) -> str
 f5: Callable[[str], str] = id(lambda x: reveal_type(x))  # revealed: str
 reveal_type(f5)  # revealed: (x: str) -> str
 
+# The same return-context propagation works for generic calls whose context solves a ParamSpec.
+def id_callable[**P, R](x: Callable[P, R]) -> Callable[P, R]:
+    return x
+
+f5_paramspec: Callable[[int], int] = id_callable(lambda x: reveal_type(x))  # revealed: int
+reveal_type(f5_paramspec)  # revealed: (x: int) -> int
+
 # TODO: This should not error once we support `Unpack`.
 # error: [invalid-assignment]
 f6: Callable[[*tuple[int, ...]], None] = lambda x, y, z: None

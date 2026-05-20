@@ -5804,17 +5804,6 @@ impl<'db> Binding<'db> {
         // If this is a generic call, attempt to specialize the parameter type using the
         // declared type context, propagating the declared types of any type variables.
         if let Some(generic_context) = self.signature.generic_context {
-            let mut builder =
-                SpecializationBuilder::new(db, constraints, generic_context.inferable_typevars(db));
-
-            if let Some(declared_return_ty) = call_expression_tcx.annotation {
-                let return_ty = self
-                    .normalized_constructor_return(db)
-                    .unwrap_or(self.signature.return_ty);
-
-                let _ = builder.infer(declared_return_ty, return_ty);
-            }
-
             let paramspec = if let Type::TypeVar(typevar) = original_parameter_type
                 && typevar.is_paramspec(db)
                 && typevar.paramspec_attr(db).is_some()
@@ -5823,6 +5812,37 @@ impl<'db> Binding<'db> {
             } else {
                 None
             };
+
+            let mut return_type_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
+                FxHashMap::default();
+            if let Some(declared_return_ty) = call_expression_tcx.annotation {
+                let return_ty = self
+                    .normalized_constructor_return(db)
+                    .unwrap_or(self.signature.return_ty);
+                let path_bounds = return_ty.assignable_solutions_with_inferable(
+                    db,
+                    declared_return_ty,
+                    generic_context.inferable_typevars(db),
+                );
+
+                if let Solutions::Constrained(solutions) = path_bounds.solve(db, constraints) {
+                    for solution in solutions {
+                        for binding in solution {
+                            let identity = binding.bound_typevar.identity(db);
+                            return_type_solutions
+                                .entry(identity)
+                                .and_modify(|existing| {
+                                    *existing = UnionType::from_two_elements(
+                                        db,
+                                        *existing,
+                                        binding.solution,
+                                    );
+                                })
+                                .or_insert(binding.solution);
+                        }
+                    }
+                }
+            }
 
             // Default specialize any type variables to a marker type, which will be ignored
             // during argument inference, allowing the concrete subset of the parameter
@@ -5833,13 +5853,18 @@ impl<'db> Binding<'db> {
             // the specialization of one to influence the specialization of the other. It's
             // not yet clear how we're going to do that. (We might have to start inferring
             // constraint sets for each expression, instead of simple types?)
-            let specialization = builder.build_with(generic_context, |_, bounds| {
-                if bounds.is_none() {
-                    Some(Type::Dynamic(DynamicType::UnspecializedTypeVar))
-                } else {
-                    None
-                }
-            });
+            let unspecialized = Type::Dynamic(DynamicType::UnspecializedTypeVar);
+            let specialization = generic_context.specialize_recursive(
+                db,
+                generic_context.variables(db).map(|typevar| {
+                    Some(
+                        return_type_solutions
+                            .get(&typevar.identity(db))
+                            .copied()
+                            .unwrap_or(unspecialized),
+                    )
+                }),
+            );
 
             // A `P.args`/`P.kwargs` parameter has a useful context only after another
             // argument, usually a `Callable[P, R]`, specializes `P`.

@@ -59,26 +59,25 @@ Validation:
 
 ### Stabilization task B — new `argument_type_context` builder call site
 
-Status: Must be addressed before review. If this call site had existed when Phase 3 started, it
-would have been in scope for the Pattern 3 migration, so it should not remain as a temporary
-`SpecializationBuilder` use in the checkpoint PR.
+Status: Complete ✅
 
-Current finding: after merging current `main`, `crates/ty_python_semantic/src/types/call/bind.rs`
-contains a `SpecializationBuilder` use in `argument_type_context`. It builds an intermediate
-specialization from the call expression's return type context so that parameter types can provide
-bidirectional inference context. This is a Pattern 3-style use: it is not the main specialization
-of the call, and unsolved typevars are explicitly replaced with
-`DynamicType::UnspecializedTypeVar`.
+Resolution: `crates/ty_python_semantic/src/types/call/bind.rs::argument_type_context` no longer
+creates a temporary `SpecializationBuilder`. It now computes return-context constraints via
+`return_ty.assignable_solutions_with_inferable(db, declared_return_ty, generic_context.inferable_typevars(db))`,
+solves them with `PathBounds::solve(...)`, unions per-path solutions by typevar in a local
+`FxHashMap`, and builds the intermediate specialization with
+`GenericContext::specialize_recursive(...)`. Typevars that are
+unsolved because the return context is missing, unconstrained, unsatisfiable, or simply does not
+mention them are specialized to `DynamicType::UnspecializedTypeVar`, preserving the previous
+fallback behavior. A bidirectional mdtest regression covers a generic callable whose return
+context solves a `ParamSpec`.
 
-Correct next step: migrate this call site in the current PR to the standalone query shape used by
-other Pattern 3 sites:
-`return_ty.assignable_solutions_with_inferable(db, declared_return_ty, generic_context.inferable_typevars(db))`
-plus `PathBounds::solve(...)`, followed by `GenericContext::specialize_recursive(...)` with
-`UnspecializedTypeVar` for unsolved typevars. Preserve the current behavior for missing,
-unconstrained, or unsatisfiable return type context by leaving all relevant typevars as
-`UnspecializedTypeVar`. Pay particular attention to generic contexts that contain `ParamSpec`,
-since the transitional `SpecializationBuilder::solve_pending_with` currently falls back to the
-legacy HashMap path for ParamSpec-specialized contexts.
+Validation:
+
+- `cargo fmt --check`
+- `cargo nextest run -p ty_python_semantic --cargo-profile fast-test -- mdtest::bidirectional.md`
+- `cargo nextest run -p ty_python_semantic --cargo-profile fast-test`
+- `/home/dcreager/bin/jpk run --from-ref @-`
 
 ### Stabilization task C — stale `assignable_solutions` helper references
 
@@ -385,7 +384,7 @@ combine the chosen per-path results via union. This matches the current hybrid b
 | `preferred_type_mappings` + callback        | 1          | Yes        | `partially_specialized_declared_type` still needs a clean exit                |
 | `maybe_promote` via `build_with`            | 2          | Yes        | Must keep working when `build_with` sees real bounds                          |
 | Historical bidirectional argument inference | 3          | Done       | Already uses cached `PathBounds`                                              |
-| Generic-call argument type context          | 3          | Open       | New/current intermediate-builder site from `main`; must migrate before review |
+| Generic-call argument type context          | 3          | Done       | Migrated to cached `PathBounds` query; includes ParamSpec regression coverage |
 | `infer_reverse_map_impl` internal           | Goes away  | Done       | —                                                                             |
 | Historical `types.rs` site                  | 3          | Done       | No current caller remains                                                     |
 | `infer_collection_literal` TCX query        | 3          | Done       | Variance now comes from path bounds                                           |
@@ -394,8 +393,7 @@ combine the chosen per-path results via union. This matches the current hybrid b
 
 No fundamental blockers. Main design challenges *for the remaining work*:
 
-1. Stabilizing the current checkpoint PR: migrate the `argument_type_context` temporary builder
-    and resolve the `Expression` performance regression.
+1. Stabilizing the current checkpoint PR: resolve the `Expression` performance regression.
 1. Preserving or eliminating the `partially_specialized_declared_type` heuristic cleanly.
 1. Behavioral differences from HashMap union vs constraint conjunction (especially invariant /
     contravariant cases).
@@ -408,12 +406,12 @@ The current public `SpecializationBuilder` API is much smaller than when this pl
 written. Current callers from the latest inspection (line numbers are approximate; use `rg` when
 resuming):
 
-| Method             | Current callers                                                                                                                                            | Plan coverage             |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
-| `new`              | `call/bind.rs` main specialization and retry; `call/bind.rs::argument_type_context` (to migrate in Step 3.4); `infer/builder.rs::infer_collection_literal` | Call sites #1/#2, #3b, #6 |
-| `build_with`       | `call/bind.rs` main specialization; `call/bind.rs::argument_type_context` (to migrate in Step 3.4); `infer/builder.rs::infer_collection_literal`           | Call sites #2, #3b, #6b   |
-| `add_type_mapping` | `call/bind.rs` preferred-type seeding; `infer/builder.rs` TCX injection; internal inference                                                                | Call sites #1 and #6b     |
-| `infer`            | `call/bind.rs::infer_argument_constraints`; `call/bind.rs::argument_type_context` (to migrate in Step 3.4); `infer/builder.rs::infer_collection_literal`   | Call sites #1, #3b, #6b   |
+| Method             | Current callers                                                                             | Plan coverage         |
+| ------------------ | ------------------------------------------------------------------------------------------- | --------------------- |
+| `new`              | `call/bind.rs` main specialization and retry; `infer/builder.rs::infer_collection_literal`  | Call sites #1/#2, #6  |
+| `build_with`       | `call/bind.rs` main specialization; `infer/builder.rs::infer_collection_literal`            | Call sites #2, #6b    |
+| `add_type_mapping` | `call/bind.rs` preferred-type seeding; `infer/builder.rs` TCX injection; internal inference | Call sites #1 and #6b |
+| `infer`            | `call/bind.rs::infer_argument_constraints`; `infer/builder.rs::infer_collection_literal`    | Call sites #1, #6b    |
 
 Removed APIs such as `mapped`, `with_default`, `infer_reverse`, `infer_reverse_map`,
 `infer_map`, `into_type_mappings`, the dedicated `insert_type_mapping` entry point, and the old
@@ -426,9 +424,8 @@ separately:
 
 - **Historical bidirectional argument inference** (`infer/builder.rs`): migrated to a standalone
     query and no longer uses `SpecializationBuilder` in that historical path
-- **Generic-call argument type context** (`call/bind.rs::argument_type_context`): current/new
-    Pattern 3-style intermediate builder call site; tracked as call site #3b and must be migrated
-    before review
+- **Generic-call argument type context** (`call/bind.rs::argument_type_context`): migrated to a
+    standalone `PathBounds` query and no longer uses `SpecializationBuilder`
 - **`infer_specialization` preferred types** (`call/bind.rs`): uses
     `return_ty.assignable_solutions_with_inferable(...)`, then `solve_with(...)`; variance and
     filtering are driven by the solved path bounds
@@ -450,8 +447,8 @@ separately:
 - **`infer_argument_constraints`**: same file
 - **Bidirectional / argument-context inference** (call site #3):
     historical path in `crates/ty_python_semantic/src/types/infer/builder.rs`; current
-    `argument_type_context` builder call site in
-    `crates/ty_python_semantic/src/types/call/bind.rs` (must migrate in Step 3.4)
+    `argument_type_context` standalone query in
+    `crates/ty_python_semantic/src/types/call/bind.rs`
 - **`infer_collection_literal`** (call site #6): same file
 
 ## Validation
@@ -600,7 +597,7 @@ leaving them as `None`. Step 5.7 later changed the current hook behavior to use
 
 ### Phase 3: Migrate Pattern 3 call sites (standalone constraint set queries)
 
-Status: Original Phase 3 sites complete ✅; new/current Step 3.4 must be completed during checkpoint stabilization
+Status: Complete ✅
 **Difficulty: Easy–Medium per step** — each is self-contained. Step 3.2 is the hardest due to
 variance tracking.
 **Dependencies: None** — can start immediately, in parallel with Phase 1.
@@ -611,8 +608,8 @@ preferred standalone-query surface is now `Type::assignable_solutions_with_infer
 
 These were good early migration targets because they were self-contained — changing them didn't
 affect the `SpecializationBuilder` API or its remaining callers. A new/current Pattern 3-style
-call site in `call/bind.rs::argument_type_context` was merged from `main` later; it is tracked in
-Stabilization task B and call site #3b above, and must be migrated before review.
+call site in `call/bind.rs::argument_type_context` was merged from `main` later; it is now covered
+by Step 3.4 and Stabilization task B.
 
 **Step 3.1 ✅**: Historical `types.rs` site. This migration was completed, and the surrounding
 code path has since disappeared from the current call graph. Keep this step as historical context
@@ -629,11 +626,14 @@ only.
     `Some(Type::Dynamic(DynamicType::UnspecializedTypeVar))` for unsolved ones
 - Removed the temporary `SpecializationBuilder` and `with_default` call
 
-**Step 3.4 ⏳**: Migrate the current `argument_type_context` intermediate builder
+**Step 3.4 ✅**: Migrated the current `argument_type_context` intermediate builder
 (`call/bind.rs`). This call site was introduced by changes merged from `main` after the original
-Phase 3 work. Because it is a Pattern 3 temporary-builder query, it is in scope for the current
-checkpoint PR and should be migrated to the same standalone `PathBounds` query shape before
-review.
+Phase 3 work. It now uses the same standalone query shape as the other Pattern 3 sites:
+`return_ty.assignable_solutions_with_inferable(...)`, `PathBounds::solve(...)`, and
+`GenericContext::specialize_recursive(...)`. It unions per-path solved bindings by typevar in a
+local `FxHashMap`, then builds the intermediate specialization from that map. Unsolved typevars
+use `DynamicType::UnspecializedTypeVar`. Added a `bidirectional.md` regression that exercises return-context specialization of a
+`Callable[P, R]` and verifies that the solved `ParamSpec` is propagated to a lambda argument.
 
 **Step 3.2 ✅**: Migrated the TCX query in `infer_collection_literal` (`infer/builder.rs`):
 
@@ -1026,9 +1026,8 @@ Implementation details:
 1. The original two solution-selection hook callers were validated:
     - `maybe_promote` in `bind.rs`
     - the collection-literal singleton-promotion hook in `infer/builder.rs`
-1. The current tree also has the `argument_type_context` intermediate-specialization hook in
-    `bind.rs`; this was introduced by changes merged from `main` and must be migrated off
-    `SpecializationBuilder` as Step 3.4 during checkpoint stabilization.
+1. The later `argument_type_context` intermediate-specialization hook in `bind.rs` has since been
+    migrated off `SpecializationBuilder` as Step 3.4 during checkpoint stabilization.
 1. Mdtest expectations were updated for the resulting behavior changes, including cases where the
     pending-set path now preserves correlated solutions or avoids former false-positive errors.
 
@@ -1038,7 +1037,7 @@ Do **not** start Step 5.8 in this PR. First complete the stabilization tasks lis
 "Current PR scope" above:
 
 - [x] Fix or explicitly justify the protocol-union pending-set dual-write gap.
-- [ ] Migrate the new `call/bind.rs::argument_type_context` builder use to a standalone
+- [x] Migrate the new `call/bind.rs::argument_type_context` builder use to a standalone
     `PathBounds` query in this PR.
 - [x] Keep stale `assignable_solutions(...)` references out of this plan and future notes; current
     code uses `assignable_solutions_with_inferable(...)`.
