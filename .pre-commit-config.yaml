@@ -39,7 +39,7 @@ repos:
         priority: 0
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.46.0
+    rev: v1.46.1
     hooks:
       - id: typos
         priority: 0
