@@ -203,3 +203,13 @@ RUF074 `@abstractmethod` should be placed after `@property`
 125 |     @foo.deleter
 126 |     def foo(self): ...
     |
+
+RUF074 `@classmethod` should be placed after `@functools.cached_property`
+   --> RUF074.py:226:5
+    |
+225 | class ClassmethodAboveCachedProperty:
+226 |     @classmethod
+    |     ^^^^^^^^^^^^
+227 |     @cached_property
+228 |     def foo(cls): ...
+    |
