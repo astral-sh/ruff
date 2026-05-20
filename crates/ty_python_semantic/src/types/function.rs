@@ -55,6 +55,7 @@ use bitflags::bitflags;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::{self as ast, OperatorPrecedence, ParameterWithDefault};
@@ -2234,40 +2235,30 @@ impl KnownFunction {
                                 "`{casted_display}` is equivalent to `{source_display}`",
                             ));
                         }
-                        if let Some(source_expr) =
-                            call_expression.arguments.find_argument_value("val", 1)
+                        if let Some(value) = call_expression.arguments.find_argument_value("val", 1)
                         {
-                            let module = parsed_module(db, file).load(db);
-                            let covering =
-                                covering_node(module.syntax().into(), call_expression.range());
-                            let source_precedence = OperatorPrecedence::from_expr(source_expr);
+                            let covering = covering_node(
+                                context.module().syntax().into(),
+                                call_expression.range(),
+                            );
                             let needs_parens = covering
                                 .parent()
                                 .and_then(ast::AnyNodeRef::as_expr_ref)
                                 .is_some_and(|parent| {
-                                    OperatorPrecedence::from_expr_ref(&parent) > source_precedence
+                                    let value_precedence = OperatorPrecedence::from_expr(value);
+                                    OperatorPrecedence::from_expr_ref(parent) >= value_precedence
                                 });
-                            let (leading, trailing) = if needs_parens {
-                                (
-                                    Edit::replacement(
-                                        "(".to_string(),
-                                        call_expression.start(),
-                                        source_expr.start(),
-                                    ),
-                                    Edit::replacement(
-                                        ")".to_string(),
-                                        source_expr.end(),
-                                        call_expression.end(),
-                                    ),
-                                )
+                            let value_text = &source_text(db, file)[value.range()];
+                            let replacement = if needs_parens {
+                                format!("({value_text})")
                             } else {
-                                (
-                                    Edit::deletion(call_expression.start(), source_expr.start()),
-                                    Edit::deletion(source_expr.end(), call_expression.end()),
-                                )
+                                value_text.to_string()
                             };
                             diagnostic.help("Remove the redundant `cast`");
-                            diagnostic.set_fix(Fix::safe_edits(leading, [trailing]));
+                            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                                replacement,
+                                call_expression.range(),
+                            )));
                         }
                     }
                 }

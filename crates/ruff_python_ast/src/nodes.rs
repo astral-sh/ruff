@@ -116,7 +116,7 @@ impl ExprRef<'_> {
     }
 
     pub fn precedence(&self) -> OperatorPrecedence {
-        OperatorPrecedence::from(self)
+        OperatorPrecedence::from(*self)
     }
 }
 
