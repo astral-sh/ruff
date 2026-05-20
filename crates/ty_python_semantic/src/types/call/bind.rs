@@ -1705,7 +1705,7 @@ impl<'db> Bindings<'db> {
                                     });
                                 for overload in binding {
                                     let params = overload.signature.parameters();
-                                    let return_ty = overload.return_ty;
+                                    let mut return_ty = overload.return_ty;
 
                                     let default_specialization = class_default_specialization
                                         .or_else(|| {
@@ -1722,24 +1722,29 @@ impl<'db> Bindings<'db> {
                                                 input_ty.apply_specialization(db, specialization);
                                         }
                                         input_types = input_types.add(input_ty);
-                                        let mut output_ty = return_ty;
                                         if let Some(specialization) = default_specialization {
-                                            output_ty =
-                                                output_ty.apply_specialization(db, specialization);
+                                            return_ty =
+                                                return_ty.apply_specialization(db, specialization);
                                         }
-                                        output_types = output_types.add(output_ty);
+                                        output_types = output_types.add(return_ty);
                                         found_any = true;
                                     } else if let Some((_, variadic)) = params.variadic() {
                                         let mut input_ty = variadic.annotated_type();
                                         if let Some(specialization) = default_specialization {
                                             input_ty =
                                                 input_ty.apply_specialization(db, specialization);
+                                            return_ty =
+                                                return_ty.apply_specialization(db, specialization);
                                         }
                                         input_types = input_types.add(input_ty);
                                         output_types = output_types.add(return_ty);
                                         found_any = true;
                                     } else if params.is_gradual() {
                                         input_types = input_types.add(Type::unknown());
+                                        if let Some(specialization) = default_specialization {
+                                            return_ty =
+                                                return_ty.apply_specialization(db, specialization);
+                                        }
                                         output_types = output_types.add(return_ty);
                                         found_any = true;
                                     }
