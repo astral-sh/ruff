@@ -26,9 +26,9 @@ def get_config_var(name: Literal["SO"]) -> Any:
 
     Equivalent to get_config_vars().get(name)
     """
-
 @overload
 def get_config_var(name: str) -> Any: ...
+
 @overload
 def get_config_vars() -> dict[str, Any]:
     """With no arguments, return a dictionary of all configuration
@@ -40,9 +40,9 @@ def get_config_vars() -> dict[str, Any]:
     With arguments, return a list of values that result from looking up
     each argument in the configuration variable dictionary.
     """
-
 @overload
 def get_config_vars(arg: str, /, *args: str) -> list[Any]: ...
+
 def get_scheme_names() -> tuple[str, ...]:
     """Return a tuple containing the schemes names."""
 
@@ -98,14 +98,12 @@ def get_platform() -> str:
 
 if sys.version_info >= (3, 15):
     def is_python_build() -> bool: ...
-
 elif sys.version_info >= (3, 11):
     @overload
     def is_python_build() -> bool: ...
     @overload
     @deprecated("The `check_home` parameter is deprecated since Python 3.12; removed in Python 3.15.")
     def is_python_build(check_home: object = None) -> bool: ...
-
 else:
     @overload
     def is_python_build() -> bool: ...

@@ -445,7 +445,6 @@ if sys.version_info >= (3, 13):
         Otherwise, the source line information (if any) is taken directly from
         the disassembled code object.
         """
-
     @overload
     @deprecated(
         "The `show_caches` parameter is deprecated since Python 3.13. "

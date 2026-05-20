@@ -206,6 +206,7 @@ class Match(Generic[AnyStr]):
     @property
     def string(self) -> AnyStr:
         """The string passed to match() or search()."""
+
     # The regular expression object whose match() or search() method produced
     # this match instance.
     @property
@@ -215,11 +216,11 @@ class Match(Generic[AnyStr]):
     @overload
     def expand(self: Match[str], template: str) -> str:
         """Return the string obtained by doing backslash substitution on the string template, as done by the sub() method."""
-
     @overload
     def expand(self: Match[bytes], template: ReadableBuffer) -> bytes: ...
     @overload
     def expand(self, template: AnyStr) -> AnyStr: ...
+
     # group() returns "AnyStr" or "AnyStr | None", depending on the pattern.
     @overload
     def group(self, group: Literal[0] = 0, /) -> AnyStr:
@@ -227,11 +228,11 @@ class Match(Generic[AnyStr]):
         Return subgroup(s) of the match by indices or names.
         For 0 returns the entire match.
         """
-
     @overload
     def group(self, group: str | int, /) -> AnyStr | MaybeNone: ...
     @overload
     def group(self, group1: str | int, group2: str | int, /, *groups: str | int) -> tuple[AnyStr | MaybeNone, ...]: ...
+
     # Each item of groups()'s return tuple is either "AnyStr" or
     # "AnyStr | None", depending on the pattern.
     @overload
@@ -241,9 +242,9 @@ class Match(Generic[AnyStr]):
         default
           Is used for groups that did not participate in the match.
         """
-
     @overload
     def groups(self, default: _T) -> tuple[AnyStr | _T, ...]: ...
+
     # Each value in groupdict()'s return dict is either "AnyStr" or
     # "AnyStr | None", depending on the pattern.
     @overload
@@ -253,9 +254,9 @@ class Match(Generic[AnyStr]):
         default
           Is used for groups that did not participate in the match.
         """
-
     @overload
     def groupdict(self, default: _T) -> dict[str, AnyStr | _T]: ...
+
     def start(self, group: int | str = 0, /) -> int:
         """Return index of the start of the substring matched by group."""
 
@@ -267,13 +268,14 @@ class Match(Generic[AnyStr]):
 
     @property
     def regs(self) -> tuple[tuple[int, int], ...]: ...  # undocumented
+
     # __getitem__() returns "AnyStr" or "AnyStr | None", depending on the pattern.
     @overload
     def __getitem__(self, key: Literal[0], /) -> AnyStr:
         """Return self[key]."""
-
     @overload
     def __getitem__(self, key: int | str, /) -> AnyStr | MaybeNone: ...
+
     def __copy__(self) -> Match[AnyStr]: ...
     def __deepcopy__(self, memo: Any, /) -> Match[AnyStr]: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
@@ -305,66 +307,65 @@ class Pattern(Generic[AnyStr]):
 
         Return None if no position in the string matches.
         """
-
     @overload
     def search(self: Pattern[bytes], string: ReadableBuffer, pos: int = 0, endpos: int = sys.maxsize) -> Match[bytes] | None: ...
     @overload
     def search(self, string: AnyStr, pos: int = 0, endpos: int = sys.maxsize) -> Match[AnyStr] | None: ...
+
     @overload
     def match(self: Pattern[str], string: str, pos: int = 0, endpos: int = sys.maxsize) -> Match[str] | None:
         """Matches zero or more characters at the beginning of the string."""
-
     @overload
     def match(self: Pattern[bytes], string: ReadableBuffer, pos: int = 0, endpos: int = sys.maxsize) -> Match[bytes] | None: ...
     @overload
     def match(self, string: AnyStr, pos: int = 0, endpos: int = sys.maxsize) -> Match[AnyStr] | None: ...
+
     if sys.version_info >= (3, 15):
         prefixmatch = match
 
     @overload
     def fullmatch(self: Pattern[str], string: str, pos: int = 0, endpos: int = sys.maxsize) -> Match[str] | None:
         """Matches against all of the string."""
-
     @overload
     def fullmatch(
         self: Pattern[bytes], string: ReadableBuffer, pos: int = 0, endpos: int = sys.maxsize
     ) -> Match[bytes] | None: ...
     @overload
     def fullmatch(self, string: AnyStr, pos: int = 0, endpos: int = sys.maxsize) -> Match[AnyStr] | None: ...
+
     @overload
     def split(self: Pattern[str], string: str, maxsplit: int = 0) -> list[str | MaybeNone]:
         """Split string by the occurrences of pattern."""
-
     @overload
     def split(self: Pattern[bytes], string: ReadableBuffer, maxsplit: int = 0) -> list[bytes | MaybeNone]: ...
     @overload
     def split(self, string: AnyStr, maxsplit: int = 0) -> list[AnyStr | MaybeNone]: ...
+
     # return type depends on the number of groups in the pattern
     @overload
     def findall(self: Pattern[str], string: str, pos: int = 0, endpos: int = sys.maxsize) -> list[Any]:
         """Return a list of all non-overlapping matches of pattern in string."""
-
     @overload
     def findall(self: Pattern[bytes], string: ReadableBuffer, pos: int = 0, endpos: int = sys.maxsize) -> list[Any]: ...
     @overload
     def findall(self, string: AnyStr, pos: int = 0, endpos: int = sys.maxsize) -> list[AnyStr]: ...
+
     @overload
     def finditer(self: Pattern[str], string: str, pos: int = 0, endpos: int = sys.maxsize) -> Iterator[Match[str]]:
         """Return an iterator over all non-overlapping matches for the RE pattern in string.
 
         For each match, the iterator returns a match object.
         """
-
     @overload
     def finditer(
         self: Pattern[bytes], string: ReadableBuffer, pos: int = 0, endpos: int = sys.maxsize
     ) -> Iterator[Match[bytes]]: ...
     @overload
     def finditer(self, string: AnyStr, pos: int = 0, endpos: int = sys.maxsize) -> Iterator[Match[AnyStr]]: ...
+
     @overload
     def sub(self: Pattern[str], repl: str | Callable[[Match[str]], str], string: str, count: int = 0) -> str:
         """Return the string obtained by replacing the leftmost non-overlapping occurrences of pattern in string by the replacement repl."""
-
     @overload
     def sub(
         self: Pattern[bytes],
@@ -374,10 +375,10 @@ class Pattern(Generic[AnyStr]):
     ) -> bytes: ...
     @overload
     def sub(self, repl: AnyStr | Callable[[Match[AnyStr]], AnyStr], string: AnyStr, count: int = 0) -> AnyStr: ...
+
     @overload
     def subn(self: Pattern[str], repl: str | Callable[[Match[str]], str], string: str, count: int = 0) -> tuple[str, int]:
         """Return the tuple (new_string, number_of_subs_made) found by replacing the leftmost non-overlapping occurrences of pattern with the replacement repl."""
-
     @overload
     def subn(
         self: Pattern[bytes],
@@ -387,6 +388,7 @@ class Pattern(Generic[AnyStr]):
     ) -> tuple[bytes, int]: ...
     @overload
     def subn(self, repl: AnyStr | Callable[[Match[AnyStr]], AnyStr], string: AnyStr, count: int = 0) -> tuple[AnyStr, int]: ...
+
     def __copy__(self) -> Pattern[AnyStr]: ...
     def __deepcopy__(self, memo: Any, /) -> Pattern[AnyStr]: ...
     def __eq__(self, value: object, /) -> bool: ...
@@ -452,23 +454,22 @@ _FlagsType: TypeAlias = int | RegexFlag
 @overload
 def compile(pattern: AnyStr, flags: _FlagsType = 0) -> Pattern[AnyStr]:
     """Compile a regular expression pattern, returning a Pattern object."""
-
 @overload
 def compile(pattern: Pattern[AnyStr], flags: _FlagsType = 0) -> Pattern[AnyStr]: ...
+
 @overload
 def search(pattern: str | Pattern[str], string: str, flags: _FlagsType = 0) -> Match[str] | None:
     """Scan through string looking for a match to the pattern, returning
     a Match object, or None if no match was found.
     """
-
 @overload
 def search(pattern: bytes | Pattern[bytes], string: ReadableBuffer, flags: _FlagsType = 0) -> Match[bytes] | None: ...
+
 @overload
 def match(pattern: str | Pattern[str], string: str, flags: _FlagsType = 0) -> Match[str] | None:
     """Try to apply the pattern at the start of the string, returning
     a Match object, or None if no match was found.
     """
-
 @overload
 def match(pattern: bytes | Pattern[bytes], string: ReadableBuffer, flags: _FlagsType = 0) -> Match[bytes] | None: ...
 
@@ -483,9 +484,9 @@ def fullmatch(pattern: str | Pattern[str], string: str, flags: _FlagsType = 0) -
     """Try to apply the pattern to all of the string, returning
     a Match object, or None if no match was found.
     """
-
 @overload
 def fullmatch(pattern: bytes | Pattern[bytes], string: ReadableBuffer, flags: _FlagsType = 0) -> Match[bytes] | None: ...
+
 @overload
 def split(pattern: str | Pattern[str], string: str, maxsplit: int = 0, flags: _FlagsType = 0) -> list[str | MaybeNone]:
     """Split the source string by the occurrences of the pattern,
@@ -496,11 +497,11 @@ def split(pattern: str | Pattern[str], string: str, maxsplit: int = 0, flags: _F
     and the remainder of the string is returned as the final element
     of the list.
     """
-
 @overload
 def split(
     pattern: bytes | Pattern[bytes], string: ReadableBuffer, maxsplit: int = 0, flags: _FlagsType = 0
 ) -> list[bytes | MaybeNone]: ...
+
 @overload
 def findall(pattern: str | Pattern[str], string: str, flags: _FlagsType = 0) -> list[Any]:
     """Return a list of all non-overlapping matches in the string.
@@ -511,9 +512,9 @@ def findall(pattern: str | Pattern[str], string: str, flags: _FlagsType = 0) -> 
 
     Empty matches are included in the result.
     """
-
 @overload
 def findall(pattern: bytes | Pattern[bytes], string: ReadableBuffer, flags: _FlagsType = 0) -> list[Any]: ...
+
 @overload
 def finditer(pattern: str | Pattern[str], string: str, flags: _FlagsType = 0) -> Iterator[Match[str]]:
     """Return an iterator over all non-overlapping matches in the
@@ -521,9 +522,9 @@ def finditer(pattern: str | Pattern[str], string: str, flags: _FlagsType = 0) ->
 
     Empty matches are included in the result.
     """
-
 @overload
 def finditer(pattern: bytes | Pattern[bytes], string: ReadableBuffer, flags: _FlagsType = 0) -> Iterator[Match[bytes]]: ...
+
 @overload
 def sub(
     pattern: str | Pattern[str], repl: str | Callable[[Match[str]], str], string: str, count: int = 0, flags: _FlagsType = 0
@@ -535,7 +536,6 @@ def sub(
     a callable, it's passed the Match object and must return
     a replacement string to be used.
     """
-
 @overload
 def sub(
     pattern: bytes | Pattern[bytes],
@@ -544,6 +544,7 @@ def sub(
     count: int = 0,
     flags: _FlagsType = 0,
 ) -> bytes: ...
+
 @overload
 def subn(
     pattern: str | Pattern[str], repl: str | Callable[[Match[str]], str], string: str, count: int = 0, flags: _FlagsType = 0
@@ -557,7 +558,6 @@ def subn(
     If it is a callable, it's passed the Match object and must
     return a replacement string to be used.
     """
-
 @overload
 def subn(
     pattern: bytes | Pattern[bytes],
@@ -566,6 +566,7 @@ def subn(
     count: int = 0,
     flags: _FlagsType = 0,
 ) -> tuple[bytes, int]: ...
+
 def escape(pattern: AnyStr) -> AnyStr:
     """
     Escape special characters in a string.

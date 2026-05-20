@@ -913,6 +913,5 @@ def text_encoding(encoding: None, stacklevel: int = 2, /) -> Literal["locale", "
     This can be used in APIs with an encoding=None parameter.
     However, please consider using encoding="utf-8" for new APIs.
     """
-
 @overload
 def text_encoding(encoding: _S, stacklevel: int = 2, /) -> _S: ...

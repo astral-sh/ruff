@@ -236,7 +236,6 @@ def getmembers(object: object, predicate: _GetMembersPredicateTypeGuard[_T]) -> 
     """Return all members of an object as (name, value) pairs sorted by name.
     Optionally, only return members that satisfy a given predicate.
     """
-
 @overload
 def getmembers(object: object, predicate: _GetMembersPredicateTypeIs[_T]) -> _GetMembersReturn[_T]: ...
 @overload
@@ -256,7 +255,6 @@ if sys.version_info >= (3, 11):
            that raise AttributeError). It can also return descriptor objects
            instead of instance members in some cases.
         """
-
     @overload
     def getmembers_static(object: object, predicate: _GetMembersPredicateTypeIs[_T]) -> _GetMembersReturn[_T]: ...
     @overload
@@ -310,11 +308,11 @@ def isgeneratorfunction(obj: Callable[..., Generator[Any, Any, Any]]) -> bool:
     Generator function objects provide the same attributes as functions.
     See help(isfunction) for a list of attributes.
     """
-
 @overload
 def isgeneratorfunction(obj: Callable[_P, Any]) -> TypeGuard[Callable[_P, GeneratorType[Any, Any, Any]]]: ...
 @overload
 def isgeneratorfunction(obj: object) -> TypeGuard[Callable[..., GeneratorType[Any, Any, Any]]]: ...
+
 @overload
 def iscoroutinefunction(obj: Callable[..., Coroutine[Any, Any, Any]]) -> bool:
     """Return true if the object is a coroutine function.
@@ -322,13 +320,13 @@ def iscoroutinefunction(obj: Callable[..., Coroutine[Any, Any, Any]]) -> bool:
     Coroutine functions are normally defined with "async def" syntax, but may
     be marked via markcoroutinefunction.
     """
-
 @overload
 def iscoroutinefunction(obj: Callable[_P, Awaitable[_T]]) -> TypeGuard[Callable[_P, CoroutineType[Any, Any, _T]]]: ...
 @overload
 def iscoroutinefunction(obj: Callable[_P, object]) -> TypeGuard[Callable[_P, CoroutineType[Any, Any, Any]]]: ...
 @overload
 def iscoroutinefunction(obj: object) -> TypeGuard[Callable[..., CoroutineType[Any, Any, Any]]]: ...
+
 def isgenerator(object: object) -> TypeIs[GeneratorType[Any, Any, Any]]:
     """Return true if the object is a generator.
 
@@ -361,11 +359,11 @@ def isasyncgenfunction(obj: Callable[..., AsyncGenerator[Any, Any]]) -> bool:
     Asynchronous generator functions are defined with "async def"
     syntax and have "yield" expressions in their body.
     """
-
 @overload
 def isasyncgenfunction(obj: Callable[_P, Any]) -> TypeGuard[Callable[_P, AsyncGeneratorType[Any, Any]]]: ...
 @overload
 def isasyncgenfunction(obj: object) -> TypeGuard[Callable[..., AsyncGeneratorType[Any, Any]]]: ...
+
 @type_check_only
 class _SupportsSet(Protocol[_T_contra, _V_contra]):
     def __set__(self, instance: _T_contra, value: _V_contra, /) -> None: ...
@@ -535,7 +533,6 @@ def getabsfile(object: _SourceObjectType, _filename: str | None = None) -> str:
 @overload
 def getblock(lines: list[str]) -> list[str]:
     """Extract the block of code at the top of the given list of lines."""
-
 @overload
 def getblock(lines: tuple[str, ...]) -> tuple[str, ...]: ...
 @overload
@@ -710,6 +707,7 @@ class Signature:
             eval_str: bool = False,
         ) -> Self:
             """Constructs Signature for the given callable object."""
+
     if sys.version_info >= (3, 14):
         def format(self, *, max_width: int | None = None, quote_annotation_strings: bool = True) -> str:
             """Create a string representation of the Signature object.

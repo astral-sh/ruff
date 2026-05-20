@@ -203,7 +203,6 @@ class HTTPMessage(email.message.Message[str, str]):
 @overload
 def parse_headers(fp: SupportsReadline[bytes], _class: Callable[[], _MessageT]) -> _MessageT:
     """Parses only RFC 5322 headers from a file pointer."""
-
 @overload
 def parse_headers(fp: SupportsReadline[bytes]) -> HTTPMessage: ...
 
@@ -240,6 +239,7 @@ class HTTPResponse(io.BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incomp
         """
 
     def readline(self, limit: int = -1) -> bytes: ...  # type: ignore[override]
+
     @overload
     def getheader(self, name: str) -> str | None:
         """Returns the value of the header matching *name*.
@@ -253,9 +253,9 @@ class HTTPResponse(io.BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incomp
         If the headers are unknown, raises http.client.ResponseNotReady.
 
         """
-
     @overload
     def getheader(self, name: str, default: _T) -> str | _T: ...
+
     def getheaders(self) -> list[tuple[str, str]]:
         """Return list of (header, value) tuples."""
 
@@ -497,6 +497,7 @@ class HTTPSConnection(HTTPConnection):
             check_hostname: bool | None = None,
             blocksize: int = 8192,
         ) -> None: ...
+
         key_file: StrOrBytesPath | None
         cert_file: StrOrBytesPath | None
 

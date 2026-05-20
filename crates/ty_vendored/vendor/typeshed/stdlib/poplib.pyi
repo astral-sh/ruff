@@ -165,9 +165,9 @@ class POP3:
         in the form 'response mesgnum uid', otherwise result is
         the list ['response', ['mesgnum uid', ...], octets]
         """
-
     @overload
     def uidl(self, which: Any) -> bytes: ...
+
     def utf8(self) -> bytes:
         """Try to enter UTF-8 mode (see RFC 6856). Returns server response."""
 
@@ -237,6 +237,7 @@ class POP3_SSL(POP3):
             timeout: float = ...,
             context: None = None,
         ) -> None: ...
+
         keyfile: StrOrBytesPath | None
         certfile: StrOrBytesPath | None
         # "context" is actually the last argument,

@@ -115,7 +115,6 @@ def input(
     The returned instance, in addition to being an iterator,
     keeps global state for the functions of this module,.
     """
-
 @overload
 def input(
     files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
@@ -138,6 +137,7 @@ def input(
     encoding: str | None = None,
     errors: str | None = None,
 ) -> FileInput[Any]: ...
+
 def close() -> None:
     """Close the sequence."""
 
@@ -240,6 +240,7 @@ class FileInput(Generic[AnyStr]):
         encoding: str | None = None,
         errors: str | None = None,
     ) -> None: ...
+
     def __del__(self) -> None: ...
     def close(self) -> None: ...
     def __enter__(self) -> Self: ...

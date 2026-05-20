@@ -37,6 +37,7 @@ class Fraction(Rational):
     """
 
     __slots__ = ("_numerator", "_denominator")
+
     @overload
     def __new__(cls, numerator: int | Rational = 0, denominator: int | Rational | None = None) -> Self:
         """Constructs a Rational.
@@ -69,10 +70,8 @@ class Fraction(Rational):
         Fraction(147, 100)
 
         """
-
     @overload
     def __new__(cls, numerator: float | Decimal | str) -> Self: ...
-
     if sys.version_info >= (3, 14):
         @overload
         def __new__(cls, numerator: _ConvertibleToIntegerRatio) -> Self:
@@ -144,106 +143,107 @@ class Fraction(Rational):
     def numerator(a) -> int: ...
     @property
     def denominator(a) -> int: ...
+
     @overload
     def __add__(a, b: int | Fraction) -> Fraction:
         """a + b"""
-
     @overload
     def __add__(a, b: float) -> float: ...
     @overload
     def __add__(a, b: complex) -> complex: ...
+
     @overload
     def __radd__(b, a: int | Fraction) -> Fraction:
         """a + b"""
-
     @overload
     def __radd__(b, a: float) -> float: ...
     @overload
     def __radd__(b, a: complex) -> complex: ...
+
     @overload
     def __sub__(a, b: int | Fraction) -> Fraction:
         """a - b"""
-
     @overload
     def __sub__(a, b: float) -> float: ...
     @overload
     def __sub__(a, b: complex) -> complex: ...
+
     @overload
     def __rsub__(b, a: int | Fraction) -> Fraction:
         """a - b"""
-
     @overload
     def __rsub__(b, a: float) -> float: ...
     @overload
     def __rsub__(b, a: complex) -> complex: ...
+
     @overload
     def __mul__(a, b: int | Fraction) -> Fraction:
         """a * b"""
-
     @overload
     def __mul__(a, b: float) -> float: ...
     @overload
     def __mul__(a, b: complex) -> complex: ...
+
     @overload
     def __rmul__(b, a: int | Fraction) -> Fraction:
         """a * b"""
-
     @overload
     def __rmul__(b, a: float) -> float: ...
     @overload
     def __rmul__(b, a: complex) -> complex: ...
+
     @overload
     def __truediv__(a, b: int | Fraction) -> Fraction:
         """a / b"""
-
     @overload
     def __truediv__(a, b: float) -> float: ...
     @overload
     def __truediv__(a, b: complex) -> complex: ...
+
     @overload
     def __rtruediv__(b, a: int | Fraction) -> Fraction:
         """a / b"""
-
     @overload
     def __rtruediv__(b, a: float) -> float: ...
     @overload
     def __rtruediv__(b, a: complex) -> complex: ...
+
     @overload
     def __floordiv__(a, b: int | Fraction) -> int:
         """a // b"""
-
     @overload
     def __floordiv__(a, b: float) -> float: ...
+
     @overload
     def __rfloordiv__(b, a: int | Fraction) -> int:
         """a // b"""
-
     @overload
     def __rfloordiv__(b, a: float) -> float: ...
+
     @overload
     def __mod__(a, b: int | Fraction) -> Fraction:
         """a % b"""
-
     @overload
     def __mod__(a, b: float) -> float: ...
+
     @overload
     def __rmod__(b, a: int | Fraction) -> Fraction:
         """a % b"""
-
     @overload
     def __rmod__(b, a: float) -> float: ...
+
     @overload
     def __divmod__(a, b: int | Fraction) -> tuple[int, Fraction]:
         """(a // b, a % b)"""
-
     @overload
     def __divmod__(a, b: float) -> tuple[float, Fraction]: ...
+
     @overload
     def __rdivmod__(a, b: int | Fraction) -> tuple[int, Fraction]:
         """(a // b, a % b)"""
-
     @overload
     def __rdivmod__(a, b: float) -> tuple[float, Fraction]: ...
+
     if sys.version_info >= (3, 14):
         @overload
         def __pow__(a, b: int, modulo: None = None) -> Fraction:
@@ -254,7 +254,6 @@ class Fraction(Rational):
             result will be rational.
 
             """
-
         @overload
         def __pow__(a, b: float | Fraction, modulo: None = None) -> float: ...
         @overload
@@ -269,23 +268,21 @@ class Fraction(Rational):
             result will be rational.
 
             """
-
         @overload
         def __pow__(a, b: float | Fraction) -> float: ...
         @overload
         def __pow__(a, b: complex) -> complex: ...
+
     if sys.version_info >= (3, 14):
         @overload
         def __rpow__(b, a: float | Fraction, modulo: None = None) -> float:
             """a ** b"""
-
         @overload
         def __rpow__(b, a: complex, modulo: None = None) -> complex: ...
     else:
         @overload
         def __rpow__(b, a: float | Fraction) -> float:
             """a ** b"""
-
         @overload
         def __rpow__(b, a: complex) -> complex: ...
 
@@ -313,9 +310,9 @@ class Fraction(Rational):
 
         Rounds half toward even.
         """
-
     @overload
     def __round__(self, ndigits: int) -> Fraction: ...
+
     def __hash__(self) -> int:  # type: ignore[override]
         """hash(self)"""
 

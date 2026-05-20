@@ -42,9 +42,9 @@ def decimal(chr: str, /) -> int:
     If no such value is defined, default is returned, or, if not given,
     ValueError is raised.
     """
-
 @overload
 def decimal(chr: str, default: _T, /) -> int | _T: ...
+
 def decomposition(chr: str, /) -> str:
     """Returns the character decomposition mapping assigned to the character chr as string.
 
@@ -59,7 +59,6 @@ def digit(chr: str, /) -> int:
     If no such value is defined, default is returned, or, if not given,
     ValueError is raised.
     """
-
 @overload
 def digit(chr: str, default: _T, /) -> int | _T: ...
 
@@ -104,9 +103,9 @@ def name(chr: str, /) -> str:
     If no name is defined, default is returned, or, if not given,
     ValueError is raised.
     """
-
 @overload
 def name(chr: str, default: _T, /) -> str | _T: ...
+
 def normalize(form: _NormalizationForm, unistr: str, /) -> str:
     """Return the normal form 'form' for the Unicode string unistr.
 
@@ -121,9 +120,9 @@ def numeric(chr: str, /) -> float:
     If no such value is defined, default is returned, or, if not given,
     ValueError is raised.
     """
-
 @overload
 def numeric(chr: str, default: _T, /) -> float | _T: ...
+
 @final
 class UCD:
     # The methods below are constructed from the same array in C
@@ -152,9 +151,9 @@ class UCD:
         If no such value is defined, default is returned, or, if not given,
         ValueError is raised.
         """
-
     @overload
     def decimal(self, chr: str, default: _T, /) -> int | _T: ...
+
     def decomposition(self, chr: str, /) -> str:
         """Returns the character decomposition mapping assigned to the character chr as string.
 
@@ -169,9 +168,9 @@ class UCD:
         If no such value is defined, default is returned, or, if not given,
         ValueError is raised.
         """
-
     @overload
     def digit(self, chr: str, default: _T, /) -> int | _T: ...
+
     def east_asian_width(self, chr: str, /) -> _EastAsianWidth:
         """Returns the east asian width assigned to the character chr as string."""
 
@@ -202,9 +201,9 @@ class UCD:
         If no name is defined, default is returned, or, if not given,
         ValueError is raised.
         """
-
     @overload
     def name(self, chr: str, default: _T, /) -> str | _T: ...
+
     def normalize(self, form: _NormalizationForm, unistr: str, /) -> str:
         """Return the normal form 'form' for the Unicode string unistr.
 
@@ -219,6 +218,5 @@ class UCD:
         If no such value is defined, default is returned, or, if not given,
         ValueError is raised.
         """
-
     @overload
     def numeric(self, chr: str, default: _T, /) -> float | _T: ...

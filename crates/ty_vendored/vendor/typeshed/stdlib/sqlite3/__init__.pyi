@@ -337,6 +337,7 @@ class Connection:
         def autocommit(self) -> int: ...
         @autocommit.setter
         def autocommit(self, val: int) -> None: ...
+
     row_factory: _RowFactoryOptions
     text_factory: Any
     if sys.version_info >= (3, 12):
@@ -450,9 +451,9 @@ class Connection:
     @overload
     def cursor(self, factory: None = None) -> Cursor:
         """Return a cursor for the connection."""
-
     @overload
     def cursor(self, factory: Callable[[Connection], _CursorT]) -> _CursorT: ...
+
     def execute(self, sql: str, parameters: _Parameters = ..., /) -> Cursor:
         """Executes an SQL statement."""
 
@@ -693,9 +694,9 @@ class Row(Sequence[Any]):
     @overload  # Note: really needs int instead of SupportsIndex
     def __getitem__(self, key: int | str, /) -> Any:
         """Return self[key]."""
-
     @overload  # Note: SupportsIndex does work within slices.
     def __getitem__(self, key: slice[SupportsIndex | None], /) -> tuple[Any, ...]: ...
+
     def __hash__(self) -> int: ...
     def __iter__(self) -> Iterator[Any]:
         """Implement iter(self)."""

@@ -38,9 +38,9 @@ def get_config_var(name: Literal["SO"]) -> int | str | None:
 
     Equivalent to get_config_vars().get(name)
     """
-
 @overload
 def get_config_var(name: str) -> int | str | None: ...
+
 @overload
 def get_config_vars() -> dict[str, str | int]:
     """With no arguments, return a dictionary of all configuration
@@ -52,9 +52,9 @@ def get_config_vars() -> dict[str, str | int]:
     With arguments, return a list of values that result from looking up
     each argument in the configuration variable dictionary.
     """
-
 @overload
 def get_config_vars(arg: str, /, *args: str) -> list[str | int]: ...
+
 def get_config_h_filename() -> str:
     """Return the path of pyconfig.h."""
 

@@ -248,17 +248,17 @@ def start_new_thread(function: Callable[[Unpack[_Ts]], object], args: tuple[Unpa
     unhandled exception; a stack trace will be printed unless the exception
     is SystemExit.
     """
-
 @overload
 def start_new_thread(function: Callable[..., object], args: tuple[Any, ...], kwargs: dict[str, Any], /) -> int: ...
+
 @overload
 @deprecated("Obsolete synonym. Use `start_new_thread()` instead.")
 def start_new(function: Callable[[Unpack[_Ts]], object], args: tuple[Unpack[_Ts]], /) -> int:  # undocumented
     """An obsolete synonym of start_new_thread()."""
-
 @overload
 @deprecated("Obsolete synonym. Use `start_new_thread()` instead.")
 def start_new(function: Callable[..., object], args: tuple[Any, ...], kwargs: dict[str, Any], /) -> int: ...  # undocumented
+
 def interrupt_main(signum: signal.Signals = signal.SIGINT, /) -> None:
     """Simulate the arrival of the given signal in the main thread,
     where the corresponding signal handler will be executed.

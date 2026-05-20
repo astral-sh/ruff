@@ -313,6 +313,7 @@ class IndexableBuffer(Buffer, Protocol):
 
 class SupportsGetItemBuffer(SliceableBuffer, IndexableBuffer, Protocol):
     def __contains__(self, x: Any, /) -> bool: ...
+
     @overload
     def __getitem__(self, slice: slice[SupportsIndex | None], /) -> Sequence[int]: ...
     @overload
@@ -350,10 +351,12 @@ AnyOrLiteralStr = TypeVar("AnyOrLiteralStr", str, bytes, LiteralString)  # noqa:
 StrOrLiteralStr = TypeVar("StrOrLiteralStr", LiteralString, str)  # noqa: Y001
 
 # Objects suitable to be passed to sys.setprofile, threading.setprofile, and similar
-ProfileFunction: TypeAlias = Callable[[FrameType, str, Any], object]
+ProfileFunction: TypeAlias = Callable[[FrameType, Literal["call", "return", "c_call", "c_return", "c_exception"], Any], object]
 
 # Objects suitable to be passed to sys.settrace, threading.settrace, and similar
-TraceFunction: TypeAlias = Callable[[FrameType, str, Any], TraceFunction | None]
+TraceFunction: TypeAlias = Callable[
+    [FrameType, Literal["call", "line", "return", "exception", "opcode"], Any], TraceFunction | None
+]
 
 # experimental
 # Might not work as expected for pyright, see

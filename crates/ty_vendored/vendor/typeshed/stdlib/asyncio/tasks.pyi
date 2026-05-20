@@ -164,7 +164,6 @@ def ensure_future(coro_or_future: _FT, *, loop: AbstractEventLoop | None = None)
 
     If the argument is a Future, it is returned directly.
     """
-
 @overload
 def ensure_future(coro_or_future: Awaitable[_T], *, loop: AbstractEventLoop | None = None) -> Task[_T]: ...
 
@@ -205,7 +204,6 @@ def gather(coro_or_future1: _FutureLike[_T1], /, *, return_exceptions: Literal[F
     after catching an exception (raised by one of the awaitables) from
     gather won't cancel any other awaitables.
     """
-
 @overload
 def gather(  # type: ignore[overload-overlap]
     coro_or_future1: _FutureLike[_T1], coro_or_future2: _FutureLike[_T2], /, *, return_exceptions: Literal[False] = False
@@ -358,9 +356,9 @@ def shield(arg: _FutureLike[_T]) -> Future[_T]:
 @overload
 async def sleep(delay: float) -> None:
     """Coroutine that completes after a given time (in seconds)."""
-
 @overload
 async def sleep(delay: float, result: _T) -> _T: ...
+
 async def wait_for(fut: _FutureLike[_T], timeout: float | None) -> _T:
     """Wait for the single Future or coroutine to complete, with timeout.
 
@@ -416,7 +414,6 @@ else:
         Note: This does not raise TimeoutError! Futures that aren't done
         when the timeout occurs are returned in the second set.
         """
-
     @overload
     async def wait(
         fs: Iterable[Awaitable[_T]], *, timeout: float | None = None, return_when: str = "ALL_COMPLETED"

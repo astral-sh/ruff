@@ -119,21 +119,20 @@ class BaseContext:
     @overload
     def RawValue(self, typecode_or_type: type[_CT], *args: Any) -> _CT:
         """Returns a shared object"""
-
     @overload
     def RawValue(self, typecode_or_type: str, *args: Any) -> Any: ...
+
     @overload
     def RawArray(self, typecode_or_type: type[_CT], size_or_initializer: int | Sequence[Any]) -> ctypes.Array[_CT]:
         """Returns a shared array"""
-
     @overload
     def RawArray(self, typecode_or_type: str, size_or_initializer: int | Sequence[Any]) -> Any: ...
+
     @overload
     def Value(
         self, typecode_or_type: type[_SimpleCData[_T]], *args: Any, lock: Literal[True] | _LockLike = True
     ) -> Synchronized[_T]:
         """Returns a synchronized shared object"""
-
     @overload
     def Value(self, typecode_or_type: type[_CT], *args: Any, lock: Literal[False]) -> Synchronized[_CT]: ...
     @overload
@@ -142,12 +141,12 @@ class BaseContext:
     def Value(self, typecode_or_type: str, *args: Any, lock: Literal[True] | _LockLike = True) -> Synchronized[Any]: ...
     @overload
     def Value(self, typecode_or_type: str | type[_CData], *args: Any, lock: bool | _LockLike = True) -> Any: ...
+
     @overload
     def Array(
         self, typecode_or_type: type[_SimpleCData[_T]], size_or_initializer: int | Sequence[Any], *, lock: Literal[False]
     ) -> SynchronizedArray[_T]:
         """Returns a synchronized shared array"""
-
     @overload
     def Array(
         self, typecode_or_type: type[c_char], size_or_initializer: int | Sequence[Any], *, lock: Literal[True] | _LockLike = True
@@ -168,6 +167,7 @@ class BaseContext:
     def Array(
         self, typecode_or_type: str | type[_CData], size_or_initializer: int | Sequence[Any], *, lock: bool | _LockLike = True
     ) -> Any: ...
+
     def freeze_support(self) -> None:
         """Check whether this is a fake forked process in a frozen executable.
         If so then run code specified by commandline and exit.
@@ -213,19 +213,22 @@ class BaseContext:
 
     @overload
     def get_context(self, method: str) -> BaseContext: ...
+
     @overload
     def get_start_method(self, allow_none: Literal[False] = False) -> str: ...
     @overload
     def get_start_method(self, allow_none: bool) -> str | None: ...
+
     def set_start_method(self, method: str | None, force: bool = False) -> None: ...
+
     @property
     def reducer(self) -> str:
         """Controls how objects will be reduced to a form that can be
         shared with other processes.
         """
-
     @reducer.setter
     def reducer(self, reduction: str) -> None: ...
+
     def _check_available(self) -> None: ...
 
 class Process(BaseProcess):

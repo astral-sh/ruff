@@ -272,6 +272,33 @@ if sys.platform != "win32":
     if sys.version_info >= (3, 15):
         from os import NODEV as NODEV
 
+    if sys.version_info >= (3, 15) and sys.platform == "linux":
+        from os import (
+            AT_NO_AUTOMOUNT as AT_NO_AUTOMOUNT,
+            AT_STATX_DONT_SYNC as AT_STATX_DONT_SYNC,
+            AT_STATX_FORCE_SYNC as AT_STATX_FORCE_SYNC,
+            AT_STATX_SYNC_AS_STAT as AT_STATX_SYNC_AS_STAT,
+            STATX_ATIME as STATX_ATIME,
+            STATX_BASIC_STATS as STATX_BASIC_STATS,
+            STATX_BLOCKS as STATX_BLOCKS,
+            STATX_BTIME as STATX_BTIME,
+            STATX_CTIME as STATX_CTIME,
+            STATX_DIOALIGN as STATX_DIOALIGN,
+            STATX_GID as STATX_GID,
+            STATX_INO as STATX_INO,
+            STATX_MNT_ID as STATX_MNT_ID,
+            STATX_MNT_ID_UNIQUE as STATX_MNT_ID_UNIQUE,
+            STATX_MODE as STATX_MODE,
+            STATX_MTIME as STATX_MTIME,
+            STATX_NLINK as STATX_NLINK,
+            STATX_SIZE as STATX_SIZE,
+            STATX_TYPE as STATX_TYPE,
+            STATX_UID as STATX_UID,
+            _clearenv as _clearenv,
+            statx as statx,
+            statx_result as statx_result,
+        )
+
     if sys.platform != "darwin":
         from os import (
             POSIX_FADV_DONTNEED as POSIX_FADV_DONTNEED,

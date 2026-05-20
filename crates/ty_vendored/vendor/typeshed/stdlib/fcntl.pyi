@@ -159,9 +159,9 @@ if sys.platform != "win32":
         arg buffer by the operating system.  The length of the arg buffer is not
         allowed to exceed 1024 bytes.
         """
-
     @overload
     def fcntl(fd: FileDescriptorLike, cmd: int, arg: str | ReadOnlyBuffer, /) -> bytes: ...
+
     # If arg is an int, return int
     @overload
     def ioctl(fd: FileDescriptorLike, request: int, arg: int = 0, mutate_flag: bool = True, /) -> int:
@@ -205,6 +205,7 @@ if sys.platform != "win32":
     def ioctl(fd: FileDescriptorLike, request: int, arg: WriteableBuffer, mutate_flag: Literal[False], /) -> bytes: ...
     @overload
     def ioctl(fd: FileDescriptorLike, request: int, arg: Buffer, mutate_flag: bool = True, /) -> Any: ...
+
     def flock(fd: FileDescriptorLike, operation: int, /) -> None:
         """Perform the lock operation on file descriptor fd.
 

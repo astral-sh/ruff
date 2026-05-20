@@ -37,6 +37,8 @@ if sys.version_info >= (3, 11):
 
 if sys.version_info >= (3, 13):
     __all__ += ["EnumDict"]
+if sys.version_info >= (3, 15):
+    __all__ += ["show_flag_values", "bin"]
 
 _EnumMemberT = TypeVar("_EnumMemberT")
 _EnumerationT = TypeVar("_EnumerationT", bound=type[Enum])
@@ -104,6 +106,7 @@ class _EnumDict(dict[str, Any]):
         def update(self, members: SupportsKeysAndGetItem[str, Any], **more_members: Any) -> None: ...
         @overload
         def update(self, members: Iterable[tuple[str, Any]], **more_members: Any) -> None: ...
+
     if sys.version_info >= (3, 13):
         @property
         def member_names(self) -> list[str]: ...
@@ -220,6 +223,7 @@ class EnumMeta(type):
 
         `type`, if set, will be mixed in as the first base class.
         """
+
     # Overload 2: Functional API for constructing new enum classes.
     if sys.version_info >= (3, 11):
         @overload

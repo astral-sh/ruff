@@ -101,7 +101,6 @@ devnull: LiteralString
 @overload
 def abspath(path: PathLike[AnyStr]) -> AnyStr:
     """Return an absolute path."""
-
 @overload
 def abspath(path: AnyStr) -> AnyStr: ...
 
@@ -110,22 +109,21 @@ if sys.version_info >= (3, 15):
     def basename(p: PathLike[AnyStr], /) -> AnyStr: ...
     @overload
     def basename(p: AnyOrLiteralStr, /) -> AnyOrLiteralStr: ...
+
     @overload
     def dirname(p: PathLike[AnyStr], /) -> AnyStr: ...
     @overload
     def dirname(p: AnyOrLiteralStr, /) -> AnyOrLiteralStr: ...
-
 else:
     @overload
     def basename(p: PathLike[AnyStr]) -> AnyStr:
         """Returns the final component of a pathname"""
-
     @overload
     def basename(p: AnyOrLiteralStr) -> AnyOrLiteralStr: ...
+
     @overload
     def dirname(p: PathLike[AnyStr]) -> AnyStr:
         """Returns the directory component of a pathname"""
-
     @overload
     def dirname(p: AnyOrLiteralStr) -> AnyOrLiteralStr: ...
 
@@ -134,15 +132,14 @@ def expanduser(path: PathLike[AnyStr]) -> AnyStr:
     """Expand ~ and ~user constructions.  If user or $HOME is unknown,
     do nothing.
     """
-
 @overload
 def expanduser(path: AnyStr) -> AnyStr: ...
+
 @overload
 def expandvars(path: PathLike[AnyStr]) -> AnyStr:
     """Expand shell variables of form $var and ${var}.  Unknown variables
     are left unchanged.
     """
-
 @overload
 def expandvars(path: AnyStr) -> AnyStr: ...
 
@@ -151,25 +148,22 @@ if sys.version_info >= (3, 15):
     def normcase(s: PathLike[AnyStr], /) -> AnyStr: ...
     @overload
     def normcase(s: AnyOrLiteralStr, /) -> AnyOrLiteralStr: ...
-
 else:
     @overload
     def normcase(s: PathLike[AnyStr]) -> AnyStr:
         """Normalize case of pathname.  Has no effect under Posix"""
-
     @overload
     def normcase(s: AnyOrLiteralStr) -> AnyOrLiteralStr: ...
 
 @overload
 def normpath(path: PathLike[AnyStr]) -> AnyStr:
     """Normalize path, eliminating double slashes, etc."""
-
 @overload
 def normpath(path: AnyOrLiteralStr) -> AnyOrLiteralStr: ...
+
 @overload
 def commonpath(paths: Iterable[LiteralString]) -> LiteralString:
     """Given a sequence of path names, returns the longest common sub-path."""
-
 @overload
 def commonpath(paths: Iterable[StrPath]) -> str: ...
 @overload
@@ -185,7 +179,6 @@ def join(a: LiteralString, /, *paths: LiteralString) -> LiteralString:
     will be discarded.  An empty last part will result in a path that
     ends with a separator.
     """
-
 @overload
 def join(a: StrPath, /, *paths: StrPath) -> str: ...
 @overload
@@ -196,21 +189,18 @@ if sys.version_info >= (3, 15):
     def realpath(filename: PathLike[AnyStr], /, *, strict: bool | _AllowMissingType = False) -> AnyStr: ...
     @overload
     def realpath(filename: AnyStr, /, *, strict: bool | _AllowMissingType = False) -> AnyStr: ...
-
 else:
     @overload
     def realpath(filename: PathLike[AnyStr], *, strict: bool | _AllowMissingType = False) -> AnyStr:
         """Return the canonical path of the specified filename, eliminating any
         symbolic links encountered in the path.
         """
-
     @overload
     def realpath(filename: AnyStr, *, strict: bool | _AllowMissingType = False) -> AnyStr: ...
 
 @overload
 def relpath(path: LiteralString, start: LiteralString | None = None) -> LiteralString:
     """Return a relative version of a path"""
-
 @overload
 def relpath(path: BytesPath, start: BytesPath | None = None) -> bytes: ...
 @overload
@@ -221,26 +211,25 @@ if sys.version_info >= (3, 15):
     def split(p: PathLike[AnyStr], /) -> tuple[AnyStr, AnyStr]: ...
     @overload
     def split(p: AnyOrLiteralStr, /) -> tuple[AnyOrLiteralStr, AnyOrLiteralStr]: ...
+
     @overload
     def splitdrive(p: PathLike[AnyStr], /) -> tuple[AnyStr, AnyStr]: ...
     @overload
     def splitdrive(p: AnyOrLiteralStr, /) -> tuple[AnyOrLiteralStr, AnyOrLiteralStr]: ...
-
 else:
     @overload
     def split(p: PathLike[AnyStr]) -> tuple[AnyStr, AnyStr]:
         """Split a pathname.  Returns tuple "(head, tail)" where "tail" is
         everything after the final slash.  Either part may be empty.
         """
-
     @overload
     def split(p: AnyOrLiteralStr) -> tuple[AnyOrLiteralStr, AnyOrLiteralStr]: ...
+
     @overload
     def splitdrive(p: PathLike[AnyStr]) -> tuple[AnyStr, AnyStr]:
         """Split a pathname into drive and path. On Posix, drive is always
         empty.
         """
-
     @overload
     def splitdrive(p: AnyOrLiteralStr) -> tuple[AnyOrLiteralStr, AnyOrLiteralStr]: ...
 
@@ -249,7 +238,6 @@ if sys.version_info >= (3, 15):
     def splitext(p: PathLike[AnyStr], /) -> tuple[AnyStr, AnyStr]: ...
     @overload
     def splitext(p: AnyOrLiteralStr, /) -> tuple[AnyOrLiteralStr, AnyOrLiteralStr]: ...
-
 else:
     @overload
     def splitext(p: PathLike[AnyStr]) -> tuple[AnyStr, AnyStr]:
@@ -258,7 +246,6 @@ else:
         Extension is everything from the last dot to the end, ignoring
         leading dots.  Returns "(root, ext)"; ext may be empty.
         """
-
     @overload
     def splitext(p: AnyOrLiteralStr) -> tuple[AnyOrLiteralStr, AnyOrLiteralStr]: ...
 
@@ -295,6 +282,5 @@ if sys.version_info >= (3, 12):
 
             The tail contains anything after the root.
             """
-
         @overload
         def splitroot(p: PathLike[AnyStr]) -> tuple[AnyStr, AnyStr, AnyStr]: ...

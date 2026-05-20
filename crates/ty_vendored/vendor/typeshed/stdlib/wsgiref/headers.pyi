@@ -53,9 +53,9 @@ class Headers:
     @overload
     def get(self, name: str, default: str) -> str:
         """Get the first header value for 'name', or return 'default'"""
-
     @overload
     def get(self, name: str, default: str | None = None) -> str | None: ...
+
     def keys(self) -> list[str]:
         """Return a list of all the header field names.
 

@@ -229,9 +229,9 @@ def getincrementaldecoder(encoding: _BufferedEncoding) -> _BufferedIncrementalDe
     or the codecs doesn't provide an incremental decoder.
 
     """
-
 @overload
 def getincrementaldecoder(encoding: str) -> _IncrementalDecoder: ...
+
 def getreader(encoding: str) -> _StreamReader:
     """Lookup up the codec for the given encoding and return
     its StreamReader class or factory function.

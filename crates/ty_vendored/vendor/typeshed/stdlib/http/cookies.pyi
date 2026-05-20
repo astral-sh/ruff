@@ -105,9 +105,9 @@ def _quote(str: None) -> None:
     string.  Otherwise, surround the string in doublequotes and quote
     (with a \\) special characters.
     """
-
 @overload
 def _quote(str: str) -> str: ...
+
 @overload
 def _unquote(str: None) -> None: ...
 @overload

@@ -170,11 +170,11 @@ class date:
     @overload
     def __sub__(self, value: datetime, /) -> NoReturn:
         """Return self-value."""
-
     @overload
     def __sub__(self, value: Self, /) -> timedelta: ...
     @overload
     def __sub__(self, value: timedelta, /) -> Self: ...
+
     def __hash__(self) -> int: ...
     def weekday(self) -> int:
         """Return the day of the week represented by the date.
@@ -242,6 +242,7 @@ class time:
         @classmethod
         def fromisoformat(cls, time_string: str, /) -> Self:
             """string -> time from a string in ISO 8601 format"""
+
     if sys.version_info >= (3, 14):
         if sys.version_info >= (3, 15):
             @classmethod
@@ -368,15 +369,15 @@ class timedelta:
     @overload
     def __floordiv__(self, value: timedelta, /) -> int:
         """Return self//value."""
-
     @overload
     def __floordiv__(self, value: int, /) -> timedelta: ...
+
     @overload
     def __truediv__(self, value: timedelta, /) -> float:
         """Return self/value."""
-
     @overload
     def __truediv__(self, value: float, /) -> timedelta: ...
+
     def __mod__(self, value: timedelta, /) -> timedelta:
         """Return self%value."""
 
@@ -546,10 +547,10 @@ class datetime(date):
     def __gt__(self, value: datetime, /) -> bool: ...  # type: ignore[override]
     def __eq__(self, value: object, /) -> bool: ...
     def __hash__(self) -> int: ...
+
     @overload  # type: ignore[override]
     def __sub__(self, value: Self, /) -> timedelta:
         """Return self-value."""
-
     @overload
     def __sub__(self, value: timedelta, /) -> Self: ...
 

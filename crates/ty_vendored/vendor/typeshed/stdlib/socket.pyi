@@ -1456,6 +1456,7 @@ class socket(_socket.socket):
         representing the connection, and the address of the client.
         For IP sockets, the address info is a pair (hostaddr, port).
         """
+
     # Note that the makefile's documented windows-specific behavior is not represented
     # mode strings with duplicates are intentionally excluded
     @overload
@@ -1474,7 +1475,6 @@ class socket(_socket.socket):
         supported mode values are 'r' (default), 'w', 'b', or a combination of
         those.
         """
-
     @overload
     def makefile(
         self,
@@ -1525,6 +1525,7 @@ class socket(_socket.socket):
         errors: str | None = None,
         newline: str | None = None,
     ) -> TextIOWrapper: ...
+
     def sendfile(self, file: _SendableFile, offset: int = 0, count: int | None = None) -> int:
         """sendfile(file[, offset[, count]]) -> sent
 

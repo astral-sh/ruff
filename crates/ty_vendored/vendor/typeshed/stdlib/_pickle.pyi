@@ -189,10 +189,12 @@ class Pickler:
         fix_imports: bool = True,
         buffer_callback: _BufferCallback = None,
     ) -> None: ...
+
     @property
     def memo(self) -> PicklerMemoProxy: ...
     @memo.setter
     def memo(self, value: PicklerMemoProxy | dict[int, tuple[int, Any]]) -> None: ...
+
     def dump(self, obj: Any, /) -> None:
         """Write a pickled representation of the given object to the open file."""
 
@@ -249,10 +251,12 @@ class Unpickler:
         errors: str = "strict",
         buffers: Iterable[Any] | None = (),
     ) -> None: ...
+
     @property
     def memo(self) -> UnpicklerMemoProxy: ...
     @memo.setter
     def memo(self, value: UnpicklerMemoProxy | dict[int, tuple[int, Any]]) -> None: ...
+
     def load(self) -> Any:
         """Load a pickle.
 

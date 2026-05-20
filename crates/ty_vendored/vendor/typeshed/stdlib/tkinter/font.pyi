@@ -81,10 +81,10 @@ class Font:
     ) -> None: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __setitem__(self, key: str, value: Any) -> None: ...
+
     @overload
     def cget(self, option: Literal["family"]) -> str:
         """Get font attribute"""
-
     @overload
     def cget(self, option: Literal["size"]) -> int: ...
     @overload
@@ -95,11 +95,12 @@ class Font:
     def cget(self, option: Literal["underline", "overstrike"]) -> bool: ...
     @overload
     def cget(self, option: str) -> Any: ...
+
     __getitem__ = cget
+
     @overload
     def actual(self, option: Literal["family"], displayof: tkinter.Misc | None = None) -> str:
         """Return actual font attributes"""
-
     @overload
     def actual(self, option: Literal["size"], displayof: tkinter.Misc | None = None) -> int: ...
     @overload
@@ -112,6 +113,7 @@ class Font:
     def actual(self, option: None, displayof: tkinter.Misc | None = None) -> _FontDict: ...
     @overload
     def actual(self, *, displayof: tkinter.Misc | None = None) -> _FontDict: ...
+
     def config(
         self,
         *,
@@ -134,11 +136,11 @@ class Font:
         For best performance, create a dummy widget
         using this font before calling this method.
         """
-
     @overload
     def metrics(self, option: Literal["fixed"], /, *, displayof: tkinter.Misc | None = ...) -> bool: ...
     @overload
     def metrics(self, *, displayof: tkinter.Misc | None = ...) -> _MetricsDict: ...
+
     def measure(self, text: str, displayof: tkinter.Misc | None = None) -> int:
         """Return text width"""
 

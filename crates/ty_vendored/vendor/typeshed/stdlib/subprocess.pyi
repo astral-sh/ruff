@@ -201,7 +201,6 @@ if sys.version_info >= (3, 11):
 
         The other arguments are the same as for the Popen constructor.
         """
-
     @overload  # encoding is str
     def run(
         args: _CMD,
@@ -373,7 +372,6 @@ if sys.version_info >= (3, 11):
         pipesize: int = -1,
         process_group: int | None = None,
     ) -> CompletedProcess[Any]: ...
-
 else:
     # 3.10 adds "pipesize" argument
     @overload  # text is True
@@ -437,7 +435,6 @@ else:
 
         The other arguments are the same as for the Popen constructor.
         """
-
     @overload  # encoding is str
     def run(
         args: _CMD,
@@ -832,7 +829,6 @@ if sys.version_info >= (3, 11):
         decoded according to locale encoding, or by "encoding" if set. Text mode
         is triggered by setting any of text, encoding, errors or universal_newlines.
         """
-
     @overload  # encoding is str
     def check_output(
         args: _CMD,
@@ -989,7 +985,6 @@ if sys.version_info >= (3, 11):
         pipesize: int = -1,
         process_group: int | None = None,
     ) -> Any: ...  # morally: -> str | bytes
-
 else:
     # 3.10 adds "pipesize" argument
     @overload  # text is True
@@ -1056,7 +1051,6 @@ else:
         decoded according to locale encoding, or by "encoding" if set. Text mode
         is triggered by setting any of text, encoding, errors or universal_newlines.
         """
-
     @overload  # encoding is str
     def check_output(
         args: _CMD,
@@ -1356,7 +1350,6 @@ class Popen(Generic[AnyStr]):
             process_group: int | None = None,
         ) -> None:
             """Create new Popen instance."""
-
         @overload  # errors is str
         def __init__(
             self: Popen[str],
@@ -1546,7 +1539,6 @@ class Popen(Generic[AnyStr]):
             pipesize: int = -1,
         ) -> None:
             """Create new Popen instance."""
-
         @overload  # errors is str
         def __init__(
             self: Popen[str],

@@ -370,9 +370,9 @@ class SMTP:
         """Authobject to use with CRAM-MD5 authentication. Requires self.user
         and self.password to be set.
         """
-
     @overload
     def auth_cram_md5(self, challenge: ReadableBuffer) -> str: ...
+
     def auth_plain(self, challenge: ReadableBuffer | None = None) -> str:
         """Authobject to use with PLAIN authentication. Requires self.user and
         self.password to be set.
@@ -447,7 +447,6 @@ class SMTP:
              SMTPHeloError            The server didn't reply properly to
                                       the helo greeting.
             """
-
         @overload
         @deprecated(
             "The `keyfile`, `certfile` parameters are deprecated since Python 3.6; "
@@ -614,6 +613,7 @@ class SMTP_SSL(SMTP):
             source_address: _SourceAddress | None = None,
             context: None = None,
         ) -> None: ...
+
         keyfile: StrOrBytesPath | None
         certfile: StrOrBytesPath | None
 

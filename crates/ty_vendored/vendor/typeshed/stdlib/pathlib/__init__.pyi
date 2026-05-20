@@ -188,7 +188,6 @@ class PurePath(PathLike[str]):
         @overload
         def is_relative_to(self, other: StrPath, /) -> bool:
             """Return True if the path is relative to another path or False."""
-
         @overload
         @deprecated("Passing additional arguments is deprecated since Python 3.12; removed in Python 3.14.")
         def is_relative_to(self, other: StrPath, /, *_deprecated: StrPath) -> bool: ...
@@ -225,7 +224,6 @@ class PurePath(PathLike[str]):
             The *walk_up* parameter controls whether `..` may be used to resolve
             the path.
             """
-
         @overload
         @deprecated("Passing additional arguments is deprecated since Python 3.12; removed in Python 3.14.")
         def relative_to(self, other: StrPath, /, *_deprecated: StrPath, walk_up: bool = False) -> Self: ...
@@ -475,31 +473,30 @@ class Path(PurePath):
             """
             Move this file or directory tree into the given existing directory.
             """
-
         @overload
         def move_into(self, target_dir: StrPath) -> Self: ...  # type: ignore[overload-overlap]
+
         @overload
         def move(self, target: _PathT) -> _PathT:  # type: ignore[overload-overlap]
             """
             Recursively move this file or directory tree to the given destination.
             """
-
         @overload
         def move(self, target: StrPath) -> Self: ...  # type: ignore[overload-overlap]
+
         @overload
         def copy_into(self, target_dir: _PathT, *, follow_symlinks: bool = True, preserve_metadata: bool = False) -> _PathT:  # type: ignore[overload-overlap]
             """
             Copy this file or directory tree into the given existing directory.
             """
-
         @overload
         def copy_into(self, target_dir: StrPath, *, follow_symlinks: bool = True, preserve_metadata: bool = False) -> Self: ...  # type: ignore[overload-overlap]
+
         @overload
         def copy(self, target: _PathT, *, follow_symlinks: bool = True, preserve_metadata: bool = False) -> _PathT:  # type: ignore[overload-overlap]
             """
             Recursively copy this file or directory tree to the given destination.
             """
-
         @overload
         def copy(self, target: StrPath, *, follow_symlinks: bool = True, preserve_metadata: bool = False) -> Self: ...  # type: ignore[overload-overlap]
 

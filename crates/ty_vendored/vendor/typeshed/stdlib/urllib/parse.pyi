@@ -330,9 +330,9 @@ def quote(string: str, safe: str | Iterable[int] = "/", encoding: str | None = N
     By default, encoding='utf-8' (characters are encoded with UTF-8), and
     errors='strict' (unsupported characters raise a UnicodeEncodeError).
     """
-
 @overload
 def quote(string: bytes | bytearray, safe: str | Iterable[int] = "/") -> str: ...
+
 def quote_from_bytes(bs: bytes | bytearray, safe: str | Iterable[int] = "/") -> str:
     """Like quote(), but accepts a bytes object rather than a str, and does
     not perform string-to-bytes encoding.  It always returns an ASCII string.
@@ -345,9 +345,9 @@ def quote_plus(string: str, safe: str | Iterable[int] = "", encoding: str | None
     HTML form values. Plus signs in the original string are escaped unless
     they are included in safe. It also does not have safe default to '/'.
     """
-
 @overload
 def quote_plus(string: bytes | bytearray, safe: str | Iterable[int] = "") -> str: ...
+
 def unquote(string: str | bytes, encoding: str = "utf-8", errors: str = "replace") -> str:
     """Replace %xx escapes by their single-character equivalent. The optional
     encoding and errors parameters specify how to decode percent-encoded
@@ -377,10 +377,8 @@ def urldefrag(url: str) -> DefragResult:
     the URL contained no fragments, the second element is the
     empty string.
     """
-
 @overload
 def urldefrag(url: bytes | bytearray | None) -> DefragResultBytes: ...
-
 if sys.version_info >= (3, 15):
     @overload
     def urldefrag(url: str, *, missing_as_none: Literal[True]) -> DefragResult[str | None]: ...
@@ -465,12 +463,10 @@ def urlparse(url: str, scheme: str = "", allow_fragments: bool = True) -> ParseR
 
     urlsplit() should generally be used instead of urlparse().
     """
-
 @overload
 def urlparse(
     url: bytes | bytearray | None, scheme: bytes | bytearray | None | Literal[""] = "", allow_fragments: bool = True
 ) -> ParseResultBytes: ...
-
 if sys.version_info >= (3, 15):
     @overload
     def urlparse(
@@ -553,7 +549,6 @@ if sys.version_info >= (3, 11):
 
         Note that % escapes are not expanded.
         """
-
 else:
     @overload
     def urlsplit(
@@ -578,7 +573,6 @@ else:
 
         Note that % escapes are not expanded.
         """
-
 if sys.version_info >= (3, 15):
     @overload
     def urlsplit(
@@ -619,7 +613,6 @@ if sys.version_info >= (3, 15):
     def urlunparse(components: Iterable[None], *, keep_empty: bool = ...) -> Literal[b""]: ...  # type: ignore[overload-overlap]
     @overload
     def urlunparse(components: Iterable[AnyStr | None], *, keep_empty: bool = ...) -> AnyStr: ...
-
 else:
     # Requires an iterable of length 6
     @overload
@@ -629,7 +622,6 @@ else:
         originally had redundant delimiters, e.g. a ? with an empty query
         (the draft states that these are equivalent).
         """
-
     @overload
     def urlunparse(components: Iterable[AnyStr | None]) -> AnyStr: ...
 
@@ -639,7 +631,6 @@ if sys.version_info >= (3, 15):
     def urlunsplit(components: Iterable[None], *, keep_empty: bool = ...) -> Literal[b""]: ...  # type: ignore[overload-overlap]
     @overload
     def urlunsplit(components: Iterable[AnyStr | None], *, keep_empty: bool = ...) -> AnyStr: ...
-
 else:
     # Requires an iterable of length 5
     @overload
@@ -650,7 +641,6 @@ else:
         was parsed originally had unnecessary delimiters (for example, a ? with an
         empty query; the RFC states that these are equivalent).
         """
-
     @overload
     def urlunsplit(components: Iterable[AnyStr | None]) -> AnyStr: ...
 

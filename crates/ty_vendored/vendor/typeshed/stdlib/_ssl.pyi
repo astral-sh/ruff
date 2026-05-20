@@ -164,11 +164,11 @@ class _SSLContext:
         NOTE: Certificates in a capath directory aren't loaded unless they have
         been used at least once.
         """
-
     @overload
     def get_ca_certs(self, binary_form: Literal[True]) -> list[bytes]: ...
     @overload
     def get_ca_certs(self, binary_form: bool = False) -> Any: ...
+
     def get_ciphers(self) -> list[_Cipher]: ...
     def load_cert_chain(
         self, certfile: StrOrBytesPath, keyfile: StrOrBytesPath | None = None, password: _PasswordType | None = None
@@ -262,6 +262,7 @@ class SSLSession:
 @final
 class Certificate:
     def get_info(self) -> _CertInfo: ...
+
     @overload
     def public_bytes(self) -> str: ...
     @overload

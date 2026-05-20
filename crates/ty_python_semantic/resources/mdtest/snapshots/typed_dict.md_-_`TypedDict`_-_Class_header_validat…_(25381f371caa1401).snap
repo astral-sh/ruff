@@ -44,9 +44,9 @@ error[invalid-typed-dict-header]: TypedDict class `Foo` can only inherit from Ty
   3 | class Foo(TypedDict, int): ...  # error: [invalid-typed-dict-header]
     |                      ^^^ `int` is not a `TypedDict` class
     |
-   ::: stdlib/builtins.pyi:337:7
+   ::: stdlib/builtins.pyi:344:7
     |
-337 | class int:
+344 | class int:
     |       --- `int` defined here
     |
 

@@ -27,6 +27,7 @@ if sys.version_info >= (3, 14):
     class WorkerContext(ThreadWorkerContext):
         interp: Interpreter | None
         results: Queue | None
+
         @overload  # type: ignore[override]
         @classmethod
         def prepare(
@@ -35,6 +36,7 @@ if sys.version_info >= (3, 14):
         @overload
         @classmethod
         def prepare(cls, initializer: Callable[[], object], initargs: tuple[()]) -> tuple[Callable[[], Self], _TaskFunc]: ...
+
         def __init__(self, initdata: _Task) -> None: ...
         def __del__(self) -> None: ...
         def run(self, task: _Task) -> None: ...  # type: ignore[override]
@@ -57,6 +59,7 @@ if sys.version_info >= (3, 14):
         def prepare_context(
             cls, initializer: Callable[[Unpack[_Ts]], object], initargs: tuple[Unpack[_Ts]]
         ) -> tuple[Callable[[], WorkerContext], _TaskFunc]: ...
+
         @overload
         def __init__(
             self,
@@ -75,7 +78,6 @@ if sys.version_info >= (3, 14):
                     each worker interpreter.
                 initargs: A tuple of arguments to pass to the initializer.
             """
-
         @overload
         def __init__(
             self,

@@ -806,7 +806,6 @@ def intern(string: LiteralString, /) -> LiteralString:
     purpose is to speed up dictionary lookups. Return the string itself or
     the previously interned string object with the same value.
     """
-
 @overload
 def intern(string: str, /) -> str: ...  # type: ignore[misc]
 

@@ -58,7 +58,6 @@ if sys.version_info >= (3, 14):
         For example, reduce(lambda x, y: x+y, [1, 2, 3, 4, 5])
         calculates ((((1 + 2) + 3) + 4) + 5).
         """
-
 else:
     @overload
     def reduce(function: Callable[[_T, _S], _T], iterable: Iterable[_S], initial: _T, /) -> _T:
@@ -155,7 +154,6 @@ def lru_cache(maxsize: int | None = 128, typed: bool = False) -> Callable[[Calla
     See:  https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_recently_used_(LRU)
 
     """
-
 @overload
 def lru_cache(maxsize: Callable[..., _T], typed: bool = False) -> _lru_cache_wrapper[_T]: ...
 
@@ -377,6 +375,7 @@ else:
 class _SingleDispatchCallable(Generic[_T]):
     registry: types.MappingProxyType[Any, Callable[..., _T]]
     def dispatch(self, cls: Any) -> Callable[..., _T]: ...
+
     # @fun.register(complex)
     # def _(arg, verbose=False): ...
     @overload
@@ -388,6 +387,7 @@ class _SingleDispatchCallable(Generic[_T]):
     # fun.register(int, lambda x: x)
     @overload
     def register(self, cls: _RegType, func: Callable[..., _T]) -> Callable[..., _T]: ...
+
     def _clear_cache(self) -> None: ...
     def __call__(self, /, *args: Any, **kwargs: Any) -> _T: ...
 
@@ -412,27 +412,30 @@ class singledispatchmethod(Generic[_T]):
     def __init__(self, func: Callable[..., _T]) -> None: ...
     @property
     def __isabstractmethod__(self) -> bool: ...
+
     @overload
     def register(self, cls: _RegType, method: None = None) -> Callable[[Callable[..., _T]], Callable[..., _T]]:
         """generic_method.register(cls, func) -> func
 
         Registers a new implementation for the given *cls* on a *generic_method*.
         """
-
     @overload
     def register(self, cls: Callable[..., _T], method: None = None) -> Callable[..., _T]: ...
     @overload
     def register(self, cls: _RegType, method: Callable[..., _T]) -> Callable[..., _T]: ...
+
     def __get__(self, obj: _S, cls: type[_S] | None = None) -> Callable[..., _T]: ...
 
 class cached_property(Generic[_T_co]):
     func: Callable[[Any], _T_co]
     attrname: str | None
     def __init__(self, func: Callable[[Any], _T_co]) -> None: ...
+
     @overload
     def __get__(self, instance: None, owner: type[Any] | None = None) -> Self: ...
     @overload
     def __get__(self, instance: object, owner: type[Any] | None = None) -> _T_co: ...
+
     def __set_name__(self, owner: type[Any], name: str) -> None: ...
     # __set__ is not defined at runtime, but @cached_property is designed to be settable
     def __set__(self, instance: object, value: _T_co) -> None: ...  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]

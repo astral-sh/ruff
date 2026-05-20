@@ -78,18 +78,18 @@ def getaddresses(fieldvalues: Iterable[str], *, strict: bool = True) -> list[tup
 @overload
 def parsedate(data: None) -> None:
     """Convert a time string to a time tuple."""
-
 @overload
 def parsedate(data: str) -> tuple[int, int, int, int, int, int, int, int, int] | None: ...
+
 @overload
 def parsedate_tz(data: None) -> None:
     """Convert a date string to a time tuple.
 
     Accounts for military timezones.
     """
-
 @overload
 def parsedate_tz(data: str) -> _PDTZ | None: ...
+
 def parsedate_to_datetime(data: str) -> datetime.datetime: ...
 def mktime_tz(data: _PDTZ) -> int:
     """Turn a 10-tuple as returned by parsedate_tz() into a POSIX timestamp."""
@@ -142,7 +142,6 @@ elif sys.version_info >= (3, 12):
         The isdst parameter is ignored.
 
         """
-
     @overload
     @deprecated("The `isdst` parameter does nothing and will be removed in Python 3.14.")
     def localtime(dt: datetime.datetime | None = None, isdst: Unused = None) -> datetime.datetime: ...

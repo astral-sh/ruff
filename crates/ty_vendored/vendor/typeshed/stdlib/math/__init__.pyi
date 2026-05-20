@@ -65,9 +65,9 @@ def ceil(x: _SupportsCeil[_T], /) -> _T:
 
     This is the smallest integer >= x.
     """
-
 @overload
 def ceil(x: _SupportsFloatOrIndex, /) -> int: ...
+
 def comb(n: SupportsIndex, k: SupportsIndex, /) -> int:
     """Number of ways to choose k items from n items without repetition and without order.
 
@@ -143,9 +143,9 @@ def floor(x: _SupportsFloor[_T], /) -> _T:
 
     This is the largest integer <= x.
     """
-
 @overload
 def floor(x: _SupportsFloatOrIndex, /) -> int: ...
+
 def fmod(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float:
     """Return fmod(x, y), according to platform C.
 
@@ -326,11 +326,11 @@ def prod(iterable: Iterable[bool | _LiteralInteger], /, *, start: int = 1) -> in
     intended specifically for use with numeric values and may reject
     non-numeric types.
     """
-
 @overload
 def prod(iterable: Iterable[_SupportsProdNoDefaultT], /) -> _SupportsProdNoDefaultT | Literal[1]: ...
 @overload
 def prod(iterable: Iterable[_MultiplicableT1], /, *, start: _MultiplicableT2) -> _MultiplicableT1 | _MultiplicableT2: ...
+
 def radians(x: _SupportsFloatOrIndex, /) -> float:
     """Convert angle x from degrees to radians."""
 
