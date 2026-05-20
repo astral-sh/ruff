@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12",
+  "$id": "ruff-py-dto.config.schema.json",
+  "title": "ruff-py-dto configuration",
+  "description": "Config schema for the ruff-py-dto generic Python AST extractor.",
+  "type": "object",
+  "required": ["match"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "root": {
+      "type": "string",
+      "description": "Root directory of the Python source tree to scan."
+    },
+    "include": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Glob patterns for files to include."
+    },
+    "exclude": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Glob patterns for files to exclude."
+    },
+    "match": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/MatchRule" },
+      "description": "List of match rules; one pass over the tree evaluates all rules."
+    },
+    "group": {
+      "$ref": "#/$defs/GroupConfig",
+      "description": "Grouping configuration for family assignment."
+    }
+  },
+  "$defs": {
+    "MatchRule": {
+      "type": "object",
+      "required": ["id", "kind", "emit"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identifier for this rule; appears as match_id in output bundles."
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["function_with_decorator"],
+          "description": "AST shape to match. Only function_with_decorator is implemented in this iteration."
+        },
+        "decorator": {
+          "$ref": "#/$defs/DecoratorSelector",
+          "description": "Selector for which decorator triggers this rule."
+        },
+        "emit": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Map from output field name to dot-path expression over the matched context."
+        }
+      }
+    },
+    "DecoratorSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "attribute": {
+          "type": "string",
+          "description": "Match decorators whose attribute name equals this value (e.g. 'route' for @bp.route)."
+        },
+        "name": {
+          "type": "string",
+          "description": "Match decorators whose bare name equals this value."
+        },
+        "any": {
+          "type": "boolean",
+          "description": "Match any decorator."
+        },
+        "min_positional_args": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Minimum number of positional arguments the decorator call must have."
+        }
+      }
+    },
+    "GroupConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "family_from_filename": {
+          "$ref": "#/$defs/FamilyFromFilename"
+        }
+      }
+    },
+    "FamilyFromFilename": {
+      "type": "object",
+      "required": ["regex"],
+      "additionalProperties": false,
+      "properties": {
+        "regex": {
+          "type": "string",
+          "description": "Regex with a named capture group 'family' applied to the filename."
+        }
+      }
+    }
+  }
+}

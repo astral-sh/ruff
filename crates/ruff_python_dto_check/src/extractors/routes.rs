@@ -44,8 +44,11 @@ pub fn detect_route(func: &StmtFunctionDef) -> Option<RouteInfo> {
     None
 }
 
-/// Map an HTTP method set to one of `read | mutation | form`. Mirrors
-/// the heuristic in `WoA/.claude/v0.2/tools/harvest_routes_v2.py`.
+/// Map an HTTP method set to one of `read | mutation | form`.
+///
+/// - `POST` + `GET` → `form` (HTML form posting)
+/// - `POST` / `PUT` / `DELETE` / `PATCH` alone → `mutation`
+/// - everything else → `read`
 pub fn infer_action(methods: &[String]) -> String {
     let upper: Vec<String> = methods.iter().map(|m| m.to_uppercase()).collect();
     let has_post = upper.iter().any(|m| m == "POST");
@@ -53,7 +56,9 @@ pub fn infer_action(methods: &[String]) -> String {
     if has_post && has_get {
         "form".to_string()
     } else if has_post
-        || upper.iter().any(|m| m == "PUT" || m == "DELETE" || m == "PATCH")
+        || upper
+            .iter()
+            .any(|m| m == "PUT" || m == "DELETE" || m == "PATCH")
     {
         "mutation".to_string()
     } else {
@@ -62,7 +67,11 @@ pub fn infer_action(methods: &[String]) -> String {
 }
 
 fn as_call(expr: &Expr) -> Option<&ExprCall> {
-    if let Expr::Call(c) = expr { Some(c) } else { None }
+    if let Expr::Call(c) = expr {
+        Some(c)
+    } else {
+        None
+    }
 }
 
 /// `bp.route` -> Some(("bp", "route"))
@@ -96,11 +105,7 @@ fn methods_kw(kws: &[Keyword]) -> Vec<String> {
         let Expr::List(list) = &kw.value else {
             return Vec::new();
         };
-        return list
-            .elts
-            .iter()
-            .filter_map(string_literal)
-            .collect();
+        return list.elts.iter().filter_map(string_literal).collect();
     }
     Vec::new()
 }
