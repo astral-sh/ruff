@@ -264,7 +264,7 @@ pub fn is_immutable_non_generic_type(qualified_name: &[&str]) -> bool {
 pub fn is_immutable_generic_type(qualified_name: &[&str]) -> bool {
     matches!(
         qualified_name,
-        ["" | "builtins", "tuple"]
+        ["" | "builtins", "frozenset" | "tuple"]
             | [
                 "collections",
                 "abc",
