@@ -867,7 +867,7 @@ pub enum DefinitionKind<'db> {
     LoopHeader(LoopHeaderDefinitionKind<'db>),
 }
 
-impl DefinitionKind<'_> {
+impl<'db> DefinitionKind<'db> {
     pub fn is_reexported(&self) -> bool {
         match self {
             DefinitionKind::Import(import) => import.is_reexported(),
@@ -905,6 +905,13 @@ impl DefinitionKind<'_> {
         matches!(self, DefinitionKind::Assignment(_))
     }
 
+    pub fn as_unannotated_assignment(&self) -> Option<AssignmentDefinitionKind<'db>> {
+        match self {
+            DefinitionKind::Assignment(assignment) => Some(assignment.clone()),
+            _ => None,
+        }
+    }
+
     pub const fn is_function_def(&self) -> bool {
         matches!(self, DefinitionKind::Function(_))
     }
@@ -915,15 +922,6 @@ impl DefinitionKind<'_> {
 
     pub const fn is_loop_header(&self) -> bool {
         matches!(self, DefinitionKind::LoopHeader(_))
-    }
-
-    pub fn is_unannotated_collection_literal(&self, module: &ParsedModuleRef) -> bool {
-        let value = match self {
-            DefinitionKind::Assignment(assignment) => assignment.value(module),
-            _ => return false,
-        };
-
-        value.is_dict_expr() || value.is_set_expr() || value.is_list_expr()
     }
 
     /// Returns `true` if this definition is user-visible (i.e., not an internal

@@ -77,9 +77,9 @@ use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::builder::typed_dict::TypedDictConstructorForm;
 use crate::types::infer::{
-    StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TypeExpressionFlags,
-    infer_statement_types, nearest_enclosing_class, nearest_enclosing_function,
-    original_class_type,
+    StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TypeAndRange,
+    TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
+    nearest_enclosing_function, original_class_type,
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::newtype::NewType;
@@ -141,12 +141,6 @@ mod typed_dict;
 mod typevar;
 
 use super::comparisons::{self, BinaryComparisonVisitor};
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-struct TypeAndRange<'db> {
-    ty: Type<'db>,
-    range: TextRange,
-}
 
 /// A helper to track if we already know that declared and inferred types are the same.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -462,6 +456,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(extra) = &inference.extra {
             self.called_functions
                 .extend(extra.called_functions.iter().copied());
+            self.return_types_and_ranges
+                .extend(extra.return_types_and_ranges.iter().copied());
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.context.extend(&extra.diagnostics);
             self.deferred.extend(extra.deferred.iter().copied());
@@ -5387,13 +5383,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .zip(ast_arguments.clone())
             .enumerate()
         {
-            let ast_argument = match ast_argument {
-                ast::ArgOrKeyword::Arg(ast::Expr::Starred(_))
-                | ast::ArgOrKeyword::Keyword(ast::Keyword { arg: None, .. }) => continue,
-
-                ast::ArgOrKeyword::Arg(arg) => arg,
-                ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. }) => value,
-            };
+            if ast_argument.is_variadic() {
+                continue;
+            }
+            let ast_argument = ast_argument.value();
 
             if matches!(argument_form, Some(ParameterForm::Type)) {
                 continue;
@@ -7949,28 +7942,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        // Record the constraints for the receiver of a bound method call, if the receiver is an
+        // Record the constraints for the receiver of a bound method call if the receiver is an
         // unannotated collection literal.
         if let ast::Expr::Attribute(attribute @ ast::ExprAttribute { value, .. }) = func.as_ref() {
             let value_type = self.expression_type(value);
 
-            if let Some((class_literal, _)) = value_type.class_specialization(self.db())
-                && let Some(collection_def) = self.index.constrained_collection(value)
+            if let Some(collection_def) = self.index.constrained_collection(value)
+                && let Some((collection_literal, _)) = value_type.class_specialization(self.db())
             {
-                let identity_instance =
-                    Type::instance(self.db(), class_literal.identity_specialization(self.db()));
+                let identity_instance = Type::instance(
+                    self.db(),
+                    collection_literal.identity_specialization(self.db()),
+                );
 
                 let mut identity_bindings = self
                     .infer_attribute_load_impl(attribute, identity_instance)
                     .bindings(self.db())
                     .match_parameters(self.db(), &call_arguments)
                     // Perform inference against the type variables on the receiver's generic context.
-                    .with_generic_context(self.db(), class_literal.generic_context(self.db()));
+                    .with_generic_context(self.db(), collection_literal.generic_context(self.db()));
 
-                let call_result = self.infer_and_check_argument_types(
+                let call_result = self.speculate().infer_and_check_argument_types(
                     ArgumentsIter::from_ast(arguments),
                     &mut call_arguments,
-                    &mut |builder, (_, expr, _)| builder.expression_type(expr),
+                    // TODO: Reuse the previously inferred types from the initial call on `collection[Divergent].
+                    &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
                     &mut identity_bindings,
                     call_expression_tcx,
                 );
@@ -9784,6 +9780,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred,
             cycle_recovery,
             called_functions,
+            mut return_types_and_ranges,
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
@@ -9795,7 +9792,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred_state: _,
             index: _,
             region: _,
-            return_types_and_ranges: _,
         } = self;
 
         let _ = scope;
@@ -9807,6 +9803,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || !expected_types.is_empty()
             || !deferred.is_empty()
             || !called_functions.is_empty()
+            || !return_types_and_ranges.is_empty()
             || !qualifiers.is_empty()
             || !type_expression_flags.is_empty()
             || !collection_use_constraints.is_empty())
@@ -9816,6 +9813,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expected_types.shrink_to_fit();
             type_expression_flags.shrink_to_fit();
             string_annotations.shrink_to_fit();
+            return_types_and_ranges.shrink_to_fit();
             Box::new(StatementInferenceInnerExtra {
                 string_annotations,
                 expected_types,
@@ -9823,6 +9821,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .into_iter()
                     .collect::<Vec<_>>()
                     .into_boxed_slice(),
+                return_types_and_ranges: return_types_and_ranges.into_boxed_slice(),
                 type_expression_flags,
                 collection_use_constraints,
                 cycle_recovery,

@@ -782,9 +782,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self.ast_ids[scope_id]
     }
 
-    /// If the given expression is a use of an unannotated collection literal binding,
-    /// returns the definition of the collection literal.
-    fn unannotated_collection_literal_binding(
+    /// If the given expression is a use of an unconstrained collection literal, returns
+    /// the definition of the collection literal.
+    fn unconstrained_collection_literal_binding(
         &self,
         collection_use: &ast::Expr,
     ) -> Option<Definition<'db>> {
@@ -797,7 +797,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .filter(|definition| {
                 definition
                     .kind(self.db)
-                    .is_unannotated_collection_literal(self.module)
+                    .as_unannotated_assignment()
+                    .is_some_and(|assignment| {
+                        is_unconstrained_collection_literal(assignment.value(self.module))
+                    })
             })
             .exactly_one()
             .ok()
@@ -2672,11 +2675,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // Unannotated collection literals must be standalone expressions to participate
                 // in full-scope bidirectional inference.
-                if node.targets.len() == 1
-                    && (node.value.is_list_expr()
-                        || node.value.is_set_expr()
-                        || node.value.is_dict_expr())
-                {
+                if node.targets.len() == 1 && is_unconstrained_collection_literal(&node.value) {
                     self.add_standalone_assigned_expression(&node.value, node);
                 }
 
@@ -3503,7 +3502,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         && func
                             .as_attribute_expr()
                             .and_then(|attribute| {
-                                self.unannotated_collection_literal_binding(&attribute.value)
+                                self.unconstrained_collection_literal_binding(&attribute.value)
                             })
                             .is_none()
                     {
@@ -3566,7 +3565,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         // created by full-scope collection inference.
         current_statement
             .collection_uses
-            .retain(|_, use_expression| {
+            .retain(|(_, use_expression)| {
                 match stmt {
                     // A return involving the collection object.
                     ruff_python_ast::Stmt::Return(_) => true,
@@ -3623,13 +3622,22 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         // the collection in its containing scope, and so each use must be part
         // of an standalone inferable statement to avoid
         // large scope-level cycles.
-        for (definition, use_expression) in current_statement.collection_uses {
+        let mut collection_defs = FxHashSet::default();
+        for (collection_def, use_expression) in current_statement.collection_uses {
+            // If the same collection is referenced multiple times in this statement,
+            // we only consider the first occurrence, as collection use constraints are
+            // tracked at the statement level.
+            if !collection_defs.insert(collection_def) {
+                continue;
+            }
+
             self.uses_by_collection
-                .entry(definition)
+                .entry(collection_def)
                 .or_default()
                 .push((standalone_statement, use_expression));
 
-            self.collections_by_use.insert(use_expression, definition);
+            self.collections_by_use
+                .insert(use_expression, collection_def);
         }
     }
 
@@ -3741,15 +3749,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                         // Keep track of any uses of collection literals.
                         if let Some(collection_def) =
-                            self.unannotated_collection_literal_binding(expr)
+                            self.unconstrained_collection_literal_binding(expr)
                             && let Some(current_statement) = self.current_statements.last_mut()
                         {
-                            // Note that if the same collection is referenced multiple times
-                            // in the same statement, we only consider the first occurrence.
                             current_statement
                                 .collection_uses
-                                .entry(collection_def)
-                                .or_insert(expr.into());
+                                .push((collection_def, expr.into()));
                         }
                     }
 
@@ -4247,7 +4252,7 @@ struct CurrentStatement<'ast, 'db> {
     /// A list of lambda expressions contained in this statement.
     lambda_expressions: Vec<&'ast ast::ExprLambda>,
     /// A list of collection definitions whose uses are contained in this statement.
-    collection_uses: FxHashMap<Definition<'db>, ExpressionNodeKey>,
+    collection_uses: Vec<(Definition<'db>, ExpressionNodeKey)>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -4448,4 +4453,13 @@ fn is_if_not_type_checking(expr: &ast::Expr) -> bool {
             ..
         }) if is_if_type_checking(operand)
     )
+}
+
+pub(crate) fn is_unconstrained_collection_literal(expr: &ast::Expr) -> bool {
+    match expr {
+        ast::Expr::List(list) => list.elts.is_empty(),
+        ast::Expr::Set(set) => set.elts.is_empty(),
+        ast::Expr::Dict(dict) => dict.items.is_empty(),
+        _ => false,
+    }
 }
