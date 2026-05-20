@@ -2628,6 +2628,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         // `target`, then the non-variadic parameters in `source` must have a default
                         // value.
                         if default_type.is_none() {
+                            let parameter =
+                                ParameterDescription::new(target_index, source_parameter.name());
+                            self.provide_context(|| ErrorContext::ExtraRequiredParameter {
+                                parameter,
+                            });
                             return self.never();
                         }
                     }
