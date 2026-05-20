@@ -291,6 +291,52 @@ a: int | MaybeInt = MaybeInt("42")  # OK
 b: int = MaybeInt("42")  # error: [invalid-assignment]
 ```
 
+### `__new__` returning a recursive alias union
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+type RecursiveNewReturn = RecursiveNew | RecursiveNewReturn
+
+class RecursiveNew:
+    def __new__(cls, value: int) -> RecursiveNewReturn:
+        raise NotImplementedError
+
+    def __init__(self, value: str) -> None: ...
+
+# error: [invalid-argument-type] "Argument to `RecursiveNew.__init__` is incorrect: Expected `str`, found `Literal[1]`"
+reveal_type(RecursiveNew(1))  # revealed: RecursiveNew
+```
+
+### Metaclass `__call__` returning a recursive alias union
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+type RecursiveMetaCallReturn = RecursiveMetaCall | RecursiveMetaCallReturn
+
+class RecursiveMeta(type):
+    def __call__(cls, value: int) -> RecursiveMetaCallReturn:
+        raise NotImplementedError
+
+class RecursiveMetaCall(metaclass=RecursiveMeta):
+    def __new__(cls, value: str) -> RecursiveMetaCall:
+        raise NotImplementedError
+
+# error: [invalid-argument-type] "Argument to constructor `RecursiveMetaCall.__new__` is incorrect: Expected `str`, found `Literal[1]`"
+reveal_type(RecursiveMetaCall(1))  # revealed: RecursiveMetaCall
+```
+
 ### `__new__` returning an intersection type
 
 ```py
