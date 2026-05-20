@@ -211,6 +211,12 @@ type TypedDictOrMapping = TD | Mapping[int, float]
 d7_alias_fallback: TypedDictOrDictAlias = {1: 5.2}
 d8_mapping_fallback: TypedDictOrMapping = {1: 5.2}
 
+# A `Mapping` fallback should only suppress `TypedDict` diagnostics when it accepts the literal.
+# error: [missing-typed-dict-key]
+# error: [invalid-key]
+d9_invalid_mapping_key: TypedDictOrMapping = {"y": 5.2}
+d10_invalid_mapping_value: TypedDictOrMapping = {1: "bad"}  # error: [missing-typed-dict-key]
+
 def return_literal() -> TD:
     return {"x": 1}
 

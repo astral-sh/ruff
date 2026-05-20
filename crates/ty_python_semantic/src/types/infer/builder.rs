@@ -6179,10 +6179,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     if let Some(typed_dict) = element.as_typed_dict() {
                         typed_dicts.push(typed_dict);
-                    } else if dict_fallback.is_assignable_to(self.db(), element)
+                    } else if !has_dict_compatible_fallback
+                        && dict_fallback.is_assignable_to(self.db(), element)
                         && element.is_assignable_to(self.db(), mapping_fallback)
                     {
-                        has_dict_compatible_fallback = true;
+                        // Suppress `TypedDict` diagnostics only when the fallback can actually
+                        // accept this literal. A merely present `Mapping` arm is not sufficient.
+                        let mut speculative_builder = self.speculate();
+                        has_dict_compatible_fallback = speculative_builder
+                            .infer_dict_expression(dict, TypeContext::new(Some(element)))
+                            .is_assignable_to(self.db(), element);
                     }
                 }
 
