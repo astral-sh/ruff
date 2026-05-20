@@ -1,7 +1,37 @@
+//! Single-path ignore-file matching with project-walk semantics.
+//!
+//! A normal project file walk delegates ignore handling to `ignore::WalkBuilder`.
+//! Some callers need the same decision for one concrete file or directory
+//! without walking an entire subtree.
+//!
+//! `IgnoreFiles` answers that question by replaying the relevant walk branch
+//! from each project walk root to the changed path. At each branch component it
+//! asks whether the active ignore files would prune that component. If an
+//! intermediate directory is ignored, nested ignore files below it are never
+//! considered, matching the full walker's pruning behavior.
+//!
+//! The active directory list represents ignore files that the walker would
+//! already have discovered at the current branch position. It contains:
+//!
+//! - canonical parent directories above the explicit walk root, matching
+//!   `ignore::Ignore::add_parents`;
+//! - the walk root itself once depth-0 admission has happened; and
+//! - descendant directories accepted while replaying the branch.
+//!
+//! Matching needs both the lexical walked path and, when available, the
+//! canonicalized candidate path. Parent ignore files discovered above a
+//! symlinked root match against the canonical path, while ignore files loaded
+//! at or below the explicit root match against the walked path. `ActiveDirectory`
+//! and `CandidatePaths` keep that distinction local.
+//!
+//! Parsed ignore files are cached per directory within one `IgnoreFiles`
+//! instance so repeated checks do not keep reparsing the same ignore files.
+
+use ignore::gitignore;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use rustc_hash::FxHashMap;
 
-/// Cached ignore-file state for one watcher change batch.
+/// Cached ignore-file state for single-path project-walk checks.
 ///
 /// `ignore::WalkBuilder` decides whether to descend into a directory before it
 /// reads ignore files inside that directory. This checker mirrors that behavior
@@ -12,47 +42,40 @@ use rustc_hash::FxHashMap;
 /// Directory entries in `directories` are populated lazily. The presence of an
 /// entry means we already checked that directory for ignore files, and any
 /// parsed matchers are reused by later watcher events in the same batch.
-pub(crate) struct IgnoreFiles {
-    walk_roots: Vec<SystemPathBuf>,
+pub(crate) struct IgnoreFiles<'a> {
+    walk_roots: &'a [SystemPathBuf],
+    system: Box<dyn System>,
     directories: FxHashMap<SystemPathBuf, DirectoryIgnoreFiles>,
-    global_gitignore: Option<ignore::gitignore::Gitignore>,
+    global_gitignore: Option<gitignore::Gitignore>,
 }
 
-impl IgnoreFiles {
-    pub(crate) fn new(walk_roots: &[SystemPathBuf]) -> Self {
+impl<'a> IgnoreFiles<'a> {
+    pub(crate) fn new(system: Box<dyn System>, walk_roots: &'a [SystemPathBuf]) -> Self {
         Self {
-            walk_roots: walk_roots.to_vec(),
+            walk_roots,
+            system,
             directories: FxHashMap::default(),
             global_gitignore: None,
         }
     }
 
     /// Returns `true` if every matching project walk root would skip `path`.
-    pub(crate) fn is_ignored(
-        &mut self,
-        system: &dyn System,
-        path: &SystemPath,
-        is_directory: bool,
-    ) -> bool {
-        let matching_roots = self
-            .walk_roots
+    pub(crate) fn is_ignored(&mut self, path: &SystemPath, is_directory: bool) -> bool {
+        let walk_roots = self.walk_roots;
+        let mut matching_roots = walk_roots
             .iter()
             .filter(|root| path.starts_with(root))
-            .cloned()
-            .collect::<Vec<_>>();
+            .peekable();
 
-        if matching_roots.is_empty() {
+        if matching_roots.peek().is_none() {
             return false;
-        }
+        };
 
-        matching_roots
-            .iter()
-            .all(|root| self.is_ignored_from_root(system, root, path, is_directory))
+        matching_roots.all(|root| self.is_ignored_from_root(root, path, is_directory))
     }
 
     fn is_ignored_from_root(
         &mut self,
-        system: &dyn System,
         root: &SystemPath,
         path: &SystemPath,
         is_directory: bool,
@@ -66,113 +89,124 @@ impl IgnoreFiles {
             return false;
         };
 
-        let mut active_directories = root
-            .parent()
+        // `ignore::Ignore::add_parents` skips parent matcher setup when the
+        // walk root cannot be canonicalized. Keep walking from the requested
+        // root in that case, but omit canonical parent ignore files.
+        let canonical_root = self.system.canonicalize_path(root).ok();
+        let mut active_directories = canonical_root
+            .as_deref()
             .into_iter()
             .flat_map(SystemPath::ancestors)
-            .map(SystemPath::to_path_buf)
+            .skip(1)
+            .map(|directory| ActiveDirectory::canonical_parent(directory.to_path_buf()))
             .collect::<Vec<_>>();
         active_directories.reverse();
 
         // Once the walker has accepted the root directory, it reads the root's
         // ignore files before deciding whether to visit any child paths.
-        active_directories.push(root.to_path_buf());
+        active_directories.push(ActiveDirectory::walked(root.to_path_buf()));
 
-        let mut current_path = root.to_path_buf();
+        let mut current_paths = CandidatePaths::new(root.to_path_buf(), canonical_root);
         let mut components = relative_path.components().peekable();
 
+        // Replay the walk one branch component at a time. A directory must be
+        // admitted before ignore files inside it can affect deeper descendants.
         while let Some(component) = components.next() {
-            current_path.push(component.as_str());
+            current_paths.push(component);
 
             let is_last_component = components.peek().is_none();
             let current_path_is_directory = !is_last_component || is_directory;
 
-            if self
-                .ignored_by_active_ignore_files(
-                    system,
-                    &active_directories,
-                    &current_path,
-                    current_path_is_directory,
-                )
-                .unwrap_or(false)
+            if self.ignored_by_active_ignore_files(
+                &active_directories,
+                &current_paths,
+                current_path_is_directory,
+            ) == Some(true)
             {
                 return true;
             }
 
             if !is_last_component {
-                active_directories.push(current_path.clone());
+                active_directories.push(ActiveDirectory::walked(
+                    current_paths.walked().to_path_buf(),
+                ));
             }
         }
 
         false
     }
 
+    /// Returns whether ignore files already visible at the current branch
+    /// position would prune `paths`.
+    ///
+    /// The active directories intentionally exclude ignore files below the
+    /// candidate path. This keeps nested allowlists from reviving paths in a
+    /// directory the real walker would already have skipped.
     fn ignored_by_active_ignore_files(
         &mut self,
-        system: &dyn System,
-        active_directories: &[SystemPathBuf],
-        path: &SystemPath,
+        active_directories: &[ActiveDirectory],
+        paths: &CandidatePaths,
         is_directory: bool,
     ) -> Option<bool> {
         if let Some(is_ignored) =
-            self.ignored_by_ignore_files(system, active_directories, path, is_directory)
+            self.ignored_by_ignore_files(active_directories, paths, is_directory)
         {
             return Some(is_ignored);
         }
 
-        if !self.has_git_repository(system, active_directories) {
+        if !self.has_git_repository(active_directories) {
             return None;
         }
 
         if let Some(is_ignored) =
-            self.ignored_by_gitignore_files(system, active_directories, path, is_directory)
+            self.ignored_by_gitignore_files(active_directories, paths, is_directory)
         {
             return Some(is_ignored);
         }
 
         if let Some(is_ignored) =
-            self.ignored_by_git_exclude(system, active_directories, path, is_directory)
+            self.ignored_by_git_exclude(active_directories, paths, is_directory)
         {
             return Some(is_ignored);
         }
 
-        self.ignored_by_global_gitignore(system, path, is_directory)
+        self.ignored_by_global_gitignore(paths.walked(), is_directory)
     }
 
     fn ignored_by_ignore_files(
         &mut self,
-        system: &dyn System,
-        active_directories: &[SystemPathBuf],
-        path: &SystemPath,
+        active_directories: &[ActiveDirectory],
+        paths: &CandidatePaths,
         is_directory: bool,
     ) -> Option<bool> {
         active_directories.iter().rev().find_map(|directory| {
-            let matcher = self.directory(system, directory).ignore.as_ref()?;
+            let matcher = self.ignore_files(directory.path()).ignore.as_ref()?;
+            let path = directory.candidate_path(paths)?;
             ignored_by_match(&matcher.matched(path.as_std_path(), is_directory))
         })
     }
 
     fn ignored_by_gitignore_files(
         &mut self,
-        system: &dyn System,
-        active_directories: &[SystemPathBuf],
-        path: &SystemPath,
+        active_directories: &[ActiveDirectory],
+        paths: &CandidatePaths,
         is_directory: bool,
     ) -> Option<bool> {
         let mut saw_git_repository = false;
 
         for directory in active_directories.iter().rev() {
-            let directory_ignore_files = self.directory(system, directory);
+            let ignore_files = self.ignore_files(directory.path());
 
             if !saw_git_repository
-                && let Some(matcher) = directory_ignore_files.gitignore.as_ref()
+                && let Some(matcher) = ignore_files.gitignore.as_ref()
+                && let Some(path) = directory.candidate_path(paths)
                 && let Some(is_ignored) =
                     ignored_by_match(&matcher.matched(path.as_std_path(), is_directory))
             {
                 return Some(is_ignored);
             }
 
-            saw_git_repository |= directory_ignore_files.has_git_repository;
+            saw_git_repository |= ignore_files.has_git_repository;
         }
 
         None
@@ -180,25 +214,25 @@ impl IgnoreFiles {
 
     fn ignored_by_git_exclude(
         &mut self,
-        system: &dyn System,
-        active_directories: &[SystemPathBuf],
-        path: &SystemPath,
+        active_directories: &[ActiveDirectory],
+        paths: &CandidatePaths,
         is_directory: bool,
     ) -> Option<bool> {
         let mut saw_git_repository = false;
 
         for directory in active_directories.iter().rev() {
-            let directory_ignore_files = self.directory(system, directory);
+            let ignore_files = self.ignore_files(directory.path());
 
             if !saw_git_repository
-                && let Some(matcher) = directory_ignore_files.git_exclude.as_ref()
+                && let Some(matcher) = ignore_files.git_exclude.as_ref()
+                && let Some(path) = directory.candidate_path(paths)
                 && let Some(is_ignored) =
                     ignored_by_match(&matcher.matched(path.as_std_path(), is_directory))
             {
                 return Some(is_ignored);
             }
 
-            saw_git_repository |= directory_ignore_files.has_git_repository;
+            saw_git_repository |= ignore_files.has_git_repository;
         }
 
         None
@@ -206,53 +240,131 @@ impl IgnoreFiles {
 
     fn ignored_by_global_gitignore(
         &mut self,
-        system: &dyn System,
         path: &SystemPath,
         is_directory: bool,
     ) -> Option<bool> {
-        let matcher = self.global_gitignore.get_or_insert_with(|| {
-            let cwd = system.current_directory();
+        ignored_by_match(
+            &self
+                .global_gitignore()
+                .matched(path.as_std_path(), is_directory),
+        )
+    }
+
+    fn global_gitignore(&mut self) -> &gitignore::Gitignore {
+        self.global_gitignore.get_or_insert_with(|| {
+            let cwd = self.system.current_directory();
             let (matcher, error) =
-                ignore::gitignore::GitignoreBuilder::new(cwd.as_std_path()).build_global();
+                gitignore::GitignoreBuilder::new(cwd.as_std_path()).build_global();
 
             if let Some(error) = error {
                 tracing::warn!("Failed to read global gitignore: {error}");
             }
 
             matcher
-        });
-
-        ignored_by_match(&matcher.matched(path.as_std_path(), is_directory))
+        })
     }
 
-    fn has_git_repository(
-        &mut self,
-        system: &dyn System,
-        active_directories: &[SystemPathBuf],
-    ) -> bool {
+    fn has_git_repository(&mut self, active_directories: &[ActiveDirectory]) -> bool {
         active_directories
             .iter()
             .rev()
-            .any(|directory| self.directory(system, directory).has_git_repository)
+            .any(|directory| self.ignore_files(directory.path()).has_git_repository)
     }
 
-    fn directory(&mut self, system: &dyn System, directory: &SystemPath) -> &DirectoryIgnoreFiles {
-        if !self.directories.contains_key(directory) {
-            let ignore_files = DirectoryIgnoreFiles::read(system, directory);
-            self.directories
-                .insert(directory.to_path_buf(), ignore_files);
-        }
-
+    fn ignore_files(&mut self, directory: &SystemPath) -> &DirectoryIgnoreFiles {
         self.directories
-            .get(directory)
-            .expect("directory ignore files to be inserted before lookup")
+            .entry(directory.to_path_buf())
+            .or_insert_with(|| DirectoryIgnoreFiles::read(self.system.as_ref(), directory))
     }
 }
 
+/// Candidate paths for the branch component currently being checked.
+///
+/// `walked` follows the lexical path requested by the project walk. `canonical`
+/// tracks the same branch from the canonicalized walk root when that root could
+/// be resolved. Parent ignore files use the canonical path, while ignore files
+/// loaded at or below the explicit walk root use the walked path.
+struct CandidatePaths {
+    walked: SystemPathBuf,
+    canonical: Option<SystemPathBuf>,
+}
+
+impl CandidatePaths {
+    fn new(walked: SystemPathBuf, canonical: Option<SystemPathBuf>) -> Self {
+        Self { walked, canonical }
+    }
+
+    fn push(&mut self, component: impl AsRef<SystemPath>) {
+        let component = component.as_ref();
+        self.walked.push(component);
+
+        if let Some(canonical) = self.canonical.as_mut() {
+            canonical.push(component);
+        }
+    }
+
+    fn walked(&self) -> &SystemPath {
+        &self.walked
+    }
+
+    fn canonical(&self) -> Option<&SystemPath> {
+        self.canonical.as_deref()
+    }
+}
+
+struct ActiveDirectory {
+    path: SystemPathBuf,
+    match_path: MatchPath,
+}
+
+impl ActiveDirectory {
+    fn canonical_parent(path: SystemPathBuf) -> Self {
+        Self {
+            path,
+            match_path: MatchPath::Canonical,
+        }
+    }
+
+    fn walked(path: SystemPathBuf) -> Self {
+        Self {
+            path,
+            match_path: MatchPath::Walked,
+        }
+    }
+
+    fn path(&self) -> &SystemPath {
+        &self.path
+    }
+
+    fn candidate_path<'a>(&self, paths: &'a CandidatePaths) -> Option<&'a SystemPath> {
+        match self.match_path {
+            MatchPath::Canonical => paths.canonical(),
+            MatchPath::Walked => Some(paths.walked()),
+        }
+    }
+}
+
+enum MatchPath {
+    /// Match against the canonicalized candidate path.
+    ///
+    /// To mirror `ignore::Ignore::add_parents`, parent ignore files above the
+    /// configured walk root are discovered by first resolving that root through
+    /// the filesystem. If the walk root is a symlink, those parent files belong
+    /// to the symlink target's ancestors, so they must match against the
+    /// correspondingly resolved candidate path.
+    Canonical,
+
+    /// Match against the lexical path observed during the walk.
+    ///
+    /// Ignore files at the explicit walk root or below it are loaded while
+    /// descending the requested path branch, so they keep the walked path.
+    Walked,
+}
+
 struct DirectoryIgnoreFiles {
-    ignore: Option<ignore::gitignore::Gitignore>,
-    gitignore: Option<ignore::gitignore::Gitignore>,
-    git_exclude: Option<ignore::gitignore::Gitignore>,
+    ignore: Option<gitignore::Gitignore>,
+    gitignore: Option<gitignore::Gitignore>,
+    git_exclude: Option<gitignore::Gitignore>,
     has_git_repository: bool,
 }
 
@@ -276,7 +388,7 @@ fn git_exclude_matcher(
     system: &dyn System,
     directory: &SystemPath,
     git_directory: &SystemPath,
-) -> Option<ignore::gitignore::Gitignore> {
+) -> Option<gitignore::Gitignore> {
     let git_common_directory = resolve_git_common_directory(system, git_directory)?;
     ignore_file_matcher(
         system,
@@ -311,7 +423,7 @@ fn resolve_git_common_directory(
         .lines()
         .next()?
         .strip_prefix("gitdir: ")
-        .map(|path| SystemPathBuf::from(path.to_string()))?;
+        .map(SystemPathBuf::from)?;
     let common_directory_file = real_git_directory.join("commondir");
     let common_directory = match system.read_to_string(&common_directory_file) {
         Ok(common_directory) => common_directory,
@@ -328,7 +440,7 @@ fn resolve_git_common_directory(
     if common_directory.starts_with('.') {
         Some(real_git_directory.join(common_directory))
     } else {
-        Some(SystemPathBuf::from(common_directory.to_string()))
+        Some(SystemPathBuf::from(common_directory))
     }
 }
 
@@ -336,7 +448,7 @@ fn ignore_file_matcher(
     system: &dyn System,
     ignore_file: &SystemPath,
     root: &SystemPath,
-) -> Option<ignore::gitignore::Gitignore> {
+) -> Option<gitignore::Gitignore> {
     const UTF8_BOM: &str = "\u{feff}";
 
     let contents = match system.read_to_string(ignore_file) {
@@ -348,7 +460,7 @@ fn ignore_file_matcher(
         }
     };
 
-    let mut builder = ignore::gitignore::GitignoreBuilder::new(root.as_std_path());
+    let mut builder = gitignore::GitignoreBuilder::new(root.as_std_path());
 
     let contents = contents.trim_start_matches(UTF8_BOM);
 
@@ -365,7 +477,7 @@ fn ignore_file_matcher(
         Ok(matcher) => matcher,
         Err(error) => {
             tracing::warn!("Failed to build ignore matcher for `{ignore_file}`: {error}");
-            ignore::gitignore::Gitignore::empty()
+            gitignore::Gitignore::empty()
         }
     })
 }
@@ -381,12 +493,19 @@ fn ignored_by_match<T>(match_result: &ignore::Match<T>) -> Option<bool> {
 #[cfg(test)]
 mod tests {
     use ruff_db::system::{InMemorySystem, System, SystemPath};
+    #[cfg(unix)]
+    use ruff_db::system::{OsSystem, SystemPathBuf};
+    #[cfg(unix)]
+    use std::fs;
+    #[cfg(unix)]
+    use std::os::unix::fs::symlink;
 
     use super::IgnoreFiles;
 
     fn is_ignored(system: &InMemorySystem, path: &SystemPath, is_directory: bool) -> bool {
         let root = system.current_directory().to_path_buf();
-        IgnoreFiles::new(std::slice::from_ref(&root)).is_ignored(system, path, is_directory)
+        IgnoreFiles::new(system.dyn_clone(), std::slice::from_ref(&root))
+            .is_ignored(path, is_directory)
     }
 
     #[test]
@@ -548,5 +667,37 @@ mod tests {
             .unwrap();
 
         assert!(is_ignored(&system, &path, false));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "Symlinked-root canonicalization requires real filesystem fixtures."
+    )]
+    fn symlinked_walk_root_uses_canonical_parent_ignore_files() -> std::io::Result<()> {
+        let temp_dir = tempfile::tempdir()?;
+        let temp_root = SystemPathBuf::from_path_buf(temp_dir.path().to_path_buf())
+            .expect("temporary test path to be UTF-8");
+        let real_parent = temp_root.join("real");
+        let real_root = real_parent.join("project");
+        let symlink_root = temp_root.join("project-link");
+        let ignored_path = symlink_root.join("ignored.py");
+
+        fs::create_dir_all(real_root.as_std_path())?;
+        fs::write(
+            real_parent.join(".ignore").as_std_path(),
+            "project/ignored.py\n",
+        )?;
+        fs::write(real_root.join("ignored.py").as_std_path(), "")?;
+        symlink(real_root.as_std_path(), symlink_root.as_std_path())?;
+
+        let system = OsSystem::new(&temp_root);
+        assert!(
+            IgnoreFiles::new(system.dyn_clone(), std::slice::from_ref(&symlink_root))
+                .is_ignored(&ignored_path, false)
+        );
+
+        Ok(())
     }
 }

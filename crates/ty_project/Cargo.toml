@@ -56,9 +56,10 @@ toml = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-ruff_db = { workspace = true, features = ["testing"] }
+ruff_db = { workspace = true, features = ["os", "testing"] }
 
 insta = { workspace = true, features = ["redactions", "ron"] }
+tempfile = { workspace = true }
 
 [features]
 default = ["zstd"]

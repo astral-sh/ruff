@@ -64,11 +64,12 @@ impl ProjectDatabase {
         let mut removed_paths = BTreeSet::default();
         let mut reload_project = false;
         let mut reload_project_files = false;
-        let mut ignore_files = project
-            .settings(self)
-            .src()
-            .respect_ignore_files
-            .then(|| IgnoreFiles::new(project.included_paths_or_root(self)));
+        let respect_ignore_files = project.settings(self).src().respect_ignore_files;
+        let ignore_walk_roots =
+            respect_ignore_files.then(|| project.included_paths_or_root(self).to_vec());
+        let mut ignore_files = ignore_walk_roots
+            .as_deref()
+            .map(|walk_roots| IgnoreFiles::new(self.system().dyn_clone(), walk_roots));
 
         for change in changes {
             tracing::debug!("Handling file watcher change event: {:?}", change);
@@ -102,7 +103,7 @@ impl ProjectDatabase {
                             reload_project_files = true;
                         } else if project.is_directory_included(self, directory)
                             && ignore_files.as_mut().is_none_or(|ignore_files| {
-                                !ignore_files.is_ignored(self.system(), directory, true)
+                                !ignore_files.is_ignored(directory, true)
                             })
                         {
                             tracing::debug!(
@@ -185,16 +186,16 @@ impl ProjectDatabase {
                         if self.system().is_file(path) {
                             if project.is_file_included_for_indexing(self, path)
                                 && ignore_files.as_mut().is_none_or(|ignore_files| {
-                                    !ignore_files.is_ignored(self.system(), path, false)
+                                    !ignore_files.is_ignored(path, false)
                                 })
                                 && let Ok(file) = system_path_to_file(self, path)
                             {
                                 project.add_file(self, file);
                             }
                         } else if project.is_directory_included(self, path)
-                            && ignore_files.as_mut().is_none_or(|ignore_files| {
-                                !ignore_files.is_ignored(self.system(), path, true)
-                            })
+                            && ignore_files
+                                .as_mut()
+                                .is_none_or(|ignore_files| !ignore_files.is_ignored(path, true))
                         {
                             // Unlike a new file, a new directory needs walking to discover
                             // project files that exist below it.
