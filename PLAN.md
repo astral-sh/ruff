@@ -1,6 +1,6 @@
 # Plan: Migrate SpecializationBuilder from type_mappings HashMap to ConstraintSet
 
-## Status: In progress (first PR stabilization; Phases 1–4 complete; Phase 5.1–5.7 implemented with Step 5.4 follow-up; Phase 5.8 deferred)
+## Status: In progress (first PR stabilization; Phases 1–4 complete; Phase 5.1–5.7 implemented; Phase 5.8 deferred)
 
 ## Overview
 
@@ -42,23 +42,20 @@ Before opening the current PR for review, address these stabilization items:
 
 ### Stabilization task A — protocol-union pending-set dual-write
 
-Status: Needs code change or an explicit written justification before review.
+Status: Complete ✅
 
-Current finding: in `crates/ty_python_semantic/src/types/generics.rs`, the
-`(formal @ Type::ProtocolInstance(_), actual @ Type::Union(_))` arm computes
-`actual.when_constraint_set_assignable_to_owned(self.db, formal)` and calls
-`add_type_mappings_from_owned_constraint_set(when)`, but it does **not** intersect that constraint
-set into `self.pending`. Other constraint-set-based inference paths added in Step 5.4 dual-write
-into `self.pending` when the local set is satisfiable.
+Resolution: `crates/ty_python_semantic/src/types/generics.rs` now loads the owned protocol-union
+constraint set, preserves the existing non-fatal behavior for unsatisfiable protocol inference, and
+intersects the same set into `self.pending` whenever
+`add_type_mappings_from_constraint_set(...)` succeeds. The now-unused owned-set helper was removed,
+and `protocols.md` has a regression case where protocol-over-union inference must combine with
+another argument's pending constraint.
 
-Correct next step: treat this as a likely missed dual-write edge. Preserve the existing non-fatal
-behavior for unsatisfiable protocol inference, but when `add_type_mappings_from_constraint_set(...)`
-returns `Ok(())`, also intersect the loaded constraint set into `self.pending`. If investigation
-finds that this arm must intentionally avoid pending-set inference, document the invariant here and
-add a targeted regression test.
+Validation:
 
-Validation focus: protocol-over-union inference, callable-wrapper patterns, and the normal
-`ty_python_semantic` / `ty_ide` test set.
+- `cargo nextest run -p ty_python_semantic --cargo-profile fast-test -- mdtest::protocols.md`
+- `cargo nextest run -p ty_python_semantic -p ty_ide --cargo-profile fast-test`
+- `/home/dcreager/bin/jpk run --from-ref @-`
 
 ### Stabilization task B — new `argument_type_context` builder call site
 
@@ -397,8 +394,8 @@ combine the chosen per-path results via union. This matches the current hybrid b
 
 No fundamental blockers. Main design challenges *for the remaining work*:
 
-1. Stabilizing the current checkpoint PR: close the Step 5.4 protocol-union dual-write gap and
-    resolve the `Expression` performance regression.
+1. Stabilizing the current checkpoint PR: migrate the `argument_type_context` temporary builder
+    and resolve the `Expression` performance regression.
 1. Preserving or eliminating the `partially_specialized_declared_type` heuristic cleanly.
 1. Behavioral differences from HashMap union vs constraint conjunction (especially invariant /
     contravariant cases).
@@ -735,7 +732,7 @@ Test expectation updated.
 
 ### Phase 5: Switch internal representation to ConstraintSet
 
-Status: In progress (Steps 5.1–5.7 implemented; Step 5.4 follow-up and Step 5.7a stabilization active; Step 5.8 deferred to a follow-on PR)
+Status: In progress (Steps 5.1–5.7 implemented; Step 5.7a stabilization active; Step 5.8 deferred to a follow-on PR)
 **Difficulty: Medium–Hard** — the mechanical changes are straightforward, but behavioral
 differences in how constraints combine (vs HashMap union) may cause test changes.
 **Dependencies: Phase 4** (callers must be migrated so that `infer_reverse` is gone).
@@ -932,11 +929,12 @@ only the `add_type_mapping` path is dual-written so far.
 - `cargo nextest run -p ty_python_semantic -p ty_ide --cargo-profile fast-test`
 - `/home/dcreager/bin/jpk run -a`
 
-**Step 5.4 ⚠️**: Added direct pending-set conjunction for constraint-set-based inference, while
+**Step 5.4 ✅**: Added direct pending-set conjunction for constraint-set-based inference, while
 keeping the existing HashMap extraction path.
 
-Status note: mostly complete, but Stabilization task A found one likely missed pending-set
-intersection in the protocol-union branch that must be resolved before review.
+Status note: Stabilization task A completed the follow-up protocol-union pending-set dual-write
+edge. Constraint-set-based inference paths now dual-write into `self.pending` when their local set
+is satisfiable.
 
 Implementation details:
 
@@ -1039,7 +1037,7 @@ Implementation details:
 Do **not** start Step 5.8 in this PR. First complete the stabilization tasks listed in
 "Current PR scope" above:
 
-- [ ] Fix or explicitly justify the protocol-union pending-set dual-write gap.
+- [x] Fix or explicitly justify the protocol-union pending-set dual-write gap.
 - [ ] Migrate the new `call/bind.rs::argument_type_context` builder use to a standalone
     `PathBounds` query in this PR.
 - [x] Keep stale `assignable_solutions(...)` references out of this plan and future notes; current

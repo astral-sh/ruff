@@ -11,8 +11,7 @@ use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
-    PathBounds, Solutions,
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBounds, Solutions,
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
@@ -2032,14 +2031,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         Ok(())
     }
 
-    fn add_type_mappings_from_owned_constraint_set(
-        &mut self,
-        set: &'db OwnedConstraintSet<'db>,
-    ) -> Result<(), ()> {
-        let set = self.constraints.load(self.db, set);
-        self.add_type_mappings_from_constraint_set(set)
-    }
-
     /// Infer type mappings by comparing formal callable signatures against actual callables.
     fn infer_from_callable_signature(
         &mut self,
@@ -2551,10 +2542,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // from even failed matches), so for now we handle this particular case.
             (formal @ Type::ProtocolInstance(_), actual @ Type::Union(_)) => {
                 let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
+                let when = self.constraints.load(self.db, when);
                 // For protocol inference via constraint sets, keep unsatisfiable results non-fatal
                 // for now, matching the protocol constraint-set path in the nominal-instance
                 // arm above.
-                let _ = self.add_type_mappings_from_owned_constraint_set(when);
+                if self.add_type_mappings_from_constraint_set(when).is_ok() {
+                    self.pending.intersect(self.db, self.constraints, when);
+                }
                 return Ok(());
             }
 

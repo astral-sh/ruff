@@ -2842,6 +2842,37 @@ static_assert(is_subtype_of(TypeOf[tuple[str, ...]], SequenceMaker[str]))  # err
 static_assert(is_subtype_of(TypeOf[tuple[str, ...]], SequenceMaker[int | str]))  # error: [static-assert-error]
 ```
 
+## Generic protocols and union arguments
+
+When a union is passed to a parameter annotated as a generic protocol, each union element can
+satisfy the protocol with a different specialization. For `IntBox | StrBox` assigned to `Box[T]`,
+`IntBox` satisfies `Box[int]` and `StrBox` satisfies `Box[str]`, so `T` is inferred as `int | str`.
+Other type variables in the same call are still inferred from their corresponding arguments:
+
+```py
+from typing import Protocol, TypeVar
+
+T_infer_union = TypeVar("T_infer_union")
+U_infer_union = TypeVar("U_infer_union")
+
+class Box(Protocol[T_infer_union]):
+    def get(self) -> T_infer_union: ...
+
+class IntBox:
+    def get(self) -> int:
+        return 1
+
+class StrBox:
+    def get(self) -> str:
+        return ""
+
+def infer_protocol_union_box(x: Box[T_infer_union], y: U_infer_union) -> tuple[T_infer_union, U_infer_union]:
+    raise NotImplementedError
+
+def check_protocol_union_box(x: IntBox | StrBox):
+    reveal_type(infer_protocol_union_box(x, 1))  # revealed: tuple[int | str, Literal[1]]
+```
+
 ## Nominal subtyping of protocols
 
 Protocols can participate in nominal subtyping as well as structural subtyping. The main use case
