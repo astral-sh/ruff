@@ -545,21 +545,21 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
     ) -> Type<'db> {
         let mut projector = NarrowingProjector::new(db, self, predicates, place);
         let projected_root = projector.project(id);
-        if projector.graph.has_pattern_predicate {
+        if projector.graph.has_shared_tail() {
             ProjectedNarrowingContext {
                 db,
                 graph: &projector.graph,
             }
             .narrow(projected_root, base_ty)
         } else {
-            let mut context = RecursiveProjectedNarrowingContext {
+            let mut recursive_context = RecursiveProjectedNarrowingContext {
                 db,
                 graph: &projector.graph,
                 predicates,
                 narrow_cache: FxHashMap::default(),
                 intersection_only_cache: FxHashMap::default(),
             };
-            context.narrow_from(projected_root, base_ty)
+            recursive_context.narrow_from(projected_root, base_ty)
         }
     }
 
@@ -649,7 +649,6 @@ struct ProjectedNarrowingGraph<'db> {
             Option<NarrowingConstraint<'db>>,
         ),
     >,
-    has_pattern_predicate: bool,
 }
 
 impl ProjectedNarrowingGraph<'_> {
@@ -672,6 +671,24 @@ impl ProjectedNarrowingGraph<'_> {
         self.nodes.push(node);
         self.node_cache.insert(node, id);
         id
+    }
+
+    /// Returns `true` if multiple projected paths reach the same interior suffix.
+    fn has_shared_tail(&self) -> bool {
+        let mut seen = vec![false; self.nodes.len()];
+
+        for node in &self.nodes {
+            for next in [node.if_true, node.if_false] {
+                if next != ProjectedNarrowingNodeId::ALWAYS_FALSE
+                    && next != ProjectedNarrowingNodeId::ALWAYS_TRUE
+                    && std::mem::replace(&mut seen[next.0], true)
+                {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 
     /// Constructs the canonical disjunction of two projected subgraphs.
@@ -817,10 +834,6 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         }
                     }
                 } else {
-                    if matches!(predicate.node, PredicateNode::Pattern(_)) {
-                        self.graph.has_pattern_predicate = true;
-                    }
-
                     let if_true = self.project(node.if_true());
                     let if_false = self.project(node.if_false());
                     let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom());
@@ -850,10 +863,11 @@ struct ProjectedNarrowingContext<'a, 'db> {
 }
 
 impl<'db> ProjectedNarrowingContext<'_, 'db> {
-    /// Narrow by propagating materialized types through the projected graph.
+    /// Narrow each shared projected suffix once.
     ///
-    /// The graph can share a tail among many reachability paths. Merging the types that arrive at
-    /// each projected node avoids walking that shared tail once for every path combination.
+    /// Projected nodes are interned bottom-up, so a node's branches always point to terminals or
+    /// to earlier nodes. Evaluating the nodes in that order preserves the recursive evaluator's
+    /// constraint order: a predicate constraint is applied after the branch suffix it guards.
     fn narrow(&self, root: ProjectedNarrowingNodeId, base_ty: Type<'db>) -> Type<'db> {
         if root == ProjectedNarrowingNodeId::ALWAYS_FALSE {
             return Type::Never;
@@ -862,43 +876,49 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
             return base_ty;
         }
 
-        let mut inputs = vec![None; self.graph.nodes.len()];
-        inputs[root.0] = Some(base_ty);
-        let mut output = Type::Never;
+        let mut outputs = Vec::with_capacity(self.graph.nodes.len());
 
-        for (index, node) in self.graph.nodes.iter().copied().enumerate().rev() {
-            let Some(base_ty) = inputs[index] else {
-                continue;
-            };
-
+        for (index, node) in self.graph.nodes.iter().copied().enumerate() {
             let (pos_constraint, neg_constraint) =
                 self.graph.predicate_constraints_cache[&node.atom].clone();
 
-            for (next, constraint) in [
-                (node.if_true, pos_constraint),
-                (node.if_false, neg_constraint),
-            ] {
-                if next == ProjectedNarrowingNodeId::ALWAYS_FALSE {
-                    continue;
-                }
+            let true_ty =
+                self.narrow_branch(node.if_true, pos_constraint, base_ty, &outputs, index);
+            let false_ty =
+                self.narrow_branch(node.if_false, neg_constraint, base_ty, &outputs, index);
 
-                let narrowed = apply_accumulated_narrowing(self.db, base_ty, constraint);
-                if next == ProjectedNarrowingNodeId::ALWAYS_TRUE {
-                    output = UnionType::from_two_elements(self.db, output, narrowed);
-                    continue;
+            let output = match (true_ty, false_ty) {
+                (Some(true_ty), Some(false_ty)) => {
+                    UnionType::from_two_elements(self.db, true_ty, false_ty)
                 }
-
-                debug_assert!(next.0 < index);
-                let old_input = inputs[next.0];
-                let new_input = match old_input {
-                    Some(old_input) => UnionType::from_two_elements(self.db, old_input, narrowed),
-                    None => narrowed,
-                };
-                inputs[next.0] = Some(new_input);
-            }
+                (Some(ty), None) | (None, Some(ty)) => ty,
+                (None, None) => Type::Never,
+            };
+            outputs.push(output);
         }
 
-        output
+        outputs[root.0]
+    }
+
+    /// Return the narrowed output of one projected branch.
+    fn narrow_branch(
+        &self,
+        next: ProjectedNarrowingNodeId,
+        constraint: Option<NarrowingConstraint<'db>>,
+        base_ty: Type<'db>,
+        outputs: &[Type<'db>],
+        index: usize,
+    ) -> Option<Type<'db>> {
+        let branch_ty = if next == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+            return None;
+        } else if next == ProjectedNarrowingNodeId::ALWAYS_TRUE {
+            base_ty
+        } else {
+            debug_assert!(next.0 < index);
+            outputs[next.0]
+        };
+
+        Some(apply_accumulated_narrowing(self.db, branch_ty, constraint))
     }
 }
 
