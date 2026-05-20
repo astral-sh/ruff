@@ -226,11 +226,7 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
 
 impl YieldFinallyVisitor<'_, '_> {
     /// Visits an `except` handler, propagating the surrounding `terminal` flag into its body.
-    fn visit_except_handler_with_terminal(
-        &mut self,
-        handler: &ast::ExceptHandler,
-        terminal: bool,
-    ) {
+    fn visit_except_handler_with_terminal(&mut self, handler: &ast::ExceptHandler, terminal: bool) {
         let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
             type_, body, ..
         }) = handler;
