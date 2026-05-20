@@ -9,6 +9,7 @@ filter(F, X) to return a string if X is a string and a tuple if X is a
 tuple.  That would require type inference, which we don't do.  Let
 Python 2.6 figure it out.
 """
+
 from typing import ClassVar, Literal
 
 from .. import fixer_base

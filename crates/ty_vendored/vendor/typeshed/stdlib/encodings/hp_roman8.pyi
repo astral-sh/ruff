@@ -8,6 +8,7 @@ Original source: LaserJet IIP Printer User's Manual HP part no
 (Used with permission)
 
 """
+
 import codecs
 from _codecs import _EncodingMap
 from _typeshed import ReadableBuffer
