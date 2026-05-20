@@ -39,6 +39,10 @@ fn nested_expression_continuations() {
         "a[b[c], d]",
         "a[b[c]:d]",
         "a[b[c] + d]",
+        "[[][0]]",
+        "[[1] for _ in xs]",
+        "{{1}.pop()}",
+        "{{1} for _ in xs}",
         "1 + (2 + (3) * 4)",
         "(1 + (lambda: 2))",
     ] {
@@ -69,8 +73,18 @@ fn deeply_nested_def_blocks() {
 
 #[test]
 fn deeply_nested_lists() {
-    let src = format!("{}1{}", "[".repeat(1_000), "]".repeat(1_000));
-    parse_module(&src).unwrap();
+    let src = format!("{}1{}", "[".repeat(5_000), "]".repeat(5_000));
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
+}
+
+#[test]
+fn deeply_nested_sets() {
+    let src = format!("{}1{}", "{".repeat(5_000), "}".repeat(5_000));
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
 }
 
 #[test]

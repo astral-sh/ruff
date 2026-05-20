@@ -2345,28 +2345,67 @@ impl<'src> Parser<'src> {
 
         self.bump(TokenKind::Lsqb);
 
-        // Nice error message when having a unclosed open bracket `[`
-        if self.at_ts(NEWLINE_EOF_SET) {
-            self.add_error(
-                ParseErrorType::OtherError("missing closing bracket `]`".to_string()),
-                self.current_token_range(),
-            );
-        }
+        self.report_unclosed_bracket();
 
         // Return an empty `ListExpr` when finding a `]` right after the `[`
         if self.eat(TokenKind::Rsqb) {
-            return Expr::List(ast::ExprList {
-                elts: vec![],
-                ctx: ExprContext::Load,
-                range: self.node_range(start),
-                node_index: AtomicNodeIndex::NONE,
-            });
+            return self.empty_list(start);
+        }
+
+        if self.at(TokenKind::Lsqb) {
+            return self.parse_nested_list_like_expression(start);
         }
 
         // Parse the first element with a more general rule and limit it later.
         let first_element =
             self.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
 
+        self.finish_list_like_expression(first_element, start)
+    }
+
+    fn parse_nested_list_like_expression(&mut self, outer_start: TextSize) -> Expr {
+        let mut starts = vec![outer_start];
+
+        let mut first_element = loop {
+            let start = self.node_start();
+            self.bump(TokenKind::Lsqb);
+
+            self.report_unclosed_bracket();
+
+            if self.eat(TokenKind::Rsqb) {
+                break self.parse_named_expression_or_higher_from_lhs(
+                    self.empty_list(start).into(),
+                    start,
+                    ExpressionContext::starred_bitwise_or(),
+                );
+            }
+
+            starts.push(start);
+
+            if !self.at(TokenKind::Lsqb) {
+                break self
+                    .parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
+            }
+        };
+
+        while let Some(start) = starts.pop() {
+            let expr = self.finish_list_like_expression(first_element, start);
+
+            if starts.is_empty() {
+                return expr;
+            }
+
+            first_element = self.parse_named_expression_or_higher_from_lhs(
+                expr.into(),
+                start,
+                ExpressionContext::starred_bitwise_or(),
+            );
+        }
+
+        unreachable!("nested list parsing always includes the outer list");
+    }
+
+    fn finish_list_like_expression(&mut self, first_element: ParsedExpr, start: TextSize) -> Expr {
         match self.current_token_kind() {
             TokenKind::Async | TokenKind::For => {
                 // Parenthesized starred expression isn't allowed either but that is
@@ -2393,6 +2432,25 @@ impl<'src> Parser<'src> {
             }
             _ => Expr::List(self.parse_list_expression(first_element.expr, start)),
         }
+    }
+
+    fn report_unclosed_bracket(&mut self) {
+        // Nice error message when having a unclosed open bracket `[`
+        if self.at_ts(NEWLINE_EOF_SET) {
+            self.add_error(
+                ParseErrorType::OtherError("missing closing bracket `]`".to_string()),
+                self.current_token_range(),
+            );
+        }
+    }
+
+    fn empty_list(&self, start: TextSize) -> Expr {
+        Expr::List(ast::ExprList {
+            elts: vec![],
+            ctx: ExprContext::Load,
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+        })
     }
 
     /// Parses a set, dict, set comprehension, or dict comprehension.
@@ -2436,21 +2494,11 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
-        // Nice error message when having a unclosed open brace `{`
-        if self.at_ts(NEWLINE_EOF_SET) {
-            self.add_error(
-                ParseErrorType::OtherError("missing closing brace `}`".to_string()),
-                self.current_token_range(),
-            );
-        }
+        self.report_unclosed_brace();
 
         // Return an empty `DictExpr` when finding a `}` right after the `{`
         if self.eat(TokenKind::Rbrace) {
-            return Expr::Dict(ast::ExprDict {
-                items: vec![],
-                range: self.node_range(start),
-                node_index: AtomicNodeIndex::NONE,
-            });
+            return self.empty_dict(start);
         }
 
         let after_brace = self.node_start();
@@ -2498,12 +2546,66 @@ impl<'src> Parser<'src> {
             return Expr::Dict(self.parse_dictionary_expression(None, value.expr, start));
         }
 
+        if self.at(TokenKind::Lbrace) {
+            return self.parse_nested_set_or_dict_like_expression(start);
+        }
+
         // For dictionary expressions, the key uses the `expression` rule while for
         // set expressions, the element uses the `star_expression` rule. So, use the
         // one that is more general and limit it later.
         let key_or_element =
             self.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
 
+        self.finish_set_or_dict_like_expression(key_or_element, start)
+    }
+
+    fn parse_nested_set_or_dict_like_expression(&mut self, outer_start: TextSize) -> Expr {
+        let mut starts = vec![outer_start];
+
+        let mut key_or_element = loop {
+            let start = self.node_start();
+            self.bump(TokenKind::Lbrace);
+
+            self.report_unclosed_brace();
+
+            if self.eat(TokenKind::Rbrace) {
+                break self.parse_named_expression_or_higher_from_lhs(
+                    self.empty_dict(start).into(),
+                    start,
+                    ExpressionContext::starred_bitwise_or(),
+                );
+            }
+
+            starts.push(start);
+
+            if !self.at(TokenKind::Lbrace) {
+                break self
+                    .parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
+            }
+        };
+
+        while let Some(start) = starts.pop() {
+            let expr = self.finish_set_or_dict_like_expression(key_or_element, start);
+
+            if starts.is_empty() {
+                return expr;
+            }
+
+            key_or_element = self.parse_named_expression_or_higher_from_lhs(
+                expr.into(),
+                start,
+                ExpressionContext::starred_bitwise_or(),
+            );
+        }
+
+        unreachable!("nested set parsing always includes the outer set");
+    }
+
+    fn finish_set_or_dict_like_expression(
+        &mut self,
+        key_or_element: ParsedExpr,
+        start: TextSize,
+    ) -> Expr {
         match self.current_token_kind() {
             TokenKind::Async | TokenKind::For => {
                 if key_or_element.is_unparenthesized_starred_expr() {
@@ -2584,6 +2686,24 @@ impl<'src> Parser<'src> {
             }
             _ => Expr::Set(self.parse_set_expression(key_or_element, start)),
         }
+    }
+
+    fn report_unclosed_brace(&mut self) {
+        // Nice error message when having a unclosed open brace `{`
+        if self.at_ts(NEWLINE_EOF_SET) {
+            self.add_error(
+                ParseErrorType::OtherError("missing closing brace `}`".to_string()),
+                self.current_token_range(),
+            );
+        }
+    }
+
+    fn empty_dict(&self, start: TextSize) -> Expr {
+        Expr::Dict(ast::ExprDict {
+            items: vec![],
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+        })
     }
 
     /// Parses an expression in parentheses, a tuple expression, or a generator expression.
