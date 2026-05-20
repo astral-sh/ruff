@@ -6,7 +6,9 @@ use ruff_benchmark::real_world_projects::{
 };
 
 use std::fmt::Write;
+use std::hint::black_box;
 use std::ops::Range;
+use std::sync::Arc;
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use rayon::ThreadPoolBuilder;
@@ -17,9 +19,9 @@ use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{InMemorySystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
-use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options};
+use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options, SrcOptions};
 use ty_project::metadata::python_version::SupportedPythonVersion;
-use ty_project::metadata::value::{RangedValue, RelativePathBuf};
+use ty_project::metadata::value::{RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource};
 use ty_project::watch::{ChangeEvent, ChangedKind};
 use ty_project::{CheckMode, Db, ProjectDatabase, ProjectMetadata};
 
@@ -28,6 +30,11 @@ struct Case {
     fs: MemoryFileSystem,
     file: File,
     file_path: SystemPathBuf,
+}
+
+struct IncludeFilterCase {
+    db: ProjectDatabase,
+    literal_file: SystemPathBuf,
 }
 
 // "https://raw.githubusercontent.com/python/cpython/8e8a4baf652f6e1cee7acde9d78c4b6154539748/Lib/tomllib";
@@ -195,6 +202,50 @@ fn benchmark_cold(criterion: &mut Criterion) {
             },
             BatchSize::SmallInput,
         );
+    });
+}
+
+fn setup_include_filter_case(pattern_count: usize) -> IncludeFilterCase {
+    let system = TestSystem::default();
+    let fs = system.memory_file_system().clone();
+    let project_root = SystemPath::new("/src");
+    let source = ValueSource::File(Arc::new(project_root.join("pyproject.toml")));
+
+    fs.write_file_all(project_root.join("file_0.py"), "")
+        .unwrap();
+
+    let include_patterns = (0..pattern_count)
+        .map(|index| RelativeGlobPattern::new(format!("file_{index}.py"), source.clone()))
+        .collect();
+
+    let mut metadata = ProjectMetadata::discover(project_root, &system).unwrap();
+    metadata.apply_options(Options {
+        src: Some(SrcOptions {
+            include: Some(RangedValue::new(include_patterns, source)),
+            respect_ignore_files: Some(false),
+            ..SrcOptions::default()
+        }),
+        ..Options::default()
+    });
+
+    let db = ProjectDatabase::fallible(metadata, system).unwrap();
+
+    IncludeFilterCase {
+        db,
+        literal_file: project_root.join(format!("file_{}.py", pattern_count - 1)),
+    }
+}
+
+fn benchmark_include_filter_literal_match(criterion: &mut Criterion) {
+    let case = setup_include_filter_case(1024);
+    let project = case.db.project();
+    let literal_file = case.literal_file.as_path();
+
+    criterion.bench_function("ty_include_filter[literal_match_1024]", |b| {
+        b.iter(|| {
+            let included = project.is_file_included(black_box(&case.db), black_box(literal_file));
+            assert!(black_box(included));
+        });
     });
 }
 
@@ -1208,6 +1259,7 @@ fn datetype(criterion: &mut Criterion) {
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);
 criterion_group!(
     micro,
+    benchmark_include_filter_literal_match,
     benchmark_many_string_assignments,
     benchmark_many_tuple_assignments,
     benchmark_tuple_implicit_instance_attributes,
