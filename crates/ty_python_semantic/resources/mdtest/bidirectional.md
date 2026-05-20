@@ -136,7 +136,7 @@ x: list[int | str] = list1(42) * 3
 `typed_dict.py`:
 
 ```py
-from typing import Any, Callable, Hashable, Mapping, TypedDict
+from typing import Any, Callable, Hashable, Iterable, Mapping, TypedDict
 from typing_extensions import Never
 
 class TD(TypedDict):
@@ -216,6 +216,11 @@ d8_mapping_fallback: TypedDictOrMapping = {1: 5.2}
 # error: [invalid-key]
 d9_invalid_mapping_key: TypedDictOrMapping = {"y": 5.2}
 d10_invalid_mapping_value: TypedDictOrMapping = {1: "bad"}  # error: [missing-typed-dict-key]
+
+def takes_td_or_iterable(value: TD | Iterable[int]) -> None:
+    pass
+
+takes_td_or_iterable({42: 42})
 
 def return_literal() -> TD:
     return {"x": 1}

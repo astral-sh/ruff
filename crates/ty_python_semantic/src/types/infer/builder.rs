@@ -6169,22 +6169,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let union_elements = union.elements(self.db());
                 let mut typed_dicts = Vec::new();
                 let mut has_dict_compatible_fallback = false;
-                let dict_fallback = KnownClass::Dict
-                    .to_specialized_instance(self.db(), &[Type::unknown(), Type::unknown()]);
-                let mapping_fallback = KnownClass::Mapping
-                    .to_specialized_instance(self.db(), &[Type::unknown(), Type::unknown()]);
 
                 for element in union_elements {
                     let element = element.resolve_type_alias(self.db());
 
                     if let Some(typed_dict) = element.as_typed_dict() {
                         typed_dicts.push(typed_dict);
-                    } else if !has_dict_compatible_fallback
-                        && dict_fallback.is_assignable_to(self.db(), element)
-                        && element.is_assignable_to(self.db(), mapping_fallback)
-                    {
-                        // Suppress `TypedDict` diagnostics only when the fallback can actually
-                        // accept this literal. A merely present `Mapping` arm is not sufficient.
+                    } else if !has_dict_compatible_fallback {
+                        // Suppress `TypedDict` diagnostics only if this literal is assignable to
+                        // the non-`TypedDict` arm of the union.
                         let mut speculative_builder = self.speculate();
                         has_dict_compatible_fallback = speculative_builder
                             .infer_dict_expression(dict, TypeContext::new(Some(element)))
