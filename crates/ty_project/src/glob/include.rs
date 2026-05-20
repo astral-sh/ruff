@@ -38,11 +38,8 @@ pub(crate) struct IncludeFilter {
     #[get_size(ignore)]
     glob_set: GlobSet,
     original_patterns: Box<[Box<str>]>,
-    /// For each glob in `glob_set`, whether it came from a literal include pattern.
     #[get_size(size_fn = bit_box_size)]
-    literal_patterns: BitBox,
-    #[get_size(ignore)]
-    has_literal_patterns: bool,
+    literal_pattern_indices: BitBox,
     #[get_size(size_fn = dfa_memory_usage)]
     dfa: Option<dfa::dense::DFA<Vec<u32>>>,
     #[get_size(ignore)]
@@ -63,7 +60,7 @@ impl IncludeFilter {
     pub(crate) fn match_file(&self, path: impl AsRef<SystemPath>) -> MatchFile {
         let path = path.as_ref();
 
-        if !self.has_literal_patterns {
+        if self.literal_pattern_indices.is_empty() {
             return if self.glob_set.is_match(path) {
                 MatchFile::Pattern
             } else {
@@ -78,9 +75,11 @@ impl IncludeFilter {
             MatchFile::No
         } else {
             for match_index in matches.iter() {
-                if *self.literal_patterns.get(*match_index).expect(
-                    "literal-pattern bitset should have one entry per glob added by the builder",
-                ) {
+                if self
+                    .literal_pattern_indices
+                    .get(*match_index)
+                    .is_some_and(|bit| *bit)
+                {
                     return MatchFile::Literal;
                 }
             }
@@ -173,19 +172,19 @@ impl MatchFile {}
 #[derive(Debug)]
 pub(crate) struct IncludeFilterBuilder {
     set: GlobSetBuilder,
+    set_len: usize,
     original_patterns: Vec<Box<str>>,
     regexes: Vec<String>,
-    /// For each glob added to `set`, whether it came from a literal include pattern.
-    literal_patterns: BitVec,
-    has_literal_patterns: bool,
+    /// Indices of literal patterns (contain no meta characters).
+    literal_pattern_indices: BitVec,
 }
 
 impl IncludeFilterBuilder {
     pub(crate) fn new() -> Self {
         Self {
-            literal_patterns: BitVec::new(),
-            has_literal_patterns: false,
+            literal_pattern_indices: BitVec::new(),
             set: GlobSetBuilder::new(),
+            set_len: 0,
             original_patterns: Vec::new(),
             regexes: Vec::new(),
         }
@@ -223,7 +222,7 @@ impl IncludeFilterBuilder {
         // Add a glob that matches `lib` exactly, change the glob to `lib/**`.
         if glob_pattern.ends_with("**") {
             self.push_prefix_regex(&glob);
-            self.add_glob(glob, false);
+            self.add_glob(glob);
         } else {
             let prefix_glob = GlobBuilder::new(&format!("{glob_pattern}/**"))
                 .literal_separator(true)
@@ -232,24 +231,29 @@ impl IncludeFilterBuilder {
                 .build()?;
 
             self.push_prefix_regex(&prefix_glob);
-            self.add_glob(prefix_glob, false);
+            self.add_glob(prefix_glob);
 
             // The reason we add the exact glob, e.g. `src` when the original pattern was `src/` is
             // so that `match_file` returns true when matching against a file. However, we don't
             // need to do this if this is a pattern that should only match a directory (specifically, its contents).
             if !only_directory {
                 let is_literal_pattern = globset::escape(glob_pattern) == glob_pattern;
-                self.add_glob(glob, is_literal_pattern);
+
+                if is_literal_pattern {
+                    self.literal_pattern_indices.resize(self.set_len, false);
+                    self.literal_pattern_indices.push(true);
+                }
+
+                self.add_glob(glob);
             }
         }
 
         Ok(self)
     }
 
-    fn add_glob(&mut self, glob: Glob, is_literal_pattern: bool) {
+    fn add_glob(&mut self, glob: Glob) {
         self.set.add(glob);
-        self.literal_patterns.push(is_literal_pattern);
-        self.has_literal_patterns |= is_literal_pattern;
+        self.set_len += 1;
     }
 
     fn push_prefix_regex(&mut self, glob: &Glob) {
@@ -302,8 +306,7 @@ impl IncludeFilterBuilder {
         Ok(IncludeFilter {
             glob_set,
             dfa,
-            literal_patterns: self.literal_patterns.into_boxed_bitslice(),
-            has_literal_patterns: self.has_literal_patterns,
+            literal_pattern_indices: self.literal_pattern_indices.into_boxed_bitslice(),
             original_patterns: self.original_patterns.into(),
             matches: Arc::new(Pool::new(Vec::new)),
         })
