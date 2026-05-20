@@ -108,6 +108,11 @@ impl AstIdsBuilder {
         use_id
     }
 
+    /// Returns the previously-recorded id for `expr`.
+    pub(super) fn expect_use(&self, expr: impl Into<ExpressionNodeKey>) -> ScopedUseId {
+        self.uses_map[&expr.into()]
+    }
+
     pub(super) fn finish(mut self) -> AstIds {
         self.uses_map.shrink_to_fit();
 
