@@ -1961,6 +1961,19 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         .add_type_mappings_from_constraint_set(formal, when, &mut *f)
                         .is_ok()
                     {
+                        if let [formal_signature] = formal_signature.overloads.as_slice()
+                            && let Type::TypeVar(actual_return_typevar) = actual_signature.return_ty
+                            && actual_return_typevar.typevar(self.db).is_self(self.db)
+                            && let Type::TypeVar(formal_return_typevar) = formal_signature.return_ty
+                            && formal_return_typevar.is_inferable(self.db, self.inferable)
+                        {
+                            self.add_type_mapping(
+                                formal_return_typevar,
+                                Type::TypeVar(actual_return_typevar),
+                                TypeVarVariance::Covariant,
+                                &mut *f,
+                            );
+                        }
                         any_satisfiable = true;
                     }
                 }

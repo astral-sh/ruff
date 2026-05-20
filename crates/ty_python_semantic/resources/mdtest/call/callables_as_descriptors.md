@@ -289,6 +289,37 @@ reveal_type(MyClass().method)  # revealed: (...) -> int
 reveal_type(MyClass().method.__name__)  # revealed: str
 ```
 
+## `Self` in methods wrapped by `Callable`-typed decorators
+
+Regression test for <https://github.com/astral-sh/ty/issues/2520>.
+
+When a decorator transforms a method returning `Self` into a `Callable[..., Box[Self]]`, the
+descriptor-binding heuristic should preserve the `Self` relationship after the method is bound to an
+instance.
+
+```py
+from typing import Callable, Generic, Self, TypeVar
+
+_T = TypeVar("_T")
+
+class Box(Generic[_T]):
+    value: _T
+
+    def __init__(self, value: _T) -> None:
+        self.value = value
+
+def boxify(f: Callable[..., _T]) -> Callable[..., Box[_T]]:
+    return lambda *args, **kwargs: Box(f(*args, **kwargs))
+
+class Foo:
+    @boxify
+    def with_decorator(self) -> Self:
+        return self
+
+reveal_type(Foo().with_decorator)  # revealed: (...) -> Box[Foo]
+reveal_type(Foo().with_decorator())  # revealed: Box[Foo]
+```
+
 ## classmethods passed through Callable-returning decorators
 
 The behavior described above is also applied to classmethods. If a method is decorated with
