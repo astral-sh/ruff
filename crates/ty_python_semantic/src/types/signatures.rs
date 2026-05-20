@@ -27,8 +27,8 @@ use crate::types::generics::{
 };
 use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, ProtocolMemberDisjointnessVisitor,
-    ProtocolMemberRelationVisitor, TypeRelation, TypeRelationChecker,
+    HasRelationToVisitor, IsDisjointVisitor, ProtocolMemberVisitors, TypeRelation,
+    TypeRelationChecker,
 };
 use crate::types::typed_dict::{
     UnpackedTypedDictKey, extract_unpacked_typed_dict_keys_from_kwargs_annotation,
@@ -457,15 +457,13 @@ impl<'db> CallableSignature<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let protocol_member_relation_visitor = ProtocolMemberRelationVisitor::default();
-        let protocol_member_disjointness_visitor = ProtocolMemberDisjointnessVisitor::default();
+        let protocol_member_visitors = ProtocolMemberVisitors::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::constraint_set_assignability(
             constraints,
             &relation_visitor,
             &disjointness_visitor,
-            &protocol_member_relation_visitor,
-            &protocol_member_disjointness_visitor,
+            &protocol_member_visitors,
             &materialization_visitor,
         );
         checker.check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
@@ -1120,15 +1118,13 @@ impl<'db> Signature<'db> {
         let constraints = ConstraintSetBuilder::new();
         let relation_visitor = HasRelationToVisitor::default(&constraints);
         let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-        let protocol_member_relation_visitor = ProtocolMemberRelationVisitor::default();
-        let protocol_member_disjointness_visitor = ProtocolMemberDisjointnessVisitor::default();
+        let protocol_member_visitors = ProtocolMemberVisitors::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::constraint_set_assignability_with_context(
             &constraints,
             &relation_visitor,
             &disjointness_visitor,
-            &protocol_member_relation_visitor,
-            &protocol_member_disjointness_visitor,
+            &protocol_member_visitors,
             &materialization_visitor,
         );
 
@@ -1156,15 +1152,13 @@ impl<'db> Signature<'db> {
         let constraints = ConstraintSetBuilder::new();
         let relation_visitor = HasRelationToVisitor::default(&constraints);
         let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-        let protocol_member_relation_visitor = ProtocolMemberRelationVisitor::default();
-        let protocol_member_disjointness_visitor = ProtocolMemberDisjointnessVisitor::default();
+        let protocol_member_visitors = ProtocolMemberVisitors::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::assignability_with_context(
             &constraints,
             &relation_visitor,
             &disjointness_visitor,
-            &protocol_member_relation_visitor,
-            &protocol_member_disjointness_visitor,
+            &protocol_member_visitors,
             &materialization_visitor,
         );
 
@@ -1238,15 +1232,13 @@ impl<'db> Signature<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let protocol_member_relation_visitor = ProtocolMemberRelationVisitor::default();
-        let protocol_member_disjointness_visitor = ProtocolMemberDisjointnessVisitor::default();
+        let protocol_member_visitors = ProtocolMemberVisitors::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::constraint_set_assignability(
             constraints,
             &relation_visitor,
             &disjointness_visitor,
-            &protocol_member_relation_visitor,
-            &protocol_member_disjointness_visitor,
+            &protocol_member_visitors,
             &materialization_visitor,
         );
         checker.check_signature_pair(db, self, other)

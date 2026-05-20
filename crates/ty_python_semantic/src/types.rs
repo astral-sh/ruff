@@ -259,9 +259,7 @@ bitflags! {
 
 impl TypeMappingFlags {
     fn for_protocol_interface() -> Self {
-        let mut flags = Self::default();
-        flags.remove(Self::SIMPLIFY_UNIONS_WITH_TYPE_RELATIONS);
-        flags
+        Self::empty()
     }
 
     const fn union_simplification(self) -> UnionSimplification {

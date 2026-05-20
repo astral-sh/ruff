@@ -32,8 +32,8 @@ use crate::types::generics::{
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
 use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, ProtocolMemberDisjointnessVisitor,
-    ProtocolMemberRelationVisitor, TypeRelation, TypeRelationChecker,
+    HasRelationToVisitor, IsDisjointVisitor, ProtocolMemberVisitors, TypeRelation,
+    TypeRelationChecker,
 };
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleSpec;
@@ -1232,16 +1232,14 @@ impl<'db> ClassType<'db> {
         let constraints = ConstraintSetBuilder::new();
         let relation_visitor = HasRelationToVisitor::default(&constraints);
         let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-        let protocol_member_relation_visitor = ProtocolMemberRelationVisitor::default();
-        let protocol_member_disjointness_visitor = ProtocolMemberDisjointnessVisitor::default();
+        let protocol_member_visitors = ProtocolMemberVisitors::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::subtyping(
             &constraints,
             InferableTypeVars::None,
             &relation_visitor,
             &disjointness_visitor,
-            &protocol_member_relation_visitor,
-            &protocol_member_disjointness_visitor,
+            &protocol_member_visitors,
             &materialization_visitor,
         );
         checker
