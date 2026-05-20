@@ -189,6 +189,31 @@ impl<'src> Parser<'src> {
         }
     }
 
+    fn parse_named_expression_or_higher_unrolling_nested_trailers(
+        &mut self,
+        context: ExpressionContext,
+    ) -> ParsedExpr {
+        if !self.at(TokenKind::Name) {
+            return self.parse_named_expression_or_higher(context);
+        }
+
+        let start = self.node_start();
+        let lhs = self.parse_atom();
+        let lhs = match self.current_token_kind() {
+            TokenKind::Lpar => {
+                Expr::Call(self.parse_call_expression_unrolling_nested_calls(lhs.expr, start))
+                    .into()
+            }
+            TokenKind::Lsqb => Expr::Subscript(
+                self.parse_subscript_expression_unrolling_nested_subscripts(lhs.expr, start),
+            )
+            .into(),
+            _ => lhs,
+        };
+
+        self.parse_named_expression_or_higher_from_lhs(lhs, start, context)
+    }
+
     fn parse_named_expression_or_higher_from_lhs(
         &mut self,
         lhs: ParsedExpr,
@@ -838,10 +863,30 @@ impl<'src> Parser<'src> {
         let arguments_start = self.node_start();
         self.bump(TokenKind::Lpar);
 
+        self.parse_call_expression_after_lpar(func, start, arguments_start)
+    }
+
+    fn parse_call_expression_unrolling_nested_calls(
+        &mut self,
+        func: Expr,
+        start: TextSize,
+    ) -> ast::ExprCall {
+        let arguments_start = self.node_start();
+        self.bump(TokenKind::Lpar);
+
         if self.at(TokenKind::Name) && self.peek() == TokenKind::Lpar {
             return self.parse_nested_call_expression(func, start, arguments_start);
         }
 
+        self.parse_call_expression_after_lpar(func, start, arguments_start)
+    }
+
+    fn parse_call_expression_after_lpar(
+        &mut self,
+        func: Expr,
+        start: TextSize,
+        arguments_start: TextSize,
+    ) -> ast::ExprCall {
         let arguments = self.parse_arguments_after_lpar(arguments_start);
 
         ast::ExprCall {
@@ -955,7 +1000,9 @@ impl<'src> Parser<'src> {
                 } else {
                     let start = parser.node_start();
                     let mut parsed_expr = parser
-                        .parse_named_expression_or_higher(ExpressionContext::starred_conditional());
+                        .parse_named_expression_or_higher_unrolling_nested_trailers(
+                            ExpressionContext::starred_conditional(),
+                        );
 
                     match parser.current_token_kind() {
                         TokenKind::Async | TokenKind::For => {
@@ -1122,8 +1169,9 @@ impl<'src> Parser<'src> {
             state.seen_keyword_unpacking = true;
         } else {
             let start = self.node_start();
-            let parsed_expr =
-                self.parse_named_expression_or_higher(ExpressionContext::starred_conditional());
+            let parsed_expr = self.parse_named_expression_or_higher_unrolling_nested_trailers(
+                ExpressionContext::starred_conditional(),
+            );
 
             self.parse_argument_from_expression(state, argument_start, start, parsed_expr);
         }
@@ -1249,6 +1297,17 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#subscriptions>
     fn parse_subscript_expression(&mut self, value: Expr, start: TextSize) -> ast::ExprSubscript {
+        self.bump(TokenKind::Lsqb);
+
+        let slice_start = self.node_start();
+        self.parse_subscript_expression_after_lsqb(value, start, slice_start)
+    }
+
+    fn parse_subscript_expression_unrolling_nested_subscripts(
+        &mut self,
+        value: Expr,
+        start: TextSize,
+    ) -> ast::ExprSubscript {
         self.bump(TokenKind::Lsqb);
 
         let slice_start = self.node_start();
@@ -1445,8 +1504,9 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
 
         if self.at_expr() {
-            let lower =
-                self.parse_named_expression_or_higher(ExpressionContext::starred_conditional());
+            let lower = self.parse_named_expression_or_higher_unrolling_nested_trailers(
+                ExpressionContext::starred_conditional(),
+            );
             self.parse_slice_from_lower(start, lower)
         } else {
             self.finish_slice(start, None)
