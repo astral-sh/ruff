@@ -9,7 +9,6 @@ Written by:   Fred L. Drake, Jr.
 Email:        <fdrake@acm.org>
 """
 
-import sys
 from collections.abc import Mapping
 from distutils.ccompiler import CCompiler
 from typing import Final, Literal, overload
@@ -97,10 +96,3 @@ def customize_compiler(compiler: CCompiler) -> None:
     Mainly needed on Unix, so we can plug in the information that
     varies across Unices and is stored in Python's Makefile.
     """
-
-if sys.version_info < (3, 10):
-    def get_python_version() -> str:
-        """Return a string containing the major and minor Python version,
-        leaving off the patchlevel.  Sample return values could be '1.5'
-        or '2.2'.
-        """

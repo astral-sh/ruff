@@ -5,13 +5,12 @@ import types
 from _collections_abc import dict_keys, dict_values
 from _typeshed import StrPath
 from collections.abc import Iterable, Iterator, Mapping
-from email.message import Message
 from importlib.abc import MetaPathFinder
+from importlib.metadata._meta import PackageMetadata as PackageMetadata, SimplePath
 from os import PathLike
-from pathlib import Path
 from re import Pattern
-from typing import Any, ClassVar, Generic, NamedTuple, TypeVar, overload, type_check_only
-from typing_extensions import Self, TypeAlias, deprecated, disjoint_base
+from typing import Any, ClassVar, Generic, NamedTuple, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import Self, deprecated, disjoint_base
 
 _T = TypeVar("_T")
 _KT = TypeVar("_KT")
@@ -20,42 +19,42 @@ _VT = TypeVar("_VT")
 __all__ = [
     "Distribution",
     "DistributionFinder",
+    "PackageMetadata",
     "PackageNotFoundError",
     "distribution",
     "distributions",
     "entry_points",
     "files",
     "metadata",
+    "packages_distributions",
     "requires",
     "version",
 ]
 
-if sys.version_info >= (3, 10):
-    __all__ += ["PackageMetadata", "packages_distributions"]
+if sys.version_info >= (3, 15):
+    __all__ += ["PackagePath", "MetadataNotFound", "SimplePath"]
 
-if sys.version_info >= (3, 10):
-    from importlib.metadata._meta import PackageMetadata as PackageMetadata, SimplePath
-    def packages_distributions() -> Mapping[str, list[str]]:
-        """
-        Return a mapping of top-level packages to their
-        distributions.
+_SimplePath: TypeAlias = SimplePath
 
-        >>> import collections.abc
-        >>> pkgs = packages_distributions()
-        >>> all(isinstance(dist, collections.abc.Sequence) for dist in pkgs.values())
-        True
-        """
-    _SimplePath: TypeAlias = SimplePath
+def packages_distributions() -> Mapping[str, list[str]]:
+    """
+    Return a mapping of top-level packages to their
+    distributions.
 
-else:
-    _SimplePath: TypeAlias = Path
+    >>> import collections.abc
+    >>> pkgs = packages_distributions()
+    >>> all(isinstance(dist, collections.abc.Sequence) for dist in pkgs.values())
+    True
+    """
 
 class PackageNotFoundError(ModuleNotFoundError):
     """The package was not found."""
 
     @property
-    def name(self) -> str:  # type: ignore[override]
-        """module name"""
+    def name(self) -> str: ...  # type: ignore[override]
+
+if sys.version_info >= (3, 15):
+    class MetadataNotFound(FileNotFoundError): ...
 
 if sys.version_info >= (3, 13):
     _EntryPointBase = object
@@ -193,37 +192,36 @@ else:
         def module(self) -> str: ...
         @property
         def attr(self) -> str: ...
-        if sys.version_info >= (3, 10):
-            dist: ClassVar[Distribution | None]
-            def matches(
-                self,
-                *,
-                name: str = ...,
-                value: str = ...,
-                group: str = ...,
-                module: str = ...,
-                attr: str = ...,
-                extras: list[str] = ...,
-            ) -> bool:  # undocumented
-                """
-                EntryPoint matches the given parameters.
+        dist: ClassVar[Distribution | None]
+        def matches(
+            self,
+            *,
+            name: str = ...,
+            value: str = ...,
+            group: str = ...,
+            module: str = ...,
+            attr: str = ...,
+            extras: list[str] = ...,
+        ) -> bool:  # undocumented
+            """
+            EntryPoint matches the given parameters.
 
-                >>> ep = EntryPoint(group='foo', name='bar', value='bing:bong [extra1, extra2]')
-                >>> ep.matches(group='foo')
-                True
-                >>> ep.matches(name='bar', value='bing:bong [extra1, extra2]')
-                True
-                >>> ep.matches(group='foo', name='other')
-                False
-                >>> ep.matches()
-                True
-                >>> ep.matches(extras=['extra1', 'extra2'])
-                True
-                >>> ep.matches(module='bing')
-                True
-                >>> ep.matches(attr='bong')
-                True
-                """
+            >>> ep = EntryPoint(group='foo', name='bar', value='bing:bong [extra1, extra2]')
+            >>> ep.matches(group='foo')
+            True
+            >>> ep.matches(name='bar', value='bing:bong [extra1, extra2]')
+            True
+            >>> ep.matches(group='foo', name='other')
+            False
+            >>> ep.matches()
+            True
+            >>> ep.matches(extras=['extra1', 'extra2'])
+            True
+            >>> ep.matches(module='bing')
+            True
+            >>> ep.matches(attr='bong')
+            True
+            """
 
         def __hash__(self) -> int: ...
         def __iter__(self) -> Iterator[Any]:  # result of iter((str, Self)), really
@@ -270,7 +268,7 @@ if sys.version_info >= (3, 12):
             Return the set of all groups of all entry points.
             """
 
-elif sys.version_info >= (3, 10):
+else:
     class DeprecatedList(list[_T]):
         """
         Allow an otherwise immutable object to implement mutability
@@ -348,7 +346,7 @@ elif sys.version_info >= (3, 10):
             set()
             """
 
-if sys.version_info >= (3, 10) and sys.version_info < (3, 12):
+if sys.version_info < (3, 12):
     class Deprecated(Generic[_KT, _VT]):
         """
         Compatibility add-in for mapping to indicate that
@@ -434,7 +432,9 @@ class FileHash:
     value: str
     def __init__(self, spec: str) -> None: ...
 
-if sys.version_info >= (3, 12):
+if sys.version_info >= (3, 15):
+    _distribution_parent = abc.ABC
+elif sys.version_info >= (3, 12):
     class DeprecatedNonAbstract: ...
     _distribution_parent = DeprecatedNonAbstract
 else:
@@ -518,38 +518,27 @@ class Distribution(_distribution_parent):
         :param path: a string or path-like object
         :return: a concrete Distribution instance for the path
         """
-    if sys.version_info >= (3, 10):
-        @property
-        def metadata(self) -> PackageMetadata:
-            """Return the parsed metadata for this Distribution.
 
-            The returned object will have keys that name the various bits of
-            metadata per the
-            `Core metadata specifications <https://packaging.python.org/en/latest/specifications/core-metadata/#core-metadata>`_.
+    @property
+    def metadata(self) -> PackageMetadata:
+        """Return the parsed metadata for this Distribution.
 
-            Custom providers may provide the METADATA file or override this
-            property.
-            """
+        The returned object will have keys that name the various bits of
+        metadata per the
+        `Core metadata specifications <https://packaging.python.org/en/latest/specifications/core-metadata/#core-metadata>`_.
 
-        @property
-        def entry_points(self) -> EntryPoints:
-            """
-            Return EntryPoints for this distribution.
+        Custom providers may provide the METADATA file or override this
+        property.
+        """
 
-            Custom providers may provide the ``entry_points.txt`` file
-            or override this property.
-            """
-    else:
-        @property
-        def metadata(self) -> Message:
-            """Return the parsed metadata for this Distribution.
+    @property
+    def entry_points(self) -> EntryPoints:
+        """
+        Return EntryPoints for this distribution.
 
-            The returned object will have keys that name the various bits of
-            metadata.  See PEP 566 for details.
-            """
-
-        @property
-        def entry_points(self) -> list[EntryPoint]: ...
+        Custom providers may provide the ``entry_points.txt`` file
+        or override this property.
+        """
 
     @property
     def version(self) -> str:
@@ -574,10 +563,10 @@ class Distribution(_distribution_parent):
     @property
     def requires(self) -> list[str] | None:
         """Generated requirements specified for this Distribution"""
-    if sys.version_info >= (3, 10):
-        @property
-        def name(self) -> str:
-            """Return the 'Name' metadata for the distribution package."""
+
+    @property
+    def name(self) -> str:
+        """Return the 'Name' metadata for the distribution package."""
     if sys.version_info >= (3, 13):
         @property
         def origin(self) -> types.SimpleNamespace | None: ...
@@ -649,7 +638,7 @@ class MetadataPathFinder(DistributionFinder):
     if sys.version_info >= (3, 11):
         @classmethod
         def invalidate_caches(cls) -> None: ...
-    elif sys.version_info >= (3, 10):
+    else:
         # Yes, this is an instance method that has a parameter named "cls"
         def invalidate_caches(cls) -> None: ...
 
@@ -703,22 +692,12 @@ def distributions(*, context: DistributionFinder.Context) -> Iterable[Distributi
 def distributions(
     *, context: None = None, name: str | None = ..., path: list[str] = ..., **kwargs: Any
 ) -> Iterable[Distribution]: ...
+def metadata(distribution_name: str) -> PackageMetadata:
+    """Get the metadata for the named package.
 
-if sys.version_info >= (3, 10):
-    def metadata(distribution_name: str) -> PackageMetadata:
-        """Get the metadata for the named package.
-
-        :param distribution_name: The name of the distribution package to query.
-        :return: A PackageMetadata containing the parsed metadata.
-        """
-
-else:
-    def metadata(distribution_name: str) -> Message:
-        """Get the metadata for the named package.
-
-        :param distribution_name: The name of the distribution package to query.
-        :return: An email.Message containing the parsed metadata.
-        """
+    :param distribution_name: The name of the distribution package to query.
+    :return: A PackageMetadata containing the parsed metadata.
+    """
 
 if sys.version_info >= (3, 12):
     def entry_points(
@@ -733,7 +712,7 @@ if sys.version_info >= (3, 12):
         :return: EntryPoints for all installed packages.
         """
 
-elif sys.version_info >= (3, 10):
+else:
     @overload
     def entry_points() -> SelectableGroups:
         """Return EntryPoint objects for all installed packages.
@@ -757,13 +736,6 @@ elif sys.version_info >= (3, 10):
     def entry_points(
         *, name: str = ..., value: str = ..., group: str = ..., module: str = ..., attr: str = ..., extras: list[str] = ...
     ) -> EntryPoints: ...
-
-else:
-    def entry_points() -> dict[str, list[EntryPoint]]:
-        """Return EntryPoint objects for all installed packages.
-
-        :return: EntryPoint objects for all installed packages.
-        """
 
 def version(distribution_name: str) -> str:
     """Get the version string for the named package.

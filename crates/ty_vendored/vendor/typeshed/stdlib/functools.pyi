@@ -5,8 +5,21 @@ import types
 from _typeshed import SupportsAllComparisons, SupportsItems
 from collections.abc import Callable, Hashable, Iterable, Sized
 from types import GenericAlias
-from typing import Any, Final, Generic, Literal, NamedTuple, TypedDict, TypeVar, final, overload, type_check_only
-from typing_extensions import ParamSpec, Self, TypeAlias, disjoint_base
+from typing import (
+    Any,
+    Final,
+    Generic,
+    Literal,
+    NamedTuple,
+    ParamSpec,
+    TypeAlias,
+    TypedDict,
+    TypeVar,
+    final,
+    overload,
+    type_check_only,
+)
+from typing_extensions import Self, disjoint_base
 
 __all__ = [
     "update_wrapper",

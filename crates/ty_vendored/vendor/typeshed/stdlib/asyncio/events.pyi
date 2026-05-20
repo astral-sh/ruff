@@ -14,8 +14,8 @@ from collections.abc import Callable, Sequence
 from concurrent.futures import Executor
 from contextvars import Context
 from socket import AddressFamily, AddressInfo, SocketKind, _Address, _RetAddress, socket
-from typing import IO, Any, Literal, Protocol, TypeVar, overload, type_check_only
-from typing_extensions import Self, TypeAlias, TypeVarTuple, Unpack, deprecated
+from typing import IO, Any, Literal, Protocol, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import Self, TypeVarTuple, Unpack, deprecated
 
 from . import _AwaitableLike, _CoroutineLike
 from .base_events import Server
@@ -748,7 +748,7 @@ class AbstractEventLoop:
             This method is a coroutine.  When completed, the coroutine
             returns a (transport, protocol) pair.
             """
-    elif sys.version_info >= (3, 10):
+    else:
         async def connect_accepted_socket(
             self,
             protocol_factory: Callable[[], _ProtocolT],
@@ -985,18 +985,12 @@ else:
         @abstractmethod
         def new_event_loop(self) -> AbstractEventLoop: ...
         # Child processes handling (Unix only).
-        if sys.version_info >= (3, 12):
-            @abstractmethod
-            @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
-            def get_child_watcher(self) -> AbstractChildWatcher: ...
-            @abstractmethod
-            @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
-            def set_child_watcher(self, watcher: AbstractChildWatcher) -> None: ...
-        else:
-            @abstractmethod
-            def get_child_watcher(self) -> AbstractChildWatcher: ...
-            @abstractmethod
-            def set_child_watcher(self, watcher: AbstractChildWatcher) -> None: ...
+        @abstractmethod
+        @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
+        def get_child_watcher(self) -> AbstractChildWatcher: ...
+        @abstractmethod
+        @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
+        def set_child_watcher(self, watcher: AbstractChildWatcher) -> None: ...
 
     AbstractEventLoopPolicy = _AbstractEventLoopPolicy
 
@@ -1070,20 +1064,16 @@ if sys.version_info >= (3, 14):
         If policy is None, the default policy is restored.
         """
 
-    @deprecated("Deprecated since Python 3.14; will be removed in Python 3.16.")
-    def get_event_loop_policy() -> _AbstractEventLoopPolicy: ...
-    @deprecated("Deprecated since Python 3.14; will be removed in Python 3.16.")
-    def set_event_loop_policy(policy: _AbstractEventLoopPolicy | None) -> None: ...
+@deprecated("Deprecated since Python 3.14; will be removed in Python 3.16.")
+def get_event_loop_policy() -> _AbstractEventLoopPolicy:
+    """Get the current event loop policy."""
 
-else:
-    def get_event_loop_policy() -> _AbstractEventLoopPolicy:
-        """Get the current event loop policy."""
+@deprecated("Deprecated since Python 3.14; will be removed in Python 3.16.")
+def set_event_loop_policy(policy: _AbstractEventLoopPolicy | None) -> None:
+    """Set the current event loop policy.
 
-    def set_event_loop_policy(policy: _AbstractEventLoopPolicy | None) -> None:
-        """Set the current event loop policy.
-
-        If policy is None, the default policy is restored.
-        """
+    If policy is None, the default policy is restored.
+    """
 
 def set_event_loop(loop: AbstractEventLoop | None) -> None:
     """Equivalent to calling get_event_loop_policy().set_event_loop(loop)."""
@@ -1092,21 +1082,12 @@ def new_event_loop() -> AbstractEventLoop:
     """Equivalent to calling get_event_loop_policy().new_event_loop()."""
 
 if sys.version_info < (3, 14):
-    if sys.version_info >= (3, 12):
-        @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
-        def get_child_watcher() -> AbstractChildWatcher:
-            """Equivalent to calling get_event_loop_policy().get_child_watcher()."""
+    @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
+    def get_child_watcher() -> AbstractChildWatcher:
+        """Equivalent to calling get_event_loop_policy().get_child_watcher()."""
 
-        @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
-        def set_child_watcher(watcher: AbstractChildWatcher) -> None:
-            """Equivalent to calling
-            get_event_loop_policy().set_child_watcher(watcher).
-            """
-    else:
-        def get_child_watcher() -> AbstractChildWatcher:
-            """Equivalent to calling get_event_loop_policy().get_child_watcher()."""
-
-        def set_child_watcher(watcher: AbstractChildWatcher) -> None:
-            """Equivalent to calling
-            get_event_loop_policy().set_child_watcher(watcher).
-            """
+    @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
+    def set_child_watcher(watcher: AbstractChildWatcher) -> None:
+        """Equivalent to calling
+        get_event_loop_policy().set_child_watcher(watcher).
+        """

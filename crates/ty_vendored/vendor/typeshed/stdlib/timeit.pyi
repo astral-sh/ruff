@@ -46,10 +46,10 @@ Functions:
     default_timer() -> float
 """
 
+import sys
 import time
 from collections.abc import Callable, Sequence
-from typing import IO, Any
-from typing_extensions import TypeAlias
+from typing import IO, Any, TypeAlias
 
 __all__ = ["Timer", "timeit", "repeat", "default_timer"]
 
@@ -134,17 +134,21 @@ class Timer:
         interested in.  After that, you should look at the entire
         vector and apply common sense rather than statistics.
         """
+    if sys.version_info >= (3, 15):
+        def autorange(
+            self, callback: Callable[[int, float], object] | None = None, target_time: float = 0.2
+        ) -> tuple[int, float]: ...
+    else:
+        def autorange(self, callback: Callable[[int, float], object] | None = None) -> tuple[int, float]:
+            """Return the number of loops and time taken so that total time >= 0.2.
 
-    def autorange(self, callback: Callable[[int, float], object] | None = None) -> tuple[int, float]:
-        """Return the number of loops and time taken so that total time >= 0.2.
+            Calls the timeit method with increasing numbers from the sequence
+            1, 2, 5, 10, 20, 50, ... until the time taken is at least 0.2
+            second.  Returns (number, time_taken).
 
-        Calls the timeit method with increasing numbers from the sequence
-        1, 2, 5, 10, 20, 50, ... until the time taken is at least 0.2
-        second.  Returns (number, time_taken).
-
-        If *callback* is given and is not None, it will be called after
-        each trial with two arguments: ``callback(number, time_taken)``.
-        """
+            If *callback* is given and is not None, it will be called after
+            each trial with two arguments: ``callback(number, time_taken)``.
+            """
 
 def timeit(
     stmt: _Stmt = "pass",

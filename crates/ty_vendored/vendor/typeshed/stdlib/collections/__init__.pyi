@@ -17,25 +17,24 @@ list, set, and tuple.
 import sys
 from _collections_abc import dict_items, dict_keys, dict_values
 from _typeshed import SupportsItems, SupportsKeysAndGetItem, SupportsRichComparison, SupportsRichComparisonT
+from collections.abc import (
+    Callable,
+    ItemsView,
+    Iterable,
+    Iterator,
+    KeysView,
+    Mapping,
+    MutableMapping,
+    MutableSequence,
+    Sequence,
+    ValuesView,
+)
 from types import GenericAlias
 from typing import Any, ClassVar, Generic, NoReturn, SupportsIndex, TypeVar, final, overload, type_check_only
 from typing_extensions import Self, disjoint_base
 
-if sys.version_info >= (3, 10):
-    from collections.abc import (
-        Callable,
-        ItemsView,
-        Iterable,
-        Iterator,
-        KeysView,
-        Mapping,
-        MutableMapping,
-        MutableSequence,
-        Sequence,
-        ValuesView,
-    )
-else:
-    from _collections_abc import *
+if sys.version_info >= (3, 15):
+    from builtins import frozendict
 
 __all__ = ["ChainMap", "Counter", "OrderedDict", "UserDict", "UserList", "UserString", "defaultdict", "deque", "namedtuple"]
 
@@ -508,17 +507,32 @@ class Counter(dict[_T, int], Generic[_T]):
     def update(self, iterable: Iterable[_T], /, **kwargs: int) -> None: ...
     @overload
     def update(self, iterable: None = None, /, **kwargs: int) -> None: ...
+    def total(self) -> int:
+        """Sum of the counts"""
+
     def __missing__(self, key: _T) -> int:
         """The count of elements not in the Counter is zero."""
 
     def __delitem__(self, elem: object) -> None:
         """Like dict.__delitem__() but does not raise KeyError for missing values."""
-    if sys.version_info >= (3, 10):
-        def __eq__(self, other: object) -> bool:
-            """True if all counts agree. Missing counts are treated as zero."""
 
-        def __ne__(self, other: object) -> bool:
-            """True if any counts disagree. Missing counts are treated as zero."""
+    def __eq__(self, other: object) -> bool:
+        """True if all counts agree. Missing counts are treated as zero."""
+
+    def __ne__(self, other: object) -> bool:
+        """True if any counts disagree. Missing counts are treated as zero."""
+
+    def __le__(self, other: Counter[Any]) -> bool:
+        """True if all counts in self are a subset of those in other."""
+
+    def __lt__(self, other: Counter[Any]) -> bool:
+        """True if all counts in self are a proper subset of those in other."""
+
+    def __ge__(self, other: Counter[Any]) -> bool:
+        """True if all counts in self are a superset of those in other."""
+
+    def __gt__(self, other: Counter[Any]) -> bool:
+        """True if all counts in self are a proper superset of those in other."""
 
     def __add__(self, other: Counter[_S]) -> Counter[_T | _S]:
         """Add counts from two counters.
@@ -551,6 +565,8 @@ class Counter(dict[_T, int], Generic[_T]):
         Counter({'b': 3, 'c': 2, 'a': 1})
 
         """
+    if sys.version_info >= (3, 15):
+        def __xor__(self, other: Counter[_S]) -> Counter[_T | _S]: ...  # type: ignore[override]
 
     def __pos__(self) -> Counter[_T]:
         """Adds an empty counter, effectively stripping negative and zero counts"""
@@ -600,21 +616,8 @@ class Counter(dict[_T, int], Generic[_T]):
         Counter({'b': 3, 'c': 2, 'a': 1})
 
         """
-    if sys.version_info >= (3, 10):
-        def total(self) -> int:
-            """Sum of the counts"""
-
-        def __le__(self, other: Counter[Any]) -> bool:
-            """True if all counts in self are a subset of those in other."""
-
-        def __lt__(self, other: Counter[Any]) -> bool:
-            """True if all counts in self are a proper subset of those in other."""
-
-        def __ge__(self, other: Counter[Any]) -> bool:
-            """True if all counts in self are a superset of those in other."""
-
-        def __gt__(self, other: Counter[Any]) -> bool:
-            """True if all counts in self are a proper superset of those in other."""
+    if sys.version_info >= (3, 15):
+        def __ixor__(self, other: Counter[_T]) -> Self: ...  # type: ignore[misc]
 
 # The pure-Python implementations of the "views" classes
 # These are exposed at runtime in `collections/__init__.py`
@@ -706,18 +709,30 @@ class OrderedDict(dict[_KT, _VT]):
     @overload
     def pop(self, key: _KT, default: _T) -> _VT | _T: ...
     def __eq__(self, value: object, /) -> bool: ...
-    @overload
-    def __or__(self, value: dict[_KT, _VT], /) -> Self:
-        """Return self|value."""
+    if sys.version_info >= (3, 15):
+        @overload
+        def __or__(self, value: dict[_KT, _VT] | frozendict[_KT, _VT], /) -> Self: ...
+        @overload
+        def __or__(self, value: dict[_T1, _T2] | frozendict[_T1, _T2], /) -> OrderedDict[_KT | _T1, _VT | _T2]: ...
+        @overload  # type: ignore[override]
+        def __ror__(self, value: dict[_KT, _VT] | frozendict[_KT, _VT], /) -> Self: ...  # type: ignore[override,misc]
+        @overload
+        def __ror__(  # type: ignore[misc]
+            self, value: dict[_T1, _T2] | frozendict[_T1, _T2], /
+        ) -> OrderedDict[_KT | _T1, _VT | _T2]: ...
+    else:
+        @overload
+        def __or__(self, value: dict[_KT, _VT], /) -> Self:
+            """Return self|value."""
 
-    @overload
-    def __or__(self, value: dict[_T1, _T2], /) -> OrderedDict[_KT | _T1, _VT | _T2]: ...
-    @overload
-    def __ror__(self, value: dict[_KT, _VT], /) -> Self:
-        """Return value|self."""
+        @overload
+        def __or__(self, value: dict[_T1, _T2], /) -> OrderedDict[_KT | _T1, _VT | _T2]: ...
+        @overload
+        def __ror__(self, value: dict[_KT, _VT], /) -> Self:
+            """Return value|self."""
 
-    @overload
-    def __ror__(self, value: dict[_T1, _T2], /) -> OrderedDict[_KT | _T1, _VT | _T2]: ...  # type: ignore[misc]
+        @overload
+        def __ror__(self, value: dict[_T1, _T2], /) -> OrderedDict[_KT | _T1, _VT | _T2]: ...  # type: ignore[misc]
 
 @disjoint_base
 class defaultdict(dict[_KT, _VT]):
@@ -778,14 +793,15 @@ class defaultdict(dict[_KT, _VT]):
 
     def copy(self) -> Self:
         """D.copy() -> a shallow copy of D."""
-
-    @overload
+    # defaultdict rejects frozendict in its direct __or__/__ror__ methods, even though dict accepts it.
+    # See https://github.com/python/cpython/issues/149534.
+    @overload  # type: ignore[override]
     def __or__(self, value: dict[_KT, _VT], /) -> Self:
         """Return self|value."""
 
     @overload
     def __or__(self, value: dict[_T1, _T2], /) -> defaultdict[_KT | _T1, _VT | _T2]: ...
-    @overload
+    @overload  # type: ignore[override]
     def __ror__(self, value: dict[_KT, _VT], /) -> Self:
         """Return value|self."""
 

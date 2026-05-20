@@ -8,11 +8,14 @@ import sys
 from _typeshed import ReadableBuffer, SupportsRead, SupportsWrite
 from collections.abc import Iterable, MutableSequence
 from types import GenericAlias
-from typing import Any, ClassVar, Literal, SupportsIndex, TypeVar, overload
-from typing_extensions import Self, TypeAlias, deprecated, disjoint_base
+from typing import Any, ClassVar, Literal, SupportsIndex, TypeAlias, TypeVar, overload
+from typing_extensions import Self, deprecated, disjoint_base
 
 _IntTypeCode: TypeAlias = Literal["b", "B", "h", "H", "i", "I", "l", "L", "q", "Q"]
-_FloatTypeCode: TypeAlias = Literal["f", "d"]
+if sys.version_info >= (3, 15):
+    _FloatTypeCode: TypeAlias = Literal["f", "d", "e", "Zf", "Zd"]
+else:
+    _FloatTypeCode: TypeAlias = Literal["f", "d"]
 if sys.version_info >= (3, 13):
     _UnicodeTypeCode: TypeAlias = Literal["u", "w"]
 else:
@@ -21,7 +24,10 @@ _TypeCode: TypeAlias = _IntTypeCode | _FloatTypeCode | _UnicodeTypeCode
 
 _T = TypeVar("_T", int, float, str)
 
-typecodes: str
+if sys.version_info >= (3, 15):
+    typecodes: tuple[str, ...]
+else:
+    typecodes: str
 
 @disjoint_base
 class array(MutableSequence[_T]):
@@ -159,15 +165,12 @@ class array(MutableSequence[_T]):
         Use array.frombytes(ustr.encode(...)) to append Unicode data to an array of
         some other type.
         """
-    if sys.version_info >= (3, 10):
-        def index(self, v: _T, start: int = 0, stop: int = sys.maxsize, /) -> int:
-            """Return index of first occurrence of v in the array.
 
-            Raise ValueError if the value is not present.
-            """
-    else:
-        def index(self, v: _T, /) -> int:  # type: ignore[override]
-            """Return index of first occurrence of v in the array."""
+    def index(self, v: _T, start: int = 0, stop: int = sys.maxsize, /) -> int:
+        """Return index of first occurrence of v in the array.
+
+        Raise ValueError if the value is not present.
+        """
 
     def insert(self, i: int, v: _T, /) -> None:
         """Insert a new item v into the array before position i."""

@@ -6,8 +6,8 @@ use ruff_text_size::Ranged;
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
-    note_py_version_too_old_for_pep_604, report_invalid_argument_number_to_special_form,
-    report_invalid_arguments_to_callable, report_invalid_concatenate_last_arg,
+    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
+    report_invalid_concatenate_last_arg,
 };
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
@@ -312,16 +312,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                         let python_version =
                                             Program::get(self.db()).python_version(self.db());
 
-                                        if python_version < PythonVersion::PY310
-                                            && !binary.left.is_string_literal_expr()
-                                            && !binary.right.is_string_literal_expr()
-                                        {
-                                            note_py_version_too_old_for_pep_604(
-                                                self.db(),
-                                                self.index,
-                                                &mut diagnostic,
-                                            );
-                                        } else if python_version < PythonVersion::PY314 {
+                                        if python_version < PythonVersion::PY314 {
                                             diagnostic.info(format_args!(
                                                 "All {}s are evaluated at \
                                                 runtime by default on Python <3.14",

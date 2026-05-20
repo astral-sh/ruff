@@ -33,8 +33,8 @@ import sys
 from _typeshed import MaybeNone
 from collections.abc import Callable, Iterable, Iterator
 from types import GenericAlias
-from typing import Any, Generic, Literal, SupportsComplex, SupportsFloat, SupportsIndex, SupportsInt, TypeVar, overload
-from typing_extensions import Self, TypeAlias, disjoint_base
+from typing import Any, Generic, Literal, SupportsComplex, SupportsFloat, SupportsIndex, SupportsInt, TypeAlias, TypeVar, overload
+from typing_extensions import Self, disjoint_base
 
 _T = TypeVar("_T")
 _S = TypeVar("_S")
@@ -525,20 +525,19 @@ class combinations_with_replacement(Generic[_T_co]):
     def __next__(self) -> _T_co:
         """Implement next(self)."""
 
-if sys.version_info >= (3, 10):
-    @disjoint_base
-    class pairwise(Generic[_T_co]):
-        """Return an iterator of overlapping pairs taken from the input iterator.
+@disjoint_base
+class pairwise(Generic[_T_co]):
+    """Return an iterator of overlapping pairs taken from the input iterator.
 
-        s -> (s0,s1), (s1,s2), (s2, s3), ...
-        """
+    s -> (s0,s1), (s1,s2), (s2, s3), ...
+    """
 
-        def __new__(cls, iterable: Iterable[_T], /) -> pairwise[tuple[_T, _T]]: ...
-        def __iter__(self) -> Self:
-            """Implement iter(self)."""
+    def __new__(cls, iterable: Iterable[_T], /) -> pairwise[tuple[_T, _T]]: ...
+    def __iter__(self) -> Self:
+        """Implement iter(self)."""
 
-        def __next__(self) -> _T_co:
-            """Implement next(self)."""
+    def __next__(self) -> _T_co:
+        """Implement next(self)."""
 
 if sys.version_info >= (3, 12):
     @disjoint_base

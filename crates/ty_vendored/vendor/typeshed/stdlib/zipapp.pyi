@@ -1,7 +1,6 @@
 from collections.abc import Callable
 from pathlib import Path
-from typing import BinaryIO
-from typing_extensions import TypeAlias
+from typing import BinaryIO, TypeAlias
 
 __all__ = ["ZipAppError", "create_archive", "get_interpreter"]
 

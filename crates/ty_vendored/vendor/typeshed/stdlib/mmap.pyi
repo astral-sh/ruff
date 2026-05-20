@@ -15,8 +15,7 @@ ALLOCATIONGRANULARITY: Final[int]
 if sys.platform == "linux":
     MAP_DENYWRITE: Final[int]
     MAP_EXECUTABLE: Final[int]
-    if sys.version_info >= (3, 10):
-        MAP_POPULATE: Final[int]
+    MAP_POPULATE: Final[int]
 if sys.version_info >= (3, 11) and sys.platform != "win32" and sys.platform != "darwin":
     MAP_STACK: Final[int]
 
@@ -28,6 +27,10 @@ if sys.platform != "win32":
     PROT_EXEC: Final[int]
     PROT_READ: Final[int]
     PROT_WRITE: Final[int]
+    if sys.version_info >= (3, 15):
+        MS_ASYNC: Final[int]
+        MS_INVALIDATE: Final[int]
+        MS_SYNC: Final[int]
 
 PAGESIZE: Final[int]
 
@@ -57,7 +60,19 @@ class mmap:
     """
 
     if sys.platform == "win32":
-        def __new__(cls, fileno: int, length: int, tagname: str | None = None, access: int = 0, offset: int = 0) -> Self: ...
+        if sys.version_info >= (3, 15):
+            def __new__(
+                cls,
+                fileno: int,
+                length: int,
+                tagname: str | None = None,
+                access: int = 0,
+                offset: int = 0,
+                *,
+                trackfd: bool = True,
+            ) -> Self: ...
+        else:
+            def __new__(cls, fileno: int, length: int, tagname: str | None = None, access: int = 0, offset: int = 0) -> Self: ...
     else:
         if sys.version_info >= (3, 13):
             def __new__(
@@ -77,11 +92,16 @@ class mmap:
             ) -> Self: ...
 
     def close(self) -> None: ...
-    def flush(self, offset: int = 0, size: int = ..., /) -> None: ...
+    if sys.version_info >= (3, 15):
+        def flush(self, offset: int = 0, size: int = ..., /, *, flags: int = 0) -> None: ...
+    else:
+        def flush(self, offset: int = 0, size: int = ..., /) -> None: ...
+
     def move(self, dest: int, src: int, count: int, /) -> None: ...
     def read_byte(self) -> int: ...
     def readline(self) -> bytes: ...
-    def resize(self, newsize: int, /) -> None: ...
+    if sys.version_info < (3, 15) or sys.platform != "darwin":
+        def resize(self, newsize: int, /) -> None: ...
     if sys.platform != "win32":
         def seek(self, pos: int, whence: Literal[0, 1, 2, 3, 4] = os.SEEK_SET, /) -> None: ...
     else:
@@ -94,12 +114,24 @@ class mmap:
         """Return len(self)."""
     closed: bool
     if sys.platform != "win32":
-        def madvise(self, option: int, start: int = 0, length: int = ..., /) -> None: ...
+        if sys.version_info >= (3, 15):
+            def madvise(self, option: int, start: int = 0, length: int | None = None, /) -> None: ...
+        else:
+            def madvise(self, option: int, start: int = 0, length: int = ..., /) -> None: ...
 
-    def find(self, view: ReadableBuffer, start: int = ..., end: int = ..., /) -> int: ...
-    def rfind(self, view: ReadableBuffer, start: int = ..., end: int = ..., /) -> int: ...
+    if sys.version_info >= (3, 15):
+        def find(self, view: ReadableBuffer, start: int | None = None, end: int | None = None, /) -> int: ...
+        def rfind(self, view: ReadableBuffer, start: int | None = None, end: int | None = None, /) -> int: ...
+
+    else:
+        def find(self, view: ReadableBuffer, start: int = ..., end: int = ..., /) -> int: ...
+        def rfind(self, view: ReadableBuffer, start: int = ..., end: int = ..., /) -> int: ...
+
     def read(self, n: int | None = None, /) -> bytes: ...
     def write(self, bytes: ReadableBuffer, /) -> int: ...
+    if sys.version_info >= (3, 15):
+        def set_name(self, name: str, /) -> None: ...
+
     @overload
     def __getitem__(self, key: SupportsIndex, /) -> int:
         """Return self[key]."""
@@ -162,7 +194,7 @@ if sys.platform != "linux" and sys.platform != "darwin" and sys.platform != "win
     MADV_CORE: Final[int]
     MADV_PROTECT: Final[int]
 
-if sys.version_info >= (3, 10) and sys.platform == "darwin":
+if sys.platform == "darwin":
     MADV_FREE_REUSABLE: Final[int]
     MADV_FREE_REUSE: Final[int]
 

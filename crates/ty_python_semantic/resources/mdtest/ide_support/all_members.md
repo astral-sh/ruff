@@ -612,33 +612,33 @@ static_assert(not has_member(module, "Optional"))
 
 ## Conditionally available members
 
-Some members are only conditionally available. For example, `int.bit_count` was only introduced in
-Python 3.10:
+Some members are only conditionally available. For example, `bytearray.take_bytes` was only
+introduced in Python 3.15:
 
-### 3.9
+### 3.14
 
 ```toml
 [environment]
-python-version = "3.9"
+python-version = "3.14"
 ```
 
 ```py
 from ty_extensions import has_member, static_assert
 
-static_assert(not has_member(42, "bit_count"))
+static_assert(not has_member(bytearray(42), "take_bytes"))
 ```
 
-### 3.10
+### 3.15
 
 ```toml
 [environment]
-python-version = "3.10"
+python-version = "3.15"
 ```
 
 ```py
 from ty_extensions import has_member, static_assert
 
-static_assert(has_member(42, "bit_count"))
+static_assert(has_member(bytearray(42), "take_bytes"))
 ```
 
 ## Failure cases

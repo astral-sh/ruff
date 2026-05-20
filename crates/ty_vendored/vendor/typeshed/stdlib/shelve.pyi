@@ -58,16 +58,21 @@ the persistent dictionary on disk, if feasible).
 
 import sys
 from _typeshed import StrOrBytesPath
-from collections.abc import Iterator, MutableMapping
+from collections.abc import Callable, Iterator, MutableMapping
 from dbm import _TFlags
 from types import TracebackType
 from typing import Any, TypeVar, overload
 from typing_extensions import Self
 
 __all__ = ["Shelf", "BsdDbShelf", "DbfilenameShelf", "open"]
+if sys.version_info >= (3, 15):
+    __all__ += ["ShelveError"]
 
 _T = TypeVar("_T")
 _VT = TypeVar("_VT")
+
+if sys.version_info >= (3, 15):
+    class ShelveError(Exception): ...
 
 class Shelf(MutableMapping[str, _VT]):
     """Base class for shelf implementations.
@@ -76,9 +81,27 @@ class Shelf(MutableMapping[str, _VT]):
     See the module's __doc__ string for an overview of the interface.
     """
 
-    def __init__(
-        self, dict: MutableMapping[bytes, bytes], protocol: int | None = None, writeback: bool = False, keyencoding: str = "utf-8"
-    ) -> None: ...
+    if sys.version_info >= (3, 15):
+        def __init__(
+            self,
+            dict: MutableMapping[bytes, bytes],
+            protocol: int | None = None,
+            writeback: bool = False,
+            keyencoding: str = "utf-8",
+            *,
+            serializer: Callable[[Any], bytes] | None = None,
+            deserializer: Callable[[bytes], Any] | None = None,
+        ) -> None: ...
+
+    else:
+        def __init__(
+            self,
+            dict: MutableMapping[bytes, bytes],
+            protocol: int | None = None,
+            writeback: bool = False,
+            keyencoding: str = "utf-8",
+        ) -> None: ...
+
     def __iter__(self) -> Iterator[str]: ...
     def __len__(self) -> int: ...
     @overload  # type: ignore[override]
@@ -98,6 +121,8 @@ class Shelf(MutableMapping[str, _VT]):
     def __del__(self) -> None: ...
     def close(self) -> None: ...
     def sync(self) -> None: ...
+    if sys.version_info >= (3, 15):
+        def reorganize(self) -> None: ...
 
 class BsdDbShelf(Shelf[_VT]):
     """Shelf implementation using the "BSD" db interface.
@@ -125,14 +150,38 @@ class DbfilenameShelf(Shelf[_VT]):
     See the module's __doc__ string for an overview of the interface.
     """
 
-    if sys.version_info >= (3, 11):
+    if sys.version_info >= (3, 15):
+        def __init__(
+            self,
+            filename: StrOrBytesPath,
+            flag: _TFlags = "c",
+            protocol: int | None = None,
+            writeback: bool = False,
+            *,
+            serializer: Callable[[Any], bytes] | None = None,
+            deserializer: Callable[[bytes], Any] | None = None,
+        ) -> None: ...
+
+    elif sys.version_info >= (3, 11):
         def __init__(
             self, filename: StrOrBytesPath, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False
         ) -> None: ...
+
     else:
         def __init__(self, filename: str, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False) -> None: ...
 
-if sys.version_info >= (3, 11):
+if sys.version_info >= (3, 15):
+    def open(
+        filename: StrOrBytesPath,
+        flag: _TFlags = "c",
+        protocol: int | None = None,
+        writeback: bool = False,
+        *,
+        serializer: Callable[[Any], bytes] | None = None,
+        deserializer: Callable[[bytes], Any] | None = None,
+    ) -> Shelf[Any]: ...
+
+elif sys.version_info >= (3, 11):
     def open(filename: StrOrBytesPath, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False) -> Shelf[Any]:
         """Open a persistent dictionary for reading and writing.
 

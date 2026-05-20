@@ -37,8 +37,8 @@ import sys
 from _collections_abc import dict_keys
 from _typeshed import FileDescriptorOrPath, ReadableBuffer, SupportsRead, SupportsWrite
 from collections.abc import Callable, Generator, ItemsView, Iterable, Iterator, Mapping, Sequence
-from typing import Any, Final, Generic, Literal, Protocol, SupportsIndex, TypeVar, overload, type_check_only
-from typing_extensions import TypeAlias, TypeGuard, deprecated, disjoint_base
+from typing import Any, Final, Generic, Literal, Protocol, SupportsIndex, TypeAlias, TypeGuard, TypeVar, overload, type_check_only
+from typing_extensions import deprecated, disjoint_base
 from xml.parsers.expat import XMLParserType
 
 __all__ = [
@@ -514,17 +514,26 @@ def parse(source: _FileRead, parser: XMLParser[Any] | None = None) -> ElementTre
 
     """
 
-# This class is defined inside the body of iterparse
+# The type of the second element of the tuple yielded by iterparse depends
+# on the event type in the first element of the tuple:
+#  * start, end: Element[str]
+#  * comment, pi: Element[_ElementCallable]
+#  * start-ns: tuple[str, str] (prefix, uri)
+#  * end-ns: None
+_EventT_co = TypeVar("_EventT_co", bound=Element[str] | Element[_ElementCallable] | tuple[str, str] | None, covariant=True)
+_EventType: TypeAlias = Literal["start", "end", "comment", "pi", "start-ns", "end-ns"]
+
+# This class is defined inside the body of iterparse.
 @type_check_only
-class _IterParseIterator(Iterator[tuple[str, Element]], Protocol):
-    def __next__(self) -> tuple[str, Element]: ...
+class _IterParseIterator(Iterator[tuple[_EventType, _EventT_co]], Protocol[_EventT_co]):
     if sys.version_info >= (3, 13):
         def close(self) -> None: ...
     if sys.version_info >= (3, 11):
         def __del__(self) -> None: ...
 
+# See the comment for _EventT_co above for possible iterator types.
 @overload
-def iterparse(source: _FileRead, events: Sequence[str] | None = None) -> _IterParseIterator:
+def iterparse(source: _FileRead, events: Iterable[_EventType]) -> _IterParseIterator[Any]:
     """Incrementally parse XML document into ElementTree.
 
     This class also reports what's going on to the user based on the
@@ -541,13 +550,18 @@ def iterparse(source: _FileRead, events: Sequence[str] | None = None) -> _IterPa
     """
 
 @overload
+def iterparse(source: _FileRead, events: None = None) -> _IterParseIterator[Element[str]]: ...
+
+# In case a custom parser is passed, the type of the second element of the tuple
+# yielded by iterparse depends on the parser.
+@overload
 @deprecated("The `parser` parameter is deprecated since Python 3.4.")
-def iterparse(source: _FileRead, events: Sequence[str] | None = None, parser: XMLParser | None = None) -> _IterParseIterator: ...
+def iterparse(source: _FileRead, events: Iterable[_EventType], parser: XMLParser | None = None) -> _IterParseIterator[Any]: ...
 
 _EventQueue: TypeAlias = tuple[str] | tuple[str, tuple[str, str]] | tuple[str, None]
 
-class XMLPullParser(Generic[_E]):
-    def __init__(self, events: Sequence[str] | None = None, *, _parser: XMLParser[_E] | None = None) -> None: ...
+class XMLPullParser(Generic[_EventT_co]):
+    def __init__(self, events: Iterable[_EventType] | None = None, *, _parser: XMLParser[_EventT_co] | None = None) -> None: ...
     def feed(self, data: str | ReadableBuffer) -> None:
         """Feed encoded data to parser."""
 
@@ -558,7 +572,7 @@ class XMLPullParser(Generic[_E]):
         read_events() to consume elements from XMLPullParser.
         """
 
-    def read_events(self) -> Iterator[_EventQueue | tuple[str, _E]]:
+    def read_events(self) -> Iterator[_EventQueue | tuple[_EventType, _EventT_co]]:
         """Return an iterator over currently available (event, elem) pairs.
 
         Events are consumed from the internal event queue as they are

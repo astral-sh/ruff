@@ -13,8 +13,8 @@ values() methods are not supported.
 import sys
 from _typeshed import ReadOnlyBuffer, StrOrBytesPath
 from types import TracebackType
-from typing import TypeVar, overload, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing import TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import Self
 
 if sys.platform != "win32":
     _T = TypeVar("_T")

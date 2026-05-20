@@ -126,11 +126,13 @@ from _decimal import (
 )
 from collections.abc import Container, Sequence
 from types import TracebackType
-from typing import Any, ClassVar, Literal, NamedTuple, final, overload, type_check_only
-from typing_extensions import Self, TypeAlias, disjoint_base
+from typing import Any, ClassVar, Literal, NamedTuple, TypeAlias, final, overload, type_check_only
+from typing_extensions import Self, disjoint_base
 
 if sys.version_info >= (3, 14):
     from _decimal import IEEE_CONTEXT_MAX_BITS as IEEE_CONTEXT_MAX_BITS, IEEEContext as IEEEContext
+if sys.version_info >= (3, 15):
+    from _decimal import SPEC_VERSION as SPEC_VERSION
 
 _Decimal: TypeAlias = Decimal | int
 _DecimalNew: TypeAlias = Decimal | float | str | tuple[int, Sequence[int], int]

@@ -33,6 +33,7 @@ from _ast import (
 )
 from _typeshed import ReadableBuffer, Unused
 from collections.abc import Iterable, Iterator, Sequence
+from types import EllipsisType
 from typing import Any, ClassVar, Generic, Literal, TypedDict, TypeVar as _TypeVar, overload, type_check_only
 from typing_extensions import Self, Unpack, deprecated, disjoint_base
 
@@ -68,8 +69,7 @@ if sys.version_info >= (3, 12):
 
 else:
     class AST:
-        if sys.version_info >= (3, 10):
-            __match_args__ = ()
+        __match_args__ = ()
         _attributes: ClassVar[tuple[str, ...]]
         _fields: ClassVar[tuple[str, ...]]
 
@@ -83,8 +83,7 @@ class mod(AST):
 class Module(mod):
     """Module(stmt* body, type_ignore* type_ignores)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("body", "type_ignores")
+    __match_args__ = ("body", "type_ignores")
     body: list[stmt]
     type_ignores: list[TypeIgnore]
     if sys.version_info >= (3, 13):
@@ -99,8 +98,7 @@ class Module(mod):
 class Interactive(mod):
     """Interactive(stmt* body)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("body",)
+    __match_args__ = ("body",)
     body: list[stmt]
     if sys.version_info >= (3, 13):
         def __init__(self, body: list[stmt] = ...) -> None: ...
@@ -114,8 +112,7 @@ class Interactive(mod):
 class Expression(mod):
     """Expression(expr body)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("body",)
+    __match_args__ = ("body",)
     body: expr
     def __init__(self, body: expr) -> None: ...
 
@@ -126,8 +123,7 @@ class Expression(mod):
 class FunctionType(mod):
     """FunctionType(expr* argtypes, expr returns)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("argtypes", "returns")
+    __match_args__ = ("argtypes", "returns")
     argtypes: list[expr]
     returns: expr
     if sys.version_info >= (3, 13):
@@ -188,7 +184,7 @@ class FunctionDef(stmt):
 
     if sys.version_info >= (3, 12):
         __match_args__ = ("name", "args", "body", "decorator_list", "returns", "type_comment", "type_params")
-    elif sys.version_info >= (3, 10):
+    else:
         __match_args__ = ("name", "args", "body", "decorator_list", "returns", "type_comment")
     name: str
     args: arguments
@@ -268,7 +264,7 @@ class AsyncFunctionDef(stmt):
 
     if sys.version_info >= (3, 12):
         __match_args__ = ("name", "args", "body", "decorator_list", "returns", "type_comment", "type_params")
-    elif sys.version_info >= (3, 10):
+    else:
         __match_args__ = ("name", "args", "body", "decorator_list", "returns", "type_comment")
     name: str
     args: arguments
@@ -348,7 +344,7 @@ class ClassDef(stmt):
 
     if sys.version_info >= (3, 12):
         __match_args__ = ("name", "bases", "keywords", "body", "decorator_list", "type_params")
-    elif sys.version_info >= (3, 10):
+    else:
         __match_args__ = ("name", "bases", "keywords", "body", "decorator_list")
     name: str
     bases: list[expr]
@@ -407,8 +403,7 @@ class ClassDef(stmt):
 class Return(stmt):
     """Return(expr? value)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("value",)
+    __match_args__ = ("value",)
     value: expr | None
     def __init__(self, value: expr | None = None, **kwargs: Unpack[_Attributes]) -> None: ...
 
@@ -419,8 +414,7 @@ class Return(stmt):
 class Delete(stmt):
     """Delete(expr* targets)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("targets",)
+    __match_args__ = ("targets",)
     targets: list[expr]
     if sys.version_info >= (3, 13):
         def __init__(self, targets: list[expr] = ..., **kwargs: Unpack[_Attributes]) -> None: ...
@@ -434,8 +428,7 @@ class Delete(stmt):
 class Assign(stmt):
     """Assign(expr* targets, expr value, string? type_comment)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("targets", "value", "type_comment")
+    __match_args__ = ("targets", "value", "type_comment")
     targets: list[expr]
     value: expr
     type_comment: str | None
@@ -495,8 +488,7 @@ if sys.version_info >= (3, 12):
 class AugAssign(stmt):
     """AugAssign(expr target, operator op, expr value)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("target", "op", "value")
+    __match_args__ = ("target", "op", "value")
     target: Name | Attribute | Subscript
     op: operator
     value: expr
@@ -518,8 +510,7 @@ class AugAssign(stmt):
 class AnnAssign(stmt):
     """AnnAssign(expr target, expr annotation, expr? value, int simple)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("target", "annotation", "value", "simple")
+    __match_args__ = ("target", "annotation", "value", "simple")
     target: Name | Attribute | Subscript
     annotation: expr
     value: expr | None
@@ -559,8 +550,7 @@ class AnnAssign(stmt):
 class For(stmt):
     """For(expr target, expr iter, stmt* body, stmt* orelse, string? type_comment)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("target", "iter", "body", "orelse", "type_comment")
+    __match_args__ = ("target", "iter", "body", "orelse", "type_comment")
     target: expr
     iter: expr
     body: list[stmt]
@@ -603,8 +593,7 @@ class For(stmt):
 class AsyncFor(stmt):
     """AsyncFor(expr target, expr iter, stmt* body, stmt* orelse, string? type_comment)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("target", "iter", "body", "orelse", "type_comment")
+    __match_args__ = ("target", "iter", "body", "orelse", "type_comment")
     target: expr
     iter: expr
     body: list[stmt]
@@ -647,8 +636,7 @@ class AsyncFor(stmt):
 class While(stmt):
     """While(expr test, stmt* body, stmt* orelse)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("test", "body", "orelse")
+    __match_args__ = ("test", "body", "orelse")
     test: expr
     body: list[stmt]
     orelse: list[stmt]
@@ -668,8 +656,7 @@ class While(stmt):
 class If(stmt):
     """If(expr test, stmt* body, stmt* orelse)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("test", "body", "orelse")
+    __match_args__ = ("test", "body", "orelse")
     test: expr
     body: list[stmt]
     orelse: list[stmt]
@@ -689,8 +676,7 @@ class If(stmt):
 class With(stmt):
     """With(withitem* items, stmt* body, string? type_comment)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("items", "body", "type_comment")
+    __match_args__ = ("items", "body", "type_comment")
     items: list[withitem]
     body: list[stmt]
     type_comment: str | None
@@ -721,8 +707,7 @@ class With(stmt):
 class AsyncWith(stmt):
     """AsyncWith(withitem* items, stmt* body, string? type_comment)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("items", "body", "type_comment")
+    __match_args__ = ("items", "body", "type_comment")
     items: list[withitem]
     body: list[stmt]
     type_comment: str | None
@@ -753,8 +738,7 @@ class AsyncWith(stmt):
 class Raise(stmt):
     """Raise(expr? exc, expr? cause)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("exc", "cause")
+    __match_args__ = ("exc", "cause")
     exc: expr | None
     cause: expr | None
     def __init__(self, exc: expr | None = None, cause: expr | None = None, **kwargs: Unpack[_Attributes]) -> None: ...
@@ -766,8 +750,7 @@ class Raise(stmt):
 class Try(stmt):
     """Try(stmt* body, excepthandler* handlers, stmt* orelse, stmt* finalbody)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("body", "handlers", "orelse", "finalbody")
+    __match_args__ = ("body", "handlers", "orelse", "finalbody")
     body: list[stmt]
     handlers: list[ExceptHandler]
     orelse: list[stmt]
@@ -846,8 +829,7 @@ if sys.version_info >= (3, 11):
 class Assert(stmt):
     """Assert(expr test, expr? msg)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("test", "msg")
+    __match_args__ = ("test", "msg")
     test: expr
     msg: expr | None
     def __init__(self, test: expr, msg: expr | None = None, **kwargs: Unpack[_Attributes]) -> None: ...
@@ -859,27 +841,57 @@ class Assert(stmt):
 class Import(stmt):
     """Import(alias* names)"""
 
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 15):
+        __match_args__ = ("names", "is_lazy")
+    else:
         __match_args__ = ("names",)
     names: list[alias]
-    if sys.version_info >= (3, 13):
+    if sys.version_info >= (3, 15):
+        is_lazy: bool | None
+    if sys.version_info >= (3, 15):
+        def __init__(self, names: list[alias] = ..., is_lazy: bool | None = None, **kwargs: Unpack[_Attributes]) -> None: ...
+
+    elif sys.version_info >= (3, 13):
         def __init__(self, names: list[alias] = ..., **kwargs: Unpack[_Attributes]) -> None: ...
     else:
         def __init__(self, names: list[alias], **kwargs: Unpack[_Attributes]) -> None: ...
 
-    if sys.version_info >= (3, 14):
+    if sys.version_info >= (3, 15):
+        def __replace__(self, *, names: list[alias] = ..., is_lazy: bool | None = ..., **kwargs: Unpack[_Attributes]) -> Self: ...
+
+    elif sys.version_info >= (3, 14):
         def __replace__(self, *, names: list[alias] = ..., **kwargs: Unpack[_Attributes]) -> Self:
             """Return a copy of the AST node with new values for the specified fields."""
 
 class ImportFrom(stmt):
     """ImportFrom(identifier? module, alias* names, int? level)"""
 
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 15):
+        __match_args__ = ("module", "names", "level", "is_lazy")
+    else:
         __match_args__ = ("module", "names", "level")
     module: str | None
     names: list[alias]
     level: int
-    if sys.version_info >= (3, 13):
+    if sys.version_info >= (3, 15):
+        is_lazy: bool | None
+    if sys.version_info >= (3, 15):
+        @overload
+        def __init__(
+            self, module: str | None, names: list[alias], level: int, is_lazy: bool | None = None, **kwargs: Unpack[_Attributes]
+        ) -> None: ...
+        @overload
+        def __init__(
+            self,
+            module: str | None = None,
+            names: list[alias] = ...,
+            *,
+            level: int,
+            is_lazy: bool | None = None,
+            **kwargs: Unpack[_Attributes],
+        ) -> None: ...
+
+    elif sys.version_info >= (3, 13):
         @overload
         def __init__(self, module: str | None, names: list[alias], level: int, **kwargs: Unpack[_Attributes]) -> None: ...
         @overload
@@ -894,7 +906,18 @@ class ImportFrom(stmt):
             self, module: str | None = None, *, names: list[alias], level: int, **kwargs: Unpack[_Attributes]
         ) -> None: ...
 
-    if sys.version_info >= (3, 14):
+    if sys.version_info >= (3, 15):
+        def __replace__(
+            self,
+            *,
+            module: str | None = ...,
+            names: list[alias] = ...,
+            level: int = ...,
+            is_lazy: bool | None = ...,
+            **kwargs: Unpack[_Attributes],
+        ) -> Self: ...
+
+    elif sys.version_info >= (3, 14):
         def __replace__(
             self, *, module: str | None = ..., names: list[alias] = ..., level: int = ..., **kwargs: Unpack[_Attributes]
         ) -> Self:
@@ -903,8 +926,7 @@ class ImportFrom(stmt):
 class Global(stmt):
     """Global(identifier* names)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("names",)
+    __match_args__ = ("names",)
     names: list[str]
     if sys.version_info >= (3, 13):
         def __init__(self, names: list[str] = ..., **kwargs: Unpack[_Attributes]) -> None: ...
@@ -918,8 +940,7 @@ class Global(stmt):
 class Nonlocal(stmt):
     """Nonlocal(identifier* names)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("names",)
+    __match_args__ = ("names",)
     names: list[str]
     if sys.version_info >= (3, 13):
         def __init__(self, names: list[str] = ..., **kwargs: Unpack[_Attributes]) -> None: ...
@@ -933,8 +954,7 @@ class Nonlocal(stmt):
 class Expr(stmt):
     """Expr(expr value)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("value",)
+    __match_args__ = ("value",)
     value: expr
     def __init__(self, value: expr, **kwargs: Unpack[_Attributes]) -> None: ...
 
@@ -996,8 +1016,7 @@ class expr(AST):
 class BoolOp(expr):
     """BoolOp(boolop op, expr* values)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("op", "values")
+    __match_args__ = ("op", "values")
     op: boolop
     values: list[expr]
     if sys.version_info >= (3, 13):
@@ -1012,8 +1031,7 @@ class BoolOp(expr):
 class NamedExpr(expr):
     """NamedExpr(expr target, expr value)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("target", "value")
+    __match_args__ = ("target", "value")
     target: Name
     value: expr
     def __init__(self, target: Name, value: expr, **kwargs: Unpack[_Attributes]) -> None: ...
@@ -1025,8 +1043,7 @@ class NamedExpr(expr):
 class BinOp(expr):
     """BinOp(expr left, operator op, expr right)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("left", "op", "right")
+    __match_args__ = ("left", "op", "right")
     left: expr
     op: operator
     right: expr
@@ -1039,8 +1056,7 @@ class BinOp(expr):
 class UnaryOp(expr):
     """UnaryOp(unaryop op, expr operand)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("op", "operand")
+    __match_args__ = ("op", "operand")
     op: unaryop
     operand: expr
     def __init__(self, op: unaryop, operand: expr, **kwargs: Unpack[_Attributes]) -> None: ...
@@ -1052,8 +1068,7 @@ class UnaryOp(expr):
 class Lambda(expr):
     """Lambda(arguments args, expr body)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("args", "body")
+    __match_args__ = ("args", "body")
     args: arguments
     body: expr
     def __init__(self, args: arguments, body: expr, **kwargs: Unpack[_Attributes]) -> None: ...
@@ -1065,8 +1080,7 @@ class Lambda(expr):
 class IfExp(expr):
     """IfExp(expr test, expr body, expr orelse)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("test", "body", "orelse")
+    __match_args__ = ("test", "body", "orelse")
     test: expr
     body: expr
     orelse: expr
@@ -1079,8 +1093,7 @@ class IfExp(expr):
 class Dict(expr):
     """Dict(expr?* keys, expr* values)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("keys", "values")
+    __match_args__ = ("keys", "values")
     keys: list[expr | None]
     values: list[expr]
     if sys.version_info >= (3, 13):
@@ -1095,8 +1108,7 @@ class Dict(expr):
 class Set(expr):
     """Set(expr* elts)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("elts",)
+    __match_args__ = ("elts",)
     elts: list[expr]
     if sys.version_info >= (3, 13):
         def __init__(self, elts: list[expr] = ..., **kwargs: Unpack[_Attributes]) -> None: ...
@@ -1110,8 +1122,7 @@ class Set(expr):
 class ListComp(expr):
     """ListComp(expr elt, comprehension* generators)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("elt", "generators")
+    __match_args__ = ("elt", "generators")
     elt: expr
     generators: list[comprehension]
     if sys.version_info >= (3, 13):
@@ -1126,8 +1137,7 @@ class ListComp(expr):
 class SetComp(expr):
     """SetComp(expr elt, comprehension* generators)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("elt", "generators")
+    __match_args__ = ("elt", "generators")
     elt: expr
     generators: list[comprehension]
     if sys.version_info >= (3, 13):
@@ -1142,10 +1152,12 @@ class SetComp(expr):
 class DictComp(expr):
     """DictComp(expr key, expr value, comprehension* generators)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("key", "value", "generators")
+    __match_args__ = ("key", "value", "generators")
     key: expr
-    value: expr
+    if sys.version_info >= (3, 15):
+        value: expr | None
+    else:
+        value: expr
     generators: list[comprehension]
     if sys.version_info >= (3, 13):
         def __init__(
@@ -1163,8 +1175,7 @@ class DictComp(expr):
 class GeneratorExp(expr):
     """GeneratorExp(expr elt, comprehension* generators)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("elt", "generators")
+    __match_args__ = ("elt", "generators")
     elt: expr
     generators: list[comprehension]
     if sys.version_info >= (3, 13):
@@ -1179,8 +1190,7 @@ class GeneratorExp(expr):
 class Await(expr):
     """Await(expr value)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("value",)
+    __match_args__ = ("value",)
     value: expr
     def __init__(self, value: expr, **kwargs: Unpack[_Attributes]) -> None: ...
 
@@ -1191,8 +1201,7 @@ class Await(expr):
 class Yield(expr):
     """Yield(expr? value)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("value",)
+    __match_args__ = ("value",)
     value: expr | None
     def __init__(self, value: expr | None = None, **kwargs: Unpack[_Attributes]) -> None: ...
 
@@ -1203,8 +1212,7 @@ class Yield(expr):
 class YieldFrom(expr):
     """YieldFrom(expr value)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("value",)
+    __match_args__ = ("value",)
     value: expr
     def __init__(self, value: expr, **kwargs: Unpack[_Attributes]) -> None: ...
 
@@ -1215,8 +1223,7 @@ class YieldFrom(expr):
 class Compare(expr):
     """Compare(expr left, cmpop* ops, expr* comparators)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("left", "ops", "comparators")
+    __match_args__ = ("left", "ops", "comparators")
     left: expr
     ops: list[cmpop]
     comparators: list[expr]
@@ -1236,8 +1243,7 @@ class Compare(expr):
 class Call(expr):
     """Call(expr func, expr* args, keyword* keywords)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("func", "args", "keywords")
+    __match_args__ = ("func", "args", "keywords")
     func: expr
     args: list[expr]
     keywords: list[keyword]
@@ -1257,8 +1263,7 @@ class Call(expr):
 class FormattedValue(expr):
     """FormattedValue(expr value, int conversion, expr? format_spec)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("value", "conversion", "format_spec")
+    __match_args__ = ("value", "conversion", "format_spec")
     value: expr
     conversion: int
     format_spec: expr | None
@@ -1273,8 +1278,7 @@ class FormattedValue(expr):
 class JoinedStr(expr):
     """JoinedStr(expr* values)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("values",)
+    __match_args__ = ("values",)
     values: list[expr]
     if sys.version_info >= (3, 13):
         def __init__(self, values: list[expr] = ..., **kwargs: Unpack[_Attributes]) -> None: ...
@@ -1322,19 +1326,12 @@ if sys.version_info >= (3, 14):
         ) -> Self:
             """Return a copy of the AST node with new values for the specified fields."""
 
-if sys.version_info >= (3, 10):
-    from types import EllipsisType
-
-    _ConstantValue: typing_extensions.TypeAlias = str | bytes | bool | int | float | complex | None | EllipsisType
-else:
-    # Rely on builtins.ellipsis
-    _ConstantValue: typing_extensions.TypeAlias = str | bytes | bool | int | float | complex | None | ellipsis  # noqa: F821
+_ConstantValue: typing_extensions.TypeAlias = str | bytes | bool | int | float | complex | None | EllipsisType
 
 class Constant(expr):
     """Constant(constant value, string? kind)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("value", "kind")
+    __match_args__ = ("value", "kind")
     value: _ConstantValue
     kind: str | None
     if sys.version_info < (3, 14):
@@ -1365,8 +1362,7 @@ class Constant(expr):
 class Attribute(expr):
     """Attribute(expr value, identifier attr, expr_context ctx)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("value", "attr", "ctx")
+    __match_args__ = ("value", "attr", "ctx")
     value: expr
     attr: str
     ctx: expr_context  # Not present in Python < 3.13 if not passed to `__init__`
@@ -1381,8 +1377,7 @@ class Attribute(expr):
 class Subscript(expr):
     """Subscript(expr value, expr slice, expr_context ctx)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("value", "slice", "ctx")
+    __match_args__ = ("value", "slice", "ctx")
     value: expr
     slice: expr
     ctx: expr_context  # Not present in Python < 3.13 if not passed to `__init__`
@@ -1397,8 +1392,7 @@ class Subscript(expr):
 class Starred(expr):
     """Starred(expr value, expr_context ctx)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("value", "ctx")
+    __match_args__ = ("value", "ctx")
     value: expr
     ctx: expr_context  # Not present in Python < 3.13 if not passed to `__init__`
     def __init__(self, value: expr, ctx: expr_context = ..., **kwargs: Unpack[_Attributes]) -> None: ...
@@ -1410,8 +1404,7 @@ class Starred(expr):
 class Name(expr):
     """Name(identifier id, expr_context ctx)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("id", "ctx")
+    __match_args__ = ("id", "ctx")
     id: str
     ctx: expr_context  # Not present in Python < 3.13 if not passed to `__init__`
     def __init__(self, id: str, ctx: expr_context = ..., **kwargs: Unpack[_Attributes]) -> None: ...
@@ -1423,8 +1416,7 @@ class Name(expr):
 class List(expr):
     """List(expr* elts, expr_context ctx)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("elts", "ctx")
+    __match_args__ = ("elts", "ctx")
     elts: list[expr]
     ctx: expr_context  # Not present in Python < 3.13 if not passed to `__init__`
     if sys.version_info >= (3, 13):
@@ -1439,8 +1431,7 @@ class List(expr):
 class Tuple(expr):
     """Tuple(expr* elts, expr_context ctx)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("elts", "ctx")
+    __match_args__ = ("elts", "ctx")
     elts: list[expr]
     ctx: expr_context  # Not present in Python < 3.13 if not passed to `__init__`
     dims: list[expr]
@@ -1462,8 +1453,7 @@ class slice(AST):
 class Slice(expr):
     """Slice(expr? lower, expr? upper, expr? step)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("lower", "upper", "step")
+    __match_args__ = ("lower", "upper", "step")
     lower: expr | None
     upper: expr | None
     step: expr | None
@@ -1619,8 +1609,7 @@ class NotIn(cmpop):
 class comprehension(AST):
     """comprehension(expr target, expr iter, expr* ifs, int is_async)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("target", "iter", "ifs", "is_async")
+    __match_args__ = ("target", "iter", "ifs", "is_async")
     target: expr
     iter: expr
     ifs: list[expr]
@@ -1655,8 +1644,7 @@ class excepthandler(AST):
 class ExceptHandler(excepthandler):
     """ExceptHandler(expr? type, identifier? name, stmt* body)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("type", "name", "body")
+    __match_args__ = ("type", "name", "body")
     type: expr | None
     name: str | None
     body: list[stmt]
@@ -1681,8 +1669,7 @@ class ExceptHandler(excepthandler):
 class arguments(AST):
     """arguments(arg* posonlyargs, arg* args, arg? vararg, arg* kwonlyargs, expr?* kw_defaults, arg? kwarg, expr* defaults)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("posonlyargs", "args", "vararg", "kwonlyargs", "kw_defaults", "kwarg", "defaults")
+    __match_args__ = ("posonlyargs", "args", "vararg", "kwonlyargs", "kw_defaults", "kwarg", "defaults")
     posonlyargs: list[arg]
     args: list[arg]
     vararg: arg | None
@@ -1755,12 +1742,11 @@ class arguments(AST):
 class arg(AST):
     """arg(identifier arg, expr? annotation, string? type_comment)"""
 
+    __match_args__ = ("arg", "annotation", "type_comment")
     lineno: int
     col_offset: int
     end_lineno: int | None
     end_col_offset: int | None
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("arg", "annotation", "type_comment")
     arg: str
     annotation: expr | None
     type_comment: str | None
@@ -1777,12 +1763,11 @@ class arg(AST):
 class keyword(AST):
     """keyword(identifier? arg, expr value)"""
 
+    __match_args__ = ("arg", "value")
     lineno: int
     col_offset: int
     end_lineno: int | None
     end_col_offset: int | None
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("arg", "value")
     arg: str | None
     value: expr
     @overload
@@ -1797,19 +1782,14 @@ class keyword(AST):
 class alias(AST):
     """alias(identifier name, identifier? asname)"""
 
+    __match_args__ = ("name", "asname")
     name: str
     asname: str | None
-    if sys.version_info >= (3, 10):
-        lineno: int
-        col_offset: int
-        end_lineno: int | None
-        end_col_offset: int | None
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("name", "asname")
-    if sys.version_info >= (3, 10):
-        def __init__(self, name: str, asname: str | None = None, **kwargs: Unpack[_Attributes]) -> None: ...
-    else:
-        def __init__(self, name: str, asname: str | None = None) -> None: ...
+    lineno: int
+    col_offset: int
+    end_lineno: int | None
+    end_col_offset: int | None
+    def __init__(self, name: str, asname: str | None = None, **kwargs: Unpack[_Attributes]) -> None: ...
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, name: str = ..., asname: str | None = ..., **kwargs: Unpack[_Attributes]) -> Self:
@@ -1818,8 +1798,7 @@ class alias(AST):
 class withitem(AST):
     """withitem(expr context_expr, expr? optional_vars)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("context_expr", "optional_vars")
+    __match_args__ = ("context_expr", "optional_vars")
     context_expr: expr
     optional_vars: expr | None
     def __init__(self, context_expr: expr, optional_vars: expr | None = None) -> None: ...
@@ -1828,210 +1807,209 @@ class withitem(AST):
         def __replace__(self, *, context_expr: expr = ..., optional_vars: expr | None = ...) -> Self:
             """Return a copy of the AST node with new values for the specified fields."""
 
-if sys.version_info >= (3, 10):
-    class pattern(AST):
-        """pattern = MatchValue(expr value)
-        | MatchSingleton(constant value)
-        | MatchSequence(pattern* patterns)
-        | MatchMapping(expr* keys, pattern* patterns, identifier? rest)
-        | MatchClass(expr cls, pattern* patterns, identifier* kwd_attrs, pattern* kwd_patterns)
-        | MatchStar(identifier? name)
-        | MatchAs(pattern? pattern, identifier? name)
-        | MatchOr(pattern* patterns)
-        """
+class pattern(AST):
+    """pattern = MatchValue(expr value)
+    | MatchSingleton(constant value)
+    | MatchSequence(pattern* patterns)
+    | MatchMapping(expr* keys, pattern* patterns, identifier? rest)
+    | MatchClass(expr cls, pattern* patterns, identifier* kwd_attrs, pattern* kwd_patterns)
+    | MatchStar(identifier? name)
+    | MatchAs(pattern? pattern, identifier? name)
+    | MatchOr(pattern* patterns)
+    """
 
-        lineno: int
-        col_offset: int
-        end_lineno: int
-        end_col_offset: int
-        def __init__(self, **kwargs: Unpack[_Attributes[int]]) -> None: ...
+    lineno: int
+    col_offset: int
+    end_lineno: int
+    end_col_offset: int
+    def __init__(self, **kwargs: Unpack[_Attributes[int]]) -> None: ...
 
-        if sys.version_info >= (3, 14):
-            def __replace__(
-                self, *, lineno: int = ..., col_offset: int = ..., end_lineno: int = ..., end_col_offset: int = ...
-            ) -> Self:
-                """Return a copy of the AST node with new values for the specified fields."""
+    if sys.version_info >= (3, 14):
+        def __replace__(
+            self, *, lineno: int = ..., col_offset: int = ..., end_lineno: int = ..., end_col_offset: int = ...
+        ) -> Self:
+            """Return a copy of the AST node with new values for the specified fields."""
 
-    class match_case(AST):
-        """match_case(pattern pattern, expr? guard, stmt* body)"""
+class match_case(AST):
+    """match_case(pattern pattern, expr? guard, stmt* body)"""
 
-        __match_args__ = ("pattern", "guard", "body")
-        pattern: ast.pattern
-        guard: expr | None
-        body: list[stmt]
-        if sys.version_info >= (3, 13):
-            def __init__(self, pattern: ast.pattern, guard: expr | None = None, body: list[stmt] = ...) -> None: ...
-        elif sys.version_info >= (3, 10):
-            @overload
-            def __init__(self, pattern: ast.pattern, guard: expr | None, body: list[stmt]) -> None: ...
-            @overload
-            def __init__(self, pattern: ast.pattern, guard: expr | None = None, *, body: list[stmt]) -> None: ...
+    __match_args__ = ("pattern", "guard", "body")
+    pattern: ast.pattern
+    guard: expr | None
+    body: list[stmt]
+    if sys.version_info >= (3, 13):
+        def __init__(self, pattern: ast.pattern, guard: expr | None = None, body: list[stmt] = ...) -> None: ...
+    else:
+        @overload
+        def __init__(self, pattern: ast.pattern, guard: expr | None, body: list[stmt]) -> None: ...
+        @overload
+        def __init__(self, pattern: ast.pattern, guard: expr | None = None, *, body: list[stmt]) -> None: ...
 
-        if sys.version_info >= (3, 14):
-            def __replace__(self, *, pattern: ast.pattern = ..., guard: expr | None = ..., body: list[stmt] = ...) -> Self:
-                """Return a copy of the AST node with new values for the specified fields."""
+    if sys.version_info >= (3, 14):
+        def __replace__(self, *, pattern: ast.pattern = ..., guard: expr | None = ..., body: list[stmt] = ...) -> Self:
+            """Return a copy of the AST node with new values for the specified fields."""
 
-    class Match(stmt):
-        """Match(expr subject, match_case* cases)"""
+class Match(stmt):
+    """Match(expr subject, match_case* cases)"""
 
-        __match_args__ = ("subject", "cases")
-        subject: expr
-        cases: list[match_case]
-        if sys.version_info >= (3, 13):
-            def __init__(self, subject: expr, cases: list[match_case] = ..., **kwargs: Unpack[_Attributes]) -> None: ...
-        else:
-            def __init__(self, subject: expr, cases: list[match_case], **kwargs: Unpack[_Attributes]) -> None: ...
+    __match_args__ = ("subject", "cases")
+    subject: expr
+    cases: list[match_case]
+    if sys.version_info >= (3, 13):
+        def __init__(self, subject: expr, cases: list[match_case] = ..., **kwargs: Unpack[_Attributes]) -> None: ...
+    else:
+        def __init__(self, subject: expr, cases: list[match_case], **kwargs: Unpack[_Attributes]) -> None: ...
 
-        if sys.version_info >= (3, 14):
-            def __replace__(self, *, subject: expr = ..., cases: list[match_case] = ..., **kwargs: Unpack[_Attributes]) -> Self:
-                """Return a copy of the AST node with new values for the specified fields."""
+    if sys.version_info >= (3, 14):
+        def __replace__(self, *, subject: expr = ..., cases: list[match_case] = ..., **kwargs: Unpack[_Attributes]) -> Self:
+            """Return a copy of the AST node with new values for the specified fields."""
 
-    class MatchValue(pattern):
-        """MatchValue(expr value)"""
+class MatchValue(pattern):
+    """MatchValue(expr value)"""
 
-        __match_args__ = ("value",)
-        value: expr
-        def __init__(self, value: expr, **kwargs: Unpack[_Attributes[int]]) -> None: ...
+    __match_args__ = ("value",)
+    value: expr
+    def __init__(self, value: expr, **kwargs: Unpack[_Attributes[int]]) -> None: ...
 
-        if sys.version_info >= (3, 14):
-            def __replace__(self, *, value: expr = ..., **kwargs: Unpack[_Attributes[int]]) -> Self:
-                """Return a copy of the AST node with new values for the specified fields."""
+    if sys.version_info >= (3, 14):
+        def __replace__(self, *, value: expr = ..., **kwargs: Unpack[_Attributes[int]]) -> Self:
+            """Return a copy of the AST node with new values for the specified fields."""
 
-    class MatchSingleton(pattern):
-        """MatchSingleton(constant value)"""
+class MatchSingleton(pattern):
+    """MatchSingleton(constant value)"""
 
-        __match_args__ = ("value",)
-        value: bool | None
-        def __init__(self, value: bool | None, **kwargs: Unpack[_Attributes[int]]) -> None: ...
+    __match_args__ = ("value",)
+    value: bool | None
+    def __init__(self, value: bool | None, **kwargs: Unpack[_Attributes[int]]) -> None: ...
 
-        if sys.version_info >= (3, 14):
-            def __replace__(self, *, value: bool | None = ..., **kwargs: Unpack[_Attributes[int]]) -> Self:
-                """Return a copy of the AST node with new values for the specified fields."""
+    if sys.version_info >= (3, 14):
+        def __replace__(self, *, value: bool | None = ..., **kwargs: Unpack[_Attributes[int]]) -> Self:
+            """Return a copy of the AST node with new values for the specified fields."""
 
-    class MatchSequence(pattern):
-        """MatchSequence(pattern* patterns)"""
+class MatchSequence(pattern):
+    """MatchSequence(pattern* patterns)"""
 
-        __match_args__ = ("patterns",)
-        patterns: list[pattern]
-        if sys.version_info >= (3, 13):
-            def __init__(self, patterns: list[pattern] = ..., **kwargs: Unpack[_Attributes[int]]) -> None: ...
-        else:
-            def __init__(self, patterns: list[pattern], **kwargs: Unpack[_Attributes[int]]) -> None: ...
+    __match_args__ = ("patterns",)
+    patterns: list[pattern]
+    if sys.version_info >= (3, 13):
+        def __init__(self, patterns: list[pattern] = ..., **kwargs: Unpack[_Attributes[int]]) -> None: ...
+    else:
+        def __init__(self, patterns: list[pattern], **kwargs: Unpack[_Attributes[int]]) -> None: ...
 
-        if sys.version_info >= (3, 14):
-            def __replace__(self, *, patterns: list[pattern] = ..., **kwargs: Unpack[_Attributes[int]]) -> Self:
-                """Return a copy of the AST node with new values for the specified fields."""
+    if sys.version_info >= (3, 14):
+        def __replace__(self, *, patterns: list[pattern] = ..., **kwargs: Unpack[_Attributes[int]]) -> Self:
+            """Return a copy of the AST node with new values for the specified fields."""
 
-    class MatchMapping(pattern):
-        """MatchMapping(expr* keys, pattern* patterns, identifier? rest)"""
+class MatchMapping(pattern):
+    """MatchMapping(expr* keys, pattern* patterns, identifier? rest)"""
 
-        __match_args__ = ("keys", "patterns", "rest")
-        keys: list[expr]
-        patterns: list[pattern]
-        rest: str | None
-        if sys.version_info >= (3, 13):
-            def __init__(
-                self,
-                keys: list[expr] = ...,
-                patterns: list[pattern] = ...,
-                rest: str | None = None,
-                **kwargs: Unpack[_Attributes[int]],
-            ) -> None: ...
-        else:
-            def __init__(
-                self, keys: list[expr], patterns: list[pattern], rest: str | None = None, **kwargs: Unpack[_Attributes[int]]
-            ) -> None: ...
-
-        if sys.version_info >= (3, 14):
-            def __replace__(
-                self,
-                *,
-                keys: list[expr] = ...,
-                patterns: list[pattern] = ...,
-                rest: str | None = ...,
-                **kwargs: Unpack[_Attributes[int]],
-            ) -> Self:
-                """Return a copy of the AST node with new values for the specified fields."""
-
-    class MatchClass(pattern):
-        """MatchClass(expr cls, pattern* patterns, identifier* kwd_attrs, pattern* kwd_patterns)"""
-
-        __match_args__ = ("cls", "patterns", "kwd_attrs", "kwd_patterns")
-        cls: expr
-        patterns: list[pattern]
-        kwd_attrs: list[str]
-        kwd_patterns: list[pattern]
-        if sys.version_info >= (3, 13):
-            def __init__(
-                self,
-                cls: expr,
-                patterns: list[pattern] = ...,
-                kwd_attrs: list[str] = ...,
-                kwd_patterns: list[pattern] = ...,
-                **kwargs: Unpack[_Attributes[int]],
-            ) -> None: ...
-        else:
-            def __init__(
-                self,
-                cls: expr,
-                patterns: list[pattern],
-                kwd_attrs: list[str],
-                kwd_patterns: list[pattern],
-                **kwargs: Unpack[_Attributes[int]],
-            ) -> None: ...
-
-        if sys.version_info >= (3, 14):
-            def __replace__(
-                self,
-                *,
-                cls: expr = ...,
-                patterns: list[pattern] = ...,
-                kwd_attrs: list[str] = ...,
-                kwd_patterns: list[pattern] = ...,
-                **kwargs: Unpack[_Attributes[int]],
-            ) -> Self:
-                """Return a copy of the AST node with new values for the specified fields."""
-
-    class MatchStar(pattern):
-        """MatchStar(identifier? name)"""
-
-        __match_args__ = ("name",)
-        name: str | None
-        def __init__(self, name: str | None = None, **kwargs: Unpack[_Attributes[int]]) -> None: ...
-
-        if sys.version_info >= (3, 14):
-            def __replace__(self, *, name: str | None = ..., **kwargs: Unpack[_Attributes[int]]) -> Self:
-                """Return a copy of the AST node with new values for the specified fields."""
-
-    class MatchAs(pattern):
-        """MatchAs(pattern? pattern, identifier? name)"""
-
-        __match_args__ = ("pattern", "name")
-        pattern: ast.pattern | None
-        name: str | None
+    __match_args__ = ("keys", "patterns", "rest")
+    keys: list[expr]
+    patterns: list[pattern]
+    rest: str | None
+    if sys.version_info >= (3, 13):
         def __init__(
-            self, pattern: ast.pattern | None = None, name: str | None = None, **kwargs: Unpack[_Attributes[int]]
+            self,
+            keys: list[expr] = ...,
+            patterns: list[pattern] = ...,
+            rest: str | None = None,
+            **kwargs: Unpack[_Attributes[int]],
+        ) -> None: ...
+    else:
+        def __init__(
+            self, keys: list[expr], patterns: list[pattern], rest: str | None = None, **kwargs: Unpack[_Attributes[int]]
         ) -> None: ...
 
-        if sys.version_info >= (3, 14):
-            def __replace__(
-                self, *, pattern: ast.pattern | None = ..., name: str | None = ..., **kwargs: Unpack[_Attributes[int]]
-            ) -> Self:
-                """Return a copy of the AST node with new values for the specified fields."""
+    if sys.version_info >= (3, 14):
+        def __replace__(
+            self,
+            *,
+            keys: list[expr] = ...,
+            patterns: list[pattern] = ...,
+            rest: str | None = ...,
+            **kwargs: Unpack[_Attributes[int]],
+        ) -> Self:
+            """Return a copy of the AST node with new values for the specified fields."""
 
-    class MatchOr(pattern):
-        """MatchOr(pattern* patterns)"""
+class MatchClass(pattern):
+    """MatchClass(expr cls, pattern* patterns, identifier* kwd_attrs, pattern* kwd_patterns)"""
 
-        __match_args__ = ("patterns",)
-        patterns: list[pattern]
-        if sys.version_info >= (3, 13):
-            def __init__(self, patterns: list[pattern] = ..., **kwargs: Unpack[_Attributes[int]]) -> None: ...
-        else:
-            def __init__(self, patterns: list[pattern], **kwargs: Unpack[_Attributes[int]]) -> None: ...
+    __match_args__ = ("cls", "patterns", "kwd_attrs", "kwd_patterns")
+    cls: expr
+    patterns: list[pattern]
+    kwd_attrs: list[str]
+    kwd_patterns: list[pattern]
+    if sys.version_info >= (3, 13):
+        def __init__(
+            self,
+            cls: expr,
+            patterns: list[pattern] = ...,
+            kwd_attrs: list[str] = ...,
+            kwd_patterns: list[pattern] = ...,
+            **kwargs: Unpack[_Attributes[int]],
+        ) -> None: ...
+    else:
+        def __init__(
+            self,
+            cls: expr,
+            patterns: list[pattern],
+            kwd_attrs: list[str],
+            kwd_patterns: list[pattern],
+            **kwargs: Unpack[_Attributes[int]],
+        ) -> None: ...
 
-        if sys.version_info >= (3, 14):
-            def __replace__(self, *, patterns: list[pattern] = ..., **kwargs: Unpack[_Attributes[int]]) -> Self:
-                """Return a copy of the AST node with new values for the specified fields."""
+    if sys.version_info >= (3, 14):
+        def __replace__(
+            self,
+            *,
+            cls: expr = ...,
+            patterns: list[pattern] = ...,
+            kwd_attrs: list[str] = ...,
+            kwd_patterns: list[pattern] = ...,
+            **kwargs: Unpack[_Attributes[int]],
+        ) -> Self:
+            """Return a copy of the AST node with new values for the specified fields."""
+
+class MatchStar(pattern):
+    """MatchStar(identifier? name)"""
+
+    __match_args__ = ("name",)
+    name: str | None
+    def __init__(self, name: str | None = None, **kwargs: Unpack[_Attributes[int]]) -> None: ...
+
+    if sys.version_info >= (3, 14):
+        def __replace__(self, *, name: str | None = ..., **kwargs: Unpack[_Attributes[int]]) -> Self:
+            """Return a copy of the AST node with new values for the specified fields."""
+
+class MatchAs(pattern):
+    """MatchAs(pattern? pattern, identifier? name)"""
+
+    __match_args__ = ("pattern", "name")
+    pattern: ast.pattern | None
+    name: str | None
+    def __init__(
+        self, pattern: ast.pattern | None = None, name: str | None = None, **kwargs: Unpack[_Attributes[int]]
+    ) -> None: ...
+
+    if sys.version_info >= (3, 14):
+        def __replace__(
+            self, *, pattern: ast.pattern | None = ..., name: str | None = ..., **kwargs: Unpack[_Attributes[int]]
+        ) -> Self:
+            """Return a copy of the AST node with new values for the specified fields."""
+
+class MatchOr(pattern):
+    """MatchOr(pattern* patterns)"""
+
+    __match_args__ = ("patterns",)
+    patterns: list[pattern]
+    if sys.version_info >= (3, 13):
+        def __init__(self, patterns: list[pattern] = ..., **kwargs: Unpack[_Attributes[int]]) -> None: ...
+    else:
+        def __init__(self, patterns: list[pattern], **kwargs: Unpack[_Attributes[int]]) -> None: ...
+
+    if sys.version_info >= (3, 14):
+        def __replace__(self, *, patterns: list[pattern] = ..., **kwargs: Unpack[_Attributes[int]]) -> Self:
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class type_ignore(AST):
     """type_ignore = TypeIgnore(int lineno, string tag)"""
@@ -2039,8 +2017,7 @@ class type_ignore(AST):
 class TypeIgnore(type_ignore):
     """TypeIgnore(int lineno, string tag)"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__ = ("lineno", "tag")
+    __match_args__ = ("lineno", "tag")
     lineno: int
     tag: str
     def __init__(self, lineno: int, tag: str) -> None: ...
@@ -2178,7 +2155,105 @@ if sys.version_info < (3, 14):
 
 _T = _TypeVar("_T", bound=AST)
 
-if sys.version_info >= (3, 13):
+if sys.version_info >= (3, 15):
+    @overload
+    def parse(
+        source: _T,
+        filename: str | bytes | os.PathLike[Any] = "<unknown>",
+        mode: Literal["exec", "eval", "func_type", "single"] = "exec",
+        *,
+        type_comments: bool = False,
+        feature_version: None | int | tuple[int, int] = None,
+        optimize: Literal[-1, 0, 1, 2] = -1,
+        module: str | None = None,
+    ) -> _T: ...
+    @overload
+    def parse(
+        source: str | ReadableBuffer,
+        filename: str | bytes | os.PathLike[Any] = "<unknown>",
+        mode: Literal["exec"] = "exec",
+        *,
+        type_comments: bool = False,
+        feature_version: None | int | tuple[int, int] = None,
+        optimize: Literal[-1, 0, 1, 2] = -1,
+        module: str | None = None,
+    ) -> Module: ...
+    @overload
+    def parse(
+        source: str | ReadableBuffer,
+        filename: str | bytes | os.PathLike[Any],
+        mode: Literal["eval"],
+        *,
+        type_comments: bool = False,
+        feature_version: None | int | tuple[int, int] = None,
+        optimize: Literal[-1, 0, 1, 2] = -1,
+        module: str | None = None,
+    ) -> Expression: ...
+    @overload
+    def parse(
+        source: str | ReadableBuffer,
+        filename: str | bytes | os.PathLike[Any],
+        mode: Literal["func_type"],
+        *,
+        type_comments: bool = False,
+        feature_version: None | int | tuple[int, int] = None,
+        optimize: Literal[-1, 0, 1, 2] = -1,
+        module: str | None = None,
+    ) -> FunctionType: ...
+    @overload
+    def parse(
+        source: str | ReadableBuffer,
+        filename: str | bytes | os.PathLike[Any],
+        mode: Literal["single"],
+        *,
+        type_comments: bool = False,
+        feature_version: None | int | tuple[int, int] = None,
+        optimize: Literal[-1, 0, 1, 2] = -1,
+        module: str | None = None,
+    ) -> Interactive: ...
+    @overload
+    def parse(
+        source: str | ReadableBuffer,
+        *,
+        mode: Literal["eval"],
+        type_comments: bool = False,
+        feature_version: None | int | tuple[int, int] = None,
+        optimize: Literal[-1, 0, 1, 2] = -1,
+        module: str | None = None,
+    ) -> Expression: ...
+    @overload
+    def parse(
+        source: str | ReadableBuffer,
+        *,
+        mode: Literal["func_type"],
+        type_comments: bool = False,
+        feature_version: None | int | tuple[int, int] = None,
+        optimize: Literal[-1, 0, 1, 2] = -1,
+        module: str | None = None,
+    ) -> FunctionType: ...
+    @overload
+    def parse(
+        source: str | ReadableBuffer,
+        *,
+        mode: Literal["single"],
+        type_comments: bool = False,
+        feature_version: None | int | tuple[int, int] = None,
+        optimize: Literal[-1, 0, 1, 2] = -1,
+        module: str | None = None,
+    ) -> Interactive: ...
+    @overload
+    def parse(
+        source: str | ReadableBuffer,
+        filename: str | bytes | os.PathLike[Any] = "<unknown>",
+        mode: str = "exec",
+        *,
+        type_comments: bool = False,
+        feature_version: None | int | tuple[int, int] = None,
+        optimize: Literal[-1, 0, 1, 2] = -1,
+        module: str | None = None,
+    ) -> mod: ...
+
+elif sys.version_info >= (3, 13):
     @overload
     def parse(
         source: _T,
@@ -2369,7 +2444,18 @@ def literal_eval(node_or_string: str | AST) -> Any:
     Caution: A complex expression can overflow the C stack and cause a crash.
     """
 
-if sys.version_info >= (3, 13):
+if sys.version_info >= (3, 15):
+    def dump(
+        node: AST,
+        annotate_fields: bool = True,
+        include_attributes: bool = False,
+        *,
+        indent: int | str | None = None,
+        show_empty: bool = False,
+        color: bool = False,
+    ) -> str: ...
+
+elif sys.version_info >= (3, 13):
     def dump(
         node: AST,
         annotate_fields: bool = True,
@@ -2604,17 +2690,16 @@ class NodeVisitor:
     def visit_keyword(self, node: keyword) -> Any: ...
     def visit_alias(self, node: alias) -> Any: ...
     def visit_withitem(self, node: withitem) -> Any: ...
-    if sys.version_info >= (3, 10):
-        def visit_Match(self, node: Match) -> Any: ...
-        def visit_match_case(self, node: match_case) -> Any: ...
-        def visit_MatchValue(self, node: MatchValue) -> Any: ...
-        def visit_MatchSequence(self, node: MatchSequence) -> Any: ...
-        def visit_MatchSingleton(self, node: MatchSingleton) -> Any: ...
-        def visit_MatchStar(self, node: MatchStar) -> Any: ...
-        def visit_MatchMapping(self, node: MatchMapping) -> Any: ...
-        def visit_MatchClass(self, node: MatchClass) -> Any: ...
-        def visit_MatchAs(self, node: MatchAs) -> Any: ...
-        def visit_MatchOr(self, node: MatchOr) -> Any: ...
+    def visit_Match(self, node: Match) -> Any: ...
+    def visit_match_case(self, node: match_case) -> Any: ...
+    def visit_MatchValue(self, node: MatchValue) -> Any: ...
+    def visit_MatchSequence(self, node: MatchSequence) -> Any: ...
+    def visit_MatchSingleton(self, node: MatchSingleton) -> Any: ...
+    def visit_MatchStar(self, node: MatchStar) -> Any: ...
+    def visit_MatchMapping(self, node: MatchMapping) -> Any: ...
+    def visit_MatchClass(self, node: MatchClass) -> Any: ...
+    def visit_MatchAs(self, node: MatchAs) -> Any: ...
+    def visit_MatchOr(self, node: MatchOr) -> Any: ...
 
     if sys.version_info >= (3, 11):
         def visit_TryStar(self, node: TryStar) -> Any: ...

@@ -9,8 +9,7 @@ from multiprocessing.managers import SyncManager
 from multiprocessing.pool import Pool as _Pool
 from multiprocessing.process import BaseProcess
 from multiprocessing.sharedctypes import Synchronized, SynchronizedArray, SynchronizedString
-from typing import Any, ClassVar, Literal, TypeVar, overload
-from typing_extensions import TypeAlias
+from typing import Any, ClassVar, Literal, TypeAlias, TypeVar, overload
 
 if sys.platform != "win32":
     from multiprocessing.connection import Connection
@@ -192,30 +191,28 @@ class BaseContext:
         child processes instead of sys.executable when using the 'spawn'
         start method.  Useful for people embedding Python.
         """
+    if sys.version_info >= (3, 15):
+        def set_forkserver_preload(
+            self, module_names: list[str], *, on_error: Literal["ignore", "warn", "fail"] = "ignore"
+        ) -> None: ...
+    else:
+        def set_forkserver_preload(self, module_names: list[str]) -> None:
+            """Set list of module names to try to load in forkserver process.
+            This is really just a hint.
+            """
 
-    def set_forkserver_preload(self, module_names: list[str]) -> None:
-        """Set list of module names to try to load in forkserver process.
-        This is really just a hint.
-        """
+    @overload
+    def get_context(self, method: None = None) -> DefaultContext: ...
+    @overload
+    def get_context(self, method: Literal["spawn"]) -> SpawnContext: ...
     if sys.platform != "win32":
-        @overload
-        def get_context(self, method: None = None) -> DefaultContext: ...
-        @overload
-        def get_context(self, method: Literal["spawn"]) -> SpawnContext: ...
         @overload
         def get_context(self, method: Literal["fork"]) -> ForkContext: ...
         @overload
         def get_context(self, method: Literal["forkserver"]) -> ForkServerContext: ...
-        @overload
-        def get_context(self, method: str) -> BaseContext: ...
-    else:
-        @overload
-        def get_context(self, method: None = None) -> DefaultContext: ...
-        @overload
-        def get_context(self, method: Literal["spawn"]) -> SpawnContext: ...
-        @overload
-        def get_context(self, method: str) -> BaseContext: ...
 
+    @overload
+    def get_context(self, method: str) -> BaseContext: ...
     @overload
     def get_start_method(self, allow_none: Literal[False] = False) -> str: ...
     @overload
@@ -278,6 +275,13 @@ if sys.platform != "win32":
         Process: ClassVar[type[ForkServerProcess]]
 
 def _force_start_method(method: str) -> None: ...
-def get_spawning_popen() -> Any | None: ...
-def set_spawning_popen(popen: Any) -> None: ...
+
+if sys.platform != "win32":
+    def get_spawning_popen() -> popen_forkserver.Popen | popen_spawn_posix.Popen | None: ...
+    def set_spawning_popen(popen: popen_forkserver.Popen | popen_spawn_posix.Popen | None) -> None: ...
+
+else:
+    def get_spawning_popen() -> popen_spawn_win32.Popen | None: ...
+    def set_spawning_popen(popen: popen_spawn_win32.Popen | None) -> None: ...
+
 def assert_spawning(obj: Any) -> None: ...

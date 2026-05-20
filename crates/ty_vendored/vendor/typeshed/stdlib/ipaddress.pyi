@@ -7,8 +7,8 @@ and networks.
 
 import sys
 from collections.abc import Iterable, Iterator
-from typing import Any, Final, Generic, Literal, TypeVar, overload
-from typing_extensions import Self, TypeAlias
+from typing import Any, Final, Generic, Literal, TypeAlias, TypeVar, overload
+from typing_extensions import Self
 
 # Undocumented length constants
 IPV4LENGTH: Final = 32

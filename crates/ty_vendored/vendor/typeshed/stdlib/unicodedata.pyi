@@ -9,14 +9,11 @@ UnicodeData File Format 16.0.0.
 
 import sys
 from _typeshed import ReadOnlyBuffer
-from typing import Any, Final, Literal, TypeVar, final, overload
-from typing_extensions import TypeAlias
+from collections.abc import Iterator
+from typing import Final, Literal, TypeAlias, TypeVar, final, overload
 
 ucd_3_2_0: UCD
 unidata_version: Final[str]
-
-if sys.version_info < (3, 10):
-    ucnhash_CAPI: Any
 
 _T = TypeVar("_T")
 
@@ -76,6 +73,15 @@ def is_normalized(form: _NormalizationForm, unistr: str, /) -> bool:
 
     Valid values for form are 'NFC', 'NFKC', 'NFD', and 'NFKD'.
     """
+
+if sys.version_info >= (3, 15):
+    def block(chr: str, /) -> str: ...
+    def extended_pictographic(chr: str, /) -> bool: ...
+    def grapheme_cluster_break(chr: str, /) -> str: ...
+    def indic_conjunct_break(chr: str, /) -> str: ...
+    def isxidstart(chr: str, /) -> bool: ...
+    def isxidcontinue(chr: str, /) -> bool: ...
+    def iter_graphemes(unistr: str, start: int = 0, end: int = sys.maxsize, /) -> Iterator[str]: ...
 
 def lookup(name: str | ReadOnlyBuffer, /) -> str:
     """Look up character by name.

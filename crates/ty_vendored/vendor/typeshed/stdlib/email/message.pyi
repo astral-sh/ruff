@@ -7,8 +7,8 @@ from email.charset import Charset
 from email.contentmanager import ContentManager
 from email.errors import MessageDefect
 from email.policy import Policy
-from typing import Any, Generic, Literal, Protocol, TypeVar, overload, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing import Any, Generic, Literal, Protocol, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import Self
 
 __all__ = ["Message", "EmailMessage"]
 

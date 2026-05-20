@@ -39,8 +39,8 @@ from re import Pattern
 from socket import socket
 from ssl import SSLContext
 from types import TracebackType
-from typing import Any, Final, Protocol, overload, type_check_only
-from typing_extensions import Self, TypeAlias, deprecated
+from typing import Any, Final, Protocol, TypeAlias, overload, type_check_only
+from typing_extensions import Self, deprecated
 
 __all__ = [
     "SMTPException",

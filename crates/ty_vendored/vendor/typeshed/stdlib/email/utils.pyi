@@ -6,8 +6,8 @@ from _typeshed import Unused
 from collections.abc import Iterable
 from email import _ParamType
 from email.charset import Charset
-from typing import overload
-from typing_extensions import TypeAlias, deprecated
+from typing import TypeAlias, overload
+from typing_extensions import deprecated
 
 __all__ = [
     "collapse_rfc2231_value",

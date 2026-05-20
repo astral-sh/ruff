@@ -844,24 +844,8 @@ impl KnownClass {
             // which is impossible to replicate in the stubs since the sole instance of the class
             // also has that name in the `sys` module.)
             Self::VersionInfo => "_version_info",
-            Self::EllipsisType => {
-                // Exposed as `types.EllipsisType` on Python >=3.10;
-                // backported as `builtins.ellipsis` by typeshed on Python <=3.9
-                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
-                    "EllipsisType"
-                } else {
-                    "ellipsis"
-                }
-            }
-            Self::NotImplementedType => {
-                // Exposed as `types.NotImplementedType` on Python >=3.10;
-                // backported as `builtins._NotImplementedType` by typeshed on Python <=3.9
-                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
-                    "NotImplementedType"
-                } else {
-                    "_NotImplementedType"
-                }
-            }
+            Self::EllipsisType => "EllipsisType",
+            Self::NotImplementedType => "NotImplementedType",
             Self::Field => "Field",
             Self::KwOnly => "KW_ONLY",
             Self::NamedTupleFallback => "NamedTupleFallback",
@@ -1175,6 +1159,8 @@ impl KnownClass {
             | Self::MethodWrapperType
             | Self::UnionType
             | Self::BuiltinFunctionType
+            | Self::EllipsisType
+            | Self::NotImplementedType
             | Self::WrapperDescriptorType => KnownModule::Types,
             Self::NoneType => KnownModule::Typeshed,
             Self::Awaitable
@@ -1189,6 +1175,7 @@ impl KnownClass {
             | Self::Sequence
             | Self::Mapping
             | Self::ProtocolMeta
+            | Self::ParamSpec
             | Self::SupportsIndex => KnownModule::Typing,
             Self::TypeAliasType
             | Self::ExtensionsTypeVar
@@ -1199,13 +1186,6 @@ impl KnownClass {
             | Self::ParamSpecKwargs
             | Self::Deprecated
             | Self::NewType => KnownModule::TypingExtensions,
-            Self::ParamSpec => {
-                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
-                    KnownModule::Typing
-                } else {
-                    KnownModule::TypingExtensions
-                }
-            }
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
 
@@ -1216,24 +1196,6 @@ impl KnownClass {
                     KnownModule::Typing
                 } else {
                     KnownModule::TypingExtensions
-                }
-            }
-            Self::EllipsisType => {
-                // Exposed as `types.EllipsisType` on Python >=3.10;
-                // backported as `builtins.ellipsis` by typeshed on Python <=3.9
-                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
-                    KnownModule::Types
-                } else {
-                    KnownModule::Builtins
-                }
-            }
-            Self::NotImplementedType => {
-                // Exposed as `types.NotImplementedType` on Python >=3.10;
-                // backported as `builtins._NotImplementedType` by typeshed on Python <=3.9
-                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
-                    KnownModule::Types
-                } else {
-                    KnownModule::Builtins
                 }
             }
             Self::ChainMap
@@ -1536,18 +1498,8 @@ impl KnownClass {
             "ABCMeta" => &[Self::ABCMeta],
             "super" => &[Self::Super],
             "_version_info" => &[Self::VersionInfo],
-            "ellipsis" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
-                &[Self::EllipsisType]
-            }
-            "EllipsisType" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
-                &[Self::EllipsisType]
-            }
-            "_NotImplementedType" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
-                &[Self::NotImplementedType]
-            }
-            "NotImplementedType" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
-                &[Self::NotImplementedType]
-            }
+            "EllipsisType" => &[Self::EllipsisType],
+            "NotImplementedType" => &[Self::NotImplementedType],
             "Field" => &[Self::Field],
             "KW_ONLY" => &[Self::KwOnly],
             "NamedTupleFallback" => &[Self::NamedTupleFallback],
@@ -1946,16 +1898,14 @@ mod tests {
             .map(|class| {
                 let version_added = match class {
                     KnownClass::Template => PythonVersion::PY314,
-                    KnownClass::UnionType => PythonVersion::PY310,
+                    KnownClass::UnionType | KnownClass::KwOnly => PythonVersion::PY310,
                     KnownClass::BaseExceptionGroup | KnownClass::ExceptionGroup => {
                         PythonVersion::PY311
                     }
                     KnownClass::GenericAlias => PythonVersion::PY39,
-                    KnownClass::KwOnly => PythonVersion::PY310,
                     KnownClass::Member | KnownClass::Nonmember | KnownClass::StrEnum => {
                         PythonVersion::PY311
                     }
-                    KnownClass::ParamSpec => PythonVersion::PY310,
                     _ => PythonVersion::PY37,
                 };
                 (class, version_added)

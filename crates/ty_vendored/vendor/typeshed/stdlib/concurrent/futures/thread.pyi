@@ -5,8 +5,8 @@ import sys
 from collections.abc import Callable, Iterable, Mapping, Set as AbstractSet
 from threading import Lock, Semaphore, Thread
 from types import GenericAlias
-from typing import Any, Generic, Protocol, TypeVar, overload, type_check_only
-from typing_extensions import Self, TypeAlias, TypeVarTuple, Unpack
+from typing import Any, Generic, Protocol, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import Self, TypeVarTuple, Unpack
 from weakref import ref
 
 from ._base import BrokenExecutor, Executor, Future
