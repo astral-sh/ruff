@@ -1125,6 +1125,7 @@ impl<'db> DeclarationsBoundnessEvaluator<'_, 'db> {
                     Some(DeclarationWithConstraint {
                         declaration,
                         reachability_constraint,
+                        ..
                     }) if declaration.is_undefined_or(|def| {
                         is_non_exported(db, def, requires_explicit_reexport)
                     }) =>
@@ -1737,6 +1738,7 @@ fn place_from_declarations_impl<'db>(
         let DeclarationWithConstraint {
             declaration,
             reachability_constraint,
+            ..
         } = declaration_with_constraint;
 
         let DefinitionState::Defined(declaration) = declaration else {
