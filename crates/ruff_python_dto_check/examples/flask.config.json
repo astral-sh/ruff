@@ -1,8 +1,8 @@
 {
   "$schema": "../schemas/ruff-py-dto.config.schema.json",
   "root": ".",
-  "include": ["woa/blueprints/**/*.py"],
-  "exclude": ["**/tests/**", "**/__pycache__/**", "**/.venv/**"],
+  "include": ["**/blueprints/**/*.py", "**/routes/**/*.py", "**/views/**/*.py"],
+  "exclude": ["**/tests/**", "**/__pycache__/**", "**/.venv/**", "**/venv/**"],
   "match": [
     {
       "id": "flask_route",
@@ -23,7 +23,7 @@
   ],
   "group": {
     "family_from_filename": {
-      "regex": "^(?P<family>[a-z_]+?)(?:_ops|_bp|_routes)?\\.py$"
+      "regex": "^(?P<family>[a-z_]+?)(?:_ops|_bp|_routes|_views)?\\.py$"
     }
   }
 }

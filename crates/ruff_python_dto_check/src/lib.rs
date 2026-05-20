@@ -6,12 +6,6 @@
 //! This crate is **additive** to ruff: it depends on `ruff_python_parser`,
 //! `ruff_python_ast`, and `ruff_source_file` but does not modify any other
 //! crate. Ruff and ty continue to work unchanged.
-//!
-//! Originally landed as `woa_transcode_harvest` (Flask-only, WoA-shaped).
-//! Renamed and being generalized so any Python project (and any reading
-//! Claude Code session) can point it at a tree and get useful bundles.
-//!
-//! Reference design RFC: `AdaWorldAPI/woa-rs:rfcs/v02-005-ruff-transcode-harvester.md`.
 
 pub mod bundle;
 pub mod config;
@@ -42,7 +36,7 @@ pub const HARVESTER_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Debug, Default)]
 pub struct ModuleHarvest {
     /// Repository-relative path of the source file (e.g.
-    /// `woa/blueprints/vorgaenge_ops.py`).
+    /// `app/blueprints/views.py`).
     pub source_file: String,
     /// One bundle per matched function in the module.
     pub bundles: Vec<Bundle>,
@@ -50,9 +44,9 @@ pub struct ModuleHarvest {
 
 /// Parse one Python source file and emit one [`Bundle`] per matched function.
 ///
-/// Uses the config-driven matcher. Falls back to the legacy Flask route
-/// detector when no config is supplied so the `wo_list_identity` golden test
-/// keeps passing.
+/// Uses the legacy Flask route detector when no config is supplied so the
+/// `flask_view_identity` golden test keeps passing. The config-driven
+/// matcher is the path callers should use in new code.
 pub fn harvest_module(source_file: &str, source: &str) -> Result<ModuleHarvest> {
     let parsed = parse_module(source).with_context(|| format!("parsing {source_file}"))?;
     let line_index = LineIndex::from_source_text(source);

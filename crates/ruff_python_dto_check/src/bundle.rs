@@ -1,8 +1,9 @@
-//! Bundle data model — reshaped per §3.5.
+//! Bundle data model.
 //!
-//! `EmittedBundle` replaces the WoA-shaped `Bundle` as the primary output
-//! type. The legacy `Bundle` is preserved for the backwards-compatible
-//! `harvest_module` API (used by the `wo_list_identity` golden test).
+//! `EmittedBundle` is the primary output type for the config-driven
+//! extraction path. The legacy `Bundle` is preserved for the
+//! backwards-compatible `harvest_module` API used by the
+//! `flask_view_identity` golden test.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -12,7 +13,7 @@ use serde::Serialize;
 use crate::{HARVESTER_VERSION, SCHEMA_VERSION};
 
 // ---------------------------------------------------------------------------
-// Legacy WoA-shaped bundle (kept for golden test compatibility)
+// Legacy bundle (kept for golden test compatibility with the non-config path)
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Serialize)]
@@ -83,13 +84,11 @@ pub struct Decorator {
 pub enum DecoratorKind {
     Route,
     Auth,
-    Scope,
-    ModuleRequired,
     Other,
 }
 
 // ---------------------------------------------------------------------------
-// New config-driven EmittedBundle (§3.5)
+// Config-driven EmittedBundle
 // ---------------------------------------------------------------------------
 
 /// One emitted record per matched function-with-decorator.
@@ -115,7 +114,7 @@ pub struct EmittedBundle {
     pub comparison_within_family: Option<ComparisonWithinFamily>,
 }
 
-/// Content-encoded comparison block (§3.4).
+/// Content-encoded comparison block.
 ///
 /// No advisory English strings. Set algebra + distributions only.
 /// Field names that are forbidden anywhere in this struct:

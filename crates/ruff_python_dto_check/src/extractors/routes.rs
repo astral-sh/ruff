@@ -44,8 +44,11 @@ pub fn detect_route(func: &StmtFunctionDef) -> Option<RouteInfo> {
     None
 }
 
-/// Map an HTTP method set to one of `read | mutation | form`. Mirrors
-/// the heuristic in `WoA/.claude/v0.2/tools/harvest_routes_v2.py`.
+/// Map an HTTP method set to one of `read | mutation | form`.
+///
+/// - `POST` + `GET` → `form` (HTML form posting)
+/// - `POST` / `PUT` / `DELETE` / `PATCH` alone → `mutation`
+/// - everything else → `read`
 pub fn infer_action(methods: &[String]) -> String {
     let upper: Vec<String> = methods.iter().map(|m| m.to_uppercase()).collect();
     let has_post = upper.iter().any(|m| m == "POST");

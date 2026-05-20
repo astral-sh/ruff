@@ -1,6 +1,8 @@
 //! Decorator classifier — heuristic match on the raw `@<expr>` text.
-//! Phase 1 will replace this with a proper AST visit + name resolution
-//! via `ruff_python_semantic`.
+//!
+//! Used by the legacy `harvest_module` API for backwards compatibility.
+//! New code should drive classification from `config.match[].kind` instead
+//! of relying on this hardcoded list.
 
 use crate::bundle::DecoratorKind;
 
@@ -16,21 +18,8 @@ pub fn classify(raw: &str) -> DecoratorKind {
     if is_route {
         return DecoratorKind::Route;
     }
-    if matches!(
-        head,
-        "login_required"
-            | "admin_required"
-            | "superadmin_required"
-            | "require_admin"
-            | "require_admin_hierarchy"
-    ) {
+    if matches!(head, "login_required" | "admin_required") {
         return DecoratorKind::Auth;
-    }
-    if head == "require_perm" || head == "require_scope_via_workorder" {
-        return DecoratorKind::Scope;
-    }
-    if head == "modul_required" || head == "woa_service_required" {
-        return DecoratorKind::ModuleRequired;
     }
     DecoratorKind::Other
 }
