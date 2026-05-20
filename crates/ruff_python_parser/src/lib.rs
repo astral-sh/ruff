@@ -69,8 +69,7 @@ pub use crate::error::{
     UnsupportedSyntaxError, UnsupportedSyntaxErrorKind,
 };
 pub use crate::parser::ParseOptions;
-
-use crate::parser::Parser;
+pub use crate::parser::Parser;
 
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{
@@ -162,11 +161,16 @@ pub fn parse_expression_range(
     range: TextRange,
 ) -> Result<Parsed<ModExpression>, ParseError> {
     let source = &source[..range.end().to_usize()];
-    Parser::new_starts_at(source, range.start(), ParseOptions::from(Mode::Expression))
-        .parse()
-        .try_into_expression()
-        .unwrap()
-        .into_result()
+    Parser::new_starts_at(
+        source,
+        range.start(),
+        ParseOptions::from(Mode::Expression),
+        &[],
+    )
+    .parse()
+    .try_into_expression()
+    .unwrap()
+    .into_result()
 }
 
 /// Parses a Python expression as if it is parenthesized.
@@ -192,6 +196,7 @@ pub fn parse_parenthesized_expression_range(
         source,
         range.start(),
         ParseOptions::from(Mode::ParenthesizedExpression),
+        &[],
     )
     .parse();
     parsed.try_into_expression().unwrap().into_result()
