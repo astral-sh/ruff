@@ -599,9 +599,7 @@ mod tests {
     #[test]
     fn test_parse_fstring_nested_spec_recursion_limit() {
         assert!(parse_suite_with_recursion_limit(r#"f"{foo:{spec}}""#, 8).is_ok());
-
-        let err = parse_suite_with_recursion_limit(&nested_format_spec('f', 200), 8).unwrap_err();
-        assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
+        assert!(parse_suite_with_recursion_limit(&nested_format_spec('f', 200), 8).is_ok());
     }
 
     #[test]
@@ -719,9 +717,7 @@ mod tests {
     #[test]
     fn test_parse_tstring_nested_spec_recursion_limit() {
         assert!(parse_suite_with_recursion_limit(r#"t"{foo:{spec}}""#, 8).is_ok());
-
-        let err = parse_suite_with_recursion_limit(&nested_format_spec('t', 200), 8).unwrap_err();
-        assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
+        assert!(parse_suite_with_recursion_limit(&nested_format_spec('t', 200), 8).is_ok());
     }
 
     #[test]

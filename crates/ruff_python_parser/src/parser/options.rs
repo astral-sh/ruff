@@ -8,12 +8,12 @@ use crate::{AsMode, Mode};
 /// exists to keep the parser from overflowing the stack on adversarial or
 /// machine-generated input.
 ///
-/// The default value mirrors CPython's `MAXSTACK` of 200 nested parentheses
-/// (`Parser/parser.c`): a one-statement module of the form `((((1))))` at
-/// depth 200 must parse, and one at depth 201 must fail. Each nesting level
-/// costs one `with_recursion` call, plus two framing calls (one for the
-/// surrounding statement and one for the innermost atom), so the cap is set
-/// to `200 + 2`.
+/// The default value follows CPython's `MAXSTACK` of 200 nested parentheses
+/// (`Parser/parser.c`) as a conservative budget for parser paths that still
+/// recurse. Common deeply nested forms are parsed iteratively and do not spend
+/// this budget. Recursive expression nesting still costs one `with_recursion`
+/// call per level, plus two framing calls (one for the surrounding statement
+/// and one for the innermost atom), so the cap is set to `200 + 2`.
 const DEFAULT_MAX_RECURSION_DEPTH: u16 = 202;
 
 /// Options for controlling how a source file is parsed.

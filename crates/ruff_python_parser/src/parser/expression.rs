@@ -3378,6 +3378,10 @@ impl<'src> Parser<'src> {
         Some(format_spec)
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the parsed interpolation state is finalized after its format spec"
+    )]
     fn finish_interpolated_element_after_format_spec(
         &mut self,
         start: TextSize,
@@ -4185,10 +4189,10 @@ impl<'src> Parser<'src> {
         if !key.is_parenthesized {
             match &key.expr {
                 Expr::Starred(_) => {
-                    self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &key.expr)
+                    self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &key.expr);
                 }
                 Expr::Named(_) => {
-                    self.add_error(ParseErrorType::UnparenthesizedNamedExpression, key)
+                    self.add_error(ParseErrorType::UnparenthesizedNamedExpression, key);
                 }
                 _ => {}
             }
@@ -5174,12 +5178,9 @@ impl<'src> Parser<'src> {
 
     fn try_parse_nested_comprehension_if(&mut self) -> Option<Expr> {
         let checkpoint = self.checkpoint();
-        let mut frame = match self.try_parse_comprehension_if_frame() {
-            Some(frame) => frame,
-            None => {
-                self.rewind(checkpoint);
-                return None;
-            }
+        let Some(mut frame) = self.try_parse_comprehension_if_frame() else {
+            self.rewind(checkpoint);
+            return None;
         };
         let mut pending = vec![];
 

@@ -1000,7 +1000,7 @@ impl Parser<'_> {
     ) -> ast::PatternMatchClass {
         let arguments_start = self.node_start();
 
-        let cls = self.parse_match_pattern_class_expr(cls);
+        let cls = Box::new(self.parse_match_pattern_class_expr(cls));
 
         self.bump(TokenKind::Lpar);
 
@@ -1018,7 +1018,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_match_pattern_class_expr(&mut self, cls: Pattern) -> Box<Expr> {
+    fn parse_match_pattern_class_expr(&mut self, cls: Pattern) -> Expr {
         match cls {
             Pattern::MatchAs(ast::PatternMatchAs {
                 pattern: None,
@@ -1026,32 +1026,32 @@ impl Parser<'_> {
                 ..
             }) => {
                 if ident.is_valid() {
-                    Box::new(Expr::Name(ast::ExprName {
+                    Expr::Name(ast::ExprName {
                         range: ident.range(),
                         id: ident.id,
                         ctx: ExprContext::Load,
                         node_index: AtomicNodeIndex::NONE,
-                    }))
+                    })
                 } else {
-                    Box::new(Expr::Name(ast::ExprName {
+                    Expr::Name(ast::ExprName {
                         range: ident.range(),
                         id: Name::empty(),
                         ctx: ExprContext::Invalid,
                         node_index: AtomicNodeIndex::NONE,
-                    }))
+                    })
                 }
             }
             Pattern::MatchValue(ast::PatternMatchValue { value, .. })
                 if matches!(&*value, Expr::Attribute(_)) =>
             {
-                value
+                *value
             }
             pattern => {
                 self.add_error(
                     ParseErrorType::OtherError("Invalid value for a class pattern".to_string()),
                     &pattern,
                 );
-                Box::new(recovery::pattern_to_expr(pattern))
+                recovery::pattern_to_expr(pattern)
             }
         }
     }
@@ -1157,7 +1157,7 @@ impl Parser<'_> {
 
         let mut class = loop {
             let arguments_start = self.node_start();
-            let parsed_cls = self.parse_match_pattern_class_expr(cls);
+            let parsed_cls = Box::new(self.parse_match_pattern_class_expr(cls));
 
             self.bump(TokenKind::Lpar);
 

@@ -3943,8 +3943,10 @@ impl<'src> Parser<'src> {
 
         let statements = if let Some(statements) = self.with_recursion(|parser| {
             if parser.indentation_depth() < MAX_RECURSIVE_INDENTATION_DEPTH {
-                parser
-                    .parse_list_into_vec(RecoveryContextKind::BlockStatements, Self::parse_statement)
+                parser.parse_list_into_vec(
+                    RecoveryContextKind::BlockStatements,
+                    Self::parse_statement,
+                )
             } else {
                 parser.parse_deep_block()
             }
