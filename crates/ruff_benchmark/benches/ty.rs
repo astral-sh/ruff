@@ -946,6 +946,75 @@ fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
     });
 }
 
+/// Benchmark for loading the same narrowed binding many times in large match arms.
+///
+/// This is modeled after event rendering code that narrows a large event union
+/// with class patterns, then accesses several attributes on the event in each
+/// match arm.
+///
+/// Sample code structure:
+/// ```python
+/// class Event0:
+///     value: int
+///     detail: str
+/// ...
+///
+/// Event = Event0 | Event1 | ...
+///
+/// def render(event: Event) -> object:
+///     match event:
+///         case Event0():
+///             return event.value, event.detail, event.value
+///         ...
+/// ```
+fn benchmark_repeated_match_narrowed_loads(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 30;
+    const NUM_MATCH_BRANCHES: usize = 29;
+
+    setup_rayon();
+
+    let mut code = "from __future__ import annotations\n\n".to_string();
+
+    for i in 0..NUM_CLASSES {
+        writeln!(
+            &mut code,
+            "class Event{i}:\n    value: int\n    detail: str\n    index: int\n"
+        )
+        .ok();
+    }
+
+    code.push_str("Event = ");
+    for i in 0..NUM_CLASSES {
+        if i > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "Event{i}").ok();
+    }
+    code.push_str("\n\n");
+
+    code.push_str("def render(event: Event) -> object:\n    match event:\n");
+    for i in 0..NUM_MATCH_BRANCHES {
+        writeln!(
+            &mut code,
+            "        case Event{i}():\n            return event.value, event.detail, event.index, event.value, event.detail"
+        )
+        .ok();
+    }
+    code.push_str("        case _:\n            return None\n\n");
+
+    criterion.bench_function("ty_micro[repeated_match_narrowed_loads]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Benchmark for narrowing through a long `isinstance` elif chain.
 ///
 /// This pattern is common in visitor-style dispatch code (e.g. koda-validate's
@@ -1401,27 +1470,28 @@ fn datetype(criterion: &mut Criterion) {
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);
 criterion_group!(
     micro,
-    benchmark_many_string_assignments,
-    benchmark_many_tuple_assignments,
-    benchmark_tuple_implicit_instance_attributes,
     benchmark_complex_constrained_attributes_1,
     benchmark_complex_constrained_attributes_2,
     benchmark_complex_constrained_attributes_3,
+    benchmark_gradual_vararg_call,
+    benchmark_large_isinstance_narrowing,
+    benchmark_large_union_narrowing,
+    benchmark_literal_equality_fallthrough_guarded_any,
+    benchmark_literal_match_fallthrough,
+    benchmark_literal_match_fallthrough_guarded_any,
     benchmark_many_enum_members,
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
-    benchmark_gradual_vararg_call,
-    benchmark_vararg_parameter_type_accumulation,
+    benchmark_many_string_assignments,
+    benchmark_many_tuple_assignments,
+    benchmark_pandas_tdd,
+    benchmark_repeated_match_narrowed_loads,
+    benchmark_tuple_implicit_instance_attributes,
+    benchmark_typeis_narrowing,
     benchmark_typevar_mapping_large_accumulation,
     benchmark_typevar_mapping_small_accumulations,
+    benchmark_vararg_parameter_type_accumulation,
     benchmark_very_large_tuple,
-    benchmark_large_union_narrowing,
-    benchmark_large_isinstance_narrowing,
-    benchmark_literal_match_fallthrough,
-    benchmark_literal_match_fallthrough_guarded_any,
-    benchmark_literal_equality_fallthrough_guarded_any,
-    benchmark_typeis_narrowing,
-    benchmark_pandas_tdd,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);
