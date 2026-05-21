@@ -3374,10 +3374,11 @@ impl<'src> Parser<'src> {
             return self.empty_parenthesized_tuple(start);
         }
 
-        // The parser used to recurse once for every nested group. Keep the common case above on
-        // its direct path and unroll only when the first parenthesized expression is another one.
         if self.at(TokenKind::Lpar) {
-            return self.parse_nested_parenthesized_expression(start);
+            return self.parse_nested_parenthesized_expression(PendingParenthesizedExpression {
+                start,
+                elts: vec![],
+            });
         }
 
         let context = ExpressionContext::yield_or_starred_bitwise_or();
@@ -3400,6 +3401,14 @@ impl<'src> Parser<'src> {
                 expression_start,
                 context,
             );
+            let parsed_expr = if self.at(TokenKind::Comma) {
+                match self.try_parse_nested_parenthesized_tuple_expression(start, parsed_expr) {
+                    Ok(pending) => return self.parse_nested_parenthesized_expression(pending),
+                    Err(parsed_expr) => parsed_expr,
+                }
+            } else {
+                parsed_expr
+            };
             return self.finish_parenthesized_expression(parsed_expr, start);
         }
 
@@ -3410,8 +3419,40 @@ impl<'src> Parser<'src> {
         self.finish_parenthesized_expression(parsed_expr, start)
     }
 
-    fn parse_nested_parenthesized_expression(&mut self, outer_start: TextSize) -> ParsedExpr {
-        let mut starts = vec![outer_start];
+    fn try_parse_nested_parenthesized_tuple_expression(
+        &mut self,
+        start: TextSize,
+        first_element: ParsedExpr,
+    ) -> Result<PendingParenthesizedExpression, ParsedExpr> {
+        let checkpoint = self.checkpoint();
+        let is_parenthesized = first_element.is_parenthesized;
+        let mut elts = vec![first_element.expr];
+
+        loop {
+            if !self.eat(TokenKind::Comma) || self.at_sequence_end() {
+                self.rewind(checkpoint);
+                return Err(ParsedExpr {
+                    expr: elts.into_iter().next().expect("first element is present"),
+                    is_parenthesized,
+                });
+            }
+
+            if self.at(TokenKind::Lpar) {
+                return Ok(PendingParenthesizedExpression { start, elts });
+            }
+
+            elts.push(
+                self.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or())
+                    .expr,
+            );
+        }
+    }
+
+    fn parse_nested_parenthesized_expression(
+        &mut self,
+        outer: PendingParenthesizedExpression,
+    ) -> ParsedExpr {
+        let mut pending = vec![outer];
 
         let mut parsed_expr = loop {
             let start = self.node_start();
@@ -3428,22 +3469,55 @@ impl<'src> Parser<'src> {
                 );
             }
 
-            starts.push(start);
-
-            if !self.at(TokenKind::Lpar) {
-                break self.parse_named_expression_or_higher(
-                    ExpressionContext::yield_or_starred_bitwise_or(),
-                );
+            if self.at(TokenKind::Lpar) {
+                pending.push(PendingParenthesizedExpression {
+                    start,
+                    elts: vec![],
+                });
+                continue;
             }
+
+            let parsed_expr = self
+                .parse_named_expression_or_higher(ExpressionContext::yield_or_starred_bitwise_or());
+            if self.at(TokenKind::Comma) {
+                match self.try_parse_nested_parenthesized_tuple_expression(start, parsed_expr) {
+                    Ok(nested) => {
+                        pending.push(nested);
+                        continue;
+                    }
+                    Err(parsed_expr) => {
+                        pending.push(PendingParenthesizedExpression {
+                            start,
+                            elts: vec![],
+                        });
+                        break parsed_expr;
+                    }
+                }
+            }
+
+            pending.push(PendingParenthesizedExpression {
+                start,
+                elts: vec![],
+            });
+            break parsed_expr;
         };
 
-        while let Some(start) = starts.pop() {
-            parsed_expr = self.finish_parenthesized_expression(parsed_expr, start);
+        while let Some(outer) = pending.pop() {
+            parsed_expr = if outer.elts.is_empty() {
+                self.finish_parenthesized_expression(parsed_expr, outer.start)
+            } else {
+                Expr::Tuple(self.finish_parenthesized_tuple_expression_after_element(
+                    outer.elts,
+                    parsed_expr.expr,
+                    outer.start,
+                ))
+                .into()
+            };
 
-            if !starts.is_empty() {
+            if !pending.is_empty() {
                 parsed_expr = self.parse_named_expression_or_higher_from_lhs(
                     parsed_expr,
-                    start,
+                    outer.start,
                     ExpressionContext::yield_or_starred_bitwise_or(),
                 );
             }
@@ -3490,7 +3564,10 @@ impl<'src> Parser<'src> {
             }
 
             if self.at(TokenKind::Lpar) {
-                break self.parse_nested_parenthesized_expression(right_start);
+                break self.parse_nested_parenthesized_expression(PendingParenthesizedExpression {
+                    start: right_start,
+                    elts: vec![],
+                });
             }
 
             expression_start = self.node_start();
@@ -3650,6 +3727,56 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
             parenthesized: parenthesized.is_yes(),
+        }
+    }
+
+    fn finish_parenthesized_tuple_expression_after_element(
+        &mut self,
+        mut elts: Vec<Expr>,
+        element: Expr,
+        start: TextSize,
+    ) -> ast::ExprTuple {
+        elts.push(element);
+
+        if self.eat(TokenKind::Comma) {
+            if !self.at(TokenKind::Rpar) {
+                self.parse_comma_separated_list(
+                    RecoveryContextKind::TupleElements(Parenthesized::Yes),
+                    |parser| {
+                        elts.push(
+                            parser
+                                .parse_named_expression_or_higher(
+                                    ExpressionContext::starred_bitwise_or(),
+                                )
+                                .expr,
+                        );
+                    },
+                );
+            }
+        } else if !self.at(TokenKind::Rpar) {
+            self.expect(TokenKind::Comma);
+            self.parse_comma_separated_list(
+                RecoveryContextKind::TupleElements(Parenthesized::Yes),
+                |parser| {
+                    elts.push(
+                        parser
+                            .parse_named_expression_or_higher(
+                                ExpressionContext::starred_bitwise_or(),
+                            )
+                            .expr,
+                    );
+                },
+            );
+        }
+
+        self.expect(TokenKind::Rpar);
+
+        ast::ExprTuple {
+            elts,
+            ctx: ExprContext::Load,
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+            parenthesized: true,
         }
     }
 
@@ -4503,6 +4630,11 @@ struct ArgumentParsingState {
     keywords: Vec<ast::Keyword>,
     seen_keyword_argument: bool,
     seen_keyword_unpacking: bool,
+}
+
+struct PendingParenthesizedExpression {
+    start: TextSize,
+    elts: Vec<Expr>,
 }
 
 struct PendingParenthesizedBinaryExpression {

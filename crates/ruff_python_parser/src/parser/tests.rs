@@ -20,6 +20,22 @@ fn deeply_nested_parens() {
 }
 
 #[test]
+fn deeply_nested_later_tuple_elements() {
+    let depth = 5_000;
+    let mut src = String::from("x = ");
+    for _ in 0..depth {
+        src.push_str("(0, ");
+    }
+    src.push('1');
+    for _ in 0..depth {
+        src.push(')');
+    }
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
+}
+
+#[test]
 fn deeply_nested_parens_continuations() {
     for source in [
         "((1) + 2)",
