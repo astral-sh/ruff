@@ -133,10 +133,10 @@ reveal_type(x)  # revealed: Literal[2, 3, 4]
 ## constraints apply to later test expressions
 
 ```py
+from typing import Literal
+
 def check(x) -> bool:
     return bool(x)
-
-from typing import Literal
 
 def _(x: Literal[1] | None):
     y = 0

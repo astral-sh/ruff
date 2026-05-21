@@ -44,10 +44,10 @@ reveal_type(FinalClass() and None)  # revealed: None
 ```py
 class A: ...
 
-def _(x: A | None, flag2: bool, flag3: bool):
-    flag2 and isinstance(x, A) and reveal_type(x)  # revealed: A
-    isinstance(x, A) and flag2 and reveal_type(x)  # revealed: A
-    reveal_type(x) and isinstance(x, A) and flag3  # revealed: A | None
+def _(x: A | None, flag1: bool, flag2: bool):
+    flag1 and isinstance(x, A) and reveal_type(x)  # revealed: A
+    isinstance(x, A) and flag1 and reveal_type(x)  # revealed: A
+    reveal_type(x) and isinstance(x, A) and flag2  # revealed: A | None
 ```
 
 ## Multiple `or` arms
@@ -55,10 +55,10 @@ def _(x: A | None, flag2: bool, flag3: bool):
 ```py
 class A: ...
 
-def _(x: A | None, flag2: bool, flag3: bool, flag4: bool):
-    flag2 or isinstance(x, A) or reveal_type(x)  # revealed: None
-    isinstance(x, A) or flag3 or reveal_type(x)  # revealed: None
-    reveal_type(x) or isinstance(x, A) or flag4  # revealed: A | None
+def _(x: A | None, flag1: bool, flag2: bool, flag3: bool):
+    flag1 or isinstance(x, A) or reveal_type(x)  # revealed: None
+    isinstance(x, A) or flag2 or reveal_type(x)  # revealed: None
+    reveal_type(x) or isinstance(x, A) or flag3  # revealed: A | None
 ```
 
 ## Multiple predicates

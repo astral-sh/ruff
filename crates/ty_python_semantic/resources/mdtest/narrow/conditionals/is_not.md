@@ -45,7 +45,8 @@ def _(x: bool):
 Boolean literals:
 
 ```py
-def _(x: bool):
+def _(flag: bool):
+    x = True if flag else False
     reveal_type(x)  # revealed: bool
 
     if x is not False:
@@ -115,7 +116,10 @@ def _(x: A, y: A | None):
 The type guard removes `False` from the union type of the tested value only.
 
 ```py
-def _(x: bool, y: bool):
+def _(x_flag: bool, y_flag: bool):
+    x = True if x_flag else False
+    y = True if y_flag else False
+
     reveal_type(x)  # revealed: bool
     reveal_type(y)  # revealed: bool
 

@@ -1,9 +1,7 @@
 # Comparison: Unsupported operators
 
 ```py
-from typing import Literal
-
-def _(int_literal_or_str_literal: Literal[1, "foo"], flag1: bool, flag2: bool):
+def _(flag: bool, flag1: bool, flag2: bool):
     class A: ...
     # snapshot
     a = 1 in 7
@@ -12,9 +10,9 @@ def _(int_literal_or_str_literal: Literal[1, "foo"], flag1: bool, flag2: bool):
 
 ```snapshot
 error[unsupported-operator]: Unsupported `in` operation
- --> src/mdtest_snippet.py:6:9
+ --> src/mdtest_snippet.py:4:9
   |
-6 |     a = 1 in 7
+4 |     a = 1 in 7
   |         -^^^^-
   |         |    |
   |         |    Has type `Literal[7]`
@@ -30,9 +28,9 @@ error[unsupported-operator]: Unsupported `in` operation
 
 ```snapshot
 error[unsupported-operator]: Unsupported `not in` operation
- --> src/mdtest_snippet.py:9:9
+ --> src/mdtest_snippet.py:7:9
   |
-9 |     b = 0 not in 10
+7 |     b = 0 not in 10
   |         -^^^^^^^^--
   |         |        |
   |         |        Has type `Literal[10]`
@@ -48,9 +46,9 @@ error[unsupported-operator]: Unsupported `not in` operation
 
 ```snapshot
 error[unsupported-operator]: Unsupported `<` operation
-  --> src/mdtest_snippet.py:12:9
+  --> src/mdtest_snippet.py:10:9
    |
-12 |     c = object() < 5
+10 |     c = object() < 5
    |         --------^^^-
    |         |          |
    |         |          Has type `Literal[5]`
@@ -66,9 +64,9 @@ error[unsupported-operator]: Unsupported `<` operation
 
 ```snapshot
 error[unsupported-operator]: Unsupported `<` operation
-  --> src/mdtest_snippet.py:15:9
+  --> src/mdtest_snippet.py:13:9
    |
-15 |     d = 5 < object()
+13 |     d = 5 < object()
    |         -^^^--------
    |         |   |
    |         |   Has type `object`
@@ -77,6 +75,7 @@ error[unsupported-operator]: Unsupported `<` operation
 ```
 
 ```py
+    int_literal_or_str_literal = 1 if flag else "foo"
     # snapshot
     e = 42 in int_literal_or_str_literal
     reveal_type(e)  # revealed: bool
@@ -84,9 +83,9 @@ error[unsupported-operator]: Unsupported `<` operation
 
 ```snapshot
 error[unsupported-operator]: Unsupported `in` operation
-  --> src/mdtest_snippet.py:18:9
+  --> src/mdtest_snippet.py:17:9
    |
-18 |     e = 42 in int_literal_or_str_literal
+17 |     e = 42 in int_literal_or_str_literal
    |         --^^^^--------------------------
    |         |     |
    |         |     Has type `Literal[1, "foo"]`
@@ -103,9 +102,9 @@ info: Operation fails because operator `in` is not supported between objects of 
 
 ```snapshot
 error[unsupported-operator]: Unsupported `<` operation
-  --> src/mdtest_snippet.py:21:9
+  --> src/mdtest_snippet.py:20:9
    |
-21 |     f = (1, 2) < (1, "hello")
+20 |     f = (1, 2) < (1, "hello")
    |         ------^^^------------
    |         |        |
    |         |        Has type `tuple[Literal[1], Literal["hello"]]`
@@ -122,9 +121,9 @@ info: Operation fails because operator `<` is not supported between the tuple el
 
 ```snapshot
 error[unsupported-operator]: Unsupported `<` operation
-  --> src/mdtest_snippet.py:24:9
+  --> src/mdtest_snippet.py:23:9
    |
-24 |     g = (flag1, A()) < (flag2, A())
+23 |     g = (flag1, A()) < (flag2, A())
    |         ------------^^^------------
    |         |
    |         Both operands have type `tuple[bool, A]`

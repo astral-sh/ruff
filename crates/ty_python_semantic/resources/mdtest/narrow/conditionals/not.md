@@ -7,13 +7,13 @@ The `not` operator negates a constraint.
 ```py
 from typing import Literal
 
-def _(x: None | Literal[1]):
+def _(x: Literal[1] | None):
     if not x is None:
         reveal_type(x)  # revealed: Literal[1]
     else:
         reveal_type(x)  # revealed: None
 
-    reveal_type(x)  # revealed: None | Literal[1]
+    reveal_type(x)  # revealed: Literal[1] | None
 ```
 
 ## `not isinstance`
