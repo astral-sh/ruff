@@ -65,7 +65,7 @@ use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module
 
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
 use crate::types::call::{Binding, CallArguments};
-use crate::types::callable::CallableTypeKind;
+use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::cyclic::ActiveRecursionDetector;
@@ -1339,16 +1339,27 @@ impl<'db> FunctionType<'db> {
             .last_definition_raw_signature(db, return_callable_typevar_scope)
     }
 
-    /// Convert the `FunctionType` into a [`CallableType`].
-    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
-        let kind = if self.is_classmethod(db) {
+    /// Return the kind for this function when it is converted into a [`CallableType`].
+    pub(crate) fn callable_type_kind(self, db: &'db dyn Db) -> CallableTypeKind {
+        if self.is_classmethod(db) {
             CallableTypeKind::ClassMethodLike
         } else if self.is_staticmethod(db) {
             CallableTypeKind::StaticMethodLike
         } else {
             CallableTypeKind::FunctionLike
-        };
-        CallableType::new(db, self.signature(db), kind)
+        }
+    }
+
+    /// Convert the `FunctionType` into a [`CallableType`].
+    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(
+            db,
+            self.signature(db),
+            self.callable_type_kind(db),
+            CallableFunctionProvenance::from_function_return_annotation(
+                self.has_explicit_return_annotation(db),
+            ),
+        )
     }
 
     /// Convert the `FunctionType` into a [`BoundMethodType`].

@@ -6,9 +6,13 @@ use crate::{
     types::{
         CallableType, KnownClass, LiteralValueType, LiteralValueTypeKind, Parameter, Parameters,
         PropertyInstanceType, Signature, StringLiteralType, Type, UnionType,
-        callable::CallableTypeKind, constraints::ConstraintSet, function::FunctionType,
-        known_instance::InternedConstraintSet, relation::TypeRelationChecker,
-        signatures::CallableSignature, visitor,
+        callable::{CallableFunctionProvenance, CallableTypeKind},
+        constraints::ConstraintSet,
+        function::FunctionType,
+        known_instance::InternedConstraintSet,
+        relation::TypeRelationChecker,
+        signatures::CallableSignature,
+        visitor,
     },
 };
 
@@ -77,6 +81,9 @@ impl<'db> BoundMethodType<'db> {
                     .map(|signature| signature.bind_self(db, Some(self_instance))),
             ),
             CallableTypeKind::FunctionLike,
+            CallableFunctionProvenance::from_function_return_annotation(
+                function.has_explicit_return_annotation(db),
+            ),
         )
     }
 

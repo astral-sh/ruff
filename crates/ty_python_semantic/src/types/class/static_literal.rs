@@ -24,7 +24,7 @@ use crate::{
         Signature, SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
         TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
         call::{CallError, CallErrorKind},
-        callable::CallableTypeKind,
+        callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, DynamicTypedDictLiteral, Field,
             FieldKind, InstanceMemberResult, MetaclassError, MetaclassErrorKind, MethodDecorator,
@@ -966,6 +966,7 @@ impl<'db> StaticClassLiteral<'db> {
                     db,
                     callable_ty.signatures(db),
                     CallableTypeKind::FunctionLike,
+                    callable_ty.provenance(db),
                 )),
                 Type::Union(union) => {
                     union.map(db, |element| into_function_like_callable(db, *element))
@@ -1191,7 +1192,12 @@ impl<'db> StaticClassLiteral<'db> {
                         )
                     }),
                 );
-                CallableType::new(db, signatures, CallableTypeKind::FunctionLike)
+                CallableType::new(
+                    db,
+                    signatures,
+                    CallableTypeKind::FunctionLike,
+                    CallableFunctionProvenance::None,
+                )
             });
 
             return Some(synthesized_callables.into_type(db));
@@ -1601,6 +1607,7 @@ impl<'db> StaticClassLiteral<'db> {
             db,
             CallableSignature::from_overloads(overloads),
             CallableTypeKind::FunctionLike,
+            CallableFunctionProvenance::None,
         )))
     }
 
