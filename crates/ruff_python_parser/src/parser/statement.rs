@@ -2831,8 +2831,24 @@ impl<'src> Parser<'src> {
                 );
 
                 // Although this statement is not a valid `async` statement,
-                // we still parse it.
-                self.parse_statement()
+                // we still parse it. Guard the recursive recovery path so
+                // `async async async ...` cannot overflow the parser stack.
+                if let Some(stmt) = self.with_recursion(Self::parse_statement) {
+                    stmt
+                } else {
+                    let range = self.node_range(async_start);
+                    self.add_error(ParseErrorType::RecursionLimitExceeded, range);
+                    Stmt::Expr(ast::StmtExpr {
+                        range,
+                        value: Box::new(Expr::Name(ast::ExprName {
+                            range,
+                            id: Name::new_static("async"),
+                            ctx: ExprContext::Invalid,
+                            node_index: AtomicNodeIndex::NONE,
+                        })),
+                        node_index: AtomicNodeIndex::NONE,
+                    })
+                }
             }
         }
     }
@@ -3069,8 +3085,14 @@ impl<'src> Parser<'src> {
     fn parse_block(&mut self) -> Vec<Stmt> {
         self.bump(TokenKind::Indent);
 
-        let statements =
-            self.parse_list_into_vec(RecoveryContextKind::BlockStatements, Self::parse_statement);
+        let statements = if let Some(statements) = self.with_recursion(|parser| {
+            parser.parse_list_into_vec(RecoveryContextKind::BlockStatements, Self::parse_statement)
+        }) {
+            statements
+        } else {
+            self.report_recursion_limit_exceeded(self.current_token_range());
+            Vec::new()
+        };
 
         self.expect(TokenKind::Dedent);
 
