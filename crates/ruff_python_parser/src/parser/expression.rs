@@ -2810,22 +2810,13 @@ impl<'src> Parser<'src> {
         flags: AnyStringFlags,
         kind: InterpolatedStringKind,
     ) -> Option<InterpolatedStringData> {
-        let checkpoint = self.checkpoint();
-        let element_start = self.node_start();
-        if !self.eat(TokenKind::Lbrace) {
-            return None;
-        }
-        self.tokens
-            .re_lex_string_token_in_interpolation_element(kind);
-
-        if !self.at(kind.start_token()) {
-            self.rewind(checkpoint);
-            return None;
-        }
+        let (element_start, initial_elements) =
+            self.try_parse_nested_interpolated_string_head(flags, kind)?;
 
         let mut pending = vec![PendingNestedInterpolatedString {
             start,
             flags,
+            initial_elements,
             element_start,
         }];
 
@@ -2834,22 +2825,17 @@ impl<'src> Parser<'src> {
             let flags = self.tokens.current_flags().as_any_string_flags();
             self.bump(kind.start_token());
 
-            let checkpoint = self.checkpoint();
-            let element_start = self.node_start();
-            if self.eat(TokenKind::Lbrace) {
-                self.tokens
-                    .re_lex_string_token_in_interpolation_element(kind);
-
-                if self.at(kind.start_token()) {
-                    pending.push(PendingNestedInterpolatedString {
-                        start,
-                        flags,
-                        element_start,
-                    });
-                    continue;
-                }
+            if let Some((element_start, initial_elements)) =
+                self.try_parse_nested_interpolated_string_head(flags, kind)
+            {
+                pending.push(PendingNestedInterpolatedString {
+                    start,
+                    flags,
+                    initial_elements,
+                    element_start,
+                });
+                continue;
             }
-            self.rewind(checkpoint);
 
             break self.parse_interpolated_string_after_start(start, flags, kind);
         };
@@ -2858,8 +2844,10 @@ impl<'src> Parser<'src> {
             let value = self.interpolated_string_expression(string, kind).into();
             let element =
                 self.finish_interpolated_element(pending.element_start, pending.flags, kind, value);
+            let mut initial_elements = pending.initial_elements;
+            initial_elements.push(InterpolatedStringElement::from(element));
             let elements = self.parse_interpolated_string_elements_after_initial(
-                vec![InterpolatedStringElement::from(element)],
+                initial_elements,
                 pending.flags,
                 InterpolatedStringElementsKind::Regular(kind),
                 kind,
@@ -2868,6 +2856,33 @@ impl<'src> Parser<'src> {
         }
 
         Some(string)
+    }
+
+    fn try_parse_nested_interpolated_string_head(
+        &mut self,
+        flags: AnyStringFlags,
+        kind: InterpolatedStringKind,
+    ) -> Option<(TextSize, Vec<InterpolatedStringElement>)> {
+        let checkpoint = self.checkpoint();
+        let middle_token_kind = kind.middle_token();
+        let mut initial_elements = Vec::new();
+        while self.at(middle_token_kind) {
+            initial_elements
+                .push(self.parse_interpolated_literal_element(flags, middle_token_kind));
+        }
+
+        let element_start = self.node_start();
+        if self.eat(TokenKind::Lbrace) {
+            self.tokens
+                .re_lex_string_token_in_interpolation_element(kind);
+
+            if self.at(kind.start_token()) {
+                return Some((element_start, initial_elements));
+            }
+        }
+
+        self.rewind(checkpoint);
+        None
     }
 
     fn interpolated_string_expression(
@@ -6517,6 +6532,7 @@ struct PendingIfExpression {
 struct PendingNestedInterpolatedString {
     start: TextSize,
     flags: AnyStringFlags,
+    initial_elements: Vec<InterpolatedStringElement>,
     element_start: TextSize,
 }
 
