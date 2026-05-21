@@ -71,7 +71,7 @@ use crate::types::function::{
     FunctionDecorators, FunctionType, KnownFunction, report_revealed_type,
 };
 use crate::types::generics::{
-    GenericContext, InferableTypeVars, SpecializationBuilder, bind_typevar,
+    GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, bind_typevar,
 };
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
@@ -98,7 +98,7 @@ use crate::types::{
     MemberLookupPolicy, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, SentinelInstance,
     Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers,
     TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
-    TypedDictType, UnionAccumulator, UnionBuilder, UnionType, binding_type,
+    TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
     infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
@@ -246,7 +246,13 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
     /// The constraints on any collection literals that are accessed in this region.
     //
-    // TODO: We should store constraint sets directly here.
+    // TODO: Store projected constraint sets directly here instead of specialized receiver types.
+    // Bound-method calls on unconstrained collection literals can introduce method-local typevars
+    // (for example, `list.sort` constrains `T@list` using `SupportsRichComparisonT@sort`). A
+    // principled representation would store an owned constraint set over the collection literal's
+    // generic context and existentially quantify away the method-local typevars, so combining
+    // `xs.append("x")` with `xs.sort()` yields `str ≤ T ≤ SupportsRichComparison` instead of
+    // leaking `SupportsRichComparisonT@sort` into the inferred list element type.
     collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
 
     /// Expressions that are string annotations
@@ -7552,6 +7558,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_arguments
     }
 
+    fn collection_use_constraint_from_specialization(
+        &self,
+        identity_instance: Type<'db>,
+        receiver_generic_context: Option<GenericContext<'db>>,
+        call_specialization: Specialization<'db>,
+    ) -> Option<Type<'db>> {
+        let constraint = identity_instance.apply_specialization(self.db(), call_specialization);
+        let Some(receiver_generic_context) = receiver_generic_context else {
+            return Some(constraint);
+        };
+
+        // Method-local typevars describe requirements imposed by the method, not concrete element
+        // types learned for the collection. Until collection-use constraints are represented as
+        // projected constraint sets, avoid leaking those method-local typevars into the inferred
+        // collection literal type.
+        let receiver_typevars: FxHashSet<_> = receiver_generic_context
+            .variables(self.db())
+            .map(|typevar| typevar.identity(self.db()))
+            .collect();
+        if any_over_type(self.db(), constraint, false, |ty| {
+            ty.as_typevar()
+                .is_some_and(|typevar| !receiver_typevars.contains(&typevar.identity(self.db())))
+        }) {
+            return None;
+        }
+
+        Some(constraint)
+    }
+
     fn infer_call_expression(
         &mut self,
         call_expression: &ast::ExprCall,
@@ -7966,13 +8001,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.db(),
                     collection_literal.identity_specialization(self.db()),
                 );
+                let collection_generic_context = collection_literal.generic_context(self.db());
 
                 let mut identity_bindings = self
                     .infer_attribute_load_impl(attribute, identity_instance)
                     .bindings(self.db())
                     .match_parameters(self.db(), &call_arguments)
                     // Perform inference against the type variables on the receiver's generic context.
-                    .with_generic_context(self.db(), collection_literal.generic_context(self.db()));
+                    .with_generic_context(self.db(), collection_generic_context);
 
                 let call_result = self.speculate().infer_and_check_argument_types(
                     ArgumentsIter::from_ast(arguments),
@@ -7996,8 +8032,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         // Record the constraints on the receiver's generic context formed by
                         // the arguments to this bound method call.
-                        let constraints =
-                            identity_instance.apply_specialization(self.db(), call_specialization);
+                        let Some(constraints) = self.collection_use_constraint_from_specialization(
+                            identity_instance,
+                            collection_generic_context,
+                            call_specialization,
+                        ) else {
+                            continue;
+                        };
 
                         self.collection_use_constraints
                             .entry(collection_def)

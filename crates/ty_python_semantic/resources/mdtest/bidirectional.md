@@ -785,6 +785,13 @@ reveal_type(x1)  # revealed: list[int | str]
 ```
 
 ```py
+x1_sorted = []
+x1_sorted.append("x")
+x1_sorted.sort()
+reveal_type(x1_sorted)  # revealed: list[str]
+```
+
+```py
 class X:
     def __init__(self):
         self.x = []
