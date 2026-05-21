@@ -73,10 +73,11 @@ use crate::rules::ruff::typing::type_hint_explicitly_allows_none;
 ///     pass
 /// ```
 ///
-/// User-defined types — including subclasses and `Enum` types — are
+/// User-defined types, including subclasses and `Enum` types, are
 /// likewise not flagged. Ruff treats names that it cannot resolve to a
 /// known type as compatible with `None` (since, for example, `Letter`
 /// could be defined as `type Letter = str | None` in scope):
+///
 /// ```python
 /// from enum import Enum
 ///
@@ -90,7 +91,7 @@ use crate::rules::ruff::typing::type_hint_explicitly_allows_none;
 ///
 /// def f(
 ///     letter: Letter = None,  # not flagged
-///     value: Custom = None,   # not flagged
+///     value: Custom = None,  # not flagged
 /// ) -> None: ...
 /// ```
 ///
