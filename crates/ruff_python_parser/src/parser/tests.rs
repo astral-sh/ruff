@@ -777,13 +777,15 @@ fn deeply_nested_right_assoc_pow_chain() {
 
 #[test]
 fn deeply_nested_ternary_else_chain() {
-    let depth = 2_000;
+    let depth = 20_000;
     let mut src = String::with_capacity(depth * 12 + 1);
     for _ in 0..depth {
         src.push_str("1 if 1 else ");
     }
     src.push('1');
-    parse_module(&src).unwrap();
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
 }
 
 #[test]

@@ -5324,28 +5324,82 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#conditional-expressions>
     pub(super) fn parse_if_expression(&mut self, body: Expr, start: TextSize) -> ast::ExprIf {
+        let pending = self.parse_if_expression_header(body, start);
+
+        if self.at(TokenKind::Lambda) {
+            let orelse = self.parse_conditional_expression_or_higher();
+            return self.if_expression(pending, orelse.expr);
+        }
+
+        let orelse_start = self.node_start();
+        let orelse = self.parse_simple_expression(ExpressionContext::default());
+
+        if self.at(TokenKind::If) {
+            self.parse_nested_if_expression(pending, orelse.expr, orelse_start)
+        } else {
+            self.if_expression(pending, orelse.expr)
+        }
+    }
+
+    fn parse_if_expression_header(&mut self, body: Expr, start: TextSize) -> PendingIfExpression {
         self.bump(TokenKind::If);
 
         let test = self.parse_simple_expression(ExpressionContext::default());
 
         self.expect(TokenKind::Else);
 
-        // `a if b else a if b else ...` recurses through `orelse` at the
-        // conditional layer, which is not covered by the `parse_lhs_expression`
-        // guard (that scope is released once each atom is parsed). Guard here.
-        let orelse = if let Some(orelse) =
-            self.with_recursion(Self::parse_conditional_expression_or_higher)
-        {
-            orelse
-        } else {
-            self.report_recursion_limit_exceeded(self.current_token_range());
-            self.recursion_recovery_expr()
+        PendingIfExpression {
+            body,
+            test: test.expr,
+            start,
+        }
+    }
+
+    fn parse_nested_if_expression(
+        &mut self,
+        outer: PendingIfExpression,
+        mut body: Expr,
+        mut start: TextSize,
+    ) -> ast::ExprIf {
+        let mut pending = vec![outer];
+
+        let mut orelse = loop {
+            pending.push(self.parse_if_expression_header(body, start));
+
+            if self.at(TokenKind::Lambda) {
+                break self.parse_conditional_expression_or_higher().expr;
+            }
+
+            start = self.node_start();
+            let parsed_orelse = self.parse_simple_expression(ExpressionContext::default());
+
+            if self.at(TokenKind::If) {
+                body = parsed_orelse.expr;
+                continue;
+            }
+
+            break parsed_orelse.expr;
         };
 
+        let innermost = pending
+            .pop()
+            .expect("nested if parsing includes the outer if expression");
+        let mut if_expr = self.if_expression(innermost, orelse);
+
+        while let Some(outer) = pending.pop() {
+            orelse = Expr::If(if_expr);
+            if_expr = self.if_expression(outer, orelse);
+        }
+
+        if_expr
+    }
+
+    fn if_expression(&self, pending: PendingIfExpression, orelse: Expr) -> ast::ExprIf {
+        let PendingIfExpression { body, test, start } = pending;
         ast::ExprIf {
             body: Box::new(body),
-            test: Box::new(test.expr),
-            orelse: Box::new(orelse.expr),
+            test: Box::new(test),
+            orelse: Box::new(orelse),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -5649,6 +5703,12 @@ struct PendingComprehensionIf {
 struct PendingLambdaExpression {
     start: TextSize,
     parameters: Option<Box<ast::Parameters>>,
+}
+
+struct PendingIfExpression {
+    body: Expr,
+    test: Expr,
+    start: TextSize,
 }
 
 enum PendingComprehensionIter {
