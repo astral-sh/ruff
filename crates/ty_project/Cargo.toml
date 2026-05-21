@@ -36,6 +36,7 @@ colored = { workspace = true }
 crossbeam = { workspace = true }
 get-size2 = { workspace = true, features = ["ordermap"] }
 globset = { workspace = true }
+ignore = { workspace = true }
 notify = { workspace = true }
 ordermap = { workspace = true, features = ["serde"] }
 pep440_rs = { workspace = true, features = ["version-ranges"] }
@@ -55,7 +56,7 @@ toml = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-ruff_db = { workspace = true, features = ["testing"] }
+ruff_db = { workspace = true, features = ["os", "testing"] }
 
 insta = { workspace = true, features = ["redactions", "ron"] }
 

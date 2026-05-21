@@ -220,18 +220,15 @@ impl Project {
         self.settings(db).to_rules()
     }
 
-    /// Returns `true` if `path` is both part of the project and included (see `included_paths_list`).
+    /// Returns whether `path` is part of the project and included (see `included_paths_list`).
     ///
     /// Unlike [Self::files], this method does not respect `.gitignore` files. It only checks
     /// the project's include and exclude settings as well as the paths that were passed to `ty check <paths>`.
     /// This means, that this method is an over-approximation of `Self::files` and may return `true` for paths
     /// that won't be included when checking the project because they're ignored in a `.gitignore` file.
-    pub fn is_file_included(self, db: &dyn Db, path: &SystemPath) -> bool {
-        matches!(
-            ProjectFilesFilter::from_project(db, self)
-                .is_file_included(path, GlobFilterCheckMode::Adhoc),
-            IncludeResult::Included { .. }
-        )
+    pub fn is_file_included(self, db: &dyn Db, path: &SystemPath) -> IncludeResult {
+        ProjectFilesFilter::from_project(db, self)
+            .is_file_included(path, GlobFilterCheckMode::Adhoc)
     }
 
     pub fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
@@ -868,9 +865,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::ProjectMetadata;
     use crate::check_file_impl;
+    use crate::db::Db as _;
     use crate::db::tests::TestDb;
+    use crate::{IncludeResult, ProjectMetadata};
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
@@ -921,5 +919,23 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn explicit_nested_included_file_is_a_literal_match() {
+        let root = SystemPathBuf::from("/project");
+        let explicit_file = root.join("build/keep.txt");
+        let project = ProjectMetadata::new(Name::new_static("test"), root.clone());
+        let mut db = TestDb::new(project);
+        let project = db.project();
+
+        project.set_included_paths(&mut db, vec![root, explicit_file.clone()]);
+
+        assert_eq!(
+            project.is_file_included(&db, &explicit_file),
+            IncludeResult::Included {
+                literal_match: Some(true)
+            }
+        );
     }
 }

@@ -4,7 +4,6 @@ use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::walk_directory::{ErrorKind, WalkDirectoryBuilder, WalkState};
 use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
-use ruff_python_ast::PySourceType;
 use rustc_hash::FxHashSet;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -121,9 +120,10 @@ enum CheckPathMatch {
 }
 
 pub(crate) struct ProjectFilesWalker {
-    /// If set, the walker only visits directories that contain
-    /// at least one of these paths. Otherwise, the visitor
-    /// walks all paths recursively, except paths that are excluded or not included by the project.
+    /// If set, the walker only visits paths that lead to one of these paths.
+    ///
+    /// Otherwise, the visitor walks all paths recursively, except paths that are excluded or
+    /// not included by the project.
     incremental_paths: Option<BTreeSet<SystemPathBuf>>,
 }
 
@@ -136,10 +136,8 @@ impl ProjectFilesWalker {
 
     /// Creates a walker for indexing newly added project files incrementally.
     pub(crate) fn incremental(paths: impl IntoIterator<Item = SystemPathBuf>) -> Self {
-        let incremental_paths = deduplicate_nested_paths(paths).collect();
-
         Self {
-            incremental_paths: Some(incremental_paths),
+            incremental_paths: Some(deduplicate_nested_paths(paths).collect()),
         }
     }
 
@@ -156,7 +154,6 @@ impl ProjectFilesWalker {
 
             create_walker(
                 db,
-                // Trim root paths that have no overlap with any of the incremental paths.
                 root_paths.iter().filter(|root| {
                     should_visit_incremental_path(root.as_path(), incremental_paths)
                 }),
@@ -230,22 +227,13 @@ impl ProjectFilesWalker {
                                     GlobFilterCheckMode::TopDown
                                 };
                                 match filter.is_file_included(entry.path(), match_mode) {
-                                    IncludeResult::Included { literal_match } => {
+                                    include_result @ IncludeResult::Included { .. } => {
                                         // Ignore any non python files to avoid creating too many entries in `Files`.
                                         // Unless the file is explicitly passed on the CLI or a literal match in the `include`, we then always assume it's a file ty can analyze
-                                        let source_type = if literal_match == Some(true)
-                                            || entry.depth() == 0
+                                        if entry.depth() > 0
+                                            && !include_result
+                                                .should_index_file(db.system(), entry.path())
                                         {
-                                            Some(PySourceType::Python)
-                                        } else {
-                                            entry
-                                                .path()
-                                                .extension()
-                                                .and_then(PySourceType::try_from_extension)
-                                                .or_else(|| db.system().source_type(entry.path()))
-                                        };
-
-                                        if source_type.is_none() {
                                             return WalkState::Skip;
                                         }
                                     }

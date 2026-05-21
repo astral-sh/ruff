@@ -555,6 +555,27 @@ fn new_file() -> anyhow::Result<()> {
 }
 
 #[test]
+fn new_non_python_file_is_not_indexed() -> anyhow::Result<()> {
+    let mut case = setup([("bar.py", "")])?;
+    let bar_path = case.project_path("bar.py");
+    let bar_file = case.system_file(&bar_path).unwrap();
+    let readme_path = case.project_path("README.md");
+
+    case.assert_indexed_project_files([bar_file]);
+
+    std::fs::write(readme_path.as_std_path(), "not Python\n")?;
+
+    let changes = case.stop_watch(event_for_file("README.md"));
+
+    case.apply_changes(&changes, None);
+
+    assert!(case.system_file(&readme_path).is_ok());
+    case.assert_indexed_project_files([bar_file]);
+
+    Ok(())
+}
+
+#[test]
 fn new_ignored_file() -> anyhow::Result<()> {
     let mut case = setup([("bar.py", ""), (".ignore", "foo.py")])?;
     let bar_path = case.project_path("bar.py");
@@ -580,7 +601,8 @@ fn new_ignored_file() -> anyhow::Result<()> {
 fn new_file_in_ignored_directory() -> anyhow::Result<()> {
     let mut case = setup(|context: &mut SetupContext| {
         context.write_project_file("bar.py", "")?;
-        context.write_project_file(".ignore", "build/\n")?;
+        context.write_project_file(".git/HEAD", "ref: refs/heads/main\n")?;
+        context.write_project_file(".gitignore", "build/\n")?;
         std::fs::create_dir(context.join_project_path("build").as_std_path())?;
         Ok(())
     })?;
@@ -588,7 +610,32 @@ fn new_file_in_ignored_directory() -> anyhow::Result<()> {
     let bar_file = case.system_file(&bar_path).unwrap();
     let bad_path = case.project_path("build/bad.py");
 
-    assert_eq!(case.system_file(&bad_path), Err(FileError::NotFound));
+    case.assert_indexed_project_files([bar_file]);
+
+    std::fs::write(bad_path.as_std_path(), "x: int = 'bad'\n")?;
+
+    let changes = case.stop_watch(event_for_file("bad.py"));
+
+    case.apply_changes(&changes, None);
+
+    assert!(case.system_file(&bad_path).is_ok());
+    case.assert_indexed_project_files([bar_file]);
+
+    Ok(())
+}
+
+#[test]
+fn new_file_in_parent_ignored_directory() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_file(".ignore", "project/build/\n")?;
+        context.write_project_file("bar.py", "")?;
+        std::fs::create_dir(context.join_project_path("build").as_std_path())?;
+        Ok(())
+    })?;
+    let bar_path = case.project_path("bar.py");
+    let bar_file = case.system_file(&bar_path).unwrap();
+    let bad_path = case.project_path("build/bad.py");
+
     case.assert_indexed_project_files([bar_file]);
 
     std::fs::write(bad_path.as_std_path(), "x: int = 'bad'\n")?;
@@ -612,14 +659,8 @@ fn new_ignore_file_in_ignored_directory() -> anyhow::Result<()> {
     ])?;
     let bar_path = case.project_path("bar.py");
     let bar_file = case.system_file(&bar_path).unwrap();
-    let bad_path = case.project_path("build/bad.py");
     let nested_ignore_path = case.project_path("build/.gitignore");
 
-    assert!(case.system_file(&bad_path).is_ok());
-    assert_eq!(
-        case.system_file(&nested_ignore_path),
-        Err(FileError::NotFound)
-    );
     case.assert_indexed_project_files([bar_file]);
 
     std::fs::write(nested_ignore_path.as_std_path(), "# harmless\n")?;
@@ -755,26 +796,6 @@ fn new_files_with_explicit_included_paths() -> anyhow::Result<()> {
     let sub_a_file = case.system_file(&sub_a_path).expect("sub/a.py to exist");
 
     case.assert_indexed_project_files([main_file, sub_init, sub_a_file]);
-
-    Ok(())
-}
-
-#[test]
-fn explicit_nested_included_file_ignores_parent_root_ignore_file() -> anyhow::Result<()> {
-    let case = setup(|context: &mut SetupContext| {
-        context.write_project_file(".ignore", "build/\n")?;
-        context.write_project_file("build/keep.py", "")?;
-        context.set_included_paths(vec![
-            context.project_path().to_path_buf(),
-            context.join_project_path("build/keep.py"),
-        ]);
-        Ok(())
-    })?;
-
-    let keep_path = case.project_path("build/keep.py");
-    let keep_file = case.system_file(&keep_path).unwrap();
-
-    case.assert_indexed_project_files([keep_file]);
 
     Ok(())
 }

@@ -22,6 +22,7 @@ use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{AnalysisSettings, Db as SemanticDb};
 
 mod changes;
+mod ignore;
 
 #[salsa::db]
 pub trait Db: SemanticDb {
