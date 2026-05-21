@@ -2596,8 +2596,8 @@ impl<'src> Parser<'src> {
             return self.empty_list(start);
         }
 
-        if self.at(TokenKind::Lsqb) {
-            return self.parse_nested_list_like_expression(start);
+        if let Some(pending) = self.try_parse_nested_list_like_expression(start) {
+            return self.parse_nested_list_like_expression(pending);
         }
 
         // Parse the first element with a more general rule and limit it later.
@@ -2607,8 +2607,32 @@ impl<'src> Parser<'src> {
         self.finish_list_like_expression(first_element, start)
     }
 
-    fn parse_nested_list_like_expression(&mut self, outer_start: TextSize) -> Expr {
-        let mut starts = vec![outer_start];
+    fn try_parse_nested_list_like_expression(
+        &mut self,
+        start: TextSize,
+    ) -> Option<PendingListLikeExpression> {
+        let checkpoint = self.checkpoint();
+        let mut elts = vec![];
+
+        loop {
+            if self.at(TokenKind::Lsqb) {
+                return Some(PendingListLikeExpression { start, elts });
+            }
+
+            elts.push(
+                self.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or())
+                    .expr,
+            );
+
+            if !self.eat(TokenKind::Comma) || self.at_sequence_end() {
+                self.rewind(checkpoint);
+                return None;
+            }
+        }
+    }
+
+    fn parse_nested_list_like_expression(&mut self, outer: PendingListLikeExpression) -> Expr {
+        let mut pending = vec![outer];
 
         let mut first_element = loop {
             let start = self.node_start();
@@ -2624,24 +2648,36 @@ impl<'src> Parser<'src> {
                 );
             }
 
-            starts.push(start);
-
-            if !self.at(TokenKind::Lsqb) {
-                break self
-                    .parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
+            if let Some(nested) = self.try_parse_nested_list_like_expression(start) {
+                pending.push(nested);
+                continue;
             }
+
+            pending.push(PendingListLikeExpression {
+                start,
+                elts: vec![],
+            });
+            break self.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
         };
 
-        while let Some(start) = starts.pop() {
-            let expr = self.finish_list_like_expression(first_element, start);
+        while let Some(outer) = pending.pop() {
+            let expr = if outer.elts.is_empty() {
+                self.finish_list_like_expression(first_element, outer.start)
+            } else {
+                Expr::List(self.parse_list_expression_after_element(
+                    outer.elts,
+                    first_element.expr,
+                    outer.start,
+                ))
+            };
 
-            if starts.is_empty() {
+            if pending.is_empty() {
                 return expr;
             }
 
             first_element = self.parse_named_expression_or_higher_from_lhs(
                 expr.into(),
-                start,
+                outer.start,
                 ExpressionContext::starred_bitwise_or(),
             );
         }
@@ -3281,6 +3317,47 @@ impl<'src> Parser<'src> {
                     .expr,
             );
         });
+
+        self.expect(TokenKind::Rsqb);
+
+        ast::ExprList {
+            elts,
+            ctx: ExprContext::Load,
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+        }
+    }
+
+    fn parse_list_expression_after_element(
+        &mut self,
+        mut elts: Vec<Expr>,
+        element: Expr,
+        start: TextSize,
+    ) -> ast::ExprList {
+        elts.push(element);
+
+        if self.eat(TokenKind::Comma) {
+            if !self.at_sequence_end() {
+                self.parse_comma_separated_list(RecoveryContextKind::ListElements, |parser| {
+                    elts.push(
+                        parser
+                            .parse_named_expression_or_higher(
+                                ExpressionContext::starred_bitwise_or(),
+                            )
+                            .expr,
+                    );
+                });
+            }
+        } else if !self.at_sequence_end() {
+            self.expect(TokenKind::Comma);
+            self.parse_comma_separated_list(RecoveryContextKind::ListElements, |parser| {
+                elts.push(
+                    parser
+                        .parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or())
+                        .expr,
+                );
+            });
+        }
 
         self.expect(TokenKind::Rsqb);
 
@@ -3959,6 +4036,11 @@ struct PendingCall {
     func: Expr,
     start: TextSize,
     arguments_start: TextSize,
+}
+
+struct PendingListLikeExpression {
+    start: TextSize,
+    elts: Vec<Expr>,
 }
 
 #[derive(Default)]
