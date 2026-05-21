@@ -8,6 +8,7 @@ use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
     DIVISION_BY_ZERO, report_unsupported_augmented_assignment, report_unsupported_binary_operation,
 };
+use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
     DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -550,7 +551,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 
             (Type::LiteralValue(left), Type::LiteralValue(right), _) => {
-                match (left.kind(), right.kind(), op) {
+                let recursively_defined = if left.recursively_defined().is_yes()
+                    || right.recursively_defined().is_yes()
+                {
+                    RecursivelyDefined::Yes
+                } else {
+                    RecursivelyDefined::No
+                };
+                let result = match (left.kind(), right.kind(), op) {
                     (
                         LiteralValueTypeKind::Int(n),
                         LiteralValueTypeKind::Int(m),
@@ -827,7 +835,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
 
                     _ => Type::try_call_bin_op_return_type(db, left_ty, op, right_ty),
-                }
+                };
+
+                result.map(|result| match result {
+                    Type::LiteralValue(literal) => {
+                        Type::LiteralValue(literal.with_recursively_defined(recursively_defined))
+                    }
+                    _ => result,
+                })
             }
 
             (
