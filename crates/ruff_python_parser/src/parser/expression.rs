@@ -3543,35 +3543,7 @@ impl<'src> Parser<'src> {
     ) -> Expr {
         match self.current_token_kind() {
             TokenKind::Async | TokenKind::For => {
-                if key_or_element.is_unparenthesized_starred_expr() {
-                    self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::UnpackingInComprehension(
-                            ComprehensionUnpackingKind::IterableInSet,
-                        ),
-                        key_or_element.range(),
-                    );
-                } else if key_or_element.is_unparenthesized_named_expr() {
-                    // test_ok parenthesized_named_expr_py38
-                    // # parse_options: {"target-version": "3.8"}
-                    // {(x := 1), 2, 3}
-                    // {(last := x) for x in range(3)}
-
-                    // test_ok unparenthesized_named_expr_py39
-                    // # parse_options: {"target-version": "3.9"}
-                    // {x := 1, 2, 3}
-                    // {last := x for x in range(3)}
-
-                    // test_err unparenthesized_named_expr_set_comp_py38
-                    // # parse_options: {"target-version": "3.8"}
-                    // {last := x for x in range(3)}
-                    self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
-                            UnparenthesizedNamedExprKind::SetComprehension,
-                        ),
-                        key_or_element.range(),
-                    );
-                }
-
+                self.validate_set_comprehension_element(&key_or_element);
                 Expr::SetComp(self.parse_set_comprehension_expression(key_or_element.expr, start))
             }
             TokenKind::Colon => {
@@ -3608,6 +3580,37 @@ impl<'src> Parser<'src> {
                 }
             }
             _ => Expr::Set(self.parse_set_expression(key_or_element, start)),
+        }
+    }
+
+    fn validate_set_comprehension_element(&mut self, element: &ParsedExpr) {
+        if element.is_unparenthesized_starred_expr() {
+            self.add_unsupported_syntax_error(
+                UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                    ComprehensionUnpackingKind::IterableInSet,
+                ),
+                element.range(),
+            );
+        } else if element.is_unparenthesized_named_expr() {
+            // test_ok parenthesized_named_expr_py38
+            // # parse_options: {"target-version": "3.8"}
+            // {(x := 1), 2, 3}
+            // {(last := x) for x in range(3)}
+
+            // test_ok unparenthesized_named_expr_py39
+            // # parse_options: {"target-version": "3.9"}
+            // {x := 1, 2, 3}
+            // {last := x for x in range(3)}
+
+            // test_err unparenthesized_named_expr_set_comp_py38
+            // # parse_options: {"target-version": "3.8"}
+            // {last := x for x in range(3)}
+            self.add_unsupported_syntax_error(
+                UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
+                    UnparenthesizedNamedExprKind::SetComprehension,
+                ),
+                element.range(),
+            );
         }
     }
 
@@ -4419,8 +4422,10 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_comprehension_iter(&mut self) -> Expr {
-        if self.at(TokenKind::Lsqb)
-            && let Some(iter) = self.try_parse_nested_list_comprehension_iter()
+        if matches!(
+            self.current_token_kind(),
+            TokenKind::Lsqb | TokenKind::Lbrace
+        ) && let Some(iter) = self.try_parse_nested_comprehension_iter()
         {
             return iter;
         }
@@ -4429,17 +4434,18 @@ impl<'src> Parser<'src> {
             .expr
     }
 
-    fn try_parse_nested_list_comprehension_iter(&mut self) -> Option<Expr> {
+    fn try_parse_nested_comprehension_iter(&mut self) -> Option<Expr> {
         let mut pending = vec![];
 
         let mut iter = loop {
             let checkpoint = self.checkpoint();
-            let start = self.node_start();
+            let next = match self.current_token_kind() {
+                TokenKind::Lsqb => self.try_parse_list_comprehension_iter(),
+                TokenKind::Lbrace => self.try_parse_set_comprehension_iter(),
+                _ => None,
+            };
 
-            self.bump(TokenKind::Lsqb);
-            self.report_unclosed_bracket();
-
-            if self.eat(TokenKind::Rsqb) {
+            let Some(next) = next else {
                 self.rewind(checkpoint);
 
                 if pending.is_empty() {
@@ -4449,31 +4455,14 @@ impl<'src> Parser<'src> {
                 break self
                     .parse_simple_expression(ExpressionContext::default())
                     .expr;
-            }
+            };
 
-            let element =
-                self.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
+            pending.push(next);
 
-            if !matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
-                self.rewind(checkpoint);
-
-                if pending.is_empty() {
-                    return None;
-                }
-
-                break self
-                    .parse_simple_expression(ExpressionContext::default())
-                    .expr;
-            }
-
-            self.validate_list_comprehension_element(&element);
-            pending.push(PendingListComprehensionIter {
-                start,
-                element: element.expr,
-                comprehension: self.parse_comprehension_header(),
-            });
-
-            if !self.at(TokenKind::Lsqb) {
+            if !matches!(
+                self.current_token_kind(),
+                TokenKind::Lsqb | TokenKind::Lbrace
+            ) {
                 break self
                     .parse_simple_expression(ExpressionContext::default())
                     .expr;
@@ -4481,17 +4470,60 @@ impl<'src> Parser<'src> {
         };
 
         while let Some(outer) = pending.pop() {
-            let first = self.finish_comprehension(outer.comprehension, iter);
-            let mut generators = vec![first];
-            generators.extend(self.parse_generators());
-            iter = Expr::ListComp(self.list_comprehension_expression(
-                outer.element,
-                generators,
-                outer.start,
-            ));
+            iter = outer.finish(self, iter);
         }
 
         Some(iter)
+    }
+
+    fn try_parse_list_comprehension_iter(&mut self) -> Option<PendingComprehensionIter> {
+        let start = self.node_start();
+
+        self.bump(TokenKind::Lsqb);
+        self.report_unclosed_bracket();
+
+        if self.eat(TokenKind::Rsqb) {
+            return None;
+        }
+
+        let element =
+            self.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
+
+        if !matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
+            return None;
+        }
+
+        self.validate_list_comprehension_element(&element);
+        Some(PendingComprehensionIter::List {
+            start,
+            element: element.expr,
+            comprehension: self.parse_comprehension_header(),
+        })
+    }
+
+    fn try_parse_set_comprehension_iter(&mut self) -> Option<PendingComprehensionIter> {
+        let start = self.node_start();
+
+        self.bump(TokenKind::Lbrace);
+        self.report_unclosed_brace();
+
+        if self.eat(TokenKind::Rbrace) {
+            return None;
+        }
+
+        let element =
+            self.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
+
+        if !matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
+            return None;
+        }
+
+        self.validate_set_comprehension_element(&element);
+        Some(PendingComprehensionIter::Set {
+            start,
+            element: element.expr,
+            comprehension: self.parse_comprehension_header(),
+        })
     }
 
     fn finish_comprehension(
@@ -4612,7 +4644,15 @@ impl<'src> Parser<'src> {
         start: TextSize,
     ) -> ast::ExprSetComp {
         let generators = self.parse_generators();
+        self.set_comprehension_expression(element, generators, start)
+    }
 
+    fn set_comprehension_expression(
+        &mut self,
+        element: Expr,
+        generators: Vec<ast::Comprehension>,
+        start: TextSize,
+    ) -> ast::ExprSetComp {
         self.expect(TokenKind::Rbrace);
 
         ast::ExprSetComp {
@@ -5414,10 +5454,44 @@ struct PendingComprehension {
     is_async: bool,
 }
 
-struct PendingListComprehensionIter {
-    start: TextSize,
-    element: Expr,
-    comprehension: PendingComprehension,
+enum PendingComprehensionIter {
+    List {
+        start: TextSize,
+        element: Expr,
+        comprehension: PendingComprehension,
+    },
+    Set {
+        start: TextSize,
+        element: Expr,
+        comprehension: PendingComprehension,
+    },
+}
+
+impl PendingComprehensionIter {
+    fn finish(self, parser: &mut Parser, iter: Expr) -> Expr {
+        match self {
+            PendingComprehensionIter::List {
+                start,
+                element,
+                comprehension,
+            } => {
+                let first = parser.finish_comprehension(comprehension, iter);
+                let mut generators = vec![first];
+                generators.extend(parser.parse_generators());
+                Expr::ListComp(parser.list_comprehension_expression(element, generators, start))
+            }
+            PendingComprehensionIter::Set {
+                start,
+                element,
+                comprehension,
+            } => {
+                let first = parser.finish_comprehension(comprehension, iter);
+                let mut generators = vec![first];
+                generators.extend(parser.parse_generators());
+                Expr::SetComp(parser.set_comprehension_expression(element, generators, start))
+            }
+        }
+    }
 }
 
 #[derive(Debug)]

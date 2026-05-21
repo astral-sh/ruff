@@ -292,6 +292,22 @@ fn deeply_nested_later_sets() {
 }
 
 #[test]
+fn deeply_nested_set_comprehension_iters() {
+    let depth = 5_000;
+    let mut src = String::from("x = ");
+    for _ in 0..depth {
+        src.push_str("{x for x in ");
+    }
+    src.push_str("xs");
+    for _ in 0..depth {
+        src.push('}');
+    }
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
+}
+
+#[test]
 fn deeply_nested_starred_sets() {
     let depth = 5_000;
     let mut src = String::from("x = ");
