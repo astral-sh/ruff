@@ -264,26 +264,6 @@ info: A `UnionType` instance can only be used as the second argument to `issubcl
 info: Element `<class 'list[int]'>` in the union `list[int] | bytes` is not a class object
 ```
 
-## PEP-604 unions on Python \<3.10
-
-PEP-604 unions were added in Python 3.10, so attempting to use them on Python 3.9 does not lead to
-any type narrowing.
-
-```toml
-[environment]
-python-version = "3.9"
-```
-
-```py
-# error: [unsupported-operator]
-def _(x: type[int | str | bytes]):
-    # error: [unsupported-operator]
-    if issubclass(x, int | str):
-        reveal_type(x)  # revealed: (type[int] & Unknown) | (type[str] & Unknown) | (type[bytes] & Unknown)
-    else:
-        reveal_type(x)  # revealed: (type[int] & Unknown) | (type[str] & Unknown) | (type[bytes] & Unknown)
-```
-
 ## `classinfo` is a `types.UnionType`
 
 Python 3.10 added the ability to use `Union[int, str]` as the second argument to `issubclass()`:

@@ -151,3 +151,5 @@ help: Use existing variable
    -             mapped_arrays[mapped_label] = [value_arrays[label][i] for i in range(len(array))]  # PLR1733
 52 +             mapped_arrays[mapped_label] = [array[i] for i in range(len(array))]  # PLR1733
 53 |     return mapped_arrays
+54 |
+55 |

@@ -1111,8 +1111,12 @@ impl<'a> Generator<'a> {
                 node_index: _,
             }) => {
                 self.p("{");
-                self.unparse_expr(key, precedence::COMPREHENSION_ELEMENT);
-                self.p(": ");
+                if let Some(key) = key {
+                    self.unparse_expr(key, precedence::COMPREHENSION_ELEMENT);
+                    self.p(": ");
+                } else {
+                    self.p("**");
+                }
                 self.unparse_expr(value, precedence::COMPREHENSION_ELEMENT);
                 self.unparse_comp(generators);
                 self.p("}");

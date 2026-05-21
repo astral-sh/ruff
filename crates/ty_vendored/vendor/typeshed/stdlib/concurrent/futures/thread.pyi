@@ -5,8 +5,8 @@ import sys
 from collections.abc import Callable, Iterable, Mapping, Set as AbstractSet
 from threading import Lock, Semaphore, Thread
 from types import GenericAlias
-from typing import Any, Generic, Protocol, TypeVar, overload, type_check_only
-from typing_extensions import Self, TypeAlias, TypeVarTuple, Unpack
+from typing import Any, Generic, Protocol, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import Self, TypeVarTuple, Unpack
 from weakref import ref
 
 from ._base import BrokenExecutor, Executor, Future
@@ -45,10 +45,12 @@ if sys.version_info >= (3, 14):
         def prepare(
             cls, initializer: Callable[[], object], initargs: tuple[()]
         ) -> tuple[Callable[[], Self], _ResolveTaskFunc]: ...
+
         @overload
         def __init__(self, initializer: Callable[[Unpack[_Ts]], object], initargs: tuple[Unpack[_Ts]]) -> None: ...
         @overload
         def __init__(self, initializer: Callable[[], object], initargs: tuple[()]) -> None: ...
+
         def initialize(self) -> None: ...
         def finalize(self) -> None: ...
         def run(self, task: _Task) -> None: ...
@@ -142,7 +144,6 @@ class ThreadPoolExecutor(Executor):
             initargs: A tuple of arguments to pass to the initializer.
             ctxkwargs: Additional arguments to cls.prepare_context().
         """
-
     @overload
     def __init__(
         self,
@@ -160,5 +161,6 @@ class ThreadPoolExecutor(Executor):
         initializer: Callable[[Unpack[_Ts]], object],
         initargs: tuple[Unpack[_Ts]],
     ) -> None: ...
+
     def _adjust_thread_count(self) -> None: ...
     def _initializer_failed(self) -> None: ...

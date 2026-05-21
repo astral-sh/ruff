@@ -212,7 +212,10 @@ impl<'db> Type<'db> {
                     }
 
                     // Flattening changed the type; recursively iterate the flattened result.
-                    non_async_special_case(db, flattened)
+                    flattened.try_iterate(db).ok()
+                }
+                Type::EnumComplement(complement) => {
+                    non_async_special_case(db, complement.remaining_literal_union(db))
                 }
                 // N.B. This special case isn't strictly necessary, it's just an obvious optimization
                 Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
@@ -247,6 +250,13 @@ impl<'db> Type<'db> {
         }
 
         if mode.is_async() {
+            if let Type::Intersection(_) = self {
+                let flattened = self.flatten_typevars(db);
+                if flattened != self {
+                    return flattened.try_iterate_with_mode(db, mode);
+                }
+            }
+
             let try_call_dunder_anext_on_iterator = |iterator: Type<'db>| -> Result<
                 Result<Type<'db>, AwaitError<'db>>,
                 CallDunderError<'db>,

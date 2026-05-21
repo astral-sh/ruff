@@ -31,6 +31,7 @@ ty_python_core = { workspace = true, features = ["schemars"] }
 ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
+bitvec = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
 crossbeam = { workspace = true }

@@ -14,9 +14,6 @@ use crate::types::{
     MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder,
     UnionTypeInstance,
 };
-use ruff_python_ast::PythonVersion;
-
-use crate::Program;
 
 enum BinaryExpressionOperandTypes<'db> {
     Inferred(Type<'db>, Type<'db>),
@@ -52,14 +49,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         self.infer_binary_expression_type(binary.into(), false, left_ty, right_ty, *op)
             .unwrap_or_else(|| {
-                report_unsupported_binary_operation(
-                    &self.context,
-                    self.index,
-                    binary,
-                    left_ty,
-                    right_ty,
-                    *op,
-                );
+                report_unsupported_binary_operation(&self.context, binary, left_ty, right_ty, *op);
                 Type::unknown()
             })
     }
@@ -333,12 +323,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             emitted_division_by_zero_diagnostic = self.check_division_by_zero(node, op, left_ty);
         }
-
-        let pep_604_unions_allowed = || {
-            Program::get(db).python_version(db) >= PythonVersion::PY310
-                || self.file().is_stub(db)
-                || self.is_in_type_checking_block(self.scope(), node)
-        };
 
         match (left_ty, right_ty, op) {
             (Type::Union(lhs_union), rhs, _) => lhs_union.try_map(db, |lhs_element| {
@@ -890,7 +874,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     | KnownInstanceType::Annotated(_)
                     | KnownInstanceType::TypeGenericAlias(_)
                     | KnownInstanceType::Callable(_)
-                    | KnownInstanceType::TypeVar(_),
+                    | KnownInstanceType::TypeVar(_)
+                    | KnownInstanceType::TypeAliasType(_)
+                    | KnownInstanceType::NewType(_),
                 ),
                 Type::ClassLiteral(..)
                 | Type::SubclassOf(..)
@@ -902,10 +888,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     | KnownInstanceType::Annotated(_)
                     | KnownInstanceType::TypeGenericAlias(_)
                     | KnownInstanceType::Callable(_)
-                    | KnownInstanceType::TypeVar(_),
+                    | KnownInstanceType::TypeVar(_)
+                    | KnownInstanceType::TypeAliasType(_)
+                    | KnownInstanceType::NewType(_),
                 ),
                 ast::Operator::BitOr,
-            ) if pep_604_unions_allowed() => {
+            ) => {
                 if left_ty.is_equivalent_to(db, right_ty) {
                     Some(left_ty)
                 } else {
@@ -935,7 +923,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 | Type::KnownInstance(..)
                 | Type::SpecialForm(..),
                 ast::Operator::BitOr,
-            ) if pep_604_unions_allowed() && instance.has_known_class(db, KnownClass::NoneType) => {
+            ) if instance.has_known_class(db, KnownClass::NoneType) => {
                 Some(UnionTypeInstance::from_value_expression_types(
                     db,
                     [left_ty, right_ty],
@@ -961,7 +949,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 _,
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..),
                 ast::Operator::BitOr,
-            ) if pep_604_unions_allowed() => Type::try_call_bin_op_with_policy(
+            ) => Type::try_call_bin_op_with_policy(
                 db,
                 left_ty,
                 ast::Operator::BitOr,
@@ -991,6 +979,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
                 | Type::Intersection(_)
+                | Type::EnumComplement(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy
                 | Type::LiteralValue(_)
@@ -1016,6 +1005,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
                 | Type::Intersection(_)
+                | Type::EnumComplement(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy
                 | Type::LiteralValue(_)

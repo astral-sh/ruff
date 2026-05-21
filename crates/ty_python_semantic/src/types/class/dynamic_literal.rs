@@ -422,7 +422,16 @@ impl<'db> DynamicClassLiteral<'db> {
     ///
     /// Returns `Ok(Mro)` if successful, or `Err(DynamicMroError)` if there's
     /// an error (duplicate bases or C3 linearization failure).
-    #[salsa::tracked(returns(ref), cycle_initial=dynamic_class_try_mro_cycle_initial, heap_size = ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial=|db, _, self_: DynamicClassLiteral<'db>| {
+            Ok(Mro::from([
+                ClassBase::Class(ClassType::NonGeneric(ClassLiteral::Dynamic(self_))),
+                ClassBase::object(db),
+            ]))
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
         Mro::of_dynamic_class(db, self)
     }
@@ -499,18 +508,4 @@ pub(crate) struct DynamicMetaclassConflict<'db> {
     /// The second conflicting metaclass and its originating base class.
     pub(crate) metaclass2: ClassType<'db>,
     pub(crate) base2: ClassBase<'db>,
-}
-
-#[expect(clippy::unnecessary_wraps)]
-fn dynamic_class_try_mro_cycle_initial<'db>(
-    db: &'db dyn Db,
-    _id: salsa::Id,
-    self_: DynamicClassLiteral<'db>,
-) -> Result<Mro<'db>, DynamicMroError<'db>> {
-    // When there's a cycle, return a minimal MRO with just the class itself and object.
-    // This breaks the cycle and allows type checking to continue.
-    Ok(Mro::from([
-        ClassBase::Class(ClassType::NonGeneric(self_.into())),
-        ClassBase::object(db),
-    ]))
 }

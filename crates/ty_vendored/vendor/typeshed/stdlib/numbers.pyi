@@ -219,10 +219,10 @@ class Real(Complex, _RealLike):
         If ndigits is omitted or None, returns an Integral, otherwise
         returns a Real. Rounds half toward even.
         """
-
     @abstractmethod
     @overload
     def __round__(self, ndigits: int) -> _RealLike: ...
+
     def __divmod__(self, other) -> tuple[_RealLike, _RealLike]:
         """divmod(self, other): The pair (self // other, self % other).
 
@@ -422,7 +422,6 @@ class Integral(Rational, _IntegralLike):
         If ndigits is omitted or None, returns an Integral, otherwise
         returns a Real. Rounds half toward even.
         """
-
     @abstractmethod
     @overload
     def __round__(self, ndigits: int) -> _IntegralLike: ...

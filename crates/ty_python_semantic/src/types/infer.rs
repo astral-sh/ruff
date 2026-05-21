@@ -56,7 +56,6 @@ use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
-    declaration_type,
 };
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
@@ -83,11 +82,67 @@ bitflags::bitflags! {
 
 impl get_size2::GetSize for TypeExpressionFlags {}
 
+/// Compact immutable key-value entries stored in key order.
+///
+/// This keeps the mutable construction path on [`FxHashMap`], then switches to a denser retained
+/// representation for cached inference results that only need iteration and keyed lookup.
+#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+pub(super) struct FrozenMap<K, V>(Box<[(K, V)]>);
+
+impl<K, V> FrozenMap<K, V> {
+    pub(super) fn iter(&self) -> std::slice::Iter<'_, (K, V)> {
+        self.0.iter()
+    }
+}
+
+impl<K: Ord, V> From<FxHashMap<K, V>> for FrozenMap<K, V> {
+    fn from(map: FxHashMap<K, V>) -> Self {
+        let mut entries = map.into_iter().collect::<Vec<_>>();
+        entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
+        Self(entries.into_boxed_slice())
+    }
+}
+
+impl<K: Ord, V> FrozenMap<K, V> {
+    pub(super) fn get(&self, key: &K) -> Option<&V> {
+        self.0
+            .binary_search_by(|(candidate, _)| candidate.cmp(key))
+            .ok()
+            .map(|index| &self.0[index].1)
+    }
+}
+
+impl<K, V> Default for FrozenMap<K, V> {
+    fn default() -> Self {
+        Self(Box::default())
+    }
+}
+
+impl<'a, K, V> IntoIterator for &'a FrozenMap<K, V> {
+    type Item = &'a (K, V);
+    type IntoIter = std::slice::Iter<'a, (K, V)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl<'a, K, V> IntoIterator for &'a mut FrozenMap<K, V> {
+    type Item = &'a mut (K, V);
+    type IntoIter = std::slice::IterMut<'a, (K, V)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter_mut()
+    }
+}
+
 /// Infer all types for a [`Definition`] (including sub-expressions).
 /// Use when resolving a place use or public type of a place.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=definition_cycle_initial,
+    cycle_initial=|db, id, definition: Definition<'db>| {
+        DefinitionInference::cycle_initial(definition.scope(db), Type::divergent(id))
+    },
     cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
     },
@@ -110,14 +165,6 @@ pub(crate) fn infer_definition_types<'db>(
 
     TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index, &module)
         .finish_definition()
-}
-
-fn definition_cycle_initial<'db>(
-    db: &'db dyn Db,
-    id: salsa::Id,
-    definition: Definition<'db>,
-) -> DefinitionInference<'db> {
-    DefinitionInference::cycle_initial(definition.scope(db), Type::divergent(id))
 }
 
 /// Infer decorator expression types for a function definition.
@@ -158,7 +205,7 @@ pub(crate) fn function_known_decorator_flags<'db>(
 /// function-definition inference.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct FunctionDecoratorInference<'db> {
-    expression_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expression_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
     called_functions: Box<[FunctionType<'db>]>,
     known_decorators: FunctionDecorators,
@@ -173,8 +220,10 @@ impl<'db> FunctionDecoratorInference<'db> {
         self.expression_types.get(&expression.into()).copied()
     }
 
-    pub(crate) fn expression_types(&self) -> &FxHashMap<ExpressionNodeKey, Type<'db>> {
-        &self.expression_types
+    pub(crate) fn expression_types(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (ExpressionNodeKey, Type<'db>)> + '_ {
+        self.expression_types.iter().copied()
     }
 
     pub(crate) fn bindings(
@@ -202,7 +251,9 @@ impl<'db> FunctionDecoratorInference<'db> {
 /// file, or in a file with `from __future__ import annotations`, or stringified annotations.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=deferred_cycle_initial,
+    cycle_initial=|db, id, definition: Definition<'db>| {
+        DefinitionInference::cycle_initial(definition.scope(db), Type::divergent(id))
+    },
     cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
     },
@@ -226,14 +277,6 @@ pub(crate) fn infer_deferred_types<'db>(
 
     TypeInferenceBuilder::new(db, InferenceRegion::Deferred(definition), index, &module)
         .finish_definition()
-}
-
-fn deferred_cycle_initial<'db>(
-    db: &'db dyn Db,
-    id: salsa::Id,
-    definition: Definition<'db>,
-) -> DefinitionInference<'db> {
-    DefinitionInference::cycle_initial(definition.scope(db), Type::divergent(id))
 }
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
@@ -428,7 +471,9 @@ pub(super) fn infer_statement_types<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=statement_cycle_initial,
+    cycle_initial=|db, id, statement: StatementInner<'db>| {
+        StatementInferenceInner::cycle_initial(statement.scope(db), Type::divergent(id))
+    },
     cycle_fn=|db, cycle, previous: &StatementInferenceInner<'db>, inference: StatementInferenceInner<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
     },
@@ -452,15 +497,6 @@ fn infer_statement_types_impl<'db>(
 
     TypeInferenceBuilder::new(db, InferenceRegion::Statement(statement), index, &module)
         .finish_statement()
-}
-
-fn statement_cycle_initial<'db>(
-    db: &'db dyn Db,
-    id: salsa::Id,
-    statement: StatementInner<'db>,
-) -> StatementInferenceInner<'db> {
-    let cycle_recovery = Type::divergent(id);
-    StatementInferenceInner::cycle_initial(statement.scope(db), cycle_recovery)
 }
 
 /// An `Expression` with an optional `TypeContext`.
@@ -554,8 +590,8 @@ impl<'db> TypeContext<'db> {
         Self { annotation }
     }
 
-    // If the type annotation is a specialized instance of the given `KnownClass`, returns the
-    // specialization.
+    /// If the type annotation is a specialized instance of the given `KnownClass`, returns the
+    /// specialization.
     fn known_specialization(
         &self,
         db: &'db dyn Db,
@@ -574,6 +610,16 @@ impl<'db> TypeContext<'db> {
     pub(crate) fn is_typealias(&self) -> bool {
         self.annotation
             .is_some_and(|ty| ty.is_typealias_special_form())
+    }
+
+    /// If the type annotation is a union, returns the target elements that it can be narrowed to.
+    pub(crate) fn narrow_targets(&self, db: &'db dyn Db) -> Option<&[Type<'db>]> {
+        self.annotation
+            .and_then(|ty| ty.as_union_like(db))
+            // TODO: We could theoretically attempt to narrow to every element of
+            // the power set of this union. However, this leads to an exponential
+            // explosion of inference attempts, and is rarely needed in practice.
+            .map(|union| union.elements(db))
     }
 }
 
@@ -627,11 +673,35 @@ pub(crate) fn nearest_enclosing_class<'db>(
         .find_map(|(_, ancestor_scope)| {
             let class = ancestor_scope.node().as_class()?;
             let definition = semantic.expect_single_definition(class);
-            declaration_type(db, definition)
-                .inner_type()
-                .as_class_literal()
-                .and_then(ClassLiteral::as_static)
+            original_class_type(db, definition).and_then(ClassLiteral::as_static)
         })
+}
+
+/// Return the original class literal for a class definition.
+///
+/// For decorated classes, this is the class object before applying decorators. The public
+/// binding may be replaced by a class decorator's return type, but class-body inference still
+/// needs the original class object for implicit `self`/`cls`, `Self`, and dataclass logic.
+///
+/// For example, the public binding for `C` may be the `int` returned by `replace`, but the class
+/// body and nested definitions still need the original class object:
+/// ```python
+/// def replace(cls: type[object]) -> int:
+///     return 1
+///
+/// @replace
+/// class C:
+///     def method(self) -> None: ...
+/// ```
+pub(crate) fn original_class_type<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<ClassLiteral<'db>> {
+    let inference = infer_definition_types(db, definition);
+    inference
+        .undecorated_type()
+        .unwrap_or_else(|| inference.binding_type(definition))
+        .as_class_literal()
 }
 
 /// Returns the type of the nearest enclosing function for the given scope.
@@ -688,7 +758,7 @@ impl<'db> InferenceRegion<'db> {
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ScopeInference<'db> {
     /// The types of every expression in this region.
-    expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
     /// The extra data that is only present for few inference regions.
     extra: Option<Box<ScopeInferenceExtra<'db>>>,
@@ -718,7 +788,7 @@ impl<'db> ScopeInference<'db> {
                 cycle_recovery: Some(cycle_recovery),
                 ..ScopeInferenceExtra::default()
             })),
-            expressions: FxHashMap::default(),
+            expressions: FrozenMap::default(),
         }
     }
 
@@ -794,7 +864,7 @@ impl<'db> ScopeInference<'db> {
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct DefinitionInference<'db> {
     /// The types of every expression in this region.
-    expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
     /// The scope this region is part of.
     #[cfg(debug_assertions)]
@@ -839,7 +909,7 @@ struct DefinitionInferenceExtra<'db> {
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
 
-    /// For function definitions, the undecorated type of the function.
+    /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
 
     /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
@@ -852,7 +922,7 @@ impl<'db> DefinitionInference<'db> {
         let _ = scope;
 
         Self {
-            expressions: FxHashMap::default(),
+            expressions: FrozenMap::default(),
             bindings: Box::default(),
             declarations: Box::default(),
             #[cfg(debug_assertions)]
@@ -1004,7 +1074,7 @@ impl<'db> DefinitionInference<'db> {
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ExpressionInference<'db> {
     /// The types of every expression in this region.
-    expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
     extra: Option<Box<ExpressionInferenceExtra<'db>>>,
 
@@ -1044,7 +1114,7 @@ impl<'db> ExpressionInference<'db> {
                 cycle_recovery: Some(cycle_recovery),
                 ..ExpressionInferenceExtra::default()
             })),
-            expressions: FxHashMap::default(),
+            expressions: FrozenMap::default(),
             #[cfg(debug_assertions)]
             scope,
         }
@@ -1124,7 +1194,7 @@ impl<'db> StatementInference<'db> {
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct StatementInferenceInner<'db> {
     /// The types of every expression in this region.
-    expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
     /// The scope this region is part of.
     #[cfg(debug_assertions)]
@@ -1173,7 +1243,7 @@ impl<'db> StatementInferenceInner<'db> {
         let _ = scope;
 
         Self {
-            expressions: FxHashMap::default(),
+            expressions: FrozenMap::default(),
             bindings: Box::default(),
             declarations: Box::default(),
             #[cfg(debug_assertions)]

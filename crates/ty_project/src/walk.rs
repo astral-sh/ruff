@@ -187,6 +187,8 @@ impl<'a> ProjectFilesWalker<'a> {
             let force_exclude = filter.force_exclude();
 
             Box::new(move |entry| {
+                db.unwind_if_revision_cancelled();
+
                 match entry {
                     Ok(entry) => {
                         // Skip excluded directories unless they were explicitly passed to the walker

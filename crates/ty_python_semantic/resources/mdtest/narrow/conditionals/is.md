@@ -90,12 +90,7 @@ def _(x: Single | int):
         reveal_type(x)  # revealed: int
 ```
 
-## `is` for `EllipsisType` (Python 3.10+)
-
-```toml
-[environment]
-python-version = "3.10"
-```
+## `is` for `EllipsisType`
 
 ```py
 from types import EllipsisType
@@ -105,25 +100,6 @@ def _(x: int | EllipsisType):
         reveal_type(x)  # revealed: EllipsisType
     else:
         reveal_type(x)  # revealed: int
-```
-
-## `is` for `EllipsisType` (Python 3.9 and below)
-
-```toml
-[environment]
-python-version = "3.9"
-```
-
-```py
-def _(flag: bool):
-    x = ... if flag else 42
-
-    reveal_type(x)  # revealed: ellipsis | Literal[42]
-
-    if x is ...:
-        reveal_type(x)  # revealed: ellipsis
-    else:
-        reveal_type(x)  # revealed: Literal[42]
 ```
 
 ## Assignment expressions

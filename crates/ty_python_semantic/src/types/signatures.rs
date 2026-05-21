@@ -37,13 +37,23 @@ use crate::types::typed_dict::{
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
-    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind,
-    ParameterDescription, SelfBinding, TypeContext, TypeMapping, UnionBuilder, VarianceInferable,
-    infer_complete_scope_types, todo_type,
+    ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind,
+    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping, UnionBuilder,
+    VarianceInferable, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 use ty_python_core::definition::Definition;
+
+/// Selects which binding context to use for type variables that only appear in a return-position
+/// `Callable`.
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
+pub(super) enum ReturnCallableTypeVarScope {
+    /// Keep the type variables bound to the function's lexical generic context.
+    Lexical,
+    /// Move the type variables to the returned `Callable`'s generic context.
+    Public,
+}
 
 /// Infer the type of a parameter or return annotation in a function signature.
 ///
@@ -136,6 +146,24 @@ impl<'db> CallableSignature<'db> {
         Self::single(Signature::bottom())
     }
 
+    pub(crate) fn cycle_initial(db: &'db dyn Db, id: salsa::Id) -> Self {
+        Self::single(Signature::new(
+            Parameters::bottom(),
+            Type::divergent(id).bottom_materialization(db),
+        ))
+    }
+
+    fn is_cycle_initial(&self) -> bool {
+        matches!(
+            self.overloads.as_slice(),
+            [signature]
+                if signature.generic_context.is_none()
+                    && signature.definition.is_none()
+                    && signature.parameters == Parameters::bottom()
+                    && signature.return_ty.is_divergent()
+        )
+    }
+
     /// Creates a new `CallableSignature` from an iterator of [`Signature`]s. Returns a
     /// non-callable signature if the iterator is empty.
     pub(crate) fn from_overloads<I>(overloads: I) -> Self
@@ -212,7 +240,7 @@ impl<'db> CallableSignature<'db> {
                     .collect(),
             }
         } else {
-            debug_assert_eq!(previous, &Self::bottom());
+            debug_assert!(previous.is_cycle_initial());
             self.clone()
         }
     }
@@ -485,6 +513,22 @@ pub struct Signature<'db> {
     pub(crate) return_ty: Type<'db>,
 }
 
+/// Whether one callable signature's parameters are compatible with another's.
+pub(crate) enum ParameterConsistency<'db> {
+    /// The parameters are compatible.
+    Consistent,
+    /// The parameters are incompatible, with context explaining the incompatibility.
+    Inconsistent(ErrorContextTree<'db>),
+}
+
+/// Whether one callable signature's return type is compatible with another's.
+pub(crate) enum ReturnTypeConsistency<'db> {
+    /// The return types are compatible.
+    Consistent,
+    /// The return types are incompatible, with context explaining the incompatibility.
+    Inconsistent(ErrorContextTree<'db>),
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct SignatureRelationKey<'db> {
     // Signature recursion for recursive protocols keeps revisiting the same method declarations
@@ -621,6 +665,7 @@ impl<'db> Signature<'db> {
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
         has_implicitly_positional_first_parameter: bool,
+        return_callable_typevar_scope: ReturnCallableTypeVarScope,
     ) -> Self {
         let parameters = Parameters::from_parameters(
             db,
@@ -641,16 +686,21 @@ impl<'db> Signature<'db> {
             legacy_generic_context,
         );
 
-        // Look for any typevars bound by this function that are only mentioned in a Callable
-        // return type. (We do this after merging the legacy and PEP-695 contexts because we need
-        // to apply this heuristic to PEP-695 typevars as well.)
-        let (generic_context, return_ty) = GenericContext::remove_callable_only_typevars(
-            db,
-            full_generic_context,
-            &parameters,
-            return_ty,
-            definition,
-        );
+        let (generic_context, return_ty) = match return_callable_typevar_scope {
+            ReturnCallableTypeVarScope::Lexical => (full_generic_context, return_ty),
+            ReturnCallableTypeVarScope::Public => {
+                // Look for any typevars bound by this function that are only mentioned in a
+                // Callable return type. (We do this after merging the legacy and PEP-695 contexts
+                // because we need to apply this heuristic to PEP-695 typevars as well.)
+                GenericContext::remove_callable_only_typevars(
+                    db,
+                    full_generic_context,
+                    &parameters,
+                    return_ty,
+                    definition,
+                )
+            }
+        };
 
         Self {
             generic_context,
@@ -1073,6 +1123,84 @@ impl<'db> Signature<'db> {
         }
     }
 
+    pub(crate) fn is_non_generic(&self) -> bool {
+        self.generic_context.is_none()
+    }
+
+    /// Return whether this non-generic implementation accepts the arguments of a non-generic
+    /// overload, and the relation error context if it does not.
+    ///
+    /// This is a deliberately narrow first pass for overload implementation consistency. Generic
+    /// signatures need additional type-variable-domain handling and should be left to the full
+    /// implementation.
+    pub(crate) fn non_generic_implementation_parameters_consistency_with(
+        &self,
+        db: &'db dyn Db,
+        overload: &Self,
+    ) -> ParameterConsistency<'db> {
+        debug_assert!(self.is_non_generic());
+        debug_assert!(overload.is_non_generic());
+
+        let implementation = self.clone().with_return_type(Type::unknown());
+        let overload = overload.clone().with_return_type(Type::unknown());
+        let constraints = ConstraintSetBuilder::new();
+        let relation_visitor = HasRelationToVisitor::default(&constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        let checker = TypeRelationChecker::constraint_set_assignability_with_context(
+            &constraints,
+            &relation_visitor,
+            &disjointness_visitor,
+            &signature_relation_visitor,
+            &materialization_visitor,
+        );
+
+        let is_consistent = checker
+            .check_signature_pair(db, &implementation, &overload)
+            .is_always_satisfied(db);
+
+        if is_consistent {
+            ParameterConsistency::Consistent
+        } else {
+            ParameterConsistency::Inconsistent(checker.into_error_context())
+        }
+    }
+
+    /// Return whether a non-generic overload return type is assignable to a non-generic
+    /// implementation return type, and the relation error context if it is not.
+    pub(crate) fn non_generic_implementation_return_type_consistency_with(
+        &self,
+        db: &'db dyn Db,
+        overload: &Self,
+    ) -> ReturnTypeConsistency<'db> {
+        debug_assert!(self.is_non_generic());
+        debug_assert!(overload.is_non_generic());
+
+        let constraints = ConstraintSetBuilder::new();
+        let relation_visitor = HasRelationToVisitor::default(&constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        let checker = TypeRelationChecker::assignability_with_context(
+            &constraints,
+            &relation_visitor,
+            &disjointness_visitor,
+            &signature_relation_visitor,
+            &materialization_visitor,
+        );
+
+        let is_consistent = checker
+            .check_type_pair(db, overload.return_ty, self.return_ty)
+            .is_always_satisfied(db);
+
+        if is_consistent {
+            ReturnTypeConsistency::Consistent
+        } else {
+            ReturnTypeConsistency::Inconsistent(checker.into_error_context())
+        }
+    }
+
     pub(crate) fn when_constraint_set_assignable_to_signatures<'c>(
         &self,
         db: &'db dyn Db,
@@ -1359,17 +1487,33 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
 
                 (None, Some((target_tvar, target_return))) if source_overloads.len() > 1 => {
+                    // TODO: Ideally, the constraint solver should use the return type constraint
+                    // to remove unmatched overloads from the `ParamSpec` specialization instead
+                    // of filtering them here.
                     let lower = Type::Callable(CallableType::new(
                         db,
-                        CallableSignature::from_overloads(source_overloads.iter().map(
-                            |signature| {
-                                Signature::new_generic(
-                                    signature.generic_context,
-                                    signature.parameters().clone(),
-                                    Type::unknown(),
-                                )
-                            },
-                        )),
+                        CallableSignature::from_overloads(
+                            source_overloads
+                                .iter()
+                                .filter(|signature| {
+                                    !self
+                                        .without_context_collection(|| {
+                                            self.check_type_pair(
+                                                db,
+                                                signature.return_ty,
+                                                target_return,
+                                            )
+                                        })
+                                        .is_never_satisfied(db)
+                                })
+                                .map(|signature| {
+                                    Signature::new_generic(
+                                        signature.generic_context,
+                                        signature.parameters().clone(),
+                                        Type::unknown(),
+                                    )
+                                }),
+                        ),
                         CallableTypeKind::ParamSpecValue,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
@@ -2484,6 +2628,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         // `target`, then the non-variadic parameters in `source` must have a default
                         // value.
                         if default_type.is_none() {
+                            let parameter =
+                                ParameterDescription::new(target_index, source_parameter.name());
+                            self.provide_context(|| ErrorContext::ExtraRequiredParameter {
+                                parameter,
+                            });
                             return self.never();
                         }
                     }

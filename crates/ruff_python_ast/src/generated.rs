@@ -9399,7 +9399,7 @@ pub struct ExprSetComp {
 pub struct ExprDictComp {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub key: Box<Expr>,
+    pub key: Option<Box<Expr>>,
     pub value: Box<Expr>,
     pub generators: Vec<crate::Comprehension>,
 }
@@ -10416,7 +10416,11 @@ impl ExprDictComp {
             range: _,
             node_index: _,
         } = self;
-        visitor.visit_expr(key);
+
+        if let Some(key) = key {
+            visitor.visit_expr(key);
+        }
+
         visitor.visit_expr(value);
 
         for elm in generators {

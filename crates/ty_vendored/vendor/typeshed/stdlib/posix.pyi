@@ -45,6 +45,7 @@ if sys.platform != "win32":
         O_DIRECTORY as O_DIRECTORY,
         O_DSYNC as O_DSYNC,
         O_EXCL as O_EXCL,
+        O_FSYNC as O_FSYNC,
         O_NDELAY as O_NDELAY,
         O_NOCTTY as O_NOCTTY,
         O_NOFOLLOW as O_NOFOLLOW,
@@ -233,9 +234,6 @@ if sys.platform != "win32":
         writev as writev,
     )
 
-    if sys.version_info >= (3, 10):
-        from os import O_FSYNC as O_FSYNC
-
     if sys.version_info >= (3, 11):
         from os import login_tty as login_tty
 
@@ -271,6 +269,36 @@ if sys.platform != "win32":
     if sys.platform != "linux" and sys.version_info >= (3, 13):
         from os import O_EXEC as O_EXEC, O_SEARCH as O_SEARCH
 
+    if sys.version_info >= (3, 15):
+        from os import NODEV as NODEV
+
+    if sys.version_info >= (3, 15) and sys.platform == "linux":
+        from os import (
+            AT_NO_AUTOMOUNT as AT_NO_AUTOMOUNT,
+            AT_STATX_DONT_SYNC as AT_STATX_DONT_SYNC,
+            AT_STATX_FORCE_SYNC as AT_STATX_FORCE_SYNC,
+            AT_STATX_SYNC_AS_STAT as AT_STATX_SYNC_AS_STAT,
+            STATX_ATIME as STATX_ATIME,
+            STATX_BASIC_STATS as STATX_BASIC_STATS,
+            STATX_BLOCKS as STATX_BLOCKS,
+            STATX_BTIME as STATX_BTIME,
+            STATX_CTIME as STATX_CTIME,
+            STATX_DIOALIGN as STATX_DIOALIGN,
+            STATX_GID as STATX_GID,
+            STATX_INO as STATX_INO,
+            STATX_MNT_ID as STATX_MNT_ID,
+            STATX_MNT_ID_UNIQUE as STATX_MNT_ID_UNIQUE,
+            STATX_MODE as STATX_MODE,
+            STATX_MTIME as STATX_MTIME,
+            STATX_NLINK as STATX_NLINK,
+            STATX_SIZE as STATX_SIZE,
+            STATX_TYPE as STATX_TYPE,
+            STATX_UID as STATX_UID,
+            _clearenv as _clearenv,
+            statx as statx,
+            statx_result as statx_result,
+        )
+
     if sys.platform != "darwin":
         from os import (
             POSIX_FADV_DONTNEED as POSIX_FADV_DONTNEED,
@@ -279,6 +307,7 @@ if sys.platform != "win32":
             POSIX_FADV_RANDOM as POSIX_FADV_RANDOM,
             POSIX_FADV_SEQUENTIAL as POSIX_FADV_SEQUENTIAL,
             POSIX_FADV_WILLNEED as POSIX_FADV_WILLNEED,
+            RWF_APPEND as RWF_APPEND,
             RWF_DSYNC as RWF_DSYNC,
             RWF_HIPRI as RWF_HIPRI,
             RWF_NOWAIT as RWF_NOWAIT,
@@ -309,14 +338,14 @@ if sys.platform != "win32":
             setresuid as setresuid,
         )
 
-        if sys.version_info >= (3, 10):
-            from os import RWF_APPEND as RWF_APPEND
-
     if sys.platform != "darwin" or sys.version_info >= (3, 13):
         from os import waitid as waitid, waitid_result as waitid_result
 
     if sys.platform == "linux":
         from os import (
+            EFD_CLOEXEC as EFD_CLOEXEC,
+            EFD_NONBLOCK as EFD_NONBLOCK,
+            EFD_SEMAPHORE as EFD_SEMAPHORE,
             GRND_NONBLOCK as GRND_NONBLOCK,
             GRND_RANDOM as GRND_RANDOM,
             MFD_ALLOW_SEALING as MFD_ALLOW_SEALING,
@@ -347,10 +376,16 @@ if sys.platform != "win32":
             SCHED_BATCH as SCHED_BATCH,
             SCHED_IDLE as SCHED_IDLE,
             SCHED_RESET_ON_FORK as SCHED_RESET_ON_FORK,
+            SPLICE_F_MORE as SPLICE_F_MORE,
+            SPLICE_F_MOVE as SPLICE_F_MOVE,
+            SPLICE_F_NONBLOCK as SPLICE_F_NONBLOCK,
             XATTR_CREATE as XATTR_CREATE,
             XATTR_REPLACE as XATTR_REPLACE,
             XATTR_SIZE_MAX as XATTR_SIZE_MAX,
             copy_file_range as copy_file_range,
+            eventfd as eventfd,
+            eventfd_read as eventfd_read,
+            eventfd_write as eventfd_write,
             getrandom as getrandom,
             getxattr as getxattr,
             listxattr as listxattr,
@@ -358,21 +393,8 @@ if sys.platform != "win32":
             pidfd_open as pidfd_open,
             removexattr as removexattr,
             setxattr as setxattr,
+            splice as splice,
         )
-
-        if sys.version_info >= (3, 10):
-            from os import (
-                EFD_CLOEXEC as EFD_CLOEXEC,
-                EFD_NONBLOCK as EFD_NONBLOCK,
-                EFD_SEMAPHORE as EFD_SEMAPHORE,
-                SPLICE_F_MORE as SPLICE_F_MORE,
-                SPLICE_F_MOVE as SPLICE_F_MOVE,
-                SPLICE_F_NONBLOCK as SPLICE_F_NONBLOCK,
-                eventfd as eventfd,
-                eventfd_read as eventfd_read,
-                eventfd_write as eventfd_write,
-                splice as splice,
-            )
 
         if sys.version_info >= (3, 12):
             from os import (
@@ -396,6 +418,8 @@ if sys.platform != "win32":
             )
 
     if sys.platform == "darwin":
+        from os import O_EVTONLY as O_EVTONLY, O_NOFOLLOW_ANY as O_NOFOLLOW_ANY, O_SYMLINK as O_SYMLINK
+
         if sys.version_info >= (3, 12):
             from os import (
                 PRIO_DARWIN_BG as PRIO_DARWIN_BG,
@@ -403,8 +427,6 @@ if sys.platform != "win32":
                 PRIO_DARWIN_PROCESS as PRIO_DARWIN_PROCESS,
                 PRIO_DARWIN_THREAD as PRIO_DARWIN_THREAD,
             )
-    if sys.platform == "darwin" and sys.version_info >= (3, 10):
-        from os import O_EVTONLY as O_EVTONLY, O_NOFOLLOW_ANY as O_NOFOLLOW_ANY, O_SYMLINK as O_SYMLINK
 
     # Not same as os.environ or os.environb
     # Because of this variable, we can't do "from posix import *" in os/__init__.pyi

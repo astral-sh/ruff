@@ -298,6 +298,28 @@ error[invalid-assignment]: Object of type `(int, str, /) -> bool` is not assigna
    |             |
    |             Declared type
    |
+info: unexpected extra parameter
+```
+
+Assigning a function with an extra required parameter to a `Callable`:
+
+```py
+def source(x: int, extra: str) -> bool:
+    raise NotImplementedError
+
+target: Callable[[int], bool] = source  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `def source(x: int, extra: str) -> bool` is not assignable to `(int, /) -> bool`
+  --> src/mdtest_snippet.py:16:9
+   |
+16 | target: Callable[[int], bool] = source  # snapshot
+   |         ---------------------   ^^^^^^ Incompatible value of type `def source(x: int, extra: str) -> bool`
+   |         |
+   |         Declared type
+   |
+info: unexpected extra parameter `extra`
 ```
 
 Assigning a class to a `Callable`
@@ -311,9 +333,9 @@ target: Callable[[str], Any] = Number  # snapshot
 
 ```snapshot
 error[invalid-assignment]: Object of type `<class 'Number'>` is not assignable to `(str, /) -> Any`
-  --> src/mdtest_snippet.py:16:9
+  --> src/mdtest_snippet.py:20:9
    |
-16 | target: Callable[[str], Any] = Number  # snapshot
+20 | target: Callable[[str], Any] = Number  # snapshot
    |         --------------------   ^^^^^^ Incompatible value of type `<class 'Number'>`
    |         |
    |         Declared type

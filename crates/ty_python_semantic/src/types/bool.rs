@@ -288,10 +288,18 @@ impl<'db> Type<'db> {
 
             Type::Union(union) => try_union(*union)?,
 
-            Type::Intersection(_) => {
-                // TODO
-                Truthiness::Ambiguous
+            Type::Intersection(intersection) => {
+                if let Some(alternatives) = intersection.finite_alternative_union(db) {
+                    alternatives.try_bool_impl(db, allow_short_circuit, visitor)?
+                } else {
+                    // TODO
+                    Truthiness::Ambiguous
+                }
             }
+
+            Type::EnumComplement(complement) => complement
+                .remaining_literal_union(db)
+                .try_bool_impl(db, allow_short_circuit, visitor)?,
 
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::LiteralString => Truthiness::Ambiguous,

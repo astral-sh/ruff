@@ -4,8 +4,7 @@ import sys
 import unittest.case
 from _typeshed import OptExcInfo
 from collections.abc import Callable
-from typing import Any, Final, TextIO, TypeVar
-from typing_extensions import TypeAlias
+from typing import Any, Final, TextIO, TypeAlias, TypeVar
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 _DurationsType: TypeAlias = list[tuple[str, float]]

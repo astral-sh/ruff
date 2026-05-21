@@ -5689,13 +5689,13 @@ impl PathAssignments {
 
         let mut new_constraints = Vec::new();
         for ((ante1, ante2), posts) in &self.map.pair_implications {
-            for post in posts {
-                if !self.assignment_holds(ante1.when_true())
-                    || !self.assignment_holds(ante2.when_true())
-                {
-                    continue;
-                }
+            if !self.assignment_holds(ante1.when_true())
+                || !self.assignment_holds(ante2.when_true())
+            {
+                continue;
+            }
 
+            for post in posts {
                 // Nested-typevar sequents are the mechanism that preserves cross-typevar facts when
                 // we later existentially quantify away one of the typevars. However, once we've
                 // applied a particular substitution site on the current path, reapplying it with a
@@ -5714,10 +5714,8 @@ impl PathAssignments {
         }
 
         for (ante, posts) in &self.map.single_implications {
-            for post in posts {
-                if self.assignment_holds(ante.when_true()) {
-                    new_constraints.push(*post);
-                }
+            if self.assignment_holds(ante.when_true()) {
+                new_constraints.extend(posts.iter().copied());
             }
         }
 

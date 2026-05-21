@@ -28,6 +28,7 @@ export function viteStaticCopyPyodide() {
       {
         src: [pyodideDir, ...PYODIDE_EXCLUDE],
         dest: "assets",
+        rename: { stripBase: true },
       },
     ],
   });
