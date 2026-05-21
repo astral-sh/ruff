@@ -1647,6 +1647,7 @@ impl<'src> Parser<'src> {
                     start,
                     slice_start,
                     slices: nested.slices,
+                    nested_slice: nested.nested_slice,
                 },
                 nested.value,
                 nested.start,
@@ -1661,6 +1662,28 @@ impl<'src> Parser<'src> {
         let mut slices = vec![];
 
         loop {
+            if self.at(TokenKind::Star) && self.peek() == TokenKind::Name {
+                let slice_checkpoint = self.checkpoint();
+                let starred_start = self.node_start();
+                self.bump(TokenKind::Star);
+
+                if self.at(TokenKind::Name) && self.peek() == TokenKind::Lsqb {
+                    let start = self.node_start();
+                    let value = self.parse_atom().expr;
+                    return Some(NestedSubscriptSlice {
+                        value,
+                        start,
+                        slices,
+                        nested_slice: PendingSubscriptSlice::Starred {
+                            starred_start,
+                            value_start: start,
+                        },
+                    });
+                }
+
+                self.rewind(slice_checkpoint);
+            }
+
             if self.at(TokenKind::Name) && self.peek() == TokenKind::Lsqb {
                 let start = self.node_start();
                 let value = self.parse_atom().expr;
@@ -1668,6 +1691,7 @@ impl<'src> Parser<'src> {
                     value,
                     start,
                     slices,
+                    nested_slice: PendingSubscriptSlice::Direct,
                 });
             }
 
@@ -1705,6 +1729,7 @@ impl<'src> Parser<'src> {
                 start,
                 slice_start,
                 slices: nested.slices,
+                nested_slice: nested.nested_slice,
             });
 
             value = nested.value;
@@ -1712,11 +1737,30 @@ impl<'src> Parser<'src> {
         };
 
         while let Some(subscript) = subscripts.pop() {
-            let lower = self.parse_named_expression_or_higher_from_lhs(
-                expr.into(),
-                subscript.slice_start,
-                ExpressionContext::starred_conditional(),
-            );
+            let lower = match subscript.nested_slice {
+                PendingSubscriptSlice::Direct => self.parse_named_expression_or_higher_from_lhs(
+                    expr.into(),
+                    subscript.slice_start,
+                    ExpressionContext::starred_conditional(),
+                ),
+                PendingSubscriptSlice::Starred {
+                    starred_start,
+                    value_start,
+                } => {
+                    let value = self.parse_conditional_expression_or_higher_from_lhs(
+                        expr.into(),
+                        value_start,
+                        ExpressionContext::starred_conditional().disallow_starred_expressions(),
+                    );
+                    Expr::Starred(ast::ExprStarred {
+                        value: Box::new(value.expr),
+                        ctx: ExprContext::Load,
+                        range: self.node_range(starred_start),
+                        node_index: AtomicNodeIndex::NONE,
+                    })
+                    .into()
+                }
+            };
             let slice = self.parse_slice_from_lower(subscript.slice_start, lower);
             expr = Expr::Subscript(if subscript.slices.is_empty() {
                 self.finish_subscript_expression(
@@ -4995,12 +5039,22 @@ struct PendingSubscript {
     start: TextSize,
     slice_start: TextSize,
     slices: Vec<Expr>,
+    nested_slice: PendingSubscriptSlice,
 }
 
 struct NestedSubscriptSlice {
     value: Expr,
     start: TextSize,
     slices: Vec<Expr>,
+    nested_slice: PendingSubscriptSlice,
+}
+
+enum PendingSubscriptSlice {
+    Direct,
+    Starred {
+        starred_start: TextSize,
+        value_start: TextSize,
+    },
 }
 
 struct PendingUnaryExpression {
