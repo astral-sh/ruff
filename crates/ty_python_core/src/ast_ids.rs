@@ -102,10 +102,12 @@ impl AstIdsBuilder {
     /// Adds `expr` to the use ids map and returns its id.
     pub(super) fn record_use(&mut self, expr: impl Into<ExpressionNodeKey>) -> ScopedUseId {
         let use_id = self.uses_map.len().into();
-
         self.uses_map.insert(expr.into(), use_id);
-
         use_id
+    }
+
+    pub(super) fn try_use_id(&self, key: impl Into<ExpressionNodeKey>) -> Option<ScopedUseId> {
+        self.uses_map.get(&key.into()).copied()
     }
 
     pub(super) fn finish(mut self) -> AstIds {

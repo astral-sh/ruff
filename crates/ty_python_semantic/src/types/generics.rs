@@ -830,6 +830,16 @@ impl<'db> GenericContext<'db> {
         self.specialize(db, types)
     }
 
+    /// Returns a specialization of this generic context where each typevar is mapped to the same type.
+    pub(crate) fn repeat_specialization(
+        self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> Specialization<'db> {
+        let types: Vec<Type> = self.variables(db).map(|_| ty).collect();
+        self.specialize(db, types)
+    }
+
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         match self.len(db) {
             0 => self.specialize(db, &[]),
@@ -2475,6 +2485,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // for now, matching the protocol constraint-set path in the nominal-instance
                 // arm above.
                 let _ = self.add_type_mappings_from_owned_constraint_set(formal, when, &mut f);
+                return Ok(());
+            }
+
+            (formal @ Type::ProtocolInstance(_), actual @ Type::TypedDict(_)) => {
+                let when =
+                    actual.when_constraint_set_assignable_to(self.db, formal, self.constraints);
+                // For protocol inference via constraint sets, keep unsatisfiable results non-fatal
+                // for now, matching the protocol constraint-set path in the nominal-instance
+                // arm above.
+                let _ = self.add_type_mappings_from_constraint_set(formal, when, &mut f);
                 return Ok(());
             }
 

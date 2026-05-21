@@ -1698,7 +1698,7 @@ impl<'db> Bindings<'db> {
                                     .as_constructor()
                                     .map(ConstructorBinding::constructed_instance_type)
                                     .and_then(|ty| ty.class_specialization(db))
-                                    .map(|specialization| {
+                                    .map(|(_, specialization)| {
                                         specialization
                                             .generic_context(db)
                                             .default_specialization(db, None)

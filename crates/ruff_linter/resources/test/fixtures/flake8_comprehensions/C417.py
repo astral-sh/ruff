@@ -79,3 +79,7 @@ _ = t"{dict(map(lambda v: (v, v**2), nums))}"
 # See https://github.com/astral-sh/ruff/issues/20198
 # No error: lambda contains `yield`, so map() should not be rewritten
 map(lambda x: (yield x), [1, 2, 3])
+
+# Ok: lambda has a positional-only parameter alongside a regular parameter;
+# total arity is 2, so rewriting to a comprehension is incorrect.
+map(lambda x, /, y: x + y, nums)

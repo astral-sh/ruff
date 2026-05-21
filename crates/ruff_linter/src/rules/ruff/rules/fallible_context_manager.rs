@@ -49,7 +49,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `contextlib.contextmanager`](https://docs.python.org/3/library/contextlib.html#contextlib.contextmanager)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "0.15.14")]
 pub(crate) struct FallibleContextManager;
 
 impl Violation for FallibleContextManager {

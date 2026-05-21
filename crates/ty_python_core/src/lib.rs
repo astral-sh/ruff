@@ -2,6 +2,7 @@ use ruff_python_ast as ast;
 use std::iter::{FusedIterator, once};
 use std::sync::Arc;
 
+use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
@@ -282,6 +283,12 @@ pub struct SemanticIndex<'db> {
     /// Map from a lambda expression to its containing statement.
     enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
 
+    // Map from a constraining use of a collection literal to its definition.
+    collections_by_use: FxHashMap<ExpressionNodeKey, Definition<'db>>,
+
+    // Map from a collection literal definition to statements containing a constraining use.
+    uses_by_collection: FxHashMap<Definition<'db>, Vec<(Statement<'db>, ExpressionNodeKey)>>,
+
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
 
@@ -454,6 +461,27 @@ impl<'db> SemanticIndex<'db> {
         self.enclosing_lambda_statements.get(&lambda).copied()
     }
 
+    /// If this is a potentially constraining use of an unconstrained collection literal, returns
+    /// its definition.
+    pub fn unconstrained_collection_binding(
+        &self,
+        collection_use: &ast::Expr,
+    ) -> Option<Definition<'db>> {
+        self.collections_by_use.get(&collection_use.into()).copied()
+    }
+
+    /// Returns all potentially constraining uses of the given unnannotated collection literal.
+    pub fn constraining_collection_uses(
+        &self,
+        collection_def: Definition<'db>,
+    ) -> impl Iterator<Item = (Statement<'db>, ExpressionNodeKey)> {
+        self.uses_by_collection
+            .get(&collection_def)
+            .into_iter()
+            .flatten()
+            .copied()
+    }
+
     pub fn is_in_type_checking_block(&self, scope_id: FileScopeId, range: TextRange) -> bool {
         self.ancestor_scopes(scope_id).any(|(scope_id, _)| {
             self.use_def_map(scope_id)
@@ -536,6 +564,18 @@ impl<'db> SemanticIndex<'db> {
             definitions.len()
         );
         definitions[0]
+    }
+
+    pub fn try_definition(
+        &self,
+        definition_key: impl Into<DefinitionNodeKey>,
+    ) -> Option<Definition<'db>> {
+        self.definitions_by_node
+            .get(&definition_key.into())?
+            .iter()
+            .copied()
+            .exactly_one()
+            .ok()
     }
 
     /// Returns the [`Expression`] ingredient for an expression node.

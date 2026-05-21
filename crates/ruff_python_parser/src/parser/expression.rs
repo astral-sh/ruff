@@ -272,7 +272,9 @@ impl<'src> Parser<'src> {
                 break;
             }
 
-            let Some(operator) = BinaryLikeOperator::try_from_tokens(current_token, self.peek())
+            let next_token =
+                matches!(current_token, TokenKind::Is | TokenKind::Not).then(|| self.peek());
+            let Some(operator) = BinaryLikeOperator::try_from_tokens(current_token, next_token)
             else {
                 // Not an operator.
                 break;
@@ -1302,7 +1304,9 @@ impl<'src> Parser<'src> {
                 break;
             }
 
-            let Some(next_op) = helpers::token_kind_to_cmp_op([next_token, self.peek()]) else {
+            let next_next_token =
+                matches!(next_token, TokenKind::Is | TokenKind::Not).then(|| self.peek());
+            let Some(next_op) = helpers::token_kind_to_cmp_op(next_token, next_next_token) else {
                 break;
             };
 
@@ -3150,15 +3154,16 @@ enum BinaryLikeOperator {
 }
 
 impl BinaryLikeOperator {
-    /// Attempts to convert the two tokens into the corresponding binary-like operator. Returns
-    /// [None] if it's not a binary-like operator.
-    fn try_from_tokens(current: TokenKind, next: TokenKind) -> Option<BinaryLikeOperator> {
+    /// Attempts to convert the token into the corresponding binary-like operator. `next` is
+    /// required to distinguish `is not` and `not in` from their one-token alternatives.
+    /// Returns [None] if it's not a binary-like operator.
+    fn try_from_tokens(current: TokenKind, next: Option<TokenKind>) -> Option<BinaryLikeOperator> {
         if let Some(bool_op) = current.as_bool_operator() {
             Some(BinaryLikeOperator::Boolean(bool_op))
         } else if let Some(bin_op) = current.as_binary_operator() {
             Some(BinaryLikeOperator::Binary(bin_op))
         } else {
-            helpers::token_kind_to_cmp_op([current, next]).map(BinaryLikeOperator::Comparison)
+            helpers::token_kind_to_cmp_op(current, next).map(BinaryLikeOperator::Comparison)
         }
     }
 
