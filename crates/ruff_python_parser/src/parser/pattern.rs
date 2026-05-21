@@ -114,8 +114,12 @@ impl Parser<'_> {
 
         // We don't yet know if it's an or pattern or an as pattern, so use whatever
         // was passed in.
-        let mut lhs = self.parse_match_pattern_lhs(allow_star_pattern);
+        let lhs = self.parse_match_pattern_lhs(allow_star_pattern);
 
+        self.parse_match_pattern_from_lhs(lhs, start)
+    }
+
+    fn parse_match_pattern_from_lhs(&mut self, mut lhs: Pattern, start: TextSize) -> Pattern {
         // Or pattern
         if self.at(TokenKind::Vbar) {
             // We know it's an `or` pattern now, so check for star pattern usage.
@@ -164,7 +168,7 @@ impl Parser<'_> {
     fn parse_match_pattern_lhs(&mut self, allow_star_pattern: AllowStarPattern) -> Pattern {
         let start = self.node_start();
 
-        let mut lhs = match self.current_token_kind() {
+        let lhs = match self.current_token_kind() {
             TokenKind::Lbrace => Pattern::MatchMapping(self.parse_match_pattern_mapping()),
             TokenKind::Star => {
                 let star_pattern = self.parse_match_pattern_star();
@@ -177,6 +181,10 @@ impl Parser<'_> {
             _ => self.parse_match_pattern_literal(),
         };
 
+        self.finish_match_pattern_lhs(lhs, start)
+    }
+
+    fn finish_match_pattern_lhs(&mut self, mut lhs: Pattern, start: TextSize) -> Pattern {
         if self.at(TokenKind::Lpar) {
             lhs = Pattern::MatchClass(self.parse_match_pattern_class(lhs, start));
         }
@@ -315,13 +323,74 @@ impl Parser<'_> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#sequence-patterns>
     fn parse_parenthesized_or_sequence_pattern(&mut self) -> Pattern {
         let start = self.node_start();
-        let parentheses = if self.eat(TokenKind::Lpar) {
+        let parentheses = self.parse_sequence_match_pattern_parentheses();
+
+        self.report_unclosed_sequence_match_pattern(parentheses);
+
+        if self.eat(parentheses.closing_kind()) {
+            return self.empty_sequence_match_pattern(start);
+        }
+
+        if matches!(self.current_token_kind(), TokenKind::Lpar | TokenKind::Lsqb) {
+            return self.parse_nested_parenthesized_or_sequence_pattern(start, parentheses);
+        }
+
+        let pattern = self.parse_match_pattern(AllowStarPattern::Yes);
+
+        self.finish_parenthesized_or_sequence_pattern(pattern, start, parentheses)
+    }
+
+    fn parse_nested_parenthesized_or_sequence_pattern(
+        &mut self,
+        outer_start: TextSize,
+        outer_parentheses: SequenceMatchPatternParentheses,
+    ) -> Pattern {
+        let mut pending = vec![(outer_start, outer_parentheses)];
+
+        let mut pattern = loop {
+            let start = self.node_start();
+            let parentheses = self.parse_sequence_match_pattern_parentheses();
+
+            self.report_unclosed_sequence_match_pattern(parentheses);
+
+            if self.eat(parentheses.closing_kind()) {
+                let lhs =
+                    self.finish_match_pattern_lhs(self.empty_sequence_match_pattern(start), start);
+                break self.parse_match_pattern_from_lhs(lhs, start);
+            }
+
+            pending.push((start, parentheses));
+
+            if !matches!(self.current_token_kind(), TokenKind::Lpar | TokenKind::Lsqb) {
+                break self.parse_match_pattern(AllowStarPattern::Yes);
+            }
+        };
+
+        while let Some((start, parentheses)) = pending.pop() {
+            pattern = self.finish_parenthesized_or_sequence_pattern(pattern, start, parentheses);
+
+            if !pending.is_empty() {
+                let lhs = self.finish_match_pattern_lhs(pattern, start);
+                pattern = self.parse_match_pattern_from_lhs(lhs, start);
+            }
+        }
+
+        pattern
+    }
+
+    fn parse_sequence_match_pattern_parentheses(&mut self) -> SequenceMatchPatternParentheses {
+        if self.eat(TokenKind::Lpar) {
             SequenceMatchPatternParentheses::Tuple
         } else {
             self.bump(TokenKind::Lsqb);
             SequenceMatchPatternParentheses::List
-        };
+        }
+    }
 
+    fn report_unclosed_sequence_match_pattern(
+        &mut self,
+        parentheses: SequenceMatchPatternParentheses,
+    ) {
         if matches!(
             self.current_token_kind(),
             TokenKind::Newline | TokenKind::Colon
@@ -337,28 +406,32 @@ impl Parser<'_> {
                 self.current_token_range(),
             );
         }
+    }
 
-        if self.eat(parentheses.closing_kind()) {
-            return Pattern::MatchSequence(ast::PatternMatchSequence {
-                patterns: vec![],
-                range: self.node_range(start),
-                node_index: AtomicNodeIndex::NONE,
-            });
-        }
+    fn empty_sequence_match_pattern(&self, start: TextSize) -> Pattern {
+        Pattern::MatchSequence(ast::PatternMatchSequence {
+            patterns: vec![],
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+        })
+    }
 
-        let mut pattern = self.parse_match_pattern(AllowStarPattern::Yes);
-
+    fn finish_parenthesized_or_sequence_pattern(
+        &mut self,
+        pattern: Pattern,
+        start: TextSize,
+        parentheses: SequenceMatchPatternParentheses,
+    ) -> Pattern {
         if parentheses.is_list() || self.at(TokenKind::Comma) {
-            pattern = Pattern::MatchSequence(self.parse_sequence_match_pattern(
+            Pattern::MatchSequence(self.parse_sequence_match_pattern(
                 pattern,
                 start,
                 Some(parentheses),
-            ));
+            ))
         } else {
             self.expect(parentheses.closing_kind());
+            pattern
         }
-
-        pattern
     }
 
     /// Parses the rest of a sequence pattern, given the first element.

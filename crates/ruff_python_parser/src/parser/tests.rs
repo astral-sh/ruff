@@ -225,15 +225,17 @@ fn deeply_nested_subscripts() {
 #[test]
 fn deeply_nested_match_patterns() {
     let mut src = String::from("match x:\n case ");
-    for _ in 0..600 {
+    for _ in 0..5_000 {
         src.push('(');
     }
     src.push('y');
-    for _ in 0..600 {
+    for _ in 0..5_000 {
         src.push(')');
     }
     src.push_str(": pass\n");
-    parse_module(&src).unwrap();
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
 }
 
 #[test]
