@@ -487,6 +487,14 @@ impl<'db> GenericContext<'db> {
         self.variables_inner(db).values().copied()
     }
 
+    pub(crate) fn contains(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarIdentity<'db>,
+    ) -> bool {
+        self.variables_inner(db).contains_key(&bound_typevar)
+    }
+
     /// Returns `true` if this generic context contains exactly one `ParamSpec` and no other type
     /// variables.
     ///
@@ -1969,9 +1977,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> bool {
         ty.as_typevar().is_some_and(|typevar| {
             typevar.is_inferable(self.db, self.inferable)
-                && generic_context
-                    .variables_inner(self.db)
-                    .contains_key(&typevar.identity(self.db))
+                && generic_context.contains(self.db, typevar.identity(self.db))
         })
     }
 

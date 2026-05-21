@@ -7573,13 +7573,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // types learned for the collection. Until collection-use constraints are represented as
         // projected constraint sets, avoid leaking those method-local typevars into the inferred
         // collection literal type.
-        let receiver_typevars: FxHashSet<_> = receiver_generic_context
-            .variables(self.db())
-            .map(|typevar| typevar.identity(self.db()))
-            .collect();
         if any_over_type(self.db(), constraint, false, |ty| {
-            ty.as_typevar()
-                .is_some_and(|typevar| !receiver_typevars.contains(&typevar.identity(self.db())))
+            ty.as_typevar().is_some_and(|typevar| {
+                !receiver_generic_context.contains(self.db(), typevar.identity(self.db()))
+            })
         }) {
             return None;
         }
