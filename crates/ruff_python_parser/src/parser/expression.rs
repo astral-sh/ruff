@@ -5232,18 +5232,11 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#lambda>
     fn parse_lambda_expr(&mut self) -> ast::ExprLambda {
-        let start = self.node_start();
-        self.bump(TokenKind::Lambda);
+        let pending = self.parse_lambda_header();
 
-        let parameters = if self.at(TokenKind::Colon) {
-            // test_ok lambda_with_no_parameters
-            // lambda: 1
-            None
-        } else {
-            Some(Box::new(self.parse_parameters(FunctionKind::Lambda)))
-        };
-
-        self.expect(TokenKind::Colon);
+        if self.at(TokenKind::Lambda) {
+            return self.parse_nested_lambda_expr(pending);
+        }
 
         // test_ok lambda_with_valid_body
         // lambda x: x
@@ -5273,8 +5266,50 @@ impl<'src> Parser<'src> {
                 self.recursion_recovery_expr()
             };
 
+        self.lambda_expression(pending, body.expr)
+    }
+
+    fn parse_lambda_header(&mut self) -> PendingLambdaExpression {
+        let start = self.node_start();
+        self.bump(TokenKind::Lambda);
+
+        let parameters = if self.at(TokenKind::Colon) {
+            // test_ok lambda_with_no_parameters
+            // lambda: 1
+            None
+        } else {
+            Some(Box::new(self.parse_parameters(FunctionKind::Lambda)))
+        };
+
+        self.expect(TokenKind::Colon);
+
+        PendingLambdaExpression { start, parameters }
+    }
+
+    fn parse_nested_lambda_expr(&mut self, outer: PendingLambdaExpression) -> ast::ExprLambda {
+        let mut pending = vec![outer];
+
+        while self.at(TokenKind::Lambda) {
+            pending.push(self.parse_lambda_header());
+        }
+
+        let body = self.parse_conditional_expression_or_higher();
+        let innermost = pending
+            .pop()
+            .expect("nested lambda parsing includes the outer lambda");
+        let mut lambda = self.lambda_expression(innermost, body.expr);
+
+        while let Some(outer) = pending.pop() {
+            lambda = self.lambda_expression(outer, Expr::Lambda(lambda));
+        }
+
+        lambda
+    }
+
+    fn lambda_expression(&self, pending: PendingLambdaExpression, body: Expr) -> ast::ExprLambda {
+        let PendingLambdaExpression { start, parameters } = pending;
         ast::ExprLambda {
-            body: Box::new(body.expr),
+            body: Box::new(body),
             parameters,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
@@ -5609,6 +5644,11 @@ struct PendingComprehensionIf {
     expression: PendingComprehensionIter,
     iter: Expr,
     ifs: Vec<Expr>,
+}
+
+struct PendingLambdaExpression {
+    start: TextSize,
+    parameters: Option<Box<ast::Parameters>>,
 }
 
 enum PendingComprehensionIter {

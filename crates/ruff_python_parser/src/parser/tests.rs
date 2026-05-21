@@ -788,13 +788,15 @@ fn deeply_nested_ternary_else_chain() {
 
 #[test]
 fn deeply_nested_lambda_chain() {
-    let depth = 2_000;
+    let depth = 20_000;
     let mut src = String::from("x = ");
     for _ in 0..depth {
         src.push_str("lambda: ");
     }
     src.push('1');
-    parse_module(&src).unwrap();
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
 }
 
 #[test]
