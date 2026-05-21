@@ -39,6 +39,7 @@ ruff_python_stdlib = { path = "crates/ruff_python_stdlib" }
 ruff_python_trivia = { path = "crates/ruff_python_trivia" }
 ruff_server = { path = "crates/ruff_server" }
 ruff_source_file = { path = "crates/ruff_source_file" }
+ruff_mdtest = { path = "crates/ruff_mdtest" }
 ruff_text_size = { path = "crates/ruff_text_size" }
 ruff_workspace = { path = "crates/ruff_workspace" }
 
@@ -219,6 +220,7 @@ zip = { version = "0.6.6", default-features = false }
 [workspace.metadata.cargo-shear]
 ignored = [
     "getrandom",
+    "ruff_mdtest",
     "ty_completion_bench",
     "ty_completion_eval",
 ]

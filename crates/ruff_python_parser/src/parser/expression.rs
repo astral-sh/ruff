@@ -12,7 +12,9 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::error::{FStringKind, StarTupleKind, UnparenthesizedNamedExprKind};
+use crate::error::{
+    ComprehensionUnpackingKind, FStringKind, StarTupleKind, UnparenthesizedNamedExprKind,
+};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{FunctionKind, Parser, helpers};
 use crate::string::{
@@ -730,9 +732,11 @@ impl<'src> Parser<'src> {
                     match parser.current_token_kind() {
                         TokenKind::Async | TokenKind::For => {
                             if parsed_expr.is_unparenthesized_starred_expr() {
-                                parser.add_error(
-                                    ParseErrorType::IterableUnpackingInComprehension,
-                                    &parsed_expr,
+                                parser.add_unsupported_syntax_error(
+                                    UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                                        ComprehensionUnpackingKind::IterableInGenerator,
+                                    ),
+                                    parsed_expr.range(),
                                 );
                             }
 
@@ -2036,7 +2040,9 @@ impl<'src> Parser<'src> {
                 // [*x for x in y]
                 if first_element.is_unparenthesized_starred_expr() {
                     self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::IterableUnpackingInListComprehension,
+                        UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                            ComprehensionUnpackingKind::IterableInList,
+                        ),
                         first_element.range(),
                     );
                 }
@@ -2058,6 +2064,33 @@ impl<'src> Parser<'src> {
     /// - <https://docs.python.org/3/reference/expressions.html#dictionary-displays>
     /// - <https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries>
     fn parse_set_or_dict_like_expression(&mut self) -> Expr {
+        // test_ok pep_798_unpacking_comprehensions_py315
+        // # parse_options: {"target-version": "3.15"}
+        // [*x for x in y]
+        // {*x for x in y}
+        // {**x for x in y}
+        // (*x for x in y)
+        // f(*x for x in y)
+        // [*x async for x in y]
+        // {*x async for x in y}
+        // {**x async for x in y}
+        // (*x async for x in y)
+
+        // test_err pep_798_unpacking_comprehensions_py314
+        // # parse_options: {"target-version": "3.14"}
+        // [*x for x in y]
+        // {*x for x in y}
+        // {**x for x in y}
+        // (*x for x in y)
+        // f(*x for x in y)
+
+        // test_err pep_798_invalid_dict_unpacking_comprehensions_py315
+        // # parse_options: {"target-version": "3.15"}
+        // {*k: v for k, v in items}
+        // {k: *v for k, v in items}
+        // {**k: v for k, v in items}
+        // {k: **v for k, v in items}
+
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
@@ -2078,10 +2111,47 @@ impl<'src> Parser<'src> {
             });
         }
 
+        let after_brace = self.node_start();
+
         if self.eat(TokenKind::DoubleStar) {
             // Handle dictionary unpacking. Here, the grammar is `'**' bitwise_or`
             // which requires limiting the expression.
             let value = self.parse_expression_with_bitwise_or_precedence();
+            let unpack_range = TextRange::new(after_brace, value.range().end());
+
+            if matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                        ComprehensionUnpackingKind::DictInDict,
+                    ),
+                    unpack_range,
+                );
+
+                return Expr::DictComp(
+                    self.parse_dictionary_comprehension_expression(None, value.expr, start),
+                );
+            }
+
+            if self.at(TokenKind::Colon) {
+                self.add_error(ParseErrorType::InvalidStarredExpressionUsage, unpack_range);
+
+                self.bump(TokenKind::Colon);
+                let dict_value = self.parse_conditional_expression_or_higher();
+
+                if matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
+                    return Expr::DictComp(self.parse_dictionary_comprehension_expression(
+                        Some(value.expr),
+                        dict_value.expr,
+                        start,
+                    ));
+                }
+
+                return Expr::Dict(self.parse_dictionary_expression(
+                    Some(value.expr),
+                    dict_value.expr,
+                    start,
+                ));
+            }
 
             return Expr::Dict(self.parse_dictionary_expression(None, value.expr, start));
         }
@@ -2095,9 +2165,11 @@ impl<'src> Parser<'src> {
         match self.current_token_kind() {
             TokenKind::Async | TokenKind::For => {
                 if key_or_element.is_unparenthesized_starred_expr() {
-                    self.add_error(
-                        ParseErrorType::IterableUnpackingInComprehension,
-                        &key_or_element,
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                            ComprehensionUnpackingKind::IterableInSet,
+                        ),
+                        key_or_element.range(),
                     );
                 } else if key_or_element.is_unparenthesized_named_expr() {
                     // test_ok parenthesized_named_expr_py38
@@ -2141,11 +2213,22 @@ impl<'src> Parser<'src> {
                 }
 
                 self.bump(TokenKind::Colon);
-                let value = self.parse_conditional_expression_or_higher();
+                let value = if self.at(TokenKind::DoubleStar) {
+                    let unpack_start = self.node_start();
+                    self.bump(TokenKind::DoubleStar);
+                    let value = self.parse_expression_with_bitwise_or_precedence();
+                    self.add_error(
+                        ParseErrorType::InvalidStarredExpressionUsage,
+                        TextRange::new(unpack_start, value.range().end()),
+                    );
+                    value
+                } else {
+                    self.parse_conditional_expression_or_higher()
+                };
 
                 if matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
                     Expr::DictComp(self.parse_dictionary_comprehension_expression(
-                        key_or_element.expr,
+                        Some(key_or_element.expr),
                         value.expr,
                         start,
                     ))
@@ -2212,9 +2295,11 @@ impl<'src> Parser<'src> {
             TokenKind::Async | TokenKind::For => {
                 // grammar: `genexp`
                 if parsed_expr.is_unparenthesized_starred_expr() {
-                    self.add_error(
-                        ParseErrorType::IterableUnpackingInComprehension,
-                        &parsed_expr,
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                            ComprehensionUnpackingKind::IterableInGenerator,
+                        ),
+                        parsed_expr.range(),
                     );
                 }
 
@@ -2523,7 +2608,7 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries>
     fn parse_dictionary_comprehension_expression(
         &mut self,
-        key: Expr,
+        key: Option<Expr>,
         value: Expr,
         start: TextSize,
     ) -> ast::ExprDictComp {
@@ -2532,7 +2617,7 @@ impl<'src> Parser<'src> {
         self.expect(TokenKind::Rbrace);
 
         ast::ExprDictComp {
-            key: Box::new(key),
+            key: key.map(Box::new),
             value: Box::new(value),
             generators,
             range: self.node_range(start),

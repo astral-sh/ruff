@@ -55,7 +55,6 @@ pub(crate) fn unnecessary_dict_index_lookup(checker: &Checker, stmt_for: &StmtFo
     let ranges = {
         let mut visitor = SequenceIndexVisitor::new(&dict_name.id, &index_name.id, &value_name.id);
         visitor.visit_body(&stmt_for.body);
-        visitor.visit_body(&stmt_for.orelse);
         visitor.into_accesses()
     };
 

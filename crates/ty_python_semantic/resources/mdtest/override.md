@@ -308,17 +308,13 @@ class Foo:
     elif coinflip():
         @overload
         @override
-        def method2(self, x: str) -> str: ...
+        def method2(self, x: str) -> str: ...  # error: [invalid-explicit-override]
         @overload
         def method2(self, x: int) -> int: ...
 
     else:
-        # TODO: not sure why this is being emitted on this line rather than on
-        # the first overload in the `elif` block? Ideally it would be emitted
-        # on the first reachable definition, but perhaps this is due to the way
-        # name lookups are deferred in stub files...? -- AW
         @override
-        def method2(self, x): ...  # error: [invalid-explicit-override]
+        def method2(self, x): ...
 ```
 
 ## Definitions in statically known branches

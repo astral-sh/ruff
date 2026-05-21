@@ -70,6 +70,19 @@ reveal_type(A() ^ B())  # revealed: A
 reveal_type(A() | B())  # revealed: A
 ```
 
+## Recursive dunder return annotation
+
+```py
+from __future__ import annotations
+
+class A:
+    def __add__(self, other: object) -> type(x + x):  # error: [invalid-type-form]
+        ...
+
+x = A()
+reveal_type(x + x)  # revealed: Unknown
+```
+
 ## Reflected
 
 We also support inference for reflected operations:

@@ -103,3 +103,10 @@ print(1)
 # pyrefly: ignore[unused-import]
 
 print(1)
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/25116,
+# note the leading tab character
+def foo():
+	# testing: Foo Bar Baz
+	...

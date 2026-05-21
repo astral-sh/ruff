@@ -13,16 +13,14 @@ use ruff_text_size::TextSize;
 
 /// The length of a line of text that is considered too long.
 ///
-/// The allowed range of values is 1..=320
+/// The allowed range of values is 1..=65535
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct LineLength(
-    #[cfg_attr(feature = "schemars", schemars(range(min = 1, max = 320)))] NonZeroU16,
-);
+pub struct LineLength(NonZeroU16);
 
 impl LineLength {
     /// Maximum allowed value for a valid [`LineLength`]
-    pub const MAX: u16 = 320;
+    pub const MAX: u16 = u16::MAX;
 
     /// Return the numeric value for this [`LineLength`]
     pub fn value(&self) -> u16 {
@@ -115,8 +113,8 @@ impl TryFrom<u16> for LineLength {
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match NonZeroU16::try_from(value) {
-            Ok(value) if value.get() <= Self::MAX => Ok(LineLength(value)),
-            Ok(_) | Err(_) => Err(LineLengthFromIntError(value)),
+            Ok(value) => Ok(LineLength(value)),
+            Err(_) => Err(LineLengthFromIntError(value)),
         }
     }
 }

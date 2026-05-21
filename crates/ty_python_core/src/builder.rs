@@ -106,29 +106,35 @@ struct ScopeInfo<'ast> {
 }
 
 #[derive(Clone)]
-struct BoolOpSnapshots {
+struct ConditionFlowSnapshots {
     truthy: FlowSnapshot,
     falsy: FlowSnapshot,
 }
 
-struct BoolOpSnapshot {
-    before: FlowSnapshot,
-    after: Option<BoolOpSnapshots>,
+struct ConditionFlowSnapshot {
+    fallback: FlowSnapshot,
+    snapshots: Option<ConditionFlowSnapshots>,
 }
 
-impl BoolOpSnapshot {
+impl ConditionFlowSnapshot {
     fn truthy(&self) -> FlowSnapshot {
-        let Self { before, after } = self;
-        after
+        let Self {
+            fallback,
+            snapshots,
+        } = self;
+        snapshots
             .as_ref()
-            .map_or_else(|| before, |snapshots| &snapshots.truthy)
+            .map_or_else(|| fallback, |snapshots| &snapshots.truthy)
             .clone()
     }
     fn falsy(&self) -> FlowSnapshot {
-        let Self { before, after } = self;
-        after
+        let Self {
+            fallback,
+            snapshots,
+        } = self;
+        snapshots
             .as_ref()
-            .map_or_else(|| before, |snapshots| &snapshots.falsy)
+            .map_or_else(|| fallback, |snapshots| &snapshots.falsy)
             .clone()
     }
 }
@@ -175,7 +181,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     scopes_by_expression: ExpressionsScopeMapBuilder,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
-    bool_op_snapshots_by_node: FxHashMap<ExpressionNodeKey, BoolOpSnapshots>,
+    condition_flow_snapshots_by_node: FxHashMap<ExpressionNodeKey, ConditionFlowSnapshots>,
     statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
     enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
     imported_modules: FxHashSet<ModuleName>,
@@ -224,7 +230,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
-            bool_op_snapshots_by_node: FxHashMap::default(),
+            condition_flow_snapshots_by_node: FxHashMap::default(),
             statements_by_node: FxHashMap::default(),
             enclosing_lambda_statements: FxHashMap::default(),
 
@@ -925,6 +931,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn flow_snapshot(&self) -> FlowSnapshot {
         self.current_use_def_map().snapshot()
+    }
+
+    /// Returns specialized truthy/falsy flow states for condition expressions whose evaluation can
+    /// leave different bindings behind depending on the condition outcome.
+    fn condition_flow_snapshots(&self, expr: &ast::Expr) -> Option<ConditionFlowSnapshots> {
+        match expr {
+            ast::Expr::BoolOp(_) => self
+                .condition_flow_snapshots_by_node
+                .get(&ExpressionNodeKey::from(expr))
+                .cloned(),
+            ast::Expr::UnaryOp(unary_op) if unary_op.op == ast::UnaryOp::Not => {
+                let snapshots = self.condition_flow_snapshots(&unary_op.operand)?;
+                Some(ConditionFlowSnapshots {
+                    truthy: snapshots.falsy,
+                    falsy: snapshots.truthy,
+                })
+            }
+            _ => None,
+        }
+    }
+
+    fn flow_snapshot_for_condition(&self, condition: &ast::Expr) -> ConditionFlowSnapshot {
+        ConditionFlowSnapshot {
+            fallback: self.flow_snapshot(),
+            snapshots: self.condition_flow_snapshots(condition),
+        }
     }
 
     fn flow_restore(&mut self, state: FlowSnapshot) {
@@ -1904,8 +1936,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         );
 
         for if_expr in &generator.ifs {
-            self.visit_expr(if_expr);
-            let _ = self.record_expression_narrowing_constraint(if_expr);
+            self.visit_comprehension_filter(if_expr);
         }
 
         for generator in generators_iter {
@@ -1922,8 +1953,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             );
 
             for if_expr in &generator.ifs {
-                self.visit_expr(if_expr);
-                let _ = self.record_expression_narrowing_constraint(if_expr);
+                self.visit_comprehension_filter(if_expr);
             }
         }
 
@@ -1931,6 +1961,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.pop_scope();
 
         self.current_assignments = saved_assignments;
+    }
+
+    fn visit_comprehension_filter(&mut self, if_expr: &'ast ast::Expr) {
+        self.visit_expr(if_expr);
+        let condition_flow_snapshot = self.flow_snapshot_for_condition(if_expr);
+        self.flow_restore(condition_flow_snapshot.truthy());
+        let _ = self.record_expression_narrowing_constraint(if_expr);
     }
 
     fn declare_parameters(&mut self, parameters: &'ast ast::Parameters) {
@@ -2571,22 +2608,23 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // falsy. This is why we apply the negated `test` predicate as a narrowing and
                 // reachability constraint on the `msg` expression.
                 //
-                // The other important part is the `<halt>`. This lets us skip the usual merging of
-                // flow states and simplification of reachability constraints, since there is no way
-                // of getting out of that `msg` branch. We simply restore to the post-test state.
+                // The other important part is the `<halt>`. This lets us skip merging the
+                // `msg` branch back into the following flow, since there is no way of getting out
+                // of that branch. Code after the assertion starts from the condition's truthy flow.
 
                 self.visit_expr(test);
+                let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
                 let predicate = self.build_predicate(test);
 
                 if let Some(msg) = msg {
-                    let post_test = self.flow_snapshot();
+                    self.flow_restore(condition_flow_snapshot.falsy());
                     let negated_predicate = predicate.negated();
                     self.record_narrowing_constraint(negated_predicate);
                     self.record_reachability_constraint(negated_predicate);
                     self.visit_expr(msg);
-                    self.flow_restore(post_test);
                 }
 
+                self.flow_restore(condition_flow_snapshot.truthy());
                 self.record_narrowing_constraint(predicate);
                 self.record_reachability_constraint(predicate);
             }
@@ -2705,20 +2743,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
             ast::Stmt::If(node) => {
-                let flow_snapshot = |builder: &Self, test: &'ast ast::Expr| {
-                    let no_branch_taken = builder.flow_snapshot();
-                    let bool_op_snapshots = builder
-                        .bool_op_snapshots_by_node
-                        .get(&ExpressionNodeKey::from(test));
-                    BoolOpSnapshot {
-                        before: no_branch_taken,
-                        after: bool_op_snapshots.cloned(),
-                    }
-                };
-
                 self.visit_expr(&node.test);
-                let mut bool_op_snapshot = flow_snapshot(self, &node.test);
-                self.flow_restore(bool_op_snapshot.truthy());
+                let mut condition_flow_snapshot = self.flow_snapshot_for_condition(&node.test);
+                self.flow_restore(condition_flow_snapshot.truthy());
                 let (mut last_predicate, mut last_narrowing_id) =
                     self.record_expression_narrowing_constraint(&node.test);
                 let mut last_reachability_constraint =
@@ -2759,7 +2786,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     post_clauses.push(self.flow_snapshot());
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken
-                    self.flow_restore(bool_op_snapshot.falsy());
+                    self.flow_restore(condition_flow_snapshot.falsy());
 
                     self.record_negated_narrowing_constraint(last_predicate, last_narrowing_id);
                     self.record_negated_reachability_constraint(last_reachability_constraint);
@@ -2767,8 +2794,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     if let Some(elif_test) = clause_test {
                         self.visit_expr(elif_test);
                         // A test expression is evaluated whether the branch is taken or not
-                        bool_op_snapshot = flow_snapshot(self, elif_test);
-                        self.flow_restore(bool_op_snapshot.truthy());
+                        condition_flow_snapshot = self.flow_snapshot_for_condition(elif_test);
+                        self.flow_restore(condition_flow_snapshot.truthy());
 
                         (last_predicate, last_narrowing_id) =
                             self.record_expression_narrowing_constraint(elif_test);
@@ -2834,11 +2861,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // Visit the test expression after creating loop headers, so that loop-back values
                 // are visible.
                 self.visit_expr(test);
+                let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
 
-                // Take the pre_loop snapshot after visiting the test expression, so that walrus
-                // bindings in the test (which are always evaluated at least once) remain visible
-                // after the loop.
+                // Take the pre_loop snapshot from the post-test fallback flow before restoring the
+                // condition's truthy flow for the body. This preserves the zero-iteration path for
+                // the loop exit merge below.
                 let pre_loop = self.flow_snapshot();
+                self.flow_restore(condition_flow_snapshot.truthy());
                 let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
                 self.record_reachability_constraint(predicate);
 
@@ -3033,7 +3062,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         // statically known conditions, so we currently don't model that.
                         self.record_ambiguous_reachability();
                         self.visit_expr(guard);
-                        let post_guard_eval = self.flow_snapshot();
+                        let condition_flow_snapshot = self.flow_snapshot_for_condition(guard);
                         let predicate = PredicateOrLiteral::Predicate(Predicate {
                             node: PredicateNode::Expression(guard_expr),
                             is_positive: true,
@@ -3042,13 +3071,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         // path. This ensures the positive and negative atoms share the same ID.
                         let guard_predicate_id = self.add_predicate(predicate);
                         let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
+                        self.flow_restore(condition_flow_snapshot.falsy());
                         self.current_use_def_map_mut()
                             .record_negated_narrowing_constraint_for_places(
                                 guard_predicate_id,
                                 &possibly_narrowed,
                             );
                         let match_success_guard_failure = self.flow_snapshot();
-                        self.flow_restore(post_guard_eval);
+                        self.flow_restore(condition_flow_snapshot.truthy());
                         self.current_use_def_map_mut()
                             .record_narrowing_constraint_for_places(
                                 guard_predicate_id,
@@ -3645,7 +3675,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 body, test, orelse, ..
             }) => {
                 self.visit_expr(test);
-                let pre_if = self.flow_snapshot();
+                let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
+                self.flow_restore(condition_flow_snapshot.truthy());
                 let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
                 let reachability_constraint = self.record_reachability_constraint(predicate);
                 let in_type_checking_block = self.in_type_checking_block;
@@ -3653,7 +3684,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     .record_range_reachability(body.range(), in_type_checking_block);
                 self.visit_expr(body);
                 let post_body = self.flow_snapshot();
-                self.flow_restore(pre_if);
+                self.flow_restore(condition_flow_snapshot.falsy());
 
                 self.record_negated_narrowing_constraint(predicate, predicate_id);
                 self.record_negated_reachability_constraint(reachability_constraint);
@@ -3708,7 +3739,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     NodeWithScopeRef::DictComprehension(dict_comprehension),
                     generators,
                     |builder| {
-                        builder.visit_expr(key);
+                        if let Some(key) = key {
+                            builder.visit_expr(key);
+                        }
                         builder.visit_expr(value);
                     },
                 );
@@ -3782,8 +3815,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         ast::BoolOp::And => (no_short_circuit, maybe_short_circuit),
                         ast::BoolOp::Or => (maybe_short_circuit, no_short_circuit),
                     };
-                    self.bool_op_snapshots_by_node
-                        .insert(bool_op_key, BoolOpSnapshots { truthy, falsy });
+                    self.condition_flow_snapshots_by_node
+                        .insert(bool_op_key, ConditionFlowSnapshots { truthy, falsy });
                 }
             }
             ast::Expr::StringLiteral(_) => {

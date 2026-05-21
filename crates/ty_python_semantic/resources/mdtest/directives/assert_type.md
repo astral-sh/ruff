@@ -145,6 +145,23 @@ error[type-assertion-failure]: Argument does not have asserted type `Baz`
 info: `Baz` and `Foo & Bar` are not equivalent types
 ```
 
+Compact enum complements that are equivalent to a literal union are still spellable.
+
+```py
+from enum import Flag
+from typing_extensions import assert_type
+
+class F(Flag):
+    A = 1
+    B = 2
+    C = 4
+
+def _(f: F):
+    if f is F.A or f is F.B:
+        return
+    assert_type(f, F)  # error: [type-assertion-failure] "Type `Literal[F.C]` does not match asserted type `F`"
+```
+
 ## Gradual types
 
 ```py

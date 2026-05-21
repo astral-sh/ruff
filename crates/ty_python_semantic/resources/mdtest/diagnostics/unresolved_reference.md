@@ -6,11 +6,11 @@
 
 ```toml
 [environment]
-python-version = "3.9"
+python-version = "3.12"
 ```
 
 ```py
-aiter  # error: [unresolved-reference]
+PythonFinalizationError  # error: [unresolved-reference]
 ```
 
 ## Typing builtin has Info help

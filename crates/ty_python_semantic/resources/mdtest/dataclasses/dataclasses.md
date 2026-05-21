@@ -594,9 +594,116 @@ class MyFrozenClass:
     x: int = 1
 
 class MyFrozenChildClass(MyFrozenClass): ...
+class MyFrozenGrandchildClass(MyFrozenChildClass): ...
 
 frozen = MyFrozenChildClass()
 frozen.x = 2  # error: [invalid-assignment]
+
+grandchild = MyFrozenGrandchildClass()
+grandchild.x = 2  # error: [invalid-assignment]
+```
+
+Non-field attributes on a non-dataclass subclass of a frozen dataclass are still assignable:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int = 1
+
+class MyFrozenChildClass(MyFrozenClass):
+    y: int
+
+class MyFrozenGrandchildClass(MyFrozenChildClass):
+    z: int
+
+frozen = MyFrozenChildClass()
+frozen.y = 2
+frozen.z = 2
+
+grandchild = MyFrozenGrandchildClass()
+grandchild.y = 2
+grandchild.z = 2
+grandchild.unknown = 2
+```
+
+The synthesized `__setattr__` is exposed as a member on non-dataclass subclasses of frozen
+dataclasses:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int = 1
+
+class MyFrozenChildClass(MyFrozenClass): ...
+
+child = MyFrozenChildClass()
+reveal_type(child.__setattr__)  # revealed: Overload[(name: Literal["x"], value) -> Never, (name: str, value) -> None]
+```
+
+An explicit `__setattr__` on an intermediate subclass overrides the inherited frozen dataclass
+setter:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int = 1
+
+class MyFrozenIntermediateClass(MyFrozenClass):
+    def __setattr__(self, name: str, value: object) -> None: ...  # error: [invalid-method-override]
+
+class MyFrozenChildClass(MyFrozenIntermediateClass):
+    y: int
+
+class MyFrozenGrandchildClass(MyFrozenChildClass):
+    z: int
+
+child = MyFrozenChildClass()
+child.x = 2
+child.y = 2
+child.unknown = 2
+
+grandchild = MyFrozenGrandchildClass()
+grandchild.x = 2
+grandchild.y = 2
+grandchild.z = 2
+grandchild.unknown = 2
+```
+
+Non-field attributes on subclasses of slotted frozen dataclasses are still rejected. This correctly
+models the runtime behavior, but is somewhat surprising and may be a CPython bug, as subclasses of
+slotted classes usually allow arbitrary attributes to be set on them unless the subclass also
+explicitly declares `__slots__`. We should change our behavior here to follow CPython, if they "fix"
+it.
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True, slots=True)
+class MySlottedFrozenClass:
+    x: int = 1
+
+class MySlottedFrozenChildClass(MySlottedFrozenClass):
+    y: int
+
+class MySlottedFrozenGrandchildClass(MySlottedFrozenChildClass):
+    z: int
+
+frozen = MySlottedFrozenChildClass()
+frozen.x = 2  # error: [invalid-assignment]
+frozen.y = 2  # error: [invalid-assignment]
+frozen.z = 2  # error: [invalid-assignment]
+
+grandchild = MySlottedFrozenGrandchildClass()
+grandchild.x = 2  # error: [invalid-assignment]
+grandchild.y = 2  # error: [invalid-assignment]
+grandchild.z = 2  # error: [invalid-assignment]
+grandchild.unknown = 2  # error: [invalid-assignment]
 ```
 
 The same diagnostic is emitted if a frozen dataclass is inherited, and an attempt is made to delete
@@ -854,7 +961,7 @@ python-version = "3.9"
 ```py
 from dataclasses import dataclass
 
-@dataclass(kw_only=True)  # TODO: Emit a diagnostic here
+@dataclass(kw_only=True)  # error: [no-matching-overload]
 class A:
     x: int
     y: int
@@ -1088,8 +1195,7 @@ from dataclasses import dataclass
 
 # fmt: off
 
-# TODO: these nonexistent keyword arguments should cause us to emit diagnostics on Python 3.9
-@dataclass(
+@dataclass(  # error: [no-matching-overload]
     slots=True,
     weakref_slot=True,
     match_args=True
@@ -1597,6 +1703,19 @@ error[too-many-positional-arguments]: Too many positional arguments: expected 1,
 13 | C(3, "")
    |      ^^
    |
+```
+
+Declaration order still controls `KW_ONLY` when a later field name was already referenced by an
+earlier annotation:
+
+```py
+@dataclass
+class ShadowedOrder:
+    x: int
+    _: KW_ONLY
+    int: int
+
+reveal_type(ShadowedOrder.__init__)  # revealed: (self: ShadowedOrder, x: int, *, int: int) -> None
 ```
 
 Using `KW_ONLY` to annotate more than one field in a dataclass causes a `TypeError` to be raised at

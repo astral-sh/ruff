@@ -41,7 +41,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
                 // `Foo()`, where the resolved definition is `__init__` and
                 // usually carries no docstring of its own.
                 goto_target
-                    .get_definition_targets(
+                    .definitions(
                         &model,
                         ty_python_semantic::ImportAliasResolution::ResolveAliases,
                     )
@@ -50,7 +50,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
             .map(HoverContent::Docstring)
     } else {
         goto_target
-            .get_definition_targets(
+            .definitions(
                 &model,
                 ty_python_semantic::ImportAliasResolution::ResolveAliases,
             )
@@ -4616,6 +4616,44 @@ def function():
           |     source
           |
         ");
+    }
+
+    #[test]
+    fn hover_func_docstring_escapes_html_in_markdown() {
+        let test = hover_test(
+            r#"
+        def url<CURSOR>parse():
+            """Parse a URL into components:
+            <scheme>://<netloc>/<path>;<params>?<query>#<fragment>
+            """
+            return
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        def urlparse() -> Unknown
+        ---------------------------------------------
+        Parse a URL into components:
+        <scheme>://<netloc>/<path>;<params>?<query>#<fragment>
+
+        ---------------------------------------------
+        ```python
+        def urlparse() -> Unknown
+        ```
+        ---
+        Parse a URL into components:<HB>
+        &lt;scheme&gt;://&lt;netloc&gt;/&lt;path&gt;;&lt;params&gt;?&lt;query&gt;#&lt;fragment&gt;
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:5
+          |
+        2 | def urlparse():
+          |     ^^^-^^^^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        "#);
     }
 
     #[test]

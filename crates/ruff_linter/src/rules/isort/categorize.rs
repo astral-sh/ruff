@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
 use crate::package::PackageRoot;
+use crate::settings::types::IdentifierPattern;
 use crate::warn_user_once;
 use ruff_macros::CacheKey;
 use ruff_python_ast::PythonVersion;
@@ -283,20 +284,20 @@ pub(crate) fn categorize_imports<'a>(
 #[derive(Debug, Clone, Default, CacheKey)]
 pub struct KnownModules {
     /// A map of known modules to their section.
-    known: Vec<(glob::Pattern, ImportSection)>,
+    known: Vec<(IdentifierPattern, ImportSection)>,
     /// Whether any of the known modules are submodules (e.g., `foo.bar`, as opposed to `foo`).
     has_submodules: bool,
 }
 
 impl KnownModules {
     pub fn new(
-        first_party: Vec<glob::Pattern>,
-        third_party: Vec<glob::Pattern>,
-        local_folder: Vec<glob::Pattern>,
-        standard_library: Vec<glob::Pattern>,
-        user_defined: FxHashMap<String, Vec<glob::Pattern>>,
+        first_party: Vec<IdentifierPattern>,
+        third_party: Vec<IdentifierPattern>,
+        local_folder: Vec<IdentifierPattern>,
+        standard_library: Vec<IdentifierPattern>,
+        user_defined: FxHashMap<String, Vec<IdentifierPattern>>,
     ) -> Self {
-        let known: Vec<(glob::Pattern, ImportSection)> = user_defined
+        let known: Vec<(IdentifierPattern, ImportSection)> = user_defined
             .into_iter()
             .flat_map(|(section, modules)| {
                 modules
@@ -395,8 +396,8 @@ impl KnownModules {
     }
 
     /// Return the list of user-defined modules, indexed by section.
-    pub fn user_defined(&self) -> FxHashMap<&str, Vec<&glob::Pattern>> {
-        let mut user_defined: FxHashMap<&str, Vec<&glob::Pattern>> = FxHashMap::default();
+    pub fn user_defined(&self) -> FxHashMap<&str, Vec<&IdentifierPattern>> {
+        let mut user_defined: FxHashMap<&str, Vec<&IdentifierPattern>> = FxHashMap::default();
         for (module, section) in &self.known {
             if let ImportSection::UserDefined(section_name) = section {
                 user_defined

@@ -394,7 +394,7 @@ pub(crate) fn symbols_for_file(db: &dyn Db, file: File) -> FlatSymbols {
 /// returned doesn't include children.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=symbols_for_file_global_only_cycle_initial,
+    cycle_initial=|_, _, _| FlatSymbols::default(),
     heap_size=ruff_memory_usage::heap_size,
 )]
 pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: File) -> FlatSymbols {
@@ -413,14 +413,6 @@ pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: File) -> FlatSymbo
         parsed.clear();
     }
     visitor.into_flat_symbols()
-}
-
-fn symbols_for_file_global_only_cycle_initial(
-    _db: &dyn Db,
-    _id: salsa::Id,
-    _file: File,
-) -> FlatSymbols {
-    FlatSymbols::default()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]

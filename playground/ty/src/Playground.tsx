@@ -60,7 +60,7 @@ export default function Playground() {
   // This is safe as this is only called once on startup.
   // We need useRef to avoid duplicate initialization when
   // running locally due to react rendering
-  // everything twice in strict mode in debug builds.
+  // eslint-disable-next-line
   const sessionPromise = sessionPromiseRef.current;
 
   const fileName = useMemo(() => {
@@ -242,7 +242,7 @@ export default function Playground() {
   }, [session, files]);
 
   return (
-    <main className="flex flex-col h-full bg-ayu-background dark:bg-ayu-background-dark">
+    <main className="flex flex-col h-full bg-white dark:bg-ayu-background-dark">
       <Header
         theme={theme}
         tool="ty"

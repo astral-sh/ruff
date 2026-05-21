@@ -407,6 +407,10 @@ fn map_intersection_subscript<'db, F>(
 where
     F: FnMut(Type<'db>) -> Result<Type<'db>, SubscriptError<'db>>,
 {
+    if let Some(alternatives) = intersection.finite_alternative_union(db) {
+        return map_fn(alternatives);
+    }
+
     let mut results = Vec::new();
     let mut errors = Vec::new();
 
@@ -541,6 +545,14 @@ impl<'db> Type<'db> {
             (_, Type::Union(union)) => Some(map_union_subscript(db, union, |element| {
                 value_ty.subscript(db, element, expr_context)
             })),
+
+            (Type::EnumComplement(complement), _) => {
+                Some(complement.remaining_literal_union(db).subscript(db, slice_ty, expr_context))
+            }
+
+            (_, Type::EnumComplement(complement)) => {
+                Some(value_ty.subscript(db, complement.remaining_literal_union(db), expr_context))
+            }
 
             (Type::Intersection(intersection), _) => {
                 Some(map_intersection_subscript(db, intersection, |element| {

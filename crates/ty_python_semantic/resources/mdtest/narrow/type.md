@@ -69,6 +69,21 @@ def _(x: A | B, y: Literal[1, 2]):
         reveal_type(y)  # revealed: Literal[1]
 ```
 
+## `type(x) is type(self)`
+
+```py
+class Pattern: ...
+
+class InstanceOf(Pattern):
+    def matches(self, other: Pattern) -> bool:
+        if type(other) is type(self):
+            reveal_type(other)  # revealed: InstanceOf
+            return True
+
+        reveal_type(other)  # revealed: Pattern
+        return False
+```
+
 ## `type(x) is not C`
 
 ```py
@@ -99,6 +114,39 @@ def _(x: A | B, y: A | C):
         reveal_type(y)  # revealed: A | C
     else:
         reveal_type(y)  # revealed: A
+```
+
+## `x.__class__ is C`
+
+```py
+from typing import final
+
+class A: ...
+class B: ...
+
+@final
+class C: ...
+
+def _(x: A | B, y: A | C):
+    if x.__class__ is A:
+        reveal_type(x)  # revealed: A
+    else:
+        reveal_type(x)  # revealed: A | B
+
+    if C is y.__class__:
+        reveal_type(y)  # revealed: C
+    else:
+        reveal_type(y)  # revealed: A
+
+    if x.__class__ is not A:
+        reveal_type(x)  # revealed: A | B
+    else:
+        reveal_type(x)  # revealed: A
+
+    if y.__class__ is not C:
+        reveal_type(y)  # revealed: A
+    else:
+        reveal_type(y)  # revealed: C
 ```
 
 ## The top materialization is used for generic classes

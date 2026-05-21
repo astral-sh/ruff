@@ -319,6 +319,8 @@ def _[T](x: X[type[T]]):
 ## Generic Type Inference
 
 ```py
+from typing import Callable
+
 def f1[T](x: type[T]) -> type[T]:
     return x
 
@@ -331,8 +333,30 @@ def f2[T](x: T) -> type[T]:
 reveal_type(f2(int(1)))  # revealed: type[int]
 reveal_type(f2(object()))  # revealed: type
 
-# TODO: This should reveal `type[Literal[1]]`.
-reveal_type(f2(1))  # revealed: type[Unknown]
+reveal_type(f2(1))  # revealed: <class 'int'>
+reveal_type(f2(type))  # revealed: <class 'type'>
+
+def foo() -> int:
+    return 1
+
+reveal_type(f2(foo))  # revealed: <class 'FunctionType'>
+
+def _(x: Callable[[int], int]):
+    reveal_type(f2(x))  # revealed: type
+
+class Meta(type): ...
+class Base(metaclass=Meta): ...
+
+reveal_type(f2(Base))  # revealed: <class 'Meta'>
+reveal_type(type(Base))  # revealed: <class 'Meta'>
+
+class MetaWithAttr(type):
+    meta_attr: int
+
+class BaseWithAttr(metaclass=MetaWithAttr): ...
+
+def _[T: type[BaseWithAttr]](x: type[T]) -> None:
+    reveal_type(x.meta_attr)  # revealed: int
 
 def f3[T](x: type[T]) -> T:
     return x()

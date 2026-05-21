@@ -3,8 +3,7 @@ import sys
 from collections import deque
 from collections.abc import Callable
 from enum import Enum
-from typing import Any, ClassVar, Final, Literal
-from typing_extensions import TypeAlias
+from typing import Any, ClassVar, Final, Literal, TypeAlias
 
 from . import constants, events, futures, protocols, transports
 

@@ -297,7 +297,7 @@ impl<'db> From<LiteralValueType<'db>> for Type<'db> {
 
 // This type has the same alignment as `salsa::Id`, allowing `LiteralValueType` to use a smaller
 // discriminant.
-#[derive(PartialOrd, Ord, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) struct IntLiteralType {
     high: u32,
     low: u32,
@@ -328,6 +328,18 @@ impl std::fmt::Display for IntLiteralType {
 impl std::fmt::Debug for IntLiteralType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(&self.as_i64(), f)
+    }
+}
+
+impl std::cmp::Ord for IntLiteralType {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.as_i64().cmp(&other.as_i64())
+    }
+}
+
+impl std::cmp::PartialOrd for IntLiteralType {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 

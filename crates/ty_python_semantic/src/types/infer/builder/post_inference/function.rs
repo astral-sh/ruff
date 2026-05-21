@@ -6,6 +6,7 @@ use crate::{
         diagnostic::{INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_TYPE_VARIABLE_DEFAULT},
         function::OverloadLiteral,
         infer_definition_types,
+        signatures::ReturnCallableTypeVarScope,
         typevar::TypeVarInstance,
         visitor::find_over_type,
     },
@@ -32,7 +33,7 @@ pub(crate) fn check_function_definition<'db>(
     };
 
     let last_definition = function_type.literal(db).last_definition;
-    let signature = last_definition.raw_signature(db);
+    let signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Public);
 
     check_legacy_positional_only_convention(context, last_definition, &signature);
     check_legacy_typevar_defaults(context, last_definition, &signature, file_expression_type);

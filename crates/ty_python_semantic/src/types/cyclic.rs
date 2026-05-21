@@ -193,10 +193,24 @@ impl<T: Hash + Eq + Clone> ActiveRecursionDetector<T> {
             return on_cycle();
         }
 
-        let ret = func();
+        // Keep the active-recursion state scoped even if `func` unwinds. In some cases, we catch
+        // panics and continue handling later work on the same thread.
+        let _guard = ActiveRecursionGuard {
+            seen: &self.seen,
+            item,
+        };
 
-        self.seen.borrow_mut().remove(item);
+        func()
+    }
+}
 
-        ret
+struct ActiveRecursionGuard<'a, T: Hash + Eq> {
+    seen: &'a RefCell<FxHashSet<T>>,
+    item: &'a T,
+}
+
+impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
+    fn drop(&mut self) {
+        self.seen.borrow_mut().remove(self.item);
     }
 }

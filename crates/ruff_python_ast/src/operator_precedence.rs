@@ -54,7 +54,7 @@ pub enum OperatorPrecedence {
 }
 
 impl OperatorPrecedence {
-    pub fn from_expr_ref(expr: &ExprRef) -> Self {
+    pub fn from_expr_ref(expr: ExprRef) -> Self {
         match expr {
             // Binding or parenthesized expression, list display, dictionary display, set display
             ExprRef::Tuple(_)
@@ -130,7 +130,7 @@ impl OperatorPrecedence {
     }
 
     pub fn from_expr(expr: &Expr) -> Self {
-        Self::from(&ExprRef::from(expr))
+        Self::from(ExprRef::from(expr))
     }
 
     /// Returns `true` if the precedence is right-associative i.e., the operations are evaluated
@@ -146,8 +146,8 @@ impl From<&Expr> for OperatorPrecedence {
     }
 }
 
-impl<'a> From<&ExprRef<'a>> for OperatorPrecedence {
-    fn from(expr_ref: &ExprRef<'a>) -> Self {
+impl<'a> From<ExprRef<'a>> for OperatorPrecedence {
+    fn from(expr_ref: ExprRef<'a>) -> Self {
         Self::from_expr_ref(expr_ref)
     }
 }

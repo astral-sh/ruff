@@ -248,35 +248,25 @@ def start_new_thread(function: Callable[[Unpack[_Ts]], object], args: tuple[Unpa
     unhandled exception; a stack trace will be printed unless the exception
     is SystemExit.
     """
-
 @overload
 def start_new_thread(function: Callable[..., object], args: tuple[Any, ...], kwargs: dict[str, Any], /) -> int: ...
+
 @overload
 @deprecated("Obsolete synonym. Use `start_new_thread()` instead.")
 def start_new(function: Callable[[Unpack[_Ts]], object], args: tuple[Unpack[_Ts]], /) -> int:  # undocumented
     """An obsolete synonym of start_new_thread()."""
-
 @overload
 @deprecated("Obsolete synonym. Use `start_new_thread()` instead.")
 def start_new(function: Callable[..., object], args: tuple[Any, ...], kwargs: dict[str, Any], /) -> int: ...  # undocumented
 
-if sys.version_info >= (3, 10):
-    def interrupt_main(signum: signal.Signals = signal.SIGINT, /) -> None:
-        """Simulate the arrival of the given signal in the main thread,
-        where the corresponding signal handler will be executed.
-        If *signum* is omitted, SIGINT is assumed.
-        A subthread can use this function to interrupt the main thread.
+def interrupt_main(signum: signal.Signals = signal.SIGINT, /) -> None:
+    """Simulate the arrival of the given signal in the main thread,
+    where the corresponding signal handler will be executed.
+    If *signum* is omitted, SIGINT is assumed.
+    A subthread can use this function to interrupt the main thread.
 
-        Note: the default signal handler for SIGINT raises ``KeyboardInterrupt``.
-        """
-
-else:
-    def interrupt_main() -> None:
-        """interrupt_main()
-
-        Raise a KeyboardInterrupt in the main thread.
-        A subthread can use this function to interrupt the main thread.
-        """
+    Note: the default signal handler for SIGINT raises ``KeyboardInterrupt``.
+    """
 
 def exit() -> NoReturn:
     """This is synonymous to ``raise SystemExit''.  It will cause the current
@@ -340,8 +330,7 @@ class _ExceptHookArgs(structseq[Any], tuple[type[BaseException], BaseException |
     Type used to pass arguments to threading.excepthook.
     """
 
-    if sys.version_info >= (3, 10):
-        __match_args__: Final = ("exc_type", "exc_value", "exc_traceback", "thread")
+    __match_args__: Final = ("exc_type", "exc_value", "exc_traceback", "thread")
 
     @property
     def exc_type(self) -> type[BaseException]:

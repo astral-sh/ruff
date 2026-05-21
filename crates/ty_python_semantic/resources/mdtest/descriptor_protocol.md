@@ -84,6 +84,50 @@ c.flexible_int = None  # not okay
 reveal_type(c.flexible_int)  # revealed: int | None
 ```
 
+### Enum complement as descriptor mutation receiver
+
+`overloaded.pyi`:
+
+```pyi
+from enum import Enum
+from typing import Literal, overload
+
+class Marker:
+    @overload
+    def __set__(self, instance: "Literal[Color.GREEN]", value: int) -> None: ...
+    @overload
+    def __set__(self, instance: "Literal[Color.BLUE]", value: int) -> None: ...
+    def __set__(self, instance, value: int) -> None: ...
+    @overload
+    def __delete__(self, instance: "Literal[Color.GREEN]") -> None: ...
+    @overload
+    def __delete__(self, instance: "Literal[Color.BLUE]") -> None: ...
+    def __delete__(self, instance) -> None: ...
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+    marker: Marker
+```
+
+```py
+from typing import Literal
+
+from overloaded import Color
+
+def narrowed(color: Color):
+    if color is Color.RED:
+        return
+    color.marker = 1
+    del color.marker
+
+def explicit(color: Literal[Color.GREEN, Color.BLUE]):
+    color.marker = 1
+    del color.marker
+```
+
 ### Data and non-data descriptors
 
 Descriptors that define `__set__` or `__delete__` are called *data descriptors*. An example of a
