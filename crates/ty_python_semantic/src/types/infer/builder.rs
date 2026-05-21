@@ -40,7 +40,7 @@ use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
-use crate::types::callable::CallableTypeKind;
+use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::class::{ClassLiteral, CodeGeneratorKind, MethodDecorator};
 use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::context::InferContext;
@@ -4995,17 +4995,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db: &'d dyn Db,
             ty: Type<'d>,
             kind: CallableTypeKind,
+            provenance: CallableFunctionProvenance,
         ) -> Option<Type<'d>> {
             match ty {
                 Type::Callable(callable) => Some(Type::Callable(CallableType::new(
                     db,
                     callable.signatures(db),
                     kind,
+                    provenance,
                 ))),
-                Type::Union(union) => {
-                    union.try_map(db, |element| propagate_callable_kind(db, *element, kind))
+                Type::Union(union) => union.try_map(db, |element| {
+                    propagate_callable_kind(db, *element, kind, provenance)
+                }),
+                Type::TypeAlias(alias) => {
+                    propagate_callable_kind(db, alias.value_type(db), kind, provenance)
                 }
-                Type::TypeAlias(alias) => propagate_callable_kind(db, alias.value_type(db), kind),
                 // Intersections are currently not handled here because that would require
                 // the decorator to be explicitly annotated as returning an intersection.
                 Type::Intersection(_) | Type::EnumComplement(_) => None,
@@ -5045,23 +5049,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // computing the signature requires evaluating those defaults which may trigger
         // deferred inference.
         let propagatable_kind = match decorated_ty {
-            Type::FunctionLiteral(func) => {
-                let db = self.db();
-                if func.is_classmethod(db) {
-                    Some(CallableTypeKind::ClassMethodLike)
-                } else if func.is_staticmethod(db) {
-                    Some(CallableTypeKind::StaticMethodLike)
-                } else {
-                    Some(CallableTypeKind::FunctionLike)
-                }
-            }
+            Type::FunctionLiteral(func) => Some((
+                func.callable_type_kind(self.db()),
+                CallableFunctionProvenance::from_function_return_annotation(
+                    func.has_explicit_return_annotation(self.db()),
+                ),
+            )),
             _ => decorated_ty
                 .try_upcast_to_callable(self.db())
                 .and_then(CallableTypes::exactly_one)
                 .and_then(|callable| match callable.kind(self.db()) {
                     kind @ (CallableTypeKind::FunctionLike
                     | CallableTypeKind::StaticMethodLike
-                    | CallableTypeKind::ClassMethodLike) => Some(kind),
+                    | CallableTypeKind::ClassMethodLike) => {
+                        Some((kind, callable.provenance(self.db())))
+                    }
                     _ => None,
                 }),
         };
@@ -5081,7 +5083,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // a `Callable`-typed decorator" in `callables_as_descriptors.md` for the
         // extended explanation.
         propagatable_kind
-            .and_then(|kind| propagate_callable_kind(self.db(), return_ty, kind))
+            .and_then(|(kind, provenance)| {
+                propagate_callable_kind(self.db(), return_ty, kind, provenance)
+            })
             .unwrap_or(return_ty)
     }
 
@@ -7242,7 +7246,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.extend_scope(inference);
 
         let return_ty = inference.expression_type(lambda_expression.body.as_ref());
-        Type::function_like_callable(self.db(), Signature::new(parameters, return_ty))
+        Type::Callable(CallableType::new(
+            self.db(),
+            CallableSignature::single(Signature::new(parameters, return_ty)),
+            CallableTypeKind::FunctionLike,
+            CallableFunctionProvenance::ImplicitReturn,
+        ))
     }
 
     /// Attempt to narrow a splatted dictionary argument based on the narrowed types of individual
@@ -7329,6 +7338,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     db,
                     CallableSignature::from_overloads(getitem_overloads),
                     CallableTypeKind::FunctionLike,
+                    CallableFunctionProvenance::None,
                 ),
             )],
         );

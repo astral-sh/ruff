@@ -10,7 +10,7 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::place::PlaceAndQualifiers;
-use crate::types::callable::CallableTypeKind;
+use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::generics::GenericContext;
 use crate::types::member::Member;
 use crate::types::mro::Mro;
@@ -153,6 +153,7 @@ fn synthesize_typed_dict_init<'db>(
         db,
         CallableSignature::from_overloads([map_overload, keyword_overload]),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -176,6 +177,7 @@ fn synthesize_typed_dict_getitem<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -219,6 +221,7 @@ fn synthesize_typed_dict_setitem<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -258,6 +261,7 @@ fn synthesize_typed_dict_delitem<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -377,6 +381,7 @@ fn synthesize_typed_dict_get<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -490,6 +495,7 @@ fn synthesize_typed_dict_pop<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -516,6 +522,7 @@ fn synthesize_typed_dict_setdefault<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -583,6 +590,7 @@ fn synthesize_typed_dict_merge<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 

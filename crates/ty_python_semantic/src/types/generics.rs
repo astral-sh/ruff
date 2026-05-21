@@ -677,7 +677,12 @@ impl<'db> GenericContext<'db> {
                         );
                         let signatures =
                             signatures.with_inherited_generic_context(db, generic_context);
-                        let replacement = CallableType::new(db, signatures, callable.kind(db));
+                        let replacement = CallableType::new(
+                            db,
+                            signatures,
+                            callable.kind(db),
+                            callable.provenance(db),
+                        );
 
                         Some((callable, replacement))
                     })
