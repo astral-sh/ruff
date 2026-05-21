@@ -691,7 +691,26 @@ impl<'src> Parser<'src> {
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_expression_with_bitwise_or_precedence(&mut self) -> ParsedExpr {
         let parsed_expr = self.parse_conditional_expression_or_higher();
+        self.validate_expression_with_bitwise_or_precedence(parsed_expr)
+    }
 
+    fn parse_expression_with_bitwise_or_precedence_from_lhs(
+        &mut self,
+        lhs: ParsedExpr,
+        start: TextSize,
+    ) -> ParsedExpr {
+        let parsed_expr = self.parse_conditional_expression_or_higher_from_lhs(
+            lhs,
+            start,
+            ExpressionContext::default(),
+        );
+        self.validate_expression_with_bitwise_or_precedence(parsed_expr)
+    }
+
+    fn validate_expression_with_bitwise_or_precedence(
+        &mut self,
+        parsed_expr: ParsedExpr,
+    ) -> ParsedExpr {
         if parsed_expr.is_parenthesized {
             // Parentheses resets the precedence, so we don't need to validate it.
             return parsed_expr;
@@ -2968,7 +2987,24 @@ impl<'src> Parser<'src> {
 
         loop {
             if self.at(TokenKind::Lsqb) {
-                return Some(PendingListLikeExpression { start, elts });
+                return Some(PendingListLikeExpression {
+                    start,
+                    elts,
+                    nested_element: PendingListElement::Direct,
+                });
+            }
+
+            if self.at(TokenKind::Star) && self.peek() == TokenKind::Lsqb {
+                let starred_start = self.node_start();
+                self.bump(TokenKind::Star);
+                return Some(PendingListLikeExpression {
+                    start,
+                    elts,
+                    nested_element: PendingListElement::Starred {
+                        starred_start,
+                        value_start: self.node_start(),
+                    },
+                });
             }
 
             elts.push(
@@ -3008,17 +3044,38 @@ impl<'src> Parser<'src> {
             pending.push(PendingListLikeExpression {
                 start,
                 elts: vec![],
+                nested_element: PendingListElement::Direct,
             });
             break self.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
         };
 
         while let Some(outer) = pending.pop() {
+            let nested_element = match outer.nested_element {
+                PendingListElement::Direct => first_element,
+                PendingListElement::Starred {
+                    starred_start,
+                    value_start,
+                } => {
+                    let value = self.parse_expression_with_bitwise_or_precedence_from_lhs(
+                        first_element,
+                        value_start,
+                    );
+                    Expr::Starred(ast::ExprStarred {
+                        value: Box::new(value.expr),
+                        ctx: ExprContext::Load,
+                        range: self.node_range(starred_start),
+                        node_index: AtomicNodeIndex::NONE,
+                    })
+                    .into()
+                }
+            };
+
             let expr = if outer.elts.is_empty() {
-                self.finish_list_like_expression(first_element, outer.start)
+                self.finish_list_like_expression(nested_element, outer.start)
             } else {
                 Expr::List(self.parse_list_expression_after_element(
                     outer.elts,
-                    first_element.expr,
+                    nested_element.expr,
                     outer.start,
                 ))
             };
@@ -4749,6 +4806,15 @@ impl PendingCallArgument {
 struct PendingListLikeExpression {
     start: TextSize,
     elts: Vec<Expr>,
+    nested_element: PendingListElement,
+}
+
+enum PendingListElement {
+    Direct,
+    Starred {
+        starred_start: TextSize,
+        value_start: TextSize,
+    },
 }
 
 enum PendingSetOrDictLikeExpression {
