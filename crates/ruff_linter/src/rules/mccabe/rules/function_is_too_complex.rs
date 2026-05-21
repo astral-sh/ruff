@@ -20,25 +20,46 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
-/// def foo(a, b, c):
-///     if a:
-///         if b:
-///             if c:
-///                 return 1
-///             else:
-///                 return 2
-///         else:
-///             return 3
-///     else:
-///         return 4
+/// def normalize_status(status):
+///     if status == "new":
+///         return "queued"
+///     if status == "queued":
+///         return "running"
+///     if status == "running":
+///         return "done"
+///     if status == "failed":
+///         return "retry"
+///     if status == "cancelled":
+///         return "closed"
+///     return "unknown"
 /// ```
 ///
-/// To reduce a function's `McCabe` complexity, extract independent decision
-/// branches into smaller helpers, replace decision trees with lookups, or
-/// flatten nested conditionals into early returns whose branches have lower
-/// branching factor than the original. Note that mechanically inverting
-/// conditions to use guard clauses does not, on its own, lower the McCabe
-/// complexity, since the number of decision points is unchanged.
+/// Use instead:
+///
+/// ```python
+/// STATUS_TRANSITIONS = {
+///     "new": "queued",
+///     "queued": "running",
+///     "running": "done",
+///     "failed": "retry",
+///     "cancelled": "closed",
+/// }
+///
+///
+/// def normalize_status(status):
+///     return STATUS_TRANSITIONS.get(status, "unknown")
+/// ```
+///
+/// The rewrite turns the branching decision tree into a data table, which
+/// lowers the function's number of decision points and so its McCabe
+/// complexity. Mechanically inverting conditions to use guard clauses does
+/// not, on its own, lower the complexity, since the number of decision
+/// points is unchanged.
+///
+/// The examples above assume a `lint.mccabe.max-complexity` of `5` or
+/// less, since the first example's complexity is `6` (one for the function
+/// plus one per `if`). The default is `10`, so neither example triggers
+/// `C901` out of the box.
 ///
 /// ## Options
 /// - `lint.mccabe.max-complexity`
