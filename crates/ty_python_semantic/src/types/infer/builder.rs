@@ -6571,15 +6571,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             continue;
                         }
 
-                        builder
-                            .infer_map(
-                                identity_instance,
-                                *constraint,
-                                // We promote element literal types in invariant position by default, unless they
-                                // were inferred with an explicit literal annotation.
-                                |(_, _, inferred_ty)| Some(inferred_ty.promote(self.db())),
-                            )
-                            .ok()?;
+                        builder.infer(identity_instance, *constraint).ok()?;
                     }
                 }
             }
@@ -6695,6 +6687,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .apply_specialization(self.db(), |_| {
                 builder.build_with(generic_context, |current_typevar, bounds| {
                     let (lower, _upper) = bounds?;
+
+                    let lower = if tcx.annotation.is_none() {
+                        // Constraints learned from later collection uses should follow the same
+                        // promotion policy as literal elements: promote element literal types in
+                        // invariant position unless an explicit annotation made them unpromotable.
+                        lower.promote(self.db())
+                    } else {
+                        lower
+                    };
 
                     let lower = if tuple_size_promotion_constraints
                         .allow(current_typevar.identity(self.db()))
