@@ -3157,28 +3157,155 @@ impl<'src> Parser<'src> {
         };
 
         let format_spec = if self.eat(TokenKind::Colon) {
-            let spec_start = self.node_start();
-            let elements = if let Some(elements) = self.with_recursion(|parser| {
-                parser.parse_interpolated_string_elements(
-                    flags,
-                    InterpolatedStringElementsKind::FormatSpec(string_kind),
-                    string_kind,
-                )
-            }) {
-                elements
-            } else {
-                self.report_recursion_limit_exceeded(self.current_token_range());
-                ast::InterpolatedStringElements::from(vec![])
-            };
-            Some(Box::new(ast::InterpolatedStringFormatSpec {
-                range: self.node_range(spec_start),
-                elements,
-                node_index: AtomicNodeIndex::NONE,
-            }))
+            Some(Box::new(
+                self.parse_interpolated_string_format_spec(flags, string_kind),
+            ))
         } else {
             None
         };
 
+        self.finish_interpolated_element_after_format_spec(
+            start,
+            flags,
+            string_kind,
+            value,
+            debug_text,
+            conversion,
+            format_spec,
+        )
+    }
+
+    fn parse_interpolated_string_format_spec(
+        &mut self,
+        flags: AnyStringFlags,
+        string_kind: InterpolatedStringKind,
+    ) -> ast::InterpolatedStringFormatSpec {
+        let start = self.node_start();
+
+        if let Some(format_spec) =
+            self.try_parse_nested_interpolated_string_format_spec(start, flags, string_kind)
+        {
+            return format_spec;
+        }
+
+        self.parse_interpolated_string_format_spec_after_start(start, flags, string_kind)
+    }
+
+    fn parse_interpolated_string_format_spec_after_start(
+        &mut self,
+        start: TextSize,
+        flags: AnyStringFlags,
+        string_kind: InterpolatedStringKind,
+    ) -> ast::InterpolatedStringFormatSpec {
+        let elements = self.parse_interpolated_string_elements(
+            flags,
+            InterpolatedStringElementsKind::FormatSpec(string_kind),
+            string_kind,
+        );
+
+        self.finish_interpolated_string_format_spec(start, elements)
+    }
+
+    fn finish_interpolated_string_format_spec(
+        &self,
+        start: TextSize,
+        elements: InterpolatedStringElements,
+    ) -> ast::InterpolatedStringFormatSpec {
+        ast::InterpolatedStringFormatSpec {
+            range: self.node_range(start),
+            elements,
+            node_index: AtomicNodeIndex::NONE,
+        }
+    }
+
+    fn try_parse_nested_interpolated_string_format_spec(
+        &mut self,
+        start: TextSize,
+        flags: AnyStringFlags,
+        string_kind: InterpolatedStringKind,
+    ) -> Option<ast::InterpolatedStringFormatSpec> {
+        let mut format_specs = Vec::new();
+        let mut format_spec_start = start;
+
+        loop {
+            let checkpoint = self.checkpoint();
+            if !self.at(TokenKind::Lbrace) {
+                if format_specs.is_empty() {
+                    return None;
+                }
+                break;
+            }
+
+            let element_start = self.node_start();
+            self.bump(TokenKind::Lbrace);
+            self.tokens
+                .re_lex_string_token_in_interpolation_element(string_kind);
+            let value =
+                self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());
+
+            if !value.is_parenthesized && value.expr.is_lambda_expr() {
+                self.rewind(checkpoint);
+                if format_specs.is_empty() {
+                    return None;
+                }
+                break;
+            }
+
+            if self.eat(TokenKind::Colon) && self.at(TokenKind::Lbrace) {
+                format_specs.push(PendingNestedInterpolatedFormatSpec {
+                    start: format_spec_start,
+                    element_start,
+                    value,
+                });
+                format_spec_start = self.node_start();
+                continue;
+            }
+
+            self.rewind(checkpoint);
+            if format_specs.is_empty() {
+                return None;
+            }
+            break;
+        }
+
+        let mut format_spec = self.parse_interpolated_string_format_spec_after_start(
+            format_spec_start,
+            flags,
+            string_kind,
+        );
+
+        while let Some(pending) = format_specs.pop() {
+            let element = self.finish_interpolated_element_after_format_spec(
+                pending.element_start,
+                flags,
+                string_kind,
+                pending.value,
+                None,
+                ConversionFlag::None,
+                Some(Box::new(format_spec)),
+            );
+            let elements = self.parse_interpolated_string_elements_after_initial(
+                vec![InterpolatedStringElement::from(element)],
+                flags,
+                InterpolatedStringElementsKind::FormatSpec(string_kind),
+                string_kind,
+            );
+            format_spec = self.finish_interpolated_string_format_spec(pending.start, elements);
+        }
+
+        Some(format_spec)
+    }
+
+    fn finish_interpolated_element_after_format_spec(
+        &mut self,
+        start: TextSize,
+        flags: AnyStringFlags,
+        string_kind: InterpolatedStringKind,
+        value: ParsedExpr,
+        debug_text: Option<ast::DebugText>,
+        conversion: ConversionFlag,
+        format_spec: Option<Box<ast::InterpolatedStringFormatSpec>>,
+    ) -> ast::InterpolatedElement {
         self.tokens
             .re_lex_string_token_in_interpolation_element(string_kind);
 
@@ -6087,6 +6214,12 @@ struct PendingNestedInterpolatedString {
     start: TextSize,
     flags: AnyStringFlags,
     element_start: TextSize,
+}
+
+struct PendingNestedInterpolatedFormatSpec {
+    start: TextSize,
+    element_start: TextSize,
+    value: ParsedExpr,
 }
 
 enum PendingComprehensionIter {
