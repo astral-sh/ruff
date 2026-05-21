@@ -968,8 +968,8 @@ fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
 ///         ...
 /// ```
 fn benchmark_repeated_match_narrowed_loads(criterion: &mut Criterion) {
-    const NUM_CLASSES: usize = 30;
-    const NUM_MATCH_BRANCHES: usize = 29;
+    const NUM_CLASSES: usize = 16;
+    const NUM_MATCH_BRANCHES: usize = 15;
 
     setup_rayon();
 
