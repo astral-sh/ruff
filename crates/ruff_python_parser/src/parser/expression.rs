@@ -1521,40 +1521,75 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Lsqb);
 
         let slice_start = self.node_start();
-        if self.at(TokenKind::Name) && self.peek() == TokenKind::Lsqb {
-            return self.parse_nested_subscript_expression(value, start, slice_start);
+        if let Some(nested) = self.try_parse_nested_subscript_slice() {
+            return self.parse_nested_subscript_expression(
+                PendingSubscript {
+                    value,
+                    start,
+                    slice_start,
+                    slices: nested.slices,
+                },
+                nested.value,
+                nested.start,
+            );
         }
 
         self.parse_subscript_expression_after_lsqb(value, start, slice_start)
     }
 
+    fn try_parse_nested_subscript_slice(&mut self) -> Option<NestedSubscriptSlice> {
+        let checkpoint = self.checkpoint();
+        let mut slices = vec![];
+
+        loop {
+            if self.at(TokenKind::Name) && self.peek() == TokenKind::Lsqb {
+                let start = self.node_start();
+                let value = self.parse_atom().expr;
+                return Some(NestedSubscriptSlice {
+                    value,
+                    start,
+                    slices,
+                });
+            }
+
+            slices.push(self.parse_slice());
+
+            if !self.eat(TokenKind::Comma) || self.at(TokenKind::Rsqb) {
+                self.rewind(checkpoint);
+                return None;
+            }
+        }
+    }
+
     fn parse_nested_subscript_expression(
         &mut self,
+        outer: PendingSubscript,
         mut value: Expr,
         mut start: TextSize,
-        mut slice_start: TextSize,
     ) -> ast::ExprSubscript {
-        let mut subscripts = Vec::new();
+        let mut subscripts = vec![outer];
 
         let mut expr = loop {
-            if !self.at(TokenKind::Name) || self.peek() != TokenKind::Lsqb {
+            self.bump(TokenKind::Lsqb);
+            let slice_start = self.node_start();
+
+            let Some(nested) = self.try_parse_nested_subscript_slice() else {
                 break Expr::Subscript(self.parse_subscript_expression_after_lsqb(
                     value,
                     start,
                     slice_start,
                 ));
-            }
+            };
 
             subscripts.push(PendingSubscript {
                 value,
                 start,
                 slice_start,
+                slices: nested.slices,
             });
 
-            start = self.node_start();
-            value = self.parse_atom().expr;
-            self.bump(TokenKind::Lsqb);
-            slice_start = self.node_start();
+            value = nested.value;
+            start = nested.start;
         };
 
         while let Some(subscript) = subscripts.pop() {
@@ -1564,12 +1599,22 @@ impl<'src> Parser<'src> {
                 ExpressionContext::starred_conditional(),
             );
             let slice = self.parse_slice_from_lower(subscript.slice_start, lower);
-            expr = Expr::Subscript(self.finish_subscript_expression(
-                subscript.value,
-                subscript.start,
-                subscript.slice_start,
-                slice,
-            ));
+            expr = Expr::Subscript(if subscript.slices.is_empty() {
+                self.finish_subscript_expression(
+                    subscript.value,
+                    subscript.start,
+                    subscript.slice_start,
+                    slice,
+                )
+            } else {
+                self.finish_subscript_expression_after_slice(
+                    subscript.value,
+                    subscript.start,
+                    subscript.slice_start,
+                    subscript.slices,
+                    slice,
+                )
+            });
         }
 
         let Expr::Subscript(subscript) = expr else {
@@ -1647,6 +1692,49 @@ impl<'src> Parser<'src> {
             });
         }
 
+        self.finish_subscript_expression_with_slice(value, start, slice)
+    }
+
+    fn finish_subscript_expression_after_slice(
+        &mut self,
+        value: Expr,
+        start: TextSize,
+        slice_start: TextSize,
+        mut slices: Vec<Expr>,
+        slice: Expr,
+    ) -> ast::ExprSubscript {
+        slices.push(slice);
+
+        if self.eat(TokenKind::Comma) {
+            if !self.at(TokenKind::Rsqb) {
+                self.parse_comma_separated_list(RecoveryContextKind::Slices, |parser| {
+                    slices.push(parser.parse_slice());
+                });
+            }
+        } else if !self.at(TokenKind::Rsqb) {
+            self.expect(TokenKind::Comma);
+            self.parse_comma_separated_list(RecoveryContextKind::Slices, |parser| {
+                slices.push(parser.parse_slice());
+            });
+        }
+
+        let slice = Expr::Tuple(ast::ExprTuple {
+            elts: slices,
+            ctx: ExprContext::Load,
+            range: self.node_range(slice_start),
+            parenthesized: false,
+            node_index: AtomicNodeIndex::NONE,
+        });
+
+        self.finish_subscript_expression_with_slice(value, start, slice)
+    }
+
+    fn finish_subscript_expression_with_slice(
+        &mut self,
+        value: Expr,
+        start: TextSize,
+        slice: Expr,
+    ) -> ast::ExprSubscript {
         self.expect(TokenKind::Rsqb);
 
         // test_ok star_index_py311
@@ -4429,6 +4517,13 @@ struct PendingSubscript {
     value: Expr,
     start: TextSize,
     slice_start: TextSize,
+    slices: Vec<Expr>,
+}
+
+struct NestedSubscriptSlice {
+    value: Expr,
+    start: TextSize,
+    slices: Vec<Expr>,
 }
 
 struct PendingUnaryExpression {
