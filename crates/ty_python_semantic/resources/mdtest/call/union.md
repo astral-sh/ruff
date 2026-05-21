@@ -111,8 +111,7 @@ class A:
 class B:
     def __init__(self, x: str) -> None: ...
 
-def _(flag: bool):
-    cls = A if flag else B
+def _(cls: type[A] | type[B]):
     # error: [invalid-argument-type] "Argument to `B.__init__` is incorrect: Expected `str`, found `Literal[1]`"
     reveal_type(cls(1))  # revealed: A | B
 ```

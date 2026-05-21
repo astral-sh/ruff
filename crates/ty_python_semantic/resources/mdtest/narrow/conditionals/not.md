@@ -5,9 +5,9 @@ The `not` operator negates a constraint.
 ## `not is None`
 
 ```py
-def _(flag: bool):
-    x = None if flag else 1
+from typing import Literal
 
+def _(x: None | Literal[1]):
     if not x is None:
         reveal_type(x)  # revealed: Literal[1]
     else:
@@ -19,9 +19,9 @@ def _(flag: bool):
 ## `not isinstance`
 
 ```py
-def _(flag: bool):
-    x = 1 if flag else "a"
+from typing import Literal
 
+def _(x: Literal[1, "a"]):
     if not isinstance(x, (int)):
         reveal_type(x)  # revealed: Literal["a"]
     else:

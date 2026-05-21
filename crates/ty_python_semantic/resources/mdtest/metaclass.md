@@ -708,6 +708,9 @@ When a class has an explicit `metaclass` that is not a class, but is a callable 
 `type.__new__` arguments, we should return the meta-type of its return type.
 
 ```py
+from typing import Literal
+from ty_extensions import RegularCallableTypeOf
+
 def f(*args, **kwargs) -> int:
     return 1
 
@@ -724,9 +727,7 @@ def _(n: int):
     reveal_type(B)  # revealed: <class 'B'>
     reveal_type(B.__class__)  # revealed: type[Unknown]
 
-def _(flag: bool):
-    m = f if flag else 42
-
+def _(m: RegularCallableTypeOf[f] | Literal[42]):
     # error: [invalid-metaclass]
     class C(metaclass=m): ...
     # TODO: Should be `int | Unknown`

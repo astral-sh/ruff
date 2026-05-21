@@ -457,6 +457,7 @@ reveal_type(p)  # revealed: partial[() -> int]
 ```py
 from functools import partial
 from typing import Callable
+from ty_extensions import RegularCallableTypeOf
 
 def zero_arg(x: int) -> int:
     return x
@@ -464,8 +465,9 @@ def zero_arg(x: int) -> int:
 def one_arg(x: int, y: str) -> int:
     return x + len(y)
 
-def test_union_partial(flag: bool) -> None:
-    f = zero_arg if flag else one_arg
+def test_union_partial(
+    f: RegularCallableTypeOf[zero_arg] | RegularCallableTypeOf[one_arg],
+) -> None:
     p = partial(f, 1)
     reveal_type(p)  # revealed: partial[() -> int] | partial[(y: str) -> int]
 

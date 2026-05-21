@@ -3,9 +3,9 @@
 ## `is None`
 
 ```py
-def _(flag: bool):
-    x = None if flag else 1
+from typing import Literal
 
+def _(x: None | Literal[1]):
     if x is None:
         reveal_type(x)  # revealed: None
     else:
@@ -17,11 +17,9 @@ def _(flag: bool):
 ## `is` for other types
 
 ```py
-def _(flag: bool):
-    class A: ...
-    x = A()
-    y = x if flag else None
+class A: ...
 
+def _(x: A, y: A | None):
     if y is x:
         reveal_type(y)  # revealed: A
     else:
@@ -33,10 +31,7 @@ def _(flag: bool):
 ## `is` in chained comparisons
 
 ```py
-def _(x_flag: bool, y_flag: bool):
-    x = True if x_flag else False
-    y = True if y_flag else False
-
+def _(x: bool, y: bool):
     reveal_type(x)  # revealed: bool
     reveal_type(y)  # revealed: bool
 
@@ -53,9 +48,9 @@ def _(x_flag: bool, y_flag: bool):
 ## `is` in elif clause
 
 ```py
-def _(flag1: bool, flag2: bool):
-    x = None if flag1 else (1 if flag2 else True)
+from typing import Literal
 
+def _(x: None | Literal[1, True]):
     reveal_type(x)  # revealed: None | Literal[1, True]
     if x is None:
         reveal_type(x)  # revealed: None

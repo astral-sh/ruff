@@ -974,9 +974,7 @@ class D:
     def __new__(cls, x: int | str) -> object: ...
     def __init__(self, x: str) -> None: ...
 
-def f(flag: bool) -> None:
-    ctor = C if flag else D
-
+def f(ctor: type[C] | type[D]) -> None:
     # `str -> Self` is selected on both constructor branches. `C.__init__` still
     # requires `y`, so this should fail even after unioning constructor bindings.
     # error: [missing-argument]
@@ -1248,8 +1246,7 @@ class B:
     def __init__(self, x: int) -> None:
         self.x = x
 
-def f(flag: bool):
-    cls = A if flag else B
+def f(cls: type[A] | type[B]):
     reveal_type(cls(1))  # revealed: A | B
 ```
 

@@ -8,9 +8,9 @@ python-version = "3.10"
 ## Single `match` pattern
 
 ```py
-def _(flag: bool):
-    x = None if flag else 1
+from typing import Literal
 
+def _(x: None | Literal[1]):
     reveal_type(x)  # revealed: None | Literal[1]
 
     y = 0

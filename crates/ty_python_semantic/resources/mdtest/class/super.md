@@ -514,8 +514,9 @@ def f(x: C | D):
     # error: [unresolved-attribute] "Attribute `b` is not defined on `<super: <class 'A'>, D>` in union `<super: <class 'A'>, C> | <super: <class 'A'>, D>`"
     s.b
 
-def f(flag: bool):
-    x = "" if flag else "hello"
+from typing import Literal
+
+def f(x: Literal["", "hello"]):
     reveal_type(x)  # revealed: Literal["", "hello"]
     reveal_type(super(str, x))  # revealed: <super: <class 'str'>, str>
 

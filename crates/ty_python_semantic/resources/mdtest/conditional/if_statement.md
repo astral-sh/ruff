@@ -136,8 +136,9 @@ reveal_type(x)  # revealed: Literal[2, 3, 4]
 def check(x) -> bool:
     return bool(x)
 
-def _(flag: bool):
-    x = 1 if flag else None
+from typing import Literal
+
+def _(x: Literal[1] | None):
     y = 0
 
     if x is None:

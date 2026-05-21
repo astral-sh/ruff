@@ -5,9 +5,9 @@
 The type guard removes `None` from the union type:
 
 ```py
-def _(flag: bool):
-    x = None if flag else 1
+from typing import Literal
 
+def _(x: None | Literal[1]):
     if x is not None:
         reveal_type(x)  # revealed: Literal[1]
     else:
@@ -19,9 +19,9 @@ def _(flag: bool):
 ## `None is not x` (reversed operands)
 
 ```py
-def _(flag: bool):
-    x = None if flag else 1
+from typing import Literal
 
+def _(x: None | Literal[1]):
     if None is not x:
         reveal_type(x)  # revealed: Literal[1]
     else:
@@ -33,9 +33,7 @@ def _(flag: bool):
 This also works for other singleton types with reversed operands:
 
 ```py
-def _(flag: bool):
-    x = True if flag else False
-
+def _(x: bool):
     if False is not x:
         reveal_type(x)  # revealed: Literal[True]
     else:
@@ -47,8 +45,7 @@ def _(flag: bool):
 Boolean literals:
 
 ```py
-def _(flag: bool):
-    x = True if flag else False
+def _(x: bool):
     reveal_type(x)  # revealed: bool
 
     if x is not False:
@@ -102,11 +99,9 @@ else:
 ## `is not` for other types
 
 ```py
-def _(flag: bool):
-    class A: ...
-    x = A()
-    y = x if flag else None
+class A: ...
 
+def _(x: A, y: A | None):
     if y is not x:
         reveal_type(y)  # revealed: A | None
     else:
@@ -120,10 +115,7 @@ def _(flag: bool):
 The type guard removes `False` from the union type of the tested value only.
 
 ```py
-def _(x_flag: bool, y_flag: bool):
-    x = True if x_flag else False
-    y = True if y_flag else False
-
+def _(x: bool, y: bool):
     reveal_type(x)  # revealed: bool
     reveal_type(y)  # revealed: bool
 

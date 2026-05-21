@@ -150,9 +150,7 @@ class Yes:
 
 class No: ...
 
-def _(flag: bool):
-    x = Yes() if flag else No()
-
+def _(x: Yes | No):
     # snapshot: unsupported-operator
     reveal_type(+x)  # revealed: bool
 
@@ -165,27 +163,27 @@ def _(flag: bool):
 
 ```snapshot
 error[unsupported-operator]: Unary operator `+` is not supported for object of type `Yes | No`
-  --> src/mdtest_snippet.py:17:17
+  --> src/mdtest_snippet.py:15:17
    |
-17 |     reveal_type(+x)  # revealed: bool
+15 |     reveal_type(+x)  # revealed: bool
    |                 ^^
    |
 info: `No` does not implement `__pos__`
 
 
 error[unsupported-operator]: Unary operator `-` is not supported for object of type `Yes | No`
-  --> src/mdtest_snippet.py:20:17
+  --> src/mdtest_snippet.py:18:17
    |
-20 |     reveal_type(-x)  # revealed: str
+18 |     reveal_type(-x)  # revealed: str
    |                 ^^
    |
 info: `No` does not implement `__neg__`
 
 
 error[unsupported-operator]: Unary operator `~` is not supported for object of type `Yes | No`
-  --> src/mdtest_snippet.py:23:17
+  --> src/mdtest_snippet.py:21:17
    |
-23 |     reveal_type(~x)  # revealed: int
+21 |     reveal_type(~x)  # revealed: int
    |                 ^^
    |
 info: `No` does not implement `__invert__`
