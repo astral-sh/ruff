@@ -733,7 +733,32 @@ impl Parser<'_> {
     ) -> ast::PatternMatchClass {
         let arguments_start = self.node_start();
 
-        let cls = match cls {
+        let cls = self.parse_match_pattern_class_expr(cls);
+
+        self.bump(TokenKind::Lpar);
+
+        if let Some((nested_cls, nested_start)) = self.try_parse_nested_match_pattern_class_head() {
+            return self.parse_nested_match_pattern_class(
+                cls,
+                start,
+                arguments_start,
+                nested_cls,
+                nested_start,
+            );
+        }
+
+        let arguments = self.parse_match_pattern_class_arguments(arguments_start);
+
+        ast::PatternMatchClass {
+            cls,
+            arguments,
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+        }
+    }
+
+    fn parse_match_pattern_class_expr(&mut self, cls: Pattern) -> Box<Expr> {
+        match cls {
             Pattern::MatchAs(ast::PatternMatchAs {
                 pattern: None,
                 name: Some(ident),
@@ -767,84 +792,229 @@ impl Parser<'_> {
                 );
                 Box::new(recovery::pattern_to_expr(pattern))
             }
+        }
+    }
+
+    fn try_parse_nested_match_pattern_class_head(&mut self) -> Option<(Pattern, TextSize)> {
+        if !self.at_name_or_keyword() {
+            return None;
+        }
+
+        let checkpoint = self.checkpoint();
+        let start = self.node_start();
+        let cls = self.parse_match_pattern_literal();
+
+        if self.at(TokenKind::Lpar) {
+            Some((cls, start))
+        } else {
+            self.rewind(checkpoint);
+            None
+        }
+    }
+
+    fn parse_nested_match_pattern_class(
+        &mut self,
+        outer_cls: Box<Expr>,
+        outer_start: TextSize,
+        outer_arguments_start: TextSize,
+        mut cls: Pattern,
+        mut start: TextSize,
+    ) -> ast::PatternMatchClass {
+        let mut pending = vec![PendingMatchPatternClass {
+            cls: outer_cls,
+            start: outer_start,
+            arguments_start: outer_arguments_start,
+            first_pattern_start: start,
+        }];
+
+        let mut class = loop {
+            let arguments_start = self.node_start();
+            let parsed_cls = self.parse_match_pattern_class_expr(cls);
+
+            self.bump(TokenKind::Lpar);
+
+            if let Some((nested_cls, nested_start)) =
+                self.try_parse_nested_match_pattern_class_head()
+            {
+                pending.push(PendingMatchPatternClass {
+                    cls: parsed_cls,
+                    start,
+                    arguments_start,
+                    first_pattern_start: nested_start,
+                });
+                cls = nested_cls;
+                start = nested_start;
+                continue;
+            }
+
+            let arguments = self.parse_match_pattern_class_arguments(arguments_start);
+
+            break ast::PatternMatchClass {
+                cls: parsed_cls,
+                arguments,
+                range: self.node_range(start),
+                node_index: AtomicNodeIndex::NONE,
+            };
         };
 
-        self.bump(TokenKind::Lpar);
+        while let Some(pending) = pending.pop() {
+            let arguments = self.parse_match_pattern_class_arguments_after_first(
+                pending.arguments_start,
+                pending.first_pattern_start,
+                Pattern::MatchClass(class),
+            );
 
-        let mut patterns = vec![];
-        let mut keywords = vec![];
-        let mut has_seen_pattern = false;
-        let mut has_seen_keyword_pattern = false;
+            class = ast::PatternMatchClass {
+                cls: pending.cls,
+                arguments,
+                range: self.node_range(pending.start),
+                node_index: AtomicNodeIndex::NONE,
+            };
+        }
+
+        class
+    }
+
+    fn parse_match_pattern_class_arguments(
+        &mut self,
+        arguments_start: TextSize,
+    ) -> ast::PatternArguments {
+        let mut state = MatchPatternClassArgumentParsingState::default();
 
         self.parse_comma_separated_list(
             RecoveryContextKind::MatchPatternClassArguments,
-            |parser| {
-                let pattern_start = parser.node_start();
-                let pattern = parser.parse_match_pattern(AllowStarPattern::No);
-
-                if parser.eat(TokenKind::Equal) {
-                    has_seen_pattern = false;
-                    has_seen_keyword_pattern = true;
-
-                    let key = if let Pattern::MatchAs(ast::PatternMatchAs {
-                        pattern: None,
-                        name: Some(name),
-                        ..
-                    }) = pattern
-                    {
-                        name
-                    } else {
-                        parser.add_error(
-                            ParseErrorType::OtherError(
-                                "Expected an identifier for the keyword pattern".to_string(),
-                            ),
-                            &pattern,
-                        );
-                        ast::Identifier {
-                            id: Name::empty(),
-                            range: parser.missing_node_range(),
-                            node_index: AtomicNodeIndex::NONE,
-                        }
-                    };
-
-                    let value_pattern = parser.parse_match_pattern(AllowStarPattern::No);
-
-                    keywords.push(ast::PatternKeyword {
-                        attr: key,
-                        pattern: value_pattern,
-                        range: parser.node_range(pattern_start),
-                        node_index: AtomicNodeIndex::NONE,
-                    });
-                } else {
-                    has_seen_pattern = true;
-                    patterns.push(pattern);
-                }
-
-                if has_seen_keyword_pattern && has_seen_pattern {
-                    parser.add_error(
-                        ParseErrorType::OtherError(
-                            "Positional patterns cannot follow keyword patterns".to_string(),
-                        ),
-                        parser.node_range(pattern_start),
-                    );
-                }
-            },
+            |parser| parser.parse_match_pattern_class_argument(&mut state),
         );
 
         self.expect(TokenKind::Rpar);
 
-        ast::PatternMatchClass {
-            cls,
-            arguments: ast::PatternArguments {
-                patterns,
-                keywords,
-                range: self.node_range(arguments_start),
+        self.finish_match_pattern_class_arguments(arguments_start, state)
+    }
+
+    fn parse_match_pattern_class_arguments_after_first(
+        &mut self,
+        arguments_start: TextSize,
+        first_pattern_start: TextSize,
+        first_pattern: Pattern,
+    ) -> ast::PatternArguments {
+        let mut state = MatchPatternClassArgumentParsingState::default();
+        self.parse_match_pattern_class_argument_from_pattern(
+            &mut state,
+            first_pattern_start,
+            first_pattern,
+        );
+
+        if self.eat(TokenKind::Comma) {
+            if !self.at(TokenKind::Rpar) {
+                self.parse_comma_separated_list(
+                    RecoveryContextKind::MatchPatternClassArguments,
+                    |parser| parser.parse_match_pattern_class_argument(&mut state),
+                );
+            }
+        } else if !self.at(TokenKind::Rpar) {
+            self.expect(TokenKind::Comma);
+            self.parse_comma_separated_list(
+                RecoveryContextKind::MatchPatternClassArguments,
+                |parser| parser.parse_match_pattern_class_argument(&mut state),
+            );
+        }
+
+        self.expect(TokenKind::Rpar);
+
+        self.finish_match_pattern_class_arguments(arguments_start, state)
+    }
+
+    fn parse_match_pattern_class_argument(
+        &mut self,
+        state: &mut MatchPatternClassArgumentParsingState,
+    ) {
+        let pattern_start = self.node_start();
+        let pattern = self.parse_match_pattern(AllowStarPattern::No);
+
+        self.parse_match_pattern_class_argument_from_pattern(state, pattern_start, pattern);
+    }
+
+    fn parse_match_pattern_class_argument_from_pattern(
+        &mut self,
+        state: &mut MatchPatternClassArgumentParsingState,
+        pattern_start: TextSize,
+        pattern: Pattern,
+    ) {
+        if self.eat(TokenKind::Equal) {
+            state.has_seen_pattern = false;
+            state.has_seen_keyword_pattern = true;
+
+            let key = if let Pattern::MatchAs(ast::PatternMatchAs {
+                pattern: None,
+                name: Some(name),
+                ..
+            }) = pattern
+            {
+                name
+            } else {
+                self.add_error(
+                    ParseErrorType::OtherError(
+                        "Expected an identifier for the keyword pattern".to_string(),
+                    ),
+                    &pattern,
+                );
+                ast::Identifier {
+                    id: Name::empty(),
+                    range: self.missing_node_range(),
+                    node_index: AtomicNodeIndex::NONE,
+                }
+            };
+
+            let value_pattern = self.parse_match_pattern(AllowStarPattern::No);
+
+            state.keywords.push(ast::PatternKeyword {
+                attr: key,
+                pattern: value_pattern,
+                range: self.node_range(pattern_start),
                 node_index: AtomicNodeIndex::NONE,
-            },
-            range: self.node_range(start),
+            });
+        } else {
+            state.has_seen_pattern = true;
+            state.patterns.push(pattern);
+        }
+
+        if state.has_seen_keyword_pattern && state.has_seen_pattern {
+            self.add_error(
+                ParseErrorType::OtherError(
+                    "Positional patterns cannot follow keyword patterns".to_string(),
+                ),
+                self.node_range(pattern_start),
+            );
+        }
+    }
+
+    fn finish_match_pattern_class_arguments(
+        &self,
+        arguments_start: TextSize,
+        state: MatchPatternClassArgumentParsingState,
+    ) -> ast::PatternArguments {
+        ast::PatternArguments {
+            patterns: state.patterns,
+            keywords: state.keywords,
+            range: self.node_range(arguments_start),
             node_index: AtomicNodeIndex::NONE,
         }
     }
+}
+
+struct PendingMatchPatternClass {
+    cls: Box<Expr>,
+    start: TextSize,
+    arguments_start: TextSize,
+    first_pattern_start: TextSize,
+}
+
+#[derive(Default)]
+struct MatchPatternClassArgumentParsingState {
+    patterns: Vec<Pattern>,
+    keywords: Vec<ast::PatternKeyword>,
+    has_seen_pattern: bool,
+    has_seen_keyword_pattern: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
