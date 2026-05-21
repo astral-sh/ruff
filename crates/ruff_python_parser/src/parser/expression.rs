@@ -4441,7 +4441,7 @@ impl<'src> Parser<'src> {
             let checkpoint = self.checkpoint();
             let next = match self.current_token_kind() {
                 TokenKind::Lsqb => self.try_parse_list_comprehension_iter(),
-                TokenKind::Lbrace => self.try_parse_set_comprehension_iter(),
+                TokenKind::Lbrace => self.try_parse_set_or_dict_comprehension_iter(),
                 _ => None,
             };
 
@@ -4501,7 +4501,7 @@ impl<'src> Parser<'src> {
         })
     }
 
-    fn try_parse_set_comprehension_iter(&mut self) -> Option<PendingComprehensionIter> {
+    fn try_parse_set_or_dict_comprehension_iter(&mut self) -> Option<PendingComprehensionIter> {
         let start = self.node_start();
 
         self.bump(TokenKind::Lbrace);
@@ -4514,14 +4514,30 @@ impl<'src> Parser<'src> {
         let element =
             self.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
 
+        if matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
+            self.validate_set_comprehension_element(&element);
+            return Some(PendingComprehensionIter::Set {
+                start,
+                element: element.expr,
+                comprehension: self.parse_comprehension_header(),
+            });
+        }
+
+        if !self.eat(TokenKind::Colon) {
+            return None;
+        }
+
+        self.validate_dictionary_key(&element);
+        let value = self.parse_conditional_expression_or_higher();
+
         if !matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
             return None;
         }
 
-        self.validate_set_comprehension_element(&element);
-        Some(PendingComprehensionIter::Set {
+        Some(PendingComprehensionIter::Dict {
             start,
-            element: element.expr,
+            key: element.expr,
+            value: value.expr,
             comprehension: self.parse_comprehension_header(),
         })
     }
@@ -4623,7 +4639,16 @@ impl<'src> Parser<'src> {
         start: TextSize,
     ) -> ast::ExprDictComp {
         let generators = self.parse_generators();
+        self.dictionary_comprehension_expression(key, value, generators, start)
+    }
 
+    fn dictionary_comprehension_expression(
+        &mut self,
+        key: Option<Expr>,
+        value: Expr,
+        generators: Vec<ast::Comprehension>,
+        start: TextSize,
+    ) -> ast::ExprDictComp {
         self.expect(TokenKind::Rbrace);
 
         ast::ExprDictComp {
@@ -5465,6 +5490,12 @@ enum PendingComprehensionIter {
         element: Expr,
         comprehension: PendingComprehension,
     },
+    Dict {
+        start: TextSize,
+        key: Expr,
+        value: Expr,
+        comprehension: PendingComprehension,
+    },
 }
 
 impl PendingComprehensionIter {
@@ -5489,6 +5520,22 @@ impl PendingComprehensionIter {
                 let mut generators = vec![first];
                 generators.extend(parser.parse_generators());
                 Expr::SetComp(parser.set_comprehension_expression(element, generators, start))
+            }
+            PendingComprehensionIter::Dict {
+                start,
+                key,
+                value,
+                comprehension,
+            } => {
+                let first = parser.finish_comprehension(comprehension, iter);
+                let mut generators = vec![first];
+                generators.extend(parser.parse_generators());
+                Expr::DictComp(parser.dictionary_comprehension_expression(
+                    Some(key),
+                    value,
+                    generators,
+                    start,
+                ))
             }
         }
     }
