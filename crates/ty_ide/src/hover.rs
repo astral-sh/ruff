@@ -35,13 +35,6 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         _ => None,
     };
 
-    let is_alias_type = match &goto_target {
-        GotoTarget::Expression(ast::ExprRef::Name(name)) => type_alias_hover(&model, name),
-        _ => None,
-    };
-
-    dbg!(&is_alias_type);
-
     let docs = if typed_dict_key.is_some() {
         None
     } else if let GotoTarget::Call { call, .. } = goto_target {
@@ -82,19 +75,6 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         if let Some(docstring) = typed_dict_key.docstring {
             contents.push(HoverContent::Docstring(Docstring::new(docstring)));
         }
-    } else if let Some(type_alias_resolved) = is_alias_type {
-        let qualifiers = goto_target.type_qualifiers(&model);
-
-        contents.push(HoverContent::Type(
-            type_alias_resolved.resolved_type,
-            None,
-            qualifiers,
-            Some(type_alias_resolved.alias_name),
-        ));
-
-        if let Some(docstring) = type_alias_resolved.docstring {
-            contents.push(HoverContent::Docstring(Docstring::new(docstring)));
-        };
     } else if let Some(ty) = goto_target.inferred_type(&model) {
         tracing::debug!("Inferred type of covering node is {}", ty.display(db));
         let qualifiers = goto_target.type_qualifiers(&model);
@@ -110,12 +90,18 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
                     )
                 }),
             Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => {
-                HoverContent::Type(Type::TypeAlias(alias), None, qualifiers)
+                dbg!("Here - known instance");
+                HoverContent::Type(Type::TypeAlias(alias), None, qualifiers, None)
             }
             Type::TypeVar(typevar) => {
+                dbg!("Here - direct typevar");
                 HoverContent::Type(ty, Some(typevar.variance(db)), qualifiers, None)
             }
-            _ => HoverContent::Type(ty, None, qualifiers, None),
+            typea => {
+                dbg!("Here", typea);
+
+                HoverContent::Type(ty, None, qualifiers, None)
+            }
         });
     }
     contents.extend(docs);
@@ -6231,7 +6217,7 @@ U<CURSOR> = MyType
         );
 
         assert_snapshot!(test.hover(), @"
-        u = MyType
+        U = MyType
         ---------------------------------------------
         Awesome docs
 
