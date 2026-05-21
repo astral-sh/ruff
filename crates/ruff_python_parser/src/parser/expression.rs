@@ -4826,13 +4826,83 @@ impl<'src> Parser<'src> {
     ) -> ast::ExprNamed {
         self.bump(TokenKind::ColonEqual);
 
+        self.prepare_named_expression_target(&mut target);
+
+        let target = match self.try_parse_nested_parenthesized_named_expression(target, start) {
+            Ok(named) => return named,
+            Err(target) => target,
+        };
+
+        let value = self.parse_conditional_expression_or_higher();
+        self.named_expression(target, value.expr, start)
+    }
+
+    fn try_parse_nested_parenthesized_named_expression(
+        &mut self,
+        mut target: Expr,
+        mut start: TextSize,
+    ) -> Result<ast::ExprNamed, Expr> {
+        if !self.at(TokenKind::Lpar) || self.peek() != TokenKind::Name {
+            return Err(target);
+        }
+
+        let mut pending = vec![];
+
+        let mut named = loop {
+            let checkpoint = self.checkpoint();
+            let parenthesis_start = self.node_start();
+            self.bump(TokenKind::Lpar);
+            self.report_unclosed_parenthesis();
+
+            let nested_start = self.node_start();
+            let mut nested_target = self.parse_atom().expr;
+
+            if !self.eat(TokenKind::ColonEqual) {
+                self.rewind(checkpoint);
+
+                if pending.is_empty() {
+                    return Err(target);
+                }
+
+                let value = self.parse_conditional_expression_or_higher();
+                break self.named_expression(target, value.expr, start);
+            }
+
+            self.prepare_named_expression_target(&mut nested_target);
+            pending.push(PendingParenthesizedNamedExpression {
+                target,
+                start,
+                parenthesis_start,
+            });
+
+            target = nested_target;
+            start = nested_start;
+
+            if !self.at(TokenKind::Lpar) || self.peek() != TokenKind::Name {
+                let value = self.parse_conditional_expression_or_higher();
+                break self.named_expression(target, value.expr, start);
+            }
+        };
+
+        while let Some(outer) = pending.pop() {
+            let value = self.finish_parenthesized_expression(
+                Expr::Named(named).into(),
+                outer.parenthesis_start,
+            );
+            named = self.named_expression(outer.target, value.expr, outer.start);
+        }
+
+        Ok(named)
+    }
+
+    fn prepare_named_expression_target(&mut self, target: &mut Expr) {
         if !target.is_name_expr() {
             self.add_error(ParseErrorType::InvalidNamedAssignmentTarget, target.range());
         }
-        helpers::set_expr_ctx(&mut target, ExprContext::Store);
+        helpers::set_expr_ctx(target, ExprContext::Store);
+    }
 
-        let value = self.parse_conditional_expression_or_higher();
-
+    fn named_expression(&mut self, target: Expr, value: Expr, start: TextSize) -> ast::ExprNamed {
         let range = self.node_range(start);
 
         // test_err walrus_py37
@@ -4847,7 +4917,7 @@ impl<'src> Parser<'src> {
 
         ast::ExprNamed {
             target: Box::new(target),
-            value: Box::new(value.expr),
+            value: Box::new(value),
             range,
             node_index: AtomicNodeIndex::NONE,
         }
@@ -5219,6 +5289,12 @@ struct PendingAwaitExpression {
 
 struct PendingParenthesizedYieldExpression {
     yield_start: TextSize,
+    parenthesis_start: TextSize,
+}
+
+struct PendingParenthesizedNamedExpression {
+    target: Expr,
+    start: TextSize,
     parenthesis_start: TextSize,
 }
 
