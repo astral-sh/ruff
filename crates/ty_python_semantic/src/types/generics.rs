@@ -1863,6 +1863,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 if let Some(ty) = choose(typevar, Some((lower, upper))) {
                     return Ok(Some(ty));
                 }
+
                 PathBounds::default_solve(self.db, self.constraints, typevar, lower, upper)
             },
         ) {
@@ -1900,7 +1901,102 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
         }
 
+        // Sequent-map transitivity can add relationships between inferable typevars to path
+        // bounds. Those relationships are important while solving, but should not become recursive
+        // specialization outputs when concrete bounds are available.
+        //
+        // TODO: This is a solution-level projection. A more principled version would live in the
+        // constraint-set solution extraction layer, taking an explicit domain of typevars to solve
+        // for and existentially quantifying away the other typevars in that domain.
+        if self.can_remove_inferable_typevar_artifacts(generic_context) {
+            for identity in generic_context.variables_inner(self.db).keys() {
+                if let Some(ty) = types.get_mut(identity) {
+                    *ty =
+                        self.remove_inferable_typevar_artifacts_from_solution(generic_context, *ty);
+                }
+            }
+        }
+
         types
+    }
+
+    fn can_remove_inferable_typevar_artifacts(&self, generic_context: GenericContext<'db>) -> bool {
+        // Mixed contexts can intentionally use one context's typevars to solve another (for
+        // example, constructor calls whose `__init__` self annotation remaps class typevars).
+        // Only remove artifacts for ordinary generic calls whose typevars all come from one
+        // source-level binding context.
+        let mut binding_contexts = generic_context
+            .variables_inner(self.db)
+            .values()
+            .map(|typevar| typevar.binding_context(self.db));
+        let Some(first) = binding_contexts.next() else {
+            return false;
+        };
+        first != BindingContext::Synthetic && binding_contexts.all(|context| context == first)
+    }
+
+    fn is_inferable_typevar_artifact(
+        &self,
+        generic_context: GenericContext<'db>,
+        ty: Type<'db>,
+    ) -> bool {
+        ty.as_typevar().is_some_and(|typevar| {
+            typevar.is_inferable(self.db, self.inferable)
+                && generic_context
+                    .variables_inner(self.db)
+                    .contains_key(&typevar.identity(self.db))
+        })
+    }
+
+    fn remove_inferable_typevar_artifacts_from_solution(
+        &self,
+        generic_context: GenericContext<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
+        let ty = self.remove_inferable_typevar_artifacts_from_lower_bound(generic_context, ty);
+        self.remove_inferable_typevar_artifacts_from_upper_bound(generic_context, ty)
+    }
+
+    fn remove_inferable_typevar_artifacts_from_lower_bound(
+        &self,
+        generic_context: GenericContext<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
+        match ty {
+            Type::Union(union)
+                if union.elements(self.db).iter().any(|element| {
+                    !self.is_inferable_typevar_artifact(generic_context, *element)
+                }) =>
+            {
+                union.filter(self.db, |element| {
+                    !self.is_inferable_typevar_artifact(generic_context, *element)
+                })
+            }
+            _ => ty,
+        }
+    }
+
+    fn remove_inferable_typevar_artifacts_from_upper_bound(
+        &self,
+        generic_context: GenericContext<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
+        match ty {
+            Type::Intersection(intersection)
+                if intersection.iter_positive(self.db).any(|element| {
+                    !self.is_inferable_typevar_artifact(generic_context, element)
+                }) =>
+            {
+                intersection.map_positive(self.db, |element| {
+                    if self.is_inferable_typevar_artifact(generic_context, *element) {
+                        Type::object()
+                    } else {
+                        *element
+                    }
+                })
+            }
+            _ => ty,
+        }
     }
 
     fn solve_hash_map_with(

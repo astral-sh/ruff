@@ -1,6 +1,6 @@
 # Plan: Migrate SpecializationBuilder from type_mappings HashMap to ConstraintSet
 
-## Status: In progress (first PR stabilization; Phases 1–4 complete; Phase 5.1–5.7 implemented; Phase 5.8 deferred)
+## Status: In progress (first PR stabilization complete; Phases 1–4 complete; Phase 5.1–5.7 implemented; Phase 5.8 deferred)
 
 ## Overview
 
@@ -33,12 +33,12 @@ through other files in the repo as necessary to validate that the status markers
 
 ## Current PR scope: reviewable checkpoint before Phase 5.8
 
-Status: Active stabilization work. We are intentionally **not** proceeding to Step 5.8 in this
-PR. The current dual-write / pending-solve state after Step 5.7 should be reviewed and merged as a
+Status: Stabilization complete. We are intentionally **not** proceeding to Step 5.8 in this PR.
+The current dual-write / pending-solve state after Step 5.7 should be reviewed and merged as a
 separate first PR. Removing the legacy HashMap state and old code paths is deferred to follow-on
 PRs.
 
-Before opening the current PR for review, address these stabilization items:
+Stabilization items addressed for this checkpoint:
 
 ### Stabilization task A — protocol-union pending-set dual-write
 
@@ -91,7 +91,7 @@ convenience wrapper later.
 
 ### Stabilization task D — Expression ecosystem performance regression
 
-Status: Needs investigation and, ideally, a fix before review.
+Status: Complete ✅
 
 CI reported a large regression on the `Expression` ecosystem project, from roughly `0.09s` to
 `4.07s` (>40×). A local ecosystem run from this worktree reproduced the same order of regression,
@@ -102,15 +102,30 @@ eco -o $HOME/.pi/tmp/expression-feature.json Expression   # Expression: 2.646s
 eco -m -o $HOME/.pi/tmp/expression-main.json Expression   # Expression: 0.078s
 ```
 
-Correct next step: profile before changing semantics. First localize the hot path (for example by
-profiling the `ty check` run on the cached Expression checkout and/or by checking project subsets),
-then decide whether the fix belongs in the current PR. Suspect areas include the new pending-set
-solve path in `SpecializationBuilder::build_with`, repeated `remove_noninferable` /
-`ConstraintSet::solutions_with` / `PathBounds::compute` work, and any cases where the dual-write
-transition now solves large constraint sets even though the legacy HashMap state already has the
-needed answer. Possible fixes to evaluate include cheap `pending.is_always_satisfied(...)` guards,
-avoiding repeated solves for unconstrained builders, or narrowing when the pending-set path is used
-in this checkpoint PR.
+Resolution: minimized the slowdown to `tests/test_compose.py`, specifically a generic `compose`
+call with a seven-callable chain. A standalone repro showed exponential growth beginning around six
+or seven chained `Callable[[T_i], T_{i+1}]` parameters; eight parameters could exhaust an 8 GiB
+process memory limit. The pending-set solve produced solutions containing same-context inferable
+typevar artifacts from sequent-map transitivity (for example `int | _A | _B | ...`), and recursive
+specialization then repeatedly expanded those artifacts.
+
+`SpecializationBuilder::solve_pending_with(...)` now post-processes pending-set solutions for simple
+single-binding-context generic calls, removing same-context inferable typevar artifacts from
+solution-level unions/intersections when concrete content is present. The guard intentionally skips
+mixed-context/synthetic generic contexts such as constructor `self`-remapping, where cross-context
+typevar relationships are part of the intended solution. The regression test in
+`call/function.md` covers the generic callable-chain case and verifies the precise
+`Callable[[int], int]` result.
+
+Validation:
+
+- minimized repro under 8 GiB memory limit: 7-argument chain `~0.066s`, 8-argument chain `~0.106s`,
+    9-argument chain `~0.198s` after the fix
+- `cargo nextest run -p ty_python_semantic --cargo-profile fast-test -- mdtest::call/constructor.md mdtest::call/function.md`
+- `cargo nextest run -p ty_python_semantic --cargo-profile fast-test`
+- `cargo nextest run -p ty_python_semantic -p ty_ide --cargo-profile fast-test`
+- `eco -o $HOME/.pi/tmp/expression-final.json Expression` (`Expression: 0.120s`; previous feature
+    run `2.646s`, local `main` run `0.078s`)
 
 ## Three-pattern framework
 
@@ -250,16 +265,10 @@ historical path anymore.
 **Builds a specialization**: Technically yes, but only as an intermediate used to compute a
 bidirectional type context for one argument of a generic call.
 
-**Current behavior**: This is a new/current call site introduced by changes merged from `main`
-during the migration. It still uses `SpecializationBuilder`: it infers from the call expression's
-return type context (`return_ty ≤ declared_return_ty`, encoded today as
-`builder.infer(declared_return_ty, return_ty)`) and then calls `build_with`, substituting
-`DynamicType::UnspecializedTypeVar` for unsolved typevars.
-
-**Correct next step**: Migrate this call site in the current checkpoint PR. It should use the
-standalone query shape:
+**Current behavior**: This migration is complete. The current `argument_type_context` code uses
+the standalone query shape:
 `return_ty.assignable_solutions_with_inferable(db, declared_return_ty, inferable)` plus
-`PathBounds::solve(...)`, then `GenericContext::specialize_recursive(...)`, preserving the current
+`PathBounds::solve(...)`, then `GenericContext::specialize_recursive(...)`, preserving the
 `UnspecializedTypeVar` fallback for unsolved typevars.
 
 ### 4. `infer_reverse_map_impl`'s internal builder (`generics.rs`)
@@ -389,11 +398,10 @@ combine the chosen per-path results via union. This matches the current hybrid b
 | Historical `types.rs` site                  | 3          | Done       | No current caller remains                                                     |
 | `infer_collection_literal` TCX query        | 3          | Done       | Variance now comes from path bounds                                           |
 | `infer_collection_literal` final builder    | 1 + 2      | Mostly yes | Preserve singleton-promotion hook across the Phase 5 switch                   |
-| Expression ecosystem performance            | Validation | Open       | Large slowdown must be investigated before review                             |
+| Expression ecosystem performance            | Validation | Done       | Slowdown fixed; final local run is near main timing                           |
 
-No fundamental blockers. Main design challenges *for the remaining work*:
+No fundamental blockers. Main design challenges *for follow-on work*:
 
-1. Stabilizing the current checkpoint PR: resolve the `Expression` performance regression.
 1. Preserving or eliminating the `partially_specialized_declared_type` heuristic cleanly.
 1. Behavioral differences from HashMap union vs constraint conjunction (especially invariant /
     contravariant cases).
@@ -475,8 +483,8 @@ diagnostics against a `main` baseline to ensure no regressions.
 
 For the current checkpoint PR, also include the `Expression` ecosystem project in performance
 validation. CI reported it as the worst regression, and a local run reproduced a large slowdown
-(current branch `2.646s` vs `main` `0.078s` in one run). Do not open the PR for review until this
-has been investigated and either fixed or explicitly accepted.
+(current branch `2.646s` vs `main` `0.078s` in one run). This has been fixed and revalidated with
+`eco -o $HOME/.pi/tmp/expression-final.json Expression` (`0.120s`).
 
 If tests fail due to behavioral changes from CSA (usually more precise types), **do not update
 test expectations without confirming with @dcreager first**. Document which tests changed and
@@ -732,7 +740,7 @@ Test expectation updated.
 
 ### Phase 5: Switch internal representation to ConstraintSet
 
-Status: In progress (Steps 5.1–5.7 implemented; Step 5.7a stabilization active; Step 5.8 deferred to a follow-on PR)
+Status: In progress (Steps 5.1–5.7 implemented; Step 5.7a stabilization complete; Step 5.8 deferred to a follow-on PR)
 **Difficulty: Medium–Hard** — the mechanical changes are straightforward, but behavioral
 differences in how constraints combine (vs HashMap union) may cause test changes.
 **Dependencies: Phase 4** (callers must be migrated so that `infer_reverse` is gone).
@@ -1031,17 +1039,17 @@ Implementation details:
 1. Mdtest expectations were updated for the resulting behavior changes, including cases where the
     pending-set path now preserves correlated solutions or avoids former false-positive errors.
 
-**Step 5.7a ⏳**: Stabilize the current checkpoint PR before review/merge.
+**Step 5.7a ✅**: Stabilize the current checkpoint PR before review/merge.
 
-Do **not** start Step 5.8 in this PR. First complete the stabilization tasks listed in
-"Current PR scope" above:
+Do **not** start Step 5.8 in this PR. The stabilization tasks listed in
+"Current PR scope" above are complete:
 
 - [x] Fix or explicitly justify the protocol-union pending-set dual-write gap.
 - [x] Migrate the new `call/bind.rs::argument_type_context` builder use to a standalone
     `PathBounds` query in this PR.
 - [x] Keep stale `assignable_solutions(...)` references out of this plan and future notes; current
     code uses `assignable_solutions_with_inferable(...)`.
-- [ ] Investigate and ideally fix the `Expression` ecosystem performance regression before review.
+- [x] Investigate and fix the `Expression` ecosystem performance regression before review.
 
 **Step 5.8 (deferred)**: Remove the HashMap field and old code paths.
 
