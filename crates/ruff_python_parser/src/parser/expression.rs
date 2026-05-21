@@ -3225,6 +3225,22 @@ impl<'src> Parser<'src> {
                 });
             }
 
+            if self.at(TokenKind::Star) && self.peek() == TokenKind::Lbrace {
+                if items.is_some() {
+                    self.rewind(checkpoint);
+                    return None;
+                }
+
+                let starred_start = self.node_start();
+                self.bump(TokenKind::Star);
+                return Some(PendingSetOrDictLikeExpression::StarredSet {
+                    start,
+                    elts,
+                    starred_start,
+                    value_start: self.node_start(),
+                });
+            }
+
             if self.eat(TokenKind::DoubleStar) {
                 if !elts.is_empty() {
                     self.rewind(checkpoint);
@@ -3339,6 +3355,38 @@ impl<'src> Parser<'src> {
                     Expr::Set(self.parse_set_expression_after_element(elts, key_or_element, start)),
                     start,
                 ),
+                PendingSetOrDictLikeExpression::StarredSet {
+                    start,
+                    elts,
+                    starred_start,
+                    value_start,
+                } => {
+                    let value = self.parse_expression_with_bitwise_or_precedence_from_lhs(
+                        key_or_element,
+                        value_start,
+                    );
+                    let element = Expr::Starred(ast::ExprStarred {
+                        value: Box::new(value.expr),
+                        ctx: ExprContext::Load,
+                        range: self.node_range(starred_start),
+                        node_index: AtomicNodeIndex::NONE,
+                    })
+                    .into();
+
+                    if elts.is_empty() {
+                        (
+                            self.finish_set_or_dict_like_expression(element, start),
+                            start,
+                        )
+                    } else {
+                        (
+                            Expr::Set(
+                                self.parse_set_expression_after_element(elts, element, start),
+                            ),
+                            start,
+                        )
+                    }
+                }
                 PendingSetOrDictLikeExpression::DictValue { start, items, key } => (
                     Expr::Dict(self.parse_dictionary_expression_after_item(
                         items,
@@ -4821,6 +4869,12 @@ enum PendingSetOrDictLikeExpression {
     Set {
         start: TextSize,
         elts: Vec<ParsedExpr>,
+    },
+    StarredSet {
+        start: TextSize,
+        elts: Vec<ParsedExpr>,
+        starred_start: TextSize,
+        value_start: TextSize,
     },
     DictValue {
         start: TextSize,
