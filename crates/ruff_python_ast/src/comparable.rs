@@ -17,6 +17,7 @@
 
 use crate as ast;
 use crate::{Expr, Number};
+use ruff_text_size::TextRange;
 use std::borrow::Cow;
 use std::hash::Hash;
 
@@ -734,6 +735,30 @@ impl<'a> From<&'a ast::FStringValue> for ComparableFString<'a> {
 pub struct ComparableTString<'a> {
     strings: Box<[ComparableInterpolatedStringElement<'a>]>,
     interpolations: Box<[InterpolatedElement<'a>]>,
+    // Source ranges of the original `ast::InterpolatedElement`s. T-strings
+    // expose the source text of each interpolation at runtime via the
+    // `string.templatelib.Interpolation.expression` attribute, so two
+    // t-strings whose AST shapes collide can still be observably different
+    // programs (e.g. `t"{00}"` vs `t"{000}"`, or `t"{0x0=}"` vs `t"{0=}"`).
+    // The `ComparableExpr` form of the interpolation expression normalizes
+    // both source representations to the same `NumberLiteral(0)` node, so
+    // distinguishing them inside `ComparableTString` itself would require
+    // access to source text that this module does not have.
+    //
+    // As a conservative fallback, include each interpolation's source range
+    // in the comparable representation: two distinct `ast::InterpolatedElement`
+    // nodes always have distinct ranges, so two t-string occurrences are
+    // never considered equal. The only equality this preserves is
+    // reflexive equality of a single AST node with itself, which is what
+    // `Eq` requires.
+    //
+    // This means PYI016 (`duplicate-union-member`) will not flag true
+    // t-string duplicates such as `t"{x}" | t"{x}"` either, but that is
+    // preferable to the prior behavior of either reporting false positives
+    // on `t"{00}" | t"{000}"` or, on a real duplicate, autofixing by
+    // normalizing the source representation and silently changing program
+    // behavior (see astral-sh/ruff#25164).
+    interpolation_ranges: Box<[TextRange]>,
 }
 
 impl<'a> From<&'a ast::TStringValue> for ComparableTString<'a> {
@@ -751,6 +776,7 @@ impl<'a> From<&'a ast::TStringValue> for ComparableTString<'a> {
         struct Collector<'a> {
             strings: Vec<ComparableInterpolatedStringElement<'a>>,
             interpolations: Vec<InterpolatedElement<'a>>,
+            interpolation_ranges: Vec<TextRange>,
         }
 
         impl Default for Collector<'_> {
@@ -758,6 +784,7 @@ impl<'a> From<&'a ast::TStringValue> for ComparableTString<'a> {
                 Self {
                     strings: vec![ComparableInterpolatedStringElement::Literal("".into())],
                     interpolations: vec![],
+                    interpolation_ranges: vec![],
                 }
             }
         }
@@ -786,6 +813,7 @@ impl<'a> From<&'a ast::TStringValue> for ComparableTString<'a> {
 
             fn push_tstring_interpolation(&mut self, expression: &'a ast::InterpolatedElement) {
                 self.interpolations.push(expression.into());
+                self.interpolation_ranges.push(expression.range);
                 self.start_new_literal();
             }
         }
@@ -806,6 +834,7 @@ impl<'a> From<&'a ast::TStringValue> for ComparableTString<'a> {
         Self {
             strings: collector.strings.into_boxed_slice(),
             interpolations: collector.interpolations.into_boxed_slice(),
+            interpolation_ranges: collector.interpolation_ranges.into_boxed_slice(),
         }
     }
 }

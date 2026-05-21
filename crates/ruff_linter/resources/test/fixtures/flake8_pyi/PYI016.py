@@ -156,3 +156,12 @@ field53: typing.Literal[f"{x:.2f}"] | typing.Literal[f"{x:.3f}"]  # OK (differen
 field54: typing.Literal[f"{x}"] | typing.Literal[f"{x}"]  # Error (true duplicate)
 field55: typing.Literal[f"{x =}"] | typing.Literal[f"{x=}"]  # OK (different debug text due to spaces)
 field56: typing.Literal[f"{0x0=}"] | typing.Literal[f"{0o0=}"]  # OK (different source text: "0x0" vs "0o0")
+
+# Regression test for https://github.com/astral-sh/ruff/issues/25164
+# T-strings expose source text of interpolations at runtime via
+# `string.templatelib.Interpolation.expression`, so source representation
+# matters even without an `=` debug specifier. Conservatively, no two
+# t-string occurrences are now treated as duplicates.
+field57: typing.Annotated[int, t"{00}"] | typing.Annotated[int, t"{000}"] | None  # OK (distinct source representations of the same value)
+field58: typing.Annotated[int, t"{0x0=}"] | typing.Annotated[int, t"{0x0=}"] | None  # OK (true duplicate, but not flagged: any fix would normalize source text and change runtime output)
+field59: typing.Annotated[int, t"{x}"] | typing.Annotated[int, t"{x}"] | None        # OK (true duplicate, not flagged for the same reason)
