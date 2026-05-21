@@ -2787,8 +2787,8 @@ impl<'src> Parser<'src> {
             return self.parse_dict_unpacking_after_lbrace(start, after_brace);
         }
 
-        if self.at(TokenKind::Lbrace) {
-            return self.parse_nested_set_or_dict_like_expression(start);
+        if let Some(pending) = self.try_parse_nested_set_or_dict_like_expression(start) {
+            return self.parse_nested_set_or_dict_like_expression(pending);
         }
 
         // For dictionary expressions, the key uses the `expression` rule while for
@@ -2800,8 +2800,46 @@ impl<'src> Parser<'src> {
         self.finish_set_or_dict_like_expression(key_or_element, start)
     }
 
-    fn parse_nested_set_or_dict_like_expression(&mut self, outer_start: TextSize) -> Expr {
-        let mut starts = vec![outer_start];
+    fn try_parse_nested_set_or_dict_like_expression(
+        &mut self,
+        start: TextSize,
+    ) -> Option<PendingSetLikeExpression> {
+        let checkpoint = self.checkpoint();
+        let mut elts = vec![];
+
+        loop {
+            if self.at(TokenKind::Lbrace) {
+                return Some(PendingSetLikeExpression { start, elts });
+            }
+
+            let element =
+                self.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
+
+            if matches!(
+                self.current_token_kind(),
+                TokenKind::Async | TokenKind::Colon | TokenKind::For
+            ) {
+                self.rewind(checkpoint);
+                return None;
+            }
+
+            elts.push(element);
+
+            if !self.eat(TokenKind::Comma)
+                || self.at_sequence_end()
+                || self.at(TokenKind::DoubleStar)
+            {
+                self.rewind(checkpoint);
+                return None;
+            }
+        }
+    }
+
+    fn parse_nested_set_or_dict_like_expression(
+        &mut self,
+        outer: PendingSetLikeExpression,
+    ) -> Expr {
+        let mut pending = vec![outer];
 
         let mut key_or_element = loop {
             let start = self.node_start();
@@ -2826,24 +2864,36 @@ impl<'src> Parser<'src> {
                 );
             }
 
-            starts.push(start);
-
-            if !self.at(TokenKind::Lbrace) {
-                break self
-                    .parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
+            if let Some(nested) = self.try_parse_nested_set_or_dict_like_expression(start) {
+                pending.push(nested);
+                continue;
             }
+
+            pending.push(PendingSetLikeExpression {
+                start,
+                elts: vec![],
+            });
+            break self.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
         };
 
-        while let Some(start) = starts.pop() {
-            let expr = self.finish_set_or_dict_like_expression(key_or_element, start);
+        while let Some(outer) = pending.pop() {
+            let expr = if outer.elts.is_empty() {
+                self.finish_set_or_dict_like_expression(key_or_element, outer.start)
+            } else {
+                Expr::Set(self.parse_set_expression_after_element(
+                    outer.elts,
+                    key_or_element,
+                    outer.start,
+                ))
+            };
 
-            if starts.is_empty() {
+            if pending.is_empty() {
                 return expr;
             }
 
             key_or_element = self.parse_named_expression_or_higher_from_lhs(
                 expr.into(),
-                start,
+                outer.start,
                 ExpressionContext::starred_bitwise_or(),
             );
         }
@@ -3383,14 +3433,7 @@ impl<'src> Parser<'src> {
         // {1, x := 2, 3}
         // {1, 2, x := 3}
 
-        if first_element.is_unparenthesized_named_expr() {
-            self.add_unsupported_syntax_error(
-                UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
-                    UnparenthesizedNamedExprKind::SetLiteral,
-                ),
-                first_element.range(),
-            );
-        }
+        self.validate_set_expression_element(&first_element);
 
         let mut elts = vec![first_element.expr];
 
@@ -3398,14 +3441,7 @@ impl<'src> Parser<'src> {
             let parsed_expr =
                 parser.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
 
-            if parsed_expr.is_unparenthesized_named_expr() {
-                parser.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
-                        UnparenthesizedNamedExprKind::SetLiteral,
-                    ),
-                    parsed_expr.range(),
-                );
-            }
+            parser.validate_set_expression_element(&parsed_expr);
 
             elts.push(parsed_expr.expr);
         });
@@ -3416,6 +3452,63 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
             elts,
+        }
+    }
+
+    fn parse_set_expression_after_element(
+        &mut self,
+        mut elements: Vec<ParsedExpr>,
+        element: ParsedExpr,
+        start: TextSize,
+    ) -> ast::ExprSet {
+        elements.push(element);
+
+        let mut elts = Vec::with_capacity(elements.len());
+        for element in elements {
+            self.validate_set_expression_element(&element);
+            elts.push(element.expr);
+        }
+
+        if self.eat(TokenKind::Comma) {
+            if !self.at_sequence_end() {
+                self.parse_comma_separated_list(RecoveryContextKind::SetElements, |parser| {
+                    let parsed_expr = parser
+                        .parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
+
+                    parser.validate_set_expression_element(&parsed_expr);
+
+                    elts.push(parsed_expr.expr);
+                });
+            }
+        } else if !self.at_sequence_end() {
+            self.expect(TokenKind::Comma);
+            self.parse_comma_separated_list(RecoveryContextKind::SetElements, |parser| {
+                let parsed_expr = parser
+                    .parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
+
+                parser.validate_set_expression_element(&parsed_expr);
+
+                elts.push(parsed_expr.expr);
+            });
+        }
+
+        self.expect(TokenKind::Rbrace);
+
+        ast::ExprSet {
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+            elts,
+        }
+    }
+
+    fn validate_set_expression_element(&mut self, element: &ParsedExpr) {
+        if element.is_unparenthesized_named_expr() {
+            self.add_unsupported_syntax_error(
+                UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
+                    UnparenthesizedNamedExprKind::SetLiteral,
+                ),
+                element.range(),
+            );
         }
     }
 
@@ -4041,6 +4134,11 @@ struct PendingCall {
 struct PendingListLikeExpression {
     start: TextSize,
     elts: Vec<Expr>,
+}
+
+struct PendingSetLikeExpression {
+    start: TextSize,
+    elts: Vec<ParsedExpr>,
 }
 
 #[derive(Default)]
