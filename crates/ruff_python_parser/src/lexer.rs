@@ -162,7 +162,11 @@ impl<'src> Lexer<'src> {
     /// Lex the next token.
     pub fn next_token(&mut self) -> TokenKind {
         self.cursor.start_token();
-        self.current_value = TokenValue::None;
+        // In optimized assembly this keeps the common empty case to a discriminant branch,
+        // rather than calling `TokenValue` drop glue to assign `None` again.
+        if !matches!(self.current_value, TokenValue::None) {
+            self.current_value = TokenValue::None;
+        }
         self.current_flags = TokenFlags::empty();
         self.current_kind = self.lex_token();
         // For `Unknown` token, the `push_error` method updates the current range.
