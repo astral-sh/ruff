@@ -919,6 +919,20 @@ x20.setdefault("b", str(len(x20)))
 reveal_type(x20)  # revealed: dict[str, int | str]
 ```
 
+```py
+x21 = []
+_: list[int] = x21  # error: [invalid-assignment]
+
+# TODO: We should error on this `append` instead of the assignment and not union
+# later constraints after the element type has been fully constrained above, to
+# avoid confusing error messages where the type of the collection may be unexpectedly
+# influenced by uses later in the scope.
+x21.append("a")
+
+# TODO: This would then reveal `list[int]`.
+reveal_type(x21)  # revealed: list[int | str]
+```
+
 ## Multi-inference diagnostics
 
 Diagnostics unrelated to the type-context are only reported once:
