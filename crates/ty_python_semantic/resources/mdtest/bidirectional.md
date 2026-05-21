@@ -933,6 +933,19 @@ x21.append("a")
 reveal_type(x21)  # revealed: list[int | str]
 ```
 
+```py
+def _(flag: bool):
+    if flag:
+        x22 = []
+    else:
+        x22 = []
+
+    x22.append(1)
+
+    # TODO: This should reveal `list[int]`.
+    reveal_type(x22)  # revealed: list[Unknown]
+```
+
 ## Multi-inference diagnostics
 
 Diagnostics unrelated to the type-context are only reported once:
