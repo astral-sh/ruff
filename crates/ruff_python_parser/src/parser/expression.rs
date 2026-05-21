@@ -2803,32 +2803,71 @@ impl<'src> Parser<'src> {
     fn try_parse_nested_set_or_dict_like_expression(
         &mut self,
         start: TextSize,
-    ) -> Option<PendingSetLikeExpression> {
+    ) -> Option<PendingSetOrDictLikeExpression> {
         let checkpoint = self.checkpoint();
         let mut elts = vec![];
+        let mut items: Option<Vec<ast::DictItem>> = None;
 
         loop {
             if self.at(TokenKind::Lbrace) {
-                return Some(PendingSetLikeExpression { start, elts });
+                if items.is_some() {
+                    self.rewind(checkpoint);
+                    return None;
+                }
+
+                return Some(PendingSetOrDictLikeExpression::Set { start, elts });
             }
 
-            let element =
-                self.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
+            if self.eat(TokenKind::DoubleStar) {
+                if !elts.is_empty() {
+                    self.rewind(checkpoint);
+                    return None;
+                }
 
-            if matches!(
-                self.current_token_kind(),
-                TokenKind::Async | TokenKind::Colon | TokenKind::For
-            ) {
-                self.rewind(checkpoint);
-                return None;
+                items.get_or_insert_default().push(ast::DictItem {
+                    key: None,
+                    value: self.parse_expression_with_bitwise_or_precedence().expr,
+                });
+            } else {
+                let key_or_element =
+                    self.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
+
+                if self.eat(TokenKind::Colon) {
+                    if !elts.is_empty() {
+                        self.rewind(checkpoint);
+                        return None;
+                    }
+
+                    self.validate_dictionary_key(&key_or_element);
+
+                    if self.at(TokenKind::Lbrace) {
+                        return Some(PendingSetOrDictLikeExpression::DictValue {
+                            start,
+                            items: items.unwrap_or_default(),
+                            key: key_or_element.expr,
+                        });
+                    }
+
+                    items.get_or_insert_default().push(ast::DictItem {
+                        key: Some(key_or_element.expr),
+                        value: self.parse_conditional_expression_or_higher().expr,
+                    });
+                } else {
+                    if items.is_some()
+                        || matches!(
+                            self.current_token_kind(),
+                            TokenKind::Async | TokenKind::Colon | TokenKind::For
+                        )
+                    {
+                        self.rewind(checkpoint);
+                        return None;
+                    }
+
+                    elts.push(key_or_element);
+                }
             }
 
-            elts.push(element);
-
-            if !self.eat(TokenKind::Comma)
-                || self.at_sequence_end()
-                || self.at(TokenKind::DoubleStar)
-            {
+            if !self.eat(TokenKind::Comma) || self.at_sequence_end() {
                 self.rewind(checkpoint);
                 return None;
             }
@@ -2837,7 +2876,7 @@ impl<'src> Parser<'src> {
 
     fn parse_nested_set_or_dict_like_expression(
         &mut self,
-        outer: PendingSetLikeExpression,
+        outer: PendingSetOrDictLikeExpression,
     ) -> Expr {
         let mut pending = vec![outer];
 
@@ -2869,7 +2908,7 @@ impl<'src> Parser<'src> {
                 continue;
             }
 
-            pending.push(PendingSetLikeExpression {
+            pending.push(PendingSetOrDictLikeExpression::Set {
                 start,
                 elts: vec![],
             });
@@ -2877,14 +2916,24 @@ impl<'src> Parser<'src> {
         };
 
         while let Some(outer) = pending.pop() {
-            let expr = if outer.elts.is_empty() {
-                self.finish_set_or_dict_like_expression(key_or_element, outer.start)
-            } else {
-                Expr::Set(self.parse_set_expression_after_element(
-                    outer.elts,
-                    key_or_element,
-                    outer.start,
-                ))
+            let (expr, start) = match outer {
+                PendingSetOrDictLikeExpression::Set { start, elts } if elts.is_empty() => (
+                    self.finish_set_or_dict_like_expression(key_or_element, start),
+                    start,
+                ),
+                PendingSetOrDictLikeExpression::Set { start, elts } => (
+                    Expr::Set(self.parse_set_expression_after_element(elts, key_or_element, start)),
+                    start,
+                ),
+                PendingSetOrDictLikeExpression::DictValue { start, items, key } => (
+                    Expr::Dict(self.parse_dictionary_expression_after_item(
+                        items,
+                        Some(key),
+                        key_or_element.expr,
+                        start,
+                    )),
+                    start,
+                ),
             };
 
             if pending.is_empty() {
@@ -2893,7 +2942,7 @@ impl<'src> Parser<'src> {
 
             key_or_element = self.parse_named_expression_or_higher_from_lhs(
                 expr.into(),
-                outer.start,
+                start,
                 ExpressionContext::starred_bitwise_or(),
             );
         }
@@ -2991,19 +3040,7 @@ impl<'src> Parser<'src> {
             TokenKind::Colon => {
                 // Now, we know that it's either a dictionary expression or a dictionary comprehension.
                 // In either case, the key is limited to an `expression`.
-                if !key_or_element.is_parenthesized {
-                    match key_or_element.expr {
-                        Expr::Starred(_) => self.add_error(
-                            ParseErrorType::InvalidStarredExpressionUsage,
-                            &key_or_element.expr,
-                        ),
-                        Expr::Named(_) => self.add_error(
-                            ParseErrorType::UnparenthesizedNamedExpression,
-                            &key_or_element,
-                        ),
-                        _ => {}
-                    }
-                }
+                self.validate_dictionary_key(&key_or_element);
 
                 self.bump(TokenKind::Colon);
                 let value = if self.at(TokenKind::DoubleStar) {
@@ -3034,6 +3071,20 @@ impl<'src> Parser<'src> {
                 }
             }
             _ => Expr::Set(self.parse_set_expression(key_or_element, start)),
+        }
+    }
+
+    fn validate_dictionary_key(&mut self, key: &ParsedExpr) {
+        if !key.is_parenthesized {
+            match &key.expr {
+                Expr::Starred(_) => {
+                    self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &key.expr)
+                }
+                Expr::Named(_) => {
+                    self.add_error(ParseErrorType::UnparenthesizedNamedExpression, key)
+                }
+                _ => {}
+            }
         }
     }
 
@@ -3521,12 +3572,37 @@ impl<'src> Parser<'src> {
         value: Expr,
         start: TextSize,
     ) -> ast::ExprDict {
-        if !self.at_sequence_end() {
+        self.parse_dictionary_expression_after_item(vec![], key, value, start)
+    }
+
+    fn parse_dictionary_expression_after_item(
+        &mut self,
+        mut items: Vec<ast::DictItem>,
+        key: Option<Expr>,
+        value: Expr,
+        start: TextSize,
+    ) -> ast::ExprDict {
+        items.push(ast::DictItem { key, value });
+
+        if self.eat(TokenKind::Comma) {
+            if !self.at_sequence_end() {
+                self.parse_dictionary_expression_items(&mut items);
+            }
+        } else if !self.at_sequence_end() {
             self.expect(TokenKind::Comma);
+            self.parse_dictionary_expression_items(&mut items);
         }
 
-        let mut items = vec![ast::DictItem { key, value }];
+        self.expect(TokenKind::Rbrace);
 
+        ast::ExprDict {
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+            items,
+        }
+    }
+
+    fn parse_dictionary_expression_items(&mut self, items: &mut Vec<ast::DictItem>) {
         self.parse_comma_separated_list(RecoveryContextKind::DictElements, |parser| {
             if parser.eat(TokenKind::DoubleStar) {
                 // Handle dictionary unpacking. Here, the grammar is `'**' bitwise_or`
@@ -3545,14 +3621,6 @@ impl<'src> Parser<'src> {
                 });
             }
         });
-
-        self.expect(TokenKind::Rbrace);
-
-        ast::ExprDict {
-            range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
-            items,
-        }
     }
 
     /// Parses a list of comprehension generators.
@@ -4136,9 +4204,16 @@ struct PendingListLikeExpression {
     elts: Vec<Expr>,
 }
 
-struct PendingSetLikeExpression {
-    start: TextSize,
-    elts: Vec<ParsedExpr>,
+enum PendingSetOrDictLikeExpression {
+    Set {
+        start: TextSize,
+        elts: Vec<ParsedExpr>,
+    },
+    DictValue {
+        start: TextSize,
+        items: Vec<ast::DictItem>,
+        key: Expr,
+    },
 }
 
 #[derive(Default)]

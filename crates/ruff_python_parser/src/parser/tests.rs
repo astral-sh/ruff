@@ -228,6 +228,22 @@ fn deeply_nested_later_sets() {
 }
 
 #[test]
+fn deeply_nested_dict_values() {
+    let depth = 5_000;
+    let mut src = String::new();
+    for _ in 0..depth {
+        src.push_str("{0: ");
+    }
+    src.push('1');
+    for _ in 0..depth {
+        src.push('}');
+    }
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
+}
+
+#[test]
 fn deeply_nested_unary() {
     let src = format!("{}1", "+".repeat(20_000));
 
