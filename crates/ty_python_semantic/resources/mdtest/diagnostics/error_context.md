@@ -340,7 +340,8 @@ error[invalid-assignment]: Object of type `<class 'Number'>` is not assignable t
    |         |
    |         Declared type
    |
-info: the first parameter has an incompatible type: `str` is not assignable to `int`
+info: type `<class 'Number'>` has inferred callable type `(value: int) -> Number`
+info: └── the first parameter has an incompatible type: `str` is not assignable to `int`
 ```
 
 ## Function assignability and overrides
