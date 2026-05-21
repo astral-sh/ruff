@@ -173,12 +173,9 @@ impl<'db> ConstructorBinding<'db> {
     where
         F: Fn(CallableBinding<'db>) -> CallableBinding<'db>,
     {
-        // We only ever map constructor bindings before we set their downstream constructor; don't
-        // spend complexity on dead code.
-        assert!(
-            self.downstream_constructor.is_none(),
-            "map should not be used on a ConstructorBinding with downstream constructor"
-        );
+        // TODO: Model the nested constructor chain if we want to support class objects assigned to
+        // `__new__`. For now, map the callable itself and drop its downstream constructor checks
+        // instead of panicking.
         ConstructorBinding {
             entry: f(self.entry),
             constructor_context: self.constructor_context,
