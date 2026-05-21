@@ -522,13 +522,8 @@ Commit each step of this process separately for easier review.
     1. Run `uv run --only-dev --no-sync scripts/update_schemastore.py --proto <https|ssh>`
     1. Once run successfully, you should follow the link in the output to create a PR.
 
-1. If needed, update the [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) and
-    [`ruff-vscode`](https://github.com/astral-sh/ruff-vscode) repositories and follow
-    the release instructions in those repositories. `ruff-lsp` should always be updated
-    before `ruff-vscode`.
-
-    This step is generally not required for a patch release, but should always be done
-    for a minor release.
+1. Update the [`ruff-vscode`](https://github.com/astral-sh/ruff-vscode) repository by following
+    the [release instructions](https://github.com/astral-sh/ruff-vscode/blob/main/CONTRIBUTING.md#release) there.
 
 ## Ecosystem CI
 
