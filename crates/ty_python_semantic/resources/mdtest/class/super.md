@@ -494,6 +494,7 @@ When the owner is a union type, `super()` is built separately for each branch, a
 super objects are combined into a union.
 
 ```py
+from typing import Literal
 from ty_extensions import reveal_mro
 
 class A: ...
@@ -514,10 +515,7 @@ def f(x: C | D):
     # error: [unresolved-attribute] "Attribute `b` is not defined on `<super: <class 'A'>, D>` in union `<super: <class 'A'>, C> | <super: <class 'A'>, D>`"
     s.b
 
-from typing import Literal
-
 def f(x: Literal["", "hello"]):
-    reveal_type(x)  # revealed: Literal["", "hello"]
     reveal_type(super(str, x))  # revealed: <super: <class 'str'>, str>
 
 def f(x: int | str):

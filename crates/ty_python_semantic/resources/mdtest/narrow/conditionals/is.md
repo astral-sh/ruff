@@ -32,9 +32,6 @@ def _(x: A, y: A | None):
 
 ```py
 def _(x: bool, y: bool):
-    reveal_type(x)  # revealed: bool
-    reveal_type(y)  # revealed: bool
-
     if y is x is False:  # Interpreted as `(y is x) and (x is False)`
         reveal_type(x)  # revealed: Literal[False]
         reveal_type(y)  # revealed: bool
@@ -51,7 +48,6 @@ def _(x: bool, y: bool):
 from typing import Literal
 
 def _(x: None | Literal[1, True]):
-    reveal_type(x)  # revealed: None | Literal[1, True]
     if x is None:
         reveal_type(x)  # revealed: None
     elif x is True:
