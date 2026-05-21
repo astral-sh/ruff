@@ -1703,7 +1703,10 @@ impl<'src> Parser<'src> {
                         value,
                         start: value_start,
                         slices,
-                        nested_slice: PendingSubscriptSlice::Upper { value_start },
+                        nested_slice: PendingSubscriptSlice::Upper {
+                            value_start,
+                            lower: None,
+                        },
                     });
                 }
 
@@ -1717,7 +1720,10 @@ impl<'src> Parser<'src> {
                         value,
                         start: value_start,
                         slices,
-                        nested_slice: PendingSubscriptSlice::Step { value_start },
+                        nested_slice: PendingSubscriptSlice::Step {
+                            value_start,
+                            lower: None,
+                        },
                     });
                 }
 
@@ -1756,6 +1762,47 @@ impl<'src> Parser<'src> {
                     nested_slice: PendingSubscriptSlice::Direct,
                 });
             }
+
+            let slice_checkpoint = self.checkpoint();
+            if self.at_expr() {
+                let lower = self.parse_named_expression_or_higher_unrolling_nested_trailers(
+                    ExpressionContext::starred_conditional(),
+                );
+
+                if self.eat(TokenKind::Colon) {
+                    if self.at(TokenKind::Name) && self.peek() == TokenKind::Lsqb {
+                        let value_start = self.node_start();
+                        let value = self.parse_atom().expr;
+                        return Some(NestedSubscriptSlice {
+                            value,
+                            start: value_start,
+                            slices,
+                            nested_slice: PendingSubscriptSlice::Upper {
+                                value_start,
+                                lower: Some(lower),
+                            },
+                        });
+                    }
+
+                    if self.eat(TokenKind::Colon)
+                        && self.at(TokenKind::Name)
+                        && self.peek() == TokenKind::Lsqb
+                    {
+                        let value_start = self.node_start();
+                        let value = self.parse_atom().expr;
+                        return Some(NestedSubscriptSlice {
+                            value,
+                            start: value_start,
+                            slices,
+                            nested_slice: PendingSubscriptSlice::Step {
+                                value_start,
+                                lower: Some(lower),
+                            },
+                        });
+                    }
+                }
+            }
+            self.rewind(slice_checkpoint);
 
             slices.push(self.parse_slice());
 
@@ -1826,21 +1873,28 @@ impl<'src> Parser<'src> {
                     .into();
                     self.parse_slice_from_lower(subscript.slice_start, lower)
                 }
-                PendingSubscriptSlice::Upper { value_start } => {
+                PendingSubscriptSlice::Upper { value_start, lower } => {
                     let upper = self.parse_conditional_expression_or_higher_from_lhs(
                         expr.into(),
                         value_start,
                         ExpressionContext::default(),
                     );
-                    self.finish_slice_after_upper(subscript.slice_start, None, Some(upper.expr))
+                    let lower = lower.map(|lower| self.validated_slice_lower(lower));
+                    self.finish_slice_after_upper(subscript.slice_start, lower, Some(upper.expr))
                 }
-                PendingSubscriptSlice::Step { value_start } => {
+                PendingSubscriptSlice::Step { value_start, lower } => {
                     let step = self.parse_conditional_expression_or_higher_from_lhs(
                         expr.into(),
                         value_start,
                         ExpressionContext::default(),
                     );
-                    self.finish_slice_after_step(subscript.slice_start, None, None, Some(step.expr))
+                    let lower = lower.map(|lower| Box::new(self.validated_slice_lower(lower)));
+                    self.finish_slice_after_step(
+                        subscript.slice_start,
+                        lower,
+                        None,
+                        Some(step.expr),
+                    )
                 }
             };
             expr = Expr::Subscript(if subscript.slices.is_empty() {
@@ -2081,8 +2135,13 @@ impl<'src> Parser<'src> {
         }
 
         // Now we know we're in a slice.
+        let lower = self.validated_slice_lower(lower);
+        self.finish_slice(start, Some(lower))
+    }
+
+    fn validated_slice_lower(&mut self, lower: ParsedExpr) -> Expr {
         if !lower.is_parenthesized {
-            match lower.expr {
+            match &lower.expr {
                 Expr::Starred(_) => {
                     self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &lower);
                 }
@@ -2093,7 +2152,7 @@ impl<'src> Parser<'src> {
             }
         }
 
-        self.finish_slice(start, Some(lower.expr))
+        lower.expr
     }
 
     fn finish_slice(&mut self, start: TextSize, lower: Option<Expr>) -> Expr {
@@ -5770,9 +5829,11 @@ enum PendingSubscriptSlice {
     },
     Upper {
         value_start: TextSize,
+        lower: Option<ParsedExpr>,
     },
     Step {
         value_start: TextSize,
+        lower: Option<ParsedExpr>,
     },
 }
 

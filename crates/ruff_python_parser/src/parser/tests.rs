@@ -649,6 +649,22 @@ fn deeply_nested_subscript_slice_uppers() {
 }
 
 #[test]
+fn deeply_nested_subscript_slice_uppers_after_lowers() {
+    let depth = 5_000;
+    let mut src = String::from("x = ");
+    for _ in 0..depth {
+        src.push_str("a[0:");
+    }
+    src.push('1');
+    for _ in 0..depth {
+        src.push(']');
+    }
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
+}
+
+#[test]
 fn deeply_nested_subscript_slice_steps() {
     let depth = 5_000;
     let mut src = String::from("x = ");
