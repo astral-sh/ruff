@@ -2810,49 +2810,67 @@ impl<'src> Parser<'src> {
         flags: AnyStringFlags,
         kind: InterpolatedStringKind,
     ) -> Option<InterpolatedStringData> {
-        let (element_start, initial_elements) =
+        let (element_start, initial_elements, mut nested_kind) =
             self.try_parse_nested_interpolated_string_head(flags, kind)?;
 
         let mut pending = vec![PendingNestedInterpolatedString {
             start,
             flags,
+            kind,
             initial_elements,
             element_start,
         }];
 
-        let mut string = loop {
+        let (mut string, mut string_kind) = loop {
             let start = self.node_start();
             let flags = self.tokens.current_flags().as_any_string_flags();
-            self.bump(kind.start_token());
+            self.bump(nested_kind.start_token());
 
-            if let Some((element_start, initial_elements)) =
-                self.try_parse_nested_interpolated_string_head(flags, kind)
+            if let Some((element_start, initial_elements, child_kind)) =
+                self.try_parse_nested_interpolated_string_head(flags, nested_kind)
             {
                 pending.push(PendingNestedInterpolatedString {
                     start,
                     flags,
+                    kind: nested_kind,
                     initial_elements,
                     element_start,
                 });
+                nested_kind = child_kind;
                 continue;
             }
 
-            break self.parse_interpolated_string_after_start(start, flags, kind);
+            break (
+                self.parse_interpolated_string_after_start(start, flags, nested_kind),
+                nested_kind,
+            );
         };
 
         while let Some(pending) = pending.pop() {
-            let value = self.interpolated_string_expression(string, kind).into();
-            let element =
-                self.finish_interpolated_element(pending.element_start, pending.flags, kind, value);
+            let value = self
+                .interpolated_string_expression(string, string_kind)
+                .into();
+            let element = self.finish_interpolated_element(
+                pending.element_start,
+                pending.flags,
+                pending.kind,
+                value,
+            );
             let mut initial_elements = pending.initial_elements;
             initial_elements.push(InterpolatedStringElement::from(element));
             let elements = self.parse_interpolated_string_elements_after_initial(
                 initial_elements,
                 pending.flags,
-                InterpolatedStringElementsKind::Regular(kind),
-                kind,
+                InterpolatedStringElementsKind::Regular(pending.kind),
+                pending.kind,
             );
-            string = self.finish_interpolated_string(pending.start, pending.flags, kind, elements);
+            string = self.finish_interpolated_string(
+                pending.start,
+                pending.flags,
+                pending.kind,
+                elements,
+            );
+            string_kind = pending.kind;
         }
 
         Some(string)
@@ -2862,7 +2880,11 @@ impl<'src> Parser<'src> {
         &mut self,
         flags: AnyStringFlags,
         kind: InterpolatedStringKind,
-    ) -> Option<(TextSize, Vec<InterpolatedStringElement>)> {
+    ) -> Option<(
+        TextSize,
+        Vec<InterpolatedStringElement>,
+        InterpolatedStringKind,
+    )> {
         let checkpoint = self.checkpoint();
         let middle_token_kind = kind.middle_token();
         let mut initial_elements = Vec::new();
@@ -2876,8 +2898,13 @@ impl<'src> Parser<'src> {
             self.tokens
                 .re_lex_string_token_in_interpolation_element(kind);
 
-            if self.at(kind.start_token()) {
-                return Some((element_start, initial_elements));
+            let nested_kind = match self.current_token_kind() {
+                TokenKind::FStringStart => Some(InterpolatedStringKind::FString),
+                TokenKind::TStringStart => Some(InterpolatedStringKind::TString),
+                _ => None,
+            };
+            if let Some(nested_kind) = nested_kind {
+                return Some((element_start, initial_elements, nested_kind));
             }
         }
 
@@ -6532,6 +6559,7 @@ struct PendingIfExpression {
 struct PendingNestedInterpolatedString {
     start: TextSize,
     flags: AnyStringFlags,
+    kind: InterpolatedStringKind,
     initial_elements: Vec<InterpolatedStringElement>,
     element_start: TextSize,
 }

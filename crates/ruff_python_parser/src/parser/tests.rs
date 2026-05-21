@@ -949,6 +949,26 @@ fn deeply_nested_later_fstrings() {
 }
 
 #[test]
+fn deeply_nested_mixed_interpolated_strings() {
+    let depth = 5_000;
+    let mut src = String::from("x = ");
+    for index in 0..depth {
+        if index % 2 == 0 {
+            src.push_str("f\"{");
+        } else {
+            src.push_str("t\"{");
+        }
+    }
+    src.push('1');
+    for _ in 0..depth {
+        src.push_str("}\"");
+    }
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
+}
+
+#[test]
 fn deeply_nested_fstring_format_specs() {
     let depth = 5_000;
     let mut src = String::from("x = f\"");
