@@ -4593,8 +4593,10 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_comprehension_if(&mut self) -> Expr {
-        if self.at(TokenKind::Lsqb)
-            && let Some(expr) = self.try_parse_nested_list_comprehension_if()
+        if matches!(
+            self.current_token_kind(),
+            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace
+        ) && let Some(expr) = self.try_parse_nested_comprehension_if()
         {
             return expr;
         }
@@ -4603,9 +4605,9 @@ impl<'src> Parser<'src> {
             .expr
     }
 
-    fn try_parse_nested_list_comprehension_if(&mut self) -> Option<Expr> {
+    fn try_parse_nested_comprehension_if(&mut self) -> Option<Expr> {
         let checkpoint = self.checkpoint();
-        let mut frame = match self.try_parse_list_comprehension_if_frame() {
+        let mut frame = match self.try_parse_comprehension_if_frame() {
             Some(frame) => frame,
             None => {
                 self.rewind(checkpoint);
@@ -4620,10 +4622,13 @@ impl<'src> Parser<'src> {
             while self.eat(TokenKind::If) {
                 progress.assert_progressing(self);
 
-                if self.at(TokenKind::Lsqb) {
+                if matches!(
+                    self.current_token_kind(),
+                    TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace
+                ) {
                     let checkpoint = self.checkpoint();
 
-                    if let Some(nested) = self.try_parse_list_comprehension_if_frame() {
+                    if let Some(nested) = self.try_parse_comprehension_if_frame() {
                         pending.push(frame);
                         frame = nested;
                         continue 'frames;
@@ -4638,7 +4643,7 @@ impl<'src> Parser<'src> {
                 );
             }
 
-            let expr = self.finish_list_comprehension_if_frame(frame);
+            let expr = frame.finish(self);
 
             let Some(mut outer) = pending.pop() else {
                 return Some(expr);
@@ -4649,39 +4654,19 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn try_parse_list_comprehension_if_frame(&mut self) -> Option<PendingListComprehensionIf> {
-        let pending = match self.try_parse_list_comprehension_iter()? {
-            PendingComprehensionIter::List {
-                start,
-                element,
-                comprehension,
-            } => PendingListComprehensionIf {
-                start,
-                element,
-                comprehension,
-                iter: self.parse_comprehension_iter(),
-                ifs: vec![],
-            },
-            _ => return None,
+    fn try_parse_comprehension_if_frame(&mut self) -> Option<PendingComprehensionIf> {
+        let expression = match self.current_token_kind() {
+            TokenKind::Lpar => self.try_parse_generator_expression_iter(),
+            TokenKind::Lsqb => self.try_parse_list_comprehension_iter(),
+            TokenKind::Lbrace => self.try_parse_set_or_dict_comprehension_iter(),
+            _ => None,
         };
 
-        Some(pending)
-    }
-
-    fn finish_list_comprehension_if_frame(&mut self, pending: PendingListComprehensionIf) -> Expr {
-        let PendingListComprehensionIf {
-            start,
-            element,
-            comprehension,
-            iter,
-            ifs,
-        } = pending;
-
-        let first = self.comprehension(comprehension, iter, ifs);
-        let mut generators = vec![first];
-        generators.extend(self.parse_generators());
-
-        Expr::ListComp(self.list_comprehension_expression(element, generators, start))
+        Some(PendingComprehensionIf {
+            expression: expression?,
+            iter: self.parse_comprehension_iter(),
+            ifs: vec![],
+        })
     }
 
     fn comprehension(
@@ -5620,10 +5605,8 @@ struct PendingComprehension {
     is_async: bool,
 }
 
-struct PendingListComprehensionIf {
-    start: TextSize,
-    element: Expr,
-    comprehension: PendingComprehension,
+struct PendingComprehensionIf {
+    expression: PendingComprehensionIter,
     iter: Expr,
     ifs: Vec<Expr>,
 }
@@ -5654,13 +5637,18 @@ enum PendingComprehensionIter {
 
 impl PendingComprehensionIter {
     fn finish(self, parser: &mut Parser, iter: Expr) -> Expr {
+        let ifs = parser.parse_comprehension_ifs();
+        self.finish_with_ifs(parser, iter, ifs)
+    }
+
+    fn finish_with_ifs(self, parser: &mut Parser, iter: Expr, ifs: Vec<Expr>) -> Expr {
         match self {
             PendingComprehensionIter::List {
                 start,
                 element,
                 comprehension,
             } => {
-                let first = parser.finish_comprehension(comprehension, iter);
+                let first = parser.comprehension(comprehension, iter, ifs);
                 let mut generators = vec![first];
                 generators.extend(parser.parse_generators());
                 Expr::ListComp(parser.list_comprehension_expression(element, generators, start))
@@ -5670,7 +5658,7 @@ impl PendingComprehensionIter {
                 element,
                 comprehension,
             } => {
-                let first = parser.finish_comprehension(comprehension, iter);
+                let first = parser.comprehension(comprehension, iter, ifs);
                 let mut generators = vec![first];
                 generators.extend(parser.parse_generators());
                 Expr::SetComp(parser.set_comprehension_expression(element, generators, start))
@@ -5681,7 +5669,7 @@ impl PendingComprehensionIter {
                 value,
                 comprehension,
             } => {
-                let first = parser.finish_comprehension(comprehension, iter);
+                let first = parser.comprehension(comprehension, iter, ifs);
                 let mut generators = vec![first];
                 generators.extend(parser.parse_generators());
                 Expr::DictComp(parser.dictionary_comprehension_expression(
@@ -5696,7 +5684,7 @@ impl PendingComprehensionIter {
                 element,
                 comprehension,
             } => {
-                let first = parser.finish_comprehension(comprehension, iter);
+                let first = parser.comprehension(comprehension, iter, ifs);
                 let mut generators = vec![first];
                 generators.extend(parser.parse_generators());
                 Expr::Generator(parser.generator_expression(
@@ -5707,6 +5695,12 @@ impl PendingComprehensionIter {
                 ))
             }
         }
+    }
+}
+
+impl PendingComprehensionIf {
+    fn finish(self, parser: &mut Parser) -> Expr {
+        self.expression.finish_with_ifs(parser, self.iter, self.ifs)
     }
 }
 
