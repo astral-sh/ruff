@@ -4017,15 +4017,7 @@ impl<'src> Parser<'src> {
             }
             TokenKind::Async | TokenKind::For => {
                 // grammar: `genexp`
-                if parsed_expr.is_unparenthesized_starred_expr() {
-                    self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::UnpackingInComprehension(
-                            ComprehensionUnpackingKind::IterableInGenerator,
-                        ),
-                        parsed_expr.range(),
-                    );
-                }
-
+                self.validate_generator_expression_element(&parsed_expr);
                 let generator = Expr::Generator(self.parse_generator_expression(
                     parsed_expr.expr,
                     start,
@@ -4048,6 +4040,17 @@ impl<'src> Parser<'src> {
                 parsed_expr.is_parenthesized = true;
                 parsed_expr
             }
+        }
+    }
+
+    fn validate_generator_expression_element(&mut self, element: &ParsedExpr) {
+        if element.is_unparenthesized_starred_expr() {
+            self.add_unsupported_syntax_error(
+                UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                    ComprehensionUnpackingKind::IterableInGenerator,
+                ),
+                element.range(),
+            );
         }
     }
 
@@ -4424,7 +4427,7 @@ impl<'src> Parser<'src> {
     fn parse_comprehension_iter(&mut self) -> Expr {
         if matches!(
             self.current_token_kind(),
-            TokenKind::Lsqb | TokenKind::Lbrace
+            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace
         ) && let Some(iter) = self.try_parse_nested_comprehension_iter()
         {
             return iter;
@@ -4440,6 +4443,7 @@ impl<'src> Parser<'src> {
         let mut iter = loop {
             let checkpoint = self.checkpoint();
             let next = match self.current_token_kind() {
+                TokenKind::Lpar => self.try_parse_generator_expression_iter(),
                 TokenKind::Lsqb => self.try_parse_list_comprehension_iter(),
                 TokenKind::Lbrace => self.try_parse_set_or_dict_comprehension_iter(),
                 _ => None,
@@ -4461,7 +4465,7 @@ impl<'src> Parser<'src> {
 
             if !matches!(
                 self.current_token_kind(),
-                TokenKind::Lsqb | TokenKind::Lbrace
+                TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace
             ) {
                 break self
                     .parse_simple_expression(ExpressionContext::default())
@@ -4474,6 +4478,31 @@ impl<'src> Parser<'src> {
         }
 
         Some(iter)
+    }
+
+    fn try_parse_generator_expression_iter(&mut self) -> Option<PendingComprehensionIter> {
+        let start = self.node_start();
+
+        self.bump(TokenKind::Lpar);
+        self.report_unclosed_parenthesis();
+
+        if self.eat(TokenKind::Rpar) {
+            return None;
+        }
+
+        let element =
+            self.parse_named_expression_or_higher(ExpressionContext::yield_or_starred_bitwise_or());
+
+        if !matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
+            return None;
+        }
+
+        self.validate_generator_expression_element(&element);
+        Some(PendingComprehensionIter::Generator {
+            start,
+            element: element.expr,
+            comprehension: self.parse_comprehension_header(),
+        })
     }
 
     fn try_parse_list_comprehension_iter(&mut self) -> Option<PendingComprehensionIter> {
@@ -4587,7 +4616,16 @@ impl<'src> Parser<'src> {
         parenthesized: Parenthesized,
     ) -> ast::ExprGenerator {
         let generators = self.parse_generators();
+        self.generator_expression(element, generators, start, parenthesized)
+    }
 
+    fn generator_expression(
+        &mut self,
+        element: Expr,
+        generators: Vec<ast::Comprehension>,
+        start: TextSize,
+        parenthesized: Parenthesized,
+    ) -> ast::ExprGenerator {
         if parenthesized.is_yes() {
             self.expect(TokenKind::Rpar);
         }
@@ -5496,6 +5534,11 @@ enum PendingComprehensionIter {
         value: Expr,
         comprehension: PendingComprehension,
     },
+    Generator {
+        start: TextSize,
+        element: Expr,
+        comprehension: PendingComprehension,
+    },
 }
 
 impl PendingComprehensionIter {
@@ -5535,6 +5578,21 @@ impl PendingComprehensionIter {
                     value,
                     generators,
                     start,
+                ))
+            }
+            PendingComprehensionIter::Generator {
+                start,
+                element,
+                comprehension,
+            } => {
+                let first = parser.finish_comprehension(comprehension, iter);
+                let mut generators = vec![first];
+                generators.extend(parser.parse_generators());
+                Expr::Generator(parser.generator_expression(
+                    element,
+                    generators,
+                    start,
+                    Parenthesized::Yes,
                 ))
             }
         }
