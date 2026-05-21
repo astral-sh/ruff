@@ -4576,22 +4576,125 @@ impl<'src> Parser<'src> {
         pending: PendingComprehension,
         iter: Expr,
     ) -> ast::Comprehension {
-        let PendingComprehension {
-            start,
-            target,
-            is_async,
-        } = pending;
+        let ifs = self.parse_comprehension_ifs();
+        self.comprehension(pending, iter, ifs)
+    }
 
+    fn parse_comprehension_ifs(&mut self) -> Vec<Expr> {
         let mut ifs = vec![];
         let mut progress = ParserProgress::default();
 
         while self.eat(TokenKind::If) {
             progress.assert_progressing(self);
-
-            let parsed_expr = self.parse_simple_expression(ExpressionContext::default());
-
-            ifs.push(parsed_expr.expr);
+            ifs.push(self.parse_comprehension_if());
         }
+
+        ifs
+    }
+
+    fn parse_comprehension_if(&mut self) -> Expr {
+        if self.at(TokenKind::Lsqb)
+            && let Some(expr) = self.try_parse_nested_list_comprehension_if()
+        {
+            return expr;
+        }
+
+        self.parse_simple_expression(ExpressionContext::default())
+            .expr
+    }
+
+    fn try_parse_nested_list_comprehension_if(&mut self) -> Option<Expr> {
+        let checkpoint = self.checkpoint();
+        let mut frame = match self.try_parse_list_comprehension_if_frame() {
+            Some(frame) => frame,
+            None => {
+                self.rewind(checkpoint);
+                return None;
+            }
+        };
+        let mut pending = vec![];
+
+        'frames: loop {
+            let mut progress = ParserProgress::default();
+
+            while self.eat(TokenKind::If) {
+                progress.assert_progressing(self);
+
+                if self.at(TokenKind::Lsqb) {
+                    let checkpoint = self.checkpoint();
+
+                    if let Some(nested) = self.try_parse_list_comprehension_if_frame() {
+                        pending.push(frame);
+                        frame = nested;
+                        continue 'frames;
+                    }
+
+                    self.rewind(checkpoint);
+                }
+
+                frame.ifs.push(
+                    self.parse_simple_expression(ExpressionContext::default())
+                        .expr,
+                );
+            }
+
+            let expr = self.finish_list_comprehension_if_frame(frame);
+
+            let Some(mut outer) = pending.pop() else {
+                return Some(expr);
+            };
+
+            outer.ifs.push(expr);
+            frame = outer;
+        }
+    }
+
+    fn try_parse_list_comprehension_if_frame(&mut self) -> Option<PendingListComprehensionIf> {
+        let pending = match self.try_parse_list_comprehension_iter()? {
+            PendingComprehensionIter::List {
+                start,
+                element,
+                comprehension,
+            } => PendingListComprehensionIf {
+                start,
+                element,
+                comprehension,
+                iter: self.parse_comprehension_iter(),
+                ifs: vec![],
+            },
+            _ => return None,
+        };
+
+        Some(pending)
+    }
+
+    fn finish_list_comprehension_if_frame(&mut self, pending: PendingListComprehensionIf) -> Expr {
+        let PendingListComprehensionIf {
+            start,
+            element,
+            comprehension,
+            iter,
+            ifs,
+        } = pending;
+
+        let first = self.comprehension(comprehension, iter, ifs);
+        let mut generators = vec![first];
+        generators.extend(self.parse_generators());
+
+        Expr::ListComp(self.list_comprehension_expression(element, generators, start))
+    }
+
+    fn comprehension(
+        &self,
+        pending: PendingComprehension,
+        iter: Expr,
+        ifs: Vec<Expr>,
+    ) -> ast::Comprehension {
+        let PendingComprehension {
+            start,
+            target,
+            is_async,
+        } = pending;
 
         ast::Comprehension {
             range: self.node_range(start),
@@ -5515,6 +5618,14 @@ struct PendingComprehension {
     start: TextSize,
     target: Expr,
     is_async: bool,
+}
+
+struct PendingListComprehensionIf {
+    start: TextSize,
+    element: Expr,
+    comprehension: PendingComprehension,
+    iter: Expr,
+    ifs: Vec<Expr>,
 }
 
 enum PendingComprehensionIter {
