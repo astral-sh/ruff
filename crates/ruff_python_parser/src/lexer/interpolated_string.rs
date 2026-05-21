@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ruff_python_ast::StringFlags;
 
 use crate::string::InterpolatedStringKind;
@@ -124,24 +126,29 @@ impl InterpolatedStringContext {
 /// lexer encounters. This is necessary because f-strings and t-strings can be nested.
 #[derive(Debug, Default)]
 pub(crate) struct InterpolatedStrings {
-    stack: Vec<InterpolatedStringContext>,
+    // Checkpoints share the stack until lookahead mutates it.
+    stack: Option<Arc<Vec<InterpolatedStringContext>>>,
 }
 
 impl InterpolatedStrings {
     pub(crate) fn push(&mut self, context: InterpolatedStringContext) {
-        self.stack.push(context);
+        Arc::make_mut(self.stack.get_or_insert_with(Default::default)).push(context);
     }
 
     pub(crate) fn pop(&mut self) -> Option<InterpolatedStringContext> {
-        self.stack.pop()
+        self.stack
+            .as_mut()
+            .and_then(|stack| Arc::make_mut(stack).pop())
     }
 
     pub(crate) fn current(&self) -> Option<&InterpolatedStringContext> {
-        self.stack.last()
+        self.stack.as_deref().and_then(|stack| stack.last())
     }
 
     pub(crate) fn current_mut(&mut self) -> Option<&mut InterpolatedStringContext> {
-        self.stack.last_mut()
+        self.stack
+            .as_mut()
+            .and_then(|stack| Arc::make_mut(stack).last_mut())
     }
 
     pub(crate) fn checkpoint(&self) -> InterpolatedStringsCheckpoint {
@@ -154,4 +161,4 @@ impl InterpolatedStrings {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct InterpolatedStringsCheckpoint(Vec<InterpolatedStringContext>);
+pub(crate) struct InterpolatedStringsCheckpoint(Option<Arc<Vec<InterpolatedStringContext>>>);

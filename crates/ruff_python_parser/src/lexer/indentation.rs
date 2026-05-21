@@ -1,6 +1,8 @@
-use static_assertions::assert_eq_size;
 use std::cmp::Ordering;
 use std::fmt::Debug;
+use std::sync::Arc;
+
+use static_assertions::assert_eq_size;
 
 /// The column index of an indentation.
 ///
@@ -86,14 +88,15 @@ pub(super) struct UnexpectedIndentation;
 /// [See Indentation](docs.python.org/3/reference/lexical_analysis.html#indentation).
 #[derive(Debug, Clone, Default)]
 pub(super) struct Indentations {
-    stack: Vec<Indentation>,
+    // Checkpoints share the stack until lookahead mutates it.
+    stack: Option<Arc<Vec<Indentation>>>,
 }
 
 impl Indentations {
     pub(super) fn indent(&mut self, indent: Indentation) {
         debug_assert_eq!(self.current().try_compare(indent), Ok(Ordering::Less));
 
-        self.stack.push(indent);
+        Arc::make_mut(self.stack.get_or_insert_with(Default::default)).push(indent);
     }
 
     /// Dedent one level to eventually reach `new_indentation`.
@@ -117,12 +120,17 @@ impl Indentations {
     }
 
     pub(super) fn dedent(&mut self) -> Option<Indentation> {
-        self.stack.pop()
+        self.stack
+            .as_mut()
+            .and_then(|stack| Arc::make_mut(stack).pop())
     }
 
     pub(super) fn current(&self) -> &Indentation {
         static ROOT: Indentation = Indentation::root();
-        self.stack.last().unwrap_or(&ROOT)
+        self.stack
+            .as_deref()
+            .and_then(|stack| stack.last())
+            .unwrap_or(&ROOT)
     }
 
     pub(crate) fn checkpoint(&self) -> IndentationsCheckpoint {
@@ -135,7 +143,7 @@ impl Indentations {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct IndentationsCheckpoint(Vec<Indentation>);
+pub(crate) struct IndentationsCheckpoint(Option<Arc<Vec<Indentation>>>);
 
 assert_eq_size!(Indentation, u64);
 
