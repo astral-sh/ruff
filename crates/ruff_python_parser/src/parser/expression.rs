@@ -215,8 +215,17 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_conditional_expression_or_higher_unrolling_nested_trailers(&mut self) -> ParsedExpr {
+        self.parse_conditional_expression_or_higher_unrolling_nested_trailers_with_context(
+            ExpressionContext::default(),
+        )
+    }
+
+    fn parse_conditional_expression_or_higher_unrolling_nested_trailers_with_context(
+        &mut self,
+        context: ExpressionContext,
+    ) -> ParsedExpr {
         if !self.at(TokenKind::Name) {
-            return self.parse_conditional_expression_or_higher();
+            return self.parse_conditional_expression_or_higher_impl(context);
         }
 
         let start = self.node_start();
@@ -233,11 +242,7 @@ impl<'src> Parser<'src> {
             _ => lhs,
         };
 
-        self.parse_conditional_expression_or_higher_from_lhs(
-            lhs,
-            start,
-            ExpressionContext::default(),
-        )
+        self.parse_conditional_expression_or_higher_from_lhs(lhs, start, context)
     }
 
     fn parse_named_expression_or_higher_from_lhs(
@@ -1079,6 +1084,25 @@ impl<'src> Parser<'src> {
                         parsed_expr.expr,
                     )
                 }
+                PendingCallArgument::Starred { argument_start, .. } => {
+                    let parsed_expr = self.parse_conditional_expression_or_higher_from_lhs(
+                        expr.into(),
+                        value_start,
+                        ExpressionContext::starred_conditional().disallow_starred_expressions(),
+                    );
+                    self.parse_arguments_after_positional(
+                        call.arguments_start,
+                        call.state,
+                        argument_start,
+                        Expr::Starred(ast::ExprStarred {
+                            value: Box::new(parsed_expr.expr),
+                            ctx: ExprContext::Load,
+                            range: self.node_range(argument_start),
+                            node_index: AtomicNodeIndex::NONE,
+                        })
+                        .into(),
+                    )
+                }
             };
 
             expr = Expr::Call(ast::ExprCall {
@@ -1100,6 +1124,28 @@ impl<'src> Parser<'src> {
         let mut state = ArgumentParsingState::default();
 
         loop {
+            if self.at(TokenKind::Star) && self.peek() == TokenKind::Name {
+                let argument_checkpoint = self.checkpoint();
+                let argument_start = self.node_start();
+                self.bump(TokenKind::Star);
+
+                if self.at(TokenKind::Name) && self.peek() == TokenKind::Lpar {
+                    let value_start = self.node_start();
+                    let func = self.parse_atom().expr;
+                    return Some(NestedCallArgument {
+                        func,
+                        start: value_start,
+                        argument: PendingCallArgument::Starred {
+                            argument_start,
+                            value_start,
+                        },
+                        state,
+                    });
+                }
+
+                self.rewind(argument_checkpoint);
+            }
+
             if self.at(TokenKind::DoubleStar) && self.peek() == TokenKind::Name {
                 let argument_checkpoint = self.checkpoint();
                 let argument_start = self.node_start();
@@ -4267,7 +4313,7 @@ impl<'src> Parser<'src> {
 
         let parsed_expr = match context.starred_expression_precedence() {
             StarredExpressionPrecedence::Conditional => self
-                .parse_conditional_expression_or_higher_impl(
+                .parse_conditional_expression_or_higher_unrolling_nested_trailers_with_context(
                     // test_err starred_starred_expression
                     // print(*
                     // *[])
@@ -4683,6 +4729,10 @@ enum PendingCallArgument {
         argument_start: TextSize,
         value_start: TextSize,
     },
+    Starred {
+        argument_start: TextSize,
+        value_start: TextSize,
+    },
 }
 
 impl PendingCallArgument {
@@ -4690,7 +4740,8 @@ impl PendingCallArgument {
         match self {
             PendingCallArgument::Positional { argument_start } => *argument_start,
             PendingCallArgument::Keyword { value_start, .. }
-            | PendingCallArgument::KeywordUnpacking { value_start, .. } => *value_start,
+            | PendingCallArgument::KeywordUnpacking { value_start, .. }
+            | PendingCallArgument::Starred { value_start, .. } => *value_start,
         }
     }
 }

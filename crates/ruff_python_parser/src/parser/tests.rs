@@ -377,6 +377,22 @@ fn deeply_nested_keyword_unpacking_call_values() {
 }
 
 #[test]
+fn deeply_nested_starred_call_values() {
+    let depth = 5_000;
+    let mut src = String::from("x = ");
+    for _ in 0..depth {
+        src.push_str("f(*");
+    }
+    src.push('1');
+    for _ in 0..depth {
+        src.push(')');
+    }
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
+}
+
+#[test]
 fn deeply_nested_subscripts() {
     let src = format!("x = {}1{}", "a[".repeat(1_000), "]".repeat(1_000));
     parse_module(&src).unwrap();
