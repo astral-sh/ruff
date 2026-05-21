@@ -4722,6 +4722,63 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#yield-expressions>
     fn parse_yield_from_expression(&mut self, start: TextSize) -> Expr {
+        if let Some(expr) = self.try_parse_nested_parenthesized_yield_from_expression(start) {
+            return expr;
+        }
+
+        self.finish_yield_from_expression(start)
+    }
+
+    fn try_parse_nested_parenthesized_yield_from_expression(
+        &mut self,
+        mut yield_start: TextSize,
+    ) -> Option<Expr> {
+        if !self.at(TokenKind::Lpar) || self.peek() != TokenKind::Yield {
+            return None;
+        }
+
+        let checkpoint = self.checkpoint();
+        let mut pending = vec![];
+
+        let mut expr = loop {
+            let parenthesis_start = self.node_start();
+            self.bump(TokenKind::Lpar);
+            self.report_unclosed_parenthesis();
+
+            let nested_yield_start = self.node_start();
+            self.bump(TokenKind::Yield);
+
+            if !self.eat(TokenKind::From) {
+                self.rewind(checkpoint);
+                return None;
+            }
+
+            pending.push(PendingParenthesizedYieldExpression {
+                yield_start,
+                parenthesis_start,
+            });
+
+            if self.at(TokenKind::Lpar) && self.peek() == TokenKind::Yield {
+                yield_start = nested_yield_start;
+                continue;
+            }
+
+            break self.finish_yield_from_expression(nested_yield_start);
+        };
+
+        while let Some(outer) = pending.pop() {
+            let value = self.finish_parenthesized_expression(expr.into(), outer.parenthesis_start);
+            expr = Expr::YieldFrom(ast::ExprYieldFrom {
+                value: Box::new(value.expr),
+                range: self.node_range(outer.yield_start),
+                node_index: AtomicNodeIndex::NONE,
+            });
+        }
+
+        Some(expr)
+    }
+
+    fn finish_yield_from_expression(&mut self, start: TextSize) -> Expr {
         // Grammar:
         //     'yield' 'from' expression
         //
