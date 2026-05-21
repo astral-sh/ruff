@@ -2760,15 +2760,39 @@ impl<'src> Parser<'src> {
         kind: InterpolatedStringKind,
     ) -> InterpolatedStringData {
         let start = self.node_start();
-        let mut flags = self.tokens.current_flags().as_any_string_flags();
+        let flags = self.tokens.current_flags().as_any_string_flags();
 
         self.bump(kind.start_token());
+
+        if let Some(string) = self.try_parse_nested_interpolated_string(start, flags, kind) {
+            return string;
+        }
+
+        self.parse_interpolated_string_after_start(start, flags, kind)
+    }
+
+    fn parse_interpolated_string_after_start(
+        &mut self,
+        start: TextSize,
+        flags: AnyStringFlags,
+        kind: InterpolatedStringKind,
+    ) -> InterpolatedStringData {
         let elements = self.parse_interpolated_string_elements(
             flags,
             InterpolatedStringElementsKind::Regular(kind),
             kind,
         );
 
+        self.finish_interpolated_string(start, flags, kind, elements)
+    }
+
+    fn finish_interpolated_string(
+        &mut self,
+        start: TextSize,
+        mut flags: AnyStringFlags,
+        kind: InterpolatedStringKind,
+        elements: InterpolatedStringElements,
+    ) -> InterpolatedStringData {
         if !self.expect(kind.end_token()) {
             flags = flags.with_unclosed(true);
         }
@@ -2777,6 +2801,100 @@ impl<'src> Parser<'src> {
             elements,
             range: self.node_range(start),
             flags,
+        }
+    }
+
+    fn try_parse_nested_interpolated_string(
+        &mut self,
+        start: TextSize,
+        flags: AnyStringFlags,
+        kind: InterpolatedStringKind,
+    ) -> Option<InterpolatedStringData> {
+        let checkpoint = self.checkpoint();
+        let element_start = self.node_start();
+        if !self.eat(TokenKind::Lbrace) {
+            return None;
+        }
+        self.tokens
+            .re_lex_string_token_in_interpolation_element(kind);
+
+        if !self.at(kind.start_token()) {
+            self.rewind(checkpoint);
+            return None;
+        }
+
+        let mut pending = vec![PendingNestedInterpolatedString {
+            start,
+            flags,
+            element_start,
+        }];
+
+        let mut string = loop {
+            let start = self.node_start();
+            let flags = self.tokens.current_flags().as_any_string_flags();
+            self.bump(kind.start_token());
+
+            let checkpoint = self.checkpoint();
+            let element_start = self.node_start();
+            if self.eat(TokenKind::Lbrace) {
+                self.tokens
+                    .re_lex_string_token_in_interpolation_element(kind);
+
+                if self.at(kind.start_token()) {
+                    pending.push(PendingNestedInterpolatedString {
+                        start,
+                        flags,
+                        element_start,
+                    });
+                    continue;
+                }
+            }
+            self.rewind(checkpoint);
+
+            break self.parse_interpolated_string_after_start(start, flags, kind);
+        };
+
+        while let Some(pending) = pending.pop() {
+            let value = self.interpolated_string_expression(string, kind).into();
+            let element =
+                self.finish_interpolated_element(pending.element_start, pending.flags, kind, value);
+            let elements = self.parse_interpolated_string_elements_after_initial(
+                vec![InterpolatedStringElement::from(element)],
+                pending.flags,
+                InterpolatedStringElementsKind::Regular(kind),
+                kind,
+            );
+            string = self.finish_interpolated_string(pending.start, pending.flags, kind, elements);
+        }
+
+        Some(string)
+    }
+
+    fn interpolated_string_expression(
+        &mut self,
+        string: InterpolatedStringData,
+        kind: InterpolatedStringKind,
+    ) -> Expr {
+        let range = string.range;
+
+        match kind {
+            InterpolatedStringKind::FString => Expr::FString(ast::ExprFString {
+                value: ast::FStringValue::single(string.into()),
+                range,
+                node_index: AtomicNodeIndex::NONE,
+            }),
+            InterpolatedStringKind::TString => {
+                let string = TString::from(string);
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::TemplateStrings,
+                    string.range(),
+                );
+                Expr::TString(ast::ExprTString {
+                    value: ast::TStringValue::single(string),
+                    range,
+                    node_index: AtomicNodeIndex::NONE,
+                })
+            }
         }
     }
 
@@ -2815,7 +2933,21 @@ impl<'src> Parser<'src> {
         elements_kind: InterpolatedStringElementsKind,
         string_kind: InterpolatedStringKind,
     ) -> ast::InterpolatedStringElements {
-        let mut elements = vec![];
+        self.parse_interpolated_string_elements_after_initial(
+            vec![],
+            flags,
+            elements_kind,
+            string_kind,
+        )
+    }
+
+    fn parse_interpolated_string_elements_after_initial(
+        &mut self,
+        mut elements: Vec<InterpolatedStringElement>,
+        flags: ast::AnyStringFlags,
+        elements_kind: InterpolatedStringElementsKind,
+        string_kind: InterpolatedStringKind,
+    ) -> ast::InterpolatedStringElements {
         let middle_token_kind = string_kind.middle_token();
 
         self.parse_list(
@@ -2915,6 +3047,16 @@ impl<'src> Parser<'src> {
 
         let value = self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());
 
+        self.finish_interpolated_element(start, flags, string_kind, value)
+    }
+
+    fn finish_interpolated_element(
+        &mut self,
+        start: TextSize,
+        flags: AnyStringFlags,
+        string_kind: InterpolatedStringKind,
+        value: ParsedExpr,
+    ) -> ast::InterpolatedElement {
         if !value.is_parenthesized && value.expr.is_lambda_expr() {
             // TODO(dhruvmanila): This requires making some changes in lambda expression
             // parsing logic to handle the emitted `FStringMiddle` token in case the
@@ -5939,6 +6081,12 @@ struct PendingIfExpression {
     body: Expr,
     test: Expr,
     start: TextSize,
+}
+
+struct PendingNestedInterpolatedString {
+    start: TextSize,
+    flags: AnyStringFlags,
+    element_start: TextSize,
 }
 
 enum PendingComprehensionIter {
