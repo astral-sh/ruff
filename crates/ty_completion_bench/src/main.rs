@@ -138,7 +138,10 @@ fn get_completions<'db>(
 ) -> anyhow::Result<Vec<Completion<'db>>> {
     let file = system_path_to_file(db, path)
         .with_context(|| format!("failed to get database file for `{path}`"))?;
-    let settings = ty_ide::CompletionSettings { auto_import: true };
+    let settings = ty_ide::CompletionSettings {
+        auto_import: true,
+        ..ty_ide::CompletionSettings::default()
+    };
     Ok(ty_ide::completion(db, &settings, file, offset))
 }
 

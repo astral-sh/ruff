@@ -377,6 +377,7 @@ impl From<&CompletionSettings> for ty_ide::CompletionSettings {
     fn from(x: &CompletionSettings) -> ty_ide::CompletionSettings {
         ty_ide::CompletionSettings {
             auto_import: x.auto_import,
+            ..ty_ide::CompletionSettings::default()
         }
     }
 }

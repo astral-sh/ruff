@@ -79,6 +79,146 @@ walktr
     Ok(())
 }
 
+#[test]
+fn complete_function_parentheses() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+class Class: ...
+
+class Object:
+    def method(self) -> None: ...
+
+object = Object()
+
+def function() -> None: ...
+
+Cla
+func
+object.met
+func(
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            ClientOptions::default()
+                .with_auto_import(false)
+                .with_complete_function_parentheses(true),
+        )
+        .enable_completion_snippets(true)
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let class_completion = callable_completions(&mut server, foo, Position::new(9, 3));
+    insta::assert_json_snapshot!(class_completion, @r#"
+    [
+      {
+        "label": "Class",
+        "kind": 7,
+        "detail": "type[Class]",
+        "sortText": "0",
+        "insertText": "Class($0)",
+        "insertTextFormat": 2
+      }
+    ]
+    "#);
+
+    let function_completion = callable_completions(&mut server, foo, Position::new(10, 4));
+    insta::assert_json_snapshot!(function_completion, @r#"
+    [
+      {
+        "label": "function",
+        "kind": 3,
+        "detail": "def function() -> None",
+        "sortText": "0",
+        "insertText": "function($0)",
+        "insertTextFormat": 2
+      }
+    ]
+    "#);
+
+    let method_completion = callable_completions(&mut server, foo, Position::new(11, 10));
+    insta::assert_json_snapshot!(method_completion, @r#"
+    [
+      {
+        "label": "method",
+        "kind": 2,
+        "detail": "def method(self) -> None",
+        "sortText": "0",
+        "insertText": "method($0)",
+        "insertTextFormat": 2
+      }
+    ]
+    "#);
+
+    let before_parenthesis = callable_completions(&mut server, foo, Position::new(12, 4));
+    insta::assert_json_snapshot!(before_parenthesis, @r#"
+    [
+      {
+        "label": "function",
+        "kind": 3,
+        "detail": "def function() -> None",
+        "sortText": "0"
+      }
+    ]
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn complete_function_parentheses_requires_snippet_support() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def function() -> None: ...
+
+func
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            ClientOptions::default()
+                .with_auto_import(false)
+                .with_complete_function_parentheses(true),
+        )
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let completion = callable_completions(&mut server, foo, Position::new(2, 4));
+    insta::assert_json_snapshot!(completion, @r#"
+    [
+      {
+        "label": "function",
+        "kind": 3,
+        "detail": "def function() -> None",
+        "sortText": "0"
+      }
+    ]
+    "#);
+
+    Ok(())
+}
+
+fn callable_completions(
+    server: &mut crate::TestServer,
+    file: &SystemPath,
+    position: Position,
+) -> Vec<lsp_types::CompletionItem> {
+    let mut completions = server.completion_request(&server.file_uri(file), position);
+    completions
+        .retain(|completion| matches!(completion.label.as_str(), "Class" | "function" | "method"));
+    completions
+}
+
 /// Tests that auto-import completions show the fully
 /// qualified form when it will insert it for you. Also,
 /// that an `import` won't be shown when it won't

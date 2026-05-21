@@ -1298,6 +1298,18 @@ impl TestServerBuilder {
         self
     }
 
+    pub(crate) fn enable_completion_snippets(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .completion
+            .get_or_insert_default()
+            .completion_item
+            .get_or_insert_default()
+            .snippet_support = Some(enabled);
+        self
+    }
+
     /// Enable or disable file watching capability
     #[expect(dead_code)]
     pub(crate) fn enable_did_change_watched_files(mut self, enabled: bool) -> Self {

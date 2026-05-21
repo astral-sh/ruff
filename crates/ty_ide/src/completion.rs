@@ -61,7 +61,8 @@ pub fn completion<'db>(
     }
 
     let query = UserQuery::fuzzy(context.cursor.typed);
-    let mut completions = Completions::new(db, context.collection_context(db, &model), query);
+    let mut completions =
+        Completions::new(db, context.collection_context(db, &model, settings), query);
     match context.kind {
         ContextKind::Import(ref import) => {
             import.add_completions(db, file, &mut completions);
@@ -270,6 +271,8 @@ pub struct Completion<'db> {
     ///
     /// When this is not set, `name` is used.
     pub insert: Option<Name>,
+    /// The format of [`Self::insert`].
+    pub insert_text_format: CompletionInsertTextFormat,
     /// The type of this completion, if available.
     ///
     /// Generally speaking, this is always available
@@ -449,10 +452,24 @@ impl<'db> CompletionBuilder<'db> {
             .kind
             .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
         let relevance = Relevance::new(ctx, query, &self);
+        let (insert, insert_text_format) = if ctx.insert_call_parentheses
+            && matches!(
+                kind,
+                Some(CompletionKind::Function | CompletionKind::Method | CompletionKind::Class)
+            ) {
+            let insert = self.insert.take().unwrap_or_else(|| self.name.clone());
+            (
+                Some(Name::new(format!("{insert}($0)"))),
+                CompletionInsertTextFormat::Snippet,
+            )
+        } else {
+            (self.insert, CompletionInsertTextFormat::PlainText)
+        };
         Completion {
             name: self.name,
             qualified: self.qualified,
-            insert: self.insert,
+            insert,
+            insert_text_format,
             ty: self.ty,
             kind,
             module_name: self.module_name,
@@ -571,9 +588,21 @@ pub enum CompletionKind {
     TypeParameter,
 }
 
+/// The format of a completion's insertion text.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum CompletionInsertTextFormat {
+    /// Plain text to insert as-is.
+    #[default]
+    PlainText,
+    /// Snippet text with tab stops or placeholders.
+    Snippet,
+}
+
 #[derive(Clone, Debug)]
 pub struct CompletionSettings {
     pub auto_import: bool,
+    /// Whether callable completions should insert parentheses.
+    pub complete_function_parentheses: bool,
 }
 
 // N.B. It's important for the defaults here to match the defaults
@@ -583,7 +612,10 @@ pub struct CompletionSettings {
 // `CompletionOptions::into_settings` definition.
 impl Default for CompletionSettings {
     fn default() -> CompletionSettings {
-        CompletionSettings { auto_import: true }
+        CompletionSettings {
+            auto_import: true,
+            complete_function_parentheses: false,
+        }
     }
 }
 
@@ -642,6 +674,7 @@ impl<'m> Context<'m> {
         &self,
         db: &'db dyn Db,
         model: &SemanticModel<'db>,
+        settings: &CompletionSettings,
     ) -> CollectionContext<'db> {
         match self.kind {
             ContextKind::Import(_) => CollectionContext::none(),
@@ -663,6 +696,8 @@ impl<'m> Context<'m> {
                     is_raising_exception: exception_ty.is_some(),
                     existing_class_bases,
                     valid_keywords: self.cursor.valid_keywords(),
+                    insert_call_parentheses: settings.complete_function_parentheses
+                        && !self.cursor.next_token_is_open_parenthesis(),
                 }
             }
         }
@@ -810,6 +845,14 @@ impl<'m> ContextCursor<'m> {
         self.tokens_before
             .last()
             .map(|token| token.string_quote_style())
+    }
+
+    fn next_token_is_open_parenthesis(&self) -> bool {
+        self.parsed
+            .tokens()
+            .at_offset(self.offset)
+            .last()
+            .is_some_and(|token| token.kind() == TokenKind::Lpar)
     }
 
     /// Returns true when the tokens indicate that the definition of a new
@@ -1161,6 +1204,8 @@ struct CollectionContext<'db> {
     /// When set, the context dictates that only *these* keywords
     /// are acceptable in this context.
     valid_keywords: Option<FxHashSet<&'static str>>,
+    /// Whether callable completions should insert call parentheses.
+    insert_call_parentheses: bool,
 }
 
 impl<'db> CollectionContext<'db> {
