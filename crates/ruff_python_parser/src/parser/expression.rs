@@ -445,37 +445,63 @@ impl<'src> Parser<'src> {
                     self.parse_comparison_expression(left.expr, start, cmp_op, context),
                 ),
                 BinaryLikeOperator::Binary(bin_op) => {
-                    self.bump(TokenKind::from(bin_op));
-
-                    let right = if new_precedence.is_right_associative() {
-                        // For right-associative operators (`**`), the right
-                        // operand recursion is unbounded in `a**a**a**...`,
-                        // and it bypasses the guard in `parse_lhs_expression`
-                        // (that scope is exited once the atom is parsed).
-                        if let Some(right) = self.with_recursion(|parser| {
-                            parser.parse_binary_expression_or_higher(new_precedence, context)
-                        }) {
-                            right
-                        } else {
-                            self.report_recursion_limit_exceeded(self.current_token_range());
-                            self.recursion_recovery_expr()
-                        }
+                    if bin_op == Operator::Pow {
+                        self.parse_nested_power_expression(left.expr, start, context)
                     } else {
-                        self.parse_binary_expression_or_higher(new_precedence, context)
-                    };
+                        self.bump(TokenKind::from(bin_op));
 
-                    Expr::BinOp(ast::ExprBinOp {
-                        left: Box::new(left.expr),
-                        op: bin_op,
-                        right: Box::new(right.expr),
-                        range: self.node_range(start),
-                        node_index: AtomicNodeIndex::NONE,
-                    })
+                        let right = self.parse_binary_expression_or_higher(new_precedence, context);
+
+                        Expr::BinOp(ast::ExprBinOp {
+                            left: Box::new(left.expr),
+                            op: bin_op,
+                            right: Box::new(right.expr),
+                            range: self.node_range(start),
+                            node_index: AtomicNodeIndex::NONE,
+                        })
+                    }
                 }
             };
         }
 
         left
+    }
+
+    fn parse_nested_power_expression(
+        &mut self,
+        lhs: Expr,
+        start: TextSize,
+        context: ExpressionContext,
+    ) -> Expr {
+        let mut expressions = vec![PendingPowerExpression { left: lhs, start }];
+
+        let mut right = loop {
+            self.bump(TokenKind::DoubleStar);
+
+            let right_start = self.node_start();
+            let right = self.parse_lhs_expression(OperatorPrecedence::Exponent, context);
+
+            if !self.at(TokenKind::DoubleStar) {
+                break right.expr;
+            }
+
+            expressions.push(PendingPowerExpression {
+                left: right.expr,
+                start: right_start,
+            });
+        };
+
+        while let Some(expression) = expressions.pop() {
+            right = Expr::BinOp(ast::ExprBinOp {
+                left: Box::new(expression.left),
+                op: Operator::Pow,
+                right: Box::new(right),
+                range: self.node_range(expression.start),
+                node_index: AtomicNodeIndex::NONE,
+            });
+        }
+
+        right
     }
 
     /// Parses the left-hand side of an expression.
@@ -5670,6 +5696,11 @@ struct PendingUnaryExpression {
     op: UnaryOp,
     start: TextSize,
     operand_start: TextSize,
+}
+
+struct PendingPowerExpression {
+    left: Expr,
+    start: TextSize,
 }
 
 struct PendingAwaitExpression {
