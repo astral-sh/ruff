@@ -4,6 +4,21 @@
 # requires-python = ">=3.11"
 # dependencies = ["mypy-primer"]
 #
+# [tool.uv]
+# # The only direct dependency of this script is mypy-primer,
+# # and mypy-primer is a git dependency, so it is unaffected
+# # by the `exclude-newer` setting:
+# #
+# # > The --exclude-newer option is only applied to packages
+# # > that are read from a registry (as opposed to, e.g., Git dependencies).
+# # -- https://docs.astral.sh/uv/concepts/resolution/#reproducible-resolutions
+# #
+# # That's probably desirable: we usually want the latest
+# # version of mypy-primer anyway. But it's still worth setting
+# # `exclude-newer` here for any transitive dependencies of
+# # mypy-primer.
+# exclude-newer = "7 days"
+#
 # [tool.uv.sources]
 # mypy-primer = { git = "https://github.com/hauntsaninja/mypy_primer" }
 # ///
