@@ -967,6 +967,23 @@ fn deeply_nested_later_fstring_format_specs() {
 }
 
 #[test]
+fn deeply_nested_converted_fstring_format_specs() {
+    let depth = 5_000;
+    let mut src = String::from("x = f\"");
+    for _ in 0..depth {
+        src.push_str("{1!r:");
+    }
+    src.push('1');
+    for _ in 0..depth {
+        src.push('}');
+    }
+    src.push('"');
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
+}
+
+#[test]
 fn test_expr_mode_invalid_syntax1() {
     let source = "first second";
     let error = parse_expression(source).unwrap_err();

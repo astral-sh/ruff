@@ -3061,6 +3061,34 @@ impl<'src> Parser<'src> {
         string_kind: InterpolatedStringKind,
         value: ParsedExpr,
     ) -> ast::InterpolatedElement {
+        let (debug_text, conversion) =
+            self.parse_interpolated_element_tail_before_format_spec(start, string_kind, &value);
+
+        let format_spec = if self.eat(TokenKind::Colon) {
+            Some(Box::new(
+                self.parse_interpolated_string_format_spec(flags, string_kind),
+            ))
+        } else {
+            None
+        };
+
+        self.finish_interpolated_element_after_format_spec(
+            start,
+            flags,
+            string_kind,
+            value,
+            debug_text,
+            conversion,
+            format_spec,
+        )
+    }
+
+    fn parse_interpolated_element_tail_before_format_spec(
+        &mut self,
+        start: TextSize,
+        string_kind: InterpolatedStringKind,
+        value: &ParsedExpr,
+    ) -> (Option<ast::DebugText>, ConversionFlag) {
         if !value.is_parenthesized && value.expr.is_lambda_expr() {
             // TODO(dhruvmanila): This requires making some changes in lambda expression
             // parsing logic to handle the emitted `FStringMiddle` token in case the
@@ -3160,23 +3188,7 @@ impl<'src> Parser<'src> {
             ConversionFlag::None
         };
 
-        let format_spec = if self.eat(TokenKind::Colon) {
-            Some(Box::new(
-                self.parse_interpolated_string_format_spec(flags, string_kind),
-            ))
-        } else {
-            None
-        };
-
-        self.finish_interpolated_element_after_format_spec(
-            start,
-            flags,
-            string_kind,
-            value,
-            debug_text,
-            conversion,
-            format_spec,
-        )
+        (debug_text, conversion)
     }
 
     fn parse_interpolated_string_format_spec(
@@ -3255,13 +3267,11 @@ impl<'src> Parser<'src> {
             let value =
                 self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());
 
-            if !value.is_parenthesized && value.expr.is_lambda_expr() {
-                self.rewind(checkpoint);
-                if format_specs.is_empty() {
-                    return None;
-                }
-                break;
-            }
+            let (debug_text, conversion) = self.parse_interpolated_element_tail_before_format_spec(
+                element_start,
+                string_kind,
+                &value,
+            );
 
             if self.eat(TokenKind::Colon) {
                 format_specs.push(PendingNestedInterpolatedFormatSpec {
@@ -3269,6 +3279,8 @@ impl<'src> Parser<'src> {
                     initial_elements,
                     element_start,
                     value,
+                    debug_text,
+                    conversion,
                 });
                 format_spec_start = self.node_start();
                 continue;
@@ -3293,8 +3305,8 @@ impl<'src> Parser<'src> {
                 flags,
                 string_kind,
                 pending.value,
-                None,
-                ConversionFlag::None,
+                pending.debug_text,
+                pending.conversion,
                 Some(Box::new(format_spec)),
             );
             let mut initial_elements = pending.initial_elements;
@@ -6513,6 +6525,8 @@ struct PendingNestedInterpolatedFormatSpec {
     initial_elements: Vec<InterpolatedStringElement>,
     element_start: TextSize,
     value: ParsedExpr,
+    debug_text: Option<ast::DebugText>,
+    conversion: ConversionFlag,
 }
 
 enum PendingComprehensionIter {
