@@ -1229,6 +1229,7 @@ impl<'db> Type<'db> {
                 };
                 bound.nominal_class(db)
             }
+            Type::LiteralValue(literal) => literal.fallback_instance(db).nominal_class(db),
             _ => None,
         }
     }
@@ -3531,15 +3532,8 @@ impl<'db> Type<'db> {
             | Type::TypedDict(_) => {
                 // Enum members can be accessed through enum instances and other enum members,
                 // e.g. `answer.YES` or `Answer.YES.NO`.
-                let enum_class = match self {
-                    Type::LiteralValue(literal) => literal
-                        .as_enum()
-                        .map(|enum_literal| enum_literal.enum_class(db)),
-                    Type::NominalInstance(instance) => Some(instance.class_literal(db)),
-                    _ => None,
-                };
-
-                if let Some(enum_class) = enum_class
+                if let Some(enum_class) =
+                    self.nominal_class(db).map(|class| class.class_literal(db))
                     && let Some(metadata) = enum_metadata(db, enum_class)
                     && let Some(resolved_name) = metadata.resolve_member(&name)
                 {
