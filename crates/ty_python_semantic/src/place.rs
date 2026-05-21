@@ -2,6 +2,7 @@ use itertools::Either;
 use ruff_db::files::File;
 use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
+use rustc_hash::FxHashMap;
 use ty_module_resolver::{
     KnownModule, Module, ModuleName, file_to_module, resolve_module_confident,
 };
@@ -676,8 +677,12 @@ pub(super) fn place_from_bindings<'db>(
         bindings_with_constraints,
         RequiresExplicitReExport::No,
         None,
+        None,
     )
 }
+
+pub(super) type NarrowedBindingTypes<'db> =
+    FxHashMap<(Definition<'db>, ScopedNarrowingConstraint), Type<'db>>;
 
 pub(super) fn place_from_bindings_with_reachability_cache<'db>(
     db: &'db dyn Db,
@@ -689,6 +694,22 @@ pub(super) fn place_from_bindings_with_reachability_cache<'db>(
         bindings_with_constraints,
         RequiresExplicitReExport::No,
         Some(reachability_cache),
+        None,
+    )
+}
+
+pub(super) fn place_from_bindings_with_caches<'db>(
+    db: &'db dyn Db,
+    bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
+    reachability_cache: &ReachabilityEvaluationCache<'db>,
+    narrowed_bindings: &mut NarrowedBindingTypes<'db>,
+) -> PlaceWithDefinition<'db> {
+    place_from_bindings_impl(
+        db,
+        bindings_with_constraints,
+        RequiresExplicitReExport::No,
+        Some(reachability_cache),
+        Some(narrowed_bindings),
     )
 }
 
@@ -1017,7 +1038,7 @@ pub(crate) fn place_by_id<'db>(
     // inferred type, without unioning with `Unknown`, because it cannot be modified.
     if let Some(qualifiers) = declared.is_bare_final() {
         let bindings = all_considered_bindings();
-        return place_from_bindings_impl(db, bindings, requires_explicit_reexport, None)
+        return place_from_bindings_impl(db, bindings, requires_explicit_reexport, None, None)
             .place
             .with_qualifiers(qualifiers);
     }
@@ -1037,7 +1058,9 @@ pub(crate) fn place_by_id<'db>(
             qualifiers,
         } if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
             let bindings = all_considered_bindings();
-            match place_from_bindings_impl(db, bindings, requires_explicit_reexport, None).place {
+            match place_from_bindings_impl(db, bindings, requires_explicit_reexport, None, None)
+                .place
+            {
                 Place::Defined(DefinedPlace {
                     ty: inferred,
                     origin,
@@ -1085,7 +1108,8 @@ pub(crate) fn place_by_id<'db>(
         } => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
-            let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport, None);
+            let inferred =
+                place_from_bindings_impl(db, bindings, requires_explicit_reexport, None, None);
 
             let place = match inferred.place {
                 // Place is possibly undeclared and definitely unbound
@@ -1131,7 +1155,7 @@ pub(crate) fn place_by_id<'db>(
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
             let mut inferred =
-                place_from_bindings_impl(db, bindings, requires_explicit_reexport, None).place;
+                place_from_bindings_impl(db, bindings, requires_explicit_reexport, None, None).place;
 
             if boundness_analysis == BoundnessAnalysis::AssumeBound {
                 if let Place::Defined(defined) = inferred {
@@ -1470,6 +1494,7 @@ fn place_from_bindings_impl<'db>(
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
     reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
+    mut narrowed_bindings: Option<&mut NarrowedBindingTypes<'db>>,
 ) -> PlaceWithDefinition<'db> {
     let predicates = bindings_with_constraints.predicates();
     let reachability_constraints = bindings_with_constraints.reachability_constraints();
@@ -1632,10 +1657,16 @@ fn place_from_bindings_impl<'db>(
             first_definition.get_or_insert(binding);
             provenance = provenance.or(Provenance::SingleDefinition(binding));
             let binding_ty = binding_type(db, binding);
-            Some((
-                narrowing_constraint.narrow(db, binding_ty, binding.place(db)),
-                static_reachability,
-            ))
+            let narrowed_ty = if let Some(narrowed_bindings) = &mut narrowed_bindings {
+                *narrowed_bindings
+                    .entry((binding, narrowing_constraint.constraint()))
+                    .or_insert_with(|| {
+                        narrowing_constraint.narrow(db, binding_ty, binding.place(db))
+                    })
+            } else {
+                narrowing_constraint.narrow(db, binding_ty, binding.place(db))
+            };
+            Some((narrowed_ty, static_reachability))
         },
     );
 

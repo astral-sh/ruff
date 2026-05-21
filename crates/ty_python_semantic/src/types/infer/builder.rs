@@ -29,12 +29,12 @@ use super::{
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
-    ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
-    RequiresExplicitReExport, TypeOrigin, builtins_module_scope, builtins_symbol,
-    class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
+    ConsideredDefinitions, DefinedPlace, Definedness, LookupError, NarrowedBindingTypes, Place,
+    PlaceAndQualifiers, RequiresExplicitReExport, TypeOrigin, builtins_module_scope,
+    builtins_symbol, class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
-    place_from_bindings_with_reachability_cache, place_from_declarations_with_reachability_cache,
-    typing_extensions_symbol,
+    place_from_bindings_with_caches, place_from_bindings_with_reachability_cache,
+    place_from_declarations_with_reachability_cache, typing_extensions_symbol,
 };
 use crate::reachability::{ReachabilityEvaluationCache, evaluate_reachability_with_cache};
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
@@ -247,6 +247,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// during multi-inference can reuse predicate truthiness computed by the parent builder.
     reachability_cache: Rc<ReachabilityEvaluationCache<'db>>,
 
+    /// Narrowed binding types reused across local place loads in this inference region.
+    narrowed_binding_types: RefCell<NarrowedBindingTypes<'db>>,
+
     /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
     /// Only populated for expressions that have non-empty qualifiers.
     qualifiers: FxHashMap<ExpressionNodeKey, TypeQualifiers>,
@@ -384,6 +387,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 scope,
                 reachability_constraints,
             )),
+            narrowed_binding_types: RefCell::default(),
             qualifiers: FxHashMap::default(),
             type_expression_flags: FxHashMap::default(),
             collection_use_constraints: FxHashMap::default(),
@@ -9158,10 +9162,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let use_id = expr_ref.scoped_use_id(db, self.file());
-            let place = place_from_bindings_with_reachability_cache(
+            let place = place_from_bindings_with_caches(
                 db,
                 use_def.bindings_at_use(use_id),
                 &self.reachability_cache,
+                &mut self.narrowed_binding_types.borrow_mut(),
             )
             .place;
 
@@ -10492,6 +10497,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // builder only state
             expression_cache: _,
             reachability_cache: _,
+            narrowed_binding_types: _,
             typevar_binding_context: _,
             deferred_state: _,
             called_functions: _,
@@ -10574,6 +10580,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // builder only state
             expression_cache: _,
             reachability_cache: _,
+            narrowed_binding_types: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
             deferred_state: _,
@@ -10669,6 +10676,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             called_functions,
             expression_cache: _,
             reachability_cache: _,
+            narrowed_binding_types: _,
             declarations: _,
             deferred: _,
             scope: _,
@@ -10724,6 +10732,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // builder only state
             expression_cache: _,
             reachability_cache: _,
+            narrowed_binding_types: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
             deferred_state: _,
@@ -10817,6 +10826,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Builder only state
             expression_cache: _,
             reachability_cache: _,
+            narrowed_binding_types: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
             deferred_state: _,
@@ -10873,6 +10883,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             typevar_binding_context,
             ref expression_cache,
             ref reachability_cache,
+            narrowed_binding_types: _,
             ref return_types_and_ranges,
             ref dataclass_field_specifiers,
 
@@ -10939,6 +10950,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // builder only state
             expression_cache: _,
             reachability_cache: _,
+            narrowed_binding_types: _,
             typevar_binding_context: _,
             deferred_state: _,
             called_functions,
