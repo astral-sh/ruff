@@ -69,7 +69,7 @@ use crate::rules::pylint::helpers::num_statements;
 /// uses a different default setting.
 /// To replicate it exactly, set `lint.pylint.max-statements-in-try` to 1.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "0.15.14")]
 pub(crate) struct TooManyStatementsInTryClause {
     statements: usize,
     max_statements: usize,
