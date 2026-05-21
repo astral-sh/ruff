@@ -3035,22 +3035,12 @@ impl<'src> Parser<'src> {
 
         let after_brace = self.node_start();
 
-        if self.at(TokenKind::DoubleStar) {
-            if self.peek() == TokenKind::Lbrace {
-                self.bump(TokenKind::DoubleStar);
-                return self.parse_nested_set_or_dict_like_expression(
-                    PendingSetOrDictLikeExpression::DictUnpackingValue {
-                        start,
-                        items: vec![],
-                    },
-                );
-            }
-
-            return self.parse_dict_unpacking_after_lbrace(start, after_brace);
-        }
-
         if let Some(pending) = self.try_parse_nested_set_or_dict_like_expression(start) {
             return self.parse_nested_set_or_dict_like_expression(pending);
+        }
+
+        if self.at(TokenKind::DoubleStar) {
+            return self.parse_dict_unpacking_after_lbrace(start, after_brace);
         }
 
         // For dictionary expressions, the key uses the `expression` rule while for
@@ -3161,27 +3151,18 @@ impl<'src> Parser<'src> {
                 );
             }
 
-            if self.at(TokenKind::DoubleStar) {
-                if self.peek() == TokenKind::Lbrace {
-                    self.bump(TokenKind::DoubleStar);
-                    pending.push(PendingSetOrDictLikeExpression::DictUnpackingValue {
-                        start,
-                        items: vec![],
-                    });
-                    continue;
-                }
+            if let Some(nested) = self.try_parse_nested_set_or_dict_like_expression(start) {
+                pending.push(nested);
+                continue;
+            }
 
+            if self.at(TokenKind::DoubleStar) {
                 let dict = self.parse_dict_unpacking_after_lbrace(start, self.node_start());
                 break self.parse_named_expression_or_higher_from_lhs(
                     dict.into(),
                     start,
                     ExpressionContext::starred_bitwise_or(),
                 );
-            }
-
-            if let Some(nested) = self.try_parse_nested_set_or_dict_like_expression(start) {
-                pending.push(nested);
-                continue;
             }
 
             pending.push(PendingSetOrDictLikeExpression::Set {
