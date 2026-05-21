@@ -3612,6 +3612,20 @@ impl<'src> Parser<'src> {
             return self.parse_nested_parenthesized_expression(PendingParenthesizedExpression {
                 start,
                 elts: vec![],
+                nested_element: PendingParenthesizedElement::Direct,
+            });
+        }
+
+        if self.at(TokenKind::Star) && self.peek() == TokenKind::Lpar {
+            let starred_start = self.node_start();
+            self.bump(TokenKind::Star);
+            return self.parse_nested_parenthesized_expression(PendingParenthesizedExpression {
+                start,
+                elts: vec![],
+                nested_element: PendingParenthesizedElement::Starred {
+                    starred_start,
+                    value_start: self.node_start(),
+                },
             });
         }
 
@@ -3672,7 +3686,24 @@ impl<'src> Parser<'src> {
             }
 
             if self.at(TokenKind::Lpar) {
-                return Ok(PendingParenthesizedExpression { start, elts });
+                return Ok(PendingParenthesizedExpression {
+                    start,
+                    elts,
+                    nested_element: PendingParenthesizedElement::Direct,
+                });
+            }
+
+            if self.at(TokenKind::Star) && self.peek() == TokenKind::Lpar {
+                let starred_start = self.node_start();
+                self.bump(TokenKind::Star);
+                return Ok(PendingParenthesizedExpression {
+                    start,
+                    elts,
+                    nested_element: PendingParenthesizedElement::Starred {
+                        starred_start,
+                        value_start: self.node_start(),
+                    },
+                });
             }
 
             elts.push(
@@ -3707,6 +3738,21 @@ impl<'src> Parser<'src> {
                 pending.push(PendingParenthesizedExpression {
                     start,
                     elts: vec![],
+                    nested_element: PendingParenthesizedElement::Direct,
+                });
+                continue;
+            }
+
+            if self.at(TokenKind::Star) && self.peek() == TokenKind::Lpar {
+                let starred_start = self.node_start();
+                self.bump(TokenKind::Star);
+                pending.push(PendingParenthesizedExpression {
+                    start,
+                    elts: vec![],
+                    nested_element: PendingParenthesizedElement::Starred {
+                        starred_start,
+                        value_start: self.node_start(),
+                    },
                 });
                 continue;
             }
@@ -3723,6 +3769,7 @@ impl<'src> Parser<'src> {
                         pending.push(PendingParenthesizedExpression {
                             start,
                             elts: vec![],
+                            nested_element: PendingParenthesizedElement::Direct,
                         });
                         break parsed_expr;
                     }
@@ -3732,17 +3779,38 @@ impl<'src> Parser<'src> {
             pending.push(PendingParenthesizedExpression {
                 start,
                 elts: vec![],
+                nested_element: PendingParenthesizedElement::Direct,
             });
             break parsed_expr;
         };
 
         while let Some(outer) = pending.pop() {
+            let nested_element = match outer.nested_element {
+                PendingParenthesizedElement::Direct => parsed_expr,
+                PendingParenthesizedElement::Starred {
+                    starred_start,
+                    value_start,
+                } => {
+                    let value = self.parse_expression_with_bitwise_or_precedence_from_lhs(
+                        parsed_expr,
+                        value_start,
+                    );
+                    Expr::Starred(ast::ExprStarred {
+                        value: Box::new(value.expr),
+                        ctx: ExprContext::Load,
+                        range: self.node_range(starred_start),
+                        node_index: AtomicNodeIndex::NONE,
+                    })
+                    .into()
+                }
+            };
+
             parsed_expr = if outer.elts.is_empty() {
-                self.finish_parenthesized_expression(parsed_expr, outer.start)
+                self.finish_parenthesized_expression(nested_element, outer.start)
             } else {
                 Expr::Tuple(self.finish_parenthesized_tuple_expression_after_element(
                     outer.elts,
-                    parsed_expr.expr,
+                    nested_element.expr,
                     outer.start,
                 ))
                 .into()
@@ -3801,6 +3869,7 @@ impl<'src> Parser<'src> {
                 break self.parse_nested_parenthesized_expression(PendingParenthesizedExpression {
                     start: right_start,
                     elts: vec![],
+                    nested_element: PendingParenthesizedElement::Direct,
                 });
             }
 
@@ -4902,6 +4971,15 @@ struct ArgumentParsingState {
 struct PendingParenthesizedExpression {
     start: TextSize,
     elts: Vec<Expr>,
+    nested_element: PendingParenthesizedElement,
+}
+
+enum PendingParenthesizedElement {
+    Direct,
+    Starred {
+        starred_start: TextSize,
+        value_start: TextSize,
+    },
 }
 
 struct PendingParenthesizedBinaryExpression {
