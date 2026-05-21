@@ -573,7 +573,11 @@ impl<'src> Parser<'src> {
                 return Expr::Starred(starred_expr).into();
             }
             TokenKind::Await => {
-                let await_expr = self.parse_await_expression();
+                let await_expr = if self.peek() == TokenKind::Await {
+                    self.parse_nested_await_expression()
+                } else {
+                    self.parse_await_expression()
+                };
 
                 // `await` expressions cannot be nested
                 if left_precedence >= OperatorPrecedence::Await {
@@ -4567,8 +4571,52 @@ impl<'src> Parser<'src> {
             ExpressionContext::default(),
         );
 
+        self.await_expression(parsed_expr.expr, start)
+    }
+
+    fn parse_nested_await_expression(&mut self) -> ast::ExprAwait {
+        let mut expressions = vec![];
+
+        while self.at(TokenKind::Await) {
+            let start = self.node_start();
+            self.bump(TokenKind::Await);
+
+            expressions.push(PendingAwaitExpression {
+                start,
+                operand_start: self.node_start(),
+            });
+        }
+
+        let innermost = expressions
+            .pop()
+            .expect("nested await parsing always includes the outer await expression");
+        let operand = self.parse_binary_expression_or_higher(
+            OperatorPrecedence::Await,
+            ExpressionContext::default(),
+        );
+        let mut expression = self.await_expression(operand.expr, innermost.start);
+
+        while let Some(outer) = expressions.pop() {
+            self.add_error(
+                ParseErrorType::OtherError("Await expression cannot be used here".to_string()),
+                &expression,
+            );
+
+            let operand = self.parse_binary_expression_or_higher_recursive(
+                Expr::Await(expression).into(),
+                OperatorPrecedence::Await,
+                ExpressionContext::default(),
+                outer.operand_start,
+            );
+            expression = self.await_expression(operand.expr, outer.start);
+        }
+
+        expression
+    }
+
+    fn await_expression(&self, value: Expr, start: TextSize) -> ast::ExprAwait {
         ast::ExprAwait {
-            value: Box::new(parsed_expr.expr),
+            value: Box::new(value),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -5059,6 +5107,11 @@ enum PendingSubscriptSlice {
 
 struct PendingUnaryExpression {
     op: UnaryOp,
+    start: TextSize,
+    operand_start: TextSize,
+}
+
+struct PendingAwaitExpression {
     start: TextSize,
     operand_start: TextSize,
 }

@@ -364,6 +364,14 @@ fn deeply_nested_unary() {
 }
 
 #[test]
+fn deeply_nested_await_chain() {
+    let src = format!("async def f():\n    return {}x\n", "await ".repeat(20_000));
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_unchecked(&src, ParseOptions::from(Mode::Module)));
+}
+
+#[test]
 fn deeply_nested_invalid_async_prefixes() {
     let src = format!("{}def f(): pass\n", "async ".repeat(20_000));
 
