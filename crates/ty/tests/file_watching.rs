@@ -760,6 +760,26 @@ fn new_files_with_explicit_included_paths() -> anyhow::Result<()> {
 }
 
 #[test]
+fn explicit_nested_included_file_ignores_parent_root_ignore_file() -> anyhow::Result<()> {
+    let case = setup(|context: &mut SetupContext| {
+        context.write_project_file(".ignore", "build/\n")?;
+        context.write_project_file("build/keep.py", "")?;
+        context.set_included_paths(vec![
+            context.project_path().to_path_buf(),
+            context.join_project_path("build/keep.py"),
+        ]);
+        Ok(())
+    })?;
+
+    let keep_path = case.project_path("build/keep.py");
+    let keep_file = case.system_file(&keep_path).unwrap();
+
+    case.assert_indexed_project_files([keep_file]);
+
+    Ok(())
+}
+
+#[test]
 fn new_file_in_included_out_of_project_directory() -> anyhow::Result<()> {
     let mut case = setup(|context: &mut SetupContext| {
         context.write_project_file("src/main.py", "")?;

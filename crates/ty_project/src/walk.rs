@@ -158,7 +158,7 @@ impl ProjectFilesWalker {
                 db,
                 // Trim root paths that have no overlap with any of the incremental paths.
                 root_paths.iter().filter(|root| {
-                    should_visit_incremental_path(root.as_path(), &incremental_paths)
+                    should_visit_incremental_path(root.as_path(), incremental_paths)
                 }),
             )
         } else {
