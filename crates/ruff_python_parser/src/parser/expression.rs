@@ -3145,29 +3145,32 @@ impl<'src> Parser<'src> {
     fn finish_list_like_expression(&mut self, first_element: ParsedExpr, start: TextSize) -> Expr {
         match self.current_token_kind() {
             TokenKind::Async | TokenKind::For => {
-                // Parenthesized starred expression isn't allowed either but that is
-                // handled by the `parse_parenthesized_expression` method.
-
-                // test_ok starred_list_comp_py315
-                // # parse_options: {"target-version": "3.15"}
-                // [*x for x in y]
-                // [*factor.dims for factor in bases]
-
-                // test_err starred_list_comp_py314
-                // # parse_options: {"target-version": "3.14"}
-                // [*x for x in y]
-                if first_element.is_unparenthesized_starred_expr() {
-                    self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::UnpackingInComprehension(
-                            ComprehensionUnpackingKind::IterableInList,
-                        ),
-                        first_element.range(),
-                    );
-                }
-
+                self.validate_list_comprehension_element(&first_element);
                 Expr::ListComp(self.parse_list_comprehension_expression(first_element.expr, start))
             }
             _ => Expr::List(self.parse_list_expression(first_element.expr, start)),
+        }
+    }
+
+    fn validate_list_comprehension_element(&mut self, element: &ParsedExpr) {
+        // Parenthesized starred expression isn't allowed either but that is
+        // handled by the `parse_parenthesized_expression` method.
+
+        // test_ok starred_list_comp_py315
+        // # parse_options: {"target-version": "3.15"}
+        // [*x for x in y]
+        // [*factor.dims for factor in bases]
+
+        // test_err starred_list_comp_py314
+        // # parse_options: {"target-version": "3.14"}
+        // [*x for x in y]
+        if element.is_unparenthesized_starred_expr() {
+            self.add_unsupported_syntax_error(
+                UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                    ComprehensionUnpackingKind::IterableInList,
+                ),
+                element.range(),
+            );
         }
     }
 
@@ -4381,6 +4384,12 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries>
     fn parse_comprehension(&mut self) -> ast::Comprehension {
+        let pending = self.parse_comprehension_header();
+        let iter = self.parse_comprehension_iter();
+        self.finish_comprehension(pending, iter)
+    }
+
+    fn parse_comprehension_header(&mut self) -> PendingComprehension {
         let start = self.node_start();
 
         let is_async = self.eat(TokenKind::Async);
@@ -4401,7 +4410,100 @@ impl<'src> Parser<'src> {
         self.validate_assignment_target(&target.expr);
 
         self.expect(TokenKind::In);
-        let iter = self.parse_simple_expression(ExpressionContext::default());
+
+        PendingComprehension {
+            start,
+            target: target.expr,
+            is_async,
+        }
+    }
+
+    fn parse_comprehension_iter(&mut self) -> Expr {
+        if self.at(TokenKind::Lsqb)
+            && let Some(iter) = self.try_parse_nested_list_comprehension_iter()
+        {
+            return iter;
+        }
+
+        self.parse_simple_expression(ExpressionContext::default())
+            .expr
+    }
+
+    fn try_parse_nested_list_comprehension_iter(&mut self) -> Option<Expr> {
+        let mut pending = vec![];
+
+        let mut iter = loop {
+            let checkpoint = self.checkpoint();
+            let start = self.node_start();
+
+            self.bump(TokenKind::Lsqb);
+            self.report_unclosed_bracket();
+
+            if self.eat(TokenKind::Rsqb) {
+                self.rewind(checkpoint);
+
+                if pending.is_empty() {
+                    return None;
+                }
+
+                break self
+                    .parse_simple_expression(ExpressionContext::default())
+                    .expr;
+            }
+
+            let element =
+                self.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
+
+            if !matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
+                self.rewind(checkpoint);
+
+                if pending.is_empty() {
+                    return None;
+                }
+
+                break self
+                    .parse_simple_expression(ExpressionContext::default())
+                    .expr;
+            }
+
+            self.validate_list_comprehension_element(&element);
+            pending.push(PendingListComprehensionIter {
+                start,
+                element: element.expr,
+                comprehension: self.parse_comprehension_header(),
+            });
+
+            if !self.at(TokenKind::Lsqb) {
+                break self
+                    .parse_simple_expression(ExpressionContext::default())
+                    .expr;
+            }
+        };
+
+        while let Some(outer) = pending.pop() {
+            let first = self.finish_comprehension(outer.comprehension, iter);
+            let mut generators = vec![first];
+            generators.extend(self.parse_generators());
+            iter = Expr::ListComp(self.list_comprehension_expression(
+                outer.element,
+                generators,
+                outer.start,
+            ));
+        }
+
+        Some(iter)
+    }
+
+    fn finish_comprehension(
+        &mut self,
+        pending: PendingComprehension,
+        iter: Expr,
+    ) -> ast::Comprehension {
+        let PendingComprehension {
+            start,
+            target,
+            is_async,
+        } = pending;
 
         let mut ifs = vec![];
         let mut progress = ParserProgress::default();
@@ -4417,8 +4519,8 @@ impl<'src> Parser<'src> {
         ast::Comprehension {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
-            target: target.expr,
-            iter: iter.expr,
+            target,
+            iter,
             ifs,
             is_async,
         }
@@ -4460,7 +4562,15 @@ impl<'src> Parser<'src> {
         start: TextSize,
     ) -> ast::ExprListComp {
         let generators = self.parse_generators();
+        self.list_comprehension_expression(element, generators, start)
+    }
 
+    fn list_comprehension_expression(
+        &mut self,
+        element: Expr,
+        generators: Vec<ast::Comprehension>,
+        start: TextSize,
+    ) -> ast::ExprListComp {
         self.expect(TokenKind::Rsqb);
 
         ast::ExprListComp {
@@ -5296,6 +5406,18 @@ struct PendingParenthesizedNamedExpression {
     target: Expr,
     start: TextSize,
     parenthesis_start: TextSize,
+}
+
+struct PendingComprehension {
+    start: TextSize,
+    target: Expr,
+    is_async: bool,
+}
+
+struct PendingListComprehensionIter {
+    start: TextSize,
+    element: Expr,
+    comprehension: PendingComprehension,
 }
 
 #[derive(Debug)]
