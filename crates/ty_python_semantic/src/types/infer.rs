@@ -43,8 +43,6 @@
 //! of iterations, so if we fail to converge, Salsa will eventually panic. (This should of course
 //! be considered a bug.)
 
-use std::collections::hash_map::Entry;
-
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
@@ -807,21 +805,6 @@ impl<'db> ScopeInference<'db> {
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }
 
-        if cycle.iteration() > crate::TAINTED_CYCLES
-            && let Some(prev_extra) = &previous_inference.extra
-        {
-            for (collection_def, constraints) in &prev_extra.collection_use_constraints {
-                let extra = self.extra.get_or_insert_default();
-
-                match extra.collection_use_constraints.entry(*collection_def) {
-                    Entry::Vacant(entry) => {
-                        entry.insert(constraints.clone());
-                    }
-                    Entry::Occupied(mut entry) => entry.get_mut().extend(constraints),
-                }
-            }
-        }
-
         self
     }
 
@@ -1019,20 +1002,6 @@ impl<'db> DefinitionInference<'db> {
                     declaration_ty.map_type(|decl_ty| decl_ty.recursive_type_normalized(db, cycle));
             }
         }
-        if cycle.iteration() > crate::TAINTED_CYCLES
-            && let Some(prev_extra) = &previous_inference.extra
-        {
-            for (collection_def, constraints) in &prev_extra.collection_use_constraints {
-                let extra = self.extra.get_or_insert_default();
-
-                match extra.collection_use_constraints.entry(*collection_def) {
-                    Entry::Vacant(entry) => {
-                        entry.insert(constraints.clone());
-                    }
-                    Entry::Occupied(mut entry) => entry.get_mut().extend(constraints),
-                }
-            }
-        }
 
         self
     }
@@ -1217,21 +1186,6 @@ impl<'db> ExpressionInference<'db> {
                     *binding_ty = binding_ty.recursive_type_normalized(db, cycle);
                 }
             }
-
-            if cycle.iteration() > crate::TAINTED_CYCLES
-                && let Some(prev_extra) = &previous.extra
-            {
-                for (collection_def, constraints) in &prev_extra.collection_use_constraints {
-                    let extra = self.extra.get_or_insert_default();
-
-                    match extra.collection_use_constraints.entry(*collection_def) {
-                        Entry::Vacant(entry) => {
-                            entry.insert(constraints.clone());
-                        }
-                        Entry::Occupied(mut entry) => entry.get_mut().extend(constraints),
-                    }
-                }
-            }
         }
 
         for (expr, ty) in &mut self.expressions {
@@ -1414,20 +1368,6 @@ impl<'db> StatementInferenceInner<'db> {
             } else {
                 *declaration_ty =
                     declaration_ty.map_type(|decl_ty| decl_ty.recursive_type_normalized(db, cycle));
-            }
-        }
-        if cycle.iteration() > crate::TAINTED_CYCLES
-            && let Some(prev_extra) = &previous_inference.extra
-        {
-            for (collection_def, constraints) in &prev_extra.collection_use_constraints {
-                let extra = self.extra.get_or_insert_default();
-
-                match extra.collection_use_constraints.entry(*collection_def) {
-                    Entry::Vacant(entry) => {
-                        entry.insert(constraints.clone());
-                    }
-                    Entry::Occupied(mut entry) => entry.get_mut().extend(constraints),
-                }
             }
         }
 
