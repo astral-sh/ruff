@@ -351,3 +351,6 @@ opt-level = 1
 # The profile that 'cargo dist' will build with.
 [profile.dist]
 inherits = "release"
+
+[patch.crates-io]
+ignore = { path = "/private/tmp/ignore-walk-state-fork/crates/ignore" }

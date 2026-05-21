@@ -69,7 +69,7 @@ impl ProjectDatabase {
             respect_ignore_files.then(|| project.included_paths_or_root(self).to_vec());
         let mut ignore_files = ignore_walk_roots
             .as_deref()
-            .map(|walk_roots| IgnoreFiles::new(self.system().dyn_clone(), walk_roots));
+            .map(|walk_roots| IgnoreFiles::new(self.system(), walk_roots));
 
         for change in changes {
             tracing::debug!("Handling file watcher change event: {:?}", change);

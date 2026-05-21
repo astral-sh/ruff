@@ -1335,6 +1335,17 @@ checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 [[package]]
 name = "globset"
 version = "0.4.18"
+dependencies = [
+ "aho-corasick",
+ "bstr",
+ "log",
+ "regex-automata",
+ "regex-syntax",
+]
+
+[[package]]
+name = "globset"
+version = "0.4.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52dfc19153a48bde0cbd630453615c8151bce3a5adfac7a0aebfbf0a1e1f57e3"
 dependencies = [
@@ -1564,11 +1575,9 @@ dependencies = [
 [[package]]
 name = "ignore"
 version = "0.4.25"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3d782a365a015e0f5c04902246139249abf769125006fbe7649e2ee88169b4a"
 dependencies = [
  "crossbeam-deque",
- "globset",
+ "globset 0.4.18",
  "log",
  "memchr",
  "regex-automata",
@@ -3025,7 +3034,7 @@ version = "0.0.0"
 dependencies = [
  "filetime",
  "glob",
- "globset",
+ "globset 0.4.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.14.0",
  "regex",
  "ruff_macros",
@@ -3190,7 +3199,7 @@ dependencies = [
  "compact_str",
  "fern",
  "glob",
- "globset",
+ "globset 0.4.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashbrown 0.17.0",
  "imperative",
  "insta",
@@ -3604,7 +3613,7 @@ dependencies = [
  "colored 3.1.1",
  "etcetera",
  "glob",
- "globset",
+ "globset 0.4.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "ignore",
  "indexmap",
  "is-macro",
@@ -4609,7 +4618,7 @@ dependencies = [
  "colored 3.1.1",
  "crossbeam",
  "get-size2",
- "globset",
+ "globset 0.4.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "ignore",
  "insta",
  "notify",
