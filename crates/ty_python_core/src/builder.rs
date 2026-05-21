@@ -802,6 +802,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         is_unconstrained_collection_literal(assignment.value(self.module))
                     })
             })
+            // TODO: Support uses that refer to multiple definitions. This currently seems to lead to
+            // cycle-related panics.
             .exactly_one()
             .ok()
     }
