@@ -50,16 +50,8 @@ use crate::checkers::ast::Checker;
 ///     return STATUS_TRANSITIONS.get(status, "unknown")
 /// ```
 ///
-/// The rewrite turns the branching decision tree into a data table, which
-/// lowers the function's number of decision points and so its McCabe
-/// complexity. Mechanically inverting conditions to use guard clauses does
-/// not, on its own, lower the complexity, since the number of decision
-/// points is unchanged.
-///
-/// The examples above assume a `lint.mccabe.max-complexity` of `5` or
-/// less, since the first example's complexity is `6` (one for the function
-/// plus one per `if`). The default is `10`, so neither example triggers
-/// `C901` out of the box.
+/// Note that this example assumes a `lint.mccabe.max-complexity` of 5 or less to trigger a
+/// diagnostic because the initial code only has a complexity of 6.
 ///
 /// ## Options
 /// - `lint.mccabe.max-complexity`
