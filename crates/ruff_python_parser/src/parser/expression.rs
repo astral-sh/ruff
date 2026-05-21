@@ -214,6 +214,32 @@ impl<'src> Parser<'src> {
         self.parse_named_expression_or_higher_from_lhs(lhs, start, context)
     }
 
+    fn parse_conditional_expression_or_higher_unrolling_nested_trailers(&mut self) -> ParsedExpr {
+        if !self.at(TokenKind::Name) {
+            return self.parse_conditional_expression_or_higher();
+        }
+
+        let start = self.node_start();
+        let lhs = self.parse_atom();
+        let lhs = match self.current_token_kind() {
+            TokenKind::Lpar => {
+                Expr::Call(self.parse_call_expression_unrolling_nested_calls(lhs.expr, start))
+                    .into()
+            }
+            TokenKind::Lsqb => Expr::Subscript(
+                self.parse_subscript_expression_unrolling_nested_subscripts(lhs.expr, start),
+            )
+            .into(),
+            _ => lhs,
+        };
+
+        self.parse_conditional_expression_or_higher_from_lhs(
+            lhs,
+            start,
+            ExpressionContext::default(),
+        )
+    }
+
     fn parse_named_expression_or_higher_from_lhs(
         &mut self,
         lhs: ParsedExpr,
@@ -225,6 +251,26 @@ impl<'src> Parser<'src> {
             is_parenthesized: lhs.is_parenthesized,
         };
         self.parse_named_expression_or_higher_from_simple_lhs(lhs, start, context)
+    }
+
+    fn parse_conditional_expression_or_higher_from_lhs(
+        &mut self,
+        lhs: ParsedExpr,
+        start: TextSize,
+        context: ExpressionContext,
+    ) -> ParsedExpr {
+        let lhs = ParsedExpr {
+            expr: self.parse_postfix_expression(lhs.expr, start),
+            is_parenthesized: lhs.is_parenthesized,
+        };
+        let parsed_expr = self.parse_binary_expression_or_higher_recursive(
+            lhs,
+            OperatorPrecedence::None,
+            context,
+            start,
+        );
+
+        self.parse_conditional_expression_or_higher_from_simple_expression(parsed_expr, start)
     }
 
     fn parse_named_expression_or_higher_from_simple_lhs(
@@ -954,7 +1000,7 @@ impl<'src> Parser<'src> {
             func: outer_func,
             start: outer_start,
             arguments_start: outer_arguments_start,
-            argument_start: nested.argument_start,
+            argument: nested.argument,
             state: nested.state,
         }];
         let mut func = nested.func;
@@ -969,7 +1015,7 @@ impl<'src> Parser<'src> {
                     func,
                     start,
                     arguments_start,
-                    argument_start: nested.argument_start,
+                    argument: nested.argument,
                     state: nested.state,
                 });
                 func = nested.func;
@@ -987,17 +1033,40 @@ impl<'src> Parser<'src> {
         };
 
         while let Some(call) = calls.pop() {
-            let parsed_expr = self.parse_named_expression_or_higher_from_lhs(
-                expr.into(),
-                call.argument_start,
-                ExpressionContext::starred_conditional(),
-            );
-            let arguments = self.parse_arguments_after_positional(
-                call.arguments_start,
-                call.state,
-                call.argument_start,
-                parsed_expr,
-            );
+            let value_start = call.argument.value_start();
+            let arguments = match call.argument {
+                PendingCallArgument::Positional { argument_start } => {
+                    let parsed_expr = self.parse_named_expression_or_higher_from_lhs(
+                        expr.into(),
+                        value_start,
+                        ExpressionContext::starred_conditional(),
+                    );
+                    self.parse_arguments_after_positional(
+                        call.arguments_start,
+                        call.state,
+                        argument_start,
+                        parsed_expr,
+                    )
+                }
+                PendingCallArgument::Keyword {
+                    argument_start,
+                    arg,
+                    ..
+                } => {
+                    let parsed_expr = self.parse_conditional_expression_or_higher_from_lhs(
+                        expr.into(),
+                        value_start,
+                        ExpressionContext::default(),
+                    );
+                    self.parse_arguments_after_keyword_value(
+                        call.arguments_start,
+                        call.state,
+                        argument_start,
+                        arg,
+                        parsed_expr.expr,
+                    )
+                }
+            };
 
             expr = Expr::Call(ast::ExprCall {
                 func: Box::new(call.func),
@@ -1014,7 +1083,7 @@ impl<'src> Parser<'src> {
     }
 
     fn try_parse_nested_call_argument(&mut self) -> Option<NestedCallArgument> {
-        let checkpoint = self.checkpoint();
+        let arguments_checkpoint = self.checkpoint();
         let mut state = ArgumentParsingState::default();
 
         loop {
@@ -1024,15 +1093,42 @@ impl<'src> Parser<'src> {
                 return Some(NestedCallArgument {
                     func,
                     start: argument_start,
-                    argument_start,
+                    argument: PendingCallArgument::Positional { argument_start },
                     state,
                 });
             }
 
+            let argument_checkpoint = self.checkpoint();
+            let argument_start = self.node_start();
+            let start = self.node_start();
+            let parsed_expr = self.parse_named_expression_or_higher_unrolling_nested_trailers(
+                ExpressionContext::starred_conditional(),
+            );
+            let arg_range = self.node_range(start);
+            if self.eat(TokenKind::Equal)
+                && self.at(TokenKind::Name)
+                && self.peek() == TokenKind::Lpar
+            {
+                let arg = self.parse_keyword_argument_name(parsed_expr, arg_range);
+                let value_start = self.node_start();
+                let func = self.parse_atom().expr;
+                return Some(NestedCallArgument {
+                    func,
+                    start: value_start,
+                    argument: PendingCallArgument::Keyword {
+                        argument_start,
+                        arg,
+                        value_start,
+                    },
+                    state,
+                });
+            }
+            self.rewind(argument_checkpoint);
+
             self.parse_argument(&mut state);
 
             if !self.eat(TokenKind::Comma) || self.at(TokenKind::Rpar) {
-                self.rewind(checkpoint);
+                self.rewind(arguments_checkpoint);
                 return None;
             }
         }
@@ -1154,7 +1250,8 @@ impl<'src> Parser<'src> {
                             }
                         };
 
-                        let value = parser.parse_conditional_expression_or_higher();
+                        let value = parser
+                            .parse_conditional_expression_or_higher_unrolling_nested_trailers();
 
                         keywords.push(ast::Keyword {
                             arg: Some(arg),
@@ -1209,6 +1306,27 @@ impl<'src> Parser<'src> {
             parsed_expr,
         );
 
+        self.parse_arguments_after_state(start, state)
+    }
+
+    fn parse_arguments_after_keyword_value(
+        &mut self,
+        start: TextSize,
+        mut state: ArgumentParsingState,
+        argument_start: TextSize,
+        arg: ast::Identifier,
+        value: Expr,
+    ) -> ast::Arguments {
+        self.parse_keyword_argument_from_value(&mut state, argument_start, arg, value);
+
+        self.parse_arguments_after_state(start, state)
+    }
+
+    fn parse_arguments_after_state(
+        &mut self,
+        start: TextSize,
+        mut state: ArgumentParsingState,
+    ) -> ast::Arguments {
         let has_trailing_comma = if self.eat(TokenKind::Comma) {
             if self.at(TokenKind::Rpar) {
                 true
@@ -1232,7 +1350,7 @@ impl<'src> Parser<'src> {
     fn parse_argument(&mut self, state: &mut ArgumentParsingState) {
         let argument_start = self.node_start();
         if self.eat(TokenKind::DoubleStar) {
-            let value = self.parse_conditional_expression_or_higher();
+            let value = self.parse_conditional_expression_or_higher_unrolling_nested_trailers();
 
             state.keywords.push(ast::Keyword {
                 arg: None,
@@ -1286,47 +1404,10 @@ impl<'src> Parser<'src> {
 
         let arg_range = self.node_range(start);
         if self.eat(TokenKind::Equal) {
-            state.seen_keyword_argument = true;
-            let arg = if let ParsedExpr {
-                expr: Expr::Name(ident_expr),
-                is_parenthesized,
-            } = parsed_expr
-            {
-                if is_parenthesized {
-                    self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
-                        arg_range,
-                    );
-                }
+            let arg = self.parse_keyword_argument_name(parsed_expr, arg_range);
 
-                ast::Identifier {
-                    id: ident_expr.id,
-                    range: ident_expr.range,
-                    node_index: AtomicNodeIndex::NONE,
-                }
-            } else {
-                // TODO(dhruvmanila): Parser shouldn't drop the `parsed_expr` if it's
-                // not a name expression. We could add the expression into `args` but
-                // that means the error is a missing comma instead.
-                self.add_error(
-                    ParseErrorType::OtherError("Expected a parameter name".to_string()),
-                    &parsed_expr,
-                );
-                ast::Identifier {
-                    id: Name::empty(),
-                    range: parsed_expr.range(),
-                    node_index: AtomicNodeIndex::NONE,
-                }
-            };
-
-            let value = self.parse_conditional_expression_or_higher();
-
-            state.keywords.push(ast::Keyword {
-                arg: Some(arg),
-                value: value.expr,
-                range: self.node_range(argument_start),
-                node_index: AtomicNodeIndex::NONE,
-            });
+            let value = self.parse_conditional_expression_or_higher_unrolling_nested_trailers();
+            self.parse_keyword_argument_from_value(state, argument_start, arg, value.expr);
         } else {
             if !parsed_expr.is_unparenthesized_starred_expr() {
                 if state.seen_keyword_unpacking {
@@ -1340,6 +1421,60 @@ impl<'src> Parser<'src> {
             }
             state.args.push(parsed_expr.expr);
         }
+    }
+
+    fn parse_keyword_argument_name(
+        &mut self,
+        parsed_expr: ParsedExpr,
+        arg_range: TextRange,
+    ) -> ast::Identifier {
+        if let ParsedExpr {
+            expr: Expr::Name(ident_expr),
+            is_parenthesized,
+        } = parsed_expr
+        {
+            if is_parenthesized {
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
+                    arg_range,
+                );
+            }
+
+            ast::Identifier {
+                id: ident_expr.id,
+                range: ident_expr.range,
+                node_index: AtomicNodeIndex::NONE,
+            }
+        } else {
+            // TODO(dhruvmanila): Parser shouldn't drop the `parsed_expr` if it's
+            // not a name expression. We could add the expression into `args` but
+            // that means the error is a missing comma instead.
+            self.add_error(
+                ParseErrorType::OtherError("Expected a parameter name".to_string()),
+                &parsed_expr,
+            );
+            ast::Identifier {
+                id: Name::empty(),
+                range: parsed_expr.range(),
+                node_index: AtomicNodeIndex::NONE,
+            }
+        }
+    }
+
+    fn parse_keyword_argument_from_value(
+        &self,
+        state: &mut ArgumentParsingState,
+        argument_start: TextSize,
+        arg: ast::Identifier,
+        value: Expr,
+    ) {
+        state.seen_keyword_argument = true;
+        state.keywords.push(ast::Keyword {
+            arg: Some(arg),
+            value,
+            range: self.node_range(argument_start),
+            node_index: AtomicNodeIndex::NONE,
+        });
     }
 
     fn finish_arguments(
@@ -4226,15 +4361,35 @@ struct PendingCall {
     func: Expr,
     start: TextSize,
     arguments_start: TextSize,
-    argument_start: TextSize,
+    argument: PendingCallArgument,
     state: ArgumentParsingState,
 }
 
 struct NestedCallArgument {
     func: Expr,
     start: TextSize,
-    argument_start: TextSize,
+    argument: PendingCallArgument,
     state: ArgumentParsingState,
+}
+
+enum PendingCallArgument {
+    Positional {
+        argument_start: TextSize,
+    },
+    Keyword {
+        argument_start: TextSize,
+        arg: ast::Identifier,
+        value_start: TextSize,
+    },
+}
+
+impl PendingCallArgument {
+    const fn value_start(&self) -> TextSize {
+        match self {
+            PendingCallArgument::Positional { argument_start } => *argument_start,
+            PendingCallArgument::Keyword { value_start, .. } => *value_start,
+        }
+    }
 }
 
 struct PendingListLikeExpression {
