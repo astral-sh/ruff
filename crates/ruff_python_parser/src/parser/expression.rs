@@ -1723,8 +1723,32 @@ impl<'src> Parser<'src> {
                         nested_slice: PendingSubscriptSlice::Step {
                             value_start,
                             lower: None,
+                            upper: None,
                         },
                     });
+                }
+
+                if self.at_expr() {
+                    let upper =
+                        self.parse_conditional_expression_or_higher_unrolling_nested_trailers();
+
+                    if self.eat(TokenKind::Colon)
+                        && self.at(TokenKind::Name)
+                        && self.peek() == TokenKind::Lsqb
+                    {
+                        let value_start = self.node_start();
+                        let value = self.parse_atom().expr;
+                        return Some(NestedSubscriptSlice {
+                            value,
+                            start: value_start,
+                            slices,
+                            nested_slice: PendingSubscriptSlice::Step {
+                                value_start,
+                                lower: None,
+                                upper: Some(upper.expr),
+                            },
+                        });
+                    }
                 }
 
                 self.rewind(slice_checkpoint);
@@ -1797,8 +1821,32 @@ impl<'src> Parser<'src> {
                             nested_slice: PendingSubscriptSlice::Step {
                                 value_start,
                                 lower: Some(lower),
+                                upper: None,
                             },
                         });
+                    }
+
+                    if self.at_expr() {
+                        let upper =
+                            self.parse_conditional_expression_or_higher_unrolling_nested_trailers();
+
+                        if self.eat(TokenKind::Colon)
+                            && self.at(TokenKind::Name)
+                            && self.peek() == TokenKind::Lsqb
+                        {
+                            let value_start = self.node_start();
+                            let value = self.parse_atom().expr;
+                            return Some(NestedSubscriptSlice {
+                                value,
+                                start: value_start,
+                                slices,
+                                nested_slice: PendingSubscriptSlice::Step {
+                                    value_start,
+                                    lower: Some(lower),
+                                    upper: Some(upper.expr),
+                                },
+                            });
+                        }
                     }
                 }
             }
@@ -1882,17 +1930,22 @@ impl<'src> Parser<'src> {
                     let lower = lower.map(|lower| self.validated_slice_lower(lower));
                     self.finish_slice_after_upper(subscript.slice_start, lower, Some(upper.expr))
                 }
-                PendingSubscriptSlice::Step { value_start, lower } => {
+                PendingSubscriptSlice::Step {
+                    value_start,
+                    lower,
+                    upper,
+                } => {
                     let step = self.parse_conditional_expression_or_higher_from_lhs(
                         expr.into(),
                         value_start,
                         ExpressionContext::default(),
                     );
                     let lower = lower.map(|lower| Box::new(self.validated_slice_lower(lower)));
+                    let upper = upper.map(Box::new);
                     self.finish_slice_after_step(
                         subscript.slice_start,
                         lower,
-                        None,
+                        upper,
                         Some(step.expr),
                     )
                 }
@@ -5834,6 +5887,7 @@ enum PendingSubscriptSlice {
     Step {
         value_start: TextSize,
         lower: Option<ParsedExpr>,
+        upper: Option<Expr>,
     },
 }
 
