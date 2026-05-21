@@ -203,6 +203,7 @@ use crate::{
         infer_narrowing_constraint,
     },
 };
+use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -219,11 +220,11 @@ use ty_python_core::{
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
 };
 
-fn singleton_to_type(db: &dyn Db, singleton: ruff_python_ast::Singleton) -> Type<'_> {
+fn singleton_to_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
     let ty = match singleton {
-        ruff_python_ast::Singleton::None => Type::none(db),
-        ruff_python_ast::Singleton::True => Type::bool_literal(true),
-        ruff_python_ast::Singleton::False => Type::bool_literal(false),
+        ast::Singleton::None => Type::none(db),
+        ast::Singleton::True => Type::bool_literal(true),
+        ast::Singleton::False => Type::bool_literal(false),
     };
     debug_assert!(ty.is_singleton(db));
     ty
