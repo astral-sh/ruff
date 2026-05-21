@@ -847,13 +847,11 @@ Regression test for <https://github.com/astral-sh/ty/issues/2734>.
 
 ```py
 def f5(x: int | None = None, y: str = "") -> None: ...
-def f6(flag: bool) -> None:
-    args = () if flag else (1,)
+def f6(args: tuple[()] | tuple[int]) -> None:
     f5(*args)
 
 def f7(x: int | None = None, y: str = "") -> None: ...
-def f8(flag: bool) -> None:
-    args = () if flag else ("bad",)
+def f8(args: tuple[()] | tuple[str]) -> None:
     f7(*args)  # error: [invalid-argument-type]
 
 def f11(*args: int) -> None: ...

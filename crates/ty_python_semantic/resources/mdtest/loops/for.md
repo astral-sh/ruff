@@ -228,8 +228,8 @@ class Test2:
     def __iter__(self) -> TestIter:
         return TestIter()
 
-def _(flag: bool):
-    for x in Test() if flag else Test2():
+def _(iterable: Test | Test2):
+    for x in iterable:
         reveal_type(x)  # revealed: int
 ```
 
@@ -286,8 +286,8 @@ class Test2:
     def __iter__(self) -> TestIter3 | TestIter4:
         return TestIter3()
 
-def _(flag: bool):
-    for x in Test() if flag else Test2():
+def _(iterable: Test | Test2):
+    for x in iterable:
         reveal_type(x)  # revealed: Result1A | Result1B | Result2A | Result2B | Result3 | Result4
 ```
 
@@ -376,6 +376,8 @@ class C:
 ## Union type as iterable where one union element has no `__iter__` method
 
 ```py
+from typing import Literal
+
 class TestIter:
     def __next__(self) -> int:
         return 42
@@ -384,18 +386,18 @@ class Test:
     def __iter__(self) -> TestIter:
         return TestIter()
 
-def _(flag: bool):
+def _(iterable: Test | Literal[42]):
     # snapshot: not-iterable
-    for x in Test() if flag else 42:
+    for x in iterable:
         reveal_type(x)  # revealed: int
 ```
 
 ```snapshot
 error[not-iterable]: Object of type `Test | Literal[42]` may not be iterable
-  --> src/mdtest_snippet.py:11:14
+  --> src/mdtest_snippet.py:13:14
    |
-11 |     for x in Test() if flag else 42:
-   |              ^^^^^^^^^^^^^^^^^^^^^^
+13 |     for x in iterable:
+   |              ^^^^^^^^
    |
 info: It may not have an `__iter__` method and it doesn't have a `__getitem__` method
 info: `Literal[42]` does not implement `__iter__`
@@ -416,10 +418,10 @@ class Test2:
     def __iter__(self) -> int:
         return 42
 
-def _(flag: bool):
+def _(iterable: Test | Test2):
     # TODO: Improve error message to state which union variant isn't iterable (https://github.com/astral-sh/ruff/issues/13989)
     # snapshot: not-iterable
-    for x in Test() if flag else Test2():
+    for x in iterable:
         reveal_type(x)  # revealed: int
 ```
 
@@ -427,8 +429,8 @@ def _(flag: bool):
 error[not-iterable]: Object of type `Test | Test2` may not be iterable
   --> src/mdtest_snippet.py:16:14
    |
-16 |     for x in Test() if flag else Test2():
-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+16 |     for x in iterable:
+   |              ^^^^^^^^
    |
 info: Its `__iter__` method returns an object of type `TestIter | int`, which may not have a `__next__` method
 ```
@@ -452,8 +454,7 @@ class NotIter:
     # `__iter__` is present but not callable
     __iter__: int = 32
 
-def _(flag: bool):
-    iterable = Test() if flag else NotIter()
+def _(iterable: Test | NotIter):
     # snapshot: not-iterable
     for x in iterable:
         reveal_type(x)  # revealed: int | Unknown
@@ -461,9 +462,9 @@ def _(flag: bool):
 
 ```snapshot
 error[not-iterable]: Object of type `Test | NotIter` may not be iterable
-  --> src/mdtest_snippet.py:16:14
+  --> src/mdtest_snippet.py:15:14
    |
-16 |     for x in iterable:
+15 |     for x in iterable:
    |              ^^^^^^^^
    |
 info: Its `__iter__` attribute (with type `(bound method Test.__iter__() -> TestIter) | int`) may not be callable

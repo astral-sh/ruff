@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -29,16 +29,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 14 | 
 15 | class BadSub1(Bad1()): ...  # error: [invalid-base]
 16 | class BadSub2(Bad2()): ...  # error: [invalid-base]
-17 | def _(flag: bool):
-18 |     class HasMroEntries:
-19 |         def __mro_entries__(self, bases: tuple[type, ...]) -> tuple[type, ...]:
-20 |             return ()
-21 | 
-22 |     class NoMroEntries: ...
-23 | 
-24 |     base = HasMroEntries() if flag else NoMroEntries()
-25 | 
-26 |     class Foo(base): ...  # error: [invalid-base]
+17 | class HasMroEntries:
+18 |     def __mro_entries__(self, bases: tuple[type, ...]) -> tuple[type, ...]:
+19 |         return ()
+20 | 
+21 | class NoMroEntries: ...
+22 | 
+23 | def _(base: HasMroEntries | NoMroEntries):
+24 |     class Foo(base): ...  # error: [invalid-base]
 ```
 
 # Diagnostics
@@ -95,9 +93,9 @@ info: Type `Bad2` has an `__mro_entries__` method, but it does not return a tupl
 
 ```
 error[invalid-base]: Invalid class base with type `HasMroEntries | NoMroEntries`
-  --> src/mdtest_snippet.py:26:15
+  --> src/mdtest_snippet.py:24:15
    |
-26 |     class Foo(base): ...  # error: [invalid-base]
+24 |     class Foo(base): ...  # error: [invalid-base]
    |               ^^^^
    |
 info: Definition of class `Foo` will raise `TypeError` at runtime
