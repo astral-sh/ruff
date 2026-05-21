@@ -3036,6 +3036,16 @@ impl<'src> Parser<'src> {
         let after_brace = self.node_start();
 
         if self.at(TokenKind::DoubleStar) {
+            if self.peek() == TokenKind::Lbrace {
+                self.bump(TokenKind::DoubleStar);
+                return self.parse_nested_set_or_dict_like_expression(
+                    PendingSetOrDictLikeExpression::DictUnpackingValue {
+                        start,
+                        items: vec![],
+                    },
+                );
+            }
+
             return self.parse_dict_unpacking_after_lbrace(start, after_brace);
         }
 
@@ -3072,6 +3082,13 @@ impl<'src> Parser<'src> {
                 if !elts.is_empty() {
                     self.rewind(checkpoint);
                     return None;
+                }
+
+                if self.at(TokenKind::Lbrace) {
+                    return Some(PendingSetOrDictLikeExpression::DictUnpackingValue {
+                        start,
+                        items: items.unwrap_or_default(),
+                    });
                 }
 
                 items.get_or_insert_default().push(ast::DictItem {
@@ -3145,6 +3162,15 @@ impl<'src> Parser<'src> {
             }
 
             if self.at(TokenKind::DoubleStar) {
+                if self.peek() == TokenKind::Lbrace {
+                    self.bump(TokenKind::DoubleStar);
+                    pending.push(PendingSetOrDictLikeExpression::DictUnpackingValue {
+                        start,
+                        items: vec![],
+                    });
+                    continue;
+                }
+
                 let dict = self.parse_dict_unpacking_after_lbrace(start, self.node_start());
                 break self.parse_named_expression_or_higher_from_lhs(
                     dict.into(),
@@ -3179,6 +3205,15 @@ impl<'src> Parser<'src> {
                     Expr::Dict(self.parse_dictionary_expression_after_item(
                         items,
                         Some(key),
+                        key_or_element.expr,
+                        start,
+                    )),
+                    start,
+                ),
+                PendingSetOrDictLikeExpression::DictUnpackingValue { start, items } => (
+                    Expr::Dict(self.parse_dictionary_expression_after_item(
+                        items,
+                        None,
                         key_or_element.expr,
                         start,
                     )),
@@ -4634,6 +4669,10 @@ enum PendingSetOrDictLikeExpression {
         start: TextSize,
         items: Vec<ast::DictItem>,
         key: Expr,
+    },
+    DictUnpackingValue {
+        start: TextSize,
+        items: Vec<ast::DictItem>,
     },
     DictKey {
         start: TextSize,
