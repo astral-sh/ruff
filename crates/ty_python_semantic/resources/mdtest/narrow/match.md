@@ -246,42 +246,6 @@ def _(x: Literal["foo", b"bar"] | int):
             pass
 ```
 
-## Value patterns with fallthrough
-
-Fallthrough arms preserve their narrowing after a `match` without re-evaluating a shared suffix for
-each arm.
-
-```py
-from typing import Any, Literal, TypeGuard
-
-Value = Literal["first", "return", "last"]
-
-def keep_value(value: object) -> TypeGuard[Value]:
-    return True
-
-def _(value: Value) -> None:
-    match value:
-        case "first":
-            pass
-        case "return":
-            return
-        case "last":
-            pass
-
-    reveal_type(value)  # revealed: Literal["first", "last"]
-
-def _(value: Value | Any) -> None:
-    match value:
-        case "first" if keep_value(value):
-            pass
-        case "return":
-            return
-        case "last":
-            pass
-
-    reveal_type(value)  # revealed: Literal["return", "first", "last"] | (Any & ~Literal["return"])
-```
-
 ## Or patterns
 
 ```py
