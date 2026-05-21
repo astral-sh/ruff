@@ -63,36 +63,19 @@ use crate::rules::ruff::typing::type_hint_explicitly_allows_none;
 ///
 /// ## Limitations
 ///
-/// Type aliases are not supported and could result in false negatives.
-/// For example, the following code will not be flagged:
+/// Type aliases and other user-defined types are not supported and could
+/// result in false negatives. For example, the following code will not be
+/// flagged:
+///
 /// ```python
 /// Text = str | bytes
-///
-///
-/// def foo(arg: Text = None):
-///     pass
-/// ```
-///
-/// User-defined types, including subclasses and `Enum` types, are
-/// likewise not flagged. Ruff treats names that it cannot resolve to a
-/// known type as compatible with `None` (since, for example, `Letter`
-/// could be defined as `type Letter = str | None` in scope):
-///
-/// ```python
-/// from enum import Enum
-///
-///
-/// class Letter(Enum):
-///     A = "A"
 ///
 ///
 /// class Custom: ...
 ///
 ///
-/// def f(
-///     letter: Letter = None,  # not flagged
-///     value: Custom = None,  # not flagged
-/// ) -> None: ...
+/// def foo(text_arg: Text = None, custom_arg: Custom = None):
+///     pass
 /// ```
 ///
 /// ## Options
