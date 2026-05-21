@@ -975,6 +975,31 @@ impl Parser<'_> {
     fn try_parse_nested_match_pattern_class_argument(
         &mut self,
     ) -> Option<NestedMatchPatternClassArgument> {
+        let checkpoint = self.checkpoint();
+        let mut state = MatchPatternClassArgumentParsingState::default();
+
+        loop {
+            if !self.at_pattern_start() {
+                self.rewind(checkpoint);
+                return None;
+            }
+
+            if let Some(nested) = self.try_parse_nested_match_pattern_class_argument_head() {
+                return Some(NestedMatchPatternClassArgument { state, ..nested });
+            }
+
+            self.parse_match_pattern_class_argument(&mut state);
+
+            if !self.eat(TokenKind::Comma) || self.at(TokenKind::Rpar) {
+                self.rewind(checkpoint);
+                return None;
+            }
+        }
+    }
+
+    fn try_parse_nested_match_pattern_class_argument_head(
+        &mut self,
+    ) -> Option<NestedMatchPatternClassArgument> {
         if !self.at_name_or_keyword() {
             return None;
         }
@@ -987,6 +1012,7 @@ impl Parser<'_> {
             return Some(NestedMatchPatternClassArgument {
                 cls: pattern,
                 cls_start: pattern_start,
+                state: MatchPatternClassArgumentParsingState::default(),
                 pending_argument: PendingMatchPatternClassArgument::Positional { pattern_start },
             });
         }
@@ -998,6 +1024,7 @@ impl Parser<'_> {
             return Some(NestedMatchPatternClassArgument {
                 cls,
                 cls_start,
+                state: MatchPatternClassArgumentParsingState::default(),
                 pending_argument: PendingMatchPatternClassArgument::Keyword {
                     pattern_start,
                     attr,
@@ -1021,7 +1048,8 @@ impl Parser<'_> {
             cls: outer_cls,
             start: outer_start,
             arguments_start: outer_arguments_start,
-            first_argument: nested.pending_argument,
+            state: nested.state,
+            argument: nested.pending_argument,
         }];
         let mut cls = nested.cls;
         let mut start = nested.cls_start;
@@ -1037,7 +1065,8 @@ impl Parser<'_> {
                     cls: parsed_cls,
                     start,
                     arguments_start,
-                    first_argument: nested.pending_argument,
+                    state: nested.state,
+                    argument: nested.pending_argument,
                 });
                 cls = nested.cls;
                 start = nested.cls_start;
@@ -1055,27 +1084,15 @@ impl Parser<'_> {
         };
 
         while let Some(pending) = pending.pop() {
-            let value_start = pending.first_argument.value_start();
+            let value_start = pending.argument.value_start();
             let lhs = self.finish_match_pattern_lhs(Pattern::MatchClass(class), value_start);
             let pattern = self.parse_match_pattern_from_lhs(lhs, value_start);
-            let arguments = match pending.first_argument {
-                PendingMatchPatternClassArgument::Positional { pattern_start } => self
-                    .parse_match_pattern_class_arguments_after_first(
-                        pending.arguments_start,
-                        pattern_start,
-                        pattern,
-                    ),
-                PendingMatchPatternClassArgument::Keyword {
-                    pattern_start,
-                    attr,
-                    ..
-                } => self.parse_match_pattern_class_arguments_after_first_keyword(
-                    pending.arguments_start,
-                    pattern_start,
-                    attr,
-                    pattern,
-                ),
-            };
+            let arguments = self.parse_match_pattern_class_arguments_after_argument(
+                pending.arguments_start,
+                pending.state,
+                pending.argument,
+                pattern,
+            );
 
             class = ast::PatternMatchClass {
                 cls: pending.cls,
@@ -1104,41 +1121,36 @@ impl Parser<'_> {
         self.finish_match_pattern_class_arguments(arguments_start, state)
     }
 
-    fn parse_match_pattern_class_arguments_after_first(
+    fn parse_match_pattern_class_arguments_after_argument(
         &mut self,
         arguments_start: TextSize,
-        first_pattern_start: TextSize,
-        first_pattern: Pattern,
-    ) -> ast::PatternArguments {
-        let mut state = MatchPatternClassArgumentParsingState::default();
-        self.parse_match_pattern_class_argument_from_pattern(
-            &mut state,
-            first_pattern_start,
-            first_pattern,
-        );
-
-        self.parse_match_pattern_class_arguments_after_first_state(arguments_start, state)
-    }
-
-    fn parse_match_pattern_class_arguments_after_first_keyword(
-        &mut self,
-        arguments_start: TextSize,
-        pattern_start: TextSize,
-        attr: ast::Identifier,
+        mut state: MatchPatternClassArgumentParsingState,
+        argument: PendingMatchPatternClassArgument,
         pattern: Pattern,
     ) -> ast::PatternArguments {
-        let mut state = MatchPatternClassArgumentParsingState::default();
-        self.parse_match_pattern_class_keyword_argument_from_value(
-            &mut state,
-            pattern_start,
-            attr,
-            pattern,
-        );
+        match argument {
+            PendingMatchPatternClassArgument::Positional { pattern_start } => self
+                .parse_match_pattern_class_argument_from_pattern(
+                    &mut state,
+                    pattern_start,
+                    pattern,
+                ),
+            PendingMatchPatternClassArgument::Keyword {
+                pattern_start,
+                attr,
+                ..
+            } => self.parse_match_pattern_class_keyword_argument_from_value(
+                &mut state,
+                pattern_start,
+                attr,
+                pattern,
+            ),
+        }
 
-        self.parse_match_pattern_class_arguments_after_first_state(arguments_start, state)
+        self.parse_match_pattern_class_arguments_after_state(arguments_start, state)
     }
 
-    fn parse_match_pattern_class_arguments_after_first_state(
+    fn parse_match_pattern_class_arguments_after_state(
         &mut self,
         arguments_start: TextSize,
         mut state: MatchPatternClassArgumentParsingState,
@@ -1276,12 +1288,14 @@ struct PendingMatchPatternClass {
     cls: Box<Expr>,
     start: TextSize,
     arguments_start: TextSize,
-    first_argument: PendingMatchPatternClassArgument,
+    state: MatchPatternClassArgumentParsingState,
+    argument: PendingMatchPatternClassArgument,
 }
 
 struct NestedMatchPatternClassArgument {
     cls: Pattern,
     cls_start: TextSize,
+    state: MatchPatternClassArgumentParsingState,
     pending_argument: PendingMatchPatternClassArgument,
 }
 
