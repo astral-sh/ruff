@@ -1707,6 +1707,20 @@ impl<'src> Parser<'src> {
                     });
                 }
 
+                if self.eat(TokenKind::Colon)
+                    && self.at(TokenKind::Name)
+                    && self.peek() == TokenKind::Lsqb
+                {
+                    let value_start = self.node_start();
+                    let value = self.parse_atom().expr;
+                    return Some(NestedSubscriptSlice {
+                        value,
+                        start: value_start,
+                        slices,
+                        nested_slice: PendingSubscriptSlice::Step { value_start },
+                    });
+                }
+
                 self.rewind(slice_checkpoint);
             }
 
@@ -1819,6 +1833,14 @@ impl<'src> Parser<'src> {
                         ExpressionContext::default(),
                     );
                     self.finish_slice_after_upper(subscript.slice_start, None, Some(upper.expr))
+                }
+                PendingSubscriptSlice::Step { value_start } => {
+                    let step = self.parse_conditional_expression_or_higher_from_lhs(
+                        expr.into(),
+                        value_start,
+                        ExpressionContext::default(),
+                    );
+                    self.finish_slice_after_step(subscript.slice_start, None, None, Some(step.expr))
                 }
             };
             expr = Expr::Subscript(if subscript.slices.is_empty() {
@@ -2108,18 +2130,31 @@ impl<'src> Parser<'src> {
             if self.at_ts(STEP_END_SET) {
                 None
             } else {
-                Some(Box::new(self.parse_conditional_expression_or_higher().expr))
+                Some(
+                    self.parse_conditional_expression_or_higher_unrolling_nested_trailers()
+                        .expr,
+                )
             }
         } else {
             None
         };
 
+        self.finish_slice_after_step(start, lower, upper, step)
+    }
+
+    fn finish_slice_after_step(
+        &self,
+        start: TextSize,
+        lower: Option<Box<Expr>>,
+        upper: Option<Box<Expr>>,
+        step: Option<Expr>,
+    ) -> Expr {
         Expr::Slice(ast::ExprSlice {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
             lower,
             upper,
-            step,
+            step: step.map(Box::new),
         })
     }
 
@@ -5734,6 +5769,9 @@ enum PendingSubscriptSlice {
         value_start: TextSize,
     },
     Upper {
+        value_start: TextSize,
+    },
+    Step {
         value_start: TextSize,
     },
 }
