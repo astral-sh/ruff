@@ -144,6 +144,8 @@ pub enum KnownClass {
     ConstraintSet,
     GenericContext,
     Specialization,
+    TyExtensionsAsyncIterable,
+    TyExtensionsAsyncIterator,
     TyExtensionsIterable,
     TyExtensionsIterator,
 }
@@ -239,6 +241,8 @@ impl KnownClass {
             | Self::IntFlag
             | Self::ABCMeta
             | Self::Iterable
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
             | Self::TyExtensionsIterable
             | Self::Iterator
             | Self::TyExtensionsIterator
@@ -339,6 +343,8 @@ impl KnownClass {
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
             | KnownClass::TyExtensionsIterable
             | KnownClass::Iterator
             | KnownClass::TyExtensionsIterator
@@ -437,6 +443,8 @@ impl KnownClass {
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
             | KnownClass::TyExtensionsIterable
             | KnownClass::Iterator
             | KnownClass::TyExtensionsIterator
@@ -535,6 +543,8 @@ impl KnownClass {
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
             | KnownClass::TyExtensionsIterable
             | KnownClass::Iterator
             | KnownClass::TyExtensionsIterator
@@ -581,6 +591,8 @@ impl KnownClass {
         match self {
             Self::SupportsIndex
             | Self::Iterable
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
             | Self::TyExtensionsIterable
             | Self::Iterator
             | Self::TyExtensionsIterator
@@ -750,6 +762,8 @@ impl KnownClass {
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
             | KnownClass::TyExtensionsIterable
             | KnownClass::Iterator
             | KnownClass::TyExtensionsIterator
@@ -853,6 +867,8 @@ impl KnownClass {
             Self::ABCMeta => "ABCMeta",
             Self::Super => "super",
             Self::Iterable => "Iterable",
+            Self::TyExtensionsAsyncIterable => "AsyncIterable",
+            Self::TyExtensionsAsyncIterator => "AsyncIterator",
             Self::TyExtensionsIterable => "Iterable",
             Self::Iterator => "Iterator",
             Self::TyExtensionsIterator => "Iterator",
@@ -1234,6 +1250,8 @@ impl KnownClass {
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
             | Self::TyExtensionsIterable
             | Self::TyExtensionsIterator => KnownModule::TyExtensions,
             Self::Template => KnownModule::Templatelib,
@@ -1320,6 +1338,8 @@ impl KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::Iterable
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
             | Self::TyExtensionsIterable
             | Self::Iterator
             | Self::TyExtensionsIterator
@@ -1424,6 +1444,8 @@ impl KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::Iterable
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
             | Self::TyExtensionsIterable
             | Self::Iterator
             | Self::TyExtensionsIterator
@@ -1497,7 +1519,8 @@ impl KnownClass {
             "TypeVar" => &[Self::TypeVar, Self::ExtensionsTypeVar],
             "Iterable" => &[Self::Iterable, Self::TyExtensionsIterable],
             "Iterator" => &[Self::Iterator, Self::TyExtensionsIterator],
-            "AsyncIterator" => &[Self::AsyncIterator],
+            "AsyncIterable" => &[Self::TyExtensionsAsyncIterable],
+            "AsyncIterator" => &[Self::AsyncIterator, Self::TyExtensionsAsyncIterator],
             "Sequence" => &[Self::Sequence],
             "Mapping" => &[Self::Mapping],
             "ParamSpec" => &[Self::ParamSpec, Self::ExtensionsParamSpec],
@@ -1628,6 +1651,8 @@ impl KnownClass {
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
             | Self::TyExtensionsIterable
             | Self::TyExtensionsIterator
             | Self::Awaitable
