@@ -884,6 +884,22 @@ fn deeply_nested_lambda_defaults() {
 }
 
 #[test]
+fn deeply_nested_later_lambda_defaults() {
+    let depth = 5_000;
+    let mut src = String::from("x = ");
+    for _ in 0..depth {
+        src.push_str("lambda x, y=");
+    }
+    src.push('1');
+    for _ in 0..depth {
+        src.push_str(": y");
+    }
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
+}
+
+#[test]
 fn deeply_nested_fstrings() {
     let depth = 5_000;
     let mut src = String::from("x = ");

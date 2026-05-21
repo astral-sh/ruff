@@ -5759,59 +5759,30 @@ impl<'src> Parser<'src> {
     }
 
     fn try_parse_nested_lambda_default_expr(&mut self) -> Option<ast::ExprLambda> {
-        if !self.at_nested_lambda_default_head() {
-            return None;
-        }
+        let mut pending = vec![self.try_parse_nested_lambda_default_head()?];
 
-        let mut pending = Vec::new();
-
-        loop {
-            let start = self.node_start();
-            self.bump(TokenKind::Lambda);
-
-            let parameters_start = self.node_start();
-            let name = self.parse_identifier();
-            let parameter = ast::Parameter {
-                range: self.node_range(parameters_start),
-                node_index: AtomicNodeIndex::NONE,
-                name,
-                annotation: None,
-            };
-
-            self.bump(TokenKind::Equal);
-
-            pending.push(PendingNestedLambdaDefault {
-                start,
-                parameters_start,
-                parameter,
-            });
-
-            if !self.at_nested_lambda_default_head() {
-                break;
-            }
+        while let Some(default) = self.try_parse_nested_lambda_default_head() {
+            pending.push(default);
         }
 
         let mut lambda = self.parse_lambda_expr();
 
-        while let Some(default) = pending.pop() {
-            let parameter_range = self.node_range(default.parameters_start);
-            let mut parameters = ast::Parameters {
-                range: parameter_range,
-                ..ast::Parameters::default()
-            };
-            parameters.args.push(ast::ParameterWithDefault {
+        while let Some(mut default) = pending.pop() {
+            let parameter_range = self.node_range(default.parameter_start);
+            default.parameters.args.push(ast::ParameterWithDefault {
                 range: parameter_range,
                 node_index: AtomicNodeIndex::NONE,
                 parameter: default.parameter,
                 default: Some(Box::new(Expr::Lambda(lambda))),
             });
+            default.parameters.range = self.node_range(default.parameters_start);
 
             self.expect(TokenKind::Colon);
             let body = self.parse_conditional_expression_or_higher();
             lambda = self.lambda_expression(
                 PendingLambdaExpression {
                     start: default.start,
-                    parameters: Some(Box::new(parameters)),
+                    parameters: Some(Box::new(default.parameters)),
                 },
                 body.expr,
             );
@@ -5820,17 +5791,60 @@ impl<'src> Parser<'src> {
         Some(lambda)
     }
 
-    fn at_nested_lambda_default_head(&mut self) -> bool {
+    fn try_parse_nested_lambda_default_head(&mut self) -> Option<PendingNestedLambdaDefault> {
         if !self.at(TokenKind::Lambda) {
-            return false;
+            return None;
         }
 
         let checkpoint = self.checkpoint();
+        let start = self.node_start();
         self.bump(TokenKind::Lambda);
-        let is_head =
-            self.at_name_or_soft_keyword() && self.peek2() == (TokenKind::Equal, TokenKind::Lambda);
-        self.rewind(checkpoint);
-        is_head
+
+        let parameters_start = self.node_start();
+        let mut parameters = ast::Parameters::default();
+
+        loop {
+            if !self.at_name_or_soft_keyword() {
+                self.rewind(checkpoint);
+                return None;
+            }
+
+            let parameter_start = self.node_start();
+            let name = self.parse_identifier();
+            let parameter = ast::Parameter {
+                range: self.node_range(parameter_start),
+                node_index: AtomicNodeIndex::NONE,
+                name,
+                annotation: None,
+            };
+
+            if self.eat(TokenKind::Equal) {
+                if self.at(TokenKind::Lambda) {
+                    return Some(PendingNestedLambdaDefault {
+                        start,
+                        parameters_start,
+                        parameters,
+                        parameter_start,
+                        parameter,
+                    });
+                }
+
+                self.rewind(checkpoint);
+                return None;
+            }
+
+            parameters.args.push(ast::ParameterWithDefault {
+                range: self.node_range(parameter_start),
+                node_index: AtomicNodeIndex::NONE,
+                parameter,
+                default: None,
+            });
+
+            if !self.eat(TokenKind::Comma) {
+                self.rewind(checkpoint);
+                return None;
+            }
+        }
     }
 
     fn parse_lambda_header(&mut self) -> PendingLambdaExpression {
@@ -6286,6 +6300,8 @@ struct PendingLambdaExpression {
 struct PendingNestedLambdaDefault {
     start: TextSize,
     parameters_start: TextSize,
+    parameters: ast::Parameters,
+    parameter_start: TextSize,
     parameter: ast::Parameter,
 }
 
