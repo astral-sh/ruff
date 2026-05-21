@@ -1692,6 +1692,24 @@ impl<'src> Parser<'src> {
         let mut slices = vec![];
 
         loop {
+            if self.at(TokenKind::Colon) {
+                let slice_checkpoint = self.checkpoint();
+                self.bump(TokenKind::Colon);
+
+                if self.at(TokenKind::Name) && self.peek() == TokenKind::Lsqb {
+                    let value_start = self.node_start();
+                    let value = self.parse_atom().expr;
+                    return Some(NestedSubscriptSlice {
+                        value,
+                        start: value_start,
+                        slices,
+                        nested_slice: PendingSubscriptSlice::Upper { value_start },
+                    });
+                }
+
+                self.rewind(slice_checkpoint);
+            }
+
             if self.at(TokenKind::Star) && self.peek() == TokenKind::Name {
                 let slice_checkpoint = self.checkpoint();
                 let starred_start = self.node_start();
@@ -1767,12 +1785,15 @@ impl<'src> Parser<'src> {
         };
 
         while let Some(subscript) = subscripts.pop() {
-            let lower = match subscript.nested_slice {
-                PendingSubscriptSlice::Direct => self.parse_named_expression_or_higher_from_lhs(
-                    expr.into(),
-                    subscript.slice_start,
-                    ExpressionContext::starred_conditional(),
-                ),
+            let slice = match subscript.nested_slice {
+                PendingSubscriptSlice::Direct => {
+                    let lower = self.parse_named_expression_or_higher_from_lhs(
+                        expr.into(),
+                        subscript.slice_start,
+                        ExpressionContext::starred_conditional(),
+                    );
+                    self.parse_slice_from_lower(subscript.slice_start, lower)
+                }
                 PendingSubscriptSlice::Starred {
                     starred_start,
                     value_start,
@@ -1782,16 +1803,24 @@ impl<'src> Parser<'src> {
                         value_start,
                         ExpressionContext::starred_conditional().disallow_starred_expressions(),
                     );
-                    Expr::Starred(ast::ExprStarred {
+                    let lower = Expr::Starred(ast::ExprStarred {
                         value: Box::new(value.expr),
                         ctx: ExprContext::Load,
                         range: self.node_range(starred_start),
                         node_index: AtomicNodeIndex::NONE,
                     })
-                    .into()
+                    .into();
+                    self.parse_slice_from_lower(subscript.slice_start, lower)
+                }
+                PendingSubscriptSlice::Upper { value_start } => {
+                    let upper = self.parse_conditional_expression_or_higher_from_lhs(
+                        expr.into(),
+                        value_start,
+                        ExpressionContext::default(),
+                    );
+                    self.finish_slice_after_upper(subscript.slice_start, None, Some(upper.expr))
                 }
             };
-            let slice = self.parse_slice_from_lower(subscript.slice_start, lower);
             expr = Expr::Subscript(if subscript.slices.is_empty() {
                 self.finish_subscript_expression(
                     subscript.value,
@@ -2049,18 +2078,32 @@ impl<'src> Parser<'src> {
         const UPPER_END_SET: TokenSet =
             TokenSet::new([TokenKind::Comma, TokenKind::Colon, TokenKind::Rsqb])
                 .union(NEWLINE_EOF_SET);
-        const STEP_END_SET: TokenSet =
-            TokenSet::new([TokenKind::Comma, TokenKind::Rsqb]).union(NEWLINE_EOF_SET);
 
         self.expect(TokenKind::Colon);
 
-        let lower = lower.map(Box::new);
         let upper = if self.at_ts(UPPER_END_SET) {
             None
         } else {
-            Some(Box::new(self.parse_conditional_expression_or_higher().expr))
+            Some(
+                self.parse_conditional_expression_or_higher_unrolling_nested_trailers()
+                    .expr,
+            )
         };
 
+        self.finish_slice_after_upper(start, lower, upper)
+    }
+
+    fn finish_slice_after_upper(
+        &mut self,
+        start: TextSize,
+        lower: Option<Expr>,
+        upper: Option<Expr>,
+    ) -> Expr {
+        const STEP_END_SET: TokenSet =
+            TokenSet::new([TokenKind::Comma, TokenKind::Rsqb]).union(NEWLINE_EOF_SET);
+
+        let lower = lower.map(Box::new);
+        let upper = upper.map(Box::new);
         let step = if self.eat(TokenKind::Colon) {
             if self.at_ts(STEP_END_SET) {
                 None
@@ -5688,6 +5731,9 @@ enum PendingSubscriptSlice {
     Direct,
     Starred {
         starred_start: TextSize,
+        value_start: TextSize,
+    },
+    Upper {
         value_start: TextSize,
     },
 }
