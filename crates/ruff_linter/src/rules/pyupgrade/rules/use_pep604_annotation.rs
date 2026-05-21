@@ -43,20 +43,12 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// while `UP045` checks for `typing.Optional`.
 ///
 /// ## Fix safety
-/// The fix is safe when [`target-version`] is Python 3.10 or later (where
-/// `X | Y` is native syntax) **and** the original annotation contains no
-/// comments. Otherwise it is marked unsafe, for one of these reasons:
-///
-/// - On Python versions earlier than 3.10, the `X | Y` form is not
-///   evaluable at runtime, so libraries that introspect annotations at
-///   runtime (such as Pydantic) may raise `TypeError` once the rewrite is
-///   applied.
-/// - Comments inside the original `Union[...]` would be dropped by the
-///   rewrite.
-///
-/// The fix may also produce a runtime error in unusual and likely
-/// incorrect type annotations whose inner expression does not support the
-/// `|` operator.
+/// This rule's fix is marked as unsafe on Python versions prior to 3.10 because
+/// using the PEP-604 syntax may lead to runtime errors in libraries that rely
+/// on runtime type annotations, like Pydantic, or in unusual and likely
+/// incorrect type annotations where the type does not support the `|`
+/// operator. The fix is also marked as unsafe when it would remove comments
+/// present within the type annotation being rewritten.
 ///
 /// ## Options
 /// - `target-version`
@@ -109,20 +101,12 @@ impl Violation for NonPEP604AnnotationUnion {
 /// ```
 ///
 /// ## Fix safety
-/// The fix is safe when [`target-version`] is Python 3.10 or later (where
-/// `X | None` is native syntax) **and** the original annotation contains
-/// no comments. Otherwise it is marked unsafe, for one of these reasons:
-///
-/// - On Python versions earlier than 3.10, the `X | None` form is not
-///   evaluable at runtime, so libraries that introspect annotations at
-///   runtime (such as Pydantic) may raise `TypeError` once the rewrite is
-///   applied.
-/// - Comments inside the original `Optional[...]` would be dropped by the
-///   rewrite.
-///
-/// The fix may also produce a runtime error in unusual and likely
-/// incorrect type annotations whose inner expression does not support the
-/// `|` operator.
+/// This rule's fix is marked as unsafe on Python versions prior to 3.10 because
+/// using the PEP-604 syntax may lead to runtime errors in libraries that rely
+/// on runtime type annotations, like Pydantic, or in unusual and likely
+/// incorrect type annotations where the type does not support the `|`
+/// operator. The fix is also marked as unsafe when it would remove comments
+/// present within the type annotation being rewritten.
 ///
 /// ## Options
 /// - `target-version`
