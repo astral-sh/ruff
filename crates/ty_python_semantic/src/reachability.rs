@@ -618,6 +618,10 @@ impl ProjectedNarrowingNodeId {
     const ALWAYS_TRUE: Self = Self(usize::MAX);
     /// Terminal node for paths that are statically unreachable.
     const ALWAYS_FALSE: Self = Self(usize::MAX - 1);
+
+    fn is_terminal(self) -> bool {
+        self == Self::ALWAYS_TRUE || self == Self::ALWAYS_FALSE
+    }
 }
 
 /// Interior node in a projected narrowing graph.
@@ -668,18 +672,8 @@ impl ProjectedNarrowingGraph<'_> {
 
     /// Returns the projected nodes that join multiple incoming paths.
     ///
-    /// Projection interns equivalent subgraphs, so the projected graph is a DAG rather than a
-    /// tree. For example, two alternatives can share the same projected suffix:
-    ///
-    /// ```text
-    /// root --if_true--> left  --...--> suffix
-    ///      --if_false-> right --...--^
-    /// ```
-    ///
-    /// Evaluating both paths independently would re-evaluate `suffix`. A node is therefore a join
-    /// when it is reached from more than one parent while walking the nodes reachable from `root`.
-    /// The returned flags let the narrowing evaluator cache that shared suffix at its boundary and
-    /// apply each incoming prefix constraint afterward.
+    /// Projection interns equivalent subgraphs into a DAG. Caching each join lets narrowing
+    /// evaluate a shared suffix once and apply each incoming prefix constraint afterward.
     fn joins(&self, root: ProjectedNarrowingNodeId) -> Vec<bool> {
         let mut referenced = vec![false; self.nodes.len()];
         let mut joins = vec![false; self.nodes.len()];
@@ -687,18 +681,13 @@ impl ProjectedNarrowingGraph<'_> {
         let mut pending = vec![root];
 
         while let Some(id) = pending.pop() {
-            if id == ProjectedNarrowingNodeId::ALWAYS_FALSE
-                || id == ProjectedNarrowingNodeId::ALWAYS_TRUE
-                || std::mem::replace(&mut visited[id.0], true)
-            {
+            if id.is_terminal() || std::mem::replace(&mut visited[id.0], true) {
                 continue;
             }
 
             let node = self.node(id);
             for next in [node.if_true, node.if_false] {
-                if next != ProjectedNarrowingNodeId::ALWAYS_FALSE
-                    && next != ProjectedNarrowingNodeId::ALWAYS_TRUE
-                {
+                if !next.is_terminal() {
                     if std::mem::replace(&mut referenced[next.0], true) {
                         joins[next.0] = true;
                     }
@@ -880,12 +869,9 @@ struct ProjectedNarrowingContext<'a, 'db> {
     db: &'db dyn Db,
     base_ty: Type<'db>,
     graph: &'a ProjectedNarrowingGraph<'db>,
-    /// Marks projected nodes that are reached from multiple parents.
-    ///
-    /// These nodes are join boundaries: their suffix can be narrowed once and reused for each
-    /// incoming projected path.
+    /// Marks join boundaries in the projected DAG.
     joins: Vec<bool>,
-    /// Caches the narrowed type of each fully static join from its boundary.
+    /// Caches each join's narrowed suffix type from its boundary.
     join_type_cache: FxHashMap<ProjectedNarrowingNodeId, Type<'db>>,
     /// Caches the narrowed suffix constraints of each gradual join from its boundary.
     ///
@@ -895,7 +881,11 @@ struct ProjectedNarrowingContext<'a, 'db> {
 }
 
 impl<'db> ProjectedNarrowingContext<'_, 'db> {
-    /// Evaluates one fully static projected join from its boundary and caches its narrowed type.
+    fn is_join(&self, id: ProjectedNarrowingNodeId) -> bool {
+        !id.is_terminal() && self.joins[id.0]
+    }
+
+    /// Evaluates one projected join from its boundary and caches its narrowed suffix type.
     fn narrow_join_type(&mut self, id: ProjectedNarrowingNodeId) -> Type<'db> {
         if let Some(cached) = self.join_type_cache.get(&id) {
             return *cached;
@@ -926,10 +916,7 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
         id: ProjectedNarrowingNodeId,
         accumulated: Option<NarrowingConstraint<'db>>,
     ) -> Type<'db> {
-        if id != ProjectedNarrowingNodeId::ALWAYS_FALSE
-            && id != ProjectedNarrowingNodeId::ALWAYS_TRUE
-            && self.joins[id.0]
-        {
+        if self.is_join(id) {
             let suffix_ty = self.narrow_join_type(id);
             if !suffix_ty.has_dynamic(self.db) {
                 return apply_accumulated_narrowing(self.db, suffix_ty, accumulated);
@@ -951,10 +938,7 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
 
     /// Recursively evaluates a projected suffix into a constraint independent of its prefix.
     fn narrow_suffix(&mut self, id: ProjectedNarrowingNodeId) -> Option<NarrowingConstraint<'db>> {
-        if id != ProjectedNarrowingNodeId::ALWAYS_FALSE
-            && id != ProjectedNarrowingNodeId::ALWAYS_TRUE
-            && self.joins[id.0]
-        {
+        if self.is_join(id) {
             return self.narrow_join_constraint(id);
         }
 
