@@ -2852,11 +2852,11 @@ Other type variables in the same call are still inferred from their correspondin
 ```py
 from typing import Protocol, TypeVar
 
-T_infer_union = TypeVar("T_infer_union")
-U_infer_union = TypeVar("U_infer_union")
+T = TypeVar("T")
+U = TypeVar("U")
 
-class Box(Protocol[T_infer_union]):
-    def get(self) -> T_infer_union: ...
+class Box(Protocol[T]):
+    def get(self) -> T: ...
 
 class IntBox:
     def get(self) -> int:
@@ -2866,7 +2866,7 @@ class StrBox:
     def get(self) -> str:
         return ""
 
-def infer_protocol_union_box(x: Box[T_infer_union], y: U_infer_union) -> tuple[T_infer_union, U_infer_union]:
+def infer_protocol_union_box(x: Box[T], y: U) -> tuple[T, U]:
     raise NotImplementedError
 
 def check_protocol_union_box(x: IntBox | StrBox):
