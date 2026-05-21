@@ -550,7 +550,8 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
             base_ty,
             graph: &projector.graph,
             joins: projector.graph.joins(projected_root),
-            join_cache: FxHashMap::default(),
+            join_type_cache: FxHashMap::default(),
+            join_constraint_cache: FxHashMap::default(),
         };
         context.narrow(projected_root, None)
     }
@@ -884,22 +885,38 @@ struct ProjectedNarrowingContext<'a, 'db> {
     /// These nodes are join boundaries: their suffix can be narrowed once and reused for each
     /// incoming projected path.
     joins: Vec<bool>,
-    /// Caches the narrowed type of each join from its boundary.
+    /// Caches the narrowed type of each fully static join from its boundary.
+    join_type_cache: FxHashMap<ProjectedNarrowingNodeId, Type<'db>>,
+    /// Caches the narrowed suffix constraints of each gradual join from its boundary.
     ///
-    /// Incoming prefix constraints are applied after the cached suffix is evaluated so that
-    /// replacement narrowing keeps the same order as a full path evaluation.
-    join_cache: FxHashMap<ProjectedNarrowingNodeId, Type<'db>>,
+    /// Incoming prefix constraints are composed with these suffix constraints before narrowing the
+    /// gradual base type. Materializing the suffix type first can lose precision for gradual types.
+    join_constraint_cache: FxHashMap<ProjectedNarrowingNodeId, Option<NarrowingConstraint<'db>>>,
 }
 
 impl<'db> ProjectedNarrowingContext<'_, 'db> {
-    /// Evaluates one projected join from its boundary and caches its narrowed type.
-    fn narrow_join(&mut self, id: ProjectedNarrowingNodeId) -> Type<'db> {
-        if let Some(cached) = self.join_cache.get(&id) {
+    /// Evaluates one fully static projected join from its boundary and caches its narrowed type.
+    fn narrow_join_type(&mut self, id: ProjectedNarrowingNodeId) -> Type<'db> {
+        if let Some(cached) = self.join_type_cache.get(&id) {
             return *cached;
         }
 
         let result = self.narrow_uncached(id, None);
-        self.join_cache.insert(id, result);
+        self.join_type_cache.insert(id, result);
+        result
+    }
+
+    /// Evaluates one projected join from its boundary and caches its suffix constraints.
+    fn narrow_join_constraint(
+        &mut self,
+        id: ProjectedNarrowingNodeId,
+    ) -> Option<NarrowingConstraint<'db>> {
+        if let Some(cached) = self.join_constraint_cache.get(&id) {
+            return cached.clone();
+        }
+
+        let result = self.narrow_suffix_uncached(id);
+        self.join_constraint_cache.insert(id, result.clone());
         result
     }
 
@@ -913,13 +930,68 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
             && id != ProjectedNarrowingNodeId::ALWAYS_TRUE
             && self.joins[id.0]
         {
-            // Preserve replacement narrowing order at a join: evaluate the shared suffix once,
-            // then apply the incoming prefix constraint to its narrowed type.
-            let suffix_ty = self.narrow_join(id);
-            return apply_accumulated_narrowing(self.db, suffix_ty, accumulated);
+            let suffix_ty = self.narrow_join_type(id);
+            if !suffix_ty.has_dynamic(self.db) {
+                return apply_accumulated_narrowing(self.db, suffix_ty, accumulated);
+            }
+
+            let Some(suffix) = self.narrow_join_constraint(id) else {
+                return Type::Never;
+            };
+
+            // Compose the shared suffix with its incoming prefix before narrowing the base type.
+            // Materializing the suffix first would change gradual and replacement narrowing at a
+            // shared join.
+            let accumulated = prepend_constraint(accumulated, suffix);
+            return apply_accumulated_narrowing(self.db, self.base_ty, Some(accumulated));
         }
 
         self.narrow_uncached(id, accumulated)
+    }
+
+    /// Recursively evaluates a projected suffix into a constraint independent of its prefix.
+    fn narrow_suffix(&mut self, id: ProjectedNarrowingNodeId) -> Option<NarrowingConstraint<'db>> {
+        if id != ProjectedNarrowingNodeId::ALWAYS_FALSE
+            && id != ProjectedNarrowingNodeId::ALWAYS_TRUE
+            && self.joins[id.0]
+        {
+            return self.narrow_join_constraint(id);
+        }
+
+        self.narrow_suffix_uncached(id)
+    }
+
+    /// Recursively evaluates an unshared projected suffix into a constraint.
+    fn narrow_suffix_uncached(
+        &mut self,
+        id: ProjectedNarrowingNodeId,
+    ) -> Option<NarrowingConstraint<'db>> {
+        if id == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+            return None;
+        }
+
+        if id == ProjectedNarrowingNodeId::ALWAYS_TRUE {
+            return Some(NarrowingConstraint::identity());
+        }
+
+        let node = self.graph.node(id);
+        let (pos_constraint, neg_constraint) =
+            self.graph.predicate_constraints_cache[&node.atom].clone();
+
+        let true_suffix = self
+            .narrow_suffix(node.if_true)
+            .map(|suffix| prepend_constraint(pos_constraint, suffix));
+        let false_suffix = self
+            .narrow_suffix(node.if_false)
+            .map(|suffix| prepend_constraint(neg_constraint, suffix));
+
+        match (true_suffix, false_suffix) {
+            (Some(true_suffix), Some(false_suffix)) => {
+                Some(true_suffix.merge_constraint_or(false_suffix))
+            }
+            (Some(suffix), None) | (None, Some(suffix)) => Some(suffix),
+            (None, None) => None,
+        }
     }
 
     /// Recursively evaluates an unshared projected path while accumulating narrowing constraints.
@@ -955,6 +1027,17 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
                 UnionType::from_two_elements(self.db, true_ty, false_ty)
             }
         }
+    }
+}
+
+/// Prepend a path prefix constraint to cached suffix constraints.
+fn prepend_constraint<'db>(
+    prefix: Option<NarrowingConstraint<'db>>,
+    suffix: NarrowingConstraint<'db>,
+) -> NarrowingConstraint<'db> {
+    match prefix {
+        Some(prefix) => suffix.merge_constraint_and(prefix),
+        None => suffix,
     }
 }
 

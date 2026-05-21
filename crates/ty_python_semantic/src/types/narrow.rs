@@ -485,6 +485,16 @@ pub(crate) struct NarrowingConstraint<'db> {
 }
 
 impl<'db> NarrowingConstraint<'db> {
+    /// Create an identity constraint that leaves the previous type unchanged.
+    pub(crate) fn identity() -> Self {
+        Self {
+            intersection_disjuncts: smallvec_inline![Conjunctions {
+                conjuncts: smallvec![],
+            }],
+            replacement_disjuncts: smallvec![],
+        }
+    }
+
     /// Create an "intersection" constraint: the previous type will be
     /// intersected with this constraint
     pub(crate) fn intersection(constraint: Type<'db>) -> Self {
@@ -554,6 +564,15 @@ impl<'db> NarrowingConstraint<'db> {
             intersection_disjuncts: new_intersection_disjuncts,
             replacement_disjuncts: new_replacement_disjuncts,
         }
+    }
+
+    /// Merge two constraints with disjunction semantics.
+    pub(crate) fn merge_constraint_or(mut self, other: Self) -> Self {
+        self.intersection_disjuncts
+            .extend(other.intersection_disjuncts);
+        self.replacement_disjuncts
+            .extend(other.replacement_disjuncts);
+        self
     }
 
     /// Evaluate the type this effectively constrains to
