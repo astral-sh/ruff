@@ -1066,6 +1066,19 @@ impl<'src> Parser<'src> {
                         parsed_expr.expr,
                     )
                 }
+                PendingCallArgument::KeywordUnpacking { argument_start, .. } => {
+                    let parsed_expr = self.parse_conditional_expression_or_higher_from_lhs(
+                        expr.into(),
+                        value_start,
+                        ExpressionContext::default(),
+                    );
+                    self.parse_arguments_after_keyword_unpacking_value(
+                        call.arguments_start,
+                        call.state,
+                        argument_start,
+                        parsed_expr.expr,
+                    )
+                }
             };
 
             expr = Expr::Call(ast::ExprCall {
@@ -1087,6 +1100,28 @@ impl<'src> Parser<'src> {
         let mut state = ArgumentParsingState::default();
 
         loop {
+            if self.at(TokenKind::DoubleStar) && self.peek() == TokenKind::Name {
+                let argument_checkpoint = self.checkpoint();
+                let argument_start = self.node_start();
+                self.bump(TokenKind::DoubleStar);
+
+                if self.at(TokenKind::Name) && self.peek() == TokenKind::Lpar {
+                    let value_start = self.node_start();
+                    let func = self.parse_atom().expr;
+                    return Some(NestedCallArgument {
+                        func,
+                        start: value_start,
+                        argument: PendingCallArgument::KeywordUnpacking {
+                            argument_start,
+                            value_start,
+                        },
+                        state,
+                    });
+                }
+
+                self.rewind(argument_checkpoint);
+            }
+
             if self.at(TokenKind::Name) && self.peek() == TokenKind::Lpar {
                 let argument_start = self.node_start();
                 let func = self.parse_atom().expr;
@@ -1158,7 +1193,8 @@ impl<'src> Parser<'src> {
             self.parse_comma_separated_list(RecoveryContextKind::Arguments, |parser| {
                 let argument_start = parser.node_start();
                 if parser.eat(TokenKind::DoubleStar) {
-                    let value = parser.parse_conditional_expression_or_higher();
+                    let value =
+                        parser.parse_conditional_expression_or_higher_unrolling_nested_trailers();
 
                     keywords.push(ast::Keyword {
                         arg: None,
@@ -1318,6 +1354,24 @@ impl<'src> Parser<'src> {
         value: Expr,
     ) -> ast::Arguments {
         self.parse_keyword_argument_from_value(&mut state, argument_start, arg, value);
+
+        self.parse_arguments_after_state(start, state)
+    }
+
+    fn parse_arguments_after_keyword_unpacking_value(
+        &mut self,
+        start: TextSize,
+        mut state: ArgumentParsingState,
+        argument_start: TextSize,
+        value: Expr,
+    ) -> ast::Arguments {
+        state.keywords.push(ast::Keyword {
+            arg: None,
+            value,
+            range: self.node_range(argument_start),
+            node_index: AtomicNodeIndex::NONE,
+        });
+        state.seen_keyword_unpacking = true;
 
         self.parse_arguments_after_state(start, state)
     }
@@ -4625,13 +4679,18 @@ enum PendingCallArgument {
         arg: ast::Identifier,
         value_start: TextSize,
     },
+    KeywordUnpacking {
+        argument_start: TextSize,
+        value_start: TextSize,
+    },
 }
 
 impl PendingCallArgument {
     const fn value_start(&self) -> TextSize {
         match self {
             PendingCallArgument::Positional { argument_start } => *argument_start,
-            PendingCallArgument::Keyword { value_start, .. } => *value_start,
+            PendingCallArgument::Keyword { value_start, .. }
+            | PendingCallArgument::KeywordUnpacking { value_start, .. } => *value_start,
         }
     }
 }
