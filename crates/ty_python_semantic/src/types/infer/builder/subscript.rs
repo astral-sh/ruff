@@ -1284,7 +1284,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ArgumentsIter::synthesized(&ast_arguments),
                     &mut call_arguments,
                     &mut |builder, (_, expr, tcx)| {
-                        // TODO: Reuse the previously inferred types from the initial call on `collection[Divergent].
+                        // TODO: The argument types have already been inferred and stored in `call_arguments`.
+                        // However, `object` would have been inferred to a be a collection with `Divergent`
+                        // element types, meaning the type context for a given argument, by which the inferred
+                        // type is keyed, may not be the same as the type context we get here. It is not immediately
+                        // clear how to retrieve those types, and so we just re-infer the argument expressions
+                        // for simplicity.
                         builder.infer_maybe_standalone_expression(expr, tcx)
                     },
                     &mut identity_bindings,

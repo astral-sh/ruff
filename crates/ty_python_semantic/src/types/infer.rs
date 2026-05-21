@@ -775,7 +775,7 @@ struct ScopeInferenceExtra<'db> {
     /// Metadata for type expressions in this region.
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
 
-    /// The type contexts applicable to every definition in this region.
+    /// The constraints on any collection literals that are accessed in this region.
     collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
 
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
@@ -920,7 +920,7 @@ struct DefinitionInferenceExtra<'db> {
     /// Metadata for type expressions in this region.
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
 
-    /// The type contexts applicable to every definition in this region.
+    /// The constraints on any collection literals that are accessed in this region.
     collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
 
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
@@ -1169,7 +1169,7 @@ struct ExpressionInferenceExtra<'db> {
     /// Metadata for type expressions in this region.
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
 
-    /// The type contexts applicable to every definition in this region.
+    /// The constraints on any collection literals that are accessed in this region.
     collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
 
     /// The types of every binding in this expression region.
@@ -1347,7 +1347,7 @@ struct StatementInferenceInnerExtra<'db> {
     /// Metadata for type expressions in this region.
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
 
-    /// The type contexts applicable to every definition in this region.
+    /// The constraints on any collection literals that are accessed in this region.
     collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
 
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.

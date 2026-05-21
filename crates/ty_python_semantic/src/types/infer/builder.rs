@@ -244,7 +244,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// Only populated for expressions that have non-empty flags.
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
 
-    /// The constraints on any collection literals that accessed in this region.
+    /// The constraints on any collection literals that are accessed in this region.
     //
     // TODO: We should store constraint sets directly here.
     collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
@@ -7973,7 +7973,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let call_result = self.speculate().infer_and_check_argument_types(
                     ArgumentsIter::from_ast(arguments),
                     &mut call_arguments,
-                    // TODO: Reuse the previously inferred types from the initial call on `collection[Divergent].
+                    // TODO: The argument types have already been inferred and stored in `call_arguments`.
+                    // However, `value` would have been inferred to a be a collection with `Divergent`
+                    // element types, meaning the type context for a given argument, by which the inferred
+                    // type is keyed, may not be the same as the type context we get here. It is not immediately
+                    // clear how to retrieve those types, and so we just re-infer the argument expressions
+                    // for simplicity.
                     &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
                     &mut identity_bindings,
                     call_expression_tcx,

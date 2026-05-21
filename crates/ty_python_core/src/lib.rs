@@ -286,7 +286,7 @@ pub struct SemanticIndex<'db> {
     // Map from a constraining use of a collection literal to its definition.
     collections_by_use: FxHashMap<ExpressionNodeKey, Definition<'db>>,
 
-    // Map from a collection literal definition to a statement containing a constraining use.
+    // Map from a collection literal definition to statements containing a constraining use.
     uses_by_collection: FxHashMap<Definition<'db>, Vec<(Statement<'db>, ExpressionNodeKey)>>,
 
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].

@@ -780,6 +780,8 @@ class X:
         self.x.append(1)
         self.x.append("2")
         reveal_type(self.x)  # revealed: list[int | str]
+
+reveal_type(X().x)  # revealed: list[int | str]
 ```
 
 ```py

@@ -189,7 +189,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
     // A map from a constraining use of a collection literal to its definition.
     collections_by_use: FxHashMap<ExpressionNodeKey, Definition<'db>>,
-    // A map from a collection literal definition to a statement containing a constraining use.
+    // A map from a collection literal definition to statements containing a constraining use.
     uses_by_collection: FxHashMap<Definition<'db>, Vec<(Statement<'db>, ExpressionNodeKey)>>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
     ///
@@ -3498,6 +3498,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // participants, and the reachability analysis of a given use of the
                     // collection may create dependencies on all previous uses, leading to
                     // significant performance regressions.
+                    //
+                    // Note that built-in collection types do not have methods that explicitly
+                    // return `Never`, so does not have a meaningful semantic impact, except in
+                    // the rare case where a collection is explicitly marked as having elements
+                    // of type `Never`.
                     if !self.source_type.is_stub()
                         && func
                             .as_attribute_expr()
@@ -3580,7 +3585,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         }
                     }
 
-                    // An annotated assignment involving the collection object to a new binding.
+                    // An annotated assignment assigning the collection object to a new binding.
                     ruff_python_ast::Stmt::AnnAssign(_) => true,
 
                     // A bound-method call on the collection object.
