@@ -5,6 +5,9 @@
 #     "rich",
 #     "watchfiles>=1.1.0",
 # ]
+#
+# [tool.uv]
+# exclude-newer = "7 days"
 # ///
 
 from __future__ import annotations
