@@ -5780,6 +5780,7 @@ impl<'src> Parser<'src> {
             } else {
                 default.parameters.args.push(parameter);
             }
+            self.parse_nested_lambda_default_tail(&mut default.parameters, default.keyword_only);
             default.parameters.range = self.node_range(default.parameters_start);
 
             self.expect(TokenKind::Colon);
@@ -5794,6 +5795,97 @@ impl<'src> Parser<'src> {
         }
 
         Some(lambda)
+    }
+
+    fn parse_nested_lambda_default_tail(
+        &mut self,
+        parameters: &mut ast::Parameters,
+        mut seen_keyword_only_separator: bool,
+    ) {
+        let mut seen_positional_only_separator = !parameters.posonlyargs.is_empty();
+        let mut seen_default_param = true;
+
+        while self.eat(TokenKind::Comma) && !self.at(TokenKind::Colon) {
+            match self.current_token_kind() {
+                TokenKind::Slash => {
+                    let slash_range = self.current_token_range();
+                    if !seen_positional_only_separator
+                        && !seen_keyword_only_separator
+                        && !parameters.args.is_empty()
+                    {
+                        std::mem::swap(&mut parameters.args, &mut parameters.posonlyargs);
+                        self.add_unsupported_syntax_error(
+                            UnsupportedSyntaxErrorKind::PositionalOnlyParameter,
+                            slash_range,
+                        );
+                    }
+                    seen_positional_only_separator = true;
+                    self.bump(TokenKind::Slash);
+                }
+                TokenKind::Star => {
+                    let parameter_start = self.node_start();
+                    self.bump(TokenKind::Star);
+                    seen_keyword_only_separator = true;
+
+                    if self.at_name_or_soft_keyword() {
+                        let name = self.parse_identifier();
+                        parameters.vararg = Some(Box::new(ast::Parameter {
+                            range: self.node_range(parameter_start),
+                            node_index: AtomicNodeIndex::NONE,
+                            name,
+                            annotation: None,
+                        }));
+                    }
+                }
+                TokenKind::DoubleStar => {
+                    let parameter_start = self.node_start();
+                    self.bump(TokenKind::DoubleStar);
+                    let name = self.parse_identifier();
+                    parameters.kwarg = Some(Box::new(ast::Parameter {
+                        range: self.node_range(parameter_start),
+                        node_index: AtomicNodeIndex::NONE,
+                        name,
+                        annotation: None,
+                    }));
+                }
+                _ if self.at_name_or_soft_keyword() => {
+                    let parameter_start = self.node_start();
+                    let name = self.parse_identifier();
+                    let parameter = ast::Parameter {
+                        range: self.node_range(parameter_start),
+                        node_index: AtomicNodeIndex::NONE,
+                        name,
+                        annotation: None,
+                    };
+
+                    let default = if self.eat(TokenKind::Equal) {
+                        seen_default_param = true;
+                        Some(Box::new(self.parse_conditional_expression_or_higher().expr))
+                    } else {
+                        None
+                    };
+
+                    let parameter = ast::ParameterWithDefault {
+                        range: self.node_range(parameter_start),
+                        node_index: AtomicNodeIndex::NONE,
+                        parameter,
+                        default,
+                    };
+                    if seen_keyword_only_separator {
+                        parameters.kwonlyargs.push(parameter);
+                    } else {
+                        if seen_default_param && parameter.default.is_none() {
+                            self.add_error(
+                                ParseErrorType::NonDefaultParamAfterDefaultParam,
+                                &parameter,
+                            );
+                        }
+                        parameters.args.push(parameter);
+                    }
+                }
+                _ => break,
+            }
+        }
     }
 
     fn try_parse_nested_lambda_default_head(&mut self) -> Option<PendingNestedLambdaDefault> {
@@ -5814,6 +5906,7 @@ impl<'src> Parser<'src> {
         loop {
             match self.current_token_kind() {
                 TokenKind::Slash => {
+                    let slash_range = self.current_token_range();
                     if seen_positional_only_separator
                         || seen_keyword_only_separator
                         || parameters.args.is_empty()
@@ -5824,6 +5917,10 @@ impl<'src> Parser<'src> {
 
                     self.bump(TokenKind::Slash);
                     std::mem::swap(&mut parameters.args, &mut parameters.posonlyargs);
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::PositionalOnlyParameter,
+                        slash_range,
+                    );
                     seen_positional_only_separator = true;
 
                     if !self.eat(TokenKind::Comma) {

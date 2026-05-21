@@ -80,6 +80,7 @@ fn nested_expression_continuations() {
         "{{**0}}",
         "1 + (2 + (3) * 4)",
         "(1 + (lambda: 2))",
+        "lambda x=lambda: 1, y=2: x",
     ] {
         parse_expression(source).unwrap();
     }
