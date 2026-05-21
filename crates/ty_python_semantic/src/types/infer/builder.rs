@@ -7558,6 +7558,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_arguments
     }
 
+    // TODO: This should not be needed once we use constraint sets to track the usages of each
+    // container literal across a scope.
+    // https://github.com/astral-sh/ty/issues/3507
     fn collection_use_constraint_from_specialization(
         &self,
         identity_instance: Type<'db>,
