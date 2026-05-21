@@ -248,6 +248,44 @@ class OuterClass:
         ");
     }
 
+    #[test]
+    fn test_document_symbols_type_alias() {
+        let test = cursor_test(
+            "
+type IntList = list[int]
+
+class Aliases:
+    type Item = int
+<CURSOR>",
+        );
+
+        assert_snapshot!(test.document_symbols(), @"
+        info[document-symbols]: SymbolInfo
+         --> main.py:2:6
+          |
+        2 | type IntList = list[int]
+          |      ^^^^^^^
+          |
+        info: Variable IntList
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:4:7
+          |
+        4 | class Aliases:
+          |       ^^^^^^^
+          |
+        info: Class Aliases
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:5:10
+          |
+        5 |     type Item = int
+          |          ^^^^
+          |
+        info: Variable Item
+        ");
+    }
+
     impl CursorTest {
         fn document_symbols(&self) -> String {
             let symbols = document_symbols(&self.db, self.cursor.file).to_hierarchical();
