@@ -147,10 +147,7 @@ impl<'src> TokenSource<'src> {
     ///
     /// [`peek2`]: TokenSource::peek2
     pub(crate) fn peek(&mut self) -> TokenKind {
-        let checkpoint = self.lexer.checkpoint();
-        let next = self.next_non_trivia_token();
-        self.lexer.rewind(checkpoint);
-        next
+        self.lexer.lookahead(next_non_trivia_token)
     }
 
     /// Returns the next two non-trivia tokens without consuming it.
@@ -159,11 +156,11 @@ impl<'src> TokenSource<'src> {
     ///
     /// [`peek`]: TokenSource::peek
     pub(crate) fn peek2(&mut self) -> (TokenKind, TokenKind) {
-        let checkpoint = self.lexer.checkpoint();
-        let first = self.next_non_trivia_token();
-        let second = self.next_non_trivia_token();
-        self.lexer.rewind(checkpoint);
-        (first, second)
+        self.lexer.lookahead(|lexer| {
+            let first = next_non_trivia_token(lexer);
+            let second = next_non_trivia_token(lexer);
+            (first, second)
+        })
     }
 
     /// Bumps the token source to the next non-trivia token.
@@ -186,17 +183,6 @@ impl<'src> TokenSource<'src> {
                 continue;
             }
             break;
-        }
-    }
-
-    /// Returns the next non-trivia token without adding it to the token vector.
-    fn next_non_trivia_token(&mut self) -> TokenKind {
-        loop {
-            let kind = self.lexer.next_token();
-            if kind.is_trivia() {
-                continue;
-            }
-            break kind;
         }
     }
 
@@ -251,6 +237,17 @@ impl<'src> TokenSource<'src> {
         }
 
         (self.tokens, self.lexer.finish())
+    }
+}
+
+/// Returns the next non-trivia token from the lexer.
+fn next_non_trivia_token(lexer: &mut Lexer) -> TokenKind {
+    loop {
+        let kind = lexer.next_token();
+        if kind.is_trivia() {
+            continue;
+        }
+        break kind;
     }
 }
 

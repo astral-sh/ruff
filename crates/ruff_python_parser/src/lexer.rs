@@ -1700,6 +1700,38 @@ impl<'src> Lexer<'src> {
         }
     }
 
+    /// Runs `f` and restores the lexer to its current state afterwards.
+    pub(crate) fn lookahead<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        let value = std::mem::take(&mut self.current_value);
+        let current_kind = self.current_kind;
+        let current_range = self.current_range;
+        let current_flags = self.current_flags;
+        let cursor = self.cursor.clone();
+        let state = self.state;
+        let nesting = self.nesting;
+        let indentations_checkpoint = self.indentations.checkpoint();
+        let pending_indentation = self.pending_indentation;
+        let interpolated_strings_checkpoint = self.interpolated_strings.checkpoint();
+        let errors_position = self.errors.len();
+
+        let result = f(self);
+
+        self.current_value = value;
+        self.current_kind = current_kind;
+        self.current_range = current_range;
+        self.current_flags = current_flags;
+        self.cursor = cursor;
+        self.state = state;
+        self.nesting = nesting;
+        self.indentations.rewind(indentations_checkpoint);
+        self.pending_indentation = pending_indentation;
+        self.interpolated_strings
+            .rewind(interpolated_strings_checkpoint);
+        self.errors.truncate(errors_position);
+
+        result
+    }
+
     /// Restore the lexer to the given checkpoint.
     pub(crate) fn rewind(&mut self, checkpoint: LexerCheckpoint) {
         let LexerCheckpoint {
