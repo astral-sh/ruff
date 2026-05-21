@@ -4633,6 +4633,50 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Yield);
 
+        if self.at(TokenKind::Lpar) && self.peek() == TokenKind::Yield {
+            return self.parse_nested_parenthesized_yield_expression(start);
+        }
+
+        self.finish_yield_expression(start)
+    }
+
+    fn parse_nested_parenthesized_yield_expression(&mut self, mut yield_start: TextSize) -> Expr {
+        let mut pending = vec![];
+
+        let mut expr = loop {
+            let parenthesis_start = self.node_start();
+            self.bump(TokenKind::Lpar);
+            self.report_unclosed_parenthesis();
+
+            let nested_yield_start = self.node_start();
+            self.bump(TokenKind::Yield);
+
+            pending.push(PendingParenthesizedYieldExpression {
+                yield_start,
+                parenthesis_start,
+            });
+
+            if self.at(TokenKind::Lpar) && self.peek() == TokenKind::Yield {
+                yield_start = nested_yield_start;
+                continue;
+            }
+
+            break self.finish_yield_expression(nested_yield_start);
+        };
+
+        while let Some(outer) = pending.pop() {
+            let value = self.finish_parenthesized_expression(expr.into(), outer.parenthesis_start);
+            expr = Expr::Yield(ast::ExprYield {
+                value: Some(Box::new(value.expr)),
+                range: self.node_range(outer.yield_start),
+                node_index: AtomicNodeIndex::NONE,
+            });
+        }
+
+        expr
+    }
+
+    fn finish_yield_expression(&mut self, start: TextSize) -> Expr {
         if self.eat(TokenKind::From) {
             return self.parse_yield_from_expression(start);
         }
@@ -5114,6 +5158,11 @@ struct PendingUnaryExpression {
 struct PendingAwaitExpression {
     start: TextSize,
     operand_start: TextSize,
+}
+
+struct PendingParenthesizedYieldExpression {
+    yield_start: TextSize,
+    parenthesis_start: TextSize,
 }
 
 #[derive(Debug)]

@@ -372,6 +372,23 @@ fn deeply_nested_await_chain() {
 }
 
 #[test]
+fn deeply_nested_yield_chain() {
+    let depth = 5_000;
+    let mut src = String::from("def f():\n    yield ");
+    for _ in 0..depth {
+        src.push_str("(yield ");
+    }
+    src.push('1');
+    for _ in 0..depth {
+        src.push(')');
+    }
+    src.push('\n');
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
+}
+
+#[test]
 fn deeply_nested_invalid_async_prefixes() {
     let src = format!("{}def f(): pass\n", "async ".repeat(20_000));
 
