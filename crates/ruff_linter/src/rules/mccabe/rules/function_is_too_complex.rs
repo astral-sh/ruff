@@ -33,17 +33,12 @@ use crate::checkers::ast::Checker;
 ///         return 4
 /// ```
 ///
-/// Use instead:
-/// ```python
-/// def foo(a, b, c):
-///     if not a:
-///         return 4
-///     if not b:
-///         return 3
-///     if not c:
-///         return 2
-///     return 1
-/// ```
+/// To reduce a function's `McCabe` complexity, extract independent decision
+/// branches into smaller helpers, replace decision trees with lookups, or
+/// flatten nested conditionals into early returns whose branches have lower
+/// branching factor than the original. Note that mechanically inverting
+/// conditions to use guard clauses does not, on its own, lower the McCabe
+/// complexity, since the number of decision points is unchanged.
 ///
 /// ## Options
 /// - `lint.mccabe.max-complexity`
