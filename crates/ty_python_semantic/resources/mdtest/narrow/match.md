@@ -395,6 +395,20 @@ class Answer(Enum):
             case _:
                 assert_never(self)  # no error
 
+    @classmethod
+    def is_yes_through_cls_member(cls, answer: "Answer") -> bool:
+        reveal_type(cls.YES)  # revealed: Literal[Answer.YES]
+
+        match answer:
+            case cls.YES:
+                reveal_type(answer)  # revealed: Literal[Answer.YES]
+                return True
+            case cls.NO | cls.MAYBE:
+                reveal_type(answer)  # revealed: Literal[Answer.NO, Answer.MAYBE]
+                return False
+            case _:
+                assert_never(answer)  # no error
+
     def assert_yes(self) -> Self:
         reveal_type(self)  # revealed: Self@assert_yes
 
