@@ -60,6 +60,10 @@ impl<'src> TokenSource<'src> {
         self.lexer.current_flags()
     }
 
+    pub(crate) fn indentation_depth(&self) -> usize {
+        self.lexer.indentation_depth()
+    }
+
     /// Calls the underlying [`take_value`] method on the lexer. Refer to its documentation
     /// for more info.
     ///

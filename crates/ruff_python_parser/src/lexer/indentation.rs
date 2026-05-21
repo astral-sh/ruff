@@ -125,6 +125,10 @@ impl Indentations {
         self.stack.last().unwrap_or(&ROOT)
     }
 
+    pub(super) fn depth(&self) -> usize {
+        self.stack.len()
+    }
+
     pub(crate) fn checkpoint(&self) -> IndentationsCheckpoint {
         IndentationsCheckpoint(self.stack.clone())
     }

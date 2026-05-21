@@ -142,6 +142,10 @@ impl<'src> Lexer<'src> {
         self.current_flags
     }
 
+    pub(crate) fn indentation_depth(&self) -> usize {
+        self.indentations.depth()
+    }
+
     /// Takes the token value corresponding to the current token out of the lexer, replacing it
     /// with the default value.
     ///

@@ -357,6 +357,10 @@ impl<'src> Parser<'src> {
         self.tokens.peek2()
     }
 
+    fn indentation_depth(&self) -> usize {
+        self.tokens.indentation_depth()
+    }
+
     /// Returns the current token kind.
     #[inline]
     fn current_token_kind(&self) -> TokenKind {
