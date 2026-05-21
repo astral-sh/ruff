@@ -352,9 +352,13 @@ impl<'src> Parser<'src> {
         self.tokens.peek()
     }
 
-    /// Returns the next two token kinds without consuming it.
-    fn peek2(&mut self) -> (TokenKind, TokenKind) {
-        self.tokens.peek2()
+    /// Returns the next token kind and conditionally the token kind after it without consuming
+    /// them.
+    fn peek2_if(
+        &mut self,
+        should_peek_second: impl FnOnce(TokenKind) -> bool,
+    ) -> (TokenKind, Option<TokenKind>) {
+        self.tokens.peek2_if(should_peek_second)
     }
 
     /// Returns the current token kind.

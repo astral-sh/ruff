@@ -339,11 +339,10 @@ impl<'src> Parser<'src> {
                 if token == TokenKind::Type {
                     // Type is considered a soft keyword, so we will treat it as an identifier if
                     // it's followed by an unexpected token.
-                    let (first, second) = self.peek2();
-
-                    if (first == TokenKind::Name || first.is_soft_keyword())
-                        && matches!(second, TokenKind::Lsqb | TokenKind::Equal)
-                    {
+                    if matches!(
+                        self.peek2_if(|first| first == TokenKind::Name || first.is_soft_keyword()),
+                        (_, Some(TokenKind::Lsqb | TokenKind::Equal))
+                    ) {
                         return Stmt::TypeAlias(self.parse_type_alias_statement());
                     }
                 }
@@ -2531,7 +2530,12 @@ impl<'src> Parser<'src> {
                     node_index: AtomicNodeIndex::NONE,
                 })
             }
-            TokenKind::Newline if matches!(self.peek2(), (TokenKind::Indent, TokenKind::Case)) => {
+            TokenKind::Newline
+                if matches!(
+                    self.peek2_if(|first| first == TokenKind::Indent),
+                    (_, Some(TokenKind::Case))
+                ) =>
+            {
                 // `match` is a keyword
 
                 // test_err match_expected_colon
@@ -3821,12 +3825,12 @@ impl<'src> Parser<'src> {
     fn classify_match_token(&mut self) -> MatchTokenKind {
         assert_eq!(self.current_token_kind(), TokenKind::Match);
 
-        let (first, second) = self.peek2();
+        let (first, second) = self.peek2_if(|first| first == TokenKind::Not);
 
         match first {
             // test_ok match_classify_as_identifier_1
             // match not in case
-            TokenKind::Not if second == TokenKind::In => MatchTokenKind::Identifier,
+            TokenKind::Not if second == Some(TokenKind::In) => MatchTokenKind::Identifier,
 
             // test_ok match_classify_as_keyword_1
             // match foo:
