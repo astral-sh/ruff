@@ -207,20 +207,18 @@ fn lambda_has_expected_arity(lambda: &ExprLambda) -> bool {
     let Some(parameters) = lambda.parameters.as_deref() else {
         return false;
     };
+
     if parameters.len() != 1 {
         return false;
     }
+
     let [parameter] = &*parameters.args else {
         return false;
     };
+
     if parameter.default.is_some() {
         return false;
     }
-
-    if parameters.vararg.is_some() || parameters.kwarg.is_some() {
-        return false;
-    }
-
     if late_binding(parameters, &lambda.body) {
         return false;
     }
