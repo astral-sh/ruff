@@ -210,82 +210,217 @@ impl Parser<'_> {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
-        let mut keys = vec![];
-        let mut patterns = vec![];
-        let mut rest = None;
+        if let Some(pending) = self.try_parse_nested_match_pattern_mapping_value(start) {
+            return self.parse_nested_match_pattern_mapping(pending);
+        }
+
+        self.parse_match_pattern_mapping_after_lbrace(start)
+    }
+
+    fn parse_match_pattern_mapping_after_lbrace(
+        &mut self,
+        start: TextSize,
+    ) -> ast::PatternMatchMapping {
+        let mut state = MatchPatternMappingParsingState::default();
 
         self.parse_comma_separated_list(RecoveryContextKind::MatchPatternMapping, |parser| {
-            let mapping_item_start = parser.node_start();
-
-            if parser.eat(TokenKind::DoubleStar) {
-                let identifier = parser.parse_identifier();
-                if rest.is_some() {
-                    parser.add_error(
-                        ParseErrorType::OtherError(
-                            "Only one double star pattern is allowed".to_string(),
-                        ),
-                        parser.node_range(mapping_item_start),
-                    );
-                }
-                // TODO(dhruvmanila): It's not possible to retain multiple double starred
-                // patterns because of the way the mapping node is represented in the grammar.
-                // The last value will always win. Update the AST representation.
-                // See: https://github.com/astral-sh/ruff/pull/10477#discussion_r1535143536
-                rest = Some(identifier);
-            } else {
-                let key = match parser.parse_match_pattern_lhs(AllowStarPattern::No) {
-                    Pattern::MatchValue(ast::PatternMatchValue { value, .. }) => *value,
-                    Pattern::MatchSingleton(ast::PatternMatchSingleton {
-                        value,
-                        range,
-                        node_index,
-                    }) => match value {
-                        Singleton::None => {
-                            Expr::NoneLiteral(ast::ExprNoneLiteral { range, node_index })
-                        }
-                        Singleton::True => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
-                            value: true,
-                            range,
-                            node_index,
-                        }),
-                        Singleton::False => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
-                            value: false,
-                            range,
-                            node_index,
-                        }),
-                    },
-                    pattern => {
-                        parser.add_error(
-                            ParseErrorType::OtherError("Invalid mapping pattern key".to_string()),
-                            &pattern,
-                        );
-                        recovery::pattern_to_expr(pattern)
-                    }
-                };
-                keys.push(key);
-
-                parser.expect(TokenKind::Colon);
-
-                patterns.push(parser.parse_match_pattern(AllowStarPattern::No));
-
-                if rest.is_some() {
-                    parser.add_error(
-                        ParseErrorType::OtherError(
-                            "Pattern cannot follow a double star pattern".to_string(),
-                        ),
-                        parser.node_range(mapping_item_start),
-                    );
-                }
-            }
+            parser.parse_match_pattern_mapping_item(&mut state);
         });
 
         self.expect(TokenKind::Rbrace);
 
+        self.finish_match_pattern_mapping(start, state)
+    }
+
+    fn parse_match_pattern_mapping_item(&mut self, state: &mut MatchPatternMappingParsingState) {
+        let mapping_item_start = self.node_start();
+
+        if self.eat(TokenKind::DoubleStar) {
+            let identifier = self.parse_identifier();
+            if state.rest.is_some() {
+                self.add_error(
+                    ParseErrorType::OtherError(
+                        "Only one double star pattern is allowed".to_string(),
+                    ),
+                    self.node_range(mapping_item_start),
+                );
+            }
+            // TODO(dhruvmanila): It's not possible to retain multiple double starred
+            // patterns because of the way the mapping node is represented in the grammar.
+            // The last value will always win. Update the AST representation.
+            // See: https://github.com/astral-sh/ruff/pull/10477#discussion_r1535143536
+            state.rest = Some(identifier);
+        } else {
+            let key = self.parse_match_pattern_mapping_key();
+
+            self.expect(TokenKind::Colon);
+
+            let pattern = self.parse_match_pattern(AllowStarPattern::No);
+
+            self.parse_match_pattern_mapping_item_from_value(
+                state,
+                mapping_item_start,
+                key,
+                pattern,
+            );
+        }
+    }
+
+    fn parse_match_pattern_mapping_item_from_value(
+        &mut self,
+        state: &mut MatchPatternMappingParsingState,
+        mapping_item_start: TextSize,
+        key: Expr,
+        pattern: Pattern,
+    ) {
+        state.keys.push(key);
+        state.patterns.push(pattern);
+
+        if state.rest.is_some() {
+            self.add_error(
+                ParseErrorType::OtherError(
+                    "Pattern cannot follow a double star pattern".to_string(),
+                ),
+                self.node_range(mapping_item_start),
+            );
+        }
+    }
+
+    fn parse_match_pattern_mapping_key(&mut self) -> Expr {
+        match self.parse_match_pattern_lhs(AllowStarPattern::No) {
+            Pattern::MatchValue(ast::PatternMatchValue { value, .. }) => *value,
+            Pattern::MatchSingleton(ast::PatternMatchSingleton {
+                value,
+                range,
+                node_index,
+            }) => match value {
+                Singleton::None => Expr::NoneLiteral(ast::ExprNoneLiteral { range, node_index }),
+                Singleton::True => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
+                    value: true,
+                    range,
+                    node_index,
+                }),
+                Singleton::False => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
+                    value: false,
+                    range,
+                    node_index,
+                }),
+            },
+            pattern => {
+                self.add_error(
+                    ParseErrorType::OtherError("Invalid mapping pattern key".to_string()),
+                    &pattern,
+                );
+                recovery::pattern_to_expr(pattern)
+            }
+        }
+    }
+
+    fn try_parse_nested_match_pattern_mapping_value(
+        &mut self,
+        start: TextSize,
+    ) -> Option<PendingMatchPatternMapping> {
+        if !self.at_mapping_pattern_start() || self.at(TokenKind::DoubleStar) {
+            return None;
+        }
+
+        let checkpoint = self.checkpoint();
+        let mapping_item_start = self.node_start();
+        let key = self.parse_match_pattern_mapping_key();
+
+        self.expect(TokenKind::Colon);
+
+        if self.at(TokenKind::Lbrace) {
+            Some(PendingMatchPatternMapping {
+                start,
+                mapping_item_start,
+                key,
+                value_start: self.node_start(),
+            })
+        } else {
+            self.rewind(checkpoint);
+            None
+        }
+    }
+
+    fn parse_nested_match_pattern_mapping(
+        &mut self,
+        outer: PendingMatchPatternMapping,
+    ) -> ast::PatternMatchMapping {
+        let mut pending = vec![outer];
+
+        let mut mapping = loop {
+            let start = self.node_start();
+            self.bump(TokenKind::Lbrace);
+
+            if let Some(pending_mapping) = self.try_parse_nested_match_pattern_mapping_value(start)
+            {
+                pending.push(pending_mapping);
+                continue;
+            }
+
+            break self.parse_match_pattern_mapping_after_lbrace(start);
+        };
+
+        while let Some(pending) = pending.pop() {
+            let lhs =
+                self.finish_match_pattern_lhs(Pattern::MatchMapping(mapping), pending.value_start);
+            let pattern = self.parse_match_pattern_from_lhs(lhs, pending.value_start);
+            mapping = self.parse_match_pattern_mapping_after_first(
+                pending.start,
+                pending.mapping_item_start,
+                pending.key,
+                pattern,
+            );
+        }
+
+        mapping
+    }
+
+    fn parse_match_pattern_mapping_after_first(
+        &mut self,
+        start: TextSize,
+        mapping_item_start: TextSize,
+        key: Expr,
+        pattern: Pattern,
+    ) -> ast::PatternMatchMapping {
+        let mut state = MatchPatternMappingParsingState::default();
+        self.parse_match_pattern_mapping_item_from_value(
+            &mut state,
+            mapping_item_start,
+            key,
+            pattern,
+        );
+
+        if self.eat(TokenKind::Comma) {
+            if !self.at(TokenKind::Rbrace) {
+                self.parse_comma_separated_list(
+                    RecoveryContextKind::MatchPatternMapping,
+                    |parser| parser.parse_match_pattern_mapping_item(&mut state),
+                );
+            }
+        } else if !self.at(TokenKind::Rbrace) {
+            self.expect(TokenKind::Comma);
+            self.parse_comma_separated_list(RecoveryContextKind::MatchPatternMapping, |parser| {
+                parser.parse_match_pattern_mapping_item(&mut state);
+            });
+        }
+
+        self.expect(TokenKind::Rbrace);
+
+        self.finish_match_pattern_mapping(start, state)
+    }
+
+    fn finish_match_pattern_mapping(
+        &self,
+        start: TextSize,
+        state: MatchPatternMappingParsingState,
+    ) -> ast::PatternMatchMapping {
         ast::PatternMatchMapping {
             range: self.node_range(start),
-            keys,
-            patterns,
-            rest,
+            keys: state.keys,
+            patterns: state.patterns,
+            rest: state.rest,
             node_index: AtomicNodeIndex::NONE,
         }
     }
@@ -1000,6 +1135,20 @@ impl Parser<'_> {
             node_index: AtomicNodeIndex::NONE,
         }
     }
+}
+
+struct PendingMatchPatternMapping {
+    start: TextSize,
+    mapping_item_start: TextSize,
+    key: Expr,
+    value_start: TextSize,
+}
+
+#[derive(Default)]
+struct MatchPatternMappingParsingState {
+    keys: Vec<Expr>,
+    patterns: Vec<Pattern>,
+    rest: Option<ast::Identifier>,
 }
 
 struct PendingMatchPatternClass {
