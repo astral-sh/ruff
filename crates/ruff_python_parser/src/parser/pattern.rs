@@ -236,20 +236,7 @@ impl Parser<'_> {
         let mapping_item_start = self.node_start();
 
         if self.eat(TokenKind::DoubleStar) {
-            let identifier = self.parse_identifier();
-            if state.rest.is_some() {
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "Only one double star pattern is allowed".to_string(),
-                    ),
-                    self.node_range(mapping_item_start),
-                );
-            }
-            // TODO(dhruvmanila): It's not possible to retain multiple double starred
-            // patterns because of the way the mapping node is represented in the grammar.
-            // The last value will always win. Update the AST representation.
-            // See: https://github.com/astral-sh/ruff/pull/10477#discussion_r1535143536
-            state.rest = Some(identifier);
+            self.parse_match_pattern_mapping_rest(state, mapping_item_start);
         } else {
             let key = self.parse_match_pattern_mapping_key();
 
@@ -264,6 +251,25 @@ impl Parser<'_> {
                 pattern,
             );
         }
+    }
+
+    fn parse_match_pattern_mapping_rest(
+        &mut self,
+        state: &mut MatchPatternMappingParsingState,
+        mapping_item_start: TextSize,
+    ) {
+        let identifier = self.parse_identifier();
+        if state.rest.is_some() {
+            self.add_error(
+                ParseErrorType::OtherError("Only one double star pattern is allowed".to_string()),
+                self.node_range(mapping_item_start),
+            );
+        }
+        // TODO(dhruvmanila): It's not possible to retain multiple double starred
+        // patterns because of the way the mapping node is represented in the grammar.
+        // The last value will always win. Update the AST representation.
+        // See: https://github.com/astral-sh/ruff/pull/10477#discussion_r1535143536
+        state.rest = Some(identifier);
     }
 
     fn parse_match_pattern_mapping_item_from_value(
@@ -320,26 +326,50 @@ impl Parser<'_> {
         &mut self,
         start: TextSize,
     ) -> Option<PendingMatchPatternMapping> {
-        if !self.at_mapping_pattern_start() || self.at(TokenKind::DoubleStar) {
+        if !self.at_mapping_pattern_start() {
             return None;
         }
 
         let checkpoint = self.checkpoint();
-        let mapping_item_start = self.node_start();
-        let key = self.parse_match_pattern_mapping_key();
+        let mut state = MatchPatternMappingParsingState::default();
 
-        self.expect(TokenKind::Colon);
+        loop {
+            if !self.at_mapping_pattern_start() {
+                self.rewind(checkpoint);
+                return None;
+            }
 
-        if self.at(TokenKind::Lbrace) {
-            Some(PendingMatchPatternMapping {
-                start,
-                mapping_item_start,
-                key,
-                value_start: self.node_start(),
-            })
-        } else {
-            self.rewind(checkpoint);
-            None
+            let mapping_item_start = self.node_start();
+            if self.eat(TokenKind::DoubleStar) {
+                self.parse_match_pattern_mapping_rest(&mut state, mapping_item_start);
+            } else {
+                let key = self.parse_match_pattern_mapping_key();
+
+                self.expect(TokenKind::Colon);
+
+                if self.at(TokenKind::Lbrace) {
+                    return Some(PendingMatchPatternMapping {
+                        start,
+                        state,
+                        mapping_item_start,
+                        key,
+                        value_start: self.node_start(),
+                    });
+                }
+
+                let pattern = self.parse_match_pattern(AllowStarPattern::No);
+                self.parse_match_pattern_mapping_item_from_value(
+                    &mut state,
+                    mapping_item_start,
+                    key,
+                    pattern,
+                );
+            }
+
+            if !self.eat(TokenKind::Comma) || self.at(TokenKind::Rbrace) {
+                self.rewind(checkpoint);
+                return None;
+            }
         }
     }
 
@@ -366,8 +396,9 @@ impl Parser<'_> {
             let lhs =
                 self.finish_match_pattern_lhs(Pattern::MatchMapping(mapping), pending.value_start);
             let pattern = self.parse_match_pattern_from_lhs(lhs, pending.value_start);
-            mapping = self.parse_match_pattern_mapping_after_first(
+            mapping = self.parse_match_pattern_mapping_after_value(
                 pending.start,
+                pending.state,
                 pending.mapping_item_start,
                 pending.key,
                 pattern,
@@ -377,14 +408,14 @@ impl Parser<'_> {
         mapping
     }
 
-    fn parse_match_pattern_mapping_after_first(
+    fn parse_match_pattern_mapping_after_value(
         &mut self,
         start: TextSize,
+        mut state: MatchPatternMappingParsingState,
         mapping_item_start: TextSize,
         key: Expr,
         pattern: Pattern,
     ) -> ast::PatternMatchMapping {
-        let mut state = MatchPatternMappingParsingState::default();
         self.parse_match_pattern_mapping_item_from_value(
             &mut state,
             mapping_item_start,
@@ -1228,6 +1259,7 @@ impl Parser<'_> {
 
 struct PendingMatchPatternMapping {
     start: TextSize,
+    state: MatchPatternMappingParsingState,
     mapping_item_start: TextSize,
     key: Expr,
     value_start: TextSize,

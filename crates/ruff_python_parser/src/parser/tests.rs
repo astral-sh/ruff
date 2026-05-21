@@ -273,6 +273,23 @@ fn deeply_nested_mapping_patterns() {
 }
 
 #[test]
+fn deeply_nested_later_mapping_patterns() {
+    let depth = 5_000;
+    let mut src = String::from("match x:\n case ");
+    for _ in 0..depth {
+        src.push_str("{0: _, 1: ");
+    }
+    src.push('_');
+    for _ in 0..depth {
+        src.push('}');
+    }
+    src.push_str(": pass\n");
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
+}
+
+#[test]
 fn deeply_nested_keyword_class_patterns() {
     let depth = 5_000;
     let mut src = String::from("match x:\n case ");
