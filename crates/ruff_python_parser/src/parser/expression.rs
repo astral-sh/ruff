@@ -5769,12 +5769,17 @@ impl<'src> Parser<'src> {
 
         while let Some(mut default) = pending.pop() {
             let parameter_range = self.node_range(default.parameter_start);
-            default.parameters.args.push(ast::ParameterWithDefault {
+            let parameter = ast::ParameterWithDefault {
                 range: parameter_range,
                 node_index: AtomicNodeIndex::NONE,
                 parameter: default.parameter,
                 default: Some(Box::new(Expr::Lambda(lambda))),
-            });
+            };
+            if default.keyword_only {
+                default.parameters.kwonlyargs.push(parameter);
+            } else {
+                default.parameters.args.push(parameter);
+            }
             default.parameters.range = self.node_range(default.parameters_start);
 
             self.expect(TokenKind::Colon);
@@ -5802,8 +5807,67 @@ impl<'src> Parser<'src> {
 
         let parameters_start = self.node_start();
         let mut parameters = ast::Parameters::default();
+        let mut seen_default_param = false;
+        let mut seen_positional_only_separator = false;
+        let mut seen_keyword_only_separator = false;
 
         loop {
+            match self.current_token_kind() {
+                TokenKind::Slash => {
+                    if seen_positional_only_separator
+                        || seen_keyword_only_separator
+                        || parameters.args.is_empty()
+                    {
+                        self.rewind(checkpoint);
+                        return None;
+                    }
+
+                    self.bump(TokenKind::Slash);
+                    std::mem::swap(&mut parameters.args, &mut parameters.posonlyargs);
+                    seen_positional_only_separator = true;
+
+                    if !self.eat(TokenKind::Comma) {
+                        self.rewind(checkpoint);
+                        return None;
+                    }
+
+                    continue;
+                }
+                TokenKind::Star => {
+                    if seen_keyword_only_separator {
+                        self.rewind(checkpoint);
+                        return None;
+                    }
+
+                    let parameter_start = self.node_start();
+                    self.bump(TokenKind::Star);
+                    seen_keyword_only_separator = true;
+
+                    if self.at_name_or_soft_keyword() {
+                        let name = self.parse_identifier();
+                        parameters.vararg = Some(Box::new(ast::Parameter {
+                            range: self.node_range(parameter_start),
+                            node_index: AtomicNodeIndex::NONE,
+                            name,
+                            annotation: None,
+                        }));
+
+                        if self.at(TokenKind::Equal) {
+                            self.rewind(checkpoint);
+                            return None;
+                        }
+                    }
+
+                    if !self.eat(TokenKind::Comma) {
+                        self.rewind(checkpoint);
+                        return None;
+                    }
+
+                    continue;
+                }
+                _ => {}
+            }
+
             if !self.at_name_or_soft_keyword() {
                 self.rewind(checkpoint);
                 return None;
@@ -5818,7 +5882,7 @@ impl<'src> Parser<'src> {
                 annotation: None,
             };
 
-            if self.eat(TokenKind::Equal) {
+            let default = if self.eat(TokenKind::Equal) {
                 if self.at(TokenKind::Lambda) {
                     return Some(PendingNestedLambdaDefault {
                         start,
@@ -5826,19 +5890,33 @@ impl<'src> Parser<'src> {
                         parameters,
                         parameter_start,
                         parameter,
+                        keyword_only: seen_keyword_only_separator,
                     });
                 }
 
-                self.rewind(checkpoint);
-                return None;
-            }
+                seen_default_param = true;
+                Some(Box::new(self.parse_conditional_expression_or_higher().expr))
+            } else {
+                if seen_default_param && !seen_keyword_only_separator {
+                    self.rewind(checkpoint);
+                    return None;
+                }
 
-            parameters.args.push(ast::ParameterWithDefault {
+                None
+            };
+
+            let parameter = ast::ParameterWithDefault {
                 range: self.node_range(parameter_start),
                 node_index: AtomicNodeIndex::NONE,
                 parameter,
-                default: None,
-            });
+                default,
+            };
+
+            if seen_keyword_only_separator {
+                parameters.kwonlyargs.push(parameter);
+            } else {
+                parameters.args.push(parameter);
+            }
 
             if !self.eat(TokenKind::Comma) {
                 self.rewind(checkpoint);
@@ -6303,6 +6381,7 @@ struct PendingNestedLambdaDefault {
     parameters: ast::Parameters,
     parameter_start: TextSize,
     parameter: ast::Parameter,
+    keyword_only: bool,
 }
 
 struct PendingIfExpression {
