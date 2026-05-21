@@ -33,6 +33,13 @@ use super::{InterpolatedStringElementsKind, Parenthesized, RecoveryContextKind};
 /// A token set consisting of a newline or end of file.
 const NEWLINE_EOF_SET: TokenSet = TokenSet::new([TokenKind::Newline, TokenKind::EndOfFile]);
 
+/// Tokens that start a string expression.
+const STRING_START_SET: TokenSet = TokenSet::new([
+    TokenKind::String,
+    TokenKind::FStringStart,
+    TokenKind::TStringStart,
+]);
+
 /// Tokens that represents a literal expression.
 const LITERAL_SET: TokenSet = TokenSet::new([
     TokenKind::Int,
@@ -118,6 +125,13 @@ pub(super) const END_EXPR_SET: TokenSet = TokenSet::new([
 const END_SEQUENCE_SET: TokenSet = END_EXPR_SET.remove(TokenKind::Comma);
 
 impl<'src> Parser<'src> {
+    #[inline]
+    fn should_unroll_nested_expression(&self) -> bool {
+        // Starred container nesting spends two recursive expression frames per
+        // bracket level before the nested parser takes over.
+        self.tokens.nesting() >= self.max_nesting_depth / 2
+    }
+
     /// Returns `true` if the parser is at a name or keyword (including soft keyword) token.
     pub(super) fn at_name_or_keyword(&self) -> bool {
         self.at(TokenKind::Name) || self.current_token_kind().is_keyword()
@@ -153,6 +167,26 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         let parsed_expr = self.parse_conditional_expression_or_higher_impl(context);
 
+        self.parse_expression_list_from_expr(parsed_expr, start, context)
+    }
+
+    fn parse_expression_list_from_lhs(
+        &mut self,
+        lhs: ParsedExpr,
+        start: TextSize,
+        context: ExpressionContext,
+    ) -> ParsedExpr {
+        let parsed_expr = self.parse_conditional_expression_or_higher_from_lhs(lhs, start, context);
+
+        self.parse_expression_list_from_expr(parsed_expr, start, context)
+    }
+
+    fn parse_expression_list_from_expr(
+        &mut self,
+        parsed_expr: ParsedExpr,
+        start: TextSize,
+        context: ExpressionContext,
+    ) -> ParsedExpr {
         if self.at(TokenKind::Comma) {
             Expr::Tuple(self.parse_tuple_expression(
                 parsed_expr.expr,
@@ -193,7 +227,7 @@ impl<'src> Parser<'src> {
         &mut self,
         context: ExpressionContext,
     ) -> ParsedExpr {
-        if !self.at(TokenKind::Name) {
+        if !self.should_unroll_nested_expression() || !self.at(TokenKind::Name) {
             return self.parse_named_expression_or_higher(context);
         }
 
@@ -224,7 +258,7 @@ impl<'src> Parser<'src> {
         &mut self,
         context: ExpressionContext,
     ) -> ParsedExpr {
-        if !self.at(TokenKind::Name) {
+        if !self.should_unroll_nested_expression() || !self.at(TokenKind::Name) {
             return self.parse_conditional_expression_or_higher_impl(context);
         }
 
@@ -1012,6 +1046,7 @@ impl<'src> Parser<'src> {
         self.parse_call_expression_after_lpar(func, start, arguments_start)
     }
 
+    #[cold]
     fn parse_call_expression_unrolling_nested_calls(
         &mut self,
         func: Expr,
@@ -1043,6 +1078,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    #[cold]
     fn parse_nested_call_expression(
         &mut self,
         outer_func: Expr,
@@ -1168,6 +1204,7 @@ impl<'src> Parser<'src> {
         call
     }
 
+    #[cold]
     fn try_parse_nested_call_argument(&mut self) -> Option<NestedCallArgument> {
         let arguments_checkpoint = self.checkpoint();
         let mut state = ArgumentParsingState::default();
@@ -1662,6 +1699,7 @@ impl<'src> Parser<'src> {
         self.parse_subscript_expression_after_lsqb(value, start, slice_start)
     }
 
+    #[cold]
     fn parse_subscript_expression_unrolling_nested_subscripts(
         &mut self,
         value: Expr,
@@ -1677,6 +1715,7 @@ impl<'src> Parser<'src> {
                     start,
                     slice_start,
                     slices: nested.slices,
+                    nested_slice_start: nested.nested_slice_start,
                     nested_slice: nested.nested_slice,
                 },
                 nested.value,
@@ -1687,11 +1726,14 @@ impl<'src> Parser<'src> {
         self.parse_subscript_expression_after_lsqb(value, start, slice_start)
     }
 
+    #[cold]
     fn try_parse_nested_subscript_slice(&mut self) -> Option<NestedSubscriptSlice> {
         let checkpoint = self.checkpoint();
         let mut slices = vec![];
 
         loop {
+            let nested_slice_start = self.node_start();
+
             if self.at(TokenKind::Colon) {
                 let slice_checkpoint = self.checkpoint();
                 self.bump(TokenKind::Colon);
@@ -1703,6 +1745,7 @@ impl<'src> Parser<'src> {
                         value,
                         start: value_start,
                         slices,
+                        nested_slice_start,
                         nested_slice: PendingSubscriptSlice::Upper {
                             value_start,
                             lower: None,
@@ -1720,6 +1763,7 @@ impl<'src> Parser<'src> {
                         value,
                         start: value_start,
                         slices,
+                        nested_slice_start,
                         nested_slice: PendingSubscriptSlice::Step {
                             value_start,
                             lower: None,
@@ -1742,6 +1786,7 @@ impl<'src> Parser<'src> {
                             value,
                             start: value_start,
                             slices,
+                            nested_slice_start,
                             nested_slice: PendingSubscriptSlice::Step {
                                 value_start,
                                 lower: None,
@@ -1766,6 +1811,7 @@ impl<'src> Parser<'src> {
                         value,
                         start,
                         slices,
+                        nested_slice_start,
                         nested_slice: PendingSubscriptSlice::Starred {
                             starred_start,
                             value_start: start,
@@ -1783,6 +1829,7 @@ impl<'src> Parser<'src> {
                     value,
                     start,
                     slices,
+                    nested_slice_start,
                     nested_slice: PendingSubscriptSlice::Direct,
                 });
             }
@@ -1801,6 +1848,7 @@ impl<'src> Parser<'src> {
                             value,
                             start: value_start,
                             slices,
+                            nested_slice_start,
                             nested_slice: PendingSubscriptSlice::Upper {
                                 value_start,
                                 lower: Some(lower),
@@ -1818,6 +1866,7 @@ impl<'src> Parser<'src> {
                             value,
                             start: value_start,
                             slices,
+                            nested_slice_start,
                             nested_slice: PendingSubscriptSlice::Step {
                                 value_start,
                                 lower: Some(lower),
@@ -1840,6 +1889,7 @@ impl<'src> Parser<'src> {
                                 value,
                                 start: value_start,
                                 slices,
+                                nested_slice_start,
                                 nested_slice: PendingSubscriptSlice::Step {
                                     value_start,
                                     lower: Some(lower),
@@ -1861,6 +1911,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    #[cold]
     fn parse_nested_subscript_expression(
         &mut self,
         outer: PendingSubscript,
@@ -1886,6 +1937,7 @@ impl<'src> Parser<'src> {
                 start,
                 slice_start,
                 slices: nested.slices,
+                nested_slice_start: nested.nested_slice_start,
                 nested_slice: nested.nested_slice,
             });
 
@@ -1898,10 +1950,10 @@ impl<'src> Parser<'src> {
                 PendingSubscriptSlice::Direct => {
                     let lower = self.parse_named_expression_or_higher_from_lhs(
                         expr.into(),
-                        subscript.slice_start,
+                        subscript.nested_slice_start,
                         ExpressionContext::starred_conditional(),
                     );
-                    self.parse_slice_from_lower(subscript.slice_start, lower)
+                    self.parse_slice_from_lower(subscript.nested_slice_start, lower)
                 }
                 PendingSubscriptSlice::Starred {
                     starred_start,
@@ -1919,7 +1971,7 @@ impl<'src> Parser<'src> {
                         node_index: AtomicNodeIndex::NONE,
                     })
                     .into();
-                    self.parse_slice_from_lower(subscript.slice_start, lower)
+                    self.parse_slice_from_lower(subscript.nested_slice_start, lower)
                 }
                 PendingSubscriptSlice::Upper { value_start, lower } => {
                     let upper = self.parse_conditional_expression_or_higher_from_lhs(
@@ -1928,7 +1980,11 @@ impl<'src> Parser<'src> {
                         ExpressionContext::default(),
                     );
                     let lower = lower.map(|lower| self.validated_slice_lower(lower));
-                    self.finish_slice_after_upper(subscript.slice_start, lower, Some(upper.expr))
+                    self.finish_slice_after_upper(
+                        subscript.nested_slice_start,
+                        lower,
+                        Some(upper.expr),
+                    )
                 }
                 PendingSubscriptSlice::Step {
                     value_start,
@@ -1943,7 +1999,7 @@ impl<'src> Parser<'src> {
                     let lower = lower.map(|lower| Box::new(self.validated_slice_lower(lower)));
                     let upper = upper.map(Box::new);
                     self.finish_slice_after_step(
-                        subscript.slice_start,
+                        subscript.nested_slice_start,
                         lower,
                         upper,
                         Some(step.expr),
@@ -2461,51 +2517,21 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/grammar.html> (Search "strings:")
     pub(super) fn parse_strings(&mut self) -> Expr {
-        const STRING_START_SET: TokenSet = TokenSet::new([
-            TokenKind::String,
-            TokenKind::FStringStart,
-            TokenKind::TStringStart,
-        ]);
-
         let start = self.node_start();
-        let mut strings = vec![];
+        let first = self.parse_string_type();
+
+        self.parse_strings_after_first(start, first)
+    }
+
+    fn parse_strings_after_first(&mut self, start: TextSize, first: StringType) -> Expr {
+        let mut strings = vec![first];
 
         let mut progress = ParserProgress::default();
 
         while self.at_ts(STRING_START_SET) {
             progress.assert_progressing(self);
 
-            if self.at(TokenKind::String) {
-                strings.push(self.parse_string_or_byte_literal());
-            } else if self.at(TokenKind::FStringStart) {
-                strings.push(StringType::FString(
-                    self.parse_interpolated_string(InterpolatedStringKind::FString)
-                        .into(),
-                ));
-            } else if self.at(TokenKind::TStringStart) {
-                // test_ok template_strings_py314
-                // # parse_options: {"target-version": "3.14"}
-                // t"{hey}"
-                // t'{there}'
-                // t"""what's
-                // happening?"""
-
-                // test_err template_strings_py313
-                // # parse_options: {"target-version": "3.13"}
-                // t"{hey}"
-                // t'{there}'
-                // t"""what's
-                // happening?"""
-                let string_type = StringType::TString(
-                    self.parse_interpolated_string(InterpolatedStringKind::TString)
-                        .into(),
-                );
-                self.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::TemplateStrings,
-                    string_type.range(),
-                );
-                strings.push(string_type);
-            }
+            strings.push(self.parse_string_type());
         }
 
         let range = self.node_range(start);
@@ -2515,29 +2541,60 @@ impl<'src> Parser<'src> {
             // `String`, `FStringStart`, or `TStringStart` token.
             0 => unreachable!("Expected to parse at least one string"),
             // We need a owned value, hence the `pop` here.
-            1 => match strings.pop().unwrap() {
-                StringType::Str(string) => Expr::StringLiteral(ast::ExprStringLiteral {
-                    value: ast::StringLiteralValue::single(string),
-                    range,
-                    node_index: AtomicNodeIndex::NONE,
-                }),
-                StringType::Bytes(bytes) => Expr::BytesLiteral(ast::ExprBytesLiteral {
-                    value: ast::BytesLiteralValue::single(bytes),
-                    range,
-                    node_index: AtomicNodeIndex::NONE,
-                }),
-                StringType::FString(fstring) => Expr::FString(ast::ExprFString {
-                    value: ast::FStringValue::single(fstring),
-                    range,
-                    node_index: AtomicNodeIndex::NONE,
-                }),
-                StringType::TString(tstring) => Expr::TString(ast::ExprTString {
-                    value: ast::TStringValue::single(tstring),
-                    range,
-                    node_index: AtomicNodeIndex::NONE,
-                }),
-            },
+            1 => Self::string_type_expression(strings.pop().unwrap(), range),
             _ => self.handle_implicitly_concatenated_strings(strings, range),
+        }
+    }
+
+    fn parse_string_type(&mut self) -> StringType {
+        if self.at(TokenKind::String) {
+            self.parse_string_or_byte_literal()
+        } else if self.at(TokenKind::FStringStart) {
+            let string = self.parse_interpolated_string(InterpolatedStringKind::FString);
+            self.interpolated_string_type(string, InterpolatedStringKind::FString)
+        } else if self.at(TokenKind::TStringStart) {
+            // test_ok template_strings_py314
+            // # parse_options: {"target-version": "3.14"}
+            // t"{hey}"
+            // t'{there}'
+            // t"""what's
+            // happening?"""
+
+            // test_err template_strings_py313
+            // # parse_options: {"target-version": "3.13"}
+            // t"{hey}"
+            // t'{there}'
+            // t"""what's
+            // happening?"""
+            let string = self.parse_interpolated_string(InterpolatedStringKind::TString);
+            self.interpolated_string_type(string, InterpolatedStringKind::TString)
+        } else {
+            unreachable!("Expected to parse a string")
+        }
+    }
+
+    fn string_type_expression(string: StringType, range: TextRange) -> Expr {
+        match string {
+            StringType::Str(string) => Expr::StringLiteral(ast::ExprStringLiteral {
+                value: ast::StringLiteralValue::single(string),
+                range,
+                node_index: AtomicNodeIndex::NONE,
+            }),
+            StringType::Bytes(bytes) => Expr::BytesLiteral(ast::ExprBytesLiteral {
+                value: ast::BytesLiteralValue::single(bytes),
+                range,
+                node_index: AtomicNodeIndex::NONE,
+            }),
+            StringType::FString(fstring) => Expr::FString(ast::ExprFString {
+                value: ast::FStringValue::single(fstring),
+                range,
+                node_index: AtomicNodeIndex::NONE,
+            }),
+            StringType::TString(tstring) => Expr::TString(ast::ExprTString {
+                value: ast::TStringValue::single(tstring),
+                range,
+                node_index: AtomicNodeIndex::NONE,
+            }),
         }
     }
 
@@ -2764,7 +2821,9 @@ impl<'src> Parser<'src> {
 
         self.bump(kind.start_token());
 
-        if let Some(string) = self.try_parse_nested_interpolated_string(start, flags, kind) {
+        if self.should_unroll_nested_expression()
+            && let Some(string) = self.try_parse_nested_interpolated_string(start, flags, kind)
+        {
             return string;
         }
 
@@ -2804,6 +2863,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    #[cold]
     fn try_parse_nested_interpolated_string(
         &mut self,
         start: TextSize,
@@ -2849,12 +2909,23 @@ impl<'src> Parser<'src> {
         };
 
         while let Some(pending) = pending.pop() {
-            let mut value = self
-                .interpolated_string_expression(string, string_kind)
-                .into();
+            let string_start = string.range.start();
+            let mut value = if self.at_ts(STRING_START_SET) {
+                let first = self.interpolated_string_type(string, string_kind);
+                self.parse_strings_after_first(string_start, first).into()
+            } else {
+                self.interpolated_string_expression(string, string_kind)
+                    .into()
+            };
             for parenthesis_start in pending.parentheses.into_iter().rev() {
                 value = self.finish_parenthesized_expression(value, parenthesis_start);
             }
+            let value_start = value.start();
+            let value = self.parse_expression_list_from_lhs(
+                value,
+                value_start,
+                ExpressionContext::yield_or_starred_bitwise_or(),
+            );
             let element = self.finish_interpolated_element(
                 pending.element_start,
                 pending.flags,
@@ -2881,6 +2952,7 @@ impl<'src> Parser<'src> {
         Some(string)
     }
 
+    #[cold]
     fn try_parse_nested_interpolated_string_head(
         &mut self,
         flags: AnyStringFlags,
@@ -2932,23 +3004,24 @@ impl<'src> Parser<'src> {
     ) -> Expr {
         let range = string.range;
 
+        let string = self.interpolated_string_type(string, kind);
+        Self::string_type_expression(string, range)
+    }
+
+    fn interpolated_string_type(
+        &mut self,
+        string: InterpolatedStringData,
+        kind: InterpolatedStringKind,
+    ) -> StringType {
         match kind {
-            InterpolatedStringKind::FString => Expr::FString(ast::ExprFString {
-                value: ast::FStringValue::single(string.into()),
-                range,
-                node_index: AtomicNodeIndex::NONE,
-            }),
+            InterpolatedStringKind::FString => StringType::FString(string.into()),
             InterpolatedStringKind::TString => {
                 let string = TString::from(string);
                 self.add_unsupported_syntax_error(
                     UnsupportedSyntaxErrorKind::TemplateStrings,
                     string.range(),
                 );
-                Expr::TString(ast::ExprTString {
-                    value: ast::TStringValue::single(string),
-                    range,
-                    node_index: AtomicNodeIndex::NONE,
-                })
+                StringType::TString(string)
             }
         }
     }
@@ -3253,8 +3326,9 @@ impl<'src> Parser<'src> {
     ) -> ast::InterpolatedStringFormatSpec {
         let start = self.node_start();
 
-        if let Some(format_spec) =
-            self.try_parse_nested_interpolated_string_format_spec(start, flags, string_kind)
+        if self.should_unroll_nested_expression()
+            && let Some(format_spec) =
+                self.try_parse_nested_interpolated_string_format_spec(start, flags, string_kind)
         {
             return format_spec;
         }
@@ -3289,6 +3363,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    #[cold]
     fn try_parse_nested_interpolated_string_format_spec(
         &mut self,
         start: TextSize,
@@ -3586,7 +3661,9 @@ impl<'src> Parser<'src> {
             return self.empty_list(start);
         }
 
-        if let Some(pending) = self.try_parse_nested_list_like_expression(start) {
+        if self.should_unroll_nested_expression()
+            && let Some(pending) = self.try_parse_nested_list_like_expression(start)
+        {
             return self.parse_nested_list_like_expression(pending);
         }
 
@@ -3597,6 +3674,7 @@ impl<'src> Parser<'src> {
         self.finish_list_like_expression(first_element, start)
     }
 
+    #[cold]
     fn try_parse_nested_list_like_expression(
         &mut self,
         start: TextSize,
@@ -3638,6 +3716,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    #[cold]
     fn parse_nested_list_like_expression(&mut self, outer: PendingListLikeExpression) -> Expr {
         let mut pending = vec![outer];
 
@@ -3814,7 +3893,9 @@ impl<'src> Parser<'src> {
 
         let after_brace = self.node_start();
 
-        if let Some(pending) = self.try_parse_nested_set_or_dict_like_expression(start) {
+        if self.should_unroll_nested_expression()
+            && let Some(pending) = self.try_parse_nested_set_or_dict_like_expression(start)
+        {
             return self.parse_nested_set_or_dict_like_expression(pending);
         }
 
@@ -3831,6 +3912,7 @@ impl<'src> Parser<'src> {
         self.finish_set_or_dict_like_expression(key_or_element, start)
     }
 
+    #[cold]
     fn try_parse_nested_set_or_dict_like_expression(
         &mut self,
         start: TextSize,
@@ -3926,6 +4008,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    #[cold]
     fn parse_nested_set_or_dict_like_expression(
         &mut self,
         outer: PendingSetOrDictLikeExpression,
@@ -4009,24 +4092,51 @@ impl<'src> Parser<'src> {
                         )
                     }
                 }
-                PendingSetOrDictLikeExpression::DictValue { start, items, key } => (
-                    Expr::Dict(self.parse_dictionary_expression_after_item(
-                        items,
-                        Some(key),
-                        key_or_element.expr,
+                PendingSetOrDictLikeExpression::DictValue { start, items, key } => {
+                    let value_start = key_or_element.start();
+                    let value = self.parse_conditional_expression_or_higher_from_lhs(
+                        key_or_element,
+                        value_start,
+                        ExpressionContext::default(),
+                    );
+
+                    if items.is_empty()
+                        && matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For)
+                    {
+                        (
+                            Expr::DictComp(self.parse_dictionary_comprehension_expression(
+                                Some(key),
+                                value.expr,
+                                start,
+                            )),
+                            start,
+                        )
+                    } else {
+                        (
+                            Expr::Dict(self.parse_dictionary_expression_after_item(
+                                items,
+                                Some(key),
+                                value.expr,
+                                start,
+                            )),
+                            start,
+                        )
+                    }
+                }
+                PendingSetOrDictLikeExpression::DictUnpackingValue { start, items } => {
+                    let value_start = key_or_element.start();
+                    let value = self.parse_expression_with_bitwise_or_precedence_from_lhs(
+                        key_or_element,
+                        value_start,
+                    );
+
+                    (
+                        Expr::Dict(self.parse_dictionary_expression_after_item(
+                            items, None, value.expr, start,
+                        )),
                         start,
-                    )),
-                    start,
-                ),
-                PendingSetOrDictLikeExpression::DictUnpackingValue { start, items } => (
-                    Expr::Dict(self.parse_dictionary_expression_after_item(
-                        items,
-                        None,
-                        key_or_element.expr,
-                        start,
-                    )),
-                    start,
-                ),
+                    )
+                }
                 PendingSetOrDictLikeExpression::DictKey { start, items } => {
                     self.validate_dictionary_key(&key_or_element);
                     self.expect(TokenKind::Colon);
@@ -4233,25 +4343,31 @@ impl<'src> Parser<'src> {
             return self.empty_parenthesized_tuple(start);
         }
 
-        if self.at(TokenKind::Lpar) {
-            return self.parse_nested_parenthesized_expression(PendingParenthesizedExpression {
-                start,
-                elts: vec![],
-                nested_element: PendingParenthesizedElement::Direct,
-            });
-        }
+        if self.should_unroll_nested_expression() {
+            if self.at(TokenKind::Lpar) {
+                return self.parse_nested_parenthesized_expression(
+                    PendingParenthesizedExpression {
+                        start,
+                        elts: vec![],
+                        nested_element: PendingParenthesizedElement::Direct,
+                    },
+                );
+            }
 
-        if self.at(TokenKind::Star) && self.peek() == TokenKind::Lpar {
-            let starred_start = self.node_start();
-            self.bump(TokenKind::Star);
-            return self.parse_nested_parenthesized_expression(PendingParenthesizedExpression {
-                start,
-                elts: vec![],
-                nested_element: PendingParenthesizedElement::Starred {
-                    starred_start,
-                    value_start: self.node_start(),
-                },
-            });
+            if self.at(TokenKind::Star) && self.peek() == TokenKind::Lpar {
+                let starred_start = self.node_start();
+                self.bump(TokenKind::Star);
+                return self.parse_nested_parenthesized_expression(
+                    PendingParenthesizedExpression {
+                        start,
+                        elts: vec![],
+                        nested_element: PendingParenthesizedElement::Starred {
+                            starred_start,
+                            value_start: self.node_start(),
+                        },
+                    },
+                );
+            }
         }
 
         let context = ExpressionContext::yield_or_starred_bitwise_or();
@@ -4260,7 +4376,9 @@ impl<'src> Parser<'src> {
             let expression_start = self.node_start();
             let lhs = self.parse_lhs_expression(OperatorPrecedence::None, context);
 
-            if self.parenthesized_binary_operator().is_some() {
+            if self.should_unroll_nested_expression()
+                && self.parenthesized_binary_operator().is_some()
+            {
                 return self.parse_nested_parenthesized_binary_expression(
                     lhs,
                     expression_start,
@@ -4274,7 +4392,8 @@ impl<'src> Parser<'src> {
                 expression_start,
                 context,
             );
-            let parsed_expr = if self.at(TokenKind::Comma) {
+            let parsed_expr = if self.should_unroll_nested_expression() && self.at(TokenKind::Comma)
+            {
                 match self.try_parse_nested_parenthesized_tuple_expression(start, parsed_expr) {
                     Ok(pending) => return self.parse_nested_parenthesized_expression(pending),
                     Err(parsed_expr) => parsed_expr,
@@ -4292,6 +4411,7 @@ impl<'src> Parser<'src> {
         self.finish_parenthesized_expression(parsed_expr, start)
     }
 
+    #[cold]
     fn try_parse_nested_parenthesized_tuple_expression(
         &mut self,
         start: TextSize,
@@ -4338,6 +4458,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    #[cold]
     fn parse_nested_parenthesized_expression(
         &mut self,
         outer: PendingParenthesizedExpression,
@@ -4459,6 +4580,7 @@ impl<'src> Parser<'src> {
         (self.peek() == TokenKind::Lpar).then_some(operator)
     }
 
+    #[cold]
     fn parse_nested_parenthesized_binary_expression(
         &mut self,
         mut lhs: ParsedExpr,
@@ -5758,6 +5880,11 @@ impl<'src> Parser<'src> {
                 Expr::Named(named).into(),
                 outer.parenthesis_start,
             );
+            let value = self.parse_conditional_expression_or_higher_from_lhs(
+                value,
+                outer.parenthesis_start,
+                ExpressionContext::default(),
+            );
             named = self.named_expression(outer.target, value.expr, outer.start);
         }
 
@@ -5887,6 +6014,7 @@ impl<'src> Parser<'src> {
     ) {
         let mut seen_positional_only_separator = !parameters.posonlyargs.is_empty();
         let mut seen_default_param = true;
+        let mut last_keyword_only_separator_range = None;
 
         while self.eat(TokenKind::Comma) && !self.at(TokenKind::Colon) {
             match self.current_token_kind() {
@@ -5907,6 +6035,7 @@ impl<'src> Parser<'src> {
                 }
                 TokenKind::Star => {
                     let parameter_start = self.node_start();
+                    let star_range = self.current_token_range();
                     self.bump(TokenKind::Star);
                     seen_keyword_only_separator = true;
 
@@ -5918,18 +6047,28 @@ impl<'src> Parser<'src> {
                             name,
                             annotation: None,
                         }));
+                        last_keyword_only_separator_range = None;
+                    } else {
+                        last_keyword_only_separator_range = Some(star_range);
                     }
                 }
                 TokenKind::DoubleStar => {
                     let parameter_start = self.node_start();
                     self.bump(TokenKind::DoubleStar);
                     let name = self.parse_identifier();
+                    let parameter_range = self.node_range(parameter_start);
+
+                    if last_keyword_only_separator_range.is_some() {
+                        self.add_error(ParseErrorType::ExpectedKeywordParam, parameter_range);
+                    }
+
                     parameters.kwarg = Some(Box::new(ast::Parameter {
-                        range: self.node_range(parameter_start),
+                        range: parameter_range,
                         node_index: AtomicNodeIndex::NONE,
                         name,
                         annotation: None,
                     }));
+                    last_keyword_only_separator_range = None;
                 }
                 _ if self.at_name_or_soft_keyword() => {
                     let parameter_start = self.node_start();
@@ -5968,6 +6107,10 @@ impl<'src> Parser<'src> {
                 }
                 _ => break,
             }
+        }
+
+        if let Some(star_range) = last_keyword_only_separator_range {
+            self.add_error(ParseErrorType::ExpectedKeywordParam, star_range);
         }
     }
 
@@ -6484,6 +6627,7 @@ struct PendingSubscript {
     start: TextSize,
     slice_start: TextSize,
     slices: Vec<Expr>,
+    nested_slice_start: TextSize,
     nested_slice: PendingSubscriptSlice,
 }
 
@@ -6491,6 +6635,7 @@ struct NestedSubscriptSlice {
     value: Expr,
     start: TextSize,
     slices: Vec<Expr>,
+    nested_slice_start: TextSize,
     nested_slice: PendingSubscriptSlice,
 }
 

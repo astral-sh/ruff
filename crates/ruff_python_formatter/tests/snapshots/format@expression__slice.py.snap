@@ -93,6 +93,9 @@ e210 = "e"[a() : 1 :]
 # Regression test for https://github.com/astral-sh/ruff/issues/5605
 f = "f"[:,]
 
+# A later slice can contain a nested subscript as its upper bound.
+h = "h"[0, : bounds[0]]
+
 # Regression test for https://github.com/astral-sh/ruff/issues/5733
 g1 = "g"[(1):(2)]
 g2 = "g"[(1):(2):(3)]
@@ -217,6 +220,9 @@ e210 = "e"[a() : 1 :]
 
 # Regression test for https://github.com/astral-sh/ruff/issues/5605
 f = "f"[:,]
+
+# A later slice can contain a nested subscript as its upper bound.
+h = "h"[0, : bounds[0]]
 
 # Regression test for https://github.com/astral-sh/ruff/issues/5733
 g1 = "g"[(1):(2)]

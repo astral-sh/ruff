@@ -80,6 +80,8 @@ fn nested_expression_continuations() {
         "{{**0}}",
         "1 + (2 + (3) * 4)",
         "(1 + (lambda: 2))",
+        "(x := (y := 0)())",
+        "(colon_count := (address := address.lower()).count(':')) == 0",
         "lambda x=lambda: 1, y=2: x",
     ] {
         parse_expression(source).unwrap();
@@ -914,6 +916,15 @@ fn deeply_nested_keyword_only_lambda_defaults() {
 
     // Keep this focused on parser recursion rather than recursive AST destruction.
     std::mem::forget(parse_module(&src).unwrap());
+}
+
+#[test]
+fn nested_lambda_default_preserves_bare_star_validation() {
+    parse_expression("lambda a=lambda: 0, *args, **kw: a").unwrap();
+
+    let error = parse_expression("lambda a=lambda: 0, *, **kw: a").unwrap_err();
+
+    assert!(matches!(error.error, ParseErrorType::ExpectedKeywordParam));
 }
 
 #[test]
