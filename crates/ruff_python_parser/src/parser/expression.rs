@@ -2958,30 +2958,7 @@ impl<'src> Parser<'src> {
                         parser.parse_interpolated_element(flags, string_kind),
                     ),
                     tok if tok == middle_token_kind => {
-                        let range = parser.current_token_range();
-                        let TokenValue::InterpolatedStringMiddle(value) =
-                            parser.bump_value(middle_token_kind)
-                        else {
-                            unreachable!()
-                        };
-                        InterpolatedStringElement::Literal(
-                            parse_interpolated_string_literal_element(value, flags, range)
-                                .unwrap_or_else(|lex_error| {
-                                    // test_err invalid_fstring_literal_element
-                                    // f'hello \N{INVALID} world'
-                                    // f"""hello \N{INVALID} world"""
-                                    let location = lex_error.location();
-                                    parser.add_error(
-                                        ParseErrorType::Lexical(lex_error.into_error()),
-                                        location,
-                                    );
-                                    ast::InterpolatedStringLiteralElement {
-                                        value: "".into(),
-                                        range,
-                                        node_index: AtomicNodeIndex::NONE,
-                                    }
-                                }),
-                        )
+                        parser.parse_interpolated_literal_element(flags, middle_token_kind)
                     }
                     // `Invalid` tokens are created when there's a lexical error, so
                     // we ignore it here to avoid creating unexpected token errors
@@ -3005,6 +2982,33 @@ impl<'src> Parser<'src> {
         );
 
         ast::InterpolatedStringElements::from(elements)
+    }
+
+    fn parse_interpolated_literal_element(
+        &mut self,
+        flags: AnyStringFlags,
+        middle_token_kind: TokenKind,
+    ) -> InterpolatedStringElement {
+        let range = self.current_token_range();
+        let TokenValue::InterpolatedStringMiddle(value) = self.bump_value(middle_token_kind) else {
+            unreachable!()
+        };
+        InterpolatedStringElement::Literal(
+            parse_interpolated_string_literal_element(value, flags, range).unwrap_or_else(
+                |lex_error| {
+                    // test_err invalid_fstring_literal_element
+                    // f'hello \N{INVALID} world'
+                    // f"""hello \N{INVALID} world"""
+                    let location = lex_error.location();
+                    self.add_error(ParseErrorType::Lexical(lex_error.into_error()), location);
+                    ast::InterpolatedStringLiteralElement {
+                        value: "".into(),
+                        range,
+                        node_index: AtomicNodeIndex::NONE,
+                    }
+                },
+            ),
+        )
     }
 
     /// Parses an f/t-string expression element.
@@ -3226,10 +3230,18 @@ impl<'src> Parser<'src> {
     ) -> Option<ast::InterpolatedStringFormatSpec> {
         let mut format_specs = Vec::new();
         let mut format_spec_start = start;
+        let middle_token_kind = string_kind.middle_token();
 
         loop {
             let checkpoint = self.checkpoint();
+            let mut initial_elements = Vec::new();
+            while self.at(middle_token_kind) {
+                initial_elements
+                    .push(self.parse_interpolated_literal_element(flags, middle_token_kind));
+            }
+
             if !self.at(TokenKind::Lbrace) {
+                self.rewind(checkpoint);
                 if format_specs.is_empty() {
                     return None;
                 }
@@ -3251,9 +3263,10 @@ impl<'src> Parser<'src> {
                 break;
             }
 
-            if self.eat(TokenKind::Colon) && self.at(TokenKind::Lbrace) {
+            if self.eat(TokenKind::Colon) {
                 format_specs.push(PendingNestedInterpolatedFormatSpec {
                     start: format_spec_start,
+                    initial_elements,
                     element_start,
                     value,
                 });
@@ -3284,8 +3297,10 @@ impl<'src> Parser<'src> {
                 ConversionFlag::None,
                 Some(Box::new(format_spec)),
             );
+            let mut initial_elements = pending.initial_elements;
+            initial_elements.push(InterpolatedStringElement::from(element));
             let elements = self.parse_interpolated_string_elements_after_initial(
-                vec![InterpolatedStringElement::from(element)],
+                initial_elements,
                 flags,
                 InterpolatedStringElementsKind::FormatSpec(string_kind),
                 string_kind,
@@ -6495,6 +6510,7 @@ struct PendingNestedInterpolatedString {
 
 struct PendingNestedInterpolatedFormatSpec {
     start: TextSize,
+    initial_elements: Vec<InterpolatedStringElement>,
     element_start: TextSize,
     value: ParsedExpr,
 }
