@@ -3,7 +3,10 @@ use std::{path::Path, sync::LazyLock};
 use regex::Regex;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::format_module_source;
-use ruff_python_trivia::textwrap::{dedent, indent};
+use ruff_python_trivia::{
+    is_python_whitespace,
+    textwrap::{dedent, indent},
+};
 use ruff_source_file::{Line, UniversalNewlines};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::FormatterSettings;
@@ -46,6 +49,21 @@ enum MarkdownState {
     Off,
 }
 
+fn is_closing_code_fence(line: &str, opening_fence: &str) -> bool {
+    let Some(fence_byte) = opening_fence.as_bytes().first().copied() else {
+        return false;
+    };
+
+    let line = line.trim_start();
+    let fence_len = line
+        .as_bytes()
+        .iter()
+        .take_while(|&&byte| byte == fence_byte)
+        .count();
+
+    fence_len >= opening_fence.len() && line[fence_len..].chars().all(is_python_whitespace)
+}
+
 pub fn format_code_blocks(
     source: &str,
     path: Option<&Path>,
@@ -73,14 +91,7 @@ pub fn format_code_blocks(
 
             // Consume lines until reaching the matching/ending code fence
             for code_line in lines.by_ref() {
-                let Some((_, [_, closing_fence, _, _])) = MARKDOWN_CODE_FENCE
-                    .captures(&code_line)
-                    .map(|cap| cap.extract())
-                else {
-                    continue;
-                };
-
-                if closing_fence != opening_fence {
+                if !is_closing_code_fence(&code_line, opening_fence) {
                     continue;
                 }
 
@@ -349,6 +360,37 @@ print( 'hello' )
         print("hello")
         ~~~~~
         "#);
+    }
+
+    #[test]
+    fn format_code_blocks_longer_closing_fence() {
+        let code = r#"
+```py
+print( 'hello' )
+````
+        "#;
+        assert_snapshot!(
+            format_code_blocks(code, None, &FormatterSettings::default()),
+            @r#"
+
+        ```py
+        print("hello")
+        ````
+        "#);
+    }
+
+    #[test]
+    fn format_code_blocks_invalid_closing_fence_info() {
+        let code = r#"
+```py
+print( 'hello' )
+```not_a_close
+print( 'world' )
+```
+        "#;
+        assert_snapshot!(
+            format_code_blocks(code, None, &FormatterSettings::default()),
+            @"Unchanged");
     }
 
     #[test]
