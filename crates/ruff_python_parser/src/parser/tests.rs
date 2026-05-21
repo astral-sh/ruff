@@ -265,6 +265,22 @@ fn nested_calls() {
 }
 
 #[test]
+fn deeply_nested_later_calls() {
+    let depth = 5_000;
+    let mut src = String::from("x = ");
+    for _ in 0..depth {
+        src.push_str("f(0, ");
+    }
+    src.push('1');
+    for _ in 0..depth {
+        src.push(')');
+    }
+
+    // Keep this focused on parser recursion rather than recursive AST destruction.
+    std::mem::forget(parse_module(&src).unwrap());
+}
+
+#[test]
 fn deeply_nested_subscripts() {
     let src = format!("x = {}1{}", "a[".repeat(1_000), "]".repeat(1_000));
     parse_module(&src).unwrap();

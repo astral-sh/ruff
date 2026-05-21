@@ -920,8 +920,8 @@ impl<'src> Parser<'src> {
         let arguments_start = self.node_start();
         self.bump(TokenKind::Lpar);
 
-        if self.at(TokenKind::Name) && self.peek() == TokenKind::Lpar {
-            return self.parse_nested_call_expression(func, start, arguments_start);
+        if let Some(nested) = self.try_parse_nested_call_argument() {
+            return self.parse_nested_call_expression(func, start, arguments_start, nested);
         }
 
         self.parse_call_expression_after_lpar(func, start, arguments_start)
@@ -945,53 +945,57 @@ impl<'src> Parser<'src> {
 
     fn parse_nested_call_expression(
         &mut self,
-        func: Expr,
-        start: TextSize,
-        arguments_start: TextSize,
+        outer_func: Expr,
+        outer_start: TextSize,
+        outer_arguments_start: TextSize,
+        nested: NestedCallArgument,
     ) -> ast::ExprCall {
         let mut calls = vec![PendingCall {
-            func,
-            start,
-            arguments_start,
+            func: outer_func,
+            start: outer_start,
+            arguments_start: outer_arguments_start,
+            argument_start: nested.argument_start,
+            state: nested.state,
         }];
+        let mut func = nested.func;
+        let mut start = nested.start;
 
-        loop {
-            let start = self.node_start();
-            let func = self.parse_atom().expr;
-            calls.push(PendingCall {
-                func,
-                start,
-                arguments_start: self.node_start(),
-            });
-
+        let mut expr = loop {
+            let arguments_start = self.node_start();
             self.bump(TokenKind::Lpar);
 
-            if !self.at(TokenKind::Name) || self.peek() != TokenKind::Lpar {
-                break;
+            if let Some(nested) = self.try_parse_nested_call_argument() {
+                calls.push(PendingCall {
+                    func,
+                    start,
+                    arguments_start,
+                    argument_start: nested.argument_start,
+                    state: nested.state,
+                });
+                func = nested.func;
+                start = nested.start;
+                continue;
             }
-        }
 
-        let innermost = calls
-            .pop()
-            .expect("nested calls always include the outer call");
-        let arguments = self.parse_arguments_after_lpar(innermost.arguments_start);
-        let mut expr = Expr::Call(ast::ExprCall {
-            func: Box::new(innermost.func),
-            arguments,
-            range: self.node_range(innermost.start),
-            node_index: AtomicNodeIndex::NONE,
-        });
+            let arguments = self.parse_arguments_after_lpar(arguments_start);
+            break Expr::Call(ast::ExprCall {
+                func: Box::new(func),
+                arguments,
+                range: self.node_range(start),
+                node_index: AtomicNodeIndex::NONE,
+            });
+        };
 
         while let Some(call) = calls.pop() {
-            let argument_start = expr.range().start();
             let parsed_expr = self.parse_named_expression_or_higher_from_lhs(
                 expr.into(),
-                argument_start,
+                call.argument_start,
                 ExpressionContext::starred_conditional(),
             );
-            let arguments = self.parse_arguments_after_first_positional(
+            let arguments = self.parse_arguments_after_positional(
                 call.arguments_start,
-                argument_start,
+                call.state,
+                call.argument_start,
                 parsed_expr,
             );
 
@@ -1007,6 +1011,31 @@ impl<'src> Parser<'src> {
             unreachable!("nested call parsing always builds a call expression");
         };
         call
+    }
+
+    fn try_parse_nested_call_argument(&mut self) -> Option<NestedCallArgument> {
+        let checkpoint = self.checkpoint();
+        let mut state = ArgumentParsingState::default();
+
+        loop {
+            if self.at(TokenKind::Name) && self.peek() == TokenKind::Lpar {
+                let argument_start = self.node_start();
+                let func = self.parse_atom().expr;
+                return Some(NestedCallArgument {
+                    func,
+                    start: argument_start,
+                    argument_start,
+                    state,
+                });
+            }
+
+            self.parse_argument(&mut state);
+
+            if !self.eat(TokenKind::Comma) || self.at(TokenKind::Rpar) {
+                self.rewind(checkpoint);
+                return None;
+            }
+        }
     }
 
     /// Parses an argument list.
@@ -1166,13 +1195,13 @@ impl<'src> Parser<'src> {
         arguments
     }
 
-    fn parse_arguments_after_first_positional(
+    fn parse_arguments_after_positional(
         &mut self,
         start: TextSize,
+        mut state: ArgumentParsingState,
         argument_start: TextSize,
         parsed_expr: ParsedExpr,
     ) -> ast::Arguments {
-        let mut state = ArgumentParsingState::default();
         self.parse_argument_from_expression(
             &mut state,
             argument_start,
@@ -4197,6 +4226,15 @@ struct PendingCall {
     func: Expr,
     start: TextSize,
     arguments_start: TextSize,
+    argument_start: TextSize,
+    state: ArgumentParsingState,
+}
+
+struct NestedCallArgument {
+    func: Expr,
+    start: TextSize,
+    argument_start: TextSize,
+    state: ArgumentParsingState,
 }
 
 struct PendingListLikeExpression {
