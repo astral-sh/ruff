@@ -3062,12 +3062,10 @@ impl<'src> Parser<'src> {
 
         loop {
             if self.at(TokenKind::Lbrace) {
-                if items.is_some() {
-                    self.rewind(checkpoint);
-                    return None;
-                }
-
-                return Some(PendingSetOrDictLikeExpression::Set { start, elts });
+                return Some(match items {
+                    Some(items) => PendingSetOrDictLikeExpression::DictKey { start, items },
+                    None => PendingSetOrDictLikeExpression::Set { start, elts },
+                });
             }
 
             if self.eat(TokenKind::DoubleStar) {
@@ -3186,6 +3184,21 @@ impl<'src> Parser<'src> {
                     )),
                     start,
                 ),
+                PendingSetOrDictLikeExpression::DictKey { start, items } => {
+                    self.validate_dictionary_key(&key_or_element);
+                    self.expect(TokenKind::Colon);
+                    let value = self.parse_conditional_expression_or_higher().expr;
+
+                    (
+                        Expr::Dict(self.parse_dictionary_expression_after_item(
+                            items,
+                            Some(key_or_element.expr),
+                            value,
+                            start,
+                        )),
+                        start,
+                    )
+                }
             };
 
             if pending.is_empty() {
@@ -4621,6 +4634,10 @@ enum PendingSetOrDictLikeExpression {
         start: TextSize,
         items: Vec<ast::DictItem>,
         key: Expr,
+    },
+    DictKey {
+        start: TextSize,
+        items: Vec<ast::DictItem>,
     },
 }
 
