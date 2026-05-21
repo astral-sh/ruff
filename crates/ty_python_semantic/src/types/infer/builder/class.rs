@@ -672,7 +672,7 @@ impl ClassDecoratorUnknownResultPolicy {
                 // @decorator
                 // class C: ...
                 // ```
-                Some(CallableFunctionProvenance::ImplicitReturn) => Self::PreserveBinding,
+                CallableFunctionProvenance::ImplicitReturn => Self::PreserveBinding,
                 // An explicit return annotation can intentionally replace the class binding:
                 // ```python
                 // def decorator[T](cls) -> T: ...
@@ -680,7 +680,7 @@ impl ClassDecoratorUnknownResultPolicy {
                 // @decorator
                 // class C: ...
                 // ```
-                Some(CallableFunctionProvenance::ExplicitReturn) => Self::ReplaceBinding,
+                CallableFunctionProvenance::ExplicitReturn => Self::ReplaceBinding,
                 // Generic class-preserving decorator factories can lose the concrete class in
                 // their returned `Callable`, while still producing an unknown class-object result:
                 // ```python
@@ -689,7 +689,9 @@ impl ClassDecoratorUnknownResultPolicy {
                 // @identity_factory()
                 // class C: ...
                 // ```
-                None if is_unknown_class_object_decorator_result(db, decorator_result_ty) => {
+                CallableFunctionProvenance::None
+                    if is_unknown_class_object_decorator_result(db, decorator_result_ty) =>
+                {
                     Self::PreserveBinding
                 }
                 // An ordinary `Callable` replacement result has no function provenance to justify
@@ -700,7 +702,7 @@ impl ClassDecoratorUnknownResultPolicy {
                 // @replacement_factory()
                 // class C: ...
                 // ```
-                None => Self::ReplaceBinding,
+                CallableFunctionProvenance::None => Self::ReplaceBinding,
             }),
             _ => None,
         }

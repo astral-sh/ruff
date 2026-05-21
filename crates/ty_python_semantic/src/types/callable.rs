@@ -232,7 +232,7 @@ impl<'db> Type<'db> {
                 db,
                 CallableSignature::from_overloads(method.signatures(db)),
                 CallableTypeKind::Regular,
-                None,
+                CallableFunctionProvenance::None,
             ))),
 
             Type::WrapperDescriptor(wrapper_descriptor) => {
@@ -240,7 +240,7 @@ impl<'db> Type<'db> {
                     db,
                     CallableSignature::from_overloads(wrapper_descriptor.signatures(db)),
                     CallableTypeKind::Regular,
-                    None,
+                    CallableFunctionProvenance::None,
                 )))
             }
 
@@ -328,10 +328,16 @@ pub enum CallableTypeKind {
     ParamSpecValue,
 }
 
-/// Whether this callable is known to come from a function and how that function's return type was
-/// declared.
+/// Source-function provenance retained by a callable signature.
+///
+/// A [`CallableType`] can describe a bare callable shape, such as one from `Callable[...]`. For
+/// function-like sources, such as a [`FunctionType`] upcast to a [`CallableType`] or a lambda, this
+/// records whether the source function has an explicit return annotation.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum CallableFunctionProvenance {
+    /// The callable does not retain source-function provenance.
+    None,
+
     /// The callable came from a function without an explicit return annotation.
     ImplicitReturn,
 
@@ -406,7 +412,19 @@ pub struct CallableType<'db> {
 
     pub(super) kind: CallableTypeKind,
 
-    pub(crate) provenance: Option<CallableFunctionProvenance>,
+    /// Source-function return-annotation provenance retained by this callable.
+    ///
+    /// Function-like values can retain their source-function provenance when converted to a
+    /// callable signature:
+    /// ```python
+    /// def decorator(cls) -> object: ...
+    /// ```
+    ///
+    /// Callables that are only known from a callable shape do not retain that provenance:
+    /// ```python
+    /// def decorator_factory() -> Callable[[type[object]], object]: ...
+    /// ```
+    pub(crate) provenance: CallableFunctionProvenance,
 }
 
 pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -428,7 +446,7 @@ impl<'db> CallableType<'db> {
             db,
             CallableSignature::single(signature),
             CallableTypeKind::Regular,
-            None,
+            CallableFunctionProvenance::None,
         )
     }
 
@@ -437,7 +455,7 @@ impl<'db> CallableType<'db> {
             db,
             CallableSignature::single(signature),
             CallableTypeKind::FunctionLike,
-            None,
+            CallableFunctionProvenance::None,
         )
     }
 
@@ -449,7 +467,7 @@ impl<'db> CallableType<'db> {
             db,
             CallableSignature::single(Signature::new(parameters, Type::unknown())),
             CallableTypeKind::ParamSpecValue,
-            None,
+            CallableFunctionProvenance::None,
         )
     }
 
@@ -488,7 +506,7 @@ impl<'db> CallableType<'db> {
             db,
             CallableSignature::partially_apply(db, overloads)?,
             CallableTypeKind::Regular,
-            None,
+            CallableFunctionProvenance::None,
         ))
     }
 
@@ -540,7 +558,7 @@ impl<'db> CallableType<'db> {
             db,
             CallableSignature::bottom(),
             CallableTypeKind::Regular,
-            None,
+            CallableFunctionProvenance::None,
         )
     }
 
@@ -670,7 +688,7 @@ impl<'db> CallableTypes<'db> {
             db,
             CallableSignature::from_overloads(overloads),
             CallableTypeKind::Regular,
-            None,
+            CallableFunctionProvenance::None,
         )
         .into_precise_functools_partial_instance(db, wrapped)
     }

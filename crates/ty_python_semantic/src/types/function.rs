@@ -1356,9 +1356,9 @@ impl<'db> FunctionType<'db> {
             db,
             self.signature(db),
             self.callable_type_kind(db),
-            Some(CallableFunctionProvenance::from_function_return_annotation(
+            CallableFunctionProvenance::from_function_return_annotation(
                 self.has_explicit_return_annotation(db),
-            )),
+            ),
         )
     }
 

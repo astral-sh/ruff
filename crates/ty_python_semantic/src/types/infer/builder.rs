@@ -4995,7 +4995,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db: &'d dyn Db,
             ty: Type<'d>,
             kind: CallableTypeKind,
-            provenance: Option<CallableFunctionProvenance>,
+            provenance: CallableFunctionProvenance,
         ) -> Option<Type<'d>> {
             match ty {
                 Type::Callable(callable) => Some(Type::Callable(CallableType::new(
@@ -5051,9 +5051,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let propagatable_kind = match decorated_ty {
             Type::FunctionLiteral(func) => Some((
                 func.callable_type_kind(self.db()),
-                Some(CallableFunctionProvenance::from_function_return_annotation(
+                CallableFunctionProvenance::from_function_return_annotation(
                     func.has_explicit_return_annotation(self.db()),
-                )),
+                ),
             )),
             _ => decorated_ty
                 .try_upcast_to_callable(self.db())
@@ -7257,7 +7257,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.db(),
             CallableSignature::single(Signature::new(parameters, return_ty)),
             CallableTypeKind::FunctionLike,
-            Some(CallableFunctionProvenance::ImplicitReturn),
+            CallableFunctionProvenance::ImplicitReturn,
         ))
     }
 
@@ -7345,7 +7345,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     db,
                     CallableSignature::from_overloads(getitem_overloads),
                     CallableTypeKind::FunctionLike,
-                    None,
+                    CallableFunctionProvenance::None,
                 ),
             )],
         );

@@ -81,9 +81,9 @@ impl<'db> BoundMethodType<'db> {
                     .map(|signature| signature.bind_self(db, Some(self_instance))),
             ),
             CallableTypeKind::FunctionLike,
-            Some(CallableFunctionProvenance::from_function_return_annotation(
+            CallableFunctionProvenance::from_function_return_annotation(
                 function.has_explicit_return_annotation(db),
-            )),
+            ),
         )
     }
 
