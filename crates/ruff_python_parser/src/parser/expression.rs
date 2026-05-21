@@ -5717,6 +5717,10 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#lambda>
     fn parse_lambda_expr(&mut self) -> ast::ExprLambda {
+        if let Some(lambda) = self.try_parse_nested_lambda_default_expr() {
+            return lambda;
+        }
+
         let pending = self.parse_lambda_header();
 
         if self.at(TokenKind::Lambda) {
@@ -5752,6 +5756,81 @@ impl<'src> Parser<'src> {
             };
 
         self.lambda_expression(pending, body.expr)
+    }
+
+    fn try_parse_nested_lambda_default_expr(&mut self) -> Option<ast::ExprLambda> {
+        if !self.at_nested_lambda_default_head() {
+            return None;
+        }
+
+        let mut pending = Vec::new();
+
+        loop {
+            let start = self.node_start();
+            self.bump(TokenKind::Lambda);
+
+            let parameters_start = self.node_start();
+            let name = self.parse_identifier();
+            let parameter = ast::Parameter {
+                range: self.node_range(parameters_start),
+                node_index: AtomicNodeIndex::NONE,
+                name,
+                annotation: None,
+            };
+
+            self.bump(TokenKind::Equal);
+
+            pending.push(PendingNestedLambdaDefault {
+                start,
+                parameters_start,
+                parameter,
+            });
+
+            if !self.at_nested_lambda_default_head() {
+                break;
+            }
+        }
+
+        let mut lambda = self.parse_lambda_expr();
+
+        while let Some(default) = pending.pop() {
+            let parameter_range = self.node_range(default.parameters_start);
+            let mut parameters = ast::Parameters {
+                range: parameter_range,
+                ..ast::Parameters::default()
+            };
+            parameters.args.push(ast::ParameterWithDefault {
+                range: parameter_range,
+                node_index: AtomicNodeIndex::NONE,
+                parameter: default.parameter,
+                default: Some(Box::new(Expr::Lambda(lambda))),
+            });
+
+            self.expect(TokenKind::Colon);
+            let body = self.parse_conditional_expression_or_higher();
+            lambda = self.lambda_expression(
+                PendingLambdaExpression {
+                    start: default.start,
+                    parameters: Some(Box::new(parameters)),
+                },
+                body.expr,
+            );
+        }
+
+        Some(lambda)
+    }
+
+    fn at_nested_lambda_default_head(&mut self) -> bool {
+        if !self.at(TokenKind::Lambda) {
+            return false;
+        }
+
+        let checkpoint = self.checkpoint();
+        self.bump(TokenKind::Lambda);
+        let is_head =
+            self.at_name_or_soft_keyword() && self.peek2() == (TokenKind::Equal, TokenKind::Lambda);
+        self.rewind(checkpoint);
+        is_head
     }
 
     fn parse_lambda_header(&mut self) -> PendingLambdaExpression {
@@ -6202,6 +6281,12 @@ struct PendingComprehensionIf {
 struct PendingLambdaExpression {
     start: TextSize,
     parameters: Option<Box<ast::Parameters>>,
+}
+
+struct PendingNestedLambdaDefault {
+    start: TextSize,
+    parameters_start: TextSize,
+    parameter: ast::Parameter,
 }
 
 struct PendingIfExpression {
