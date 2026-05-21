@@ -247,7 +247,7 @@ fn check_bytes(checker: &Checker, literal: &BytesLiteral, module: RegexModule, f
     ));
 }
 
-/// Check how same it is to prepend the `r` prefix to the byte sting.
+/// Check how same it is to prepend the `r` prefix to the byte string.
 ///
 /// ## Returns
 ///  * `None` if the prefix cannot be added,
