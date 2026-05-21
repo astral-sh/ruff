@@ -52,6 +52,27 @@ use crate::rules::flake8_comprehensions::fixes;
 /// cannot consistently infer if the iterable type is a sequence or a mapping and cannot suggest
 /// the correct fix for mappings.
 ///
+/// Applying the fix inside an object's `__len__` method can also cause a `RecursionError` at
+/// runtime. CPython's `list()` constructor calls `__length_hint__` (and, in turn, `__len__`)
+/// when iterating over a container, so rewriting `[item for item in self]` to `list(self)` in
+/// `__len__` will recurse infinitely. The same applies to `dict()` and `set()` calls on `self`.
+///
+/// For example:
+///
+/// ```python
+/// class Container:
+///     def __iter__(self):
+///         return iter(self._items)
+///
+///     def __len__(self):
+///         items = [item for item in self]  # safe
+///         # items = list(self)             # RecursionError
+///         ...
+/// ```
+///
+/// Suppress this rule with `# noqa: C416` when the comprehension is reached (directly or
+/// transitively) from `__len__`.
+///
 /// ## Fix safety
 /// Due to the known problem with dictionary comprehensions, this fix is marked as unsafe.
 ///
