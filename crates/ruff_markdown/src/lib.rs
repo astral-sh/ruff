@@ -58,10 +58,7 @@ fn is_closing_code_fence(line: &str, opening_fence: &str) -> bool {
         .take_while(|&&byte| byte == fence_byte)
         .count();
 
-    fence_len >= opening_fence.len()
-        && line[fence_len..]
-            .chars()
-            .all(|ch| matches!(ch, ' ' | '\t'))
+    fence_len >= opening_fence.len() && line[fence_len..].chars().all(|ch| matches!(ch, ' ' | '\t'))
 }
 
 pub fn format_code_blocks(
