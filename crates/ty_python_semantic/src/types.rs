@@ -837,6 +837,8 @@ pub enum Type<'db> {
     TypeIs(TypeIsType<'db>),
     /// A subtype of `bool` that allows narrowing in only the positive case.
     TypeGuard(TypeGuardType<'db>),
+    /// The set of type-form objects that represent a type assignable to the argument.
+    TypeForm(TypeFormType<'db>),
     /// A type that represents an inhabitant of a `TypedDict`.
     TypedDict(TypedDictType<'db>),
     /// An aliased type (lazily not-yet-unpacked to its value type).
@@ -1700,6 +1702,7 @@ impl<'db> Type<'db> {
             | Type::FunctionLiteral(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypeVar(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_)
@@ -1753,7 +1756,8 @@ impl<'db> Type<'db> {
             | Type::Dynamic(_)
             | Type::TypeVar(_)
             | Type::TypeAlias(_)
-            | Type::SubclassOf(_)=> true,
+            | Type::SubclassOf(_) => true,
+            Type::TypeForm(typeform) => typeform.type_argument(db).is_spellable(db),
             Type::Intersection(_) => false,
             Type::EnumComplement(complement) => complement.is_spellable(db),
             Type::Divergent(_)
@@ -1798,6 +1802,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::PropertyInstance(_)
             | Type::FunctionLiteral(_)
             | Type::ModuleLiteral(_)
@@ -2038,6 +2043,10 @@ impl<'db> Type<'db> {
             Type::TypeGuard(type_guard) => {
                 recursive_type_normalize_type_guard_like(db, type_guard, div, nested)
             }
+            Type::TypeForm(typeform) => typeform
+                .type_argument(db)
+                .recursive_type_normalized_impl(db, div, true)
+                .map(|ty| TypeFormType::from_type_expression(db, ty)),
             Type::Divergent(_) => Some(self),
             Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
             Type::TypedDict(_) => {
@@ -2257,6 +2266,7 @@ impl<'db> Type<'db> {
             Type::AlwaysTruthy | Type::AlwaysFalsy => false,
             Type::TypeIs(type_is) => type_is.is_bound(db),
             Type::TypeGuard(type_guard) => type_guard.is_bound(db),
+            Type::TypeForm(_) => false,
             Type::TypedDict(_) => false,
             Type::TypeAlias(alias) => alias.value_type(db).is_singleton(db),
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_singleton(db),
@@ -2331,6 +2341,7 @@ impl<'db> Type<'db> {
 
             Type::TypeIs(type_is) => type_is.is_bound(db),
             Type::TypeGuard(type_guard) => type_guard.is_bound(db),
+            Type::TypeForm(_) => false,
 
             Type::TypeAlias(alias) => alias.value_type(db).is_single_valued(db),
 
@@ -2487,6 +2498,7 @@ impl<'db> Type<'db> {
             | Type::PropertyInstance(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::EnumComplement(_)
             | Type::NewTypeInstance(_) => None,
@@ -2659,7 +2671,9 @@ impl<'db> Type<'db> {
 
             Type::LiteralValue(literal) => literal.fallback_instance(db).instance_member(db, name),
 
-            Type::AlwaysTruthy | Type::AlwaysFalsy => Type::object().instance_member(db, name),
+            Type::AlwaysTruthy | Type::AlwaysFalsy | Type::TypeForm(_) => {
+                Type::object().instance_member(db, name)
+            }
             Type::ModuleLiteral(_) => KnownClass::ModuleType
                 .to_instance(db)
                 .instance_member(db, name),
@@ -3529,6 +3543,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysFalsy
             | Type::TypeIs(..)
             | Type::TypeGuard(..)
+            | Type::TypeForm(..)
             | Type::TypedDict(_) => {
                 // Enum members can be accessed through enum instances and other enum members,
                 // e.g. `answer.YES` or `Answer.YES.NO`.
@@ -4188,6 +4203,7 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_) => CallableBinding::not_callable(self).into(),
         }
     }
@@ -5262,6 +5278,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::EnumComplement(_)
             | Type::NewTypeInstance(_) => None,
@@ -5317,6 +5334,7 @@ impl<'db> Type<'db> {
             | Type::PropertyInstance(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
                     *self, scope_id
@@ -5517,6 +5535,7 @@ impl<'db> Type<'db> {
             Type::PropertyInstance(_) => KnownClass::Property.to_class_literal(db),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_class_literal(db),
+            Type::TypeForm(_) => Type::object().to_meta_type(db),
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_class_literal(db),
                 LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_class_literal(db),
@@ -5830,6 +5849,15 @@ impl<'db> Type<'db> {
                 )
             }),
 
+            Type::TypeForm(typeform) => visitor.visit(db, self, type_mapping, || {
+                TypeFormType::from_type_expression(
+                    db,
+                    typeform
+                        .type_argument(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                )
+            }),
+
             Type::TypeAlias(alias) => {
                 match type_mapping {
                     // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
@@ -6104,6 +6132,15 @@ impl<'db> Type<'db> {
 
             Type::TypeGuard(type_guard) => {
                 type_guard.return_type(db).find_legacy_typevars_impl(
+                    db,
+                    binding_context,
+                    typevars,
+                    visitor,
+                );
+            }
+
+            Type::TypeForm(typeform) => {
+                typeform.type_argument(db).find_legacy_typevars_impl(
                     db,
                     binding_context,
                     typevars,
@@ -6423,7 +6460,8 @@ impl<'db> Type<'db> {
             )
             | Self::Callable(_)
             | Self::TypeIs(_)
-            | Self::TypeGuard(_) => None,
+            | Self::TypeGuard(_)
+            | Self::TypeForm(_) => None,
         }
     }
 
@@ -6718,6 +6756,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::SubclassOf(subclass_of_type) => subclass_of_type.variance_of(db, typevar),
             Type::TypeIs(type_is_type) => type_is_type.variance_of(db, typevar),
             Type::TypeGuard(type_guard_type) => type_guard_type.variance_of(db, typevar),
+            Type::TypeForm(typeform_type) => typeform_type.variance_of(db, typevar),
             Type::KnownInstance(known_instance) => known_instance.variance_of(db, typevar),
             Type::Dynamic(_)
             | Type::Divergent(_)
@@ -7936,6 +7975,35 @@ impl<'db> VarianceInferable<'db> for TypeGuardType<'db> {
     // section of mdtest/generics/pep695/variance.md for details.
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         self.return_type(db).variance_of(db, typevar)
+    }
+}
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct TypeFormType<'db> {
+    type_argument: Type<'db>,
+}
+
+fn walk_typeform_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    typeform_type: TypeFormType<'db>,
+    visitor: &V,
+) {
+    visitor.visit_type(db, typeform_type.type_argument(db));
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for TypeFormType<'_> {}
+
+impl<'db> TypeFormType<'db> {
+    pub(crate) fn from_type_expression(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        Type::TypeForm(Self::new(db, ty))
+    }
+}
+
+impl<'db> VarianceInferable<'db> for TypeFormType<'db> {
+    // `TypeForm` is covariant in its type argument.
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        self.type_argument(db).variance_of(db, typevar)
     }
 }
 

@@ -11,6 +11,10 @@ Numbers = list[int]
 # this as `list[int]` is more helpful, though:
 reveal_type(Numbers)  # revealed: <class 'list[int]'>
 
+import types
+
+generic_alias: types.GenericAlias = list[int]
+
 def _(numbers: Numbers) -> None:
     reveal_type(numbers)  # revealed: list[int]
 ```

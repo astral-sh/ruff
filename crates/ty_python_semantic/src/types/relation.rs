@@ -293,6 +293,7 @@ impl<'db> Type<'db> {
             | Type::BoundSuper(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::TypeAlias(_)
             | Type::NewTypeInstance(_) => false,
@@ -1002,6 +1003,42 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         UnionType::from_elements(db, union.elements(db).iter().copied()),
                     )
                 })
+            }
+
+            (Type::TypeForm(source_typeform), Type::TypeForm(target_typeform)) => self
+                .with_recursion_guard(source, target, || {
+                    self.check_type_pair(
+                        db,
+                        source_typeform.type_argument(db),
+                        target_typeform.type_argument(db),
+                    )
+                }),
+
+            (Type::SubclassOf(source_subclass), Type::TypeForm(target_typeform)) => self
+                .check_type_pair(
+                    db,
+                    source_subclass.to_instance(db),
+                    target_typeform.type_argument(db),
+                ),
+
+            (Type::ClassLiteral(source_class), Type::TypeForm(target_typeform)) => self
+                .check_type_pair(
+                    db,
+                    Type::instance(db, source_class.default_specialization(db)),
+                    target_typeform.type_argument(db),
+                ),
+
+            (Type::GenericAlias(source_alias), Type::TypeForm(target_typeform)) => self
+                .check_type_pair(
+                    db,
+                    Type::instance(db, ClassType::Generic(source_alias)),
+                    target_typeform.type_argument(db),
+                ),
+
+            (Type::GenericAlias(_), Type::NominalInstance(target_instance))
+                if target_instance.has_known_class(db, KnownClass::GenericAlias) =>
+            {
+                self.always()
             }
 
             (Type::EnumComplement(complement), Type::LiteralValue(_) | Type::Union(_)) => {
@@ -1962,6 +1999,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .unwrap_or_else(|| KnownClass::Type.to_instance(db)),
                 target,
             ),
+
+            (Type::TypeForm(_), _) => self.check_type_pair(db, Type::object(), target),
 
             // For example: `Type::SpecialForm(SpecialFormType::Type)` is a subtype of `Type::NominalInstance(_SpecialForm)`,
             // because `Type::SpecialForm(SpecialFormType::Type)` is a set with exactly one runtime value in it
@@ -2946,6 +2985,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::BoundSuper(_), other) | (other, Type::BoundSuper(_)) => {
                 self.check_type_pair(db, KnownClass::Super.to_instance(db), other)
             }
+
+            (Type::TypeForm(_), _) | (_, Type::TypeForm(_)) => self.never(),
 
             (Type::GenericAlias(_), _) | (_, Type::GenericAlias(_)) => self.always(),
 

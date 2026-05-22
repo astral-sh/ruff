@@ -97,8 +97,9 @@ use crate::types::{
     IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind,
     MemberLookupPolicy, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, SentinelInstance,
     Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
-    TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
+    TypeContext, TypeFormType, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
+    TypeVarVariance, TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type,
+    binding_type,
     infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
@@ -2526,6 +2527,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => {
                 // We may infer the value type multiple times with distinct type context during
@@ -3144,6 +3146,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => {
                 let delattr_dunder_call_result = object_ty.try_call_dunder_with_policy(
@@ -3306,6 +3309,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::AlwaysFalsy
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
+                | Type::TypeForm(_)
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_) => object_ty.instance_member(db, attribute),
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
@@ -5069,6 +5073,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BoundSuper(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
+                | Type::TypeForm(_)
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_) => None,
             }
@@ -5650,6 +5655,56 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         types.expression_type(expression)
     }
 
+    /// Try implicit `TypeForm` evaluation when ordinary value inference cannot
+    /// preserve a type-form value or satisfy another arm of a union context.
+    fn infer_implicit_type_form(
+        &mut self,
+        expression: &ast::Expr,
+        tcx: TypeContext<'db>,
+    ) -> Option<Type<'db>> {
+        let target = tcx.annotation?;
+        let non_type_form_target = match target.resolve_type_alias(self.db()) {
+            Type::TypeForm(_) => None,
+            Type::Union(union)
+                if union.elements(self.db()).iter().any(|element| {
+                    matches!(element.resolve_type_alias(self.db()), Type::TypeForm(_))
+                }) =>
+            {
+                Some(target.filter_union(self.db(), |element| {
+                    !matches!(element.resolve_type_alias(self.db()), Type::TypeForm(_))
+                }))
+            }
+            _ => return None,
+        };
+
+        let value_ty = self
+            .speculate()
+            .infer_expression(expression, TypeContext::default());
+        if matches!(value_ty.resolve_type_alias(self.db()), Type::Never)
+            || self.contains_type_form_value(value_ty)
+            || non_type_form_target
+                .is_some_and(|alternative| value_ty.is_assignable_to(self.db(), alternative))
+        {
+            return None;
+        }
+
+        Some(TypeFormType::from_type_expression(
+            self.db(),
+            self.infer_type_expression_without_store(expression),
+        ))
+    }
+
+    fn contains_type_form_value(&self, ty: Type<'db>) -> bool {
+        match ty.resolve_type_alias(self.db()) {
+            Type::TypeForm(_) | Type::SubclassOf(_) => true,
+            Type::Union(union) => union
+                .elements(self.db())
+                .iter()
+                .any(|element| self.contains_type_form_value(*element)),
+            _ => false,
+        }
+    }
+
     /// Infer the type of an expression.
     fn infer_expression_impl(
         &mut self,
@@ -5666,54 +5721,68 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return ty;
         }
 
-        let mut ty = match expression {
-            ast::Expr::NoneLiteral(ast::ExprNoneLiteral {
-                range: _,
-                node_index: _,
-            }) => Type::none(self.db()),
-            ast::Expr::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
-            ast::Expr::BooleanLiteral(literal) => self.infer_boolean_literal_expression(literal),
-            ast::Expr::StringLiteral(literal) => self.infer_string_literal_expression(literal, tcx),
-            ast::Expr::BytesLiteral(bytes_literal) => {
-                self.infer_bytes_literal_expression(bytes_literal)
-            }
-            ast::Expr::FString(fstring) => self.infer_fstring_expression(fstring),
-            ast::Expr::TString(tstring) => self.infer_tstring_expression(tstring),
-            ast::Expr::EllipsisLiteral(literal) => self.infer_ellipsis_literal_expression(literal),
-            ast::Expr::Tuple(tuple) => self.infer_tuple_expression(tuple, tcx),
-            ast::Expr::List(list) => self.infer_list_expression(list, tcx),
-            ast::Expr::Set(set) => self.infer_set_expression(set, tcx),
-            ast::Expr::Dict(dict) => self.infer_dict_expression(dict, tcx),
-            ast::Expr::Generator(generator) => self.infer_generator_expression(generator, tcx),
-            ast::Expr::ListComp(listcomp) => {
-                self.infer_list_comprehension_expression(listcomp, tcx)
-            }
-            ast::Expr::DictComp(dictcomp) => {
-                self.infer_dict_comprehension_expression(dictcomp, tcx)
-            }
-            ast::Expr::SetComp(setcomp) => self.infer_set_comprehension_expression(setcomp, tcx),
-            ast::Expr::Name(name) => self.infer_name_expression(name),
-            ast::Expr::Attribute(attribute) => self.infer_attribute_expression(attribute),
-            ast::Expr::UnaryOp(unary_op) => self.infer_unary_expression(unary_op),
-            ast::Expr::BinOp(binary) => self.infer_binary_expression(binary, tcx),
-            ast::Expr::BoolOp(bool_op) => self.infer_boolean_expression(bool_op, tcx),
-            ast::Expr::Compare(compare) => self.infer_compare_expression(compare),
-            ast::Expr::Subscript(subscript) => self.infer_subscript_expression(subscript),
-            ast::Expr::Slice(slice) => self.infer_slice_expression(slice),
-            ast::Expr::If(if_expression) => self.infer_if_expression(if_expression, tcx),
-            ast::Expr::Lambda(lambda_expression) => {
-                self.infer_lambda_expression(lambda_expression, tcx)
-            }
-            ast::Expr::Call(call_expression) => self.infer_call_expression(call_expression, tcx),
-            ast::Expr::Starred(starred) => self.infer_starred_expression(starred, tcx),
-            ast::Expr::Yield(yield_expression) => self.infer_yield_expression(yield_expression),
-            ast::Expr::YieldFrom(yield_from) => self.infer_yield_from_expression(yield_from),
-            ast::Expr::Await(await_expression) => {
-                self.infer_await_expression(await_expression, tcx)
-            }
-            ast::Expr::Named(named) => self.infer_named_expression(named),
-            ast::Expr::IpyEscapeCommand(_) => {
-                todo_type!("Ipy escape command support")
+        let mut ty = if let Some(type_form) = self.infer_implicit_type_form(expression, tcx) {
+            type_form
+        } else {
+            match expression {
+                ast::Expr::NoneLiteral(ast::ExprNoneLiteral {
+                    range: _,
+                    node_index: _,
+                }) => Type::none(self.db()),
+                ast::Expr::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
+                ast::Expr::BooleanLiteral(literal) => {
+                    self.infer_boolean_literal_expression(literal)
+                }
+                ast::Expr::StringLiteral(literal) => {
+                    self.infer_string_literal_expression(literal, tcx)
+                }
+                ast::Expr::BytesLiteral(bytes_literal) => {
+                    self.infer_bytes_literal_expression(bytes_literal)
+                }
+                ast::Expr::FString(fstring) => self.infer_fstring_expression(fstring),
+                ast::Expr::TString(tstring) => self.infer_tstring_expression(tstring),
+                ast::Expr::EllipsisLiteral(literal) => {
+                    self.infer_ellipsis_literal_expression(literal)
+                }
+                ast::Expr::Tuple(tuple) => self.infer_tuple_expression(tuple, tcx),
+                ast::Expr::List(list) => self.infer_list_expression(list, tcx),
+                ast::Expr::Set(set) => self.infer_set_expression(set, tcx),
+                ast::Expr::Dict(dict) => self.infer_dict_expression(dict, tcx),
+                ast::Expr::Generator(generator) => self.infer_generator_expression(generator, tcx),
+                ast::Expr::ListComp(listcomp) => {
+                    self.infer_list_comprehension_expression(listcomp, tcx)
+                }
+                ast::Expr::DictComp(dictcomp) => {
+                    self.infer_dict_comprehension_expression(dictcomp, tcx)
+                }
+                ast::Expr::SetComp(setcomp) => {
+                    self.infer_set_comprehension_expression(setcomp, tcx)
+                }
+                ast::Expr::Name(name) => self.infer_name_expression(name),
+                ast::Expr::Attribute(attribute) => self.infer_attribute_expression(attribute),
+                ast::Expr::UnaryOp(unary_op) => self.infer_unary_expression(unary_op),
+                ast::Expr::BinOp(binary) => self.infer_binary_expression(binary, tcx),
+                ast::Expr::BoolOp(bool_op) => self.infer_boolean_expression(bool_op, tcx),
+                ast::Expr::Compare(compare) => self.infer_compare_expression(compare),
+                ast::Expr::Subscript(subscript) => self.infer_subscript_expression(subscript),
+                ast::Expr::Slice(slice) => self.infer_slice_expression(slice),
+                ast::Expr::If(if_expression) => self.infer_if_expression(if_expression, tcx),
+                ast::Expr::Lambda(lambda_expression) => {
+                    self.infer_lambda_expression(lambda_expression, tcx)
+                }
+                ast::Expr::Call(call_expression) => {
+                    self.infer_call_expression(call_expression, tcx)
+                }
+                ast::Expr::Starred(starred) => self.infer_starred_expression(starred, tcx),
+                ast::Expr::Yield(yield_expression) => self.infer_yield_expression(yield_expression),
+                ast::Expr::YieldFrom(yield_from) => self.infer_yield_from_expression(yield_from),
+                ast::Expr::Await(await_expression) => {
+                    self.infer_await_expression(await_expression, tcx)
+                }
+                ast::Expr::Named(named) => self.infer_named_expression(named),
+                ast::Expr::IpyEscapeCommand(_) => {
+                    todo_type!("Ipy escape command support")
+                }
             }
         };
 
@@ -7680,6 +7749,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return self.infer_typeddict_call_expression(call_expression, None);
         }
 
+        if callable_type == Type::SpecialForm(SpecialFormType::TypeForm) {
+            if let [argument] = &*arguments.args
+                && arguments.keywords.is_empty()
+                && !matches!(argument, ast::Expr::Starred(_))
+            {
+                return TypeFormType::from_type_expression(
+                    self.db(),
+                    self.infer_type_expression(argument),
+                );
+            }
+
+            for argument in &*arguments.args {
+                self.infer_expression(argument, TypeContext::default());
+            }
+            for keyword in &*arguments.keywords {
+                self.infer_expression(&keyword.value, TypeContext::default());
+            }
+
+            if let Some(builder) = self
+                .context
+                .report_lint(&INVALID_TYPE_FORM, call_expression)
+            {
+                builder.into_diagnostic(
+                    "`TypeForm()` expects exactly one positional-only type-expression argument",
+                );
+            }
+
+            return Type::unknown();
+        }
+
         if callable_type.is_notimplemented(self.db()) {
             if let Some(builder) = self
                 .context
@@ -9564,6 +9663,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BoundSuper(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
+                | Type::TypeForm(_)
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_),
             ) => fallback_unary_expression_type(),

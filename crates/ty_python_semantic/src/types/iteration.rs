@@ -245,6 +245,7 @@ impl<'db> Type<'db> {
                 | Type::BoundSuper(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
+                | Type::TypeForm(_)
                 | Type::TypedDict(_) => None
             }
         }
