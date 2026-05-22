@@ -1740,10 +1740,7 @@ impl<'db> Signature<'db> {
         overload: &Self,
         normalize_implicit_receiver: bool,
     ) -> Option<Type<'db>> {
-        let arguments = overload.call_arguments_for_parameters(
-            normalize_implicit_receiver,
-            overload.positional_or_keyword_parameter_count(normalize_implicit_receiver),
-        );
+        let arguments = overload.call_arguments_for_parameters(normalize_implicit_receiver);
 
         // Only overload argument types may specialize the implementation. The overload return type
         // must not provide expected context here, because that can solve implementation-local type
@@ -1800,10 +1797,10 @@ impl<'db> Signature<'db> {
         )
     }
 
-    /// Build synthetic call arguments from this signature's parameters.
+    /// Build a synthetic positional call from this signature's parameters.
     ///
-    /// Positional-or-keyword parameters are emitted as both positional and keyword forms across
-    /// repeated calls so the implementation is checked against every accepted argument shape.
+    /// A positional call is sufficient for selecting the generic implementation return type;
+    /// parameter compatibility independently checks accepted argument forms.
     ///
     /// ```python
     /// from typing import overload
@@ -1815,79 +1812,30 @@ impl<'db> Signature<'db> {
     /// ```
     fn call_arguments_for_parameters<'a>(
         &'a self,
-        gradual_or_implicit_receiver: bool,
-        positional_or_keyword_as_positional: usize,
+        normalize_implicit_receiver: bool,
     ) -> CallArguments<'a, 'db> {
-        let mut positional_or_keyword_parameters_seen = 0;
-        let include_variadic_parameters = positional_or_keyword_as_positional
-            == self.positional_or_keyword_parameter_count(gradual_or_implicit_receiver);
-
         self.parameters()
             .iter()
             .enumerate()
-            .filter_map(|(index, parameter)| {
+            .map(|(index, parameter)| {
                 let argument = match parameter.kind() {
-                    ParameterKind::PositionalOnly { .. } => Argument::Positional,
-                    ParameterKind::PositionalOrKeyword { name, .. } => {
-                        if index == 0 && gradual_or_implicit_receiver {
-                            Argument::Positional
-                        } else {
-                            let argument = if positional_or_keyword_parameters_seen
-                                < positional_or_keyword_as_positional
-                            {
-                                Argument::Positional
-                            } else {
-                                Argument::Keyword(name.as_str())
-                            };
-                            positional_or_keyword_parameters_seen += 1;
-                            argument
-                        }
-                    }
-                    ParameterKind::Variadic { .. } => {
-                        if include_variadic_parameters {
-                            Argument::Positional
-                        } else {
-                            return None;
-                        }
-                    }
+                    ParameterKind::PositionalOnly { .. }
+                    | ParameterKind::PositionalOrKeyword { .. }
+                    | ParameterKind::Variadic { .. } => Argument::Positional,
                     ParameterKind::KeywordOnly { name, .. } => Argument::Keyword(name.as_str()),
                     ParameterKind::KeywordVariadic { .. } => {
                         Argument::Keyword("__ty_synthetic_keyword")
                     }
                 };
-                let annotated_type = if index == 0 && gradual_or_implicit_receiver {
+                let annotated_type = if index == 0 && normalize_implicit_receiver {
                     Type::unknown()
                 } else {
                     parameter.annotated_type()
                 };
 
-                Some((argument, Some(annotated_type)))
+                (argument, Some(annotated_type))
             })
             .collect()
-    }
-
-    /// Count positional-or-keyword parameters after excluding an implicit receiver.
-    ///
-    /// The count controls how many synthetic call variants are needed to cover the overload's
-    /// positional and keyword call forms.
-    ///
-    /// ```python
-    /// from typing import overload
-    ///
-    /// @overload
-    /// def f(x: int, y: int) -> int: ...
-    /// def f(x: object, y: object) -> object:
-    ///     return x
-    /// ```
-    fn positional_or_keyword_parameter_count(&self, gradual_or_implicit_receiver: bool) -> usize {
-        self.parameters()
-            .iter()
-            .enumerate()
-            .filter(|(index, parameter)| {
-                !(*index == 0 && gradual_or_implicit_receiver)
-                    && matches!(parameter.kind(), ParameterKind::PositionalOrKeyword { .. })
-            })
-            .count()
     }
 
     /// Return a copy with the first parameter rewritten to have type `ty`.
