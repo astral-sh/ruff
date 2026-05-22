@@ -281,3 +281,44 @@ B018 Found useless expression. Either assign it to a variable or remove it.
 65 |     "foo" + "bar"  # BinOp (raise)
    |     ^^^^^^^^^^^^^
    |
+
+B018 Found useless expression. Either assign it to a variable or remove it.
+  --> B018.py:71:5
+   |
+69 |     # Bare tuples: the wrapping tuple is useless even when elements have side effects.
+70 |     # See https://github.com/astral-sh/ruff/issues/14131
+71 |     foo(),  # single-element trailing-comma tuple wrapping a call
+   |     ^^^^^^
+72 |     foo(), bar()  # multi-element tuple wrapping calls
+73 |     1, 2, 3  # tuple of literals
+   |
+
+B018 Found useless expression. Either assign it to a variable or remove it.
+  --> B018.py:72:5
+   |
+70 |     # See https://github.com/astral-sh/ruff/issues/14131
+71 |     foo(),  # single-element trailing-comma tuple wrapping a call
+72 |     foo(), bar()  # multi-element tuple wrapping calls
+   |     ^^^^^^^^^^^^
+73 |     1, 2, 3  # tuple of literals
+74 |     (1, 2, 3)  # parenthesized tuple of literals
+   |
+
+B018 Found useless expression. Either assign it to a variable or remove it.
+  --> B018.py:73:5
+   |
+71 |     foo(),  # single-element trailing-comma tuple wrapping a call
+72 |     foo(), bar()  # multi-element tuple wrapping calls
+73 |     1, 2, 3  # tuple of literals
+   |     ^^^^^^^
+74 |     (1, 2, 3)  # parenthesized tuple of literals
+   |
+
+B018 Found useless expression. Either assign it to a variable or remove it.
+  --> B018.py:74:5
+   |
+72 |     foo(), bar()  # multi-element tuple wrapping calls
+73 |     1, 2, 3  # tuple of literals
+74 |     (1, 2, 3)  # parenthesized tuple of literals
+   |     ^^^^^^^^^
+   |

@@ -63,3 +63,12 @@ def foo5():
     foo.bar  # Attribute (raise)
     object().__class__  # Attribute (raise)
     "foo" + "bar"  # BinOp (raise)
+
+
+def foo6():
+    # Bare tuples: the wrapping tuple is useless even when elements have side effects.
+    # See https://github.com/astral-sh/ruff/issues/14131
+    foo(),  # single-element trailing-comma tuple wrapping a call
+    foo(), bar()  # multi-element tuple wrapping calls
+    1, 2, 3  # tuple of literals
+    (1, 2, 3)  # parenthesized tuple of literals

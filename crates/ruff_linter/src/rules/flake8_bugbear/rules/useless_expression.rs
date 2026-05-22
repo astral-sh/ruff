@@ -96,6 +96,20 @@ pub(crate) fn useless_expression(checker: &Checker, value: &Expr) {
         return;
     }
 
+    // A tuple expression statement constructs a tuple that is immediately discarded.
+    // Even if the elements have side effects (e.g. `foo(),`), the tuple wrapper itself
+    // is useless and almost always indicates a stray trailing comma. Flag it ahead of
+    // the side-effect check below so those cases are not silently allowed.
+    if value.is_tuple_expr() {
+        checker.report_diagnostic(
+            UselessExpression {
+                kind: Kind::Expression,
+            },
+            value.range(),
+        );
+        return;
+    }
+
     // Ignore statements that have side effects.
     if contains_effect(value, |id| checker.semantic().has_builtin_binding(id)) {
         // Flag attributes as useless expressions, even if they're attached to calls or other
