@@ -262,9 +262,9 @@ bar<CURSOR>()
 ",
             )
             .source("a/__init__.pyi", "def bar() -> None: ...\n")
-            .source("a/__init__.py", "from .b import bar as bar\n")
+            .source("a/__init__.py", "from .impl import bar as bar\n")
             .source(
-                "a/b.py",
+                "a/impl.py",
                 r#"
 def bar() -> None:
     pass
@@ -280,7 +280,7 @@ def bar() -> None:
           | ^^^ Clicking here
           |
         info: Found 1 definition
-         --> a/b.py:2:5
+         --> a/impl.py:2:5
           |
         2 | def bar() -> None:
           |     ---
