@@ -6,6 +6,9 @@ use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
+use crate::types::attribute_write::{
+    AttributeWriteDiagnostic, AttributeWriteVisitor, validate_attribute_write,
+};
 use crate::types::call::CallArguments;
 use crate::types::callable::CallableTypeKind;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
@@ -722,6 +725,66 @@ fn property_set_type<'db>(
     Some(UnionType::from_elements(db, set_types))
 }
 
+struct ProtocolAttributeWriteVisitor<'a, 'r, 'c, 'db> {
+    checker: &'a TypeRelationChecker<'r, 'c, 'db>,
+    value_ty: Type<'db>,
+}
+
+impl<'c, 'db> AttributeWriteVisitor<'db> for ProtocolAttributeWriteVisitor<'_, '_, 'c, 'db> {
+    type Output = ConstraintSet<'db, 'c>;
+
+    fn infer_value(&mut self, _tcx: TypeContext<'db>, _emit_diagnostics: bool) -> Type<'db> {
+        self.value_ty
+    }
+
+    fn infer_value_with_last_context(&mut self, _emit_diagnostics: bool) -> Type<'db> {
+        self.value_ty
+    }
+
+    fn check_type_pair(
+        &mut self,
+        db: &'db dyn Db,
+        value_ty: Type<'db>,
+        target_ty: Type<'db>,
+        _emit_diagnostics: bool,
+    ) -> Self::Output {
+        self.checker.check_type_pair(db, value_ty, target_ty)
+    }
+
+    fn constant(&self, value: bool) -> Self::Output {
+        ConstraintSet::from_bool(self.checker.constraints, value)
+    }
+
+    fn and(&self, db: &'db dyn Db, left: Self::Output, right: Self::Output) -> Self::Output {
+        left.and(db, self.checker.constraints, || right)
+    }
+
+    fn or(&self, db: &'db dyn Db, left: Self::Output, right: Self::Output) -> Self::Output {
+        left.or(db, self.checker.constraints, || right)
+    }
+
+    fn is_never(&self, db: &'db dyn Db, result: Self::Output) -> bool {
+        result.is_never_satisfied(db)
+    }
+
+    fn is_always(&self, db: &'db dyn Db, result: Self::Output) -> bool {
+        result.is_always_satisfied(db)
+    }
+
+    fn check_final(
+        &mut self,
+        _object_ty: Type<'db>,
+        qualifiers: TypeQualifiers,
+        _emit_diagnostics: bool,
+    ) -> Self::Output {
+        self.constant(!qualifiers.contains(TypeQualifiers::FINAL))
+    }
+
+    fn check_composite_final(&mut self, _object_ty: Type<'db>, _emit_diagnostics: bool) {}
+
+    fn report(&mut self, _diagnostic: AttributeWriteDiagnostic<'db>) {}
+}
+
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     fn check_property_write(
         &self,
@@ -730,64 +793,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         member_name: &str,
         value_ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let mut arguments =
-            CallArguments::positional([Type::string_literal(db, member_name), value_ty]);
-        let setattr_result = ty.try_call_dunder_with_policy(
+        validate_attribute_write(
             db,
-            "__setattr__",
-            &mut arguments,
-            TypeContext::default(),
-            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-        );
-        let setattr_returns_never = match &setattr_result {
-            Ok(bindings) => bindings.return_type(db).is_never(),
-            Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
-        };
-        if setattr_returns_never {
-            return self.never();
-        }
-
-        let meta_attr = ty.class_member(db, member_name.into());
-        if meta_attr
-            .qualifiers
-            .intersects(TypeQualifiers::FINAL | TypeQualifiers::CLASS_VAR)
-        {
-            return self.never();
-        }
-
-        if let Place::Defined(DefinedPlace {
-            ty: meta_attr_ty,
-            definedness: Definedness::AlwaysDefined,
-            ..
-        }) = meta_attr.place
-        {
-            if let Place::Defined(DefinedPlace { ty: dunder_set, .. }) =
-                meta_attr_ty.class_member(db, "__set__".into()).place
-            {
-                return ConstraintSet::from_bool(
-                    self.constraints,
-                    dunder_set
-                        .try_call(db, &CallArguments::positional([meta_attr_ty, ty, value_ty]))
-                        .is_ok(),
-                );
-            }
-            return self.check_type_pair(db, value_ty, meta_attr_ty);
-        }
-
-        let instance_attr = ty.instance_member(db, member_name);
-        if instance_attr.qualifiers.contains(TypeQualifiers::FINAL) {
-            return self.never();
-        }
-        if let Place::Defined(DefinedPlace {
-            ty: instance_attr_ty,
-            definedness: Definedness::AlwaysDefined,
-            ..
-        }) = instance_attr.place
-        {
-            return self.check_type_pair(db, value_ty, instance_attr_ty);
-        }
-
-        ConstraintSet::from_bool(self.constraints, setattr_result.is_ok())
+            ty,
+            member_name,
+            &mut ProtocolAttributeWriteVisitor {
+                checker: self,
+                value_ty,
+            },
+            false,
+        )
     }
 
     /// Return `true` if `other` contains an attribute/method/property that satisfies

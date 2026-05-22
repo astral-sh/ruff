@@ -1865,6 +1865,38 @@ static_assert(is_subtype_of(XCustomDescriptor, HasAsymmetricXProperty))
 static_assert(is_assignable_to(XCustomDescriptor, HasAsymmetricXProperty))
 ```
 
+A property setter that never returns does not make an attribute writable:
+
+```py
+from typing_extensions import Never
+
+class TerminalPropertySetter:
+    @property
+    def x(self) -> int:
+        return 1
+
+    @x.setter
+    def x(self, value: int) -> Never:
+        raise RuntimeError
+
+class NeverAttribute:
+    x: Never
+
+class HasNeverAttribute(Protocol):
+    @property
+    def x(self) -> Never: ...
+    @x.setter
+    def x(self, value: Never) -> None: ...
+
+static_assert(not is_subtype_of(TerminalPropertySetter, HasMutableXProperty))
+static_assert(not is_assignable_to(TerminalPropertySetter, HasMutableXProperty))
+static_assert(is_subtype_of(NeverAttribute, HasNeverAttribute))
+static_assert(is_assignable_to(NeverAttribute, HasNeverAttribute))
+
+terminal_property = TerminalPropertySetter()
+terminal_property.x = 1  # error: [invalid-assignment]
+```
+
 Moreover, a read-only property on a protocol can be satisfied by a nominal class that defines a
 `__getattr__` method returning a suitable type. A read/write property can be satisfied by a nominal
 class that defines a `__getattr__` method returning a suitable type *and* a `__setattr__` method
@@ -1909,6 +1941,45 @@ class HasSetAttrWithUnsuitableInput:
 
 static_assert(not is_subtype_of(HasSetAttrWithUnsuitableInput, HasMutableXProperty))
 static_assert(not is_assignable_to(HasSetAttrWithUnsuitableInput, HasMutableXProperty))
+
+class ExplicitXWithBroadSetAttr:
+    x: int
+
+    def __setattr__(self, attr: str, value: object) -> None: ...
+
+class HasStringSetter(Protocol):
+    @property
+    def x(self) -> int: ...
+    @x.setter
+    def x(self, value: str) -> None: ...
+
+static_assert(not is_subtype_of(ExplicitXWithBroadSetAttr, HasStringSetter))
+static_assert(not is_assignable_to(ExplicitXWithBroadSetAttr, HasStringSetter))
+
+explicit_x = ExplicitXWithBroadSetAttr()
+explicit_x.x = "string"  # error: [invalid-assignment]
+```
+
+Writable attributes annotated with `Self` are checked after binding `Self` to the implementation
+type:
+
+```py
+from typing_extensions import Self
+
+class WritableSelfAttr:
+    x: Self
+
+class HasWritableSelfAttr(Protocol):
+    @property
+    def x(self) -> WritableSelfAttr: ...
+    @x.setter
+    def x(self, value: WritableSelfAttr) -> None: ...
+
+static_assert(is_subtype_of(WritableSelfAttr, HasWritableSelfAttr))
+static_assert(is_assignable_to(WritableSelfAttr, HasWritableSelfAttr))
+
+def _(value: WritableSelfAttr) -> None:
+    value.x = WritableSelfAttr()
 ```
 
 ## Variance of generic protocols with `Final` members
