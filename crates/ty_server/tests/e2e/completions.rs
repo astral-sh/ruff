@@ -119,6 +119,8 @@ func(
       {
         "label": "Class",
         "kind": 7,
+        "detail": "<class 'Class'>",
+        "sortText": " 1",
         "insertText": "Class($0)",
         "insertTextFormat": 2
       }
@@ -131,6 +133,8 @@ func(
       {
         "label": "function",
         "kind": 3,
+        "detail": "def function() -> None",
+        "sortText": "0",
         "insertText": "function($0)",
         "insertTextFormat": 2
       }
@@ -143,6 +147,8 @@ func(
       {
         "label": "method",
         "kind": 2,
+        "detail": "bound method Object.method() -> None",
+        "sortText": "0",
         "insertText": "method($0)",
         "insertTextFormat": 2
       }
@@ -154,7 +160,9 @@ func(
     [
       {
         "label": "function",
-        "kind": 3
+        "kind": 3,
+        "detail": "def function() -> None",
+        "sortText": "0"
       }
     ]
     "#);
@@ -190,7 +198,9 @@ func
     [
       {
         "label": "function",
-        "kind": 3
+        "kind": 3,
+        "detail": "def function() -> None",
+        "sortText": "0"
       }
     ]
     "#);
@@ -202,35 +212,11 @@ fn callable_completions(
     server: &mut crate::TestServer,
     file: &SystemPath,
     position: Position,
-) -> Vec<CallableCompletionSnapshot> {
-    let completions = server.completion_request(&server.file_uri(file), position);
+) -> Vec<lsp_types::CompletionItem> {
+    let mut completions = server.completion_request(&server.file_uri(file), position);
     completions
-        .into_iter()
-        .filter(|completion| matches!(completion.label.as_str(), "Class" | "function" | "method"))
-        .map(CallableCompletionSnapshot::from)
-        .collect()
-}
-
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct CallableCompletionSnapshot {
-    label: String,
-    kind: Option<lsp_types::CompletionItemKind>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    insert_text: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    insert_text_format: Option<lsp_types::InsertTextFormat>,
-}
-
-impl From<lsp_types::CompletionItem> for CallableCompletionSnapshot {
-    fn from(completion: lsp_types::CompletionItem) -> Self {
-        Self {
-            label: completion.label,
-            kind: completion.kind,
-            insert_text: completion.insert_text,
-            insert_text_format: completion.insert_text_format,
-        }
-    }
+        .retain(|completion| matches!(completion.label.as_str(), "Class" | "function" | "method"));
+    completions
 }
 
 /// Tests that auto-import completions show the fully

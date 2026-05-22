@@ -9432,10 +9432,12 @@ def decorated(): ...
                 .skip_auto_import()
                 .skip_builtins()
                 .complete_function_parentheses()
-                .filter(|completion| completion.name == "decorator")
                 .build()
                 .snapshot(),
-            @"decorator",
+            @"
+        decorated
+        decorator
+        ",
         );
     }
 
@@ -9443,9 +9445,9 @@ def decorated(): ...
     fn complete_function_parentheses_class_base() {
         let builder = completion_test_builder(
             "\
-class Base: ...
+class Parent: ...
 
-class Derived(Ba<CURSOR>
+class Derived(Par<CURSOR>
 ",
         );
         assert_snapshot!(
@@ -9453,10 +9455,11 @@ class Derived(Ba<CURSOR>
                 .skip_auto_import()
                 .skip_builtins()
                 .complete_function_parentheses()
-                .filter(|completion| completion.name == "Base")
                 .build()
                 .snapshot(),
-            @"Base",
+            @"
+        Parent
+        ",
         );
     }
 
