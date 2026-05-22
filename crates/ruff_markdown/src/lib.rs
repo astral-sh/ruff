@@ -61,11 +61,7 @@ fn is_closing_code_fence(line: &str, opening_fence: &str) -> bool {
     fence_len >= opening_fence.len()
         && line[fence_len..]
             .chars()
-            .all(is_markdown_closing_fence_trailing_whitespace)
-}
-
-const fn is_markdown_closing_fence_trailing_whitespace(ch: char) -> bool {
-    matches!(ch, ' ' | '\t')
+            .all(|ch| matches!(ch, ' ' | '\t'))
 }
 
 pub fn format_code_blocks(
