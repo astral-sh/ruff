@@ -274,11 +274,12 @@ pub(crate) fn multiple_starts_ends_with_any(checker: &Checker, call: &ast::ExprC
     };
 
     // Pull the comprehension element + generators out of either a generator
-    // expression or a list/set comprehension.
+    // expression or a list comprehension. Set comprehensions are not folded:
+    // `any({...})` is unidiomatic enough that we'd rather not encourage it
+    // by autofixing it.
     let (element, generators) = match first_arg {
         Expr::Generator(genexp) => (&*genexp.elt, &genexp.generators),
         Expr::ListComp(lc) => (&*lc.elt, &lc.generators),
-        Expr::SetComp(sc) => (&*sc.elt, &sc.generators),
         _ => return,
     };
 
@@ -318,6 +319,13 @@ pub(crate) fn multiple_starts_ends_with_any(checker: &Checker, call: &ast::ExprC
     else {
         return;
     };
+    // Match the `BoolOp` path: only fire when the receiver is a bare name.
+    // This keeps the rule's surface area consistent across forms and avoids
+    // folding `any(f().startswith(p) for p in (...))`, which would silently
+    // change the number of `f()` calls (N lazy calls under `any` → 1 call).
+    if !matches!(receiver.as_ref(), Expr::Name(_)) {
+        return;
+    }
     let attr_name = attr.as_str();
     if attr_name != "startswith" && attr_name != "endswith" {
         return;

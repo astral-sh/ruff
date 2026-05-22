@@ -116,3 +116,19 @@ if any(msg.startswith(other) for p in ("a", "b")):  # OK (call arg is not the lo
 
 if all(msg.startswith(p) for p in ("a", "b")):  # OK (`all`, not `any` — different semantics)
     print("yes")
+
+class Wrap:
+    msg = "Hello, world!"
+
+w = Wrap()
+if any(w.msg.startswith(p) for p in ("a", "b")):  # OK (receiver is an attribute, not a bare name)
+    print("yes")
+
+def _get():
+    return "hello"
+
+if any(_get().startswith(p) for p in ("a", "b")):  # OK (receiver is a call; folding would change call count)
+    print("yes")
+
+if any({msg.startswith(p) for p in ("a", "b")}):  # OK (set comprehension form is not folded)
+    print("yes")
