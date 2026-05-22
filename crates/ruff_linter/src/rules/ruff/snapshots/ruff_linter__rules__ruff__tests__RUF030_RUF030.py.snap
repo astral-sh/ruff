@@ -17,7 +17,7 @@ help: Remove `print`
 5 | # - single StringLiteral
   - assert True, print("This print is not intentional.")
 6 + assert True, "This print is not intentional."
-7 | 
+7 |
 8 | # Concatenated string literals
 9 | # Expects:
 note: This is an unsafe fix and may change runtime behavior
@@ -38,7 +38,7 @@ help: Remove `print`
 10 | # - single StringLiteral
    - assert True, print("This print" " is not intentional.")
 11 + assert True, "This print is not intentional."
-12 | 
+12 |
 13 | # Positional arguments, string literals
 14 | # Expects:
 note: This is an unsafe fix and may change runtime behavior
@@ -59,7 +59,7 @@ help: Remove `print`
 15 | # - single StringLiteral concatenated with " "
    - assert True, print("This print", "is not intentional")
 16 + assert True, "This print is not intentional"
-17 | 
+17 |
 18 | # Concatenated string literals combined with Positional arguments
 19 | # Expects:
 note: This is an unsafe fix and may change runtime behavior
@@ -80,7 +80,7 @@ help: Remove `print`
 20 | # - single stringliteral concatenated with " " only between `print` and `is`
    - assert True, print("This " "print", "is not intentional.")
 21 + assert True, "This print is not intentional."
-22 | 
+22 |
 23 | # Positional arguments, string literals with a variable
 24 | # Expects:
 note: This is an unsafe fix and may change runtime behavior
@@ -101,7 +101,7 @@ help: Remove `print`
 25 | # - single FString concatenated with " "
    - assert True, print("This", print.__name__, "is not intentional.")
 26 + assert True, f"This {print.__name__} is not intentional."
-27 | 
+27 |
 28 | # Mixed brackets string literals
 29 | # Expects:
 note: This is an unsafe fix and may change runtime behavior
@@ -122,7 +122,7 @@ help: Remove `print`
 30 | # - single StringLiteral concatenated with " "
    - assert True, print("This print", 'is not intentional', """and should be removed""")
 31 + assert True, "This print is not intentional and should be removed"
-32 | 
+32 |
 33 | # Mixed brackets with other brackets inside
 34 | # Expects:
 note: This is an unsafe fix and may change runtime behavior
@@ -143,7 +143,7 @@ help: Remove `print`
 35 | # - single StringLiteral concatenated with " " and escaped brackets
    - assert True, print("This print", 'is not "intentional"', """and "should" be 'removed'""")
 36 + assert True, "This print is not \"intentional\" and \"should\" be 'removed'"
-37 | 
+37 |
 38 | # Positional arguments, string literals with a separator
 39 | # Expects:
 note: This is an unsafe fix and may change runtime behavior
@@ -164,7 +164,7 @@ help: Remove `print`
 40 | # - single StringLiteral concatenated with "|"
    - assert True, print("This print", "is not intentional", sep="|")
 41 + assert True, "This print|is not intentional"
-42 | 
+42 |
 43 | # Positional arguments, string literals with None as separator
 44 | # Expects:
 note: This is an unsafe fix and may change runtime behavior
@@ -185,7 +185,7 @@ help: Remove `print`
 45 | # - single StringLiteral concatenated with " "
    - assert True, print("This print", "is not intentional", sep=None)
 46 + assert True, "This print is not intentional"
-47 | 
+47 |
 48 | # Positional arguments, string literals with variable as separator, needs f-string
 49 | # Expects:
 note: This is an unsafe fix and may change runtime behavior
@@ -206,7 +206,7 @@ help: Remove `print`
 50 | # - single FString concatenated with "{U00A0}"
    - assert True, print("This print", "is not intentional", sep=U00A0)
 51 + assert True, f"This print{U00A0}is not intentional"
-52 | 
+52 |
 53 | # Unnecessary f-string
 54 | # Expects:
 note: This is an unsafe fix and may change runtime behavior
@@ -227,7 +227,7 @@ help: Remove `print`
 55 | # - single StringLiteral
    - assert True, print(f"This f-string is just a literal.")
 56 + assert True, "This f-string is just a literal."
-57 | 
+57 |
 58 | # Positional arguments, string literals and f-strings
 59 | # Expects:
 note: This is an unsafe fix and may change runtime behavior
@@ -248,7 +248,7 @@ help: Remove `print`
 60 | # - single FString concatenated with " "
    - assert True, print("This print", f"is not {'intentional':s}")
 61 + assert True, f"This print is not {'intentional':s}"
-62 | 
+62 |
 63 | # Positional arguments, string literals and f-strings with a separator
 64 | # Expects:
 note: This is an unsafe fix and may change runtime behavior
@@ -269,7 +269,7 @@ help: Remove `print`
 65 | # - single FString concatenated with "|"
    - assert True, print("This print", f"is not {'intentional':s}", sep="|")
 66 + assert True, f"This print|is not {'intentional':s}"
-67 | 
+67 |
 68 | # A single f-string
 69 | # Expects:
 note: This is an unsafe fix and may change runtime behavior
@@ -290,7 +290,7 @@ help: Remove `print`
 70 | # - single FString
    - assert True, print(f"This print is not {'intentional':s}")
 71 + assert True, f"This print is not {'intentional':s}"
-72 | 
+72 |
 73 | # A single f-string with a redundant separator
 74 | # Expects:
 note: This is an unsafe fix and may change runtime behavior
@@ -311,7 +311,7 @@ help: Remove `print`
 75 | # - single FString
    - assert True, print(f"This print is not {'intentional':s}", sep="|")
 76 + assert True, f"This print is not {'intentional':s}"
-77 | 
+77 |
 78 | # Complex f-string with variable as separator
 79 | # Expects:
 note: This is an unsafe fix and may change runtime behavior
@@ -332,7 +332,7 @@ help: Remove `print`
 82 | maintainer = "John Doe"
    - assert True, print("Unreachable due to", condition, f", ask {maintainer} for advice", sep=U00A0)
 83 + assert True, f"Unreachable due to{U00A0}{condition}{U00A0}, ask {maintainer} for advice"
-84 | 
+84 |
 85 | # Empty print
 86 | # Expects:
 note: This is an unsafe fix and may change runtime behavior
@@ -353,7 +353,7 @@ help: Remove `print`
 87 | # - `msg` entirely removed from assertion
    - assert True, print()
 88 + assert True
-89 | 
+89 |
 90 | # Empty print with separator
 91 | # Expects:
 note: This is an unsafe fix and may change runtime behavior
@@ -374,7 +374,7 @@ help: Remove `print`
 92 | # - `msg` entirely removed from assertion
    - assert True, print(sep=" ")
 93 + assert True
-94 | 
+94 |
 95 | # Custom print function that actually returns a string
 96 | # Expects:
 note: This is an unsafe fix and may change runtime behavior

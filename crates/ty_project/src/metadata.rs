@@ -5,10 +5,13 @@ use ruff_python_ast::name::Name;
 use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
-use ty_python_semantic::{FallibleStrategy, MisconfigurationStrategy, ProgramSettings};
+use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, ProgramSettings};
 
+use crate::Db;
 use crate::metadata::options::ProjectOptionsOverrides;
+use crate::metadata::options::{OptionDiagnostic, ProgramSettingsDiagnostic, ToSettingsError};
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
+use crate::metadata::settings::Settings;
 use crate::metadata::value::ValueSource;
 pub use options::Options;
 use options::TyTomlError;
@@ -16,6 +19,7 @@ use options::TyTomlError;
 mod configuration_file;
 pub mod options;
 pub mod pyproject;
+pub mod python_version;
 pub mod settings;
 pub mod value;
 
@@ -283,9 +287,18 @@ impl ProjectMetadata {
         system: &dyn System,
         vendored: &VendoredFileSystem,
         strategy: &Strategy,
-    ) -> Result<ProgramSettings, Strategy::Error<anyhow::Error>> {
+    ) -> Result<(ProgramSettings, Vec<ProgramSettingsDiagnostic>), Strategy::Error<anyhow::Error>>
+    {
         self.options
             .to_program_settings(self.root(), self.name(), system, vendored, strategy)
+    }
+
+    pub fn to_settings<Strategy: MisconfigurationStrategy>(
+        &self,
+        db: &dyn Db,
+        strategy: &Strategy,
+    ) -> Result<(Settings, Vec<OptionDiagnostic>), Strategy::Error<ToSettingsError>> {
+        self.options.to_settings(db, self.root(), strategy)
     }
 
     pub fn apply_overrides(&mut self, overrides: &ProjectOptionsOverrides) {
@@ -655,7 +668,7 @@ unclosed table, expected `]`
               root: "/app",
               options: Options(
                 environment: Some(EnvironmentOptions(
-                  r#python-version: Some("3.10"),
+                  r#python-version: Some(r#3.10),
                 )),
               ),
             )
@@ -707,7 +720,7 @@ unclosed table, expected `]`
               root: "/app",
               options: Options(
                 environment: Some(EnvironmentOptions(
-                  r#python-version: Some("3.12"),
+                  r#python-version: Some(r#3.12),
                 )),
                 src: Some(SrcOptions(
                   root: Some("src"),
@@ -742,8 +755,10 @@ unclosed table, expected `]`
                 .environment
                 .unwrap_or_default()
                 .python_version
-                .as_deref(),
-            Some(&PythonVersion::PY312)
+                .as_deref()
+                .copied()
+                .map(PythonVersion::from),
+            Some(PythonVersion::PY312)
         );
 
         Ok(())
@@ -772,8 +787,10 @@ unclosed table, expected `]`
                 .environment
                 .unwrap_or_default()
                 .python_version
-                .as_deref(),
-            Some(&PythonVersion::from((3, 0)))
+                .as_deref()
+                .copied()
+                .map(PythonVersion::from),
+            Some(PythonVersion::PY37)
         );
 
         Ok(())
@@ -804,8 +821,10 @@ unclosed table, expected `]`
                 .environment
                 .unwrap_or_default()
                 .python_version
-                .as_deref(),
-            Some(&PythonVersion::PY312)
+                .as_deref()
+                .copied()
+                .map(PythonVersion::from),
+            Some(PythonVersion::PY312)
         );
 
         Ok(())
@@ -834,8 +853,10 @@ unclosed table, expected `]`
                 .environment
                 .unwrap_or_default()
                 .python_version
-                .as_deref(),
-            Some(&PythonVersion::PY313)
+                .as_deref()
+                .copied()
+                .map(PythonVersion::from),
+            Some(PythonVersion::PY313)
         );
 
         Ok(())
@@ -866,8 +887,10 @@ unclosed table, expected `]`
                 .environment
                 .unwrap_or_default()
                 .python_version
-                .as_deref(),
-            Some(&PythonVersion::PY312)
+                .as_deref()
+                .copied()
+                .map(PythonVersion::from),
+            Some(PythonVersion::PY312)
         );
 
         Ok(())
@@ -900,8 +923,10 @@ unclosed table, expected `]`
                 .environment
                 .unwrap_or_default()
                 .python_version
-                .as_deref(),
-            Some(&PythonVersion::PY310)
+                .as_deref()
+                .copied()
+                .map(PythonVersion::from),
+            Some(PythonVersion::PY310)
         );
 
         Ok(())
@@ -992,6 +1017,68 @@ unclosed table, expected `]`
         assert_error_eq(
             &error,
             "Invalid `requires-python` version specifier (`/app/pyproject.toml`): The major version `999` is larger than the maximum supported value 255",
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn requires_python_old_version_uses_lowest_supported_version() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                requires-python = "==2.7"
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let root = ProjectMetadata::discover(&root, &system)?;
+
+        assert_eq!(
+            root.options
+                .environment
+                .unwrap_or_default()
+                .python_version
+                .as_deref()
+                .copied()
+                .map(PythonVersion::from),
+            Some(PythonVersion::PY37)
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn requires_python_unsupported_future_version() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                requires-python = "==44.44"
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let Err(error) = ProjectMetadata::discover(&root, &system) else {
+            return Err(anyhow!(
+                "Expected project discovery to fail because `requires-python` does not include a ty-supported version."
+            ));
+        };
+
+        assert_error_eq(
+            &error,
+            "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `==44.44` does not include any Python version supported by ty. Adjust `requires-python` to include a supported Python 3 version or specify `environment.python-version` explicitly.",
         );
 
         Ok(())

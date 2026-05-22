@@ -10,13 +10,13 @@ N804 [*] First argument of a class method should be named `cls`
 6 |         ...
   |
 help: Rename `self` to `cls`
-2 | 
-3 | 
+2 |
+3 |
 4 | class Class:
   -     def __init_subclass__(self, default_name, **kwargs):
 5 +     def __init_subclass__(cls, default_name, **kwargs):
 6 |         ...
-7 | 
+7 |
 8 |     @classmethod
 note: This is an unsafe fix and may change runtime behavior
 
@@ -30,12 +30,12 @@ N804 [*] First argument of a class method should be named `cls`
    |
 help: Rename `self` to `cls`
 6  |         ...
-7  | 
+7  |
 8  |     @classmethod
    -     def badAllowed(self, x, /, other):
 9  +     def badAllowed(cls, x, /, other):
 10 |         ...
-11 | 
+11 |
 12 |     @classmethod
 note: This is an unsafe fix and may change runtime behavior
 
@@ -49,13 +49,13 @@ N804 [*] First argument of a class method should be named `cls`
    |
 help: Rename `self` to `cls`
 10 |         ...
-11 | 
+11 |
 12 |     @classmethod
    -     def stillBad(self, x, /, other):
 13 +     def stillBad(cls, x, /, other):
 14 |         ...
-15 | 
-16 | 
+15 |
+16 |
 note: This is an unsafe fix and may change runtime behavior
 
 N804 [*] First argument of a class method should be named `cls`
@@ -67,13 +67,13 @@ N804 [*] First argument of a class method should be named `cls`
 19 |         pass
    |
 help: Rename `self` to `cls`
-15 | 
-16 | 
+15 |
+16 |
 17 | class MetaClass(ABCMeta):
    -     def badAllowed(self):
 18 +     def badAllowed(cls):
 19 |         pass
-20 | 
+20 |
 21 |     def stillBad(self):
 note: This is an unsafe fix and may change runtime behavior
 
@@ -89,7 +89,7 @@ N804 [*] First argument of a class method should be named `cls`
 help: Rename `self` to `cls`
 18 |     def badAllowed(self):
 19 |         pass
-20 | 
+20 |
    -     def stillBad(self):
 21 +     def stillBad(cls):
 22 |         pass

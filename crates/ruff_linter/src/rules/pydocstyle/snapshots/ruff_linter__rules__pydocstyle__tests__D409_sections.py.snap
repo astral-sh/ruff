@@ -11,12 +11,12 @@ D409 [*] Section underline should match the length of its name ("Returns")
     |
 help: Adjust underline length to match "Returns"
 108 |     """Toggle the gizmo.
-109 | 
+109 |
 110 |     Returns
     -     --
 111 +     -------
 112 |     A value of some sort.
-113 | 
+113 |
 114 |     """
 
 D409 [*] Section underline should match the length of its name ("Returns")
@@ -30,7 +30,7 @@ D409 [*] Section underline should match the length of its name ("Returns")
     |
 help: Adjust underline length to match "Returns"
 222 |     returns.
-223 | 
+223 |
 224 |     Returns
     -     ------
 225 +     -------
@@ -49,7 +49,7 @@ D409 [*] Section underline should match the length of its name ("Other Parameter
     |
 help: Adjust underline length to match "Other Parameters"
 586 |         A dictionary of string attributes
-587 | 
+587 |
 588 |     Other Parameters
     -     ----------
 589 +     ----------------

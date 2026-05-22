@@ -10,9 +10,10 @@ use crate::types::cyclic::CycleDetector;
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
-    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Truthiness, Type, TypeContext,
+    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Type, TypeContext,
     TypeVarBoundOrConstraints, UnionBuilder,
 };
+use ty_python_core::Truthiness;
 
 /// Whether the intersection type is on the left or right side of the comparison.
 #[derive(Debug, Clone, Copy)]
@@ -169,6 +170,23 @@ pub(super) fn infer_binary_type_comparison<'db>(
     };
 
     let comparison_result = match (left, right) {
+        (Type::EnumComplement(complement), right) => Some(infer_binary_type_comparison(
+            context,
+            complement.remaining_literal_union(db),
+            op,
+            right,
+            range,
+            visitor,
+        )),
+        (left, Type::EnumComplement(complement)) => Some(infer_binary_type_comparison(
+            context,
+            left,
+            op,
+            complement.remaining_literal_union(db),
+            range,
+            visitor,
+        )),
+
         (Type::Union(union), other) => {
             let mut builder = UnionBuilder::new(db);
             for element in union.elements(db) {
@@ -186,6 +204,31 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 )?);
             }
             Some(Ok(builder.build()))
+        }
+
+        (Type::Intersection(intersection), right)
+            if intersection.positive(db).iter().copied().any(Type::is_type_var) =>
+        {
+            Some(infer_binary_type_comparison(
+                context,
+                intersection.with_expanded_typevars_and_newtypes(db),
+                op,
+                right,
+                range,
+                visitor
+            ))
+        }
+        (left, Type::Intersection(intersection))
+            if intersection.positive(db).iter().copied().any(Type::is_type_var) =>
+        {
+            Some(infer_binary_type_comparison(
+                context,
+                left,
+                op,
+                intersection.with_expanded_typevars_and_newtypes(db),
+                range,
+                visitor
+            ))
         }
 
         (Type::Intersection(intersection), right) => {
@@ -651,6 +694,17 @@ fn infer_binary_intersection_type_comparison<'db>(
 
     let db = context.db();
 
+    if let Some(alternatives) = intersection.finite_alternative_union(db) {
+        return match intersection_on {
+            IntersectionOn::Left => {
+                infer_binary_type_comparison(context, alternatives, op, other, range, visitor)
+            }
+            IntersectionOn::Right => {
+                infer_binary_type_comparison(context, other, op, alternatives, range, visitor)
+            }
+        };
+    }
+
     // If a comparison yields a definitive true/false answer on a (positive) part
     // of an intersection type, it will also yield a definitive answer on the full
     // intersection type, which is even more specific.
@@ -868,7 +922,7 @@ fn infer_membership_test_comparison<'db>(
         Ok(bindings) => Some(bindings.return_type(db)),
         // If `__contains__` is not available or possibly unbound,
         // fall back to iteration-based membership test.
-        Err(CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound(_)) => right
+        Err(CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound { .. }) => right
             .try_iterate(db)
             .map(|_| KnownClass::Bool.to_instance(db))
             .ok(),
@@ -888,8 +942,10 @@ fn infer_membership_test_comparison<'db>(
             });
 
             match op {
-                MembershipTestCompareOperator::In => truthiness.into_type(db),
-                MembershipTestCompareOperator::NotIn => truthiness.negate().into_type(db),
+                MembershipTestCompareOperator::In => Type::from_truthiness(db, truthiness),
+                MembershipTestCompareOperator::NotIn => {
+                    Type::from_truthiness(db, truthiness.negate())
+                }
             }
         })
         .ok_or_else(|| UnsupportedComparisonError {

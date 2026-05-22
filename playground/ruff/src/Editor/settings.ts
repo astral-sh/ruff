@@ -73,13 +73,13 @@ export async function copyAsMarkdown(
   }
 
   await navigator.clipboard.writeText(
-    `## [Playground](${url})
-
-\`\`\`py
+    `\`\`\`py
 ${pythonSource}
 \`\`\`
 
 ${settingsBlock}
+
+[Playground](${url})
 `,
   );
 }

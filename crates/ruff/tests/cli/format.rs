@@ -618,21 +618,21 @@ fn output_format_notebook() -> Result<()> {
     1 | import numpy
       - maths = (numpy.arange(100)**2).sum()
       - stats= numpy.asarray([1,2,3,4]).median()
-    2 + 
+    2 +
     3 + maths = (numpy.arange(100) ** 2).sum()
     4 + stats = numpy.asarray([1, 2, 3, 4]).median()
      ::: cell 3
     1 | # A cell with IPython escape command
     2 | def some_function(foo, bar):
     3 |     pass
-    4 + 
-    5 + 
+    4 +
+    5 +
     6 | %matplotlib inline
       ::: cell 4
     1  | foo = %pwd
        - def some_function(foo,bar,):
-    2  + 
-    3  + 
+    2  +
+    3  +
     4  + def some_function(
     5  +     foo,
     6  +     bar,
@@ -726,7 +726,7 @@ fn check_silent_mode_no_output() -> Result<()> {
     // but there should be no "reformat" output in silent mode
     let test = CliTest::with_file("main.py", "def     foo():\n                pass\n")?;
 
-    assert_cmd_snapshot!(test.format_command().args(["--check", "--silent"]), @r"
+    assert_cmd_snapshot!(test.format_command().args(["--check", "--silent"]), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -741,7 +741,7 @@ fn check_quiet_mode_shows_diagnostics_only() -> Result<()> {
     // should show diagnostics but not summary
     let test = CliTest::with_file("main.py", "def     foo():\n                pass\n")?;
 
-    assert_cmd_snapshot!(test.format_command().args(["--check", "--quiet"]), @r"
+    assert_cmd_snapshot!(test.format_command().args(["--check", "--quiet"]), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -757,7 +757,7 @@ fn check_default_mode_shows_diagnostics_and_summary() -> Result<()> {
     // default mode should show both diagnostics and summary
     let test = CliTest::with_file("main.py", "def     foo():\n                pass\n")?;
 
-    assert_cmd_snapshot!(test.format_command().args(["--check"]), @r"
+    assert_cmd_snapshot!(test.format_command().args(["--check"]), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2306,7 +2306,7 @@ fn range_formatting_notebook() -> Result<()> {
  "nbformat": 4,
  "nbformat_minor": 5
 }
-"#), @r"
+"#), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -2426,7 +2426,7 @@ fn markdown_formatting_preview_disabled() -> Result<()> {
     assert_cmd_snapshot!(test.format_command()
         .args(["--isolated", "--no-preview", "--diff"])
         .arg(unformatted),
-        @r"
+        @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -2452,22 +2452,22 @@ fn markdown_formatting_preview_enabled() -> Result<()> {
     unformatted: File would be reformatted
       --> CRATE_ROOT/resources/test/fixtures/unformatted.md:1:1
     1  | This is a markdown document with two fenced code blocks:
-    2  | 
+    2  |
     3  | ```py
        - print( "hello" )
        - def foo(): pass
     4  + print("hello")
-    5  + 
-    6  + 
+    5  +
+    6  +
     7  + def foo():
     8  +     pass
     9  | ```
-    10 | 
+    10 |
     11 | ```pyi
        - print( "hello" )
        - def foo(): pass
     12 + print("hello")
-    13 + 
+    13 +
     14 + def foo():
     15 +     pass
     16 | ```
@@ -2554,7 +2554,7 @@ print( 'hello' )
     unformatted: File would be reformatted
      --> test.bar:1:1
     2 | Text string
-    3 | 
+    3 |
     4 | ```py
       - print( 'hello' )
     5 + print("hello")
@@ -2562,7 +2562,7 @@ print( 'hello' )
 
     unformatted: File would be reformatted
      --> test.foo:1:1
-      - 
+      -
       - print( 'hello' )
     1 + print("hello")
 

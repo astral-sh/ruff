@@ -14,9 +14,9 @@ help: Import from `collections.abc`
 1 | # UP035
   - from collections import Mapping
 2 + from collections.abc import Mapping
-3 | 
+3 |
 4 | from collections import Mapping as MAP
-5 | 
+5 |
 
 UP035 [*] Import from `collections.abc` instead: `Mapping`
  --> UP035.py:4:1
@@ -31,12 +31,12 @@ UP035 [*] Import from `collections.abc` instead: `Mapping`
 help: Import from `collections.abc`
 1 | # UP035
 2 | from collections import Mapping
-3 | 
+3 |
   - from collections import Mapping as MAP
 4 + from collections.abc import Mapping as MAP
-5 | 
+5 |
 6 | from collections import Mapping, Sequence
-7 | 
+7 |
 
 UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequence`
  --> UP035.py:6:1
@@ -49,14 +49,14 @@ UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequence`
 8 | from collections import Counter, Mapping
   |
 help: Import from `collections.abc`
-3 | 
+3 |
 4 | from collections import Mapping as MAP
-5 | 
+5 |
   - from collections import Mapping, Sequence
 6 + from collections.abc import Mapping, Sequence
-7 | 
+7 |
 8 | from collections import Counter, Mapping
-9 | 
+9 |
 
 UP035 [*] Import from `collections.abc` instead: `Mapping`
   --> UP035.py:8:1
@@ -69,15 +69,15 @@ UP035 [*] Import from `collections.abc` instead: `Mapping`
 10 | from collections import (Counter, Mapping)
    |
 help: Import from `collections.abc`
-5  | 
+5  |
 6  | from collections import Mapping, Sequence
-7  | 
+7  |
    - from collections import Counter, Mapping
 8  + from collections import Counter
 9  + from collections.abc import Mapping
-10 | 
+10 |
 11 | from collections import (Counter, Mapping)
-12 | 
+12 |
 
 UP035 [*] Import from `collections.abc` instead: `Mapping`
   --> UP035.py:10:1
@@ -90,13 +90,13 @@ UP035 [*] Import from `collections.abc` instead: `Mapping`
 12 | from collections import (Counter,
    |
 help: Import from `collections.abc`
-7  | 
+7  |
 8  | from collections import Counter, Mapping
-9  | 
+9  |
    - from collections import (Counter, Mapping)
 10 + from collections import (Counter)
 11 + from collections.abc import Mapping
-12 | 
+12 |
 13 | from collections import (Counter,
 14 |                          Mapping)
 
@@ -112,14 +112,14 @@ UP035 [*] Import from `collections.abc` instead: `Mapping`
 15 |   from collections import Counter, \
    |
 help: Import from `collections.abc`
-9  | 
+9  |
 10 | from collections import (Counter, Mapping)
-11 | 
+11 |
    - from collections import (Counter,
    -                          Mapping)
 12 + from collections import (Counter)
 13 + from collections.abc import Mapping
-14 | 
+14 |
 15 | from collections import Counter, \
 16 |                          Mapping
 
@@ -137,14 +137,14 @@ UP035 [*] Import from `collections.abc` instead: `Mapping`
 help: Import from `collections.abc`
 12 | from collections import (Counter,
 13 |                          Mapping)
-14 | 
+14 |
    - from collections import Counter, \
    -                          Mapping
 15 + from collections import Counter
 16 + from collections.abc import Mapping
-17 | 
+17 |
 18 | from collections import Counter, Mapping, Sequence
-19 | 
+19 |
 
 UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequence`
   --> UP035.py:18:1
@@ -159,13 +159,13 @@ UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequence`
 help: Import from `collections.abc`
 15 | from collections import Counter, \
 16 |                          Mapping
-17 | 
+17 |
    - from collections import Counter, Mapping, Sequence
 18 + from collections import Counter
 19 + from collections.abc import Mapping, Sequence
-20 | 
+20 |
 21 | from collections import Mapping as mapping, Counter
-22 | 
+22 |
 
 UP035 [*] Import from `collections.abc` instead: `Mapping`
   --> UP035.py:20:1
@@ -178,13 +178,13 @@ UP035 [*] Import from `collections.abc` instead: `Mapping`
 22 | if True:
    |
 help: Import from `collections.abc`
-17 | 
+17 |
 18 | from collections import Counter, Mapping, Sequence
-19 | 
+19 |
    - from collections import Mapping as mapping, Counter
 20 + from collections import Counter
 21 + from collections.abc import Mapping as mapping
-22 | 
+22 |
 23 | if True:
 24 |     from collections import Mapping, Counter
 
@@ -199,12 +199,12 @@ UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
 help: Import from `collections.abc`
 20 | from collections import Mapping as mapping, Counter
-21 | 
+21 |
 22 | if True:
    -     from collections import Mapping, Counter
 23 +     from collections import Counter
 24 +     from collections.abc import Mapping
-25 | 
+25 |
 26 | if True:
 27 |     if True:
 
@@ -225,9 +225,9 @@ help: Import from `collections.abc`
    -     from collections import Mapping, Counter
 28 +     from collections import Counter
 29 +     from collections.abc import Mapping
-30 | 
+30 |
 31 | if True: from collections import Mapping
-32 | 
+32 |
 
 UP035 [*] Import from `collections.abc` instead: `Mapping`
   --> UP035.py:30:10
@@ -242,10 +242,10 @@ UP035 [*] Import from `collections.abc` instead: `Mapping`
 help: Import from `collections.abc`
 27 |         pass
 28 |     from collections import Mapping, Counter
-29 | 
+29 |
    - if True: from collections import Mapping
 30 + if True: from collections.abc import Mapping
-31 | 
+31 |
 32 | import os
 33 | from collections import Counter, Mapping
 
@@ -259,13 +259,13 @@ UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
 help: Import from `collections.abc`
 30 | if True: from collections import Mapping
-31 | 
+31 |
 32 | import os
    - from collections import Counter, Mapping
 33 + from collections import Counter
 34 + from collections.abc import Mapping
 35 | import sys
-36 | 
+36 |
 37 | if True:
 
 UP035 [*] Import from `collections.abc` instead: `Mapping`, `Callable`
@@ -283,7 +283,7 @@ UP035 [*] Import from `collections.abc` instead: `Mapping`, `Callable`
 44 |   from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
    |
 help: Import from `collections.abc`
-35 | 
+35 |
 36 | if True:
 37 |     from collections import (
    -         Mapping,
@@ -292,9 +292,9 @@ help: Import from `collections.abc`
 39 |         Good,
 40 |     )
 41 +     from collections.abc import Mapping, Callable
-42 | 
+42 |
 43 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
-44 | 
+44 |
 
 UP035 [*] Import from `collections.abc` instead: `Callable`
   --> UP035.py:44:1
@@ -309,11 +309,11 @@ UP035 [*] Import from `collections.abc` instead: `Callable`
 help: Import from `collections.abc`
 41 |         Good,
 42 |     )
-43 | 
+43 |
    - from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
 44 + from typing import Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
 45 + from collections.abc import Callable
-46 | 
+46 |
 47 | if True: from collections import (
 48 |     Mapping, Counter)
 
@@ -330,11 +330,11 @@ UP035 [*] Import from `collections` instead: `OrderedDict`
 help: Import from `collections`
 41 |         Good,
 42 |     )
-43 | 
+43 |
    - from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
 44 + from typing import Callable, Match, Pattern, List, AbstractSet, ContextManager
 45 + from collections import OrderedDict
-46 | 
+46 |
 47 | if True: from collections import (
 48 |     Mapping, Counter)
 
@@ -351,11 +351,11 @@ UP035 [*] Import from `re` instead: `Match`, `Pattern`
 help: Import from `re`
 41 |         Good,
 42 |     )
-43 | 
+43 |
    - from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
 44 + from typing import Callable, List, OrderedDict, AbstractSet, ContextManager
 45 + from re import Match, Pattern
-46 | 
+46 |
 47 | if True: from collections import (
 48 |     Mapping, Counter)
 
@@ -427,7 +427,7 @@ UP035 [*] Import from `collections` instead: `OrderedDict`
 53 | from typing import Callable
    |
 help: Import from `collections`
-48 | 
+48 |
 49 | # Bad imports from PYI027 that are now handled by PYI022 (UP035)
 50 | from typing import ContextManager
    - from typing import OrderedDict
@@ -934,7 +934,7 @@ help: Import from `collections.abc`
 76 + from collections.abc import Generator
 77 | from typing import Callable
 78 | from typing import cast
-79 | 
+79 |
 
 UP035 [*] Import from `collections.abc` instead: `Callable`
   --> UP035.py:77:1
@@ -952,7 +952,7 @@ help: Import from `collections.abc`
    - from typing import Callable
 77 + from collections.abc import Callable
 78 | from typing import cast
-79 | 
+79 |
 80 | # OK
 
 UP035 [*] Import from `typing` instead: `SupportsIndex`
@@ -966,11 +966,11 @@ UP035 [*] Import from `typing` instead: `SupportsIndex`
    |
 help: Import from `typing`
 81 | from a import b
-82 | 
+82 |
 83 | # UP035 on py312+ only
    - from typing_extensions import SupportsIndex
 84 + from typing import SupportsIndex
-85 | 
+85 |
 86 | # UP035 on py312+ only
 87 | from typing_extensions import NamedTuple
 
@@ -985,11 +985,11 @@ UP035 [*] Import from `typing` instead: `NamedTuple`
    |
 help: Import from `typing`
 84 | from typing_extensions import SupportsIndex
-85 | 
+85 |
 86 | # UP035 on py312+ only
    - from typing_extensions import NamedTuple
 87 + from typing import NamedTuple
-88 | 
+88 |
 89 | # UP035 on py312+ only: `typing_extensions` supports `frozen_default` (backported from 3.12).
 90 | from typing_extensions import dataclass_transform
 
@@ -1004,11 +1004,11 @@ UP035 [*] Import from `typing` instead: `dataclass_transform`
    |
 help: Import from `typing`
 87 | from typing_extensions import NamedTuple
-88 | 
+88 |
 89 | # UP035 on py312+ only: `typing_extensions` supports `frozen_default` (backported from 3.12).
    - from typing_extensions import dataclass_transform
 90 + from typing import dataclass_transform
-91 | 
+91 |
 92 | # UP035
 93 | from backports.strenum import StrEnum
 
@@ -1023,11 +1023,11 @@ UP035 [*] Import from `enum` instead: `StrEnum`
    |
 help: Import from `enum`
 90 | from typing_extensions import dataclass_transform
-91 | 
+91 |
 92 | # UP035
    - from backports.strenum import StrEnum
 93 + from enum import StrEnum
-94 | 
+94 |
 95 | # UP035
 96 | from typing_extensions import override
 
@@ -1042,11 +1042,11 @@ UP035 [*] Import from `typing` instead: `override`
    |
 help: Import from `typing`
 93 | from backports.strenum import StrEnum
-94 | 
+94 |
 95 | # UP035
    - from typing_extensions import override
 96 + from typing import override
-97 | 
+97 |
 98 | # UP035
 99 | from typing_extensions import Buffer
 
@@ -1061,11 +1061,11 @@ UP035 [*] Import from `collections.abc` instead: `Buffer`
     |
 help: Import from `collections.abc`
 96  | from typing_extensions import override
-97  | 
+97  |
 98  | # UP035
     - from typing_extensions import Buffer
 99  + from collections.abc import Buffer
-100 | 
+100 |
 101 | # UP035
 102 | from typing_extensions import get_original_bases
 
@@ -1080,11 +1080,11 @@ UP035 [*] Import from `types` instead: `get_original_bases`
     |
 help: Import from `types`
 99  | from typing_extensions import Buffer
-100 | 
+100 |
 101 | # UP035
     - from typing_extensions import get_original_bases
 102 + from types import get_original_bases
-103 | 
+103 |
 104 | # UP035 on py313+ only
 105 | from typing_extensions import TypeVar
 
@@ -1099,11 +1099,11 @@ UP035 [*] Import from `typing` instead: `TypeVar`
     |
 help: Import from `typing`
 102 | from typing_extensions import get_original_bases
-103 | 
+103 |
 104 | # UP035 on py313+ only
     - from typing_extensions import TypeVar
 105 + from typing import TypeVar
-106 | 
+106 |
 107 | # UP035 on py313+ only
 108 | from typing_extensions import CapsuleType
 
@@ -1118,11 +1118,11 @@ UP035 [*] Import from `types` instead: `CapsuleType`
     |
 help: Import from `types`
 105 | from typing_extensions import TypeVar
-106 | 
+106 |
 107 | # UP035 on py313+ only
     - from typing_extensions import CapsuleType
 108 + from types import CapsuleType
-109 | 
+109 |
 110 | # UP035 on py313+ only
 111 | from typing_extensions import deprecated
 
@@ -1137,11 +1137,11 @@ UP035 [*] Import from `warnings` instead: `deprecated`
     |
 help: Import from `warnings`
 108 | from typing_extensions import CapsuleType
-109 | 
+109 |
 110 | # UP035 on py313+ only
     - from typing_extensions import deprecated
 111 + from warnings import deprecated
-112 | 
+112 |
 113 | # UP035 on py313+ only
 114 | from typing_extensions import get_type_hints
 
@@ -1156,11 +1156,11 @@ UP035 [*] Import from `typing` instead: `get_type_hints`
     |
 help: Import from `typing`
 111 | from typing_extensions import deprecated
-112 | 
+112 |
 113 | # UP035 on py313+ only
     - from typing_extensions import get_type_hints
 114 + from typing import get_type_hints
-115 | 
+115 |
 116 | # https://github.com/astral-sh/ruff/issues/15780
 117 | from typing_extensions import is_typeddict
 
@@ -1175,11 +1175,11 @@ UP035 [*] Import from `typing` instead: `BinaryIO`
     |
 help: Import from `typing`
 119 | from typing_extensions import TypedDict
-120 | 
+120 |
 121 | # UP035 on py37+ only
     - from typing.io import BinaryIO
 122 + from typing import BinaryIO
-123 | 
+123 |
 124 | # UP035 on py37+ only
 125 | from typing.io import IO
 
@@ -1194,11 +1194,11 @@ UP035 [*] Import from `typing` instead: `IO`
     |
 help: Import from `typing`
 122 | from typing.io import BinaryIO
-123 | 
+123 |
 124 | # UP035 on py37+ only
     - from typing.io import IO
 125 + from typing import IO
-126 | 
+126 |
 127 | # UP035 on py37+ only
 128 | from typing.io import TextIO
 
@@ -1213,11 +1213,11 @@ UP035 [*] Import from `typing` instead: `TextIO`
     |
 help: Import from `typing`
 125 | from typing.io import IO
-126 | 
+126 |
 127 | # UP035 on py37+ only
     - from typing.io import TextIO
 128 + from typing import TextIO
-129 | 
+129 |
 130 | # UP035 on py37+ only
 131 | from typing.re import Match
 
@@ -1232,11 +1232,11 @@ UP035 [*] Import from `re` instead: `Match`
     |
 help: Import from `re`
 128 | from typing.io import TextIO
-129 | 
+129 |
 130 | # UP035 on py37+ only
     - from typing.re import Match
 131 + from re import Match
-132 | 
+132 |
 133 | # UP035 on py37+ only
 134 | from typing.re import Pattern
 
@@ -1249,7 +1249,7 @@ UP035 [*] Import from `re` instead: `Pattern`
     |
 help: Import from `re`
 131 | from typing.re import Match
-132 | 
+132 |
 133 | # UP035 on py37+ only
     - from typing.re import Pattern
 134 + from re import Pattern

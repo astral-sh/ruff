@@ -12,7 +12,7 @@ help: Remove trailing whitespace
   - '''trailing whitespace 
 1 + '''trailing whitespace
 2 | inside a multiline string'''
-3 | 
+3 |
 4 | f'''trailing whitespace 
 note: This is an unsafe fix and may change runtime behavior
 
@@ -28,11 +28,11 @@ W291 [*] Trailing whitespace
 help: Remove trailing whitespace
 1 | '''trailing whitespace 
 2 | inside a multiline string'''
-3 | 
+3 |
   - f'''trailing whitespace 
 4 + f'''trailing whitespace
 5 | inside a multiline f-string'''
-6 | 
+6 |
 7 | # Trailing whitespace after `{`
 note: This is an unsafe fix and may change runtime behavior
 
@@ -47,13 +47,13 @@ W291 [*] Trailing whitespace
    |
 help: Remove trailing whitespace
 5  | inside a multiline f-string'''
-6  | 
+6  |
 7  | # Trailing whitespace after `{`
    - f'abc { 
 8  + f'abc {
 9  |     1 + 2
 10 | }'
-11 | 
+11 |
 
 W291 [*] Trailing whitespace
   --> W291.py:14:10
@@ -65,7 +65,7 @@ W291 [*] Trailing whitespace
 15 | }'
    |
 help: Remove trailing whitespace
-11 | 
+11 |
 12 | # Trailing whitespace after `2`
 13 | f'abc {
    -     1 + 2 

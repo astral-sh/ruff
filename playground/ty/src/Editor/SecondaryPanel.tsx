@@ -2,7 +2,6 @@ import MonacoEditor from "@monaco-editor/react";
 import { AstralButton, Theme } from "shared";
 import { ReadonlyFiles } from "../Playground";
 import { Suspense, use, useState } from "react";
-import { loadPyodide } from "pyodide";
 import classNames from "classnames";
 
 export enum SecondaryTool {
@@ -18,6 +17,7 @@ export type SecondaryPanelResult =
 
 export interface SecondaryPanelProps {
   files: ReadonlyFiles;
+  onRun(): Promise<string>;
   tool: SecondaryTool;
   result: SecondaryPanelResult;
   theme: Theme;
@@ -27,6 +27,7 @@ export default function SecondaryPanel({
   tool,
   result,
   files,
+  onRun,
   theme,
 }: SecondaryPanelProps) {
   return (
@@ -35,7 +36,7 @@ export default function SecondaryPanel({
         tool={tool}
         result={result}
         theme={theme}
-        files={files}
+        onRun={onRun}
         revision={files.revision}
       />
     </div>
@@ -43,14 +44,14 @@ export default function SecondaryPanel({
 }
 
 function Content({
-  files,
   tool,
   result,
   theme,
   revision,
+  onRun,
 }: {
   tool: SecondaryTool;
-  files: ReadonlyFiles;
+  onRun(): Promise<string>;
   revision: number;
   result: SecondaryPanelResult;
   theme: Theme;
@@ -71,7 +72,7 @@ function Content({
             break;
 
           case "Run":
-            return <Run theme={theme} files={files} key={`${revision}`} />;
+            return <Run theme={theme} onRun={onRun} key={`${revision}`} />;
         }
 
         return (
@@ -103,78 +104,10 @@ function Content({
   }
 }
 
-const SANDBOX_BASE_DIRECTORY = "/playground/";
-
-function Run({ files, theme }: { files: ReadonlyFiles; theme: Theme }) {
+function Run({ onRun, theme }: { onRun(): Promise<string>; theme: Theme }) {
   const [runOutput, setRunOutput] = useState<Promise<string> | null>(null);
   const handleRun = () => {
-    const output = (async () => {
-      const pyodide = await loadPyodide({
-        env: {
-          HOME: SANDBOX_BASE_DIRECTORY,
-        },
-      });
-
-      let combined_output = "";
-
-      const outputHandler = (output: string) => {
-        combined_output += output + "\n";
-      };
-
-      pyodide.setStdout({ batched: outputHandler });
-      pyodide.setStderr({ batched: outputHandler });
-
-      const main = files.selected == null ? "" : files.contents[files.selected];
-
-      let fileName = "main.py";
-      for (const file of files.index) {
-        const last_separator = file.name.lastIndexOf("/");
-
-        if (last_separator !== -1) {
-          const directory =
-            SANDBOX_BASE_DIRECTORY + file.name.slice(0, last_separator);
-          pyodide.FS.mkdirTree(directory);
-        }
-        pyodide.FS.writeFile(
-          SANDBOX_BASE_DIRECTORY + file.name,
-          files.contents[file.id],
-        );
-
-        if (file.id === files.selected) {
-          fileName = file.name;
-        }
-      }
-
-      const dict = pyodide.globals.get("dict");
-      const globals = dict();
-
-      try {
-        // Patch `reveal_type` to print runtime values
-        pyodide.runPython(`
-        import builtins
-
-        def reveal_type(obj):
-          import typing
-          print(f"Runtime value is '{obj}'")
-          return typing.reveal_type(obj)
-
-        builtins.reveal_type = reveal_type`);
-
-        pyodide.runPython(main, {
-          globals,
-          locals: globals,
-          filename: fileName,
-        });
-
-        return combined_output;
-      } catch (e) {
-        return `Failed to run Python script: ${e}`;
-      } finally {
-        globals.destroy();
-        dict.destroy();
-      }
-    })();
-    setRunOutput(output);
+    setRunOutput(onRun());
   };
 
   if (runOutput == null) {

@@ -11,11 +11,11 @@ F401 [*] `threading.Thread` imported but unused
 14 |     # The `Thread` on the left-hand side should resolve to the `Thread` imported at the
    |
 help: Remove unused import: `threading.Thread`
-9  | 
-10 | 
+9  |
+10 |
 11 | def fn(thread: Thread):
    -     from threading import Thread
-12 | 
+12 |
 13 |     # The `Thread` on the left-hand side should resolve to the `Thread` imported at the
 14 |     # top level.
 
@@ -29,10 +29,10 @@ F401 [*] `threading.Thread` imported but unused
 22 |     # The `Thread` on the left-hand side should resolve to the `Thread` imported at the
    |
 help: Remove unused import: `threading.Thread`
-17 | 
-18 | 
+17 |
+18 |
 19 | def fn(thread: Thread):
    -     from threading import Thread
-20 | 
+20 |
 21 |     # The `Thread` on the left-hand side should resolve to the `Thread` imported at the
 22 |     # top level.

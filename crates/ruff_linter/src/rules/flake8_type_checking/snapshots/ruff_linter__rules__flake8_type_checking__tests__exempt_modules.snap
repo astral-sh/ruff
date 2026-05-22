@@ -12,17 +12,17 @@ TC002 [*] Move third-party import `flask` into a type-checking block
    |
 help: Move into type-checking block
 1  + from typing import TYPE_CHECKING
-2  + 
+2  +
 3  + if TYPE_CHECKING:
 4  +     import flask
 5  | def f():
 6  |     import pandas as pd
-7  | 
+7  |
 --------------------------------------------------------------------------------
-15 | 
-16 | 
+15 |
+16 |
 17 | def f():
    -     import flask
-18 | 
+18 |
 19 |     x: flask
 note: This is an unsafe fix and may change runtime behavior

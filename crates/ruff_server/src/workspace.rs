@@ -6,13 +6,9 @@ use thiserror::Error;
 use crate::session::{ClientOptions, WorkspaceOptionsMap};
 
 #[derive(Debug)]
-pub struct Workspaces(Vec<Workspace>);
+pub(crate) struct Workspaces(Vec<Workspace>);
 
 impl Workspaces {
-    pub fn new(workspaces: Vec<Workspace>) -> Self {
-        Self(workspaces)
-    }
-
     /// Create the workspaces from the provided workspace folders as provided by the client during
     /// initialization.
     pub(crate) fn from_workspace_folders(
@@ -72,7 +68,7 @@ pub(crate) enum WorkspacesError {
 }
 
 #[derive(Debug)]
-pub struct Workspace {
+pub(crate) struct Workspace {
     /// The [`Url`] pointing to the root of the workspace.
     url: Url,
     /// The client options for this workspace.
@@ -84,7 +80,7 @@ pub struct Workspace {
 
 impl Workspace {
     /// Create a new workspace with the given root URL.
-    pub fn new(url: Url) -> Self {
+    pub(crate) fn new(url: Url) -> Self {
         Self {
             url,
             options: None,
@@ -93,7 +89,7 @@ impl Workspace {
     }
 
     /// Create a new default workspace with the given root URL.
-    pub fn default(url: Url) -> Self {
+    pub(crate) fn default(url: Url) -> Self {
         Self {
             url,
             options: None,
@@ -103,7 +99,7 @@ impl Workspace {
 
     /// Set the client options for this workspace.
     #[must_use]
-    pub fn with_options(mut self, options: ClientOptions) -> Self {
+    pub(crate) fn with_options(mut self, options: ClientOptions) -> Self {
         self.options = Some(options);
         self
     }

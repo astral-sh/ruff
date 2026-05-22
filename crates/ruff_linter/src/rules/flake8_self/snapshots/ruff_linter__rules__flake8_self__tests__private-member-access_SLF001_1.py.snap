@@ -1,4 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_self/mod.rs
 ---
-
+SLF001 Private member accessed: `_x`
+  --> SLF001_1.py:70:15
+   |
+68 |         self = object()
+69 |         alias = self
+70 |         print(alias._x)  # error (self is not an instance parameter)
+   |               ^^^^^^^^
+   |

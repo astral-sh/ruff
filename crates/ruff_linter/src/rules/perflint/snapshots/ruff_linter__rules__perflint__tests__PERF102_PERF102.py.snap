@@ -10,14 +10,14 @@ PERF102 [*] When using only the values of a dict use the `values()` method
 6 |         print(value)
   |
 help: Replace `.items()` with `.values()`
-2 | 
-3 | 
+2 |
+3 |
 4 | def f():
   -     for _, value in some_dict.items():  # PERF102
 5 +     for value in some_dict.values():  # PERF102
 6 |         print(value)
-7 | 
-8 | 
+7 |
+8 |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the keys of a dict use the `keys()` method
@@ -29,14 +29,14 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
 11 |         print(key)
    |
 help: Replace `.items()` with `.keys()`
-7  | 
-8  | 
+7  |
+8  |
 9  | def f():
    -     for key, _ in some_dict.items():  # PERF102
 10 +     for key in some_dict.keys():  # PERF102
 11 |         print(key)
-12 | 
-13 | 
+12 |
+13 |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the keys of a dict use the `keys()` method
@@ -48,14 +48,14 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
 16 |         print(weird_arg_name)
    |
 help: Replace `.items()` with `.keys()`
-12 | 
-13 | 
+12 |
+13 |
 14 | def f():
    -     for weird_arg_name, _ in some_dict.items():  # PERF102
 15 +     for weird_arg_name in some_dict.keys():  # PERF102
 16 |         print(weird_arg_name)
-17 | 
-18 | 
+17 |
+18 |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the keys of a dict use the `keys()` method
@@ -67,14 +67,14 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
 21 |         print(name)
    |
 help: Replace `.items()` with `.keys()`
-17 | 
-18 | 
+17 |
+18 |
 19 | def f():
    -     for name, (_, _) in some_dict.items():  # PERF102
 20 +     for name in some_dict.keys():  # PERF102
 21 |         print(name)
-22 | 
-23 | 
+22 |
+23 |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the keys of a dict use the `keys()` method
@@ -86,14 +86,14 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
 31 |         print(key1)
    |
 help: Replace `.items()` with `.keys()`
-27 | 
-28 | 
+27 |
+28 |
 29 | def f():
    -     for (key1, _), (_, _) in some_dict.items():  # PERF102
 30 +     for (key1, _) in some_dict.keys():  # PERF102
 31 |         print(key1)
-32 | 
-33 | 
+32 |
+33 |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the values of a dict use the `values()` method
@@ -105,14 +105,14 @@ PERF102 [*] When using only the values of a dict use the `values()` method
 36 |         print(value)
    |
 help: Replace `.items()` with `.values()`
-32 | 
-33 | 
+32 |
+33 |
 34 | def f():
    -     for (_, (_, _)), (value, _) in some_dict.items():  # PERF102
 35 +     for (value, _) in some_dict.values():  # PERF102
 36 |         print(value)
-37 | 
-38 | 
+37 |
+38 |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the keys of a dict use the `keys()` method
@@ -124,14 +124,14 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
 51 |         print(key2)
    |
 help: Replace `.items()` with `.keys()`
-47 | 
-48 | 
+47 |
+48 |
 49 | def f():
    -     for ((_, key2), (_, _)) in some_dict.items():  # PERF102
 50 +     for (_, key2) in some_dict.keys():  # PERF102
 51 |         print(key2)
-52 | 
-53 | 
+52 |
+53 |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the keys of a dict use the `keys()` method
@@ -143,14 +143,14 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
 86 |         print(name)
    |
 help: Replace `.items()` with `.keys()`
-82 | 
-83 | 
+82 |
+83 |
 84 | def f():
    -     for name, (_, _) in (some_function()).items():  # PERF102
 85 +     for name in (some_function()).keys():  # PERF102
 86 |         print(name)
-87 | 
-88 | 
+87 |
+88 |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the keys of a dict use the `keys()` method
@@ -162,14 +162,14 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
 91 |         print(name)
    |
 help: Replace `.items()` with `.keys()`
-87 | 
-88 | 
+87 |
+88 |
 89 | def f():
    -     for name, (_, _) in (some_function().some_attribute).items():  # PERF102
 90 +     for name in (some_function().some_attribute).keys():  # PERF102
 91 |         print(name)
-92 | 
-93 | 
+92 |
+93 |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the keys of a dict use the `keys()` method
@@ -181,14 +181,14 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
 96 |         print(name)
    |
 help: Replace `.items()` with `.keys()`
-92 | 
-93 | 
+92 |
+93 |
 94 | def f():
    -     for name, unused_value in some_dict.items():  # PERF102
 95 +     for name in some_dict.keys():  # PERF102
 96 |         print(name)
-97 | 
-98 | 
+97 |
+98 |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the values of a dict use the `values()` method
@@ -200,14 +200,14 @@ PERF102 [*] When using only the values of a dict use the `values()` method
 101 |         print(value)
     |
 help: Replace `.items()` with `.values()`
-97  | 
-98  | 
+97  |
+98  |
 99  | def f():
     -     for unused_name, value in some_dict.items():  # PERF102
 100 +     for value in some_dict.values():  # PERF102
 101 |         print(value)
-102 | 
-103 | 
+102 |
+103 |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the keys of a dict use the `keys()` method
@@ -220,12 +220,12 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
 107 |         if(C:=name_to_value.get(B.name)):A.run(B.set,C)
     |
 help: Replace `.items()` with `.keys()`
-103 | 
+103 |
 104 | # Regression test for: https://github.com/astral-sh/ruff/issues/7097
 105 | def _create_context(name_to_value):
     -     for(B,D)in A.items():
 106 +     for B in A.keys():
 107 |         if(C:=name_to_value.get(B.name)):A.run(B.set,C)
-108 | 
-109 | 
+108 |
+109 |
 note: This is an unsafe fix and may change runtime behavior

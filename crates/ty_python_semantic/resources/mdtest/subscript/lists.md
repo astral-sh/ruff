@@ -33,3 +33,30 @@ x["a" if (y := 2) else 1] = 6
 # error: [invalid-assignment]
 x["a" if (y := 2) else "b"] = 6
 ```
+
+## Walrus subscript access
+
+```py
+xs: list[int | None] = [1]
+xs[0] = None
+
+reveal_type((xs := [1])[0])  # revealed: int | None
+```
+
+## Walrus subscript access after rebinding
+
+```py
+def f(xs: list[int | str]) -> None:
+    ys = xs
+    ys[0] = "s"
+    reveal_type((ys := [1])[0])  # revealed: int
+```
+
+## Walrus subscript access after later rebinding
+
+```py
+def f() -> None:
+    (ys := [1])[0] = 2
+    ys = ["s"]
+    reveal_type(ys[0])  # revealed: str
+```

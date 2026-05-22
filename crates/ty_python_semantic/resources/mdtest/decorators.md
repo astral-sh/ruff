@@ -58,6 +58,22 @@ reveal_type(even)  # revealed: (int, /) -> bool
 reveal_type(even(14))  # revealed: bool
 ```
 
+Decorator expressions can also introduce bindings that remain visible after the decorated
+definition:
+
+```py
+def decorator_factory(flag: bool):
+    def decorator(func):
+        return func
+    return decorator
+
+@decorator_factory(seen := True)
+def f():
+    pass
+
+reveal_type(seen)  # revealed: Literal[True]
+```
+
 ## Multiple decorators
 
 Multiple decorators can be applied to a single function. They are applied in "bottom-up" order,
@@ -257,7 +273,7 @@ emit an error:
 ```py
 class NoInit: ...
 
-# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
+# error: [too-many-positional-arguments] "Too many positional arguments to `object.__init__`: expected 1, got 2"
 @NoInit
 def foo(): ...
 
@@ -291,12 +307,10 @@ class AcceptsType:
     def __init__(self, cls: type) -> None:
         self.cls = cls
 
-# Decorator call is validated, but the type transformation isn't applied yet.
-# TODO: Class decorator return types should transform the class binding type.
 @AcceptsType
 class MyClass: ...
 
-reveal_type(MyClass)  # revealed: <class 'MyClass'>
+reveal_type(MyClass)  # revealed: AcceptsType
 ```
 
 ### Generic class, used as a decorator
@@ -326,7 +340,7 @@ Using `type[SomeClass]` as a decorator validates against the class's constructor
 class Base: ...
 
 def apply_decorator(cls: type[Base]) -> None:
-    # error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
+    # error: [too-many-positional-arguments] "Too many positional arguments to `object.__init__`: expected 1, got 2"
     @cls
     def inner() -> None: ...
 ```
@@ -362,6 +376,360 @@ def decorator(cls: type[int]) -> type[int]:
 @decorator
 class Baz: ...
 
-# TODO: the revealed type should ideally be `type[int]` (the decorator's return type)
-reveal_type(Baz)  # revealed: <class 'Baz'>
+reveal_type(Baz)  # revealed: type[int]
+```
+
+Class decorators can also replace the class object with an instance:
+
+```py
+from dataclasses import dataclass
+from typing import Callable, Generic, Protocol, TypeVar, overload
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class Backend(Protocol):
+    def get(self, key: str) -> bytes | None: ...
+
+class WrapBackend:
+    def __init__(self, cls: type[object]) -> None:
+        self.cls = cls
+
+    def get(self, key: str) -> bytes | None:
+        return None
+
+@WrapBackend
+class CacheClient:
+    def clone(self) -> Self:
+        reveal_type(self)  # revealed: Self@clone
+        return self
+
+    @classmethod
+    def make(cls) -> Self:
+        reveal_type(cls)  # revealed: type[Self@make]
+        return cls()
+
+reveal_type(CacheClient)  # revealed: WrapBackend
+reveal_type(CacheClient.get("x"))  # revealed: bytes | None
+
+@WrapBackend
+@dataclass
+class DataclassThenWrapped:
+    value: int
+
+reveal_type(DataclassThenWrapped)  # revealed: WrapBackend
+
+# error: [no-matching-overload]
+@dataclass
+@WrapBackend
+class WrappedThenDataclass:
+    value: int
+
+reveal_type(WrappedThenDataclass)  # revealed: Unknown
+
+def int_decorator_factory() -> Callable[[type[object]], int]:
+    def decorator(cls: type[object]) -> int:
+        return 1
+    return decorator
+
+# error: [no-matching-overload]
+@dataclass
+@int_decorator_factory()
+class IntThenDataclass:
+    value: int
+
+reveal_type(IntThenDataclass)  # revealed: Unknown
+
+@WrapBackend
+class InvalidWrappedBase(1): ...  # error: [invalid-base]
+
+reveal_type(InvalidWrappedBase)  # revealed: WrapBackend
+
+@WrapBackend
+class GenericCacheClient(Generic[T]):
+    value: T
+
+    def get_value(self) -> T:
+        return self.value
+
+reveal_type(GenericCacheClient)  # revealed: WrapBackend
+
+@WrapBackend
+class OverloadedCacheClient:
+    @overload
+    def get(self, key: str) -> bytes: ...
+    @overload
+    def get(self, key: bytes) -> bytes: ...
+    def get(self, key: str | bytes) -> bytes:
+        return b""
+```
+
+Unannotated class decorators are assumed to preserve the class binding. We do not infer returned
+classes from decorator bodies:
+
+```py
+def personify(cls):
+    class Wrapped(cls):
+        full_name: str
+
+        def set_full_name(self, full_name: str) -> None:
+            self.full_name = full_name
+
+    return Wrapped
+
+@personify
+class Animal: ...
+
+reveal_type(Animal)  # revealed: <class 'Animal'>
+reveal_type(Animal())  # revealed: Animal
+
+Animal().set_full_name("John")  # error: [unresolved-attribute]
+```
+
+This also applies to unannotated callables that are not function definitions:
+
+```py
+lambda_decorator = lambda cls: cls
+
+@lambda_decorator
+class LambdaDecorated: ...
+
+reveal_type(LambdaDecorated)  # revealed: <class 'LambdaDecorated'>
+
+class DecoratorFactory:
+    def decorator(self, cls):
+        return cls
+
+decorator_factory = DecoratorFactory()
+
+@decorator_factory.decorator
+class BoundMethodDecorated: ...
+
+reveal_type(BoundMethodDecorated)  # revealed: <class 'BoundMethodDecorated'>
+
+class CallableDecorator:
+    def __call__(self, cls):
+        return cls
+
+callable_decorator = CallableDecorator()
+
+@callable_decorator
+class CallableInstanceDecorated: ...
+
+reveal_type(CallableInstanceDecorated)  # revealed: <class 'CallableInstanceDecorated'>
+
+class ExplicitReturnDecorator(Generic[T]):
+    def __call__(self, cls) -> T:
+        raise NotImplementedError
+
+explicit_return_decorator = ExplicitReturnDecorator()
+
+@explicit_return_decorator
+class ExplicitReturnCallableInstanceDecorated: ...
+
+reveal_type(ExplicitReturnCallableInstanceDecorated)  # revealed: Unknown
+
+specialized_explicit_return_decorator = ExplicitReturnDecorator[int]()
+
+@specialized_explicit_return_decorator
+class SpecializedExplicitReturnCallableInstanceDecorated: ...
+
+reveal_type(SpecializedExplicitReturnCallableInstanceDecorated)  # revealed: int
+
+def function_decorator(func: Callable[..., T]) -> Callable[..., T]:
+    return func
+
+@function_decorator
+def explicit_return_callable_decorator(cls) -> T:
+    raise NotImplementedError
+
+@explicit_return_callable_decorator
+class ExplicitReturnCallableDecorated: ...
+
+reveal_type(ExplicitReturnCallableDecorated)  # revealed: Unknown
+
+def regular_callable_replacement_factory() -> Callable[[type[object]], T]:
+    raise NotImplementedError
+
+@regular_callable_replacement_factory()
+class RegularCallableReplacementDecorated: ...
+
+reveal_type(RegularCallableReplacementDecorated)  # revealed: Unknown
+```
+
+An unknown class decorator still makes the class binding unknown:
+
+```py
+# error: [unresolved-reference] "Name `unknown_class_decorator` used when not defined"
+@unknown_class_decorator
+class UnknownDecorated: ...
+
+reveal_type(UnknownDecorated)  # revealed: Unknown
+```
+
+An unannotated class decorator preserves the result of earlier decorators:
+
+```py
+def unannotated_identity(cls):
+    return cls
+
+@unannotated_identity
+@WrapBackend
+class WrappedThenUnannotated: ...
+
+reveal_type(WrappedThenUnannotated)  # revealed: WrapBackend
+```
+
+Metadata decorators still apply above an unannotated class-preserving decorator:
+
+```py
+from typing_extensions import deprecated
+
+def unannotated_identity(cls):
+    return cls
+
+@deprecated("use OtherClass")
+@unannotated_identity
+class DeprecatedThenUnannotated: ...
+
+DeprecatedThenUnannotated()  # error: [deprecated] "use OtherClass"
+```
+
+If a class decorator returns the original class object, we preserve the class binding so it can
+still be used in annotations and as a base class:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", bound=object)
+
+def identity_class_decorator(cls: type[T]) -> type[T]:
+    return cls
+
+@identity_class_decorator
+class PreservedClass: ...
+
+reveal_type(PreservedClass)  # revealed: <class 'PreservedClass'>
+
+class DerivedPreservedClass(PreservedClass):
+    value: PreservedClass
+```
+
+Class decorator factories that preserve the original class object also preserve the class binding:
+
+```py
+from collections.abc import Callable
+from typing import Any, TypeVar, overload
+
+DecoratorT = TypeVar("DecoratorT", bound=object)
+DecoratedClass = type[DecoratorT]
+
+@overload
+def identity_class_decorator_factory(cls: DecoratedClass, **kwargs: Any) -> DecoratedClass: ...
+@overload
+def identity_class_decorator_factory(
+    **kwargs: Any,
+) -> Callable[[DecoratedClass], DecoratedClass]: ...
+def identity_class_decorator_factory(
+    cls: DecoratedClass | None = None, **kwargs: Any
+) -> DecoratedClass | Callable[[DecoratedClass], DecoratedClass]:
+    def decorator(inner_cls: DecoratedClass) -> DecoratedClass:
+        return inner_cls
+
+    if cls is not None:
+        return decorator(cls)
+    return decorator
+
+@identity_class_decorator_factory(frozen=True)
+class FactoryPreservedClass: ...
+
+reveal_type(FactoryPreservedClass)  # revealed: <class 'FactoryPreservedClass'>
+
+class DerivedFactoryPreservedClass(FactoryPreservedClass):
+    value: FactoryPreservedClass
+```
+
+Class decorators can return intersections that expose attributes added to the decorated class
+object:
+
+```py
+from ty_extensions import Intersection
+from typing import Protocol, TypeVar
+
+class Resource:
+    def fetch(self) -> str:
+        return "data"
+
+class ResourceEnabled(Protocol):
+    resource: Resource
+
+SchemaT = TypeVar("SchemaT")
+
+def register(cls: type[SchemaT]) -> Intersection[type[SchemaT], ResourceEnabled]:
+    return cls
+
+@register
+class UserSchema:
+    id: int
+
+reveal_type(UserSchema.resource.fetch())  # revealed: str
+```
+
+Metadata decorators stacked above an intersection-returning class decorator still apply to the
+original class object, while preserving the extra intersection members:
+
+```py
+from dataclasses import dataclass
+from ty_extensions import Intersection
+from typing import Protocol, TypeVar
+
+class Resource:
+    def fetch(self) -> str:
+        return "data"
+
+class ResourceEnabled(Protocol):
+    resource: Resource
+
+SchemaT = TypeVar("SchemaT")
+
+def register(cls: type[SchemaT]) -> Intersection[type[SchemaT], ResourceEnabled]:
+    return cls
+
+@dataclass
+@register
+class RegisteredDataclass:
+    id: int
+
+reveal_type(RegisteredDataclass.resource.fetch())  # revealed: str
+reveal_type(RegisteredDataclass(1))  # revealed: RegisteredDataclass
+```
+
+Class-preserving decorators stacked above an intersection-returning class decorator preserve the
+existing intersection members:
+
+```py
+from ty_extensions import Intersection
+from typing import Protocol, TypeVar
+
+class Resource:
+    def fetch(self) -> str:
+        return "data"
+
+class ResourceEnabled(Protocol):
+    resource: Resource
+
+SchemaT = TypeVar("SchemaT")
+
+def register(cls: type[SchemaT]) -> Intersection[type[SchemaT], ResourceEnabled]:
+    return cls
+
+def identity(cls: type[SchemaT]) -> type[SchemaT]:
+    return cls
+
+@identity
+@register
+class RegisteredIdentity:
+    id: int
+
+reveal_type(RegisteredIdentity.resource.fetch())  # revealed: str
 ```

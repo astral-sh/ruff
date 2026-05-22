@@ -37,6 +37,22 @@ reveal_type(generic_context(SingleTypeVarTuple))
 reveal_type(generic_context(TypeVarAndTypeVarTuple))
 ```
 
+Decorated generic classes still use the original class for their class-body generic context:
+
+```py
+class Wrap:
+    def __init__(self, cls: type[object]) -> None: ...
+
+@Wrap
+class DecoratedGeneric[T]:
+    value: T
+
+    def get_value(self) -> T:
+        return self.value
+
+reveal_type(DecoratedGeneric)  # revealed: Wrap
+```
+
 You cannot use the same typevar more than once.
 
 ```py
@@ -396,9 +412,6 @@ wrong_innards: D[int] = D("five")
 
 ### Both present, `__new__` inherited from a generic base class
 
-If either method comes from a generic base class, we don't currently use its inferred specialization
-to specialize the class.
-
 ```py
 from ty_extensions import generic_context, into_regular_callable
 
@@ -414,7 +427,8 @@ reveal_type(generic_context(D))
 # revealed: ty_extensions.GenericContext[V@D]
 reveal_type(generic_context(into_regular_callable(D)))
 
-reveal_type(D(1))  # revealed: D[Literal[1]]
+# Because `C[T, U]` is not an instance of `D`, we never hit `D.__init__` at all.
+reveal_type(D(1))  # revealed: C[Unknown, int]
 ```
 
 ### Generic class inherits `__init__` from generic base class

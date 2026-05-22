@@ -12,7 +12,7 @@ PYI015 [*] Only simple default values allowed for assignments
    |
 help: Replace default value with `...`
 41 | field22: Final = {"foo": 5}
-42 | 
+42 |
 43 | # We *should* emit Y015 for more complex default values
    - field221: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]  # Y015 Only simple default values are allowed for assignments
 44 + field221: list[int] = ...  # Y015 Only simple default values are allowed for assignments
@@ -31,7 +31,7 @@ PYI015 [*] Only simple default values allowed for assignments
 47 | field225: list[object] = [{}, 1, 2]  # Y015 Only simple default values are allowed for assignments
    |
 help: Replace default value with `...`
-42 | 
+42 |
 43 | # We *should* emit Y015 for more complex default values
 44 | field221: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]  # Y015 Only simple default values are allowed for assignments
    - field223: list[int] = [*range(10)]  # Y015 Only simple default values are allowed for assignments
@@ -178,7 +178,7 @@ help: Replace default value with `...`
 53 + field23 = ...  # Y015 Only simple default values are allowed for assignments
 54 | field24 = b"foo" + b"bar"  # Y015 Only simple default values are allowed for assignments
 55 | field25 = 5 * 5  # Y015 Only simple default values are allowed for assignments
-56 | 
+56 |
 
 PYI015 [*] Only simple default values allowed for assignments
   --> PYI015.pyi:54:11
@@ -196,7 +196,7 @@ help: Replace default value with `...`
    - field24 = b"foo" + b"bar"  # Y015 Only simple default values are allowed for assignments
 54 + field24 = ...  # Y015 Only simple default values are allowed for assignments
 55 | field25 = 5 * 5  # Y015 Only simple default values are allowed for assignments
-56 | 
+56 |
 57 | # We shouldn't emit Y015 within functions
 
 PYI015 [*] Only simple default values allowed for assignments
@@ -215,6 +215,6 @@ help: Replace default value with `...`
 54 | field24 = b"foo" + b"bar"  # Y015 Only simple default values are allowed for assignments
    - field25 = 5 * 5  # Y015 Only simple default values are allowed for assignments
 55 + field25 = ...  # Y015 Only simple default values are allowed for assignments
-56 | 
+56 |
 57 | # We shouldn't emit Y015 within functions
 58 | def f():

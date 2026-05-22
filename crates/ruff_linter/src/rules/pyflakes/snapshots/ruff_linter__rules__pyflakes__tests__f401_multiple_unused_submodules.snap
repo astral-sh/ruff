@@ -10,7 +10,7 @@ F401 [*] `a` imported but unused
 4 | import a.c
   |
 help: Remove unused import: `a`
-1 | 
+1 |
   - import a
 2 | import a.b
 3 | import a.c
@@ -24,7 +24,7 @@ F401 [*] `a.b` imported but unused
 4 | import a.c
   |
 help: Remove unused import: `a.b`
-1 | 
+1 |
 2 | import a
   - import a.b
 3 | import a.c
@@ -38,7 +38,7 @@ F401 [*] `a.c` imported but unused
   |        ^^^
   |
 help: Remove unused import: `a.c`
-1 | 
+1 |
 2 | import a
 3 | import a.b
   - import a.c

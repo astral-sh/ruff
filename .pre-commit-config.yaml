@@ -7,7 +7,7 @@ exclude: |
     crates/ty_project/resources/.*|
     crates/ty/docs/(configuration|rules|cli|environment).md|
     crates/ruff_benchmark/resources/.*|
-    crates/ruff_linter/resources/.*|
+    crates/ruff_linter/resources/(?!mdtest/).*|
     crates/ruff_linter/src/rules/.*/snapshots/.*|
     crates/ruff_notebook/resources/.*|
     crates/ruff_server/resources/.*|
@@ -39,7 +39,7 @@ repos:
         priority: 0
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.44.0
+    rev: v1.46.1
     hooks:
       - id: typos
         priority: 0
@@ -54,7 +54,7 @@ repos:
         priority: 0
   # Prettier
   - repo: https://github.com/rbubley/mirrors-prettier
-    rev: v3.8.1
+    rev: v3.8.3
     hooks:
       - id: prettier
         types: [yaml]
@@ -63,21 +63,15 @@ repos:
   # zizmor detects security vulnerabilities in GitHub Actions workflows.
   # Additional configuration for the tool is found in `.github/zizmor.yml`
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: v1.23.1
+    rev: v1.24.1
     hooks:
       - id: zizmor
         priority: 0
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.37.0
+    rev: 0.37.2
     hooks:
       - id: check-github-workflows
-        priority: 0
-
-  - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: v0.11.0.1
-    hooks:
-      - id: shellcheck
         priority: 0
 
   - repo: https://github.com/executablebooks/mdformat
@@ -96,7 +90,7 @@ repos:
         priority: 0
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.5
+    rev: v0.15.12
     hooks:
       - id: ruff-format
         exclude: crates/ty_python_semantic/resources/corpus/
@@ -122,7 +116,7 @@ repos:
 
   # Priority 2: ruffen-docs runs after markdownlint-fix (both modify markdown).
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.5
+    rev: v0.15.12
     hooks:
       - id: ruff-format
         name: mdtest format
@@ -134,7 +128,7 @@ repos:
   # `actionlint` hook, for verifying correct syntax in GitHub Actions workflows.
   # Some additional configuration for `actionlint` can be found in `.github/actionlint.yaml`.
   - repo: https://github.com/rhysd/actionlint
-    rev: v1.7.11
+    rev: v1.7.12
     hooks:
       - id: actionlint
         stages:

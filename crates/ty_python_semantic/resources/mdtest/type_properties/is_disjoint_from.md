@@ -22,6 +22,32 @@ static_assert(not is_disjoint_from(LiteralString, LiteralString))
 static_assert(not is_disjoint_from(str, LiteralString))
 ```
 
+## Enum complements
+
+```py
+from enum import Enum
+from typing import Literal
+from ty_extensions import Intersection, Not, is_disjoint_from, static_assert
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+static_assert(
+    is_disjoint_from(
+        Intersection[Color, Not[Literal[Color.RED]]],
+        Intersection[Color, Not[Literal[Color.GREEN, Color.BLUE]]],
+    )
+)
+static_assert(
+    is_disjoint_from(
+        Intersection[Color, Not[Literal[Color.GREEN, Color.BLUE]]],
+        Intersection[Color, Not[Literal[Color.RED]]],
+    )
+)
+```
+
 ## Class hierarchies
 
 ```py
@@ -147,6 +173,8 @@ static_assert(is_disjoint_from(list[Any], dict[Any, Any]))
 static_assert(is_disjoint_from(type[list], type[dict]))
 
 static_assert(is_disjoint_from(asyncio.Task, dict))
+static_assert(not is_disjoint_from(asyncio.Task, asyncio.Future))
+static_assert(not is_disjoint_from(type[asyncio.Task], type[asyncio.Future]))
 
 @disjoint_base
 class A: ...
@@ -470,6 +498,88 @@ def g(): ...
 static_assert(is_disjoint_from(TypeOf[f], TypeOf[g]))
 static_assert(not is_disjoint_from(TypeOf[f], FunctionType))
 static_assert(not is_disjoint_from(TypeOf[f], object))
+```
+
+### Bound methods
+
+```py
+from typing import final
+from ty_extensions import TypeOf, is_disjoint_from, static_assert
+
+class A:
+    def foo(self) -> None: ...
+    def bar(self) -> None: ...
+
+class B:
+    def foo(self) -> None: ...
+
+# Bound methods with different names are disjoint.
+static_assert(is_disjoint_from(TypeOf[A().foo], TypeOf[A().bar]))
+
+# Bound methods with the same name but different self types are not disjoint, because a subclass
+# could inherit from both...
+static_assert(not is_disjoint_from(TypeOf[A().foo], TypeOf[B().foo]))
+
+@final
+class F1:
+    def foo(self) -> None: ...
+
+@final
+class F2:
+    def foo(self) -> None: ...
+
+# ...unless one or both of those classes are `@final`.
+static_assert(is_disjoint_from(TypeOf[A().foo], TypeOf[F2().foo]))
+static_assert(is_disjoint_from(TypeOf[B().foo], TypeOf[F2().foo]))
+static_assert(is_disjoint_from(TypeOf[F1().foo], TypeOf[F2().foo]))
+```
+
+### Bound `@final` methods
+
+Two different `@final` methods are disjoint, even if they share the same name and neither class is
+`@final`, because no subclass could satisfy both without overriding one:
+
+```py
+from typing import final
+from ty_extensions import TypeOf, is_disjoint_from, static_assert
+
+class C:
+    @final
+    def foo(self) -> None: ...
+
+class D:
+    @final
+    def foo(self) -> None: ...
+
+static_assert(is_disjoint_from(TypeOf[C().foo], TypeOf[D().foo]))
+```
+
+We do have to be careful not to get confused when the same `@final` method has different (but
+compatible) bound self types:
+
+```py
+class E(C): ...
+
+# `E.foo` and `C.foo` are the same method, so `E().foo` satisfies both `BoundMethod` types.
+static_assert(not is_disjoint_from(TypeOf[E().foo], TypeOf[C().foo]))
+static_assert(is_disjoint_from(TypeOf[E().foo], TypeOf[D().foo]))
+```
+
+Also, we can't establish disjointness when only one of the methods is `@final`. Consider this tricky
+multiple inheritance case:
+
+```py
+class F:
+    def foo(self) -> None: ...
+
+static_assert(not is_disjoint_from(TypeOf[C().foo], TypeOf[F().foo]))
+static_assert(not is_disjoint_from(TypeOf[D().foo], TypeOf[F().foo]))
+
+class G(C, F): ...
+
+static_assert(not is_disjoint_from(TypeOf[C().foo], TypeOf[G().foo]))
+static_assert(is_disjoint_from(TypeOf[D().foo], TypeOf[G().foo]))
+static_assert(not is_disjoint_from(TypeOf[F().foo], TypeOf[G().foo]))
 ```
 
 ### `AlwaysTruthy` and `AlwaysFalsy`

@@ -81,14 +81,138 @@ def f(x: Any, y: Unknown, z: Any | str | int):
     e = cast(str | int | Any, z)  # error: [redundant-cast]
 ```
 
-## Diagnostic snapshots
+Recursive aliases that fall back to `Divergent` should not trigger `redundant-cast`.
 
-<!-- snapshot-diagnostics -->
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import cast
+
+RecursiveAlias = list["RecursiveAlias | None"]
+
+def f(x: RecursiveAlias):
+    cast(RecursiveAlias, x)
+```
+
+## Diagnostic snapshots
 
 ```py
 import secrets
 from typing import cast
 
-# error: [redundant-cast] "Value is already of type `int`"
+# snapshot: redundant-cast
 cast(int, secrets.randbelow(10))
+```
+
+```snapshot
+warning[redundant-cast]: Value is already of type `int`
+ --> src/mdtest_snippet.py:5:1
+  |
+5 | cast(int, secrets.randbelow(10))
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove the redundant `cast`
+2 | from typing import cast
+3 |
+4 | # snapshot: redundant-cast
+  - cast(int, secrets.randbelow(10))
+5 + secrets.randbelow(10)
+6 | # snapshot: redundant-cast
+7 | cast(val=secrets.randbelow(10), typ=int)
+8 | def f(x: int, y: int, z: int) -> int:
+```
+
+```py
+# snapshot: redundant-cast
+cast(val=secrets.randbelow(10), typ=int)
+```
+
+```snapshot
+warning[redundant-cast]: Value is already of type `int`
+ --> src/mdtest_snippet.py:7:1
+  |
+7 | cast(val=secrets.randbelow(10), typ=int)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove the redundant `cast`
+4  | # snapshot: redundant-cast
+5  | cast(int, secrets.randbelow(10))
+6  | # snapshot: redundant-cast
+   - cast(val=secrets.randbelow(10), typ=int)
+7  + secrets.randbelow(10)
+8  | def f(x: int, y: int, z: int) -> int:
+9  |     # snapshot: redundant-cast
+10 |     return cast(int, x + y) * z
+```
+
+```py
+def f(x: int, y: int, z: int) -> int:
+    # snapshot: redundant-cast
+    return cast(int, x + y) * z
+```
+
+```snapshot
+warning[redundant-cast]: Value is already of type `int`
+  --> src/mdtest_snippet.py:10:12
+   |
+10 |     return cast(int, x + y) * z
+   |            ^^^^^^^^^^^^^^^^
+   |
+help: Remove the redundant `cast`
+7  | cast(val=secrets.randbelow(10), typ=int)
+8  | def f(x: int, y: int, z: int) -> int:
+9  |     # snapshot: redundant-cast
+   -     return cast(int, x + y) * z
+10 +     return (x + y) * z
+11 | def g(x: int, y: int) -> int:
+12 |     # snapshot: redundant-cast
+13 |     return -cast(int, x + y)
+```
+
+```py
+def g(x: int, y: int) -> int:
+    # snapshot: redundant-cast
+    return -cast(int, x + y)
+```
+
+```snapshot
+warning[redundant-cast]: Value is already of type `int`
+  --> src/mdtest_snippet.py:13:13
+   |
+13 |     return -cast(int, x + y)
+   |             ^^^^^^^^^^^^^^^^
+   |
+help: Remove the redundant `cast`
+10 |     return cast(int, x + y) * z
+11 | def g(x: int, y: int) -> int:
+12 |     # snapshot: redundant-cast
+   -     return -cast(int, x + y)
+13 +     return -(x + y)
+14 | def h(x: int, y: int) -> None:
+15 |     # snapshot: redundant-cast
+16 |     print(cast(int, x + y))
+```
+
+```py
+def h(x: int, y: int) -> None:
+    # snapshot: redundant-cast
+    print(cast(int, x + y))
+```
+
+```snapshot
+warning[redundant-cast]: Value is already of type `int`
+  --> src/mdtest_snippet.py:16:11
+   |
+16 |     print(cast(int, x + y))
+   |           ^^^^^^^^^^^^^^^^
+   |
+help: Remove the redundant `cast`
+13 |     return -cast(int, x + y)
+14 | def h(x: int, y: int) -> None:
+15 |     # snapshot: redundant-cast
+   -     print(cast(int, x + y))
+16 +     print(x + y)
 ```

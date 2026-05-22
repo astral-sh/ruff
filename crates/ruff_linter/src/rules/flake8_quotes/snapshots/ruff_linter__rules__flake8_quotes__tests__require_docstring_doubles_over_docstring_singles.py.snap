@@ -17,7 +17,7 @@ help: Replace single quotes docstring with double quotes
 2 | Single quotes multiline module docstring
   - '''
 3 + """
-4 | 
+4 |
 5 | '''
 6 | this is not a docstring
 
@@ -42,7 +42,7 @@ help: Replace single quotes docstring with double quotes
 15 |     Single quotes multiline class docstring
    -     '''
 16 +     """
-17 | 
+17 |
 18 |     '''
 19 |     this is not a docstring
 
@@ -67,6 +67,6 @@ help: Replace single quotes docstring with double quotes
 27 |         Single quotes multiline function docstring
    -         '''
 28 +         """
-29 | 
+29 |
 30 |         some_expression = 'hello world'
 31 |

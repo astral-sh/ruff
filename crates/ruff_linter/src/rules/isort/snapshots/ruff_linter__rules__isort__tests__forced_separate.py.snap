@@ -19,10 +19,10 @@ help: Organize imports
 2  | # but we want tests and experiments to be separated, in that order
 3  + from office_helper.assistants import entity_registry as er
 4  | from office_helper.core import CoreState
-5  + 
+5  +
 6  | import tests.common.foo as tcf
 7  | from tests.common import async_mock_service
-8  + 
+8  +
 9  | from experiments.starry import *
 10 | from experiments.weird import varieties
    - from office_helper.assistants import entity_registry as er

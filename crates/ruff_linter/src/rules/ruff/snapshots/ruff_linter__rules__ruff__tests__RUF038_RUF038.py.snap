@@ -10,13 +10,13 @@ RUF038 [*] `Literal[True, False]` can be replaced with `bool`
   |
 help: Replace with `bool`
 1 | from typing import Literal
-2 | 
-3 | 
+2 |
+3 |
   - def func1(arg1: Literal[True, False]): 
 4 + def func1(arg1: bool): 
 5 |     ...
-6 | 
-7 | 
+6 |
+7 |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF038 [*] `Literal[True, False]` can be replaced with `bool`
@@ -28,13 +28,13 @@ RUF038 [*] `Literal[True, False]` can be replaced with `bool`
   |
 help: Replace with `bool`
 5  |     ...
-6  | 
-7  | 
+6  |
+7  |
    - def func2(arg1: Literal[True, False, True]): 
 8  + def func2(arg1: bool): 
 9  |     ...
-10 | 
-11 | 
+10 |
+11 |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF038 [*] `Literal[True, False]` can be replaced with `bool`
@@ -46,13 +46,13 @@ RUF038 [*] `Literal[True, False]` can be replaced with `bool`
    |
 help: Replace with `bool`
 9  |     ...
-10 | 
-11 | 
+10 |
+11 |
    - def func3() -> Literal[True, False]: 
 12 + def func3() -> bool: 
 13 |     ...
-14 | 
-15 | 
+14 |
+15 |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF038 [*] `Literal[True, False]` can be replaced with `bool`
@@ -64,13 +64,13 @@ RUF038 [*] `Literal[True, False]` can be replaced with `bool`
    |
 help: Replace with `bool`
 13 |     ...
-14 | 
-15 | 
+14 |
+15 |
    - def func4(arg1: Literal[True, False] | bool): 
 16 + def func4(arg1: bool | bool): 
 17 |     ...
-18 | 
-19 | 
+18 |
+19 |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF038 [*] `Literal[True, False]` can be replaced with `bool`
@@ -82,13 +82,13 @@ RUF038 [*] `Literal[True, False]` can be replaced with `bool`
    |
 help: Replace with `bool`
 17 |     ...
-18 | 
-19 | 
+18 |
+19 |
    - def func5(arg1: Literal[False, True]):
 20 + def func5(arg1: bool):
 21 |     ...
-22 | 
-23 | 
+22 |
+23 |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF038 `Literal[True, False, ...]` can be replaced with `Literal[...] | bool`

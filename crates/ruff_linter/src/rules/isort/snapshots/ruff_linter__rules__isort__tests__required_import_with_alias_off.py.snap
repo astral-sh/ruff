@@ -5,7 +5,7 @@ I002 [*] Missing required import: `from __future__ import annotations as _annota
 --> off.py:1:1
 help: Insert required import: `from __future__ import annotations as _annotations`
 1 | # isort: off
-2 | 
+2 |
 3 + from __future__ import annotations as _annotations
 4 | x = 1
 5 | # isort: on

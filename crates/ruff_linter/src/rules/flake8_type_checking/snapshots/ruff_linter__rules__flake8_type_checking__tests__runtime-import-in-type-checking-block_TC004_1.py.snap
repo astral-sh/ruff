@@ -13,7 +13,7 @@ TC004 [*] Move import `datetime.datetime` out of type-checking block. Import is 
 help: Move out of type-checking block
 1 | from typing import TYPE_CHECKING
 2 + from datetime import datetime
-3 | 
+3 |
 4 | if TYPE_CHECKING:
   -     from datetime import datetime
 5 +     pass

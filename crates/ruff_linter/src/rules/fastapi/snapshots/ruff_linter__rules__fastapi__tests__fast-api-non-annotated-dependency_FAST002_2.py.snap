@@ -13,12 +13,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
 1  | """Test FAST002 ellipsis handling."""
-2  | 
+2  |
 3  | from fastapi import Body, Cookie, FastAPI, Header, Query
 4  + from typing import Annotated
-5  | 
+5  |
 6  | app = FastAPI()
-7  | 
+7  |
 --------------------------------------------------------------------------------
 12 | @app.get("/test1")
 13 | async def test_ellipsis_query(
@@ -27,7 +27,7 @@ help: Replace with `typing.Annotated`
 15 +     param: Annotated[str, Query(description="Test param")],
 16 | ) -> str:
 17 |     return param
-18 | 
+18 |
 note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
@@ -42,12 +42,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
 1  | """Test FAST002 ellipsis handling."""
-2  | 
+2  |
 3  | from fastapi import Body, Cookie, FastAPI, Header, Query
 4  + from typing import Annotated
-5  | 
+5  |
 6  | app = FastAPI()
-7  | 
+7  |
 --------------------------------------------------------------------------------
 20 | @app.get("/test2")
 21 | async def test_ellipsis_header(
@@ -56,7 +56,7 @@ help: Replace with `typing.Annotated`
 23 +     auth: Annotated[str, Header(description="Auth header")],
 24 | ) -> str:
 25 |     return auth
-26 | 
+26 |
 note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
@@ -71,12 +71,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
 1  | """Test FAST002 ellipsis handling."""
-2  | 
+2  |
 3  | from fastapi import Body, Cookie, FastAPI, Header, Query
 4  + from typing import Annotated
-5  | 
+5  |
 6  | app = FastAPI()
-7  | 
+7  |
 --------------------------------------------------------------------------------
 28 | @app.post("/test3")
 29 | async def test_ellipsis_body(
@@ -85,7 +85,7 @@ help: Replace with `typing.Annotated`
 31 +     data: Annotated[dict, Body(description="Request body")],
 32 | ) -> dict:
 33 |     return data
-34 | 
+34 |
 note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
@@ -100,12 +100,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
 1  | """Test FAST002 ellipsis handling."""
-2  | 
+2  |
 3  | from fastapi import Body, Cookie, FastAPI, Header, Query
 4  + from typing import Annotated
-5  | 
+5  |
 6  | app = FastAPI()
-7  | 
+7  |
 --------------------------------------------------------------------------------
 36 | @app.get("/test4")
 37 | async def test_ellipsis_cookie(
@@ -114,7 +114,7 @@ help: Replace with `typing.Annotated`
 39 +     session: Annotated[str, Cookie(description="Session ID")],
 40 | ) -> str:
 41 |     return session
-42 | 
+42 |
 note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
@@ -129,12 +129,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
 1  | """Test FAST002 ellipsis handling."""
-2  | 
+2  |
 3  | from fastapi import Body, Cookie, FastAPI, Header, Query
 4  + from typing import Annotated
-5  | 
+5  |
 6  | app = FastAPI()
-7  | 
+7  |
 --------------------------------------------------------------------------------
 44 | @app.get("/test5")
 45 | async def test_simple_ellipsis(
@@ -143,7 +143,7 @@ help: Replace with `typing.Annotated`
 47 +     id: Annotated[str, Query()],
 48 | ) -> str:
 49 |     return id
-50 | 
+50 |
 note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
@@ -158,12 +158,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
 1  | """Test FAST002 ellipsis handling."""
-2  | 
+2  |
 3  | from fastapi import Body, Cookie, FastAPI, Header, Query
 4  + from typing import Annotated
-5  | 
+5  |
 6  | app = FastAPI()
-7  | 
+7  |
 --------------------------------------------------------------------------------
 52 | @app.get("/test6")
 53 | async def test_multiple_kwargs_with_ellipsis(
@@ -172,7 +172,7 @@ help: Replace with `typing.Annotated`
 55 +     param: Annotated[str, Query(description="Test", min_length=1, max_length=10)],
 56 | ) -> str:
 57 |     return param
-58 | 
+58 |
 note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
@@ -187,12 +187,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
 1  | """Test FAST002 ellipsis handling."""
-2  | 
+2  |
 3  | from fastapi import Body, Cookie, FastAPI, Header, Query
 4  + from typing import Annotated
-5  | 
+5  |
 6  | app = FastAPI()
-7  | 
+7  |
 --------------------------------------------------------------------------------
 63 | @app.get("/test7")
 64 | async def test_with_default_value(
@@ -201,7 +201,7 @@ help: Replace with `typing.Annotated`
 66 +     param: Annotated[str, Query(description="Test")] = "default",
 67 | ) -> str:
 68 |     return param
-69 | 
+69 |
 note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
@@ -216,12 +216,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
 1  | """Test FAST002 ellipsis handling."""
-2  | 
+2  |
 3  | from fastapi import Body, Cookie, FastAPI, Header, Query
 4  + from typing import Annotated
-5  | 
+5  |
 6  | app = FastAPI()
-7  | 
+7  |
 --------------------------------------------------------------------------------
 71 | @app.get("/test8")
 72 | async def test_with_default_none(
@@ -230,7 +230,7 @@ help: Replace with `typing.Annotated`
 74 +     param: Annotated[str | None, Query(description="Test")] = None,
 75 | ) -> str:
 76 |     return param or "empty"
-77 | 
+77 |
 note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
@@ -245,12 +245,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
 1  | """Test FAST002 ellipsis handling."""
-2  | 
+2  |
 3  | from fastapi import Body, Cookie, FastAPI, Header, Query
 4  + from typing import Annotated
-5  | 
+5  |
 6  | app = FastAPI()
-7  | 
+7  |
 --------------------------------------------------------------------------------
 79 | @app.get("/test9")
 80 | async def test_mixed_parameters(
@@ -287,12 +287,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
 1  | """Test FAST002 ellipsis handling."""
-2  | 
+2  |
 3  | from fastapi import Body, Cookie, FastAPI, Header, Query
 4  + from typing import Annotated
-5  | 
+5  |
 6  | app = FastAPI()
-7  | 
+7  |
 --------------------------------------------------------------------------------
 83 |     # Second param should not be fixed because of the preceding default
 84 |     required_param: str = Query(..., description="Required"),

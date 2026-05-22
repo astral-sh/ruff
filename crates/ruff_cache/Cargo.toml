@@ -23,3 +23,6 @@ ruff_macros = { workspace = true }
 
 [lints]
 workspace = true
+
+[lib]
+test = false

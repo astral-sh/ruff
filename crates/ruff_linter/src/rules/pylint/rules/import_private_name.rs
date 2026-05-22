@@ -166,10 +166,7 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
 
 /// Returns `true` if the [`ResolvedReference`] is in a typing context.
 fn is_typing(reference: &ResolvedReference) -> bool {
-    reference.in_type_checking_block()
-        || reference.in_typing_only_annotation()
-        || reference.in_string_type_definition()
-        || reference.in_runtime_evaluated_annotation()
+    reference.in_typing_context() || reference.in_runtime_evaluated_annotation()
 }
 
 #[expect(clippy::struct_field_names)]

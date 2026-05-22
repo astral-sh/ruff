@@ -1,5 +1,4 @@
 use crate::place::PlaceAndQualifiers;
-use crate::semantic_index::definition::Definition;
 use crate::types::class::DynamicClassLiteral;
 use crate::types::constraints::ConstraintSet;
 use crate::types::protocol_class::ProtocolClass;
@@ -12,6 +11,7 @@ use crate::types::{
     TypedDictType, UnionType, todo_type,
 };
 use crate::{Db, FxOrderSet};
+use ty_python_core::definition::Definition;
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
@@ -80,17 +80,18 @@ impl<'db> SubclassOfType<'db> {
     pub(crate) fn try_from_instance(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
         // Handle unions by distributing `type[]` over each element:
         // `type[A | B]` -> `type[A] | type[B]`
-        if let Type::Union(union) = ty {
-            return UnionType::try_from_elements(
+        match ty {
+            Type::Union(union) => UnionType::try_from_elements(
                 db,
                 union
                     .elements(db)
                     .iter()
                     .map(|element| Self::try_from_instance(db, *element)),
-            );
+            ),
+            Type::ProtocolInstance(protocol) => Some(protocol.to_meta_type(db)),
+            _ => SubclassOfInner::try_from_instance(db, ty)
+                .map(|subclass_of| Self::from(db, subclass_of)),
         }
-
-        SubclassOfInner::try_from_instance(db, ty).map(|subclass_of| Self::from(db, subclass_of))
     }
 
     /// Return a [`Type`] instance representing the type `type[Unknown]`.
@@ -159,12 +160,7 @@ impl<'db> SubclassOfType<'db> {
             },
             SubclassOfInner::TypeVar(typevar) => {
                 let mapped = typevar.apply_type_mapping_impl(db, type_mapping, visitor);
-                if mapped.is_never() {
-                    Type::Never
-                } else {
-                    SubclassOfType::try_from_instance(db, mapped)
-                        .unwrap_or(SubclassOfType::subclass_of_unknown())
-                }
+                mapped.to_meta_type(db)
             }
         }
     }
@@ -234,6 +230,18 @@ impl<'db> SubclassOfType<'db> {
             SubclassOfInner::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type),
             SubclassOfInner::TypeVar(bound_typevar) => Type::TypeVar(bound_typevar),
         }
+    }
+
+    /// Return a type representing "the set of all instances of the metaclass of this type".
+    pub(crate) fn to_metaclass_instance(self, db: &'db dyn Db) -> Type<'db> {
+        // This kind of looks like a no-op, but it's not. For `type[C]` where `C` has metaclass
+        // `M`, `to_meta_type` transforms `type[C]` to `type[M]`, and then `to_instance` makes it
+        // just `M`. And `to_meta_type` will transpose `type[T: C]` into `T: type[C]`, collapse to
+        // the upper bound `type[C]`, and transform that to the meta-type `type[M]`, which
+        // `to_instance` then resolves to `M`.
+        self.to_meta_type(db)
+            .to_instance(db)
+            .expect("the meta-type of a SubclassOf type should always be instantiable")
     }
 
     /// Compute the metatype of this `type[T]`.
@@ -423,18 +431,23 @@ impl<'db> SubclassOfInner<'db> {
             Type::TypeVar(bound_typevar) => SubclassOfInner::TypeVar(bound_typevar),
             Type::Dynamic(DynamicType::Any) => SubclassOfInner::Dynamic(DynamicType::Any),
             Type::Dynamic(DynamicType::Unknown) => SubclassOfInner::Dynamic(DynamicType::Unknown),
-            Type::ProtocolInstance(_) => {
-                SubclassOfInner::Dynamic(todo_type!("type[T] for protocols").expect_dynamic())
-            }
             _ => return None,
         })
     }
 
-    /// Transposes `type[T]` with a type variable `T` into `T: type[...]`.
+    /// Converts `type[T]` with a type variable `T` into a type variable whose bound or
+    /// constraints describe the runtime classes of `T`'s possible inhabitants.
+    ///
+    /// For ordinary nominal bounds, this looks like transposing `type[T]` into
+    /// `T: type[...]`. The conversion intentionally goes through [`Type::to_meta_type`],
+    /// though, so bounds such as function-like callables and custom metaclasses keep the
+    /// richer meta-type that callers need instead of collapsing to `type[Unknown]`.
     ///
     /// In particular:
-    /// - If `T` has an upper bound of `T: Bound`, this returns `T: type[Bound]`.
-    /// - If `T` has constraints `T: (A, B)`, this returns `T: (type[A], type[B])`.
+    /// - If `T` has an upper bound of `T: Bound`, this returns `T` with the meta-type of
+    ///   `Bound` as its upper bound.
+    /// - If `T` has constraints `T: (A, B)`, this returns `T` constrained by the meta-types
+    ///   of `A` and `B`.
     /// - Otherwise, for an unbounded type variable, this returns `type[object]`.
     ///
     /// If this is type of a concrete type `C`, returns the type unchanged.
@@ -450,16 +463,12 @@ impl<'db> SubclassOfInner<'db> {
                         .unwrap_or(SubclassOfType::subclass_of_unknown()),
                 ),
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    TypeVarBoundOrConstraints::UpperBound(
-                        SubclassOfType::try_from_instance(db, bound)
-                            .unwrap_or(SubclassOfType::subclass_of_unknown()),
-                    )
+                    TypeVarBoundOrConstraints::UpperBound(bound.to_meta_type(db))
                 }
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    TypeVarBoundOrConstraints::Constraints(constraints.map(db, |constraint| {
-                        SubclassOfType::try_from_instance(db, *constraint)
-                            .unwrap_or(SubclassOfType::subclass_of_unknown())
-                    }))
+                    TypeVarBoundOrConstraints::Constraints(
+                        constraints.map(db, |constraint| constraint.to_meta_type(db)),
+                    )
                 }
             })
         });

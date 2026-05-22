@@ -16,5 +16,5 @@ help: Add explicit `None` return value
   -         return  # error
 3 +         return None  # error
 4 |     return 1
-5 | 
+5 |
 6 |

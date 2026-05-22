@@ -114,6 +114,7 @@ KNOWN_PARSE_ERRORS = [
     "ban-lazy",  # requires Python 3.15
     "blank-line-with-whitespace",
     "indented-form-feed",
+    "lazy-import-immediately-resolved",  # requires Python 3.15
     "lazy-import-mismatch",  # requires Python 3.15
     "missing-newline-at-end-of-file",
     "mixed-spaces-and-tabs",

@@ -12,5 +12,5 @@ help: Organize imports
   - from sklearn.svm import VAR, Class, MyVar, CONST, abc
   - from subprocess import utils, var_ABC, Variable, Klass, CONSTANT, exe
 1 + from subprocess import CONSTANT, Klass, exe, utils, var_ABC, Variable
-2 + 
+2 +
 3 + from sklearn.svm import CONST, Class, abc, MyVar, VAR

@@ -84,6 +84,17 @@ impl Expr {
         }
     }
 
+    /// Return the value expression after peeling off any nested named expressions.
+    ///
+    /// For example, this returns the `x` expression for both `x` and `(y := x)`.
+    pub fn expression_value(&self) -> &Self {
+        let mut expr = self;
+        while let Expr::Named(named) = expr {
+            expr = &named.value;
+        }
+        expr
+    }
+
     /// Return the [`OperatorPrecedence`] of this expression
     pub fn precedence(&self) -> OperatorPrecedence {
         OperatorPrecedence::from(self)
@@ -105,7 +116,7 @@ impl ExprRef<'_> {
     }
 
     pub fn precedence(&self) -> OperatorPrecedence {
-        OperatorPrecedence::from(self)
+        OperatorPrecedence::from(*self)
     }
 }
 
@@ -387,13 +398,71 @@ impl ConversionFlag {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+/// The debug text of a self-documenting f-string expression (e.g., `f"{x=}"`).
+///
+/// Stores the concatenation of leading text, expression source, and trailing text as a single
+/// [`CompactString`], with byte offsets to split them. The offsets are needed because the leading
+/// and trailing portions can contain non-whitespace characters (grouping parentheses, comments in
+/// triple-quoted f-strings) that cannot be distinguished from expression content by scanning.
+///
+/// [`CompactString`]: compact_str::CompactString
+#[derive(Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct DebugText {
+    /// The full text between the `{` and the conversion / `format_spec` / `}`.
+    text: compact_str::CompactString,
+    /// Byte offset where the expression source begins.
+    expression_start: u32,
+    /// Byte offset where the expression source ends.
+    expression_end: u32,
+}
+
+impl std::fmt::Debug for DebugText {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DebugText")
+            .field("leading", &self.leading())
+            .field("expression", &self.expression())
+            .field("trailing", &self.trailing())
+            .finish()
+    }
+}
+
+impl DebugText {
+    pub fn new(leading: &str, expression: &str, trailing: &str) -> Self {
+        let expression_start = leading.text_len().to_u32();
+        let expression_end = expression_start + expression.text_len().to_u32();
+        let mut buf = compact_str::CompactString::with_capacity(
+            leading.len() + expression.len() + trailing.len(),
+        );
+        buf.push_str(leading);
+        buf.push_str(expression);
+        buf.push_str(trailing);
+        Self {
+            text: buf,
+            expression_start,
+            expression_end,
+        }
+    }
+
+    /// The full debug text between the `{` and the conversion / `format_spec` / `}`.
+    pub fn as_str(&self) -> &str {
+        &self.text
+    }
+
     /// The text between the `{` and the expression node.
-    pub leading: String,
-    /// The text between the expression and the conversion, the `format_spec`, or the `}`, depending on what's present in the source
-    pub trailing: String,
+    pub fn leading(&self) -> &str {
+        &self.text[..self.expression_start as usize]
+    }
+
+    /// The source text of the expression (e.g., `0x0` in `f"{0x0=}"`).
+    pub fn expression(&self) -> &str {
+        &self.text[self.expression_start as usize..self.expression_end as usize]
+    }
+
+    /// The text between the expression and the conversion, the `format_spec`, or the `}`.
+    pub fn trailing(&self) -> &str {
+        &self.text[self.expression_end as usize..]
+    }
 }
 
 impl ExprFString {
@@ -2879,7 +2948,7 @@ pub struct PatternKeyword {
 
 impl PatternArguments {
     /// Returns an iterator over the patterns and keywords in source order.
-    pub fn patterns_source_order(&self) -> PatternArgumentsSourceOrder<'_> {
+    pub fn iter_source_order(&self) -> PatternArgumentsSourceOrder<'_> {
         PatternArgumentsSourceOrder {
             patterns: &self.patterns,
             keywords: &self.keywords,
@@ -2889,7 +2958,7 @@ impl PatternArguments {
     }
 }
 
-/// The iterator returned by [`PatternArguments::patterns_source_order`].
+/// The iterator returned by [`PatternArguments::iter_source_order`].
 #[derive(Clone)]
 pub struct PatternArgumentsSourceOrder<'a> {
     patterns: &'a [Pattern],
@@ -3421,6 +3490,13 @@ impl<'a> ArgOrKeyword<'a> {
             _ => None,
         }
     }
+
+    pub const fn as_keyword(self) -> Option<&'a Keyword> {
+        match self {
+            ArgOrKeyword::Keyword(keyword) => Some(keyword),
+            ArgOrKeyword::Arg(_) => None,
+        }
+    }
 }
 
 impl<'a> From<&'a Expr> for ArgOrKeyword<'a> {
@@ -3487,7 +3563,7 @@ impl Arguments {
             .or_else(|| self.find_positional(position).map(ArgOrKeyword::from))
     }
 
-    /// Return the positional and keyword arguments in the order of declaration.
+    /// Iterates over the positional and keyword arguments in the order of declaration.
     ///
     /// Positional arguments are generally before keyword arguments, but star arguments are an
     /// exception:
@@ -3521,7 +3597,7 @@ impl Arguments {
     /// 2
     /// {'4': 5}
     /// ```
-    pub fn arguments_source_order(&self) -> ArgumentsSourceOrder<'_> {
+    pub fn iter_source_order(&self) -> ArgumentsSourceOrder<'_> {
         ArgumentsSourceOrder {
             args: &self.args,
             keywords: &self.keywords,
@@ -3543,7 +3619,7 @@ impl Arguments {
     }
 }
 
-/// The iterator returned by [`Arguments::arguments_source_order`].
+/// The iterator returned by [`Arguments::iter_source_order`].
 #[derive(Clone)]
 pub struct ArgumentsSourceOrder<'a> {
     args: &'a [Expr],

@@ -693,7 +693,53 @@ impl Display for RequiredVersion {
 /// For reference pep8-naming uses
 /// [`fnmatch`](https://docs.python.org/3/library/fnmatch.html) for
 /// pattern matching.
-pub type IdentifierPattern = glob::Pattern;
+///
+/// Literal patterns without glob metacharacters fall back on string
+/// comparison to avoid the overhead of constructing a [`glob::Pattern`].
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, CacheKey)]
+pub enum IdentifierPattern {
+    Literal(String),
+    Glob(Box<glob::Pattern>),
+}
+
+impl IdentifierPattern {
+    pub fn new(pattern: &str) -> Result<Self, glob::PatternError> {
+        // `]` is only special inside `[...]`, which necessarily includes `[`.
+        if pattern.contains(['?', '*', '[']) {
+            Ok(Self::Glob(Box::new(glob::Pattern::new(pattern)?)))
+        } else {
+            Ok(Self::Literal(pattern.to_string()))
+        }
+    }
+
+    pub fn matches(&self, candidate: &str) -> bool {
+        match self {
+            Self::Literal(literal) => literal == candidate,
+            Self::Glob(pattern) => pattern.matches(candidate),
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Literal(literal) => literal,
+            Self::Glob(pattern) => pattern.as_str(),
+        }
+    }
+}
+
+impl Display for IdentifierPattern {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl FromStr for IdentifierPattern {
+    type Err = glob::PatternError;
+
+    fn from_str(pattern: &str) -> Result<Self, Self::Err> {
+        Self::new(pattern)
+    }
+}
 
 /// Like [`PerFile`] but with string globs compiled to [`GlobMatcher`]s for more efficient usage.
 #[derive(Debug, Clone)]
@@ -943,8 +989,32 @@ impl Display for CompiledPerFileTargetVersionList {
 
 #[cfg(test)]
 mod tests {
+    use super::IdentifierPattern;
+
     #[test]
     fn default_python_version_works() {
         super::PythonVersion::default();
+    }
+
+    #[test]
+    fn identifier_pattern_matches_literals_exactly() {
+        let pattern = IdentifierPattern::new("package.module").unwrap();
+
+        assert!(pattern.matches("package.module"));
+        assert!(!pattern.matches("package"));
+        assert!(!pattern.matches("package.module.extra"));
+    }
+
+    #[test]
+    fn identifier_pattern_preserves_glob_matching() {
+        let pattern = IdentifierPattern::new("package.*").unwrap();
+
+        assert!(pattern.matches("package.module"));
+        assert!(!pattern.matches("other.module"));
+    }
+
+    #[test]
+    fn identifier_pattern_rejects_invalid_globs() {
+        assert!(IdentifierPattern::new("package[").is_err());
     }
 }

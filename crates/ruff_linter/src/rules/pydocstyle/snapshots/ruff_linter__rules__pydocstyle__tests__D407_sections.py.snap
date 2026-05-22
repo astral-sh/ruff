@@ -12,11 +12,11 @@ D407 [*] Missing dashed underline after section ("Returns")
    |
 help: Add dashed line under "Returns"
 42 |     """Toggle the gizmo.
-43 | 
+43 |
 44 |     Returns
 45 +     -------
 46 |     A value of some sort.
-47 | 
+47 |
 48 |     """
 
 D407 [*] Missing dashed underline after section ("Returns")
@@ -31,12 +31,12 @@ D407 [*] Missing dashed underline after section ("Returns")
    |
 help: Add dashed line under "Returns"
 54 |     """Toggle the gizmo.
-55 | 
+55 |
 56 |     Returns
 57 +     -------
-58 | 
+58 |
 59 |     """
-60 | 
+60 |
 
 D407 [*] Missing dashed underline after section ("Returns")
   --> sections.py:67:5
@@ -49,12 +49,12 @@ D407 [*] Missing dashed underline after section ("Returns")
 help: Add dashed line under "Returns"
 64 | def no_underline_and_no_newline():  # noqa: D416
 65 |     """Toggle the gizmo.
-66 | 
+66 |
    -     Returns"""
 67 +     Returns
 68 +     -------"""
-69 | 
-70 | 
+69 |
+70 |
 71 | @expect(_D213)
 
 D407 [*] Missing dashed underline after section ("Raises")
@@ -72,7 +72,7 @@ help: Add dashed line under "Raises"
 227 |     Raises:
 228 +     ------
 229 |     My attention.
-230 | 
+230 |
 231 |     """
 
 D407 [*] Missing dashed underline after section ("Parameters")
@@ -85,13 +85,13 @@ D407 [*] Missing dashed underline after section ("Parameters")
     |
 help: Add dashed line under "Parameters"
 519 |     """Equal length equals should be replaced with dashes.
-520 | 
+520 |
 521 |     Parameters
     -     ==========
 522 +     ----------
 523 |     """
-524 | 
-525 | 
+524 |
+525 |
 
 D407 [*] Missing dashed underline after section ("Parameters")
    --> sections.py:530:5
@@ -103,13 +103,13 @@ D407 [*] Missing dashed underline after section ("Parameters")
     |
 help: Add dashed line under "Parameters"
 527 |     """Here, the length of equals is not the same.
-528 | 
+528 |
 529 |     Parameters
     -     ===========
 530 +     ----------
 531 |     """
-532 | 
-533 | 
+532 |
+533 |
 
 D407 [*] Missing dashed underline after section ("Parameters")
    --> sections.py:613:4
@@ -123,7 +123,7 @@ D407 [*] Missing dashed underline after section ("Parameters")
     |
 help: Add dashed line under "Parameters"
 611 |    """Test that lower case subsection header is valid even if it is of a different kind.
-612 | 
+612 |
 613 |    Parameters
 614 +    ----------
 615 |    -‐-----------------

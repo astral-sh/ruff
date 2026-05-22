@@ -15,11 +15,11 @@ use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use salsa::{Database, Event, Setter};
 use ty_module_resolver::SearchPaths;
-use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{
-    AnalysisSettings, Db as SemanticDb, FallibleStrategy, MisconfigurationStrategy, Program,
-    UseDefaultStrategy,
+use ty_python_core::program::{
+    FallibleStrategy, MisconfigurationStrategy, Program, UseDefaultStrategy,
 };
+use ty_python_semantic::lint::{LintRegistry, RuleSelection};
+use ty_python_semantic::{AnalysisSettings, Db as SemanticDb};
 
 mod changes;
 
@@ -106,17 +106,25 @@ impl ProjectDatabase {
         //   we may want to have a dedicated method for this?
 
         // Initialize the `Program` singleton
-        let program_settings = strategy.to_anyhow(project_metadata.to_program_settings(
-            db.system(),
-            db.vendored(),
-            strategy,
-        ))?;
+        let (program_settings, program_settings_diagnostics) = strategy.to_anyhow(
+            project_metadata.to_program_settings(db.system(), db.vendored(), strategy),
+        )?;
         Program::from_settings(&db, program_settings);
 
-        db.project = Some(strategy.map_err(
-            Project::from_metadata(&db, project_metadata, strategy),
+        let (settings, settings_diagnostics) = strategy.map_err(
+            project_metadata
+                .options()
+                .to_settings(&db, project_metadata.root(), strategy),
             |error| anyhow::anyhow!("{}", error.pretty(&db)),
-        )?);
+        )?;
+
+        db.project = Some(Project::from_metadata(
+            &db,
+            project_metadata,
+            settings,
+            settings_diagnostics,
+            program_settings_diagnostics,
+        ));
 
         Ok(db)
     }
@@ -278,12 +286,11 @@ pub struct SalsaMemoryDump {
     memos: Vec<(&'static str, salsa::IngredientInfo)>,
 }
 
-#[allow(clippy::cast_precision_loss)]
+#[expect(clippy::cast_precision_loss)]
 fn bytes_to_mb(total: usize) -> f64 {
     total as f64 / 1_000_000.
 }
 
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 impl SalsaMemoryDump {
     /// Returns a short report that provides total memory usage information.
     pub fn display_short(&self) -> impl fmt::Display + '_ {
@@ -499,9 +506,8 @@ impl ty_module_resolver::Db for ProjectDatabase {
 
 #[salsa::db]
 impl SemanticDb for ProjectDatabase {
-    fn should_check_file(&self, file: File) -> bool {
-        self.project
-            .is_some_and(|project| project.should_check_file(self, file))
+    fn check_file(&self, file: File) -> Vec<Diagnostic> {
+        ProjectDatabase::check_file(self, file)
     }
 
     fn rule_selection(&self, file: File) -> &RuleSelection {
@@ -520,6 +526,18 @@ impl SemanticDb for ProjectDatabase {
 
     fn verbose(&self) -> bool {
         self.project().verbose(self)
+    }
+
+    fn dyn_clone(&self) -> Box<dyn SemanticDb> {
+        Box::new(self.clone())
+    }
+}
+
+#[salsa::db]
+impl ty_python_core::Db for ProjectDatabase {
+    fn should_check_file(&self, file: File) -> bool {
+        self.project
+            .is_some_and(|project| project.should_check_file(self, file))
     }
 }
 
@@ -576,16 +594,16 @@ pub(crate) mod tests {
     use std::sync::{Arc, Mutex};
 
     use ruff_db::Db as SourceDb;
-    use ruff_db::files::{FileRootKind, Files};
+    use ruff_db::diagnostic::Diagnostic;
+    use ruff_db::files::{File, FileRootKind, Files};
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_python_ast::PythonVersion;
     use ty_module_resolver::SearchPathSettings;
+    use ty_python_core::platform::PythonPlatform;
+    use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-    use ty_python_semantic::{
-        AnalysisSettings, FallibleStrategy, Program, ProgramSettings, PythonPlatform,
-        PythonVersionWithSource,
-    };
+    use ty_python_semantic::{AnalysisSettings, PythonVersionWithSource};
 
     use crate::db::Db;
     use crate::{Project, ProjectMetadata};
@@ -621,7 +639,12 @@ pub(crate) mod tests {
                 project: None,
             };
 
-            let project = Project::from_metadata(&db, project, &FallibleStrategy).unwrap();
+            let (settings, settings_diagnostics) = project
+                .options()
+                .to_settings(&db, project.root(), &FallibleStrategy)
+                .unwrap();
+            let project =
+                Project::from_metadata(&db, project, settings, settings_diagnostics, Vec::new());
             db.project = Some(project);
             db
         }
@@ -704,9 +727,17 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl ty_python_semantic::Db for TestDb {
+    impl ty_python_core::Db for TestDb {
         fn should_check_file(&self, file: ruff_db::files::File) -> bool {
             !file.path(self).is_vendored_path()
+        }
+    }
+
+    #[salsa::db]
+    impl ty_python_semantic::Db for TestDb {
+        #[inline]
+        fn check_file(&self, file: File) -> Vec<Diagnostic> {
+            self.project().check_file(self, file)
         }
 
         fn rule_selection(&self, _file: ruff_db::files::File) -> &RuleSelection {
@@ -723,6 +754,10 @@ pub(crate) mod tests {
 
         fn verbose(&self) -> bool {
             false
+        }
+
+        fn dyn_clone(&self) -> Box<dyn ty_python_semantic::Db> {
+            Box::new(self.clone())
         }
     }
 

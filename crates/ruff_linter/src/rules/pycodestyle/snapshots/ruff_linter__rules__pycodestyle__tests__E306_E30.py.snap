@@ -15,7 +15,7 @@ help: Add missing blank line
 851 | # E306:3:5
 852 | def a():
 853 |     x = 1
-854 + 
+854 +
 855 |     def b():
 856 |         pass
 857 | # end
@@ -34,7 +34,7 @@ help: Add missing blank line
 859 | #: E306:3:5
 860 | async def a():
 861 |     x = 1
-862 + 
+862 +
 863 |     def b():
 864 |         pass
 865 | # end
@@ -53,7 +53,7 @@ help: Add missing blank line
 867 | #: E306:3:5 E306:5:9
 868 | def a():
 869 |     x = 2
-870 + 
+870 +
 871 |     def b():
 872 |         x = 1
 873 |         def c():
@@ -72,7 +72,7 @@ help: Add missing blank line
 869 |     x = 2
 870 |     def b():
 871 |         x = 1
-872 + 
+872 +
 873 |         def c():
 874 |             pass
 875 | # end
@@ -91,7 +91,7 @@ help: Add missing blank line
 877 | # E306:3:5 E306:6:5
 878 | def a():
 879 |     x = 1
-880 + 
+880 +
 881 |     class C:
 882 |         pass
 883 |     x = 2
@@ -110,7 +110,7 @@ help: Add missing blank line
 880 |     class C:
 881 |         pass
 882 |     x = 2
-883 + 
+883 +
 884 |     def b():
 885 |         pass
 886 | # end
@@ -128,10 +128,10 @@ help: Add missing blank line
 889 | def foo():
 890 |     def bar():
 891 |         pass
-892 + 
+892 +
 893 |     def baz(): pass
 894 | # end
-895 | 
+895 |
 
 E306 [*] Expected 1 blank line before a nested definition, found 0
    --> E30.py:899:5
@@ -147,7 +147,7 @@ help: Add missing blank line
 896 | # E306:3:5
 897 | def foo():
 898 |     def bar(): pass
-899 + 
+899 +
 900 |     def baz():
 901 |         pass
 902 | # end
@@ -166,7 +166,7 @@ help: Add missing blank line
 904 | # E306
 905 | def a():
 906 |     x = 2
-907 + 
+907 +
 908 |     @decorator
 909 |     def b():
 910 |         pass
@@ -185,7 +185,7 @@ help: Add missing blank line
 913 | # E306
 914 | def a():
 915 |     x = 2
-916 + 
+916 +
 917 |     @decorator
 918 |     async def b():
 919 |         pass
@@ -204,7 +204,7 @@ help: Add missing blank line
 922 | # E306
 923 | def a():
 924 |     x = 2
-925 + 
+925 +
 926 |     async def b():
 927 |         pass
 928 | # end
@@ -223,7 +223,7 @@ help: Add missing blank line
 980 | class foo:
 981 |     async def recv(self, *, length=65536):
 982 |         loop = asyncio.get_event_loop()
-983 + 
+983 +
 984 |         def callback():
 985 |             loop.remove_reader(self._fd)
 986 |         loop.add_reader(self._fd, callback)
@@ -242,7 +242,7 @@ help: Add missing blank line
 999  | class Bar:
 1000 |     def f():
 1001 |         x = 1
-1002 + 
+1002 +
 1003 |         def g():
 1004 |             return 1
 1005 |         return 2
@@ -261,7 +261,7 @@ help: Add missing blank line
 1006 |     def f():
 1007 |         class Baz:
 1008 |             x = 1
-1009 + 
+1009 +
 1010 |             def g():
 1011 |                 return 1
 1012 |             return 2

@@ -13,12 +13,12 @@ I001 [*] Import block is un-sorted or un-formatted
   |
 help: Organize imports
 1 | import json
-  - 
-  - 
-  - 
+  -
+  -
+  -
 2 | from typing import Any, Sequence
-3 | 
-4 | 
+3 |
+4 |
 
 E303 [*] Too many blank lines (3)
  --> E30_isort.py:5:1
@@ -28,12 +28,12 @@ E303 [*] Too many blank lines (3)
   |
 help: Remove extraneous blank line(s)
 1 | import json
-2 | 
-3 | 
-  - 
+2 |
+3 |
+  -
 4 | from typing import Any, Sequence
-5 | 
-6 | 
+5 |
+6 |
 
 E303 [*] Too many blank lines (2)
   --> E30_isort.py:21:5
@@ -46,10 +46,10 @@ E303 [*] Too many blank lines (2)
 help: Remove extraneous blank line(s)
 17 | if __name__ == "__main__":
 18 |     import abcd
-19 | 
-   - 
+19 |
+   -
 20 |     abcd.foo()
-21 | 
+21 |
 22 | def __init__(self, backend_module: str, backend_obj: str | None) -> None: ...
 
 I001 [*] Import block is un-sorted or un-formatted
@@ -66,12 +66,12 @@ I001 [*] Import block is un-sorted or un-formatted
 help: Organize imports
 25 | if TYPE_CHECKING:
 26 |     import os
-27 | 
-   - 
-   - 
+27 |
+   -
+   -
 28 |     from typing_extensions import TypeAlias
-29 | 
-30 | 
+29 |
+30 |
 
 E303 [*] Too many blank lines (3)
   --> E30_isort.py:30:5
@@ -82,12 +82,12 @@ E303 [*] Too many blank lines (3)
 help: Remove extraneous blank line(s)
 25 | if TYPE_CHECKING:
 26 |     import os
-27 | 
-   - 
-   - 
+27 |
+   -
+   -
 28 |     from typing_extensions import TypeAlias
-29 | 
-30 | 
+29 |
+30 |
 
 E303 [*] Too many blank lines (2)
   --> E30_isort.py:33:5
@@ -98,12 +98,12 @@ E303 [*] Too many blank lines (2)
 35 | def __call__(self, name: str, *args: Any, **kwargs: Any) -> Any:
    |
 help: Remove extraneous blank line(s)
-29 | 
+29 |
 30 |     from typing_extensions import TypeAlias
-31 | 
-   - 
+31 |
+   -
 32 |     abcd.foo()
-33 | 
+33 |
 34 | def __call__(self, name: str, *args: Any, **kwargs: Any) -> Any:
 
 I001 [*] Import block is un-sorted or un-formatted
@@ -115,8 +115,8 @@ I001 [*] Import block is un-sorted or un-formatted
 62 | class MissingCommand(TypeError): ...  # noqa: N818
    |
 help: Organize imports
-59 | 
+59 |
 60 | from typing import Any, Sequence
-61 | 
-62 + 
+61 |
+62 +
 63 | class MissingCommand(TypeError): ...  # noqa: N818

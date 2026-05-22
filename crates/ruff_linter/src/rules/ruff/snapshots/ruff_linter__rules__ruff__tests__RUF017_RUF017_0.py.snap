@@ -15,7 +15,7 @@ help: Replace with `functools.reduce`
 2  + import operator
 3  | x = [1, 2, 3]
 4  | y = [4, 5, 6]
-5  | 
+5  |
 6  | # RUF017
    - sum([x, y], start=[])
 7  + functools.reduce(operator.iadd, [x, y], [])
@@ -39,7 +39,7 @@ help: Replace with `functools.reduce`
 2  + import operator
 3  | x = [1, 2, 3]
 4  | y = [4, 5, 6]
-5  | 
+5  |
 6  | # RUF017
 7  | sum([x, y], start=[])
    - sum([x, y], [])
@@ -64,7 +64,7 @@ help: Replace with `functools.reduce`
 2  + import operator
 3  | x = [1, 2, 3]
 4  | y = [4, 5, 6]
-5  | 
+5  |
 6  | # RUF017
 7  | sum([x, y], start=[])
 8  | sum([x, y], [])
@@ -90,7 +90,7 @@ help: Replace with `functools.reduce`
 2  + import operator
 3  | x = [1, 2, 3]
 4  | y = [4, 5, 6]
-5  | 
+5  |
 --------------------------------------------------------------------------------
 7  | sum([x, y], start=[])
 8  | sum([x, y], [])
@@ -99,7 +99,7 @@ help: Replace with `functools.reduce`
 10 + functools.reduce(operator.iadd, [[1, 2, 3], [4, 5, 6]], [])
 11 | sum([[1, 2, 3], [4, 5, 6]],
 12 |     [])
-13 | 
+13 |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF017 [*] Avoid quadratic list summation
@@ -118,7 +118,7 @@ help: Replace with `functools.reduce`
 2  + import operator
 3  | x = [1, 2, 3]
 4  | y = [4, 5, 6]
-5  | 
+5  |
 --------------------------------------------------------------------------------
 8  | sum([x, y], [])
 9  | sum([[1, 2, 3], [4, 5, 6]], start=[])
@@ -126,7 +126,7 @@ help: Replace with `functools.reduce`
    - sum([[1, 2, 3], [4, 5, 6]],
    -     [])
 11 + functools.reduce(operator.iadd, [[1, 2, 3], [4, 5, 6]], [])
-12 | 
+12 |
 13 | # OK
 14 | sum([x, y])
 note: This is an unsafe fix and may change runtime behavior
@@ -142,11 +142,11 @@ RUF017 [*] Avoid quadratic list summation
 help: Replace with `functools.reduce`
 18 | def func():
 19 |     import functools, operator
-20 | 
+20 |
    -     sum([x, y], [])
 21 +     functools.reduce(operator.iadd, [x, y], [])
-22 | 
-23 | 
+22 |
+23 |
 24 | # Regression test for: https://github.com/astral-sh/ruff/issues/7718
 note: This is an unsafe fix and may change runtime behavior
 
@@ -163,9 +163,9 @@ help: Replace with `functools.reduce`
 2  + import operator
 3  | x = [1, 2, 3]
 4  | y = [4, 5, 6]
-5  | 
+5  |
 --------------------------------------------------------------------------------
-25 | 
+25 |
 26 | # Regression test for: https://github.com/astral-sh/ruff/issues/7718
 27 | def func():
    -     sum((factor.dims for factor in bases), [])

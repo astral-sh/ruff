@@ -14,18 +14,18 @@ TC002 [*] Move third-party import `pkg.bar.A` into a type-checking block
 help: Move into type-checking block
 1  | from __future__ import annotations
 2  + from typing import TYPE_CHECKING
-3  + 
+3  +
 4  + if TYPE_CHECKING:
 5  +     from pkg.bar import A
-6  | 
-7  | 
+6  |
+7  |
 8  | def f():
 --------------------------------------------------------------------------------
 55 | def f():
 56 |     # In un-strict mode, this _should_ raise an error, since `pkg.bar` isn't used at runtime
 57 |     import pkg
    -     from pkg.bar import A
-58 | 
+58 |
 59 |     def test(value: A):
 60 |         return pkg.B()
 note: This is an unsafe fix and may change runtime behavior
@@ -42,11 +42,11 @@ TC002 [*] Move third-party import `pkg` into a type-checking block
 help: Move into type-checking block
 1  | from __future__ import annotations
 2  + from typing import TYPE_CHECKING
-3  + 
+3  +
 4  + if TYPE_CHECKING:
 5  +     import pkg
-6  | 
-7  | 
+6  |
+7  |
 8  | def f():
 --------------------------------------------------------------------------------
 92 |     # In un-strict mode, this _should_ raise an error, since `pkg` isn't used at runtime.
@@ -54,6 +54,6 @@ help: Move into type-checking block
 94 |     # testing the implementation.
    -     import pkg
 95 |     import pkgfoo.bar as B
-96 | 
+96 |
 97 |     def test(value: pkg.A):
 note: This is an unsafe fix and may change runtime behavior

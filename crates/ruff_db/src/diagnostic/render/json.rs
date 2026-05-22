@@ -307,7 +307,7 @@ mod tests {
 
         insta::assert_snapshot!(
             env.render(&diag),
-            @r###"
+            @r#"
         [
           {
             "cell": null,
@@ -328,7 +328,7 @@ mod tests {
             "url": "https://docs.astral.sh/ruff/rules/test-diagnostic"
           }
         ]
-        "###,
+        "#,
         );
     }
 
@@ -345,7 +345,7 @@ mod tests {
 
         insta::assert_snapshot!(
             env.render(&diag),
-            @r###"
+            @r#"
         [
           {
             "cell": null,
@@ -360,7 +360,7 @@ mod tests {
             "url": "https://docs.astral.sh/ruff/rules/test-diagnostic"
           }
         ]
-        "###,
+        "#,
         );
     }
 }

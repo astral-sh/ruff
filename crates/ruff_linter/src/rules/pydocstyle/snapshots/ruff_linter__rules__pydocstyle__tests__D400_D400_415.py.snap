@@ -51,7 +51,7 @@ D400 [*] First line should end with a period
    |
 help: Add period
 16 |     ...
-17 | 
+17 |
 18 | def f():
    -     """Here's a line ending with a whitespace  """
 19 +     """Here's a line ending with a whitespace.  """

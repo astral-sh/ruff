@@ -14,12 +14,12 @@ PYI059 [*] `Generic[]` should always be the last base class
 help: Move `Generic[]` to the end
 5  | K = TypeVar('K')
 6  | V = TypeVar('V')
-7  | 
+7  |
    - class LinkedList(Generic[T], Sized):  # PYI059
 8  + class LinkedList(Sized, Generic[T]):  # PYI059
 9  |     def __init__(self) -> None:
 10 |         self._items: List[T] = []
-11 | 
+11 |
 note: This is an unsafe fix and may change runtime behavior
 
 PYI059 [*] `Generic[]` should always be the last base class
@@ -38,7 +38,7 @@ PYI059 [*] `Generic[]` should always be the last base class
    |
 help: Move `Generic[]` to the end
 13 |         self._items.append(item)
-14 | 
+14 |
 15 | class MyMapping(  # PYI059
    -     t.Generic[K, V],
 16 |     Iterable[Tuple[K, V]],
@@ -46,7 +46,7 @@ help: Move `Generic[]` to the end
 17 +     Container[Tuple[K, V]], t.Generic[K, V],
 18 | ):
 19 |     ...
-20 | 
+20 |
 note: This is an unsafe fix and may change runtime behavior
 
 PYI059 [*] `Generic[]` should always be the last base class
@@ -65,8 +65,8 @@ help: Move `Generic[]` to the end
    - class Foo(Generic, LinkedList):  # PYI059
 26 + class Foo(LinkedList, Generic):  # PYI059
 27 |     pass
-28 | 
-29 | 
+28 |
+29 |
 note: This is an unsafe fix and may change runtime behavior
 
 PYI059 [*] `Generic[]` should always be the last base class
@@ -123,13 +123,13 @@ PYI059 [*] `Generic[]` should always be the last base class
 60 |     ...
    |
 help: Move `Generic[]` to the end
-56 | 
+56 |
 57 | # syntax errors with starred and keyword arguments from
 58 | # https://github.com/astral-sh/ruff/issues/18602
    - class C1(Generic[T], str, **{"metaclass": type}):  # PYI059
 59 + class C1(str, Generic[T], **{"metaclass": type}):  # PYI059
 60 |     ...
-61 | 
+61 |
 62 | class C2(Generic[T], str, metaclass=type):  # PYI059
 note: This is an unsafe fix and may change runtime behavior
 
@@ -145,11 +145,11 @@ PYI059 [*] `Generic[]` should always be the last base class
 help: Move `Generic[]` to the end
 59 | class C1(Generic[T], str, **{"metaclass": type}):  # PYI059
 60 |     ...
-61 | 
+61 |
    - class C2(Generic[T], str, metaclass=type):  # PYI059
 62 + class C2(str, Generic[T], metaclass=type):  # PYI059
 63 |     ...
-64 | 
+64 |
 65 | class C3(Generic[T], metaclass=type, *[str]):  # PYI059 but no fix
 note: This is an unsafe fix and may change runtime behavior
 

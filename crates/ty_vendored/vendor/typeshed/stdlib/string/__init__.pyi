@@ -82,12 +82,14 @@ class Formatter:
     def format(self, format_string: LiteralString, /, *args: LiteralString, **kwargs: LiteralString) -> LiteralString: ...
     @overload
     def format(self, format_string: str, /, *args: Any, **kwargs: Any) -> str: ...
+
     @overload
     def vformat(
         self, format_string: LiteralString, args: Sequence[LiteralString], kwargs: Mapping[LiteralString, LiteralString]
     ) -> LiteralString: ...
     @overload
     def vformat(self, format_string: str, args: Sequence[Any], kwargs: Mapping[str, Any]) -> str: ...
+
     def _vformat(  # undocumented
         self,
         format_string: str,

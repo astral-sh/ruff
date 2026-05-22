@@ -11,11 +11,11 @@ UP045 [*] Use `X | None` for type annotations
    |
 help: Convert to `X | None`
 37 |     return y
-38 | 
-39 | 
+38 |
+39 |
    - x: Optional[int] = None
 40 + x: int | None = None
-41 | 
+41 |
 42 | MyList: TypeAlias = Union[List[int], List[str]]
 
 UP007 [*] Use `X | Y` for type annotations
@@ -27,8 +27,8 @@ UP007 [*] Use `X | Y` for type annotations
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Convert to `X | Y`
-39 | 
+39 |
 40 | x: Optional[int] = None
-41 | 
+41 |
    - MyList: TypeAlias = Union[List[int], List[str]]
 42 + MyList: TypeAlias = List[int] | List[str]

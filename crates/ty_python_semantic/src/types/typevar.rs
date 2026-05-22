@@ -6,18 +6,18 @@ use rustc_hash::FxHashSet;
 
 use crate::{
     Db, TypeQualifiers,
-    place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, Widening},
-    semantic_index::{
-        definition::{Definition, DefinitionKind},
-        semantic_index,
-    },
+    place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin},
     types::{
-        ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, KnownClass,
-        KnownInstanceType, MaterializationKind, Parameter, Parameters, Type, TypeAliasType,
-        TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType, any_over_type,
-        binding_type, definition_expression_type, tuple::Tuple, variance::VarianceInferable,
-        visitor,
+        ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
+        KnownClass, KnownInstanceType, MaterializationKind, Parameter, Parameters, Type,
+        TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        any_over_type, binding_type, definition_expression_type, tuple::Tuple,
+        variance::VarianceInferable, visitor,
     },
+};
+use ty_python_core::{
+    definition::{Definition, DefinitionKind},
+    semantic_index,
 };
 
 impl<'db> Type<'db> {
@@ -541,14 +541,14 @@ impl<'db> TypeVarInstance<'db> {
                     DynamicType::Todo(_)
                     | DynamicType::TodoUnpack
                     | DynamicType::TodoStarredExpression
-                    | DynamicType::TodoFunctionalTypedDict
                     | DynamicType::TodoTypeVarTuple => Parameters::todo(),
                     DynamicType::Any
                     | DynamicType::Unknown
                     | DynamicType::UnknownGeneric(_)
                     | DynamicType::UnspecializedTypeVar
-                    | DynamicType::Divergent(_) => Parameters::unknown(),
+                    | DynamicType::InvalidConcatenateUnknown => Parameters::unknown(),
                 },
+                Type::Divergent(_) => Parameters::unknown(),
                 Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
                     return ty;
                 }
@@ -577,7 +577,10 @@ impl<'db> TypeVarInstance<'db> {
                 let known_class = func_ty.as_class_literal().and_then(|cls| cls.known(db));
                 let expr = &call_expr.arguments.find_keyword("default")?.value;
                 let default_type = definition_expression_type(db, definition, expr);
-                if known_class == Some(KnownClass::ParamSpec) {
+                if matches!(
+                    known_class,
+                    Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec)
+                ) {
                     convert_type_to_paramspec_value(db, default_type)
                 } else {
                     default_type
@@ -631,10 +634,7 @@ impl<'db> TypeVarInstance<'db> {
         let (_, child) = index
             .child_scopes(typevar_definition.file_scope(db))
             .next()?;
-        child
-            .node()
-            .generic_context(db, index)?
-            .binds_typevar(db, self)
+        GenericContext::of_node(db, child.node(), index)?.binds_typevar(db, self)
     }
 }
 
@@ -712,7 +712,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             db,
             self.typevar(db).identity(db),
             Some(TypeVarBoundOrConstraintsEvaluation::Eager(upper_bound)),
-            None, // ParamSpecs cannot have explicit variance
+            self.typevar(db).explicit_variance(db),
             None, // `P.args` and `P.kwargs` cannot have defaults even though `P` can
         );
 
@@ -739,7 +739,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 db,
                 self.typevar(db).identity(db),
                 None, // Remove the upper bound set by `with_paramspec_attr`
-                None, // ParamSpecs cannot have explicit variance
+                self.typevar(db).explicit_variance(db),
                 None, // `P.args` and `P.kwargs` cannot have defaults even though `P` can
             ),
             self.binding_context(db),
@@ -903,8 +903,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                     Type::TypeVar(self)
                 }
             }
-            TypeMapping::UniqueSpecialization { .. }
-            | TypeMapping::Promote(..)
+            TypeMapping::Promote(..)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion
@@ -995,10 +994,6 @@ pub enum TypeVarKind {
 }
 
 impl TypeVarKind {
-    pub(super) const fn is_self(self) -> bool {
-        matches!(self, Self::TypingSelf)
-    }
-
     pub(super) const fn is_paramspec(self) -> bool {
         matches!(self, Self::ParamSpec | Self::Pep695ParamSpec)
     }
@@ -1299,7 +1294,7 @@ impl<'db> TypeVarConstraints<'db> {
                     } else {
                         Definedness::AlwaysDefined
                     },
-                    widening: Widening::None,
+                    public_type_policy: PublicTypePolicy::Raw,
                 })
             },
             qualifiers,
@@ -1382,6 +1377,19 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
                     visitor,
                 ))
             }
+        }
+    }
+
+    /// Represent the bound/constraints of this typevar as a single type, by unioning constraints.
+    ///
+    /// Careful with this method! It has both semantic and performance gotchas. Unioning
+    /// constraints provides a conservative upper bound, but it loses precision. And for many use
+    /// cases, it's more efficient to just map over the constraint types directly, rather than
+    /// building a union out of them and mapping over that.
+    pub(crate) fn as_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            TypeVarBoundOrConstraints::UpperBound(bound) => bound,
+            TypeVarBoundOrConstraints::Constraints(constraints) => constraints.as_type(db),
         }
     }
 }

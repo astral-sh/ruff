@@ -57,8 +57,8 @@ help: Remove unnecessary `else`
    -         else:
    -             a = z
 33 +         a = z
-34 | 
-35 | 
+34 |
+35 |
 36 | def foo3(x, y, z):
 
 RET508 [*] Unnecessary `else` after `break` statement
@@ -102,8 +102,8 @@ help: Remove unnecessary `else`
    -             c = 3
 60 +         c = 3
 61 |         break
-62 | 
-63 | 
+62 |
+63 |
 
 RET508 [*] Unnecessary `else` after `break` statement
   --> RET508.py:71:13
@@ -149,8 +149,8 @@ help: Remove unnecessary `else`
 83 +             return
 84 +         except ValueError:
 85 +             break
-86 | 
-87 | 
+86 |
+87 |
 88 | ###
 
 RET508 [*] Unnecessary `else` after `break` statement

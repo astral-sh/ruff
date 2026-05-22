@@ -15,8 +15,8 @@ help: Remove explicit `return None`
 3 |         return
   -     return None  # error
 4 +     return  # error
-5 | 
-6 | 
+5 |
+6 |
 7 | class BaseCache:
 
 RET501 [*] Do not explicitly `return None` in function if it is the only possible return value
@@ -30,12 +30,12 @@ RET501 [*] Do not explicitly `return None` in function if it is the only possibl
 16 |     @property
    |
 help: Remove explicit `return None`
-11 | 
+11 |
 12 |     def get(self, key: str) -> None:
 13 |         print(f"{key} not found")
    -         return None
 14 +         return
-15 | 
+15 |
 16 |     @property
 17 |     def prop(self) -> None:
 

@@ -11,19 +11,19 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing_extensions.Annotated`
 2  | values. See #15043 for more details."""
-3  | 
+3  |
 4  | from fastapi import FastAPI, Query
 5  + from typing_extensions import Annotated
-6  | 
+6  |
 7  | app = FastAPI()
-8  | 
-9  | 
+8  |
+9  |
 10 | @app.get("/test")
    - def handler(echo: str = Query("")):
 11 + def handler(echo: Annotated[str, Query()] = ""):
 12 |     return echo
-13 | 
-14 | 
+13 |
+14 |
 note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
@@ -36,21 +36,21 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing_extensions.Annotated`
 2  | values. See #15043 for more details."""
-3  | 
+3  |
 4  | from fastapi import FastAPI, Query
 5  + from typing_extensions import Annotated
-6  | 
+6  |
 7  | app = FastAPI()
-8  | 
+8  |
 --------------------------------------------------------------------------------
-13 | 
-14 | 
+13 |
+14 |
 15 | @app.get("/test")
    - def handler2(echo: str = Query(default="")):
 16 + def handler2(echo: Annotated[str, Query()] = ""):
 17 |     return echo
-18 | 
-19 | 
+18 |
+19 |
 note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
@@ -63,15 +63,15 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing_extensions.Annotated`
 2  | values. See #15043 for more details."""
-3  | 
+3  |
 4  | from fastapi import FastAPI, Query
 5  + from typing_extensions import Annotated
-6  | 
+6  |
 7  | app = FastAPI()
-8  | 
+8  |
 --------------------------------------------------------------------------------
-18 | 
-19 | 
+18 |
+19 |
 20 | @app.get("/test")
    - def handler3(echo: str = Query("123", min_length=3, max_length=50)):
 21 + def handler3(echo: Annotated[str, Query(min_length=3, max_length=50)] = "123"):

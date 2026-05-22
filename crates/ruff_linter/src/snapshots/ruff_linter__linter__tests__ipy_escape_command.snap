@@ -13,11 +13,11 @@ F401 [*] `os` imported but unused
   |
 help: Remove unused import: `os`
  ::: cell 1
-2 | 
+2 |
 3 | %matplotlib inline
-4 | 
+4 |
   - import os
-5 | 
+5 |
 6 | _ = math.pi
 
 F401 [*] `sys` imported but unused

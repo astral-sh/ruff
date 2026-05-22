@@ -14,7 +14,7 @@ help: Replace with `a in (b, c)`
   - if a == b or a == c:
 2 + if a in (b, c):
 3 |     d
-4 | 
+4 |
 5 | # SIM109
 note: This is an unsafe fix and may change runtime behavior
 
@@ -28,12 +28,12 @@ SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
   |
 help: Replace with `a in (b, c)`
 3 |     d
-4 | 
+4 |
 5 | # SIM109
   - if (a == b or a == c) and None:
 6 + if (a in (b, c)) and None:
 7 |     d
-8 | 
+8 |
 9 | # SIM109
 note: This is an unsafe fix and may change runtime behavior
 
@@ -47,12 +47,12 @@ SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
    |
 help: Replace with `a in (b, c)`
 7  |     d
-8  | 
+8  |
 9  | # SIM109
    - if a == b or a == c or None:
 10 + if a in (b, c) or None:
 11 |     d
-12 | 
+12 |
 13 | # SIM109
 note: This is an unsafe fix and may change runtime behavior
 
@@ -66,11 +66,11 @@ SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
    |
 help: Replace with `a in (b, c)`
 11 |     d
-12 | 
+12 |
 13 | # SIM109
    - if a == b or None or a == c:
 14 + if a in (b, c) or None:
 15 |     d
-16 | 
+16 |
 17 | # OK
 note: This is an unsafe fix and may change runtime behavior

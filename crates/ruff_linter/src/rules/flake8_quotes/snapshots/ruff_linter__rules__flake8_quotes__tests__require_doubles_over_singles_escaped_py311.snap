@@ -32,7 +32,7 @@ help: Change outer quotes to avoid escaping inner quotes
    -     "\"string\""
 9  +     '"string"'
 10 | )
-11 | 
+11 |
 12 | # Same as above, but with f-strings
 
 Q003 [*] Change outer quotes to avoid escaping inner quotes
@@ -46,7 +46,7 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
 help: Change outer quotes to avoid escaping inner quotes
 10 | )
-11 | 
+11 |
 12 | # Same as above, but with f-strings
    - f"This is a \"string\""
 13 + f'This is a "string"'
@@ -70,7 +70,7 @@ help: Change outer quotes to avoid escaping inner quotes
    -     f"\"string\""
 21 +     f'"string"'
 22 | )
-23 | 
+23 |
 24 | # Nested f-strings (Python 3.12+)
 
 Q003 [*] Change outer quotes to avoid escaping inner quotes
@@ -83,8 +83,8 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
 45 | f'This is a "string"'
    |
 help: Change outer quotes to avoid escaping inner quotes
-40 | 
-41 | 
+40 |
+41 |
 42 | # Same as above, but with t-strings
    - t"This is a \"string\""
 43 + t'This is a "string"'
@@ -130,7 +130,7 @@ help: Change outer quotes to avoid escaping inner quotes
 53 + t'"foo" {"foo"}'  # Q003
 54 | t"\"foo\" {t"foo"}"  # Q003
 55 | t"\"foo\" {t"\"foo\""} \"\""  # Q003
-56 | 
+56 |
 
 Q003 [*] Change outer quotes to avoid escaping inner quotes
   --> singles_escaped.py:54:1
@@ -148,7 +148,7 @@ help: Change outer quotes to avoid escaping inner quotes
    - t"\"foo\" {t"foo"}"  # Q003
 54 + t'"foo" {t"foo"}'  # Q003
 55 | t"\"foo\" {t"\"foo\""} \"\""  # Q003
-56 | 
+56 |
 57 | t"normal {t"nested"} normal"
 
 Q003 [*] Change outer quotes to avoid escaping inner quotes
@@ -167,7 +167,7 @@ help: Change outer quotes to avoid escaping inner quotes
 54 | t"\"foo\" {t"foo"}"  # Q003
    - t"\"foo\" {t"\"foo\""} \"\""  # Q003
 55 + t'"foo" {t"\"foo\""} ""'  # Q003
-56 | 
+56 |
 57 | t"normal {t"nested"} normal"
 58 | t"\"normal\" {t"nested"} normal"  # Q003
 
@@ -187,7 +187,7 @@ help: Change outer quotes to avoid escaping inner quotes
 54 | t"\"foo\" {t"foo"}"  # Q003
    - t"\"foo\" {t"\"foo\""} \"\""  # Q003
 55 + t"\"foo\" {t'"foo"'} \"\""  # Q003
-56 | 
+56 |
 57 | t"normal {t"nested"} normal"
 58 | t"\"normal\" {t"nested"} normal"  # Q003
 
@@ -202,7 +202,7 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
 help: Change outer quotes to avoid escaping inner quotes
 55 | t"\"foo\" {t"\"foo\""} \"\""  # Q003
-56 | 
+56 |
 57 | t"normal {t"nested"} normal"
    - t"\"normal\" {t"nested"} normal"  # Q003
 58 + t'"normal" {t"nested"} normal'  # Q003

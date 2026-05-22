@@ -35,8 +35,8 @@ class _:
 
 def _():
     reveal_type(a.x)  # revealed: int | None
-    reveal_type(a.y)  # revealed: Unknown | None
-    reveal_type(a.z)  # revealed: Unknown | None
+    reveal_type(a.y)  # revealed: None | Unknown
+    reveal_type(a.z)  # revealed: None | Unknown
 
 if False:
     a = A()
@@ -47,8 +47,8 @@ reveal_type(a.z)  # revealed: Literal[0]
 if True:
     a = A()
 reveal_type(a.x)  # revealed: int | None
-reveal_type(a.y)  # revealed: Unknown | None
-reveal_type(a.z)  # revealed: Unknown | None
+reveal_type(a.y)  # revealed: None | Unknown
+reveal_type(a.z)  # revealed: None | Unknown
 
 a.x = 0
 a.y = 0
@@ -60,8 +60,8 @@ reveal_type(a.z)  # revealed: Literal[0]
 class _:
     a = A()
     reveal_type(a.x)  # revealed: int | None
-    reveal_type(a.y)  # revealed: Unknown | None
-    reveal_type(a.z)  # revealed: Unknown | None
+    reveal_type(a.y)  # revealed: None | Unknown
+    reveal_type(a.z)  # revealed: None | Unknown
 
 def cond() -> bool:
     return True
@@ -76,16 +76,16 @@ class _:
     if cond():
         a = A()
     reveal_type(a.x)  # revealed: int | None
-    reveal_type(a.y)  # revealed: Unknown | None
-    reveal_type(a.z)  # revealed: Unknown | None
+    reveal_type(a.y)  # revealed: None | Unknown
+    reveal_type(a.z)  # revealed: None | Unknown
 
 class _:
     a = A()
 
     class Inner:
         reveal_type(a.x)  # revealed: int | None
-        reveal_type(a.y)  # revealed: Unknown | None
-        reveal_type(a.z)  # revealed: Unknown | None
+        reveal_type(a.y)  # revealed: None | Unknown
+        reveal_type(a.z)  # revealed: None | Unknown
 
 a = A()
 # error: [unresolved-attribute]
@@ -278,6 +278,8 @@ reveal_type(c[0])  # revealed: str
 ## Complex target
 
 ```py
+from typing import Any
+
 class A:
     x: list[int | None] = []
 
@@ -310,18 +312,16 @@ class F:
     def __init__(self):
         self.e = E()
 
-class Mock: ...
+class Mock(Any): ...
 
 f = F()
-reveal_type(f.e)  # revealed: Unknown | E
+reveal_type(f.e)  # revealed: E
 f.e = Mock()
 reveal_type(f.e)  # revealed: Mock
 
 f2 = F()
-reveal_type(f2.e.d)  # revealed: Unknown | D
+reveal_type(f2.e.d)  # revealed: D
 f2.e.d = Mock()
-# Strictly speaking, this narrowing is not safe because the inferred attribute type includes `Unknown`,
-# and `Unknown` could be a data descriptor type. But we enable it for practical convenience.
 reveal_type(f2.e.d)  # revealed: Mock
 ```
 

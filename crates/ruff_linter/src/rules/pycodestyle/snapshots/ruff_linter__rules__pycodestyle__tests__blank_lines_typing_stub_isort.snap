@@ -13,14 +13,14 @@ I001 [*] Import block is un-sorted or un-formatted
   |
 help: Organize imports
 1 | import json
-  - 
-  - 
-  - 
+  -
+  -
+  -
 2 | from typing import Any, Sequence
-  - 
-3 | 
+  -
+3 |
 4 | class MissingCommand(TypeError): ...  # noqa: N818
-5 | 
+5 |
 
 E303 [*] Too many blank lines (3)
  --> E30_isort.pyi:5:1
@@ -30,12 +30,12 @@ E303 [*] Too many blank lines (3)
   |
 help: Remove extraneous blank line(s)
 1 | import json
-2 | 
-  - 
-  - 
+2 |
+  -
+  -
 3 | from typing import Any, Sequence
-4 | 
-5 | 
+4 |
+5 |
 
 E303 [*] Too many blank lines (2)
  --> E30_isort.pyi:8:1
@@ -44,13 +44,13 @@ E303 [*] Too many blank lines (2)
   | ^^^^^
   |
 help: Remove extraneous blank line(s)
-4 | 
+4 |
 5 | from typing import Any, Sequence
-6 | 
-  - 
+6 |
+  -
 7 | class MissingCommand(TypeError): ...  # noqa: N818
-8 | 
-9 | 
+8 |
+9 |
 
 E303 [*] Too many blank lines (2)
   --> E30_isort.pyi:11:1
@@ -61,10 +61,10 @@ E303 [*] Too many blank lines (2)
 13 |     backend_object: str | None
    |
 help: Remove extraneous blank line(s)
-7  | 
+7  |
 8  | class MissingCommand(TypeError): ...  # noqa: N818
-9  | 
-   - 
+9  |
+   -
 10 | class BackendProxy:
 11 |     backend_module: str
 12 |     backend_object: str | None
@@ -79,11 +79,11 @@ E303 [*] Too many blank lines (2)
 help: Remove extraneous blank line(s)
 13 |     backend_object: str | None
 14 |     backend: Any
-15 | 
-   - 
+15 |
+   -
 16 | if __name__ == "__main__":
 17 |     import abcd
-18 | 
+18 |
 
 E303 [*] Too many blank lines (2)
   --> E30_isort.pyi:21:5
@@ -96,10 +96,10 @@ E303 [*] Too many blank lines (2)
 help: Remove extraneous blank line(s)
 17 | if __name__ == "__main__":
 18 |     import abcd
-19 | 
-   - 
+19 |
+   -
 20 |     abcd.foo()
-21 | 
+21 |
 22 | def __init__(self, backend_module: str, backend_obj: str | None) -> None: ...
 
 I001 [*] Import block is un-sorted or un-formatted
@@ -116,12 +116,12 @@ I001 [*] Import block is un-sorted or un-formatted
 help: Organize imports
 25 | if TYPE_CHECKING:
 26 |     import os
-27 | 
-   - 
-   - 
+27 |
+   -
+   -
 28 |     from typing_extensions import TypeAlias
-29 | 
-30 | 
+29 |
+30 |
 
 E303 [*] Too many blank lines (3)
   --> E30_isort.pyi:30:5
@@ -132,12 +132,12 @@ E303 [*] Too many blank lines (3)
 help: Remove extraneous blank line(s)
 25 | if TYPE_CHECKING:
 26 |     import os
-27 | 
-   - 
-   - 
+27 |
+   -
+   -
 28 |     from typing_extensions import TypeAlias
-29 | 
-30 | 
+29 |
+30 |
 
 E303 [*] Too many blank lines (2)
   --> E30_isort.pyi:33:5
@@ -148,12 +148,12 @@ E303 [*] Too many blank lines (2)
 35 | def __call__(self, name: str, *args: Any, **kwargs: Any) -> Any:
    |
 help: Remove extraneous blank line(s)
-29 | 
+29 |
 30 |     from typing_extensions import TypeAlias
-31 | 
-   - 
+31 |
+   -
 32 |     abcd.foo()
-33 | 
+33 |
 34 | def __call__(self, name: str, *args: Any, **kwargs: Any) -> Any:
 
 E303 [*] Too many blank lines (2)
@@ -165,11 +165,11 @@ E303 [*] Too many blank lines (2)
 help: Remove extraneous blank line(s)
 41 | def __call__2(self, name: str, *args: Any, **kwargs: Any) -> Any:
 42 |     ...
-43 | 
-   - 
+43 |
+   -
 44 | def _exit(self) -> None: ...
-45 | 
-46 | 
+45 |
+46 |
 
 E303 [*] Too many blank lines (2)
   --> E30_isort.pyi:48:1
@@ -178,13 +178,13 @@ E303 [*] Too many blank lines (2)
    | ^^^
    |
 help: Remove extraneous blank line(s)
-44 | 
+44 |
 45 | def _exit(self) -> None: ...
-46 | 
-   - 
+46 |
+   -
 47 | def _optional_commands(self) -> dict[str, bool]: ...
-48 | 
-49 | 
+48 |
+49 |
 
 E303 [*] Too many blank lines (2)
   --> E30_isort.pyi:51:1
@@ -193,13 +193,13 @@ E303 [*] Too many blank lines (2)
    | ^^^
    |
 help: Remove extraneous blank line(s)
-47 | 
+47 |
 48 | def _optional_commands(self) -> dict[str, bool]: ...
-49 | 
-   - 
+49 |
+   -
 50 | def run(argv: Sequence[str]) -> int: ...
-51 | 
-52 | 
+51 |
+52 |
 
 E303 [*] Too many blank lines (2)
   --> E30_isort.pyi:54:1
@@ -208,13 +208,13 @@ E303 [*] Too many blank lines (2)
    | ^^^
    |
 help: Remove extraneous blank line(s)
-50 | 
+50 |
 51 | def run(argv: Sequence[str]) -> int: ...
-52 | 
-   - 
+52 |
+   -
 53 | def read_line(fd: int = 0) -> bytearray: ...
-54 | 
-55 | 
+54 |
+55 |
 
 E303 [*] Too many blank lines (2)
   --> E30_isort.pyi:57:1
@@ -223,13 +223,13 @@ E303 [*] Too many blank lines (2)
    | ^^^
    |
 help: Remove extraneous blank line(s)
-53 | 
+53 |
 54 | def read_line(fd: int = 0) -> bytearray: ...
-55 | 
-   - 
+55 |
+   -
 56 | def flush() -> None: ...
-57 | 
-58 | 
+57 |
+58 |
 
 E303 [*] Too many blank lines (2)
   --> E30_isort.pyi:60:1
@@ -240,10 +240,10 @@ E303 [*] Too many blank lines (2)
 62 | class MissingCommand(TypeError): ...  # noqa: N818
    |
 help: Remove extraneous blank line(s)
-56 | 
+56 |
 57 | def flush() -> None: ...
-58 | 
-   - 
+58 |
+   -
 59 | from typing import Any, Sequence
-60 | 
+60 |
 61 | class MissingCommand(TypeError): ...  # noqa: N818

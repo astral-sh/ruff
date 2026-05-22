@@ -14,7 +14,7 @@ help: Use a raw string literal
 1 | #: W605:1:10
   - regex = '\.png$'
 2 + regex = r'\.png$'
-3 | 
+3 |
 4 | #: W605:2:1
 5 | regex = '''
 
@@ -29,13 +29,13 @@ W605 [*] Invalid escape sequence: `\.`
   |
 help: Use a raw string literal
 2 | regex = '\.png$'
-3 | 
+3 |
 4 | #: W605:2:1
   - regex = '''
 5 + regex = r'''
 6 | \.png$
 7 | '''
-8 | 
+8 |
 
 W605 [*] Invalid escape sequence: `\_`
   --> W605_0.py:11:6
@@ -47,13 +47,13 @@ W605 [*] Invalid escape sequence: `\_`
 12 | )
    |
 help: Use a raw string literal
-8  | 
+8  |
 9  | #: W605:2:6
 10 | f(
    -     '\_'
 11 +     r'\_'
 12 | )
-13 | 
+13 |
 14 | #: W605:4:6
 
 W605 [*] Invalid escape sequence: `\_`
@@ -68,7 +68,7 @@ W605 [*] Invalid escape sequence: `\_`
    |
 help: Use a raw string literal
 12 | )
-13 | 
+13 |
 14 | #: W605:4:6
    - """
 15 + r"""
@@ -85,12 +85,12 @@ W605 [*] Invalid escape sequence: `\_`
    |
 help: Add backslash to escape sequence
 20 | """
-21 | 
+21 |
 22 | #: W605:1:38
    - value = 'new line\nand invalid escape \_ here'
 23 + value = 'new line\nand invalid escape \\_ here'
-24 | 
-25 | 
+24 |
+25 |
 26 | def f():
 
 W605 [*] Invalid escape sequence: `\.`
@@ -104,12 +104,12 @@ W605 [*] Invalid escape sequence: `\.`
 30 | #: Okay
    |
 help: Use a raw string literal
-25 | 
+25 |
 26 | def f():
 27 |     #: W605:1:11
    -     return'\.png$'
 28 +     return r'\.png$'
-29 | 
+29 |
 30 | #: Okay
 31 | regex = r'\.png$'
 
@@ -126,10 +126,10 @@ W605 [*] Invalid escape sequence: `\_`
 help: Add backslash to escape sequence
 42 | \w
 43 | '''  # noqa
-44 | 
+44 |
    - regex = '\\\_'
 45 + regex = '\\\\_'
-46 | 
+46 |
 47 | #: W605:1:7
 48 | u'foo\ bar'
 
@@ -144,11 +144,11 @@ W605 [*] Invalid escape sequence: `\ `
    |
 help: Use a raw string literal
 45 | regex = '\\\_'
-46 | 
+46 |
 47 | #: W605:1:7
    - u'foo\ bar'
 48 + r'foo\ bar'
-49 | 
+49 |
 50 | #: W605:1:13
 51 | (
 
@@ -168,7 +168,7 @@ help: Add backslash to escape sequence
    -     bar \. baz"
 53 +     bar \\. baz"
 54 | )
-55 | 
+55 |
 56 | #: W605:1:6
 
 W605 [*] Invalid escape sequence: `\.`
@@ -182,11 +182,11 @@ W605 [*] Invalid escape sequence: `\.`
    |
 help: Add backslash to escape sequence
 54 | )
-55 | 
+55 |
 56 | #: W605:1:6
    - "foo \. bar \t"
 57 + "foo \\. bar \t"
-58 | 
+58 |
 59 | #: W605:1:13
 60 | "foo \t bar \."
 
@@ -199,7 +199,7 @@ W605 [*] Invalid escape sequence: `\.`
    |
 help: Add backslash to escape sequence
 57 | "foo \. bar \t"
-58 | 
+58 |
 59 | #: W605:1:13
    - "foo \t bar \."
 60 + "foo \t bar \\."

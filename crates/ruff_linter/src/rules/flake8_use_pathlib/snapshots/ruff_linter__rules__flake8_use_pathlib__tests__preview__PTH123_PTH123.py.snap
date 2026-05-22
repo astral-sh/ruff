@@ -14,10 +14,10 @@ PTH123 [*] `open()` should be replaced by `Path.open()`
 help: Replace with `Path.open()`
 5  | _x = ("r+", -1)
 6  | r_plus = "r+"
-7  | 
+7  |
    - builtins.open(file=_file)
 8  + Path(_file).open()
-9  | 
+9  |
 10 | open(_file, "r+ ", -  1)
 11 | open(mode="wb", file=_file)
 
@@ -32,9 +32,9 @@ PTH123 [*] `open()` should be replaced by `Path.open()`
 12 | open(mode="r+", buffering=-1, file=_file, encoding="utf-8")
    |
 help: Replace with `Path.open()`
-7  | 
+7  |
 8  | builtins.open(file=_file)
-9  | 
+9  |
    - open(_file, "r+ ", -  1)
 10 + Path(_file).open("r+ ", -  1)
 11 | open(mode="wb", file=_file)
@@ -52,7 +52,7 @@ PTH123 [*] `open()` should be replaced by `Path.open()`
    |
 help: Replace with `Path.open()`
 8  | builtins.open(file=_file)
-9  | 
+9  |
 10 | open(_file, "r+ ", -  1)
    - open(mode="wb", file=_file)
 11 + Path(_file).open(mode="wb")
@@ -71,7 +71,7 @@ PTH123 [*] `open()` should be replaced by `Path.open()`
 14 | open(_file, "r+", -1, None, None, None, closefd=True, opener=None)
    |
 help: Replace with `Path.open()`
-9  | 
+9  |
 10 | open(_file, "r+ ", -  1)
 11 | open(mode="wb", file=_file)
    - open(mode="r+", buffering=-1, file=_file, encoding="utf-8")
@@ -138,7 +138,7 @@ help: Replace with `Path.open()`
 15 + Path(_file).open(mode="r+", buffering=-1, encoding=None, errors=None, newline=None)
 16 | open(_file, f"  {r_plus}      ", -  1)
 17 | open(buffering=-      1, file=_file, encoding=         "utf-8")
-18 | 
+18 |
 
 PTH123 [*] `open()` should be replaced by `Path.open()`
   --> PTH123.py:16:1
@@ -156,7 +156,7 @@ help: Replace with `Path.open()`
    - open(_file, f"  {r_plus}      ", -  1)
 16 + Path(_file).open(f"  {r_plus}      ", -  1)
 17 | open(buffering=-      1, file=_file, encoding=         "utf-8")
-18 | 
+18 |
 19 | # Only diagnostic
 
 PTH123 [*] `open()` should be replaced by `Path.open()`
@@ -175,7 +175,7 @@ help: Replace with `Path.open()`
 16 | open(_file, f"  {r_plus}      ", -  1)
    - open(buffering=-      1, file=_file, encoding=         "utf-8")
 17 + Path(_file).open(buffering=-      1, encoding=         "utf-8")
-18 | 
+18 |
 19 | # Only diagnostic
 20 | open()
 

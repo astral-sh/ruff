@@ -321,7 +321,7 @@ impl<'a> Generator<'a> {
                     if let Some(arguments) = arguments {
                         self.p("(");
                         let mut first = true;
-                        for arg_or_keyword in arguments.arguments_source_order() {
+                        for arg_or_keyword in arguments.iter_source_order() {
                             match arg_or_keyword {
                                 ArgOrKeyword::Arg(arg) => {
                                     self.p_delim(&mut first, ", ");
@@ -1111,8 +1111,12 @@ impl<'a> Generator<'a> {
                 node_index: _,
             }) => {
                 self.p("{");
-                self.unparse_expr(key, precedence::COMPREHENSION_ELEMENT);
-                self.p(": ");
+                if let Some(key) = key {
+                    self.unparse_expr(key, precedence::COMPREHENSION_ELEMENT);
+                    self.p(": ");
+                } else {
+                    self.p("**");
+                }
                 self.unparse_expr(value, precedence::COMPREHENSION_ELEMENT);
                 self.unparse_comp(generators);
                 self.p("}");
@@ -1217,7 +1221,7 @@ impl<'a> Generator<'a> {
                 } else {
                     let mut first = true;
 
-                    for arg_or_keyword in arguments.arguments_source_order() {
+                    for arg_or_keyword in arguments.iter_source_order() {
                         match arg_or_keyword {
                             ArgOrKeyword::Arg(arg) => {
                                 self.p_delim(&mut first, ", ");
@@ -1500,13 +1504,13 @@ impl<'a> Generator<'a> {
         self.p(brace);
 
         if let Some(debug_text) = debug_text {
-            self.buffer += debug_text.leading.as_str();
+            self.buffer += debug_text.leading();
         }
 
         self.buffer += &generator.buffer;
 
         if let Some(debug_text) = debug_text {
-            self.buffer += debug_text.trailing.as_str();
+            self.buffer += debug_text.trailing();
         }
 
         if !conversion.is_none() {

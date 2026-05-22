@@ -11,9 +11,7 @@ use std::{fmt, fs, io, iter};
 
 use anyhow::{Context, Error, bail, format_err};
 use clap::{CommandFactory, FromArgMatches};
-use imara_diff::intern::InternedInput;
-use imara_diff::sink::Counter;
-use imara_diff::{Algorithm, diff};
+use imara_diff::{Algorithm, Diff, InternedInput};
 use indicatif::ProgressStyle;
 #[cfg_attr(feature = "singlethreaded", allow(unused_imports))]
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -119,15 +117,17 @@ impl Statistics {
         } else {
             // `similar` was too slow (for some files >90% diffing instead of formatting)
             let input = InternedInput::new(black, ruff);
-            let changes = diff(Algorithm::Histogram, &input, Counter::default());
+            let changes = Diff::compute(Algorithm::Histogram, &input);
+            let removals = changes.count_removals();
+            let additions = changes.count_additions();
             assert_eq!(
-                input.before.len() - (changes.removals as usize),
-                input.after.len() - (changes.insertions as usize)
+                input.before.len() - (removals as usize),
+                input.after.len() - (additions as usize)
             );
             Self {
-                black_input: changes.removals,
-                ruff_output: changes.insertions,
-                intersection: u32::try_from(input.before.len()).unwrap() - changes.removals,
+                black_input: removals,
+                ruff_output: additions,
+                intersection: u32::try_from(input.before.len()).unwrap() - removals,
                 files_with_differences: 1,
             }
         }

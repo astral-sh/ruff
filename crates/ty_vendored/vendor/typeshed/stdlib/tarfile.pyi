@@ -8,8 +8,8 @@ from builtins import list as _list  # aliases to avoid name clashes with fields 
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from gzip import _ReadableFileobj as _GzipReadableFileobj, _WritableFileobj as _GzipWritableFileobj
 from types import TracebackType
-from typing import IO, ClassVar, Final, Literal, Protocol, overload, type_check_only
-from typing_extensions import Self, TypeAlias, deprecated
+from typing import IO, ClassVar, Final, Literal, Protocol, TypeAlias, overload, type_check_only
+from typing_extensions import Self, deprecated
 
 if sys.version_info >= (3, 14):
     from compression.zstd import ZstdDict
@@ -138,6 +138,26 @@ class TarFile:
     extraction_filter: _FilterFunction | None
     if sys.version_info >= (3, 13):
         stream: bool
+    if sys.version_info >= (3, 15):
+        def __init__(
+            self,
+            name: StrOrBytesPath | None = None,
+            mode: Literal["r", "a", "w", "x"] = "r",
+            fileobj: _Fileobj | None = None,
+            format: int | None = None,
+            tarinfo: type[TarInfo] | None = None,
+            dereference: bool | None = None,
+            ignore_zeros: bool | None = None,
+            encoding: str | None = None,
+            errors: str = "surrogateescape",
+            pax_headers: Mapping[str, str] | None = None,
+            debug: Literal[0, 1, 2, 3] | None = None,  # default 0
+            errorlevel: Literal[0, 1, 2] | None = None,  # default 1
+            copybufsize: int | None = None,  # undocumented
+            stream: bool = False,
+            mtime: float | None = None,
+        ) -> None: ...
+    elif sys.version_info >= (3, 13):
         def __init__(
             self,
             name: StrOrBytesPath | None = None,
@@ -499,7 +519,6 @@ class TarFile:
             'w|xz'       open an lzma compressed stream for writing
             'w|zst'      open a zstd compressed stream for writing
             """
-
         @overload
         @classmethod
         def open(
@@ -638,6 +657,7 @@ class TarFile:
         errorlevel: Literal[0, 1, 2] | None = None,  # default 1
         compresslevel: int = 9,
     ) -> Self: ...
+
     @classmethod
     def taropen(
         cls,
@@ -678,7 +698,6 @@ class TarFile:
         """Open gzip compressed tar archive name for reading or writing.
         Appending is not allowed.
         """
-
     @overload
     @classmethod
     def gzopen(
@@ -697,6 +716,7 @@ class TarFile:
         debug: Literal[0, 1, 2, 3] | None = None,  # default 0
         errorlevel: Literal[0, 1, 2] | None = None,  # default 1
     ) -> Self: ...
+
     @overload
     @classmethod
     def bz2open(
@@ -718,7 +738,6 @@ class TarFile:
         """Open bzip2 compressed tar archive name for reading or writing.
         Appending is not allowed.
         """
-
     @overload
     @classmethod
     def bz2open(
@@ -737,6 +756,7 @@ class TarFile:
         debug: Literal[0, 1, 2, 3] | None = None,  # default 0
         errorlevel: Literal[0, 1, 2] | None = None,  # default 1
     ) -> Self: ...
+
     @classmethod
     def xzopen(
         cls,
@@ -781,7 +801,6 @@ class TarFile:
             """Open zstd compressed tar archive name for reading or writing.
             Appending is not allowed.
             """
-
         @overload
         @classmethod
         def zstopen(
@@ -1139,19 +1158,21 @@ class TarInfo:
         """Construct a TarInfo object. name is the optional name
         of the member.
         """
-    if sys.version_info >= (3, 13):
-        @property
-        @deprecated("Deprecated since Python 3.13; will be removed in Python 3.16.")
-        def tarfile(self) -> TarFile | None: ...
-        @tarfile.setter
-        @deprecated("Deprecated since Python 3.13; will be removed in Python 3.16.")
-        def tarfile(self, tarfile: TarFile | None) -> None: ...
-    else:
-        tarfile: TarFile | None
+
+    @property
+    @deprecated("Deprecated since Python 3.13; will be removed in Python 3.16.")
+    def tarfile(self) -> TarFile | None: ...
+    @tarfile.setter
+    @deprecated("Deprecated since Python 3.13; will be removed in Python 3.16.")
+    def tarfile(self, tarfile: TarFile | None) -> None: ...
 
     @classmethod
     def frombuf(cls, buf: bytes | bytearray, encoding: str, errors: str) -> Self:
-        """Construct a TarInfo object from a 512 byte bytes object."""
+        """Construct a TarInfo object from a 512 byte bytes object.
+
+        To support the old v7 tar format AREGTYPE headers are
+        transformed to DIRTYPE headers if their name ends in '/'.
+        """
 
     @classmethod
     def fromtarfile(cls, tarfile: TarFile) -> Self:
@@ -1162,9 +1183,9 @@ class TarInfo:
     @property
     def linkpath(self) -> str:
         """In pax headers, "linkname" is called "linkpath"."""
-
     @linkpath.setter
     def linkpath(self, linkname: str) -> None: ...
+
     def replace(
         self,
         *,

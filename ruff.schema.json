@@ -498,7 +498,7 @@
       "deprecated": true
     },
     "line-length": {
-      "description": "The line length to use when enforcing long-lines violations (like `E501`)\nand at which `isort` and the formatter prefers to wrap lines.\n\nThe length is determined by the number of characters per line, except for lines containing East Asian characters or emojis.\nFor these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nThe value must be greater than `0` and less than or equal to `320`.\n\nNote: While the formatter will attempt to format lines such that they remain\nwithin the `line-length`, it isn't a hard upper bound, and formatted lines may\nexceed the `line-length`.\n\nSee [`pycodestyle.max-line-length`](#lint_pycodestyle_max-line-length) to configure different lengths for `E501` and the formatter.",
+      "description": "The line length to use when enforcing long-lines violations (like `E501`)\nand at which `isort` and the formatter prefers to wrap lines.\n\nThe length is determined by the number of characters per line, except for lines containing East Asian characters or emojis.\nFor these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nThe value must be greater than `0`.\n\nNote: While the formatter will attempt to format lines such that they remain\nwithin the `line-length`, it isn't a hard upper bound, and formatted lines may\nexceed the `line-length`.\n\nSee [`pycodestyle.max-line-length`](#lint_pycodestyle_max-line-length) to configure different lengths for `E501` and the formatter.",
       "anyOf": [
         {
           "$ref": "#/definitions/LineLength"
@@ -1613,6 +1613,17 @@
             }
           ]
         },
+        "nested-string-quote-style": {
+          "description": "Controls the quote style for nested strings inside interpolated string expressions.\n\n- `alternating` (default): Use alternating quotes.\n- `preferred`: Use the configured [`quote-style`](#format_quote-style).\n\n```python\nf\"{data['key']}\"  # alternating (default)\nf\"{data[\"key\"]}\"  # preferred\n```\n\nNote: This setting has no effect when targeting Python versions below 3.12.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/NestedStringQuoteStyle"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "preview": {
           "description": "Whether to enable the unstable preview style formatting.",
           "type": [
@@ -2090,10 +2101,10 @@
       ]
     },
     "LineLength": {
-      "description": "The length of a line of text that is considered too long.\n\nThe allowed range of values is 1..=320",
+      "description": "The length of a line of text that is considered too long.\n\nThe allowed range of values is 1..=65535",
       "type": "integer",
       "format": "uint16",
-      "maximum": 320,
+      "maximum": 65535,
       "minimum": 1
     },
     "LineWidth": {
@@ -2659,6 +2670,13 @@
     "NameImports": {
       "type": "string"
     },
+    "NestedStringQuoteStyle": {
+      "type": "string",
+      "enum": [
+        "alternating",
+        "preferred"
+      ]
+    },
     "OutputFormat": {
       "type": "string",
       "enum": [
@@ -2986,6 +3004,15 @@
           ],
           "format": "uint",
           "minimum": 0
+        },
+        "max-statements-in-try": {
+          "description": "Maximum number of statements allowed for a try clause body (see `W0717`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
         }
       },
       "additionalProperties": false
@@ -3104,6 +3131,11 @@
         "AIR001",
         "AIR002",
         "AIR003",
+        "AIR004",
+        "AIR2",
+        "AIR20",
+        "AIR201",
+        "AIR202",
         "AIR3",
         "AIR30",
         "AIR301",
@@ -3954,6 +3986,7 @@
         "PLW07",
         "PLW071",
         "PLW0711",
+        "PLW0717",
         "PLW1",
         "PLW15",
         "PLW150",
@@ -4196,6 +4229,7 @@
         "RUF048",
         "RUF049",
         "RUF05",
+        "RUF050",
         "RUF051",
         "RUF052",
         "RUF053",
@@ -4218,6 +4252,10 @@
         "RUF07",
         "RUF070",
         "RUF071",
+        "RUF072",
+        "RUF073",
+        "RUF074",
+        "RUF075",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -4412,6 +4450,7 @@
         "TID252",
         "TID253",
         "TID254",
+        "TID255",
         "TRY",
         "TRY0",
         "TRY00",

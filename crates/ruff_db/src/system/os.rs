@@ -6,8 +6,8 @@ use super::walk_directory::{
 };
 use crate::max_parallelism;
 use crate::system::{
-    CaseSensitivity, DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath, WhichError, WhichResult, WritableSystem,
+    CaseSensitivity, DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
+    SystemVirtualPath, WhichError, WhichResult, WritableSystem,
 };
 use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
@@ -200,30 +200,6 @@ impl System for OsSystem {
                 cwd: self.current_directory().to_path_buf(),
             },
         )
-    }
-
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
-        glob::PatternError,
-    > {
-        glob::glob(pattern).map(|inner| {
-            let iterator = inner.map(|result| {
-                let path = result?;
-
-                let system_path = SystemPathBuf::from_path_buf(path).map_err(|path| GlobError {
-                    path,
-                    error: GlobErrorKind::NonUtf8Path,
-                })?;
-
-                Ok(system_path)
-            });
-
-            let boxed: Box<dyn Iterator<Item = _>> = Box::new(iterator);
-            boxed
-        })
     }
 
     fn as_writable(&self) -> Option<&dyn WritableSystem> {

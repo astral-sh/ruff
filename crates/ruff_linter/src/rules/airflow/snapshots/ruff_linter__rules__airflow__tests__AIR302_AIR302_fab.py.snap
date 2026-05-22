@@ -13,7 +13,7 @@ AIR302 [*] `airflow.api.auth.backend.basic_auth.CLIENT_AUTH` is moved into `fab`
    |
 help: Install `apache-airflow-providers-fab>=1.0.0` and use `CLIENT_AUTH` from `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth` instead.
 1  | from __future__ import annotations
-2  | 
+2  |
 3  | from airflow.api.auth.backend.basic_auth import (
    -     CLIENT_AUTH,
 4  |     auth_current_user,
@@ -21,7 +21,7 @@ help: Install `apache-airflow-providers-fab>=1.0.0` and use `CLIENT_AUTH` from `
 6  |     requires_authentication,
 7  | )
 8  + from airflow.providers.fab.auth_manager.api.auth.backend.basic_auth import CLIENT_AUTH
-9  | 
+9  |
 10 | CLIENT_AUTH
 11 | init_app()
 note: This is an unsafe fix and may change runtime behavior
@@ -43,7 +43,7 @@ help: Install `apache-airflow-providers-fab>=1.0.0` and use `init_app` from `air
 6  |     requires_authentication,
 7  | )
 8  + from airflow.providers.fab.auth_manager.api.auth.backend.basic_auth import init_app
-9  | 
+9  |
 10 | CLIENT_AUTH
 11 | init_app()
 note: This is an unsafe fix and may change runtime behavior
@@ -58,7 +58,7 @@ AIR302 [*] `airflow.api.auth.backend.basic_auth.auth_current_user` is moved into
 13 | requires_authentication()
    |
 help: Install `apache-airflow-providers-fab>=1.0.0` and use `auth_current_user` from `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth` instead.
-2  | 
+2  |
 3  | from airflow.api.auth.backend.basic_auth import (
 4  |     CLIENT_AUTH,
    -     auth_current_user,
@@ -66,7 +66,7 @@ help: Install `apache-airflow-providers-fab>=1.0.0` and use `auth_current_user` 
 6  |     requires_authentication,
 7  | )
 8  + from airflow.providers.fab.auth_manager.api.auth.backend.basic_auth import auth_current_user
-9  | 
+9  |
 10 | CLIENT_AUTH
 11 | init_app()
 note: This is an unsafe fix and may change runtime behavior
@@ -88,7 +88,7 @@ help: Install `apache-airflow-providers-fab>=1.0.0` and use `requires_authentica
    -     requires_authentication,
 7  | )
 8  + from airflow.providers.fab.auth_manager.api.auth.backend.basic_auth import requires_authentication
-9  | 
+9  |
 10 | CLIENT_AUTH
 11 | init_app()
 note: This is an unsafe fix and may change runtime behavior
@@ -111,7 +111,7 @@ help: Install `apache-airflow-providers-fab>=1.0.0` and use `log` from `airflow.
 19 |     requires_authentication,
 20 | )
 21 + from airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth import log
-22 | 
+22 |
 23 | log()
 24 | CLIENT_AUTH
 note: This is an unsafe fix and may change runtime behavior
@@ -127,7 +127,7 @@ AIR302 [*] `airflow.api.auth.backend.kerberos_auth.CLIENT_AUTH` is moved into `f
    |
 help: Install `apache-airflow-providers-fab>=1.0.0` and use `CLIENT_AUTH` from `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth` instead.
 13 | requires_authentication()
-14 | 
+14 |
 15 | from airflow.api.auth.backend.kerberos_auth import (
    -     CLIENT_AUTH,
 16 |     find_user,
@@ -136,7 +136,7 @@ help: Install `apache-airflow-providers-fab>=1.0.0` and use `CLIENT_AUTH` from `
 19 |     requires_authentication,
 20 | )
 21 + from airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth import CLIENT_AUTH
-22 | 
+22 |
 23 | log()
 24 | CLIENT_AUTH
 note: This is an unsafe fix and may change runtime behavior
@@ -152,7 +152,7 @@ AIR302 [*] `airflow.api.auth.backend.kerberos_auth.find_user` is moved into `fab
 27 | requires_authentication()
    |
 help: Install `apache-airflow-providers-fab>=1.0.0` and use `find_user` from `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth` instead.
-14 | 
+14 |
 15 | from airflow.api.auth.backend.kerberos_auth import (
 16 |     CLIENT_AUTH,
    -     find_user,
@@ -161,7 +161,7 @@ help: Install `apache-airflow-providers-fab>=1.0.0` and use `find_user` from `ai
 19 |     requires_authentication,
 20 | )
 21 + from airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth import find_user
-22 | 
+22 |
 23 | log()
 24 | CLIENT_AUTH
 note: This is an unsafe fix and may change runtime behavior
@@ -184,7 +184,7 @@ help: Install `apache-airflow-providers-fab>=1.0.0` and use `init_app` from `air
 19 |     requires_authentication,
 20 | )
 21 + from airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth import init_app
-22 | 
+22 |
 23 | log()
 24 | CLIENT_AUTH
 note: This is an unsafe fix and may change runtime behavior
@@ -206,7 +206,7 @@ help: Install `apache-airflow-providers-fab>=1.0.0` and use `requires_authentica
    -     requires_authentication,
 20 | )
 21 + from airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth import requires_authentication
-22 | 
+22 |
 23 | log()
 24 | CLIENT_AUTH
 note: This is an unsafe fix and may change runtime behavior
@@ -229,7 +229,7 @@ help: Install `apache-airflow-providers-fab>=1.0.0` and use `log` from `airflow.
 33 |     requires_authentication,
 34 | )
 35 + from airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth import log
-36 | 
+36 |
 37 | log()
 38 | CLIENT_AUTH
 note: This is an unsafe fix and may change runtime behavior
@@ -245,7 +245,7 @@ AIR302 [*] `airflow.auth.managers.fab.api.auth.backend.kerberos_auth.CLIENT_AUTH
    |
 help: Install `apache-airflow-providers-fab>=1.0.0` and use `CLIENT_AUTH` from `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth` instead.
 27 | requires_authentication()
-28 | 
+28 |
 29 | from airflow.auth.managers.fab.api.auth.backend.kerberos_auth import (
    -     CLIENT_AUTH,
 30 |     find_user,
@@ -254,7 +254,7 @@ help: Install `apache-airflow-providers-fab>=1.0.0` and use `CLIENT_AUTH` from `
 33 |     requires_authentication,
 34 | )
 35 + from airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth import CLIENT_AUTH
-36 | 
+36 |
 37 | log()
 38 | CLIENT_AUTH
 note: This is an unsafe fix and may change runtime behavior
@@ -270,7 +270,7 @@ AIR302 [*] `airflow.auth.managers.fab.api.auth.backend.kerberos_auth.find_user` 
 41 | requires_authentication()
    |
 help: Install `apache-airflow-providers-fab>=1.0.0` and use `find_user` from `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth` instead.
-28 | 
+28 |
 29 | from airflow.auth.managers.fab.api.auth.backend.kerberos_auth import (
 30 |     CLIENT_AUTH,
    -     find_user,
@@ -279,7 +279,7 @@ help: Install `apache-airflow-providers-fab>=1.0.0` and use `find_user` from `ai
 33 |     requires_authentication,
 34 | )
 35 + from airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth import find_user
-36 | 
+36 |
 37 | log()
 38 | CLIENT_AUTH
 note: This is an unsafe fix and may change runtime behavior
@@ -302,7 +302,7 @@ help: Install `apache-airflow-providers-fab>=1.0.0` and use `init_app` from `air
 33 |     requires_authentication,
 34 | )
 35 + from airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth import init_app
-36 | 
+36 |
 37 | log()
 38 | CLIENT_AUTH
 note: This is an unsafe fix and may change runtime behavior
@@ -324,7 +324,7 @@ help: Install `apache-airflow-providers-fab>=1.0.0` and use `requires_authentica
    -     requires_authentication,
 34 | )
 35 + from airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth import requires_authentication
-36 | 
+36 |
 37 | log()
 38 | CLIENT_AUTH
 note: This is an unsafe fix and may change runtime behavior
@@ -342,14 +342,14 @@ AIR302 [*] `airflow.auth.managers.fab.fab_auth_manager.FabAuthManager` is moved 
 help: Install `apache-airflow-providers-fab>=1.0.0` and use `FabAuthManager` from `airflow.providers.fab.auth_manager.fab_auth_manager` instead.
 40 | init_app()
 41 | requires_authentication()
-42 | 
+42 |
    - from airflow.auth.managers.fab.fab_auth_manager import FabAuthManager
 43 | from airflow.auth.managers.fab.security_manager.override import (
 44 |     MAX_NUM_DATABASE_USER_SESSIONS,
 45 |     FabAirflowSecurityManagerOverride,
 46 | )
 47 + from airflow.providers.fab.auth_manager.fab_auth_manager import FabAuthManager
-48 | 
+48 |
 49 | FabAuthManager()
 50 | MAX_NUM_DATABASE_USER_SESSIONS
 note: This is an unsafe fix and may change runtime behavior
@@ -363,14 +363,14 @@ AIR302 [*] `airflow.auth.managers.fab.security_manager.override.MAX_NUM_DATABASE
 51 | FabAirflowSecurityManagerOverride()
    |
 help: Install `apache-airflow-providers-fab>=1.0.0` and use `MAX_NUM_DATABASE_USER_SESSIONS` from `airflow.providers.fab.auth_manager.security_manager.override` instead.
-42 | 
+42 |
 43 | from airflow.auth.managers.fab.fab_auth_manager import FabAuthManager
 44 | from airflow.auth.managers.fab.security_manager.override import (
    -     MAX_NUM_DATABASE_USER_SESSIONS,
 45 |     FabAirflowSecurityManagerOverride,
 46 | )
 47 + from airflow.providers.fab.auth_manager.security_manager.override import MAX_NUM_DATABASE_USER_SESSIONS
-48 | 
+48 |
 49 | FabAuthManager()
 50 | MAX_NUM_DATABASE_USER_SESSIONS
 note: This is an unsafe fix and may change runtime behavior
@@ -392,7 +392,7 @@ help: Install `apache-airflow-providers-fab>=1.0.0` and use `FabAirflowSecurityM
    -     FabAirflowSecurityManagerOverride,
 46 | )
 47 + from airflow.providers.fab.auth_manager.security_manager.override import FabAirflowSecurityManagerOverride
-48 | 
+48 |
 49 | FabAuthManager()
 50 | MAX_NUM_DATABASE_USER_SESSIONS
 note: This is an unsafe fix and may change runtime behavior
@@ -408,9 +408,9 @@ AIR302 [*] `airflow.www.security.FabAirflowSecurityManagerOverride` is moved int
 help: Install `apache-airflow-providers-fab>=1.0.0` and use `FabAirflowSecurityManagerOverride` from `airflow.providers.fab.auth_manager.security_manager.override` instead.
 50 | MAX_NUM_DATABASE_USER_SESSIONS
 51 | FabAirflowSecurityManagerOverride()
-52 | 
+52 |
    - from airflow.www.security import FabAirflowSecurityManagerOverride
 53 + from airflow.providers.fab.auth_manager.security_manager.override import FabAirflowSecurityManagerOverride
-54 | 
+54 |
 55 | FabAirflowSecurityManagerOverride()
 note: This is an unsafe fix and may change runtime behavior

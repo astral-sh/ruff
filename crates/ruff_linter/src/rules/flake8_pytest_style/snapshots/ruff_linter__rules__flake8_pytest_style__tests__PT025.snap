@@ -11,8 +11,8 @@ PT025 [*] `pytest.mark.usefixtures` has no effect on fixtures
    |
 help: Remove `pytest.mark.usefixtures`
 6  |     pass
-7  | 
-8  | 
+7  |
+8  |
    - @pytest.mark.usefixtures("a")
 9  | @pytest.fixture()
 10 | def my_fixture():  # Error before
@@ -28,8 +28,8 @@ PT025 [*] `pytest.mark.usefixtures` has no effect on fixtures
 18 |     return 0
    |
 help: Remove `pytest.mark.usefixtures`
-13 | 
-14 | 
+13 |
+14 |
 15 | @pytest.fixture()
    - @pytest.mark.usefixtures("a")
 16 | def my_fixture():  # Error after

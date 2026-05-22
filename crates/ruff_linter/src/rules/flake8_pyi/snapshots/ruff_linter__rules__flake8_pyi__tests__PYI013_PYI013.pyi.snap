@@ -12,12 +12,12 @@ PYI013 [*] Non-empty class body must not contain `...`
 7 | class OneAttributeClass2:
   |
 help: Remove unnecessary `...`
-2 | 
+2 |
 3 | class OneAttributeClass:
 4 |     value: int
   -     ...  # Error
 5 +     # Error
-6 | 
+6 |
 7 | class OneAttributeClass2:
 8 |     ...  # Error
 
@@ -31,12 +31,12 @@ PYI013 [*] Non-empty class body must not contain `...`
   |
 help: Remove unnecessary `...`
 5  |     ...  # Error
-6  | 
+6  |
 7  | class OneAttributeClass2:
    -     ...  # Error
 8  +     # Error
 9  |     value: int
-10 | 
+10 |
 11 | class MyClass:
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -49,11 +49,11 @@ PYI013 [*] Non-empty class body must not contain `...`
    |
 help: Remove unnecessary `...`
 9  |     value: int
-10 | 
+10 |
 11 | class MyClass:
    -     ...
 12 |     value: int
-13 | 
+13 |
 14 | class TwoEllipsesClass:
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -66,11 +66,11 @@ PYI013 [*] Non-empty class body must not contain `...`
    |
 help: Remove unnecessary `...`
 13 |     value: int
-14 | 
+14 |
 15 | class TwoEllipsesClass:
    -     ...
 16 |     ...  # Error
-17 | 
+17 |
 18 | class DocstringClass:
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -84,12 +84,12 @@ PYI013 [*] Non-empty class body must not contain `...`
 19 | class DocstringClass:
    |
 help: Remove unnecessary `...`
-14 | 
+14 |
 15 | class TwoEllipsesClass:
 16 |     ...
    -     ...  # Error
 17 +     # Error
-18 | 
+18 |
 19 | class DocstringClass:
 20 |     """
 
@@ -106,10 +106,10 @@ PYI013 [*] Non-empty class body must not contain `...`
 help: Remove unnecessary `...`
 21 |     My body only contains an ellipsis.
 22 |     """
-23 | 
+23 |
    -     ...  # Error
 24 +     # Error
-25 | 
+25 |
 26 | class NonEmptyChild(Exception):
 27 |     value: int
 
@@ -124,12 +124,12 @@ PYI013 [*] Non-empty class body must not contain `...`
 30 | class NonEmptyChild2(Exception):
    |
 help: Remove unnecessary `...`
-25 | 
+25 |
 26 | class NonEmptyChild(Exception):
 27 |     value: int
    -     ...  # Error
 28 +     # Error
-29 | 
+29 |
 30 | class NonEmptyChild2(Exception):
 31 |     ...  # Error
 
@@ -143,12 +143,12 @@ PYI013 [*] Non-empty class body must not contain `...`
    |
 help: Remove unnecessary `...`
 28 |     ...  # Error
-29 | 
+29 |
 30 | class NonEmptyChild2(Exception):
    -     ...  # Error
 31 +     # Error
 32 |     value: int
-33 | 
+33 |
 34 | class NonEmptyWithInit:
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -162,12 +162,12 @@ PYI013 [*] Non-empty class body must not contain `...`
 38 |     def __init__():
    |
 help: Remove unnecessary `...`
-33 | 
+33 |
 34 | class NonEmptyWithInit:
 35 |     value: int
    -     ...  # Error
 36 +     # Error
-37 | 
+37 |
 38 |     def __init__():
 39 |         pass
 
@@ -182,11 +182,11 @@ PYI013 [*] Non-empty class body must not contain `...`
 45 | # Not violations
    |
 help: Remove unnecessary `...`
-40 | 
+40 |
 41 | class NonEmptyChildWithInlineComment:
 42 |     value: int
    -     ... # preserve me
 43 +     # preserve me
-44 | 
+44 |
 45 | # Not violations
 46 |

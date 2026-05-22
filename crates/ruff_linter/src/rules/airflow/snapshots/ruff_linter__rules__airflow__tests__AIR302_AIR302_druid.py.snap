@@ -12,7 +12,7 @@ AIR302 [*] `airflow.hooks.druid_hook.DruidDbApiHook` is moved into `apache-druid
    |
 help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `DruidDbApiHook` from `airflow.providers.apache.druid.hooks.druid` instead.
 1  | from __future__ import annotations
-2  | 
+2  |
 3  | from airflow.hooks.druid_hook import (
    -     DruidDbApiHook,
 4  |     DruidHook,
@@ -22,7 +22,7 @@ help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `DruidDbApi
 8  |     HiveToDruidTransfer,
 9  | )
 10 + from airflow.providers.apache.druid.hooks.druid import DruidDbApiHook
-11 | 
+11 |
 12 | DruidDbApiHook()
 13 | DruidHook()
 note: This is an unsafe fix and may change runtime behavior
@@ -37,7 +37,7 @@ AIR302 [*] `airflow.hooks.druid_hook.DruidHook` is moved into `apache-druid` pro
 15 | HiveToDruidOperator()
    |
 help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `DruidHook` from `airflow.providers.apache.druid.hooks.druid` instead.
-2  | 
+2  |
 3  | from airflow.hooks.druid_hook import (
 4  |     DruidDbApiHook,
    -     DruidHook,
@@ -47,7 +47,7 @@ help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `DruidHook`
 8  |     HiveToDruidTransfer,
 9  | )
 10 + from airflow.providers.apache.druid.hooks.druid import DruidHook
-11 | 
+11 |
 12 | DruidDbApiHook()
 13 | DruidHook()
 note: This is an unsafe fix and may change runtime behavior
@@ -69,7 +69,7 @@ help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `HiveToDrui
 8  |     HiveToDruidTransfer,
 9  | )
 10 + from airflow.providers.apache.druid.transfers.hive_to_druid import HiveToDruidOperator
-11 | 
+11 |
 12 | DruidDbApiHook()
 13 | DruidHook()
 note: This is an unsafe fix and may change runtime behavior
@@ -89,7 +89,7 @@ help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `HiveToDrui
 8  |     HiveToDruidTransfer,
 9  | )
 10 + from airflow.providers.apache.druid.transfers.hive_to_druid import HiveToDruidOperator
-11 | 
+11 |
 12 | DruidDbApiHook()
 13 | DruidHook()
 note: This is an unsafe fix and may change runtime behavior

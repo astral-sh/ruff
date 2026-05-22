@@ -60,8 +60,8 @@ help: Remove unnecessary `else`
    -         raise Exception(z)
 34 +     b = 2
 35 +     raise Exception(z)
-36 | 
-37 | 
+36 |
+37 |
 38 | def foo3(x, y, z):
 
 RET506 [*] Unnecessary `else` after `raise` statement
@@ -105,8 +105,8 @@ help: Remove unnecessary `else`
    -         c = 3
 60 +     c = 3
 61 |     raise Exception(y)
-62 | 
-63 | 
+62 |
+63 |
 
 RET506 [*] Unnecessary `else` after `raise` statement
   --> RET506.py:70:9
@@ -152,6 +152,6 @@ help: Remove unnecessary `else`
 81 +         raise Exception(False)
 82 +     except ValueError:
 83 +         raise Exception(None)
-84 | 
-85 | 
+84 |
+85 |
 86 | ###

@@ -1,0 +1,112 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: concatenate.md - `typing.Concatenate` - Invalid uses of `Concatenate` - Last argument must be `ParamSpec` or `...`
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/concatenate.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Callable, Concatenate
+ 2 | 
+ 3 | class Foo[**P]:
+ 4 |     attr: Callable[P, None]
+ 5 | 
+ 6 | # error: [invalid-type-arguments] "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` type variable: Got `str`"
+ 7 | def _(c: Callable[Concatenate[int, str], bool]): ...
+ 8 | 
+ 9 | # error: [invalid-type-arguments] "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` type variable: Got `str`"
+10 | reveal_type(Foo[Concatenate[int, str]].attr)  # revealed: (...) -> None
+11 | 
+12 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
+13 | reveal_type(Foo[Concatenate[int, Concatenate]].attr)  # revealed: (...) -> None
+14 | 
+15 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
+16 | reveal_type(Foo[Concatenate[int, Concatenate[()]]].attr)  # revealed: (...) -> None
+17 | 
+18 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
+19 | reveal_type(Foo[Concatenate[int, Concatenate[int]]].attr)  # revealed: (...) -> None
+20 | 
+21 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
+22 | reveal_type(Foo[Concatenate[int, Concatenate[int, str]]].attr)  # revealed: (...) -> None
+```
+
+# Diagnostics
+
+```
+error[invalid-type-arguments]: The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` type variable
+ --> src/mdtest_snippet.py:7:36
+  |
+7 | def _(c: Callable[Concatenate[int, str], bool]): ...
+  |                                    ^^^ Got `str`
+  |
+
+```
+
+```
+error[invalid-type-arguments]: The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` type variable
+  --> src/mdtest_snippet.py:10:34
+   |
+10 | reveal_type(Foo[Concatenate[int, str]].attr)  # revealed: (...) -> None
+   |                                  ^^^ Got `str`
+   |
+
+```
+
+```
+error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a type expression
+  --> src/mdtest_snippet.py:13:34
+   |
+13 | reveal_type(Foo[Concatenate[int, Concatenate]].attr)  # revealed: (...) -> None
+   |                                  ^^^^^^^^^^^
+   |
+info: `typing.Concatenate` is only valid:
+info:  - as the first argument to `typing.Callable`
+info:  - as a type argument for a `ParamSpec` parameter
+
+```
+
+```
+error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a type expression
+  --> src/mdtest_snippet.py:16:34
+   |
+16 | reveal_type(Foo[Concatenate[int, Concatenate[()]]].attr)  # revealed: (...) -> None
+   |                                  ^^^^^^^^^^^^^^^
+   |
+info: `typing.Concatenate` is only valid:
+info:  - as the first argument to `typing.Callable`
+info:  - as a type argument for a `ParamSpec` parameter
+
+```
+
+```
+error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a type expression
+  --> src/mdtest_snippet.py:19:34
+   |
+19 | reveal_type(Foo[Concatenate[int, Concatenate[int]]].attr)  # revealed: (...) -> None
+   |                                  ^^^^^^^^^^^^^^^^
+   |
+info: `typing.Concatenate` is only valid:
+info:  - as the first argument to `typing.Callable`
+info:  - as a type argument for a `ParamSpec` parameter
+
+```
+
+```
+error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a type expression
+  --> src/mdtest_snippet.py:22:34
+   |
+22 | reveal_type(Foo[Concatenate[int, Concatenate[int, str]]].attr)  # revealed: (...) -> None
+   |                                  ^^^^^^^^^^^^^^^^^^^^^
+   |
+info: `typing.Concatenate` is only valid:
+info:  - as the first argument to `typing.Callable`
+info:  - as a type argument for a `ParamSpec` parameter
+
+```

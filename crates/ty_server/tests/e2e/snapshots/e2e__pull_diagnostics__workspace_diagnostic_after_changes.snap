@@ -69,7 +69,7 @@ Report(
                                 source: Some(
                                     "ty",
                                 ),
-                                message: "Return type does not match returned value: expected `int`, found `Literal[/"hello/"]`",
+                                message: "Return type does not match returned value: expected `int`, found `Literal[\"hello\"]`",
                                 related_information: None,
                                 tags: None,
                                 data: None,

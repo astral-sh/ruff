@@ -1,0 +1,41 @@
+---
+source: crates/mdtest/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: sync.md - With statements - Context expression with possibly-unbound union variants
+mdtest path: crates/ty_python_semantic/resources/mdtest/with/sync.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class Manager1:
+ 2 |     def __enter__(self) -> str:
+ 3 |         return "foo"
+ 4 | 
+ 5 |     def __exit__(self, exc_type, exc_value, traceback): ...
+ 6 | 
+ 7 | class NotAContextManager: ...
+ 8 | 
+ 9 | def _(context_expr: Manager1 | NotAContextManager):
+10 |     # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the methods `__enter__` and `__exit__` are possibly missing"
+11 |     with context_expr as f:
+12 |         reveal_type(f)  # revealed: str
+```
+
+# Diagnostics
+
+```
+error[invalid-context-manager]: Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the methods `__enter__` and `__exit__` are possibly missing
+  --> src/mdtest_snippet.py:11:10
+   |
+11 |     with context_expr as f:
+   |          ^^^^^^^^^^^^
+   |
+info: `NotAContextManager` does not implement `__enter__` or `__exit__`
+
+```

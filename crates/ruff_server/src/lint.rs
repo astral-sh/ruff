@@ -19,8 +19,7 @@ use ruff_linter::{
     linter::check_path,
     package::PackageRoot,
     packaging::detect_package_root,
-    preview::is_warning_severity_enabled,
-    settings::{flags, types::PreviewMode},
+    settings::flags,
     source_kind::SourceKind,
     suppression::Suppressions,
 };
@@ -70,13 +69,13 @@ pub(crate) fn check(
     encoding: PositionEncoding,
     show_syntax_errors: bool,
 ) -> DiagnosticsMap {
-    let source_kind = query.make_source_kind();
     let settings = query.settings();
     let document_path = query.virtual_file_path();
 
-    let SourceType::Python(source_type) = query.source_type() else {
+    let SourceType::Python(source_type) = query.source_type_for_lint() else {
         return DiagnosticsMap::default();
     };
+    let source_kind = query.make_python_source_kind(source_type);
 
     // If the document is excluded, return an empty list of diagnostics.
     if is_document_excluded_for_linting(
@@ -124,7 +123,12 @@ pub(crate) fn check(
     let directives = extract_directives(parsed.tokens(), Flags::all(), &locator, &indexer);
 
     // Parse range suppression comments
-    let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
+    let suppressions = Suppressions::from_tokens(
+        locator.contents(),
+        parsed.tokens(),
+        &indexer,
+        &settings.linter,
+    );
 
     // Generate checks.
     let diagnostics = check_path(
@@ -182,7 +186,6 @@ pub(crate) fn check(
                         &source_kind,
                         locator.to_index(),
                         encoding,
-                        settings.linter.preview,
                     ))
                 }
             });
@@ -244,7 +247,6 @@ fn to_lsp_diagnostic(
     source_kind: &SourceKind,
     index: &LineIndex,
     encoding: PositionEncoding,
-    preview: PreviewMode,
 ) -> (usize, lsp_types::Diagnostic) {
     let diagnostic_range = diagnostic.range().unwrap_or_default();
     let name = diagnostic.name();
@@ -295,9 +297,7 @@ fn to_lsp_diagnostic(
         range = diagnostic_range.to_range(source_kind.source_code(), index, encoding);
     }
 
-    let (severity, code) = if let Some(code) = code
-        && !is_warning_severity_enabled(preview)
-    {
+    let (severity, code) = if let Some(code) = code {
         (severity(code), code.to_string())
     } else {
         (

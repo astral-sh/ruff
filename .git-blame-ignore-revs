@@ -36,3 +36,7 @@ a9b2876bd33264c826aaf38e462632f1f7bceb55
 53ad26f1e10b749e1ef4680603aa9156dd528dc5
 # Split up types/class.rs
 34cee06dfa6c558c4ab1460200033ea44b368ae4
+# Move the `deferred` submodule inside `infer/builder`
+96d9e0964cb87498ef15510ea7f896ba336659f9
+# Break the semantic index out into its own crate
+461994073e2f6cac13a28e60b06038ba50214ffc

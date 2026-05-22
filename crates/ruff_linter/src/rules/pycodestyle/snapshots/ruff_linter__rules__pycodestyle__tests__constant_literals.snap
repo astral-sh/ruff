@@ -159,7 +159,7 @@ help: Replace with `cond is None`
    - if None == False:  # E711, E712 (fix)
 16 + if not None:  # E711, E712 (fix)
 17 |     pass
-18 | 
+18 |
 19 | named_var = []
 note: This is an unsafe fix and may change runtime behavior
 
@@ -179,7 +179,7 @@ help: Replace with `not None`
    - if None == False:  # E711, E712 (fix)
 16 + if not None:  # E711, E712 (fix)
 17 |     pass
-18 | 
+18 |
 19 | named_var = []
 note: This is an unsafe fix and may change runtime behavior
 
@@ -194,7 +194,7 @@ F632 [*] Use `==` to compare constant literals
    |
 help: Replace `is` with `==`
 17 |     pass
-18 | 
+18 |
 19 | named_var = []
    - if [] is []:  # F632 (fix)
 20 + if [] == []:  # F632 (fix)
@@ -298,7 +298,7 @@ help: Replace `is` with `==`
    - if named_var is [i for i in [1]]:  # F632 (fix)
 30 + if named_var == [i for i in [1]]:  # F632 (fix)
 31 |     pass
-32 | 
+32 |
 33 | named_var = {}
 
 F632 [*] Use `==` to compare constant literals
@@ -312,7 +312,7 @@ F632 [*] Use `==` to compare constant literals
    |
 help: Replace `is` with `==`
 31 |     pass
-32 | 
+32 |
 33 | named_var = {}
    - if {} is {}:  # F632 (fix)
 34 + if {} == {}:  # F632 (fix)
@@ -416,7 +416,7 @@ help: Replace `is` with `==`
    - if named_var is {i for i in [1]}:  # F632 (fix)
 44 + if named_var == {i for i in [1]}:  # F632 (fix)
 45 |     pass
-46 | 
+46 |
 47 | named_var = {1: 1}
 
 F632 [*] Use `==` to compare constant literals
@@ -430,7 +430,7 @@ F632 [*] Use `==` to compare constant literals
    |
 help: Replace `is` with `==`
 45 |     pass
-46 | 
+46 |
 47 | named_var = {1: 1}
    - if {1: 1} is {1: 1}:  # F632 (fix)
 48 + if {1: 1} == {1: 1}:  # F632 (fix)
@@ -534,5 +534,5 @@ help: Replace `is` with `==`
    - if named_var is {i: 1 for i in [1]}:  # F632 (fix)
 58 + if named_var == {i: 1 for i in [1]}:  # F632 (fix)
 59 |     pass
-60 | 
+60 |
 61 | ###

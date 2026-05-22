@@ -34,7 +34,9 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
-  CONFORMANCE_SUITE_COMMIT: 1df1565c69730d88ce6877009d268ba1d602af1e
+  # Line-tables-only debug info: faster builds, backtraces still work.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CONFORMANCE_SUITE_COMMIT: 5a701a037b5243df1f39622b642893d865f06205
   PYTHON_VERSION: 3.12
 
 jobs:
@@ -46,8 +48,11 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           path: ruff
-          fetch-depth: 0
           persist-credentials: false
+
+      # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
+      - name: Fetch full history without tags
+        run: git -C ruff fetch --no-tags --filter=blob:none --unshallow origin
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -56,7 +61,7 @@ jobs:
           path: typing
           persist-credentials: false
 
-      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: "ruff"
 
@@ -66,6 +71,9 @@ jobs:
 
       - name: Install Rust toolchain
         run: rustup show
+
+      - name: "Install mold"
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
 
       - name: Compute diagnostic diff
         shell: bash
@@ -103,7 +111,7 @@ jobs:
       # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
       # Make sure to update the bot if you rename the artifact.
       - name: Upload diff
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: typing_conformance_diagnostics_diff
           path: typing_conformance_diagnostics.diff

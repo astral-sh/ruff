@@ -208,7 +208,7 @@ fn remove_comment_fix(suppression: &Suppression, source: &str) -> Fix {
     let comment_start = suppression.comment_range.start();
     let after_comment = &source[comment_end.to_usize()..];
 
-    if !after_comment.starts_with(['\n', '\r']) {
+    if !after_comment.starts_with(['\n', '\r']) && !after_comment.is_empty() {
         // For example: `# ty: ignore # fmt: off`
         // Don't remove the trailing whitespace up to the `ty: ignore` comment
         return Fix::safe_edit(Edit::range_deletion(suppression.comment_range));

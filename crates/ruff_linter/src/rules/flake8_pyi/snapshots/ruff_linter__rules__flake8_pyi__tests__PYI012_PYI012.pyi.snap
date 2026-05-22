@@ -12,11 +12,11 @@ PYI012 [*] Class body must not contain `pass`
 7 | class OneAttributeClassRev:
   |
 help: Remove unnecessary `pass`
-2 | 
+2 |
 3 | class OneAttributeClass:
 4 |     value: int
   -     pass  # PYI012 Class body must not contain `pass`
-5 | 
+5 |
 6 | class OneAttributeClassRev:
 7 |     pass  # PYI012 Class body must not contain `pass`
 
@@ -30,11 +30,11 @@ PYI012 [*] Class body must not contain `pass`
   |
 help: Remove unnecessary `pass`
 5  |     pass  # PYI012 Class body must not contain `pass`
-6  | 
+6  |
 7  | class OneAttributeClassRev:
    -     pass  # PYI012 Class body must not contain `pass`
 8  |     value: int
-9  | 
+9  |
 10 | class DocstringClass:
 
 PYI012 [*] Class body must not contain `pass`
@@ -50,9 +50,9 @@ PYI012 [*] Class body must not contain `pass`
 help: Remove unnecessary `pass`
 13 |     My body only contains pass.
 14 |     """
-15 | 
+15 |
    -     pass  # PYI012 Class body must not contain `pass`
-16 | 
+16 |
 17 | class NonEmptyChild(Exception):
 18 |     value: int
 
@@ -67,11 +67,11 @@ PYI012 [*] Class body must not contain `pass`
 22 | class NonEmptyChild2(Exception):
    |
 help: Remove unnecessary `pass`
-17 | 
+17 |
 18 | class NonEmptyChild(Exception):
 19 |     value: int
    -     pass  # PYI012 Class body must not contain `pass`
-20 | 
+20 |
 21 | class NonEmptyChild2(Exception):
 22 |     pass  # PYI012 Class body must not contain `pass`
 
@@ -85,11 +85,11 @@ PYI012 [*] Class body must not contain `pass`
    |
 help: Remove unnecessary `pass`
 20 |     pass  # PYI012 Class body must not contain `pass`
-21 | 
+21 |
 22 | class NonEmptyChild2(Exception):
    -     pass  # PYI012 Class body must not contain `pass`
 23 |     value: int
-24 | 
+24 |
 25 | class NonEmptyWithInit:
 
 PYI012 [*] Class body must not contain `pass`
@@ -103,10 +103,10 @@ PYI012 [*] Class body must not contain `pass`
 30 |     def __init__():
    |
 help: Remove unnecessary `pass`
-25 | 
+25 |
 26 | class NonEmptyWithInit:
 27 |     value: int
    -     pass  # PYI012 Class body must not contain `pass`
-28 | 
+28 |
 29 |     def __init__():
 30 |         pass

@@ -12,11 +12,11 @@ AIR302 [*] `airflow.hooks.postgres_hook.PostgresHook` is moved into `postgres` p
   |
 help: Install `apache-airflow-providers-postgres>=1.0.0` and use `PostgresHook` from `airflow.providers.postgres.hooks.postgres` instead.
 1 | from __future__ import annotations
-2 | 
+2 |
   - from airflow.hooks.postgres_hook import PostgresHook
 3 | from airflow.operators.postgres_operator import Mapping
 4 + from airflow.providers.postgres.hooks.postgres import PostgresHook
-5 | 
+5 |
 6 | PostgresHook()
 7 | Mapping()
 note: This is an unsafe fix and may change runtime behavior

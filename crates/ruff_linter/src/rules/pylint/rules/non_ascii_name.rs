@@ -73,7 +73,6 @@ pub(crate) fn non_ascii_name(checker: &Checker, binding: &Binding) {
         | BindingKind::FromImport(_)
         | BindingKind::SubmoduleImport(_)
         | BindingKind::Deletion
-        | BindingKind::ConditionalDeletion(_)
         | BindingKind::UnboundException(_)
         | BindingKind::DunderClassCell => {
             return;

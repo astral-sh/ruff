@@ -12,13 +12,13 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    |
 help: Remove redundant '+' operator to implicitly concatenate
 6  |     "def"
-7  | 
+7  |
 8  | _ = (
    -   "abc" +
 9  +   "abc"
 10 |   "def"
 11 | )
-12 | 
+12 |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
   --> ISC.py:14:3
@@ -31,13 +31,13 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    |
 help: Remove redundant '+' operator to implicitly concatenate
 11 | )
-12 | 
+12 |
 13 | _ = (
    -   f"abc" +
 14 +   f"abc"
 15 |   "def"
 16 | )
-17 | 
+17 |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
   --> ISC.py:19:3
@@ -50,13 +50,13 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    |
 help: Remove redundant '+' operator to implicitly concatenate
 16 | )
-17 | 
+17 |
 18 | _ = (
    -   b"abc" +
 19 +   b"abc"
 20 |   b"def"
 21 | )
-22 | 
+22 |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
   --> ISC.py:78:10
@@ -70,14 +70,14 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
 81 |       + f"second"} d"
    |
 help: Remove redundant '+' operator to implicitly concatenate
-76 | 
+76 |
 77 | # Explicitly concatenated nested f-strings
 78 | _ = f"a {f"first"
    -     + f"second"} d"
 79 +      f"second"} d"
 80 | _ = f"a {f"first {f"middle"}"
 81 |     + f"second"} d"
-82 | 
+82 |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
   --> ISC.py:80:10
@@ -97,7 +97,7 @@ help: Remove redundant '+' operator to implicitly concatenate
 80 | _ = f"a {f"first {f"middle"}"
    -     + f"second"} d"
 81 +      f"second"} d"
-82 | 
+82 |
 83 | # See https://github.com/astral-sh/ruff/issues/12936
 84 | _ = "\12""0" # fix should be "\0120"
 
@@ -112,13 +112,13 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
 107 | )
-108 | 
+108 |
 109 | _ = (
     -     rf"raw_f{x}" +
 110 +     rf"raw_f{x}"
 111 |     r"raw_normal"
 112 | )
-113 | 
+113 |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    --> ISC.py:117:5
@@ -131,14 +131,14 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
 119 |   )
     |
 help: Remove redundant '+' operator to implicitly concatenate
-114 | 
+114 |
 115 | # Different prefix combinations
 116 | _ = (
     -     u"unicode" +
 117 +     u"unicode"
 118 |     r"raw"
 119 | )
-120 | 
+120 |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    --> ISC.py:122:5
@@ -151,13 +151,13 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
 119 | )
-120 | 
+120 |
 121 | _ = (
     -     rb"raw_bytes" +
 122 +     rb"raw_bytes"
 123 |     b"normal_bytes"
 124 | )
-125 | 
+125 |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    --> ISC.py:127:5
@@ -170,13 +170,13 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
 124 | )
-125 | 
+125 |
 126 | _ = (
     -     b"bytes" +
 127 +     b"bytes"
 128 |     b"with_bytes"
 129 | )
-130 | 
+130 |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    --> ISC.py:133:6
@@ -191,9 +191,9 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
 136 |       "d" + "e"
     |
 help: Remove redundant '+' operator to implicitly concatenate
-130 | 
+130 |
 131 | # Repeated concatenation
-132 | 
+132 |
     - _ = ("a" +
 133 + _ = ("a"
 134 |     "b" +
@@ -214,7 +214,7 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
 137 | )
-138 | 
+138 |
 139 | _ = ("a"
     -     + "b"
 140 +      "b"
@@ -232,13 +232,13 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
 162 |   )
     |
 help: Remove redundant '+' operator to implicitly concatenate
-158 | 
+158 |
 159 | _ = (
 160 |     "first"
     -     +    "second"  # extra spaces around +
 161 +         "second"  # extra spaces around +
 162 | )
-163 | 
+163 |
 164 | _ = (
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
@@ -252,13 +252,13 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
 162 | )
-163 | 
+163 |
 164 | _ = (
     -     "first"    +  # trailing spaces before +
 165 +     "first"  # trailing spaces before +
 166 |     "second"
 167 | )
-168 | 
+168 |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    --> ISC.py:170:5
@@ -271,13 +271,13 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
 167 | )
-168 | 
+168 |
 169 | _ = ((
     -     "deep" +
 170 +     "deep"
 171 |     "nesting"
 172 | ))
-173 | 
+173 |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    --> ISC.py:175:5
@@ -290,13 +290,13 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
 172 | ))
-173 | 
+173 |
 174 | _ = (
     -     "contains + plus" +
 175 +     "contains + plus"
 176 |     "another string"
 177 | )
-178 | 
+178 |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    --> ISC.py:180:5
@@ -315,7 +315,7 @@ help: Remove redundant '+' operator to implicitly concatenate
     -     + "end"
 182 +      "end"
 183 | )
-184 | 
+184 |
 185 | _ = (
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
@@ -330,7 +330,7 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
 183 | )
-184 | 
+184 |
 185 | _ = (
     -     "start" +
 186 +     "start"
@@ -355,7 +355,7 @@ help: Remove redundant '+' operator to implicitly concatenate
     -     + t"dog"
 202 +      t"dog"
 203 | )
-204 | 
+204 |
 205 | # nested examples with both t and f-strings
 
 ISC003 Explicitly concatenated string should be implicitly concatenated

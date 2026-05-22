@@ -239,7 +239,6 @@ impl<'a> Resolver<'a> {
         // For example, if `./foo/__init__.py` is a root, and then `./foo/bar` is empty, and
         // `./foo/bar/baz/__init__.py` was detected as a root, we should only consider
         // `./foo/__init__.py`.
-        let mut non_roots = FxHashSet::default();
         let mut router: Router<&Path> = Router::new();
         for root in package_roots
             .values()
@@ -258,7 +257,6 @@ impl<'a> Resolver<'a> {
                     matched.value.display()
                 );
                 package_roots.insert(root, Some(PackageRoot::nested(root)));
-                non_roots.insert(root);
             } else {
                 let _ = router.insert(format!("{path}/{{*filepath}}"), root);
             }

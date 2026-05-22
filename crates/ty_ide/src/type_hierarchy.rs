@@ -172,7 +172,7 @@ mod tests {
 
         let mut supertypes = test.supertypes();
         supertypes.sort_by(|a, b| a.name.cmp(&b.name));
-        insta::assert_snapshot!(snapshot(&test.db, &supertypes), @r"
+        insta::assert_snapshot!(snapshot(&test.db, &supertypes), @"
         /main.py:7:8 A :: main
         /main.py:26:27 B :: main
         ");
@@ -210,7 +210,7 @@ mod tests {
         let supertypes = test.supertypes();
         insta::assert_snapshot!(
             snapshot(&test.db, &supertypes),
-            @"vendored://stdlib/builtins.pyi:3608:3614 object :: builtins",
+            @"vendored://stdlib/builtins.pyi:3609:3615 object :: builtins",
         );
     }
 
@@ -231,7 +231,7 @@ mod tests {
 
         let mut subtypes = test.subtypes();
         subtypes.sort_by(|a, b| a.name.cmp(&b.name));
-        insta::assert_snapshot!(snapshot(&test.db, &subtypes), @r"
+        insta::assert_snapshot!(snapshot(&test.db, &subtypes), @"
         /main.py:29:37 Derived1 :: main
         /main.py:61:69 Derived2 :: main
         ");
@@ -322,11 +322,11 @@ mod tests {
         );
 
         let subtypes = test.subtypes();
-        insta::assert_snapshot!(snapshot(&test.db, &subtypes), @r"
+        insta::assert_snapshot!(snapshot(&test.db, &subtypes), @"
         vendored://stdlib/email/headerregistry.pyi:703:713 BaseHeader :: email.headerregistry
-        vendored://stdlib/enum.pyi:18342:18349 StrEnum :: enum
-        vendored://stdlib/pdb.pyi:38460:38465 _rstr :: pdb
-        vendored://stdlib/xxlimited.pyi:113:116 Str :: xxlimited
+        vendored://stdlib/enum.pyi:18310:18317 StrEnum :: enum
+        vendored://stdlib/pdb.pyi:38712:38717 _rstr :: pdb
+        vendored://stdlib/xxlimited.pyi:103:106 Str :: xxlimited
         ");
     }
 
@@ -354,12 +354,12 @@ mod tests {
         );
 
         let subtypes = test.subtypes();
-        insta::assert_snapshot!(snapshot(&test.db, &subtypes), @r"
+        insta::assert_snapshot!(snapshot(&test.db, &subtypes), @"
         vendored://stdlib/email/headerregistry.pyi:703:713 BaseHeader :: email.headerregistry
-        vendored://stdlib/enum.pyi:18342:18349 StrEnum :: enum
+        vendored://stdlib/enum.pyi:18310:18317 StrEnum :: enum
         /main.py:77:89 MyEventTypeA :: main
-        vendored://stdlib/pdb.pyi:38460:38465 _rstr :: pdb
-        vendored://stdlib/xxlimited.pyi:113:116 Str :: xxlimited
+        vendored://stdlib/pdb.pyi:38712:38717 _rstr :: pdb
+        vendored://stdlib/xxlimited.pyi:103:106 Str :: xxlimited
         ");
     }
 
@@ -424,12 +424,12 @@ mod tests {
         let item = test.prepare().unwrap();
         insta::assert_snapshot!(
             snapshot(&test.db, &[item]),
-            @"vendored://stdlib/builtins.pyi:8615:8619 type :: builtins",
+            @"vendored://stdlib/builtins.pyi:8508:8512 type :: builtins",
         );
         let supertypes = test.supertypes();
         insta::assert_snapshot!(
             snapshot(&test.db, &supertypes),
-            @"vendored://stdlib/builtins.pyi:3608:3614 object :: builtins",
+            @"vendored://stdlib/builtins.pyi:3609:3615 object :: builtins",
         );
     }
 
@@ -481,7 +481,7 @@ mod tests {
         let supertypes = test.supertypes();
         insta::assert_snapshot!(
             snapshot(&test.db, &supertypes),
-            @"vendored://stdlib/builtins.pyi:101715:101720 tuple :: builtins",
+            @"vendored://stdlib/builtins.pyi:102525:102530 tuple :: builtins",
         );
     }
 
@@ -652,7 +652,7 @@ Public = _Internal
         // We should only see our own subtype and the only third-party
         // subtype that isn't treated as private.
         let subtypes = test.subtypes();
-        insta::assert_snapshot!(snapshot(&test.db, &subtypes), @r"
+        insta::assert_snapshot!(snapshot(&test.db, &subtypes), @"
         /src/foo.py:6:13 MyBytes :: foo
         /site-packages/thirdparty/__init__.py:6:17 OtherBytes1 :: thirdparty
         ");
@@ -680,7 +680,7 @@ Public = _Internal
         // Note that pylance doesn't seem to respect `__all__` in
         // this case either.
         let subtypes = test.subtypes();
-        insta::assert_snapshot!(snapshot(&test.db, &subtypes), @r"
+        insta::assert_snapshot!(snapshot(&test.db, &subtypes), @"
         /src/foo.py:6:13 MyBytes :: foo
         /site-packages/thirdparty/__init__.py:7:18 OtherBytes1 :: thirdparty
         /site-packages/thirdparty/__init__.py:38:49 OtherBytes2 :: thirdparty

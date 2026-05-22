@@ -34,7 +34,7 @@ help: Convert to `is not`
   - if not X.B is Y:
 5 + if X.B is not Y:
 6 |     pass
-7 | 
+7 |
 8 | #: Okay
 
 E714 [*] Test for object identity should be `is not`

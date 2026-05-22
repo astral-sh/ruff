@@ -58,13 +58,13 @@ impl<'a> FullRenderer<'a> {
             }
 
             let resolved = Resolved::new(self.resolver, diag, self.config);
-            let renderable = resolved.to_renderable(self.config.context);
+            let renderable = resolved.to_renderable(self.config);
             for diag in renderable.diagnostics.iter() {
                 writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
             }
 
             if self.config.show_fix_diff
-                && diag.has_applicable_fix(self.config)
+                && diag.has_applicable_fix(self.config.fix_applicability())
                 && let Some(diff) = Diff::from_diagnostic(diag, &stylesheet, self.resolver)
             {
                 write!(f, "{diff}")?;
@@ -209,12 +209,18 @@ impl std::fmt::Display for Diff<'_> {
 
                         write!(
                             f,
-                            "{line} {sign} ",
+                            "{line} {sign}",
                             line = fmt_styled(line, self.stylesheet.line_no),
                             sign = fmt_styled(sign, line_no_style),
                         )?;
 
+                        let mut needs_separator = true;
                         for (emphasized, value) in change.iter_strings_lossy() {
+                            if needs_separator && !value.trim_end_matches(['\n', '\r']).is_empty() {
+                                f.write_str(" ")?;
+                                needs_separator = false;
+                            }
+
                             let value = show_nonprinting(&value);
                             let styled = fmt_styled(value, style);
                             if emphasized {

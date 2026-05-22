@@ -1,0 +1,15 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR004 `@task.branch` can be replaced with `@task.short_circuit`
+  --> AIR004_sdk.py:9:1
+   |
+ 7 |   # Violations (should trigger AIR004):
+ 8 |
+ 9 | / @task.branch
+10 | | def sdk_two_returns_one_non_empty():  # AIR004
+11 | |     if condition1:
+12 | |         return ["my_downstream_task"]
+13 | |     return []
+   | |_____________^
+   |

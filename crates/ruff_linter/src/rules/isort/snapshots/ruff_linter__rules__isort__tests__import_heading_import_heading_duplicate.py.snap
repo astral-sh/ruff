@@ -18,7 +18,7 @@ help: Organize imports
   - # Standard library imports
 2 | import os
 3 | import sys
-4 | 
+4 |
 5 + # Third party imports
 6 + import pandas
 7 | import requests

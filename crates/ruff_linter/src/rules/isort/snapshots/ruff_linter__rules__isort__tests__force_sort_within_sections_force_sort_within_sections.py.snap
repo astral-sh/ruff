@@ -32,7 +32,7 @@ help: Organize imports
    - from z import z1
    - import b as b1  # import_as
    - import z
-8  | 
+8  |
 9  + from ...grandparent import fn3
 10 | from ..parent import *
 11 + from . import my

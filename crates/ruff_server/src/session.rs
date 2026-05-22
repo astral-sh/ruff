@@ -13,10 +13,10 @@ use crate::workspace::Workspaces;
 use crate::{PositionEncoding, TextDocument};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
-pub use self::index::DocumentQuery;
+pub(crate) use self::index::DocumentQuery;
+pub(crate) use self::options::ClientOptions;
 pub(crate) use self::options::{AllOptions, WorkspaceOptionsMap};
-pub use self::options::{ClientOptions, GlobalOptions};
-pub use client::Client;
+pub(crate) use client::Client;
 
 mod capabilities;
 mod client;
@@ -26,7 +26,7 @@ mod request_queue;
 mod settings;
 
 /// The global state for the LSP
-pub struct Session {
+pub(crate) struct Session {
     /// Used to retrieve information about open documents and settings.
     index: index::Index,
     /// The global position encoding, negotiated during LSP initialization.
@@ -46,7 +46,7 @@ pub struct Session {
 
 /// An immutable snapshot of `Session` that references
 /// a specific document.
-pub struct DocumentSnapshot {
+pub(crate) struct DocumentSnapshot {
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
     client_settings: Arc<settings::ClientSettings>,
     document_ref: index::DocumentQuery,
@@ -54,7 +54,7 @@ pub struct DocumentSnapshot {
 }
 
 impl Session {
-    pub fn new(
+    pub(crate) fn new(
         client_capabilities: &ClientCapabilities,
         position_encoding: PositionEncoding,
         global: GlobalClientSettings,
@@ -89,12 +89,12 @@ impl Session {
         self.shutdown_requested = requested;
     }
 
-    pub fn key_from_url(&self, url: Url) -> DocumentKey {
+    pub(crate) fn key_from_url(&self, url: Url) -> DocumentKey {
         self.index.key_from_url(url)
     }
 
     /// Creates a document snapshot with the URL referencing the document to snapshot.
-    pub fn take_snapshot(&self, url: Url) -> Option<DocumentSnapshot> {
+    pub(crate) fn take_snapshot(&self, url: Url) -> Option<DocumentSnapshot> {
         let key = self.key_from_url(url);
         Some(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
@@ -137,7 +137,7 @@ impl Session {
     ///
     /// The document key must point to a notebook document or cell, or this will
     /// throw an error.
-    pub fn update_notebook_document(
+    pub(crate) fn update_notebook_document(
         &mut self,
         key: &DocumentKey,
         cells: Option<NotebookDocumentCellChange>,
@@ -151,7 +151,7 @@ impl Session {
 
     /// Registers a notebook document at the provided `url`.
     /// If a document is already open here, it will be overwritten.
-    pub fn open_notebook_document(&mut self, url: Url, document: NotebookDocument) {
+    pub(crate) fn open_notebook_document(&mut self, url: Url, document: NotebookDocument) {
         self.index.open_notebook_document(url, document);
     }
 
@@ -223,7 +223,7 @@ impl DocumentSnapshot {
         &self.client_settings
     }
 
-    pub fn query(&self) -> &index::DocumentQuery {
+    pub(crate) fn query(&self) -> &index::DocumentQuery {
         &self.document_ref
     }
 

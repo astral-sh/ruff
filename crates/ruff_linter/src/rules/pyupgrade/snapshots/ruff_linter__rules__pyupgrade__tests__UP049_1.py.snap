@@ -15,8 +15,8 @@ help: Rename type parameter to remove leading underscores
   -     var: _T
 2 + class Foo[T: str]:
 3 +     var: T
-4 | 
-5 | 
+4 |
+5 |
 6 | # constraint
 
 UP049 [*] Generic class uses private type parameters
@@ -28,15 +28,15 @@ UP049 [*] Generic class uses private type parameters
 8 |     var: _T
   |
 help: Rename type parameter to remove leading underscores
-4  | 
-5  | 
+4  |
+5  |
 6  | # constraint
    - class Foo[_T: (str, bytes)]:
    -     var: _T
 7  + class Foo[T: (str, bytes)]:
 8  +     var: T
-9  | 
-10 | 
+9  |
+10 |
 11 | # python 3.13+ default
 
 UP049 [*] Generic class uses private type parameters
@@ -48,15 +48,15 @@ UP049 [*] Generic class uses private type parameters
 13 |     var: _T
    |
 help: Rename type parameter to remove leading underscores
-9  | 
-10 | 
+9  |
+10 |
 11 | # python 3.13+ default
    - class Foo[_T = int]:
    -     var: _T
 12 + class Foo[T = int]:
 13 +     var: T
-14 | 
-15 | 
+14 |
+15 |
 16 | # tuple
 
 UP049 [*] Generic class uses private type parameters
@@ -68,15 +68,15 @@ UP049 [*] Generic class uses private type parameters
 18 |     var: tuple[*_Ts]
    |
 help: Rename type parameter to remove leading underscores
-14 | 
-15 | 
+14 |
+15 |
 16 | # tuple
    - class Foo[*_Ts]:
    -     var: tuple[*_Ts]
 17 + class Foo[*Ts]:
 18 +     var: tuple[*Ts]
-19 | 
-20 | 
+19 |
+20 |
 21 | # paramspec
 
 UP049 [*] Generic class uses private type parameters
@@ -88,15 +88,15 @@ UP049 [*] Generic class uses private type parameters
 23 |     var: _P
    |
 help: Rename type parameter to remove leading underscores
-19 | 
-20 | 
+19 |
+20 |
 21 | # paramspec
    - class C[**_P]:
    -     var: _P
 22 + class C[**P]:
 23 +     var: P
-24 | 
-25 | 
+24 |
+25 |
 26 | from typing import Callable
 
 UP049 [*] Generic class uses private type parameters
@@ -110,7 +110,7 @@ UP049 [*] Generic class uses private type parameters
 33 |     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
    |
 help: Rename type parameter to remove leading underscores
-28 | 
+28 |
 29 | # each of these will get a separate diagnostic, but at least they'll all get
 30 | # fixed
    - class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
@@ -119,8 +119,8 @@ help: Rename type parameter to remove leading underscores
    -     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
 33 +     def transform(t: T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, T] | None:
 34 |         return None
-35 | 
-36 | 
+35 |
+36 |
 
 UP049 [*] Generic class uses private type parameters
   --> UP049_1.py:31:22
@@ -133,7 +133,7 @@ UP049 [*] Generic class uses private type parameters
 33 |     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
    |
 help: Rename type parameter to remove leading underscores
-28 | 
+28 |
 29 | # each of these will get a separate diagnostic, but at least they'll all get
 30 | # fixed
    - class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
@@ -142,8 +142,8 @@ help: Rename type parameter to remove leading underscores
    -     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
 33 +     def transform(t: _T, u: U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
 34 |         return None
-35 | 
-36 | 
+35 |
+36 |
 
 UP049 [*] Generic class uses private type parameters
   --> UP049_1.py:31:31
@@ -156,7 +156,7 @@ UP049 [*] Generic class uses private type parameters
 33 |     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
    |
 help: Rename type parameter to remove leading underscores
-28 | 
+28 |
 29 | # each of these will get a separate diagnostic, but at least they'll all get
 30 | # fixed
    - class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
@@ -165,8 +165,8 @@ help: Rename type parameter to remove leading underscores
    -     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
 33 +     def transform(t: _T, u: _U, v: V) -> tuple[*_W] | Callable[_X, _T] | None:
 34 |         return None
-35 | 
-36 | 
+35 |
+36 |
 
 UP049 [*] Generic class uses private type parameters
   --> UP049_1.py:31:50
@@ -179,7 +179,7 @@ UP049 [*] Generic class uses private type parameters
 33 |     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
    |
 help: Rename type parameter to remove leading underscores
-28 | 
+28 |
 29 | # each of these will get a separate diagnostic, but at least they'll all get
 30 | # fixed
    - class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
@@ -188,8 +188,8 @@ help: Rename type parameter to remove leading underscores
    -     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
 33 +     def transform(t: _T, u: _U, v: _V) -> tuple[*W] | Callable[_X, _T] | None:
 34 |         return None
-35 | 
-36 | 
+35 |
+36 |
 
 UP049 [*] Generic class uses private type parameters
   --> UP049_1.py:31:56
@@ -202,7 +202,7 @@ UP049 [*] Generic class uses private type parameters
 33 |     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
    |
 help: Rename type parameter to remove leading underscores
-28 | 
+28 |
 29 | # each of these will get a separate diagnostic, but at least they'll all get
 30 | # fixed
    - class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
@@ -211,8 +211,8 @@ help: Rename type parameter to remove leading underscores
    -     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
 33 +     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[X, _T] | None:
 34 |         return None
-35 | 
-36 | 
+35 |
+36 |
 
 UP049 Generic class uses private type parameters
   --> UP049_1.py:39:9
@@ -272,8 +272,8 @@ UP049 [*] Generic class uses private type parameters
    |
 help: Rename type parameter to remove leading underscores
 68 | class C[_T, T]: ...
-69 | 
-70 | 
+69 |
+70 |
    - class C[_T]:
    -     v1 = cast(_T, ...)
    -     v2 = cast('_T', ...)
@@ -282,7 +282,7 @@ help: Rename type parameter to remove leading underscores
 72 +     v1 = cast(T, ...)
 73 +     v2 = cast('T', ...)
 74 +     v3 = cast(T, ...)
-75 | 
+75 |
 76 |     def _(self):
    -         v1 = cast(_T, ...)
    -         v2 = cast('_T', ...)
@@ -290,8 +290,8 @@ help: Rename type parameter to remove leading underscores
 77 +         v1 = cast(T, ...)
 78 +         v2 = cast('T', ...)
 79 +         v3 = cast(T, ...)
-80 | 
-81 | 
+80 |
+81 |
 82 | class C[_T]:
 note: This is a display-only fix and is likely to be incorrect
 
@@ -304,14 +304,14 @@ UP049 [*] Generic class uses private type parameters
    |
 help: Rename type parameter to remove leading underscores
 79 |         v3 = cast("\u005fT", ...)
-80 | 
-81 | 
+80 |
+81 |
    - class C[_T]:
    -     v = cast('Literal[\'foo\'] | _T', ...)
 82 + class C[T]:
 83 +     v = cast(T, ...)
-84 | 
-85 | 
+84 |
+85 |
 86 | ## Name collision
 note: This is a display-only fix and is likely to be incorrect
 

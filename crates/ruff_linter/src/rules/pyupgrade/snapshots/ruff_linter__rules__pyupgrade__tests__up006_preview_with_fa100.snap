@@ -21,7 +21,7 @@ help: Add `from __future__ import annotations`
 1 + from __future__ import annotations
 2 | import typing
 3 | from typing import List
-4 | 
+4 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -36,7 +36,7 @@ help: Add `from __future__ import annotations`
 1 + from __future__ import annotations
 2 | import typing
 3 | from typing import List
-4 | 
+4 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -53,13 +53,13 @@ help: Replace with `list`
 1 + from __future__ import annotations
 2 | import typing
 3 | from typing import List
-4 | 
-5 | 
+4 |
+5 |
   - def f(x: typing.List[str]) -> None:
 6 + def f(x: list[str]) -> None:
 7 |     ...
-8 | 
-9 | 
+8 |
+9 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -74,11 +74,11 @@ help: Replace with `list`
 1  + from __future__ import annotations
 2  | import typing
 3  | from typing import List
-4  | 
+4  |
 --------------------------------------------------------------------------------
 7  |     ...
-8  | 
-9  | 
+8  |
+9  |
    - def g(x: List[str]) -> None:
 10 + def g(x: list[str]) -> None:
 11 |     ...

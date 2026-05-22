@@ -90,12 +90,217 @@ reveal_type((1, 2, 3))  # revealed: tuple[Literal[1], Literal[2], Literal[3]]
 reveal_type(frozenset((1, 2, 3)))  # revealed: frozenset[Literal[1, 2, 3]]
 ```
 
+## Unions of homogeneous, fixed-length tuples can be promoted to a single variadic tuple
+
+This type of promotion applies specifically when a collection literal contains at least two tuple
+literals that share an element type but that differ in length. The inferred type of those literals
+is a union of homogeneous, fixed-length tuples, which is subsequently promoted to a single, variadic
+tuple. The type of any non-tuple elements in the collection literal is preserved in the final
+inferred type.
+
+```py
+reveal_type([(1, 2), (3, 4, 5)])  # revealed: list[tuple[int, ...]]
+reveal_type({".py": (".py", ".pyi"), ".js": (".js", ".jsx", ".ts", ".tsx")})  # revealed: dict[str, tuple[str, ...]]
+reveal_type({(1, 2), (3, 4, 5)})  # revealed: set[tuple[int, ...]]
+reveal_type([0, (1, 2), "a", (3, 4, 5)])  # revealed: list[int | str | tuple[int, ...]]
+```
+
+We only widen unions of fixed-length tuples. A standalone tuple type retains its fixed length.
+
+```py
+def promote[T](x: T) -> list[T]:
+    return [x]
+
+reveal_type([()])  # revealed: list[tuple[()]]
+reveal_type((1, 2))  # revealed: tuple[Literal[1], Literal[2]]
+reveal_type(promote((1, 2)))  # revealed: list[tuple[int, int]]
+```
+
+Tuple literals of the same length also keep their fixed length. For example, a declared collection
+representing coordinate pairs does not later accept a coordinate triple.
+
+```py
+coordinates = {
+    "home": (0, 0),
+    "palm-tree": (10, 8),
+}
+reveal_type(coordinates)  # revealed: dict[str, tuple[int, int]]
+coordinates["treasure"] = (5, 6, -10)  # error: [invalid-assignment]
+```
+
+Heterogeneous tuples are not widened.
+
+```py
+reveal_type([(1, "a"), (2, "b")])  # revealed: list[tuple[int, str]]
+reveal_type([(1, 2), ("a", "b", "c")])  # revealed: list[tuple[int, int] | tuple[str, str, str]]
+```
+
+Normal union simplification can still generalize heterogeneous tuples of the same length, but the
+result should not widen to a variadic tuple.
+
+```py
+mixed_tuples = [
+    (1, "a"),
+    (object(), object()),
+    (object(), object(), object()),
+]
+reveal_type(mixed_tuples)  # revealed: list[tuple[object, object] | tuple[object, object, object]]
+```
+
+Empty tuples are treated specially: they do not count towards the minimum of two tuples that differ
+in length. This allows us to preserve accurate types for collections that model exactly two possible
+tuple shapes (empty or length N).
+
+```py
+reveal_type([(), (1,)])  # revealed: list[tuple[()] | tuple[int]]
+reveal_type([(), (1,), (2,)])  # revealed: list[tuple[()] | tuple[int]]
+```
+
+However, an empty tuple can be subsumed by a widened tuple type when enough evidence exists
+independently of the empty tuple.
+
+```py
+reveal_type([(), (1, 2), (1, 2, 3)])  # revealed: list[tuple[int, ...]]
+```
+
+A union of tuples is not widened when it is inferred into a collection (i.e., only unions that came
+from direct tuple literals in the collection are widened).
+
+```py
+def get_padding() -> int | tuple[int] | tuple[int, int]:
+    return (0, 1)
+
+reveal_type([get_padding()])  # revealed: list[int | tuple[int] | tuple[int, int]]
+```
+
+No promotion occurs in a collection that mixes literal and non-literal tuples:
+
+```py
+def get_segment() -> tuple[int] | tuple[int, int, int, int]:
+    return (0,)
+
+def get_segments() -> list[tuple[int, int]]:
+    return [(0, 1)]
+
+def get_segments_by_name() -> dict[str, tuple[int, int]]:
+    return {"origin": (0, 1)}
+
+segments = [get_segment(), (1, 2), (3, 4, 5)]
+reveal_type(segments)  # revealed: list[tuple[int] | tuple[int, int, int, int] | tuple[int, int] | tuple[int, int, int]]
+segments.append((6, 7, 8, 9, 10))  # error: [invalid-argument-type]
+
+starred_segments = [*get_segments(), (1, 2), (3, 4, 5)]
+reveal_type(starred_segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
+starred_segments.append((6, 7, 8, 9))  # error: [invalid-argument-type]
+
+mapping_segments = {**get_segments_by_name(), "start": (1, 2), "end": (3, 4, 5)}
+reveal_type(mapping_segments)  # revealed: dict[str, tuple[int, int] | tuple[int, int, int]]
+mapping_segments["bad"] = (6, 7, 8, 9)  # error: [invalid-assignment]
+```
+
+This also applies when the non-literal tuple type is hidden behind a type alias or a type variable,
+or when it is subsumed by one of the literal tuple types while building the union.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import NewType, TypeVar
+from typing_extensions import TypeIs
+
+type Segment = tuple[int, int]
+NewTypeSegment = NewType("NewTypeSegment", tuple[int, int])
+BoundSegment = TypeVar("BoundSegment", bound=tuple[int, int])
+ConstrainedSegment = TypeVar("ConstrainedSegment", tuple[int, int], tuple[int, int, int])
+
+class P: ...
+
+def is_p(x: object) -> TypeIs[P]:
+    return True
+
+def get_aliased_segment() -> Segment:
+    return (0, 1)
+
+aliased_segments = [get_aliased_segment(), (1, 2), (3, 4, 5)]
+reveal_type(aliased_segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
+aliased_segments.append((6, 7, 8, 9))  # error: [invalid-argument-type]
+
+def get_newtype_segment() -> NewTypeSegment:
+    return NewTypeSegment((0, 1))
+
+newtype_segments = [get_newtype_segment(), (1, 2), (3, 4, 5)]
+reveal_type(newtype_segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
+newtype_segments.append((6, 7, 8, 9))  # error: [invalid-argument-type]
+
+def check_bound_typevar_segment(segment: BoundSegment) -> None:
+    bound_typevar_segments = [segment, (1, 2), (3, 4, 5)]
+    reveal_type(bound_typevar_segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
+    bound_typevar_segments.append((6, 7, 8, 9))  # error: [invalid-argument-type]
+
+def check_constrained_typevar_segment(segment: ConstrainedSegment) -> None:
+    constrained_typevar_segments = [segment, (1, 2), (3, 4, 5)]
+    # revealed: list[ConstrainedSegment@check_constrained_typevar_segment | tuple[int, int] | tuple[int, int, int]]
+    reveal_type(constrained_typevar_segments)
+    constrained_typevar_segments.append((6, 7, 8, 9))  # error: [invalid-argument-type]
+
+def get_subsumed_segment() -> tuple[bool, bool]:
+    return (True, False)
+
+subsumed_segments = [get_subsumed_segment(), (1, 2), (3, 4, 5)]
+reveal_type(subsumed_segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
+subsumed_segments.append((6, 7, 8, 9))  # error: [invalid-argument-type]
+
+def get_short_subsumed_segment() -> tuple[bool]:
+    return (True,)
+
+short_subsumed_segments = [get_short_subsumed_segment(), (1, 2), (3, 4, 5)]
+reveal_type(short_subsumed_segments)  # revealed: list[tuple[bool] | tuple[int, int] | tuple[int, int, int]]
+short_subsumed_segments.append((6, 7, 8, 9))  # error: [invalid-argument-type]
+
+def get_heterogeneous_subsumed_segment() -> tuple[bool, int]:
+    return (True, 0)
+
+heterogeneous_subsumed_segments = [get_heterogeneous_subsumed_segment(), (1, 2), (3, 4, 5)]
+reveal_type(heterogeneous_subsumed_segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
+heterogeneous_subsumed_segments.append((6, 7, 8, 9))  # error: [invalid-argument-type]
+
+def check_intersection_segment(segment: tuple[int, int]) -> None:
+    if is_p(segment):
+        reveal_type(segment)  # revealed: tuple[int, int] & P
+        intersection_segments = [segment, (1, 2), (3, 4, 5)]
+        reveal_type(intersection_segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
+        intersection_segments.append((6, 7, 8, 9))  # error: [invalid-argument-type]
+```
+
+No promotion occurs when a covariant collection type context provides a fixed-length tuple.
+
+```py
+from typing import Sequence
+
+segments: Sequence[tuple[int, int] | tuple[int, int, int]] = [(1, 2), (3, 4, 5)]
+reveal_type(segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
+```
+
+Promotion still occurs when a covariant collection type context provides a gradual element type.
+
+```py
+from typing import Any
+from collections.abc import Mapping
+
+segments: Mapping[str, Any] = {"start": (1, 2), "end": (3, 4, 5)}
+reveal_type(segments)  # revealed: dict[str, tuple[int, ...]]
+```
+
 ## Invariant and contravariant return types are promoted
 
 We promote in non-covariant position in the return type of a generic function, or constructor of a
 generic class:
 
 ```py
+from typing import Callable, Literal
+
 class Bivariant[T]:
     def __init__(self, value: T): ...
 
@@ -124,6 +329,8 @@ def f8[T](x: T) -> Invariant[T] | Covariant[T] | None: ...
 def f9[T](x: T) -> tuple[Invariant[T], Invariant[T]] | None: ...
 def f10[T, U](x: T, y: U) -> tuple[Invariant[T], Covariant[U]] | None: ...
 def f11[T, U](x: T, y: U) -> tuple[Invariant[Covariant[T] | None], Covariant[U]] | None: ...
+def f12[T](x: T) -> Callable[[T], bool] | None: ...
+def f13[T](x: T) -> Callable[[bool], Invariant[T]] | None: ...
 
 reveal_type(Bivariant(1))  # revealed: Bivariant[Literal[1]]
 reveal_type(Covariant(1))  # revealed: Covariant[Literal[1]]
@@ -144,6 +351,9 @@ reveal_type(f9(1))  # revealed: tuple[Invariant[int], Invariant[int]] | None
 
 reveal_type(f10(1, 1))  # revealed: tuple[Invariant[int], Covariant[Literal[1]]] | None
 reveal_type(f11(1, 1))  # revealed: tuple[Invariant[Covariant[int] | None], Covariant[Literal[1]]] | None
+
+reveal_type(f12(1))  # revealed: ((int, /) -> bool) | None
+reveal_type(f13(1))  # revealed: ((bool, /) -> Invariant[int]) | None
 ```
 
 ## Promotion is recursive
@@ -190,6 +400,7 @@ declared in a promotable position:
 ```py
 from enum import Enum
 from typing import Sequence, Literal, LiteralString
+from typing import Callable
 
 class Color(Enum):
     RED = "red"
@@ -274,6 +485,18 @@ reveal_type(x21)  # revealed: X[Literal[1]]
 
 x22: X[Literal[1]] | None = x([1])
 reveal_type(x22)  # revealed: X[Literal[1]]
+
+def make_callable[T](x: T) -> Callable[[T], bool]:
+    raise NotImplementedError
+
+def maybe_make_callable[T](x: T) -> Callable[[T], bool] | None:
+    raise NotImplementedError
+
+x23: Callable[[Literal[1]], bool] = make_callable(1)
+reveal_type(x23)  # revealed: (Literal[1], /) -> bool
+
+x24: Callable[[Literal[1]], bool] | None = maybe_make_callable(1)
+reveal_type(x24)  # revealed: ((Literal[1], /) -> bool) | None
 ```
 
 ## Literal annotations see through subtyping
@@ -403,7 +626,7 @@ later used in a promotable position:
 
 ```py
 from enum import Enum
-from typing import Literal
+from typing import Callable, Literal
 
 def promote[T](x: T) -> list[T]:
     return [x]
@@ -439,7 +662,7 @@ type X = Literal["hello"]
 
 x4: X = "hello"
 reveal_type(x4)  # revealed: Literal["hello"]
-reveal_type([x4])  # revealed: list[Literal["hello"]]
+reveal_type([x4])  # revealed: list[X]
 
 class MyEnum(Enum):
     A = 1
@@ -449,6 +672,16 @@ class MyEnum(Enum):
 def _(x: Literal[MyEnum.A, MyEnum.B]):
     reveal_type(x)  # revealed: Literal[MyEnum.A, MyEnum.B]
     reveal_type([x])  # revealed: list[Literal[MyEnum.A, MyEnum.B]]
+
+def make_callable[T](x: T) -> Callable[[T], bool]:
+    raise NotImplementedError
+
+def maybe_make_callable[T](x: T) -> Callable[[T], bool] | None:
+    raise NotImplementedError
+
+def _(x: Literal[1]):
+    reveal_type(make_callable(x))  # revealed: (Literal[1], /) -> bool
+    reveal_type(maybe_make_callable(x))  # revealed: ((Literal[1], /) -> bool) | None
 ```
 
 Literal promotability is respected by unions:

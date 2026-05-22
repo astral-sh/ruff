@@ -10,6 +10,6 @@ C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instea
 help: Replace with `dict.fromkeys(iterable)`)
   - {x: NotImplemented for x in "XY"}
 1 + dict.fromkeys("XY", NotImplemented)
-2 | 
-3 | 
+2 |
+3 |
 4 | # Builtin bindings are placed at top of file, but should not count as

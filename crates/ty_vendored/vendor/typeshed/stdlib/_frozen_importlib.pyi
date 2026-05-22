@@ -165,22 +165,14 @@ class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader)
             The method is deprecated.  The import machinery does the job itself.
 
             """
-    if sys.version_info >= (3, 10):
-        @staticmethod
-        def create_module(spec: ModuleSpec) -> types.ModuleType | None:
-            """Create a built-in module"""
 
-        @staticmethod
-        def exec_module(module: types.ModuleType) -> None:
-            """Exec a built-in module"""
-    else:
-        @classmethod
-        def create_module(cls, spec: ModuleSpec) -> types.ModuleType | None:
-            """Create a built-in module"""
+    @staticmethod
+    def create_module(spec: ModuleSpec) -> types.ModuleType | None:
+        """Create a built-in module"""
 
-        @classmethod
-        def exec_module(cls, module: types.ModuleType) -> None:
-            """Exec a built-in module"""
+    @staticmethod
+    def exec_module(module: types.ModuleType) -> None:
+        """Exec a built-in module"""
 
 class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
     """Meta path import for frozen modules.
@@ -238,14 +230,10 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
             The method is deprecated.  The import machinery does the job itself.
 
             """
-    if sys.version_info >= (3, 10):
-        @staticmethod
-        def create_module(spec: ModuleSpec) -> types.ModuleType | None:
-            """Set __file__, if able."""
-    else:
-        @classmethod
-        def create_module(cls, spec: ModuleSpec) -> types.ModuleType | None:
-            """Use default semantics for module creation."""
+
+    @staticmethod
+    def create_module(spec: ModuleSpec) -> types.ModuleType | None:
+        """Set __file__, if able."""
 
     @staticmethod
     def exec_module(module: types.ModuleType) -> None: ...

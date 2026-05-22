@@ -232,38 +232,117 @@ preserving the original rule name.
 
 #### Rule testing: fixtures and snapshots
 
-To test rules, Ruff uses snapshots of Ruff's output for a given file (fixture). Generally, there
-will be one file per rule (e.g., `E402.py`), and each file will contain all necessary examples of
-both violations and non-violations. `cargo insta review` will generate a snapshot file containing
-Ruff's output for each fixture, which you can then commit alongside your changes.
+To test rules, Ruff uses the mdtest framework, initially developed for ty. Mdtests are written as
+Markdown files with Python code and TOML configuration blocks alongside prose
+descriptions. Generally, there will be one directory per linter (e.g. `flake8-bandit` for the `S`
+rules) with nested files for each rule (e.g. `unsafe-markup-use.md` for `S704`). Within these
+files, you can define additional Markdown sections to group related tests and their settings
+together.
 
-Once you've completed the code for the rule itself, you can define tests with the following steps:
+You can see [the ty_test
+README](https://github.com/astral-sh/ruff/blob/main/crates/ty_test/README.md) for a full description
+of the options supported by mdtest, but in general, you should use `# error` comments to assert that
+a particular rule fires on a given line. You can instead use `# snapshot` comments to also generate
+an inline snapshot of the resulting diagnostic. You can automatically accept these snapshot changes
+by setting the `MDTEST_UPDATE_SNAPSHOTS=1` environment variable when running your tests. Prefer
+using `# error` for the bulk of your assertions because it helps to keep the tests short, but
+`# snapshot` can be used to capture details of the diagnostic or suggested fix, when applicable.
 
-1. Add a Python file to `crates/ruff_linter/resources/test/fixtures/[linter]` that contains the code you
-    want to test. The file name should match the rule name (e.g., `E402.py`), and it should include
-    examples of both violations and non-violations.
+For example, a minimal mdtest for `module-import-not-at-top-of-file` (`E402`) would look something
+like this:
 
-1. Run Ruff locally against your file and verify the output is as expected. Once you're satisfied
-    with the output (you see the violations you expect, and no others), proceed to the next step.
-    For example, if you're adding a new rule named `E402`, you would run:
+````markdown
+<!-- crates/ruff_linter/resources/mdtest/pycodestyle/module-import-not-at-top-of-file.md -->
 
-    ```shell
-    cargo run -p ruff -- check crates/ruff_linter/resources/test/fixtures/pycodestyle/E402.py --no-cache --preview --select E402
-    ```
+# `module-import-not-at-top-of-file` (`E402`)
 
-    **Note:** Only a subset of rules are enabled by default. When testing a new rule, ensure that
-    you activate it by adding `--select ${rule_code}` to the command.
+## Basic examples
 
-1. Add the test to the relevant `crates/ruff_linter/src/rules/[linter]/mod.rs` file. If you're contributing
-    a rule to a pre-existing set, you should be able to find a similar example to pattern-match
-    against. If you're adding a new linter, you'll need to create a new `mod.rs` file (see,
-    e.g., `crates/ruff_linter/src/rules/flake8_bugbear/mod.rs`)
+```toml
+lint.select = ["E402"]
+```
 
-1. Run `cargo test`. Your test will fail, but you'll be prompted to follow-up
-    with `cargo insta review`. Run `cargo insta review`, review and accept the generated snapshot,
-    then commit the snapshot file alongside the rest of your changes.
+This is an example of code flagged by the rule:
 
-1. Run `cargo test` again to ensure that your test passes.
+```py
+a = 1
+import os  # snapshot: module-import-not-at-top-of-file
+```
+
+```snapshot
+error[E402]: Module level import not at top of file
+ --> src/mdtest_snippet.py:2:1
+  |
+2 | import os  # snapshot: module-import-not-at-top-of-file
+  | ^^^^^^^^^
+  |
+```
+
+Additional cases can just use `# error` since the diagnostics should look the same:
+
+```py
+b = 2
+import something_else  # error: [module-import-not-at-top-of-file]
+```
+
+## More complicated configuration
+
+If any of your tests require special configuration options, you can define additional TOML code
+blocks. These blocks accept all of the configuration options that Ruff itself does:
+
+
+```toml
+target-version = "py310"
+
+[lint]
+select = ["E"]
+
+[lint.pycodestyle]
+max-line-length = 100
+```
+````
+
+Mdtests are run as part of a normal `cargo test` invocation as part of the `ruff_mdtest` crate.
+
+### Example: Adding an auto-fix
+
+Sometimes a lint violation has a natural fix in the form of an edit to the
+source code. To surface this suggestion to the user, you will need to attach
+a `Fix` to the diagnostic using one of the helper methods on `DiagnosticGuard` found in `crates/ruff_linter/src/checkers/ast/mod.rs` (e.g. `set_fix`).
+
+You will also need to decide when to offer this fix
+and whether it is safe or unsafe. Please refer to the documentation on
+[fix safety](https://docs.astral.sh/ruff/linter/#fix-safety) to determine
+whether to offer a safe or unsafe fix. If a fix is (sometimes) unsafe,
+update the rule's documentation with an explanation under the heading
+`## Fix safety`.
+
+Often the nontrivial work lies in generating
+the new source code in the form of an `Edit`.
+There are three main ways to do this:
+
+1. **AST-based edits**. Here we construct the AST node that we wish
+    the new source code to parse to, and then generate the text using a method on
+    `checker.generator()`. The benefit of such edits is that they should essentially
+    never introduce syntax errors and they will have predictable formatting. On the
+    other hand, it can be cumbersome to build an AST node by hand, and one has less
+    fine-grained control over comments.
+1. **CST-based edits**. This is similar to
+    the above except that one leverages LibCST to first parse the source
+    into a concrete syntax tree and then modifies it as needed. This
+    retains more of the formatting of the original source while retaining
+    the other benefits of AST-based edits. However, it introduces
+    overhead.
+1. **Text-based edits**. Here we directly construct the replacement
+    text as a string. This gives you the most control over what the
+    edit will look like, and is often more performant. However,
+    it can be much more difficult to ensure that the fix does not
+    introduce syntax errors, especially on unusual source code.
+    If you adopt this approach, be sure to add even more test fixtures
+    than usual.
+
+You can find helpers for common edits in `crates/ruff_linter/src/fix/edits.rs`
+and `crates/ruff_linter/src/fix/codemods.rs`.
 
 ### Example: Adding a new configuration option
 
@@ -416,12 +495,15 @@ Commit each step of this process separately for easier review.
 
     - The new version number (without starting `v`)
 
+1. Request a deployment approval from another team member
+
 1. The release workflow will do the following:
 
     1. Build all the assets. If this fails (even though we tested in step 4), we haven't tagged or
         uploaded anything, you can restart after pushing a fix. If you just need to rerun the build,
         make sure you're [re-running all the failed
         jobs](https://docs.github.com/en/actions/managing-workflow-runs/re-running-workflows-and-jobs#re-running-failed-jobs-in-a-workflow) and not just a single failed job.
+    1. Wait for aforementioned approval
     1. Upload to PyPI.
     1. Create and push the Git tag (as extracted from `pyproject.toml`). We create the Git tag only
         after building the wheels and uploading to PyPI, since we can't delete or modify the tag ([#4468](https://github.com/astral-sh/ruff/issues/4468)).
@@ -440,13 +522,8 @@ Commit each step of this process separately for easier review.
     1. Run `uv run --only-dev --no-sync scripts/update_schemastore.py --proto <https|ssh>`
     1. Once run successfully, you should follow the link in the output to create a PR.
 
-1. If needed, update the [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) and
-    [`ruff-vscode`](https://github.com/astral-sh/ruff-vscode) repositories and follow
-    the release instructions in those repositories. `ruff-lsp` should always be updated
-    before `ruff-vscode`.
-
-    This step is generally not required for a patch release, but should always be done
-    for a minor release.
+1. Update the [`ruff-vscode`](https://github.com/astral-sh/ruff-vscode) repository by following
+    the [release instructions](https://github.com/astral-sh/ruff-vscode/blob/main/CONTRIBUTING.md#release) there.
 
 ## Ecosystem CI
 

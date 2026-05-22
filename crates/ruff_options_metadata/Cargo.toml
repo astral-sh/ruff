@@ -13,7 +13,8 @@ license = { workspace = true }
 [dependencies]
 serde = { workspace = true, optional = true }
 
-[dev-dependencies]
-
 [lints]
 workspace = true
+
+[lib]
+test = false

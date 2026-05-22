@@ -12,7 +12,7 @@ TC008 [*] Remove quotes from type alias
 12 |     f: TypeAlias = 'dict[str, int | None]'  # OK
    |
 help: Remove quotes
-7  | 
+7  |
 8  | if TYPE_CHECKING:
 9  |     c: TypeAlias = 'int | None'  # OK
    -     d: TypeAlias = 'Annotated[int, 1 | 2]'  # TC008

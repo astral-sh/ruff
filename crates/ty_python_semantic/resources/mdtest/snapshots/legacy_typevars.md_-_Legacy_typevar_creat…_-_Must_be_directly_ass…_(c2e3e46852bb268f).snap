@@ -29,14 +29,9 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/legacy_typev
 error[invalid-legacy-type-variable]: A `TypeVar` definition must be a simple variable assignment
  --> src/mdtest_snippet.py:5:14
   |
-3 | T = TypeVar("T")
-4 | # error: [invalid-legacy-type-variable]
 5 | U: TypeVar = TypeVar("U")
   |              ^^^^^^^^^^^^
-6 |
-7 | # error: [invalid-legacy-type-variable]
   |
-info: rule `invalid-legacy-type-variable` is enabled by default
 
 ```
 
@@ -44,10 +39,8 @@ info: rule `invalid-legacy-type-variable` is enabled by default
 error[invalid-legacy-type-variable]: A `TypeVar` definition must be a simple variable assignment
  --> src/mdtest_snippet.py:8:30
   |
-7 | # error: [invalid-legacy-type-variable]
 8 | tuple_with_typevar = ("foo", TypeVar("W"))
   |                              ^^^^^^^^^^^^
   |
-info: rule `invalid-legacy-type-variable` is enabled by default
 
 ```

@@ -34,7 +34,7 @@ reveal_type(x[0].__name__)  # revealed: str
 ## Mixed list
 
 ```py
-# revealed: list[int | tuple[int, int] | tuple[int, int, int]]
+# revealed: list[int | tuple[int, ...]]
 reveal_type([1, (1, 2), (1, 2, 3)])
 ```
 
@@ -83,8 +83,7 @@ class Foo:
     def method(self):
         self.mylist[0] = 42
 
-# TODO: could be `list[None | Unknown]`
-reveal_type(Foo().mylist)  # revealed: Unknown | list[None | Unknown]
+reveal_type(Foo().mylist)  # revealed: list[None | Unknown]
 ```
 
 ## List comprehensions
