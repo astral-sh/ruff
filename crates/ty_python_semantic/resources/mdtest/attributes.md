@@ -2599,14 +2599,39 @@ reveal_type(C().x)  # revealed: int
 class C:
     def __init__(self) -> None:
         def set_attribute(value: str):
-            # error: [invalid-type-form]
-            # error: [unresolved-attribute]
             self.x: str = value
         set_attribute("a")
 
 # TODO: ideally, this would be `str`. Mypy supports this, pyright does not.
 # error: [unresolved-attribute]
 reveal_type(C().x)  # revealed: Unknown
+```
+
+### Non-receiver annotated assignments from nested functions
+
+```py
+class Other:
+    x: str
+
+receiver = Other()
+
+class C:
+    def __init__(self) -> None:
+        def set_shadowed(self: Other, value: str) -> None:
+            # error: [invalid-type-form]
+            self.x: str = value
+
+    @staticmethod
+    def set_static(self: Other) -> None:
+        def nested(value: str) -> None:
+            # error: [invalid-type-form]
+            self.x: str = value
+
+    def set_global(receiver) -> None:
+        def nested(value: str) -> None:
+            global receiver
+            # error: [invalid-type-form]
+            receiver.x: str = value
 ```
 
 ### Accessing attributes on `Never`

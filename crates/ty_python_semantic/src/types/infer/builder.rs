@@ -1557,10 +1557,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|node_ref| node_ref.node(self.module()))
     }
 
-    fn current_function_type(&self) -> Option<FunctionType<'db>> {
-        let function = self.current_function_definition()?;
+    fn function_type(&self, function: &ast::StmtFunctionDef) -> Option<FunctionType<'db>> {
         let definition = self.index.expect_single_definition(function);
         infer_definition_types(self.db(), definition).function_type(definition)
+    }
+
+    fn current_function_type(&self) -> Option<FunctionType<'db>> {
+        self.function_type(self.current_function_definition()?)
     }
 
     fn function_decorator_types<'a>(
@@ -4110,7 +4113,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // the non-name targets that are valid Python syntax.
             let is_receiver_attribute = target
                 .as_attribute_expr()
-                .is_some_and(|target| self.is_instance_attribute_assignment(target));
+                .is_some_and(|target| self.is_receiver_attribute_annotation_target(target));
             if !is_receiver_attribute {
                 match target.as_ref() {
                     ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {

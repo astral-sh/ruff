@@ -112,6 +112,60 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         place_table.member(member_id).is_instance_attribute()
     }
 
+    /// Check whether an annotated attribute target uses an implicit receiver.
+    ///
+    /// This includes direct captures from enclosing methods: these are not implicit-attribute
+    /// definition scopes, but their annotations were accepted before non-name target validation.
+    pub(super) fn is_receiver_attribute_annotation_target(
+        &self,
+        target: &ast::ExprAttribute,
+    ) -> bool {
+        if self.is_instance_attribute_assignment(target) {
+            return true;
+        }
+
+        let Some(receiver) = target.value.as_name_expr() else {
+            return false;
+        };
+        let receiver_name = receiver.id.as_str();
+        let current_scope_id = self.scope().file_scope_id(self.db());
+        let Some((receiver_scope_id, receiver_scope, receiver_symbol)) = self
+            .index
+            .visible_ancestor_scopes(current_scope_id)
+            .find_map(|(scope_id, scope)| {
+                self.index
+                    .place_table(scope_id)
+                    .symbol_by_name(receiver_name)
+                    .filter(|symbol| symbol.is_local() || symbol.is_global())
+                    .map(|symbol| (scope_id, scope, symbol))
+            })
+        else {
+            return false;
+        };
+        if receiver_symbol.is_global() || receiver_scope_id == current_scope_id {
+            return false;
+        }
+        let Some(function) = receiver_scope
+            .node()
+            .as_function()
+            .map(|node| node.node(self.module()))
+        else {
+            return false;
+        };
+
+        self.index
+            .class_definition_of_method(receiver_scope_id)
+            .is_some()
+            && function
+                .parameters
+                .iter_non_variadic_params()
+                .next()
+                .is_some_and(|parameter| parameter.name() == receiver_name)
+            && self
+                .function_type(function)
+                .is_some_and(|function| function.has_implicit_receiver(self.db()))
+    }
+
     pub(super) fn invalid_assignment_to_final_attribute(
         &self,
         object_ty: Type<'db>,
