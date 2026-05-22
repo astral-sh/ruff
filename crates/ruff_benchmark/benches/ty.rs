@@ -1248,6 +1248,43 @@ fn benchmark_pandas_tdd(criterion: &mut Criterion) {
     });
 }
 
+fn benchmark_pydantic_core_schema_dict(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_micro[pydantic_core_schema_dict]", |b| {
+        b.iter_batched_ref(
+            || {
+                // Minimized from the pydantic and hydra-zen ecosystem regressions seen during the
+                // SpecializationBuilder pending-constraint-set migration. Pydantic has several
+                // empty dict literals with a type context equivalent to `dict[Hashable,
+                // core_schema.CoreSchema]` (including `schema.setdefault("metadata", {})` and
+                // tagged-union choice tables). `CoreSchema` is a large union of TypedDict schema
+                // types; solving the empty-dict specialization creates one lower-bound constraint
+                // per union element for `_VT@dict`. Combined with `_KT@dict = Hashable`,
+                // PathAssignments/SequentMap traversal derives cross-typevar facts like
+                // `TypedDictSchema <= _VT@dict <= Hashable`. This benchmark tracks the cost until
+                // constraint projection / path-bounds solving can avoid that work.
+                setup_micro_case_with_dependencies(
+                    "pydantic_core_schema_dict",
+                    &["pydantic-core"],
+                    r#"
+                    from collections.abc import Hashable
+                    from pydantic_core import core_schema
+
+                    choices: dict[Hashable, core_schema.CoreSchema] = {}
+                    "#,
+                )
+            },
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
@@ -1422,6 +1459,7 @@ criterion_group!(
     benchmark_literal_equality_fallthrough_guarded_any,
     benchmark_typeis_narrowing,
     benchmark_pandas_tdd,
+    benchmark_pydantic_core_schema_dict,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);

@@ -510,10 +510,7 @@ def f7(y: object) -> object:
 x9 = f7(reveal_type(["Sheet1"]))  # revealed: list[str]
 reveal_type(x9)  # revealed: list[int | str]
 
-# TODO: We should not error here once call inference can conjoin constraints
-# from all call arguments.
 def f8(xs: tuple[str, ...]) -> tuple[str, ...]:
-    # error: [invalid-return-type]
     return tuple(map(abspath, xs))
 
 T2 = TypeVar("T2")
@@ -596,6 +593,13 @@ reveal_type(f4)  # revealed: (x: str) -> str
 
 f5: Callable[[str], str] = id(lambda x: reveal_type(x))  # revealed: str
 reveal_type(f5)  # revealed: (x: str) -> str
+
+# The same return-context propagation works for generic calls whose context solves a ParamSpec.
+def id_callable[**P, R](x: Callable[P, R]) -> Callable[P, R]:
+    return x
+
+f5_paramspec: Callable[[int], int] = id_callable(lambda x: reveal_type(x))  # revealed: int
+reveal_type(f5_paramspec)  # revealed: (x: int) -> int
 
 # TODO: This should not error once we support `Unpack`.
 # error: [invalid-assignment]
@@ -778,6 +782,13 @@ x1 = []
 x1.append(1)
 x1.append("2")
 reveal_type(x1)  # revealed: list[int | str]
+```
+
+```py
+x1_sorted = []
+x1_sorted.append("x")
+x1_sorted.sort()
+reveal_type(x1_sorted)  # revealed: list[str]
 ```
 
 ```py
