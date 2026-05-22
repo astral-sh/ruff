@@ -273,7 +273,8 @@ class ProtocolPathSelfImplementation(BaseWithProtocolPathSelf):
         return [1]
 
 good_projected_path_receiver: Callable[[], int | str] = ProtocolPathSelfImplementation().method
-bad_projected_path_receiver: Callable[[], float] = ProtocolPathSelfImplementation().method  # error: [invalid-assignment]
+reveal_type(ProtocolPathSelfImplementation().method)  # revealed: Overload[() -> int, () -> str, () -> bytes]
+bad_projected_path_receiver: Callable[[], None] = ProtocolPathSelfImplementation().method  # error: [invalid-assignment]
 ```
 
 ## Constructor

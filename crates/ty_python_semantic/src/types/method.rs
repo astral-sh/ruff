@@ -88,7 +88,7 @@ impl<'db> BoundMethodType<'db> {
         let [signature] = function_signature.overloads.as_slice() else {
             let self_instance = self.self_instance(db);
             return CallableSignature::from_overloads(
-                function_signature.overloads.iter().filter_map(|signature| {
+                function_signature.overloads.iter().flat_map(|signature| {
                     signature.bind_self_to(db, self_instance, typing_self_type)
                 }),
             );

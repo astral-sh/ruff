@@ -951,7 +951,7 @@ impl<'db> Signature<'db> {
         }
     }
 
-    /// Returns the signature exposed after binding it to `self_type`.
+    /// Returns the signatures exposed after binding it to `self_type`.
     ///
     /// This is used to prune impossible overloads when a method is bound to a concrete receiver. If
     /// the receiver annotation contains inferable method type variables, we infer those from the
@@ -963,20 +963,20 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         self_type: Type<'db>,
         typing_self_type: Type<'db>,
-    ) -> Option<Self> {
+    ) -> SmallVec<[Self; 1]> {
         // A dynamic receiver might be compatible with any explicit receiver annotation.
         if self_type.is_dynamic() {
-            return Some(self.bind_self(db, Some(typing_self_type)));
+            return smallvec_inline![self.bind_self(db, Some(typing_self_type))];
         }
 
         // Without a first parameter, there is no receiver annotation to check.
         let Some(first_parameter) = self.parameters.get(0) else {
-            return Some(self.bind_self(db, Some(typing_self_type)));
+            return smallvec_inline![self.bind_self(db, Some(typing_self_type))];
         };
 
         // If there is no positional receiver, this signature cannot be pruned based on `self`.
         if !first_parameter.is_positional() {
-            return Some(self.bind_self(db, Some(typing_self_type)));
+            return smallvec_inline![self.bind_self(db, Some(typing_self_type))];
         }
 
         let mut expected_self_ty = first_parameter.annotated_type();
@@ -986,7 +986,7 @@ impl<'db> Signature<'db> {
         // Avoid the more expensive normalization below for receiver annotations that already
         // accept all values, or already exactly match the bound receiver.
         if accepts_any_or_exact_self(expected_self_ty) {
-            return Some(self.bind_self(db, Some(typing_self_type)));
+            return smallvec_inline![self.bind_self(db, Some(typing_self_type))];
         }
 
         // TODO: Expand type aliases here so `type Alias = Self` in a class body
@@ -995,7 +995,7 @@ impl<'db> Signature<'db> {
 
         // `Self` binding can make the receiver annotation trivially compatible.
         if accepts_any_or_exact_self(expected_self_ty) {
-            return Some(self.bind_self(db, Some(typing_self_type)));
+            return smallvec_inline![self.bind_self(db, Some(typing_self_type))];
         }
 
         // A specialized receiver can make generic receiver annotations concrete enough to compare.
@@ -1005,7 +1005,7 @@ impl<'db> Signature<'db> {
 
             // Specialization can also make the receiver annotation trivially compatible.
             if accepts_any_or_exact_self(expected_self_ty) {
-                return Some(self.bind_self(db, Some(typing_self_type)));
+                return smallvec_inline![self.bind_self(db, Some(typing_self_type))];
             }
         }
 
@@ -1013,18 +1013,16 @@ impl<'db> Signature<'db> {
         if inferable_typevars == InferableTypeVars::None || !expected_self_ty.has_typevar(db) {
             let when = self_type.when_constraint_set_assignable_to_owned(db, expected_self_ty);
             if when.query(|_, when| when.is_always_satisfied(db)) {
-                Some(self.bind_self(db, Some(typing_self_type)))
+                smallvec_inline![self.bind_self(db, Some(typing_self_type))]
             } else {
-                None
+                SmallVec::new()
             }
         } else {
             let Some(generic_context) = self.generic_context else {
-                return Some(self.bind_self(db, Some(typing_self_type)));
+                return smallvec_inline![self.bind_self(db, Some(typing_self_type))];
             };
             let constraints = ConstraintSetBuilder::new();
             let mut builder = SpecializationBuilder::new(db, &constraints, inferable_typevars);
-            builder.infer(expected_self_ty, self_type).ok()?;
-            let specialization = builder.build_with(generic_context, |_, _| None);
             let bind_if_valid = |specialization| {
                 // Inference can produce a candidate specialization that does not actually make the
                 // bound receiver compatible with the receiver annotation, especially for structural
@@ -1040,23 +1038,26 @@ impl<'db> Signature<'db> {
                 })
             };
 
-            if let Some(signature) = bind_if_valid(specialization) {
-                return Some(signature);
+            if matches!(expected_self_ty, Type::ProtocolInstance(_)) {
+                let when = self_type.when_constraint_set_assignable_to_owned(db, expected_self_ty);
+                let specializations = builder
+                    .specializations_from_owned_constraint_set(
+                        expected_self_ty,
+                        when,
+                        generic_context,
+                    )
+                    .unwrap_or_default();
+                return specializations
+                    .into_iter()
+                    .filter_map(bind_if_valid)
+                    .collect();
             }
 
-            if !matches!(expected_self_ty, Type::ProtocolInstance(_)) {
-                return None;
+            if builder.infer(expected_self_ty, self_type).is_err() {
+                return SmallVec::new();
             }
-
-            let when = self_type.when_constraint_set_assignable_to_owned(db, expected_self_ty);
-            let specializations = builder
-                .projected_specializations_from_owned_constraint_set(
-                    expected_self_ty,
-                    when,
-                    generic_context,
-                )
-                .ok()?;
-            specializations.into_iter().find_map(bind_if_valid)
+            let specialization = builder.build_with(generic_context, |_, _| None);
+            bind_if_valid(specialization).into_iter().collect()
         }
     }
 

@@ -1807,8 +1807,6 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
 /// type with respect to the type variable.
 pub(crate) type TypeVarAssignment<'db> = (BoundTypeVarIdentity<'db>, TypeVarVariance, Type<'db>);
 
-type ProjectedTypeMappingCandidate<'db> = (usize, BoundTypeVarInstance<'db>, Type<'db>);
-
 impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     pub(crate) fn new(
         db: &'db dyn Db,
@@ -1904,41 +1902,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         self.insert_type_mapping(bound_typevar, ty);
     }
 
-    fn projected_type_mapping_candidates_from_constraint_set(
-        &self,
-        set: ConstraintSet<'db, 'c>,
-    ) -> Result<Vec<Vec<ProjectedTypeMappingCandidate<'db>>>, ()> {
-        let mut saw_path = false;
-        let mut candidates = Vec::new();
-
-        set.for_each_direct_positive_constraint_path(self.constraints, |path| {
-            saw_path = true;
-            let mut path_candidates = Vec::new();
-            for (constraint, source_order) in path {
-                if !constraint.typevar.is_inferable(self.db, self.inferable) {
-                    continue;
-                }
-
-                // Keep non-inferable typevars inside the candidate type. In a call like
-                // `collect[T](items: Iterable[T])` with an argument `list[S]`, `T` should be
-                // inferred as the caller's `S`, even though only `T` is inferable here.
-                let ty = if constraint.lower.is_never() {
-                    if constraint.upper == Type::object() {
-                        continue;
-                    }
-                    constraint.upper
-                } else {
-                    constraint.lower
-                };
-
-                path_candidates.push((*source_order, constraint.typevar, ty));
-            }
-            candidates.push(path_candidates);
-        });
-
-        if saw_path { Ok(candidates) } else { Err(()) }
-    }
-
     /// Finds all of the valid specializations of a constraint set, and adds their type mappings to
     /// the specialization that this builder is building up.
     ///
@@ -1972,70 +1935,42 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         Ok(())
     }
 
-    /// Infer type mappings from a constraint set without solving the full structural proof.
-    ///
-    /// Structural protocol assignability can introduce large numbers of derived constraints while
-    /// proving that overloaded members are compatible. Those derived facts are valuable for the
-    /// proof, but they are too much information for specialization inference: we only need direct
-    /// evidence for type variables that belong to the signature currently being specialized.
-    fn add_projected_type_mappings_from_constraint_set(
-        &mut self,
-        formal: Type<'db>,
-        set: ConstraintSet<'db, 'c>,
-        mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
-    ) -> Result<(), ()> {
-        let candidates = self.projected_type_mapping_candidates_from_constraint_set(set)?;
-
-        let mut mappings = candidates.into_iter().flatten().collect_vec();
-        mappings.sort_by_key(|(source_order, _, _)| *source_order);
-
-        let mut seen = FxHashSet::default();
-        for (_, bound_typevar, ty) in mappings {
-            if !seen.insert((bound_typevar.identity(self.db), ty)) {
-                continue;
-            }
-            let variance = formal.variance_of(self.db, bound_typevar);
-            self.add_type_mapping(bound_typevar, ty, variance, &mut f);
-        }
-
-        Ok(())
-    }
-
-    fn add_projected_type_mappings_from_owned_constraint_set(
+    fn add_type_mappings_from_owned_constraint_set(
         &mut self,
         formal: Type<'db>,
         set: &'db OwnedConstraintSet<'db>,
         f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) -> Result<(), ()> {
         let set = self.constraints.load(self.db, set);
-        self.add_projected_type_mappings_from_constraint_set(formal, set, f)
+        self.add_type_mappings_from_constraint_set(formal, set, f)
     }
 
-    pub(crate) fn projected_specializations_from_owned_constraint_set(
+    pub(crate) fn specializations_from_owned_constraint_set(
         &self,
         formal: Type<'db>,
         set: &'db OwnedConstraintSet<'db>,
         generic_context: GenericContext<'db>,
     ) -> Result<Vec<Specialization<'db>>, ()> {
         let set = self.constraints.load(self.db, set);
-        let candidates = self.projected_type_mapping_candidates_from_constraint_set(set)?;
+        let set = set.remove_noninferable(self.db, self.constraints, self.inferable);
+        let solutions = match set.solutions(self.db, self.constraints) {
+            Solutions::Unsatisfiable => return Err(()),
+            Solutions::Unconstrained => vec![Vec::new()],
+            Solutions::Constrained(solutions) => solutions,
+        };
         let mut specializations = Vec::new();
         let mut seen = FxHashSet::default();
 
-        for mut mappings in candidates {
-            if mappings.is_empty() {
-                continue;
-            }
-            mappings.sort_by_key(|(source_order, _, _)| *source_order);
-
+        for solution in solutions {
             let mut builder = Self::new(self.db, self.constraints, self.inferable);
-            let mut seen_mappings = FxHashSet::default();
-            for (_, bound_typevar, ty) in mappings {
-                if !seen_mappings.insert((bound_typevar.identity(self.db), ty)) {
-                    continue;
-                }
-                let variance = formal.variance_of(self.db, bound_typevar);
-                builder.add_type_mapping(bound_typevar, ty, variance, |(_, _, ty)| Some(ty));
+            for binding in solution {
+                let variance = formal.variance_of(self.db, binding.bound_typevar);
+                builder.add_type_mapping(
+                    binding.bound_typevar,
+                    binding.solution,
+                    variance,
+                    |(_, _, ty)| Some(ty),
+                );
             }
 
             let specialization = builder.build_with(generic_context, |_, _| None);
@@ -2611,9 +2546,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // unsatisfied comparisons simply produced no type mappings), and avoids
                         // false positives for callable-wrapper patterns while this path is still
                         // a hybrid of old and new solver logic.
-                        let _ = self.add_projected_type_mappings_from_owned_constraint_set(
-                            formal, when, &mut f,
-                        );
+                        let _ =
+                            self.add_type_mappings_from_owned_constraint_set(formal, when, &mut f);
                         return Ok(());
                     }
 
@@ -2644,8 +2578,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // For protocol inference via constraint sets, keep unsatisfiable results non-fatal
                 // for now, matching the protocol constraint-set path in the nominal-instance
                 // arm above.
-                let _ = self
-                    .add_projected_type_mappings_from_owned_constraint_set(formal, when, &mut f);
+                let _ = self.add_type_mappings_from_owned_constraint_set(formal, when, &mut f);
                 return Ok(());
             }
 
