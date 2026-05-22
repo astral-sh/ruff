@@ -1492,8 +1492,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let is_unary_overload_aggregate_candidate_type = |ty: Type<'db>| {
             // Keep aggregate probing away from inference-sensitive shapes and defer them to the
-            // legacy path, which already handles typevar interactions.
-            !ty.has_typevar_or_typevar_instance(db)
+            // legacy path, which already handles dynamic/typevar interactions.
+            !ty.has_dynamic(db) && !ty.has_typevar_or_typevar_instance(db)
         };
 
         let other_parameter_type = single_required_positional_parameter_type(target_signature)?;

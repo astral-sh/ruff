@@ -2577,11 +2577,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     }
 
                     Type::ProtocolInstance(formal_protocol) => {
-                        // Tuple instances keep their element precision in `TupleSpec`, not in
-                        // their declared generic bases. Let structural protocol inference see that
-                        // tuple-specific shape instead of inferring from a lossy generic base.
-                        if actual_nominal.tuple_spec(self.db).is_none()
-                            && let Some(formal_nominal) = formal_protocol.to_nominal_instance()
+                        // Generic-base inference keeps bounded type variables precise for common
+                        // nominal containers such as `list[S]` passed to `Iterable[T]`. Avoid it
+                        // when the actual type contains a tuple specialization, since tuple
+                        // element precision is not represented in generic bases.
+                        if !any_over_type(self.db, actual, false, |ty| {
+                            ty.tuple_instance_spec(self.db).is_some()
+                        }) && let Some(formal_nominal) = formal_protocol.to_nominal_instance()
                             && let Some(formal_alias) =
                                 formal_nominal.class(self.db).into_generic_alias()
                             && self.infer_from_matching_generic_base(
