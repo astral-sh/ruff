@@ -9,7 +9,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
 use crate::{
-    TypeQualifiers,
+    Db, TypeQualifiers,
     diagnostic::format_enumeration,
     place::{place_from_bindings, place_from_declarations},
     types::{
@@ -29,11 +29,11 @@ use crate::{
             INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_BASE, INVALID_DATACLASS,
             INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE,
             INVALID_PROTOCOL, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
-            SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT, report_bad_frozen_dataclass_inheritance,
-            report_conflicting_metaclass_from_bases, report_duplicate_bases,
-            report_instance_layout_conflict, report_invalid_or_unsupported_base,
-            report_invalid_total_ordering, report_invalid_type_param_order,
-            report_invalid_typevar_default_reference,
+            SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT,
+            report_bad_frozen_dataclass_inheritance, report_conflicting_metaclass_from_bases,
+            report_duplicate_bases, report_instance_layout_conflict,
+            report_invalid_or_unsupported_base, report_invalid_total_ordering,
+            report_invalid_type_param_order, report_invalid_typevar_default_reference,
             report_named_tuple_field_with_leading_underscore,
             report_namedtuple_field_without_default_after_field_with_default,
             report_shadowed_type_variable,
@@ -381,6 +381,26 @@ pub(crate) fn check_static_class_definitions<'db>(
                 node,
                 base_is_frozen,
             );
+        }
+
+        if let Some(ordered_base_class) = ordered_dataclass_base_class(db, base_class)
+            && let Some(node) = source_node
+        {
+            // Suppress the diagnostic if the child class manually overrides all comparison
+            // methods, since the user has explicitly fixed the LSP violation.
+            if !class.has_own_comparison_methods(db)
+                && let Some(builder) = context.report_lint(&SUBCLASS_OF_DATACLASS_WITH_ORDER, node)
+            {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Class `{}` inherits from dataclass `{}` which has `order=True`",
+                    class.name(db),
+                    ordered_base_class.name(db),
+                ));
+                diagnostic.info(
+                    "Comparison of instances of the child class with instances \
+                    of the parent class will raise `TypeError` at runtime",
+                );
+            }
         }
     }
 
@@ -1048,6 +1068,27 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     class.validate_members(context);
+}
+
+fn ordered_dataclass_base_class<'db>(
+    db: &'db dyn Db,
+    base_class: ClassType<'db>,
+) -> Option<ClassType<'db>> {
+    for ancestor in base_class.iter_mro(db).filter_map(ClassBase::into_class) {
+        let Some((ancestor_literal, _)) = ancestor.static_class_literal(db) else {
+            continue;
+        };
+
+        if ancestor_literal.is_ordered_dataclass(db) {
+            return Some(ancestor);
+        }
+
+        if ancestor_literal.has_own_comparison_methods(db) {
+            return None;
+        }
+    }
+
+    None
 }
 
 /// Check that a `@final` class does not have unimplemented abstract methods.
