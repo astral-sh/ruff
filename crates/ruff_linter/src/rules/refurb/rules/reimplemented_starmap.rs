@@ -112,7 +112,7 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
             }
 
             // If the argument is used outside the function call, we can't replace it.
-            if any_over_expr(func, &|expr| {
+            if any_over_expr(func, |expr| {
                 expr.as_name_expr().is_some_and(|expr| expr.id == name.id)
             }) {
                 return;
@@ -128,7 +128,7 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
             }
 
             // If any of the members are used outside the function call, we can't replace it.
-            if any_over_expr(func, &|expr| {
+            if any_over_expr(func, |expr| {
                 tuple
                     .iter()
                     .any(|elem| ComparableExpr::from(expr) == ComparableExpr::from(elem))

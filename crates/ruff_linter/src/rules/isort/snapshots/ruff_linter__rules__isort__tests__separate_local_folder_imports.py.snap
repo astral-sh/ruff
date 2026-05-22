@@ -16,13 +16,13 @@ I001 [*] Import block is un-sorted or un-formatted
 help: Organize imports
 1  + import os
 2  | import sys
-3  + 
+3  +
 4  | import ruff
 5  + from ruff import check
-6  + 
+6  +
 7  | import leading_prefix
    - import os
-8  + 
+8  +
 9  + from .. import trailing_prefix
 10 | from . import leading_prefix
    - from .. import trailing_prefix

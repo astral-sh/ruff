@@ -60,18 +60,13 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/tuples.md
 error[unsupported-operator]: Unsupported `<` operation
   --> src/mdtest_snippet.py:12:5
    |
-10 |     # Ordering comparisons between incompatible types should emit errors
-11 |     # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[int, ...]` and `tuple[str, ...]`"
 12 |     a < b
    |     -^^^-
    |     |   |
    |     |   Has type `tuple[str, ...]`
    |     Has type `tuple[int, ...]`
-13 |     # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[str, ...]` and `tuple[int, ...]`"
-14 |     b < a
    |
 info: Operation fails because operator `<` is not supported between objects of type `int` and `str`
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -79,18 +74,13 @@ info: rule `unsupported-operator` is enabled by default
 error[unsupported-operator]: Unsupported `<` operation
   --> src/mdtest_snippet.py:14:5
    |
-12 |     a < b
-13 |     # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[str, ...]` and `tuple[int, ...]`"
 14 |     b < a
    |     -^^^-
    |     |   |
    |     |   Has type `tuple[int, ...]`
    |     Has type `tuple[str, ...]`
-15 |     # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[int, ...]` and `tuple[str]`"
-16 |     a < c
    |
 info: Operation fails because operator `<` is not supported between objects of type `str` and `int`
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -98,18 +88,13 @@ info: rule `unsupported-operator` is enabled by default
 error[unsupported-operator]: Unsupported `<` operation
   --> src/mdtest_snippet.py:16:5
    |
-14 |     b < a
-15 |     # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[int, ...]` and `tuple[str]`"
 16 |     a < c
    |     -^^^-
    |     |   |
    |     |   Has type `tuple[str]`
    |     Has type `tuple[int, ...]`
-17 |     # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[str]` and `tuple[int, ...]`"
-18 |     c < a
    |
 info: Operation fails because operator `<` is not supported between objects of type `int` and `str`
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -117,18 +102,13 @@ info: rule `unsupported-operator` is enabled by default
 error[unsupported-operator]: Unsupported `<` operation
   --> src/mdtest_snippet.py:18:5
    |
-16 |     a < c
-17 |     # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[str]` and `tuple[int, ...]`"
 18 |     c < a
    |     -^^^-
    |     |   |
    |     |   Has type `tuple[int, ...]`
    |     Has type `tuple[str]`
-19 | def _(
-20 |     var_int: tuple[int, ...],
    |
 info: Operation fails because operator `<` is not supported between objects of type `str` and `int`
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -136,18 +116,13 @@ info: rule `unsupported-operator` is enabled by default
 error[unsupported-operator]: Unsupported `<` operation
   --> src/mdtest_snippet.py:28:5
    |
-26 |     # Position 1 (if `var_int` has 2+ elements): `str` vs. `int` are not comparable.
-27 |     # error: [unsupported-operator]
 28 |     fixed_int_str < var_int
    |     -------------^^^-------
    |     |               |
    |     |               Has type `tuple[int, ...]`
    |     Has type `tuple[int, str]`
-29 |
-30 |     # Variable `tuple[int, ...]` vs. fixed `tuple[int, str]`:
    |
 info: Operation fails because operator `<` is not supported between objects of type `str` and `int`
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -155,18 +130,13 @@ info: rule `unsupported-operator` is enabled by default
 error[unsupported-operator]: Unsupported `<` operation
   --> src/mdtest_snippet.py:34:5
    |
-32 |     # Position 1 (if `var_int` has 2+ elements): `int` vs. `str` are not comparable.
-33 |     # error: [unsupported-operator]
 34 |     var_int < fixed_int_str
    |     -------^^^-------------
    |     |         |
    |     |         Has type `tuple[int, str]`
    |     Has type `tuple[int, ...]`
-35 |
-36 |     # Variable `tuple[str, ...]` vs. fixed `tuple[int, str]`:
    |
 info: Operation fails because operator `<` is not supported between objects of type `int` and `str`
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -174,8 +144,6 @@ info: rule `unsupported-operator` is enabled by default
 error[unsupported-operator]: Unsupported `<` operation
   --> src/mdtest_snippet.py:39:5
    |
-37 |     # Position 0: `str` vs. `int` are not comparable.
-38 |     # error: [unsupported-operator]
 39 |     var_str < fixed_int_str
    |     -------^^^-------------
    |     |         |
@@ -183,6 +151,5 @@ error[unsupported-operator]: Unsupported `<` operation
    |     Has type `tuple[str, ...]`
    |
 info: Operation fails because operator `<` is not supported between objects of type `str` and `int`
-info: rule `unsupported-operator` is enabled by default
 
 ```

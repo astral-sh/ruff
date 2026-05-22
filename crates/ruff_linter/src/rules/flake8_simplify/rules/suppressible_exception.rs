@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
+use ruff_python_ast::{PythonVersion, helpers};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
@@ -83,6 +83,7 @@ fn is_empty(body: &[Stmt]) -> bool {
 pub(crate) fn suppressible_exception(
     checker: &Checker,
     stmt: &Stmt,
+    is_star: bool,
     try_body: &[Stmt],
     handlers: &[ExceptHandler],
     orelse: &[Stmt],
@@ -101,6 +102,7 @@ pub(crate) fn suppressible_exception(
             | Stmt::Pass(_)]
     ) || !orelse.is_empty()
         || !finalbody.is_empty()
+        || (is_star && checker.target_version() <= PythonVersion::PY311)
     {
         return;
     }

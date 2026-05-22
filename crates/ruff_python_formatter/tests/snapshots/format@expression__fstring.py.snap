@@ -774,6 +774,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Enabled
 target_version             = 3.10
 source_type                = Python
+nested-string-quote-style  = alternating
 ```
 
 ```python
@@ -1337,27 +1338,15 @@ if f"aaaaaaaaaaa {ttttteeeeeeeeest} more {  # comment
 }":
     pass
 
-if f"aaaaaaaaaaa {
-    [
-        ttttteeeeeeeeest,
-    ]
-} more {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}":
+if f"aaaaaaaaaaa {[ttttteeeeeeeeest]} more {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}":
     pass
 
-if f"aaaaaaaaaaa {
-    [
-        ttttteeeeeeeeest,
-    ]
-} more {
+if f"aaaaaaaaaaa {[ttttteeeeeeeeest]} more {
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 }":
     pass
 
-if f"aaaaaaaaaaa {
-    [
-        ttttteeeeeeeeest,
-    ]
-} more {
+if f"aaaaaaaaaaa {[ttttteeeeeeeeest]} more {
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 }":
     pass
@@ -1605,6 +1594,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.10
 source_type                = Python
+nested-string-quote-style  = alternating
 ```
 
 ```python
@@ -2168,27 +2158,15 @@ if f"aaaaaaaaaaa {ttttteeeeeeeeest} more {  # comment
 }":
     pass
 
-if f"aaaaaaaaaaa {
-    [
-        ttttteeeeeeeeest,
-    ]
-} more {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}":
+if f"aaaaaaaaaaa {[ttttteeeeeeeeest]} more {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}":
     pass
 
-if f"aaaaaaaaaaa {
-    [
-        ttttteeeeeeeeest,
-    ]
-} more {
+if f"aaaaaaaaaaa {[ttttteeeeeeeeest]} more {
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 }":
     pass
 
-if f"aaaaaaaaaaa {
-    [
-        ttttteeeeeeeeest,
-    ]
-} more {
+if f"aaaaaaaaaaa {[ttttteeeeeeeeest]} more {
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 }":
     pass

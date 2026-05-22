@@ -129,6 +129,23 @@ def narrow_a[B: A](a: A, b: B):
         reveal_type(type_of_a)  # revealed: type[B@narrow_a]
 ```
 
+Narrowing through `type[T]` or `Type[T]` should preserve the type variable identity, so the narrowed
+value remains assignable to `T`:
+
+```py
+from typing import Type, TypeVar
+
+LegacyT = TypeVar("LegacyT", int, str)
+
+def legacy_typevar_narrowing(x: int | str, t: Type[LegacyT]) -> LegacyT:
+    assert isinstance(x, t)
+    return x
+
+def pep695_typevar_narrowing[T: (int, str)](x: int | str, t: type[T]) -> T:
+    assert isinstance(x, t)
+    return x
+```
+
 ## `__class__`
 
 ```py
@@ -153,7 +170,7 @@ from typing import Self
 class B:
     def __init__(self, x: int) -> None: ...
     def clone(self: Self) -> Self:
-        # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `int`, found `Literal["x"]`"
+        # error: [invalid-argument-type] "Argument to `B.__init__` is incorrect: Expected `int`, found `Literal["x"]`"
         self.__class__("x")
         return self.__class__(1)
 ```
@@ -267,6 +284,27 @@ def _[T: (int | str, int)](_: T):
     static_assert(not is_disjoint_from(type[int], type[T]))
 ```
 
+## Metaclass instances
+
+```py
+class Meta3(type): ...
+class Base(metaclass=Meta3): ...
+class Derived(Base): ...
+class Other: ...
+
+def unbounded[T](x: type[T], y: Meta3):
+    y = x  # error: [invalid-assignment]
+
+def bounded[T: Base](x: type[T], y: Meta3):
+    y = x
+
+def constrained[T: (Base, Derived)](x: type[T], y: Meta3):
+    y = x
+
+def mixed_constraints[T: (Base, Other)](x: type[T], y: Meta3):
+    y = x  # error: [invalid-assignment]
+```
+
 ```py
 class X[T]:
     value: T
@@ -281,6 +319,8 @@ def _[T](x: X[type[T]]):
 ## Generic Type Inference
 
 ```py
+from typing import Callable
+
 def f1[T](x: type[T]) -> type[T]:
     return x
 
@@ -293,14 +333,46 @@ def f2[T](x: T) -> type[T]:
 reveal_type(f2(int(1)))  # revealed: type[int]
 reveal_type(f2(object()))  # revealed: type
 
-# TODO: This should reveal `type[Literal[1]]`.
-reveal_type(f2(1))  # revealed: type[Unknown]
+reveal_type(f2(1))  # revealed: <class 'int'>
+reveal_type(f2(type))  # revealed: <class 'type'>
+
+def foo() -> int:
+    return 1
+
+reveal_type(f2(foo))  # revealed: <class 'FunctionType'>
+
+def _(x: Callable[[int], int]):
+    reveal_type(f2(x))  # revealed: type
+
+class Meta(type): ...
+class Base(metaclass=Meta): ...
+
+reveal_type(f2(Base))  # revealed: <class 'Meta'>
+reveal_type(type(Base))  # revealed: <class 'Meta'>
+
+class MetaWithAttr(type):
+    meta_attr: int
+
+class BaseWithAttr(metaclass=MetaWithAttr): ...
+
+def _[T: type[BaseWithAttr]](x: type[T]) -> None:
+    reveal_type(x.meta_attr)  # revealed: int
 
 def f3[T](x: type[T]) -> T:
     return x()
 
 reveal_type(f3(int))  # revealed: int
 reveal_type(f3(object))  # revealed: object
+
+class NeedsArgument:
+    def __new__[T: NeedsArgument](cls: type[T]) -> T:
+        return super().__new__(cls)
+
+    def __init__(self, value: str) -> None: ...
+
+def f4[T: NeedsArgument](x: type[T]) -> T:
+    # error: [missing-argument]
+    return x()
 ```
 
 ## Default Parameter
@@ -499,7 +571,7 @@ expects_type_c_default_of_int_str(C[str, int])
 the class that the instance-type refers to.
 
 ```py
-from ty_extensions import CallableTypeOf
+from ty_extensions import RegularCallableTypeOf
 
 class TakesStrInConstructor:
     def __init__(self, x: int, y: str | None = None): ...
@@ -564,15 +636,15 @@ def f[
     reveal_type(type_t_constrained(42, 42))  # revealed: T4@f
 
     def g(
-        object_class_upcast: CallableTypeOf[object],
-        bare_type_upcast: CallableTypeOf[bare_type],
-        type_object_upcast: CallableTypeOf[type_object],
-        type_t_unbound_upcast: CallableTypeOf[type_t_unbound],
-        type_t_object_bound_upcast: CallableTypeOf[type_t_object_bound],
-        type_int_upcast: CallableTypeOf[type_int],
-        type_t_int_bound_upcast: CallableTypeOf[type_t_int_bound],
-        type_t_union_bound_upcast: CallableTypeOf[type_t_union_bound],
-        type_t_constrained_upcast: CallableTypeOf[type_t_constrained],
+        object_class_upcast: RegularCallableTypeOf[object],
+        bare_type_upcast: RegularCallableTypeOf[bare_type],
+        type_object_upcast: RegularCallableTypeOf[type_object],
+        type_t_unbound_upcast: RegularCallableTypeOf[type_t_unbound],
+        type_t_object_bound_upcast: RegularCallableTypeOf[type_t_object_bound],
+        type_int_upcast: RegularCallableTypeOf[type_int],
+        type_t_int_bound_upcast: RegularCallableTypeOf[type_t_int_bound],
+        type_t_union_bound_upcast: RegularCallableTypeOf[type_t_union_bound],
+        type_t_constrained_upcast: RegularCallableTypeOf[type_t_constrained],
     ):
         reveal_type(object_class_upcast)  # revealed: () -> object
 

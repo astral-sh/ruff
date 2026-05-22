@@ -5,4 +5,3 @@ def name_2[T: Any](x: T):
         pass
     except x:
         pass
-

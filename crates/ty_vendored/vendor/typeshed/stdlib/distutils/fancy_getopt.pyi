@@ -11,8 +11,7 @@ additional features:
 from collections.abc import Iterable, Mapping
 from getopt import _SliceableT, _StrSequenceT_co
 from re import Pattern
-from typing import Any, Final, overload
-from typing_extensions import TypeAlias
+from typing import Any, Final, TypeAlias, overload
 
 _Option: TypeAlias = tuple[str, str | None, str]
 
@@ -34,6 +33,7 @@ class FancyGetopt:
     """
 
     def __init__(self, option_table: list[_Option] | None = None) -> None: ...
+
     # TODO: kinda wrong, `getopt(object=object())` is invalid
     @overload
     def getopt(
@@ -49,11 +49,11 @@ class FancyGetopt:
         'args' is a modified copy of the passed-in 'args' list, which
         is left untouched.
         """
-
     @overload
     def getopt(
         self, args: _SliceableT[_StrSequenceT_co] | None, object: Any
     ) -> _StrSequenceT_co: ...  # object is an arbitrary non-slotted object
+
     def get_option_order(self) -> list[tuple[str, str]]:
         """Returns the list of (option, value) tuples processed by the
         previous run of 'getopt()'.  Raises RuntimeError if

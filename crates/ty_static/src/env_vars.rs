@@ -73,18 +73,6 @@ impl EnvVars {
     /// Used to determine the root install path of Conda.
     pub const CONDA_ROOT: &'static str = "_CONDA_ROOT";
 
-    /// Filter which tests to run in mdtest.
-    ///
-    /// Only tests whose names contain this filter string will be executed.
-    #[attr_hidden]
-    pub const MDTEST_TEST_FILTER: &'static str = "MDTEST_TEST_FILTER";
-
-    /// Switch mdtest output format to GitHub Actions annotations.
-    ///
-    /// If set (to any value), mdtest will output errors in GitHub Actions format.
-    #[attr_hidden]
-    pub const MDTEST_GITHUB_ANNOTATIONS_FORMAT: &'static str = "MDTEST_GITHUB_ANNOTATIONS_FORMAT";
-
     // Externally defined environment variables
 
     /// Specifies an upper limit for the number of threads ty uses when performing work in parallel.

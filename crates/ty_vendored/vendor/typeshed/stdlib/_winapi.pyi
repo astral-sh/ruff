@@ -29,6 +29,14 @@ if sys.platform == "win32":
     ERROR_PIPE_CONNECTED: Final = 535
     ERROR_SEM_TIMEOUT: Final = 121
 
+    if sys.version_info >= (3, 15):
+        EVENTLOG_AUDIT_FAILURE: Final = 16
+        EVENTLOG_AUDIT_SUCCESS: Final = 8
+        EVENTLOG_ERROR_TYPE: Final = 1
+        EVENTLOG_INFORMATION_TYPE: Final = 4
+        EVENTLOG_SUCCESS: Final = 0
+        EVENTLOG_WARNING_TYPE: Final = 2
+
     FILE_FLAG_FIRST_PIPE_INSTANCE: Final = 0x80000
     FILE_FLAG_OVERLAPPED: Final = 0x40000000
 
@@ -127,22 +135,21 @@ if sys.platform == "win32":
     WAIT_OBJECT_0: Final = 0
     WAIT_TIMEOUT: Final = 258
 
-    if sys.version_info >= (3, 10):
-        LOCALE_NAME_INVARIANT: Final[str]
-        LOCALE_NAME_MAX_LENGTH: Final[int]
-        LOCALE_NAME_SYSTEM_DEFAULT: Final[str]
-        LOCALE_NAME_USER_DEFAULT: Final[str | None]
+    LOCALE_NAME_INVARIANT: Final[str]
+    LOCALE_NAME_MAX_LENGTH: Final[int]
+    LOCALE_NAME_SYSTEM_DEFAULT: Final[str]
+    LOCALE_NAME_USER_DEFAULT: Final[str | None]
 
-        LCMAP_FULLWIDTH: Final[int]
-        LCMAP_HALFWIDTH: Final[int]
-        LCMAP_HIRAGANA: Final[int]
-        LCMAP_KATAKANA: Final[int]
-        LCMAP_LINGUISTIC_CASING: Final[int]
-        LCMAP_LOWERCASE: Final[int]
-        LCMAP_SIMPLIFIED_CHINESE: Final[int]
-        LCMAP_TITLECASE: Final[int]
-        LCMAP_TRADITIONAL_CHINESE: Final[int]
-        LCMAP_UPPERCASE: Final[int]
+    LCMAP_FULLWIDTH: Final[int]
+    LCMAP_HALFWIDTH: Final[int]
+    LCMAP_HIRAGANA: Final[int]
+    LCMAP_KATAKANA: Final[int]
+    LCMAP_LINGUISTIC_CASING: Final[int]
+    LCMAP_LOWERCASE: Final[int]
+    LCMAP_SIMPLIFIED_CHINESE: Final[int]
+    LCMAP_TITLECASE: Final[int]
+    LCMAP_TRADITIONAL_CHINESE: Final[int]
+    LCMAP_UPPERCASE: Final[int]
 
     if sys.version_info >= (3, 12):
         COPYFILE2_CALLBACK_CHUNK_STARTED: Final = 1
@@ -184,6 +191,7 @@ if sys.platform == "win32":
     def ConnectNamedPipe(handle: int, overlapped: Literal[False] = False) -> None: ...
     @overload
     def ConnectNamedPipe(handle: int, overlapped: bool) -> Overlapped | None: ...
+
     def CreateFile(
         file_name: str,
         desired_access: int,
@@ -262,6 +270,9 @@ if sys.platform == "win32":
     def ExitProcess(ExitCode: int, /) -> NoReturn: ...
     def GetACP() -> int:
         """Get the current Windows ANSI code page identifier."""
+    if sys.version_info >= (3, 15):
+        def DeregisterEventSource(handle: int, /) -> None: ...
+        def GetOEMCP() -> int: ...
 
     def GetFileType(handle: int) -> int: ...
     def GetCurrentProcess() -> int:
@@ -299,9 +310,12 @@ if sys.platform == "win32":
     ) -> int: ...
     def OpenProcess(desired_access: int, inherit_handle: bool, process_id: int, /) -> int: ...
     def PeekNamedPipe(handle: int, size: int = 0, /) -> tuple[int, int] | tuple[bytes, int, int]: ...
-    if sys.version_info >= (3, 10):
-        def LCMapStringEx(locale: str, flags: int, src: str) -> str: ...
-        def UnmapViewOfFile(address: int, /) -> None: ...
+    def LCMapStringEx(locale: str, flags: int, src: str) -> str: ...
+    if sys.version_info >= (3, 15):
+        def RegisterEventSource(unc_server_name: str | None, source_name: str, /) -> int: ...
+        def ReportEvent(handle: int, type: int, category: int, event_id: int, string: str, /) -> None: ...
+
+    def UnmapViewOfFile(address: int, /) -> None: ...
 
     @overload
     def ReadFile(handle: int, size: int, overlapped: Literal[True]) -> tuple[Overlapped, int]: ...
@@ -309,6 +323,7 @@ if sys.platform == "win32":
     def ReadFile(handle: int, size: int, overlapped: Literal[False] = False) -> tuple[bytes, int]: ...
     @overload
     def ReadFile(handle: int, size: int, overlapped: int | bool) -> tuple[Any, int]: ...
+
     def SetNamedPipeHandleState(
         named_pipe: int, mode: int | None, max_collection_count: int | None, collect_data_timeout: int | None, /
     ) -> None: ...
@@ -326,12 +341,14 @@ if sys.platform == "win32":
         """
 
     def WaitNamedPipe(name: str, timeout: int, /) -> None: ...
+
     @overload
     def WriteFile(handle: int, buffer: ReadableBuffer, overlapped: Literal[True]) -> tuple[Overlapped, int]: ...
     @overload
     def WriteFile(handle: int, buffer: ReadableBuffer, overlapped: Literal[False] = False) -> tuple[int, int]: ...
     @overload
     def WriteFile(handle: int, buffer: ReadableBuffer, overlapped: int | bool) -> tuple[Any, int]: ...
+
     @final
     class Overlapped:
         """OVERLAPPED structure wrapper"""

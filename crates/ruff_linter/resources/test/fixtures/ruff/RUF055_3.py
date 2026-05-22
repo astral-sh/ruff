@@ -21,4 +21,7 @@ re.sub(rb"ab[c]", b"", b_src)
 re.match(rb"ab[c]", b_src)
 re.search(rb"ab[c]", b_src)
 re.fullmatch(rb"ab[c]", b_src)
-re.split(rb"ab[c]", b_src) 
+re.split(rb"ab[c]", b_src)
+
+# Empty pattern: re.split(rb"", b_src) should not be flagged
+re.split(rb"", b_src)

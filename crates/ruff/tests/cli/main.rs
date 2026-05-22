@@ -18,6 +18,8 @@ use tempfile::TempDir;
 mod analyze_graph;
 mod format;
 mod lint;
+mod show_settings;
+mod version;
 
 const BIN_NAME: &str = "ruff";
 

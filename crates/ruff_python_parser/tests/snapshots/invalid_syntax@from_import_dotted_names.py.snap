@@ -34,6 +34,7 @@ Module(
                         },
                     ],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
             ImportFrom(
@@ -70,6 +71,7 @@ Module(
                         },
                     ],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
             ImportFrom(
@@ -156,6 +158,7 @@ Module(
                         },
                     ],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
         ],

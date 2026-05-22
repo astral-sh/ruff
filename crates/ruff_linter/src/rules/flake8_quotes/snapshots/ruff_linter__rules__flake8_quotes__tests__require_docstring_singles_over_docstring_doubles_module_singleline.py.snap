@@ -12,5 +12,5 @@ help: Replace double quotes docstring with single quotes
   - """ Double quotes singleline module docstring """
 1 + ''' Double quotes singleline module docstring '''
 2 | """ this is not a docstring """
-3 | 
+3 |
 4 | def foo():

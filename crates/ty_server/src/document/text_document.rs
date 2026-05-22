@@ -24,7 +24,7 @@ pub struct TextDocument {
     version: DocumentVersion,
 
     /// The language ID of the document as provided by the client.
-    language_id: Option<LanguageId>,
+    language_id: LanguageId,
 
     /// For cells, the path to the notebook document.
     notebook: Option<AnySystemPath>,
@@ -46,20 +46,14 @@ impl From<&str> for LanguageId {
 }
 
 impl TextDocument {
-    pub fn new(url: Url, contents: String, version: DocumentVersion) -> Self {
+    pub fn new(url: Url, contents: String, version: DocumentVersion, language_id: &str) -> Self {
         Self {
             url,
             contents,
             version,
-            language_id: None,
+            language_id: LanguageId::from(language_id),
             notebook: None,
         }
-    }
-
-    #[must_use]
-    pub fn with_language_id(mut self, language_id: &str) -> Self {
-        self.language_id = Some(LanguageId::from(language_id));
-        self
     }
 
     #[must_use]
@@ -84,7 +78,7 @@ impl TextDocument {
         self.version
     }
 
-    pub fn language_id(&self) -> Option<LanguageId> {
+    pub fn language_id(&self) -> LanguageId {
         self.language_id
     }
 
@@ -177,6 +171,7 @@ def interface():
 "#
             .to_string(),
             0,
+            "python",
         );
 
         // Add an `s`, remove it again (back to the original code), and then re-add the `s`

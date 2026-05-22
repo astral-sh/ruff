@@ -1,0 +1,10 @@
+rules:
+  # TODO(charlie): Move these workflows to use dedicated GitHub environments.
+  secrets-outside-env:
+    ignore:
+      - notify-dependents.yml
+      - publish-docs.yml
+      - publish-playground.yml
+      - publish-ty-playground.yml
+      - publish-versions.yml
+      - publish-wasm.yml

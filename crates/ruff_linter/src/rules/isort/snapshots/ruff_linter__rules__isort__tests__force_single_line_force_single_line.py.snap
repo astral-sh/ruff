@@ -46,7 +46,7 @@ help: Organize imports
    - from logging.handlers import StreamHandler, FileHandler
 8  + from logging.handlers import FileHandler, StreamHandler
 9  + from os import path, uname
-10 | 
+10 |
    - # comment 1
    - from third_party import lib1, lib2, \
    -      lib3, lib7, lib5, lib6
@@ -55,7 +55,7 @@ help: Organize imports
 11 + # comment 6
 12 + from bar import a  # comment 7
 13 + from bar import b  # comment 8
-14 | 
+14 |
 15 + # comment 9
 16 + from baz import *  # comment 10
 17 | from foo import bar  # comment 3
@@ -63,7 +63,7 @@ help: Organize imports
    - from foo3 import bar3, baz3  # comment 5
 19 + from foo3 import bar3  # comment 5
 20 + from foo3 import baz3  # comment 5
-21 | 
+21 |
    - # comment 6
    - from bar import (
    -      a, # comment 7
@@ -73,7 +73,7 @@ help: Organize imports
 23 + from third_party import lib1
 24 + from third_party import lib2
 25 + from third_party import lib3
-26 | 
+26 |
    - # comment 9
    - from baz import *  # comment 10
 27 + # comment 2

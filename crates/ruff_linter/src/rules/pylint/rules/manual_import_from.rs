@@ -83,6 +83,9 @@ pub(crate) fn manual_from_import(checker: &Checker, stmt: &Stmt, alias: &Alias, 
         alias.range(),
     );
     if names.len() == 1 {
+        let is_lazy = stmt
+            .as_import_stmt()
+            .is_some_and(|import_stmt| import_stmt.is_lazy);
         let node = ast::StmtImportFrom {
             module: Some(Identifier::new(module.to_string(), TextRange::default())),
             names: vec![Alias {
@@ -92,6 +95,7 @@ pub(crate) fn manual_from_import(checker: &Checker, stmt: &Stmt, alias: &Alias, 
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }],
             level: 0,
+            is_lazy,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         };

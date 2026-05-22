@@ -5,7 +5,7 @@ use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite, X
 
 use ruff_source_file::LineColumn;
 
-use crate::diagnostic::{Diagnostic, SecondaryCode, render::FileResolver};
+use crate::diagnostic::{Diagnostic, SecondaryCode, Severity, render::FileResolver};
 
 /// Print diagnostics as a JUnit-style XML report.
 ///
@@ -80,6 +80,7 @@ impl<'a> JunitRenderer<'a> {
                         status,
                     );
                     case.set_classname(classname.to_str().unwrap_or(filename));
+                    case.add_property(("severity", severity_name(diagnostic.severity())));
 
                     if let Some(location) = location {
                         case.extra.insert(
@@ -100,6 +101,15 @@ impl<'a> JunitRenderer<'a> {
 
         let adapter = FmtAdapter { fmt: f };
         report.serialize(adapter).map_err(|_| std::fmt::Error)
+    }
+}
+
+const fn severity_name(severity: Severity) -> &'static str {
+    match severity {
+        Severity::Info => "info",
+        Severity::Warning => "warning",
+        Severity::Error => "error",
+        Severity::Fatal => "fatal",
     }
 }
 

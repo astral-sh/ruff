@@ -23,6 +23,12 @@ DEFAULT_TARGETS = [
     Project(
         repo=Repository(owner="apache", name="airflow", ref="main"),
         check_options=CheckOptions(select="ALL"),
+        config_overrides={
+            # Broken symlink
+            "exclude": [
+                "task-sdk/src/airflow/sdk/_shared/AGENTS.md",
+            ]
+        },
     ),
     Project(
         repo=Repository(owner="apache", name="superset", ref="master"),

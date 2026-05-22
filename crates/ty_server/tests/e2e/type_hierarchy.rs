@@ -17,7 +17,6 @@ class Derived(Base):
 "#;
 
     let mut server = TestServerBuilder::new()?
-        .enable_pull_diagnostics(true)
         .with_file("foo.py", content)?
         .build()
         .wait_until_workspaces_are_initialized();
@@ -50,7 +49,6 @@ class Child2(Base):
 "#;
 
     let mut server = TestServerBuilder::new()?
-        .enable_pull_diagnostics(true)
         .with_file("foo.py", content)?
         .build()
         .wait_until_workspaces_are_initialized();
@@ -86,7 +84,6 @@ class Child(Parent):
 "#;
 
     let mut server = TestServerBuilder::new()?
-        .enable_pull_diagnostics(true)
         .with_file("foo.py", content)?
         .build()
         .wait_until_workspaces_are_initialized();
@@ -131,7 +128,6 @@ class Child(Parent):
 fn vendored_supertypes() -> anyhow::Result<()> {
     let content = "from enum import StrEnum";
     let mut server = TestServerBuilder::new()?
-        .enable_pull_diagnostics(true)
         .with_file("foo.py", content)?
         .build()
         .wait_until_workspaces_are_initialized();

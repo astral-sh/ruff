@@ -157,7 +157,7 @@ class C(Generic[T, P]):
     # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
     c: ClassVar[int | T]
 
-    # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     d: ClassVar[P]
 
     # No error: no type variables
@@ -199,6 +199,67 @@ reveal_type(Base.all_instances)  # revealed: list[Base]
 class Sub(Base): ...
 
 reveal_type(Sub.all_instances)  # revealed: list[Sub]
+```
+
+Assignments through class objects should bind `Self` when writing a `ClassVar`, matching read-side
+behavior. This remains permissive for `type[Base]` values even though `ClassVar[Self]` in non-final
+classes is unsound.
+
+```py
+from typing import ClassVar, Self, TypeVar
+
+class Saved:
+    latest: ClassVar[Self]
+
+    def save(self) -> None:
+        type(self).latest = self
+
+Saved.latest = Saved()
+
+reveal_type(Saved.latest)  # revealed: Saved
+
+class SavedSub(Saved): ...
+
+reveal_type(SavedSub.latest)  # revealed: SavedSub
+
+SavedSub.latest = SavedSub()
+
+SavedSub.latest = Saved()  # error: [invalid-assignment]
+
+def store_saved(cls: type[Saved]) -> None:
+    cls.latest = Saved()
+
+T = TypeVar("T", bound=Saved)
+
+def store_generic(cls: type[T], value: T) -> None:
+    cls.latest = value
+```
+
+Assignments through gradual class objects remain permissive.
+
+```py
+from typing import Any, ClassVar, reveal_type
+
+class DynamicSaved:
+    count: ClassVar[int]
+
+def store_any(cls: type[Any], value: Any) -> None:
+    cls.count = value
+    reveal_type(cls.count)  # revealed: Any
+```
+
+Assignments through generic aliases still resolve class variables.
+
+```py
+from typing import ClassVar, Generic, TypeVar, reveal_type
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    count: ClassVar[int]
+
+Box[int].count = 1
+reveal_type(Box[int].count)  # revealed: int
 ```
 
 ## Combining `ClassVar` and `Final` in normal classes
@@ -333,10 +394,10 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import ClassVar
+from typing import ClassVar, TypedDict
 from ty_extensions import reveal_mro
 
-# error: [invalid-type-form] "`ClassVar` annotations are only allowed in class-body scopes"
+# error: [invalid-type-form] "`ClassVar` is only allowed in class bodies"
 x: ClassVar[int] = 1
 
 class C:
@@ -344,24 +405,22 @@ class C:
         # error: [invalid-type-form] "`ClassVar` annotations are not allowed for non-name targets"
         self.x: ClassVar[int] = 1
 
-        # error: [invalid-type-form] "`ClassVar` annotations are only allowed in class-body scopes"
+        # error: [invalid-type-form] "`ClassVar` is only allowed in class bodies"
         y: ClassVar[int] = 1
 
-# error: [invalid-type-form] "`ClassVar` is not allowed in function parameter annotations"
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in parameter annotations"
 def f(x: ClassVar[int]) -> None:
     pass
 
-# error: [invalid-type-form] "`ClassVar` is not allowed in function parameter annotations"
-# error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in parameter annotations"
 def f[T](x: ClassVar[T]) -> T:
     return x
 
-# error: [invalid-type-form] "`ClassVar` is not allowed in function return type annotations"
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in return type annotations"
 def f() -> ClassVar[int]:
     return 1
 
-# error: [invalid-type-form] "`ClassVar` is not allowed in function return type annotations"
-# error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in return type annotations"
 def f[T](x: T) -> ClassVar[T]:
     return x
 
@@ -371,6 +430,12 @@ class Foo(ClassVar[tuple[int]]): ...
 # TODO: Show `Unknown` instead of `@Todo` type in the MRO; or ignore `ClassVar` and show the MRO as if `ClassVar` was not there
 # revealed: (<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>)
 reveal_mro(Foo)
+
+class Foo(TypedDict):
+    # error: [invalid-type-form] "`ClassVar` is not allowed in TypedDict fields"
+    x: ClassVar[int]
+    # error: [invalid-type-form] "`ClassVar` is not allowed in TypedDict fields"
+    y: ClassVar
 ```
 
 [`typing.classvar`]: https://docs.python.org/3/library/typing.html#typing.ClassVar

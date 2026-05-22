@@ -9,13 +9,8 @@ from types import TracebackType
 from typing import Any, Literal, TypeVar
 from typing_extensions import Self
 
-from .events import AbstractEventLoop
 from .futures import Future
-
-if sys.version_info >= (3, 10):
-    from .mixins import _LoopBoundMixin
-else:
-    _LoopBoundMixin = object
+from .mixins import _LoopBoundMixin
 
 # Keep asyncio.__all__ updated with any changes to __all__ here
 if sys.version_info >= (3, 11):
@@ -84,11 +79,7 @@ class Lock(_ContextManagerMixin, _LoopBoundMixin):
     """
 
     _waiters: deque[Future[Any]] | None
-    if sys.version_info >= (3, 10):
-        def __init__(self) -> None: ...
-    else:
-        def __init__(self, *, loop: AbstractEventLoop | None = None) -> None: ...
-
+    def __init__(self) -> None: ...
     def locked(self) -> bool:
         """Return True if lock is acquired."""
 
@@ -121,11 +112,7 @@ class Event(_LoopBoundMixin):
     """
 
     _waiters: deque[Future[Any]]
-    if sys.version_info >= (3, 10):
-        def __init__(self) -> None: ...
-    else:
-        def __init__(self, *, loop: AbstractEventLoop | None = None) -> None: ...
-
+    def __init__(self) -> None: ...
     def is_set(self) -> bool:
         """Return True if and only if the internal flag is true."""
 
@@ -160,11 +147,7 @@ class Condition(_ContextManagerMixin, _LoopBoundMixin):
     """
 
     _waiters: deque[Future[Any]]
-    if sys.version_info >= (3, 10):
-        def __init__(self, lock: Lock | None = None) -> None: ...
-    else:
-        def __init__(self, lock: Lock | None = None, *, loop: AbstractEventLoop | None = None) -> None: ...
-
+    def __init__(self, lock: Lock | None = None) -> None: ...
     def locked(self) -> bool: ...
     async def acquire(self) -> Literal[True]: ...
     def release(self) -> None: ...
@@ -230,11 +213,7 @@ class Semaphore(_ContextManagerMixin, _LoopBoundMixin):
 
     _value: int
     _waiters: deque[Future[Any]] | None
-    if sys.version_info >= (3, 10):
-        def __init__(self, value: int = 1) -> None: ...
-    else:
-        def __init__(self, value: int = 1, *, loop: AbstractEventLoop | None = None) -> None: ...
-
+    def __init__(self, value: int = 1) -> None: ...
     def locked(self) -> bool:
         """Returns True if semaphore cannot be acquired immediately."""
 

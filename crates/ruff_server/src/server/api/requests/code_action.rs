@@ -1,11 +1,13 @@
 use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
+use ruff_python_ast::SourceType;
 use rustc_hash::FxHashSet;
 use types::{CodeActionKind, CodeActionOrCommand};
 
 use crate::DIAGNOSTIC_NAME;
 use crate::edit::WorkspaceEditTracker;
 use crate::lint::{DiagnosticFix, fixes_for_diagnostics};
+use crate::resolve::is_document_excluded_for_linting;
 use crate::server::Result;
 use crate::server::SupportedCodeAction;
 use crate::server::api::LSPResult;
@@ -27,6 +29,25 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
         params: types::CodeActionParams,
     ) -> Result<Option<types::CodeActionResponse>> {
         let mut response: types::CodeActionResponse = types::CodeActionResponse::default();
+
+        let query = snapshot.query();
+
+        // Don't provide code actions for non-Python documents (e.g., markdown files).
+        let SourceType::Python(_) = query.source_type_for_lint() else {
+            return Ok(Some(response));
+        };
+
+        let document_path = query.virtual_file_path();
+        let settings = query.settings();
+
+        if is_document_excluded_for_linting(
+            &document_path,
+            &settings.file_resolver,
+            &settings.linter,
+            query.text_document_language_id(),
+        ) {
+            return Ok(Some(response));
+        }
 
         let supported_code_actions = supported_code_actions(params.context.only.clone());
 

@@ -55,7 +55,7 @@ def f(x: Iterable[int], y: list[str], z: Never, aa: list[Never], bb: LiskovUncom
 
 reveal_type(tuple((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
 
-reveal_type(tuple([1]))  # revealed: tuple[Unknown | int, ...]
+reveal_type(tuple([1]))  # revealed: tuple[int, ...]
 
 x1: tuple[int, ...] = tuple([1])
 reveal_type(x1)  # revealed: tuple[int, ...]
@@ -388,8 +388,8 @@ static_assert(not is_disjoint_from(tuple[F1, ...], tuple[F2, ...]))
 static_assert(not is_disjoint_from(tuple[N1, ...], tuple[N2, ...]))
 ```
 
-We currently model tuple types to _not_ be disjoint from arbitrary instance types, because we allow
-for the possibility of `tuple` to be subclassed
+We model tuple types to _not_ be disjoint from arbitrary instance types, because we allow for the
+possibility of `tuple` to be subclassed.
 
 ```py
 class C: ...
@@ -399,17 +399,14 @@ static_assert(not is_disjoint_from(tuple[int, str], C))
 class CommonSubtype(tuple[int, str], C): ...
 ```
 
-Note: This is inconsistent with the fact that we model heterogeneous tuples to be disjoint from
-other heterogeneous tuples above:
+However, we model heterogeneous tuples to be disjoint from other heterogeneous tuples. To reconcile
+these two things, we explicitly ban two differently specialized heterogeneous tuples from coexisting
+in the same MRO:
 
 ```py
 class I1(tuple[F1, F2]): ...
 class I2(tuple[F2, F1]): ...
-
-# TODO
-# This is a subtype of both `tuple[F1, F2]` and `tuple[F2, F1]`, so those two heterogeneous tuples
-# should not be disjoint from each other (see conflicting test above).
-class CommonSubtypeOfTuples(I1, I2): ...
+class CommonSubtypeOfTuples(I1, I2): ...  # error: [invalid-generic-class]
 ```
 
 ## Truthiness
@@ -558,7 +555,7 @@ reveal_type((42, *[], 56, *[]))  # revealed: tuple[Literal[42], Literal[56]]
 tup: Sequence[str] = (*{"foo": 42, "bar": 56},)
 
 # TODO: `tuple[str, str]` would be better, given the type annotation
-reveal_type(tup)  # revealed: tuple[Unknown | str, Unknown | str]
+reveal_type(tup)  # revealed: tuple[str, str]
 
 def f(x: list[int]):
     reveal_type((42, 56, *x, 97))  # revealed: tuple[Literal[42], Literal[56], *tuple[int, ...], Literal[97]]

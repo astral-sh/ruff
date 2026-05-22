@@ -57,6 +57,22 @@ impl SemanticSyntaxChecker {
         });
     }
 
+    fn check_lazy_import_context<Ctx: SemanticSyntaxContext>(
+        ctx: &Ctx,
+        range: TextRange,
+        kind: LazyImportKind,
+    ) -> bool {
+        if let Some(context) = ctx.lazy_import_context() {
+            Self::add_error(
+                ctx,
+                SemanticSyntaxErrorKind::LazyImportNotAllowed { context, kind },
+                range,
+            );
+            return true;
+        }
+        false
+    }
+
     fn check_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
         match stmt {
             Stmt::ImportFrom(StmtImportFrom {
@@ -64,9 +80,66 @@ impl SemanticSyntaxChecker {
                 module,
                 level,
                 names,
+                is_lazy,
                 ..
             }) => {
-                if matches!(module.as_deref(), Some("__future__")) {
+                let mut handled_lazy_error = false;
+
+                if *is_lazy {
+                    // test_ok lazy_import_semantic_ok_py315
+                    // # parse_options: {"target-version": "3.15"}
+                    // import contextlib
+                    // with contextlib.nullcontext():
+                    //     lazy import os
+                    // with contextlib.nullcontext():
+                    //     lazy from sys import path
+
+                    // test_err lazy_import_invalid_context_py315
+                    // # parse_options: {"target-version": "3.15"}
+                    // try:
+                    //     lazy import os
+                    // except:
+                    //     pass
+                    //
+                    // try:
+                    //     x
+                    // except* Exception:
+                    //     lazy import sys
+                    //
+                    // def func():
+                    //     lazy import math
+                    //
+                    // async def async_func():
+                    //     lazy from json import loads
+                    //
+                    // class MyClass:
+                    //     lazy import typing
+                    //
+                    // def outer():
+                    //     class Inner:
+                    //         lazy import json
+                    if Self::check_lazy_import_context(ctx, *range, LazyImportKind::ImportFrom) {
+                        handled_lazy_error = true;
+                    } else if names.iter().any(|alias| alias.name.as_str() == "*") {
+                        // test_err lazy_import_invalid_from_py315
+                        // # parse_options: {"target-version": "3.15"}
+                        // lazy from os import *
+                        // lazy from __future__ import annotations
+                        //
+                        // def func():
+                        //     lazy from sys import *
+                        Self::add_error(ctx, SemanticSyntaxErrorKind::LazyImportStar, *range);
+                        handled_lazy_error = true;
+                    } else if matches!(module.as_deref(), Some("__future__")) {
+                        Self::add_error(ctx, SemanticSyntaxErrorKind::LazyFutureImport, *range);
+                        handled_lazy_error = true;
+                    }
+                }
+
+                if handled_lazy_error {
+                    // Skip the regular `from`-import validations after reporting the lazy-specific
+                    // syntax error with the highest precedence.
+                } else if matches!(module.as_deref(), Some("__future__")) {
                     for name in names {
                         if !is_known_future_feature(&name.name) {
                             // test_ok valid_future_feature
@@ -113,6 +186,13 @@ impl SemanticSyntaxChecker {
                         break;
                     }
                 }
+            }
+            Stmt::Import(ast::StmtImport {
+                range,
+                is_lazy: true,
+                ..
+            }) => {
+                Self::check_lazy_import_context(ctx, *range, LazyImportKind::Import);
             }
             Stmt::Match(match_stmt) => {
                 Self::irrefutable_match_case(match_stmt, ctx);
@@ -253,15 +333,11 @@ impl SemanticSyntaxChecker {
                     }
                 }
             }
-            Stmt::Break(ast::StmtBreak { range, .. }) => {
-                if !ctx.in_loop_context() {
-                    Self::add_error(ctx, SemanticSyntaxErrorKind::BreakOutsideLoop, *range);
-                }
+            Stmt::Break(ast::StmtBreak { range, .. }) if !ctx.in_loop_context() => {
+                Self::add_error(ctx, SemanticSyntaxErrorKind::BreakOutsideLoop, *range);
             }
-            Stmt::Continue(ast::StmtContinue { range, .. }) => {
-                if !ctx.in_loop_context() {
-                    Self::add_error(ctx, SemanticSyntaxErrorKind::ContinueOutsideLoop, *range);
-                }
+            Stmt::Continue(ast::StmtContinue { range, .. }) if !ctx.in_loop_context() => {
+                Self::add_error(ctx, SemanticSyntaxErrorKind::ContinueOutsideLoop, *range);
             }
             _ => {}
         }
@@ -636,7 +712,7 @@ impl SemanticSyntaxChecker {
         ctx: &Ctx,
     ) {
         let mut seen_default = false;
-        for type_param in type_params.iter() {
+        for type_param in type_params {
             let has_default = match type_param {
                 ast::TypeParam::TypeVar(ast::TypeParamTypeVar { default, .. })
                 | ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { default, .. })
@@ -748,9 +824,12 @@ impl SemanticSyntaxChecker {
         match stmt {
             Stmt::Expr(StmtExpr { value, .. })
                 if !self.seen_module_docstring_boundary && value.is_string_literal_expr() => {}
-            Stmt::ImportFrom(StmtImportFrom { module, .. }) => {
-                // Allow __future__ imports until we see a non-__future__ import.
-                if !matches!(module.as_deref(), Some("__future__")) {
+            Stmt::ImportFrom(StmtImportFrom {
+                module, is_lazy, ..
+            }) => {
+                // Allow eager `__future__` imports until we see any other import. Lazy imports,
+                // including `lazy from __future__ import ...`, always close the boundary.
+                if *is_lazy || !matches!(module.as_deref(), Some("__future__")) {
                     self.seen_futures_boundary = true;
                 }
             }
@@ -804,7 +883,9 @@ impl SemanticSyntaxChecker {
                 generators,
                 ..
             }) => {
-                Self::check_generator_expr(key, generators, ctx);
+                if let Some(key) = key {
+                    Self::check_generator_expr(key, generators, ctx);
+                }
                 Self::check_generator_expr(value, generators, ctx);
                 Self::async_comprehension_in_sync_comprehension(ctx, generators);
                 for generator in generators.iter().filter(|g| g.is_async) {
@@ -1114,6 +1195,19 @@ fn is_known_future_feature(name: &str) -> bool {
     )
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+pub enum LazyImportKind {
+    Import,
+    ImportFrom,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+pub enum LazyImportContext {
+    Function,
+    Class,
+    TryExceptBlocks,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct SemanticSyntaxError {
     pub kind: SemanticSyntaxErrorKind,
@@ -1177,7 +1271,7 @@ impl Display for SemanticSyntaxError {
                 )
             }
             SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(name) => {
-                write!(f, "attribute name `{name}` repeated in class pattern",)
+                write!(f, "attribute name `{name}` repeated in class pattern")
             }
             SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start: _ } => {
                 write!(f, "name `{name}` is used prior to global declaration")
@@ -1231,10 +1325,31 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::FutureFeatureNotDefined(name) => {
                 write!(f, "Future feature `{name}` is not defined")
             }
+            SemanticSyntaxErrorKind::LazyImportNotAllowed { context, kind } => {
+                let statement = match kind {
+                    LazyImportKind::Import => "lazy import",
+                    LazyImportKind::ImportFrom => "lazy from ... import",
+                };
+                let location = match context {
+                    LazyImportContext::Function => "functions",
+                    LazyImportContext::Class => "classes",
+                    LazyImportContext::TryExceptBlocks => "try/except blocks",
+                };
+                write!(f, "{statement} not allowed inside {location}")
+            }
+            SemanticSyntaxErrorKind::LazyImportStar => {
+                f.write_str("lazy from ... import * is not allowed")
+            }
+            SemanticSyntaxErrorKind::LazyFutureImport => {
+                f.write_str("lazy from __future__ import is not allowed")
+            }
             SemanticSyntaxErrorKind::BreakOutsideLoop => f.write_str("`break` outside loop"),
             SemanticSyntaxErrorKind::ContinueOutsideLoop => f.write_str("`continue` outside loop"),
             SemanticSyntaxErrorKind::GlobalParameter(name) => {
-                write!(f, "name `{name}` is parameter and global")
+                write!(
+                    f,
+                    "name `{name}` cannot refer to a parameter and a global variable"
+                )
             }
             SemanticSyntaxErrorKind::DifferentMatchPatternBindings => {
                 write!(f, "alternative patterns bind different names")
@@ -1257,6 +1372,18 @@ impl Ranged for SemanticSyntaxError {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum SemanticSyntaxErrorKind {
+    /// Represents a `lazy` import statement in an invalid context.
+    LazyImportNotAllowed {
+        context: LazyImportContext,
+        kind: LazyImportKind,
+    },
+
+    /// Represents the use of `lazy from ... import *`.
+    LazyImportStar,
+
+    /// Represents the use of `lazy from __future__ import ...`.
+    LazyFutureImport,
+
     /// Represents the use of a `__future__` import after the beginning of a file.
     ///
     /// ## Examples
@@ -2130,6 +2257,12 @@ where
 pub trait SemanticSyntaxContext {
     /// Returns `true` if `__future__`-style type annotations are enabled.
     fn future_annotations_or_stub(&self) -> bool;
+
+    /// Returns the nearest invalid context for a `lazy` import statement, if any.
+    ///
+    /// This should return the innermost relevant restriction in order of precedence:
+    /// function, class, then `try`/`except`.
+    fn lazy_import_context(&self) -> Option<LazyImportContext>;
 
     /// The target Python version for detecting backwards-incompatible syntax changes.
     fn python_version(&self) -> PythonVersion;

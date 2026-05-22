@@ -31,6 +31,7 @@ fn assert_example(target: &str, expected: snapbox::Data) {
     let bin_path = snapbox::cmd::compile_example(target, ["--features=testing-colors"]).unwrap();
     snapbox::cmd::Command::new(bin_path)
         .env("CLICOLOR_FORCE", "1")
+        .env_remove("NO_COLOR")
         .assert()
         .success()
         .stdout_eq(expected.raw());

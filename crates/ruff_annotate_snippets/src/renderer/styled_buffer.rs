@@ -38,7 +38,8 @@ impl StyledBuffer {
     }
 
     pub(crate) fn render(&self, stylesheet: &Stylesheet) -> Result<String, fmt::Error> {
-        let mut str = String::new();
+        let capacity = self.lines.iter().map(|line| line.len()).sum();
+        let mut str = String::with_capacity(capacity);
         for (i, line) in self.lines.iter().enumerate() {
             let mut current_style = stylesheet.none;
             for ch in line {
@@ -49,11 +50,11 @@ impl StyledBuffer {
                     current_style = ch.style;
                     write!(str, "{}", current_style.render())?;
                 }
-                write!(str, "{}", ch.ch)?;
+                str.push(ch.ch);
             }
             write!(str, "{}", current_style.render_reset())?;
             if i != self.lines.len() - 1 {
-                writeln!(str)?;
+                str.push('\n');
             }
         }
         Ok(str)
@@ -74,10 +75,18 @@ impl StyledBuffer {
     /// If `line` does not exist in our buffer, adds empty lines up to the given
     /// and fills the last line with unstyled whitespace.
     pub(crate) fn puts(&mut self, line: usize, col: usize, string: &str, style: Style) {
-        let mut n = col;
-        for c in string.chars() {
-            self.putc(line, n, c, style);
-            n += 1;
+        if string.is_empty() {
+            return;
+        }
+        self.ensure_lines(line);
+        let char_count = string.chars().count();
+        let needed = col + char_count;
+        if needed > self.lines[line].len() {
+            self.lines[line].resize(needed, StyledChar::SPACE);
+        }
+        let line = &mut self.lines[line];
+        for (i, c) in string.chars().enumerate() {
+            line[col + i] = StyledChar::new(c, style);
         }
     }
     /// For given `line` inserts `string` with `style` after old content of that line,

@@ -31,8 +31,8 @@ help: Organize imports
 1 + import collections
 2 | from typing import Any
   - import collections
-3 + 
-4 + 
+3 +
+4 +
 5 | # Newline should be added here
 6 | def foo():
 7 |     pass
@@ -51,7 +51,7 @@ help: Organize imports
 1 + import sys
 2 | from pathlib import Path
   - import sys
-3 | 
+3 |
 4 | %matplotlib \
 5 |     --inline
 
@@ -68,7 +68,7 @@ help: Organize imports
  ::: cell 3
 4 | %matplotlib \
 5 |     --inline
-6 | 
+6 |
 7 + import abc
 8 | import math
   - import abc

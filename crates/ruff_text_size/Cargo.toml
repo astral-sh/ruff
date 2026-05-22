@@ -30,3 +30,6 @@ workspace = true
 name = "serde"
 path = "tests/serde.rs"
 required-features = ["serde"]
+
+[lib]
+test = false

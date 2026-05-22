@@ -7,6 +7,8 @@ pub(crate) use portable::{
     AbsolutePortableGlobPattern, PortableGlobError, PortableGlobKind, PortableGlobPattern,
 };
 
+use crate::metadata::options::DEFAULT_SRC_EXCLUDES;
+
 mod exclude;
 mod include;
 mod portable;
@@ -65,6 +67,40 @@ impl IncludeExcludeFilter {
                 },
                 MatchFile::No => IncludeResult::NotIncluded,
             }
+        }
+    }
+}
+
+impl Default for IncludeExcludeFilter {
+    fn default() -> Self {
+        let mut includes = IncludeFilterBuilder::new();
+        includes
+            .add(
+                &PortableGlobPattern::parse("**", PortableGlobKind::Include)
+                    .unwrap()
+                    .into_absolute(""),
+            )
+            .expect("default include filter to be infallible");
+
+        let mut excludes = ExcludeFilterBuilder::new();
+
+        for pattern in DEFAULT_SRC_EXCLUDES {
+            PortableGlobPattern::parse(pattern, PortableGlobKind::Exclude)
+                .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(""))?))
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Expected default exclude to be valid glob but adding it failed with: {err}"
+                    )
+                });
+        }
+
+        Self {
+            include: includes
+                .build()
+                .expect("default include filter to be infallible"),
+            exclude: excludes
+                .build()
+                .expect("default exclude filter to be infallible"),
         }
     }
 }

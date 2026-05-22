@@ -5,20 +5,8 @@ use ruff_db::vendored::VendoredFileSystem;
 
 use crate::path::SearchPathError;
 use crate::resolve::SearchPaths;
+use crate::strategy::MisconfigurationStrategy;
 use crate::typeshed::TypeshedVersionsParseError;
-
-/// How to handle apparent misconfiguration
-#[derive(PartialEq, Eq, Debug, Copy, Clone, Default, get_size2::GetSize)]
-pub enum MisconfigurationMode {
-    /// Settings Failure Is Not An Error.
-    ///
-    /// This is used by the default database, which we are incentivized to make infallible,
-    /// while still trying to "do our best" to set things up properly where we can.
-    UseDefault,
-    /// Settings Failure Is An Error.
-    #[default]
-    Fail,
-}
 
 /// Configures the search paths for module resolution.
 #[derive(Eq, PartialEq, Debug, Clone)]
@@ -44,9 +32,6 @@ pub struct SearchPathSettings {
     /// We should ideally only ever use this for things like goto-definition,
     /// where typeshed isn't the right answer.
     pub real_stdlib_path: Option<SystemPathBuf>,
-
-    /// How to handle apparent misconfiguration
-    pub misconfiguration_mode: MisconfigurationMode,
 }
 
 impl SearchPathSettings {
@@ -64,16 +49,16 @@ impl SearchPathSettings {
             custom_typeshed: None,
             site_packages_paths: vec![],
             real_stdlib_path: None,
-            misconfiguration_mode: MisconfigurationMode::Fail,
         }
     }
 
-    pub fn to_search_paths(
+    pub fn to_search_paths<Strategy: MisconfigurationStrategy>(
         &self,
         system: &dyn System,
         vendored: &VendoredFileSystem,
-    ) -> Result<SearchPaths, SearchPathSettingsError> {
-        SearchPaths::from_settings(self, system, vendored)
+        strategy: &Strategy,
+    ) -> Result<SearchPaths, Strategy::Error<SearchPathSettingsError>> {
+        SearchPaths::from_settings(self, system, vendored, strategy)
     }
 }
 

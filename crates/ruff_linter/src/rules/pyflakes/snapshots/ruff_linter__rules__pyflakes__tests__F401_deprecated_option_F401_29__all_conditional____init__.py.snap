@@ -12,12 +12,12 @@ F401 [*] `.unused` imported but unused; consider removing, adding to `__all__`, 
 10 | if sys.version_info > (3, 9):
    |
 help: Remove unused import
-5  | 
+5  |
 6  | import sys
-7  | 
+7  |
    - from . import unused, exported, renamed as bees
 8  + from . import exported
-9  | 
+9  |
 10 | if sys.version_info > (3, 9):
 11 |     from . import also_exported
 note: This is an unsafe fix and may change runtime behavior
@@ -33,12 +33,12 @@ F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`,
 10 | if sys.version_info > (3, 9):
    |
 help: Remove unused import
-5  | 
+5  |
 6  | import sys
-7  | 
+7  |
    - from . import unused, exported, renamed as bees
 8  + from . import exported
-9  | 
+9  |
 10 | if sys.version_info > (3, 9):
 11 |     from . import also_exported
 note: This is an unsafe fix and may change runtime behavior

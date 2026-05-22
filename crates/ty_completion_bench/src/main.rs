@@ -99,7 +99,7 @@ fn main() -> anyhow::Result<ExitCode> {
         ..Options::default()
     });
     project_metadata.apply_configuration_files(&system)?;
-    let db = ProjectDatabase::new(project_metadata, system)?;
+    let db = ProjectDatabase::fallible(project_metadata, system)?;
 
     let start = std::time::Instant::now();
     let mut completions = get_completions(&db, &args.file, offset)?;

@@ -54,7 +54,7 @@ pub(crate) fn request_with_no_cert_validation(checker: &Checker, call: &ast::Exp
         .and_then(|qualified_name| match qualified_name.segments() {
             [
                 "requests",
-                "get" | "options" | "head" | "post" | "put" | "patch" | "delete",
+                "get" | "options" | "head" | "post" | "put" | "patch" | "delete" | "request",
             ] => Some("requests"),
             [
                 "httpx",

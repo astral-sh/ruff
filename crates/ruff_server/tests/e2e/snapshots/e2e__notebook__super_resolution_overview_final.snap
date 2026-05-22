@@ -1,0 +1,547 @@
+---
+source: crates/ruff_server/tests/e2e/notebook.rs
+expression: "final_diagnostics.expect(\"at least one notebook change\")"
+---
+{
+  "notebook-cell:///Users/test/notebooks/tensorflow_test_notebook.ipynb.ipynb?cell=0": [
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 0
+        },
+        "end": {
+          "line": 0,
+          "character": 0
+        }
+      },
+      "severity": 2,
+      "code": "I002",
+      "codeDescription": {
+        "href": "https://docs.astral.sh/ruff/rules/missing-required-import"
+      },
+      "source": "Ruff",
+      "message": "Missing required import: `from __future__ import annotations`",
+      "tags": [],
+      "data": {
+        "code": "I002",
+        "edits": [
+          {
+            "newText": "from __future__ import annotations\n",
+            "range": {
+              "end": {
+                "character": 0,
+                "line": 0
+              },
+              "start": {
+                "character": 0,
+                "line": 0
+              }
+            }
+          }
+        ],
+        "noqa_edit": {
+          "newText": "  # noqa: I002\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 1
+            },
+            "start": {
+              "character": 71,
+              "line": 0
+            }
+          }
+        },
+        "title": "Insert required import: `from __future__ import annotations`"
+      }
+    },
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 0
+        },
+        "end": {
+          "line": 0,
+          "character": 0
+        }
+      },
+      "severity": 2,
+      "code": "RUF900",
+      "codeDescription": {
+        "href": "https://docs.astral.sh/ruff/rules/stable-test-rule"
+      },
+      "source": "Ruff",
+      "message": "Hey this is a stable test rule.",
+      "tags": [],
+      "data": {
+        "code": "RUF900",
+        "edits": [],
+        "noqa_edit": {
+          "newText": "  # noqa: RUF900\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 1
+            },
+            "start": {
+              "character": 71,
+              "line": 0
+            }
+          }
+        },
+        "title": "stable-test-rule"
+      }
+    },
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 0
+        },
+        "end": {
+          "line": 0,
+          "character": 0
+        }
+      },
+      "severity": 2,
+      "code": "RUF901",
+      "codeDescription": {
+        "href": "https://docs.astral.sh/ruff/rules/stable-test-rule-safe-fix"
+      },
+      "source": "Ruff",
+      "message": "Hey this is a stable test rule with a safe fix.",
+      "tags": [],
+      "data": {
+        "code": "RUF901",
+        "edits": [
+          {
+            "newText": "# fix from stable-test-rule-safe-fix\n",
+            "range": {
+              "end": {
+                "character": 0,
+                "line": 0
+              },
+              "start": {
+                "character": 0,
+                "line": 0
+              }
+            }
+          }
+        ],
+        "noqa_edit": {
+          "newText": "  # noqa: RUF901\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 1
+            },
+            "start": {
+              "character": 71,
+              "line": 0
+            }
+          }
+        },
+        "title": "stable-test-rule-safe-fix"
+      }
+    },
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 0
+        },
+        "end": {
+          "line": 0,
+          "character": 0
+        }
+      },
+      "severity": 2,
+      "code": "RUF902",
+      "codeDescription": {
+        "href": "https://docs.astral.sh/ruff/rules/stable-test-rule-unsafe-fix"
+      },
+      "source": "Ruff",
+      "message": "Hey this is a stable test rule with an unsafe fix.",
+      "tags": [],
+      "data": {
+        "code": "RUF902",
+        "edits": [
+          {
+            "newText": "# fix from stable-test-rule-unsafe-fix\n",
+            "range": {
+              "end": {
+                "character": 0,
+                "line": 0
+              },
+              "start": {
+                "character": 0,
+                "line": 0
+              }
+            }
+          }
+        ],
+        "noqa_edit": {
+          "newText": "  # noqa: RUF902\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 1
+            },
+            "start": {
+              "character": 71,
+              "line": 0
+            }
+          }
+        },
+        "title": "stable-test-rule-unsafe-fix"
+      }
+    },
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 0
+        },
+        "end": {
+          "line": 0,
+          "character": 0
+        }
+      },
+      "severity": 2,
+      "code": "RUF903",
+      "codeDescription": {
+        "href": "https://docs.astral.sh/ruff/rules/stable-test-rule-display-only-fix"
+      },
+      "source": "Ruff",
+      "message": "Hey this is a stable test rule with a display only fix.",
+      "tags": [],
+      "data": {
+        "code": "RUF903",
+        "edits": [],
+        "noqa_edit": {
+          "newText": "  # noqa: RUF903\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 1
+            },
+            "start": {
+              "character": 71,
+              "line": 0
+            }
+          }
+        },
+        "title": "stable-test-rule-display-only-fix"
+      }
+    },
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 0
+        },
+        "end": {
+          "line": 0,
+          "character": 0
+        }
+      },
+      "severity": 2,
+      "code": "RUF950",
+      "codeDescription": {
+        "href": "https://docs.astral.sh/ruff/rules/redirected-to-test-rule"
+      },
+      "source": "Ruff",
+      "message": "Hey this is a test rule that was redirected from another.",
+      "tags": [],
+      "data": {
+        "code": "RUF950",
+        "edits": [],
+        "noqa_edit": {
+          "newText": "  # noqa: RUF950\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 1
+            },
+            "start": {
+              "character": 71,
+              "line": 0
+            }
+          }
+        },
+        "title": "redirected-to-test-rule"
+      }
+    }
+  ],
+  "notebook-cell:///Users/test/notebooks/tensorflow_test_notebook.ipynb.ipynb?cell=1": [],
+  "notebook-cell:///Users/test/notebooks/tensorflow_test_notebook.ipynb.ipynb?cell=2": [
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 0
+        },
+        "end": {
+          "line": 2,
+          "character": 31
+        }
+      },
+      "severity": 2,
+      "code": "I001",
+      "codeDescription": {
+        "href": "https://docs.astral.sh/ruff/rules/unsorted-imports"
+      },
+      "source": "Ruff",
+      "message": "Import block is un-sorted or un-formatted",
+      "tags": [],
+      "data": {
+        "code": "I001",
+        "edits": [
+          {
+            "newText": "import matplotlib.pyplot as plt\nimport tensorflow as tf\nimport tensorflow_hub as hub\n\n",
+            "range": {
+              "end": {
+                "character": 0,
+                "line": 3
+              },
+              "start": {
+                "character": 0,
+                "line": 0
+              }
+            }
+          }
+        ],
+        "noqa_edit": {
+          "newText": "  # noqa: I001\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 1
+            },
+            "start": {
+              "character": 23,
+              "line": 0
+            }
+          }
+        },
+        "title": "Organize imports"
+      }
+    }
+  ],
+  "notebook-cell:///Users/test/notebooks/tensorflow_test_notebook.ipynb.ipynb?cell=3": [
+    {
+      "range": {
+        "start": {
+          "line": 5,
+          "character": 29
+        },
+        "end": {
+          "line": 5,
+          "character": 30
+        }
+      },
+      "severity": 2,
+      "code": "E703",
+      "codeDescription": {
+        "href": "https://docs.astral.sh/ruff/rules/useless-semicolon"
+      },
+      "source": "Ruff",
+      "message": "Statement ends with an unnecessary semicolon",
+      "tags": [],
+      "data": {
+        "code": "E703",
+        "edits": [
+          {
+            "newText": "",
+            "range": {
+              "end": {
+                "character": 30,
+                "line": 5
+              },
+              "start": {
+                "character": 29,
+                "line": 5
+              }
+            }
+          }
+        ],
+        "noqa_edit": {
+          "newText": "  # noqa: E703\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 6
+            },
+            "start": {
+              "character": 30,
+              "line": 5
+            }
+          }
+        },
+        "title": "Remove unnecessary semicolon"
+      }
+    }
+  ],
+  "notebook-cell:///Users/test/notebooks/tensorflow_test_notebook.ipynb.ipynb?cell=4": [],
+  "notebook-cell:///Users/test/notebooks/tensorflow_test_notebook.ipynb.ipynb?cell=5": [],
+  "notebook-cell:///Users/test/notebooks/tensorflow_test_notebook.ipynb.ipynb?cell=6": [
+    {
+      "range": {
+        "start": {
+          "line": 3,
+          "character": 22
+        },
+        "end": {
+          "line": 3,
+          "character": 23
+        }
+      },
+      "severity": 2,
+      "code": "E703",
+      "codeDescription": {
+        "href": "https://docs.astral.sh/ruff/rules/useless-semicolon"
+      },
+      "source": "Ruff",
+      "message": "Statement ends with an unnecessary semicolon",
+      "tags": [],
+      "data": {
+        "code": "E703",
+        "edits": [
+          {
+            "newText": "",
+            "range": {
+              "end": {
+                "character": 23,
+                "line": 3
+              },
+              "start": {
+                "character": 22,
+                "line": 3
+              }
+            }
+          }
+        ],
+        "noqa_edit": {
+          "newText": "  # noqa: E703\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 4
+            },
+            "start": {
+              "character": 23,
+              "line": 3
+            }
+          }
+        },
+        "title": "Remove unnecessary semicolon"
+      }
+    },
+    {
+      "range": {
+        "start": {
+          "line": 8,
+          "character": 22
+        },
+        "end": {
+          "line": 8,
+          "character": 23
+        }
+      },
+      "severity": 2,
+      "code": "E703",
+      "codeDescription": {
+        "href": "https://docs.astral.sh/ruff/rules/useless-semicolon"
+      },
+      "source": "Ruff",
+      "message": "Statement ends with an unnecessary semicolon",
+      "tags": [],
+      "data": {
+        "code": "E703",
+        "edits": [
+          {
+            "newText": "",
+            "range": {
+              "end": {
+                "character": 23,
+                "line": 8
+              },
+              "start": {
+                "character": 22,
+                "line": 8
+              }
+            }
+          }
+        ],
+        "noqa_edit": {
+          "newText": "  # noqa: E703\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 9
+            },
+            "start": {
+              "character": 23,
+              "line": 8
+            }
+          }
+        },
+        "title": "Remove unnecessary semicolon"
+      }
+    },
+    {
+      "range": {
+        "start": {
+          "line": 7,
+          "character": 10
+        },
+        "end": {
+          "line": 7,
+          "character": 24
+        }
+      },
+      "severity": 2,
+      "code": "F541",
+      "codeDescription": {
+        "href": "https://docs.astral.sh/ruff/rules/f-string-missing-placeholders"
+      },
+      "source": "Ruff",
+      "message": "f-string without any placeholders",
+      "tags": [],
+      "data": {
+        "code": "F541",
+        "edits": [
+          {
+            "newText": "'ESRGAN (x4)'",
+            "range": {
+              "end": {
+                "character": 24,
+                "line": 7
+              },
+              "start": {
+                "character": 10,
+                "line": 7
+              }
+            }
+          }
+        ],
+        "noqa_edit": {
+          "newText": "  # noqa: F541\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 8
+            },
+            "start": {
+              "character": 25,
+              "line": 7
+            }
+          }
+        },
+        "title": "Remove extraneous `f` prefix"
+      }
+    }
+  ]
+}

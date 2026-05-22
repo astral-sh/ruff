@@ -16,7 +16,7 @@ help: Replace single multiline quotes with double quotes
 2 |     ''' Double quotes single line class docstring '''
   -     ''' Not a docstring '''
 3 +     """ Not a docstring """
-4 | 
+4 |
 5 |     def foo(self, bar='''not a docstring'''):
 6 |         ''' Double quotes single line method docstring'''
 
@@ -33,7 +33,7 @@ Q001 [*] Single quote multiline found but double quotes preferred
 help: Replace single multiline quotes with double quotes
 2 |     ''' Double quotes single line class docstring '''
 3 |     ''' Not a docstring '''
-4 | 
+4 |
   -     def foo(self, bar='''not a docstring'''):
 5 +     def foo(self, bar="""not a docstring"""):
 6 |         ''' Double quotes single line method docstring'''

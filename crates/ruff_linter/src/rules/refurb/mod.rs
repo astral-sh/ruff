@@ -13,10 +13,11 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_diagnostics, settings};
+    use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::ReadWholeFile, Path::new("FURB101_0.py"))]
     #[test_case(Rule::ReadWholeFile, Path::new("FURB101_1.py"))]
+    #[test_case(Rule::ReadWholeFile, Path::new("FURB101_2.py"))]
     #[test_case(Rule::RepeatedAppend, Path::new("FURB113.py"))]
     #[test_case(Rule::IfExpInsteadOfOrOperator, Path::new("FURB110.py"))]
     #[test_case(Rule::ReimplementedOperator, Path::new("FURB118.py"))]
@@ -49,6 +50,7 @@ mod tests {
     #[test_case(Rule::ListReverseCopy, Path::new("FURB187.py"))]
     #[test_case(Rule::WriteWholeFile, Path::new("FURB103_0.py"))]
     #[test_case(Rule::WriteWholeFile, Path::new("FURB103_1.py"))]
+    #[test_case(Rule::WriteWholeFile, Path::new("FURB103_2.py"))]
     #[test_case(Rule::FStringNumberFormat, Path::new("FURB116.py"))]
     #[test_case(Rule::SortedMinMax, Path::new("FURB192.py"))]
     #[test_case(Rule::SliceToRemovePrefixOrSuffix, Path::new("FURB188.py"))]
@@ -61,6 +63,18 @@ mod tests {
             &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn read_whole_file_newline_python_version_diff() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("refurb/FURB101_3.py"),
+            &settings::LinterSettings::for_rule(Rule::ReadWholeFile)
+                .with_target_version(PythonVersion::PY313),
+            &settings::LinterSettings::for_rule(Rule::ReadWholeFile)
+                .with_target_version(PythonVersion::PY312),
+        );
         Ok(())
     }
 

@@ -1,0 +1,15 @@
+version = 1
+revision = 3
+requires-python = ">=3.11"
+
+[options]
+exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
+exclude-newer-span = "P7D"
+
+[manifest]
+requirements = [{ name = "mypy-primer", git = "https://github.com/hauntsaninja/mypy_primer" }]
+
+[[package]]
+name = "mypy-primer"
+version = "0.1.0"
+source = { git = "https://github.com/hauntsaninja/mypy_primer#05f73ec3d85bb4f55676f3c57f2c3e5136228977" }

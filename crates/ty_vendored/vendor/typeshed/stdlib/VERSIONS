@@ -23,7 +23,6 @@ _ast: 3.0-
 _asyncio: 3.0-
 _bisect: 3.0-
 _blake2: 3.6-
-_bootlocale: 3.4-3.9
 _bz2: 3.3-
 _codecs: 3.0-
 _collections_abc: 3.3-
@@ -61,6 +60,7 @@ _py_abc: 3.7-
 _pydecimal: 3.5-
 _queue: 3.7-
 _random: 3.0-
+_remote_debugging: 3.15-
 _sitebuiltins: 3.4-
 _socket: 3.0-  # present in 3.0 at runtime, but not in typeshed
 _sqlite3: 3.0-
@@ -143,7 +143,6 @@ difflib: 3.0-
 dis: 3.0-
 distutils: 3.0-3.11
 distutils.command.bdist_msi: 3.0-3.10
-distutils.command.bdist_wininst: 3.0-3.9
 doctest: 3.0-
 email: 3.0-
 encodings: 3.0-
@@ -160,7 +159,6 @@ fcntl: 3.0-
 filecmp: 3.0-
 fileinput: 3.0-
 fnmatch: 3.0-
-formatter: 3.0-3.9
 fractions: 3.0-
 ftplib: 3.0-
 functools: 3.0-
@@ -211,6 +209,7 @@ mailbox: 3.0-
 mailcap: 3.0-3.12
 marshal: 3.0-
 math: 3.0-
+math.integer: 3.15-
 mimetypes: 3.0-
 mmap: 3.0-
 modulefinder: 3.0-
@@ -231,7 +230,6 @@ operator: 3.0-
 optparse: 3.0-
 os: 3.0-
 ossaudiodev: 3.0-3.12
-parser: 3.0-3.9
 pathlib: 3.4-
 pathlib.types: 3.14-
 pdb: 3.0-
@@ -246,6 +244,9 @@ posix: 3.0-
 posixpath: 3.0-
 pprint: 3.0-
 profile: 3.0-
+profiling: 3.15-
+profiling.sampling: 3.15-
+profiling.tracing: 3.15-
 pstats: 3.0-
 pty: 3.0-
 pwd: 3.0-
@@ -280,9 +281,9 @@ socket: 3.0-
 socketserver: 3.0-
 spwd: 3.0-3.12
 sqlite3: 3.0-
-sre_compile: 3.0-
-sre_constants: 3.0-
-sre_parse: 3.0-
+sre_compile: 3.0-3.14
+sre_constants: 3.0-3.14
+sre_parse: 3.0-3.14
 ssl: 3.0-
 stat: 3.0-
 statistics: 3.4-
@@ -292,9 +293,9 @@ stringprep: 3.0-
 struct: 3.0-
 subprocess: 3.0-
 sunau: 3.0-3.12
-symbol: 3.0-3.9
 symtable: 3.0-
 sys: 3.0-
+sys.__jit: 3.14-        # Similar to sys._monitoring
 sys._monitoring: 3.12-  # Doesn't actually exist. See comments in the stub.
 sysconfig: 3.0-
 syslog: 3.0-
@@ -339,6 +340,7 @@ wsgiref: 3.0-
 wsgiref.types: 3.11-
 xdrlib: 3.0-3.12
 xml: 3.0-
+xml.utils: 3.15-
 xmlrpc: 3.0-
 xxlimited: 3.2-
 zipapp: 3.5-

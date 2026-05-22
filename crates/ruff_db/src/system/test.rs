@@ -1,4 +1,3 @@
-use glob::PatternError;
 use ruff_notebook::{Notebook, NotebookError};
 use rustc_hash::FxHashMap;
 use std::panic::RefUnwindSafe;
@@ -7,8 +6,8 @@ use std::sync::{Arc, Mutex};
 use crate::Db;
 use crate::files::File;
 use crate::system::{
-    CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, Result, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath,
+    CaseSensitivity, DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath,
+    SystemPathBuf, SystemVirtualPath, WhichError, WhichResult,
 };
 
 use super::WritableSystem;
@@ -121,10 +120,6 @@ impl System for TestSystem {
         self.system().read_virtual_path_to_notebook(path)
     }
 
-    fn is_executable(&self, path: &SystemPath) -> bool {
-        self.system().is_executable(path)
-    }
-
     fn current_directory(&self) -> &SystemPath {
         self.system().current_directory()
     }
@@ -137,6 +132,10 @@ impl System for TestSystem {
         self.system().cache_dir()
     }
 
+    fn which(&self, _name: &str) -> WhichResult {
+        Err(WhichError::CannotFindBinaryPath)
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
@@ -146,16 +145,6 @@ impl System for TestSystem {
 
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
         self.system().walk_directory(path)
-    }
-
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_>,
-        PatternError,
-    > {
-        self.system().glob(pattern)
     }
 
     fn as_writable(&self) -> Option<&dyn WritableSystem> {
@@ -197,10 +186,7 @@ impl System for TestSystem {
 
 impl Default for TestSystem {
     fn default() -> Self {
-        Self {
-            inner: Arc::new(InMemorySystem::default()),
-            env_overrides: Arc::new(Mutex::new(FxHashMap::default())),
-        }
+        Self::new(InMemorySystem::default())
     }
 }
 
@@ -395,10 +381,6 @@ impl System for InMemorySystem {
         Notebook::from_source_code(&content)
     }
 
-    fn is_executable(&self, path: &SystemPath) -> bool {
-        self.memory_fs.is_executable(path)
-    }
-
     fn current_directory(&self) -> &SystemPath {
         self.memory_fs.current_directory()
     }
@@ -411,6 +393,10 @@ impl System for InMemorySystem {
         None
     }
 
+    fn which(&self, _name: &str) -> WhichResult {
+        Err(WhichError::CannotFindBinaryPath)
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
@@ -420,17 +406,6 @@ impl System for InMemorySystem {
 
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
         self.memory_fs.walk_directory(path)
-    }
-
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_>,
-        PatternError,
-    > {
-        let iterator = self.memory_fs.glob(pattern)?;
-        Ok(Box::new(iterator))
     }
 
     fn as_writable(&self) -> Option<&dyn WritableSystem> {

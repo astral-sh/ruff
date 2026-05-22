@@ -22,7 +22,7 @@ Q002 [*] Single quote docstring found but double quotes preferred
 help: Replace single quotes docstring with double quotes
   - ''"Start with empty string" ' and lint docstring safely'
 1 + ''"Start with empty string" " and lint docstring safely"
-2 | 
+2 |
 3 | def foo():
 4 |     pass
 
@@ -35,7 +35,7 @@ Q001 [*] Double quote multiline found but single quotes preferred
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Replace double multiline quotes with single quotes
-2 | 
+2 |
 3 | def foo():
 4 |     pass
   - """ this is not a docstring """

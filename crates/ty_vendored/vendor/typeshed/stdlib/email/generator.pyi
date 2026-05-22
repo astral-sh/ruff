@@ -20,6 +20,7 @@ class Generator(Generic[_MessageT]):
 
     maxheaderlen: int | None
     policy: Policy[_MessageT] | None
+
     @overload
     def __init__(
         self: Generator[Any],  # The Policy of the message is used.
@@ -51,7 +52,6 @@ class Generator(Generic[_MessageT]):
         flatten method is used.
 
         """
-
     @overload
     def __init__(
         self,
@@ -61,6 +61,7 @@ class Generator(Generic[_MessageT]):
         *,
         policy: Policy[_MessageT],
     ) -> None: ...
+
     def write(self, s: str) -> None: ...
     def flatten(self, msg: _MessageT, unixfrom: bool = False, linesep: str | None = None) -> None:
         """Print the message object tree rooted at msg to the output file
@@ -127,7 +128,6 @@ class BytesGenerator(Generator[_MessageT]):
         flatten method is used.
 
         """
-
     @overload
     def __init__(
         self,
@@ -176,7 +176,6 @@ class DecodedGenerator(Generator[_MessageT]):
 
         [Non-text (%(type)s) part of message omitted, filename %(filename)s]
         """
-
     @overload
     def __init__(
         self,

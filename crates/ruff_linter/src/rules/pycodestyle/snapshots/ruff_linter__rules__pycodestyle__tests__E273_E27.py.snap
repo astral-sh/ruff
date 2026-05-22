@@ -112,10 +112,10 @@ E273 [*] Tab after keyword
    |
 help: Replace with single space
 71 | type  Number = int
-72 | 
+72 |
 73 | #: E273
    - type	Number = int
 74 + type Number = int
-75 | 
+75 |
 76 | #: E275
 77 | match(foo):

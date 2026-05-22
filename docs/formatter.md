@@ -230,14 +230,10 @@ def f(x):
 *This feature is currently only available in [preview mode](preview.md#preview).*
 
 The Ruff formatter can also format Python code blocks in Markdown files.
-In these files, Ruff will format any CommonMark [fenced code blocks][]
-with the following info strings: `python`, `py`, `python3`, `py3`, or `pyi`.
-Fenced code blocks without an info string are assumed to be Python code examples
-and will also be formatted.
-
-If a code example is recognized and treated as Python, the Ruff formatter will
-automatically skip it if the code does not parse as valid Python or if the
-reformatted code would produce an invalid Python program.
+In these files, Ruff will format any CommonMark [fenced code blocks][] with
+the following info strings: `python`, `py`, `python3`, `py3`, or `pyi`. The
+formatter will automatically skip a code block if the code does not parse as
+valid Python or if the reformatted code would produce an invalid Python program.
 
 Code blocks marked as `python`, `py`, `python3`, or `py3` will be formatted with
 the normal Python code formatting style, while any code blocks marked with
@@ -285,43 +281,6 @@ to `<!-- fmt:off -->` and `<!-- fmt:on -->` respectively.
 
 [blacken-docs]: https://github.com/adamchainz/blacken-docs/
 
-Ruff will not automatically discover or format Markdown files in your project,
-but will format any Markdown files explicitly passed with a `.md` extension:
-
-```shell-session
-$ ruff format --preview --check docs/
-warning: No Python files found under the given path(s)
-
-$ ruff format --preview --check docs/*.md
-13 files already formatted
-```
-
-This is likely to change in a future release when the feature is stabilized.
-Including Markdown files without also enabling [preview mode](preview.md#preview)
-will result in an error message and non-zero [exit code](#exit-codes).
-
-To include Markdown files by default when running Ruff on your project, add them
-with [`extend-include`](settings.md#extend-include) in your project settings:
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ruff]
-    # Find and format code blocks in Markdown files
-    extend-include = ["*.md"]
-    # OR
-    extend-include = ["docs/*.md"]
-    ```
-
-=== "ruff.toml"
-
-    ```toml
-    # Find and format code blocks in Markdown files
-    extend-include = ["*.md"]
-    # OR
-    extend-include = ["docs/*.md"]
-    ```
-
 To format Markdown files with extensions other than `.md`, configure custom
 [`extension`](settings.md#extension) mappings. Ruff will automatically include
 these mapped extensions in file discovery:
@@ -347,11 +306,29 @@ support needs to be explicitly included by adding it to `types_or`:
 ```yaml title=".pre-commit-config.yaml"
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.4
+    rev: v0.15.14
     hooks:
       - id: ruff-format
         types_or: [python, pyi, jupyter, markdown]
 ```
+
+To *disable* formatting of Markdown files, add them to
+[`extend-exclude`](settings.md#extend-exclude) in your project settings:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    # Disable formatting in Markdown files
+    extend-exclude = ["*.md"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    # Disable formatting in Markdown files
+    extend-exclude = ["*.md"]
+    ```
 
 ## Format suppression
 
@@ -453,6 +430,7 @@ When using Ruff as a formatter, we recommend avoiding the following lint rules:
 - [`indentation-with-invalid-multiple`](rules/indentation-with-invalid-multiple.md) (`E111`)
 - [`indentation-with-invalid-multiple-comment`](rules/indentation-with-invalid-multiple-comment.md) (`E114`)
 - [`over-indented`](rules/over-indented.md) (`E117`)
+- [`incorrect-blank-line-before-class`](rules/incorrect-blank-line-before-class.md) (`D203`)
 - [`docstring-tab-indentation`](rules/docstring-tab-indentation.md) (`D206`)
 - [`triple-single-quotes`](rules/triple-single-quotes.md) (`D300`)
 - [`bad-quotes-inline-string`](rules/bad-quotes-inline-string.md) (`Q000`)
@@ -576,8 +554,9 @@ f'{1=:"foo}'
 f"{1=:"foo}"
 ```
 
-For nested f-strings, Ruff alternates quote styles, starting with the [configured quote style] for the
-outermost f-string. For example, consider the following f-string:
+By default, or when targeting Python versions below 3.12, Ruff alternates quote styles for nested
+f-strings, starting with the [configured quote style] for the outermost f-string.
+For example, consider the following f-string:
 
 ```python
 # format.quote-style = "double"
@@ -585,10 +564,17 @@ outermost f-string. For example, consider the following f-string:
 f"outer f-string {f"nested f-string {f"another nested f-string"} end"} end"
 ```
 
-Ruff formats it as:
+With default settings, Ruff formats it as:
 
 ```python
 f"outer f-string {f'nested f-string {f"another nested f-string"} end'} end"
+```
+
+When targeting Python 3.12+ and with `nested-string-quote-style = "preferred"`,
+Ruff will use the configured quote style for nested strings:
+
+```python
+f"outer f-string {f"nested f-string {f"another nested f-string"} end"} end"
 ```
 
 #### Line breaks

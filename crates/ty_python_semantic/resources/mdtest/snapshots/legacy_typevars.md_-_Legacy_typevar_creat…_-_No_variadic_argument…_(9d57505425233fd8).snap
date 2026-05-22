@@ -30,13 +30,9 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/legacy_typev
 error[invalid-legacy-type-variable]: Starred arguments are not supported in `TypeVar` creation
  --> src/mdtest_snippet.py:6:18
   |
-5 | # error: [invalid-legacy-type-variable]
 6 | T = TypeVar("T", *types)
   |                  ^^^^^^
-7 |
-8 | # error: [invalid-legacy-type-variable]
   |
-info: rule `invalid-legacy-type-variable` is enabled by default
 
 ```
 
@@ -44,10 +40,8 @@ info: rule `invalid-legacy-type-variable` is enabled by default
 error[invalid-legacy-type-variable]: Starred arguments are not supported in `TypeVar` creation
  --> src/mdtest_snippet.py:9:18
   |
-8 | # error: [invalid-legacy-type-variable]
 9 | S = TypeVar("S", **{"bound": int})
   |                  ^^^^^^^^^^^^^^^^
   |
-info: rule `invalid-legacy-type-variable` is enabled by default
 
 ```

@@ -27,7 +27,7 @@ pub struct Cli {
     pub(crate) command: Command,
 }
 
-#[allow(clippy::large_enum_variant)]
+#[expect(clippy::large_enum_variant)]
 #[derive(Debug, clap::Subcommand)]
 pub(crate) enum Command {
     /// Check a project for type errors.
@@ -44,12 +44,18 @@ pub(crate) enum Command {
             default_value = "text",
             help = "The format in which to display the version information"
         )]
-        output_format: VersionFormat,
+        output_format: HelpFormat,
     },
 
     /// Generate shell completion
     #[clap(hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },
+
+    /// Explain rules and other parts of ty
+    Explain {
+        #[command(subcommand)]
+        command: ExplainCommand,
+    },
 }
 
 #[derive(Debug, Parser)]
@@ -62,8 +68,12 @@ pub(crate) struct CheckCommand {
     )]
     pub paths: Vec<SystemPathBuf>,
 
-    /// Adds `ty: ignore` comments to suppress all rule diagnostics.
+    /// Apply fixes to resolve errors.
     #[arg(long)]
+    pub(crate) fix: bool,
+
+    /// Adds `ty: ignore` comments to suppress all rule diagnostics.
+    #[arg(long, conflicts_with("fix"))]
     pub(crate) add_ignore: bool,
 
     /// Run the command within the given project directory.
@@ -116,7 +126,7 @@ pub(crate) struct CheckCommand {
     /// 2. Check for an activated or configured Python environment
     ///    and attempt to infer the Python version of that environment
     /// 3. Fall back to the latest stable Python version supported by ty (see `ty check --help` output)
-    #[arg(long, value_name = "VERSION", alias = "target-version")]
+    #[arg(long, value_name = "VERSION", alias = "target-version", value_enum)]
     pub(crate) python_version: Option<PythonVersion>,
 
     /// Target platform to assume when resolving types.
@@ -232,9 +242,7 @@ impl CheckCommand {
             .or(self.respect_ignore_files);
         let options = Options {
             environment: Some(EnvironmentOptions {
-                python_version: self
-                    .python_version
-                    .map(|version| RangedValue::cli(version.into())),
+                python_version: self.python_version.map(Into::into).map(RangedValue::cli),
                 python_platform: self
                     .python_platform
                     .map(|platform| RangedValue::cli(platform.into())),
@@ -412,7 +420,7 @@ pub(crate) enum TerminalColor {
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
-pub(crate) enum VersionFormat {
+pub(crate) enum HelpFormat {
     Text,
     Json,
 }
@@ -477,6 +485,22 @@ impl ConfigsArg {
     pub(crate) fn into_options(self) -> Option<Options> {
         self.0
     }
+}
+
+#[derive(Debug, clap::Subcommand)]
+pub(crate) enum ExplainCommand {
+    /// Explain a rule (or all rules).
+    Rule {
+        /// Rule to explain
+        ///
+        /// Defaults to all rules if omitted.
+        #[arg(hide_possible_values = true)]
+        rule: Option<String>,
+
+        /// Output format
+        #[arg(long, value_enum, default_value = "text")]
+        output_format: HelpFormat,
+    },
 }
 
 fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {

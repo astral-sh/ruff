@@ -787,8 +787,8 @@ involving them.
 This means that when intersecting a constrained typevar with a type `T`, constraints that are
 supertypes of `T` can be simplified to `T`, since intersection distributes over `OneOf`. Moreover,
 constraints that are disjoint from `T` are no longer valid specializations of the typevar, since
-`Never` is an identity for `OneOf`. After these simplifications, if only one constraint remains, we
-can simplify the intersection as a whole to that constraint.
+`Never` is an identity for `OneOf`. Even if only one compatible constraint remains, we preserve the
+typevar itself in the intersection so other occurrences of the same typevar stay correlated.
 
 ```py
 def constrained[T: (Base, Sub, Unrelated)](t: T) -> None:
@@ -797,10 +797,10 @@ def constrained[T: (Base, Sub, Unrelated)](t: T) -> None:
         reveal_type(x)  # revealed: T@constrained & Base
 
     def _(x: Intersection[T, Unrelated]) -> None:
-        reveal_type(x)  # revealed: Unrelated
+        reveal_type(x)  # revealed: T@constrained & Unrelated
 
     def _(x: Intersection[T, Sub]) -> None:
-        reveal_type(x)  # revealed: Sub
+        reveal_type(x)  # revealed: T@constrained & Sub
 
     def _(x: Intersection[T, None]) -> None:
         reveal_type(x)  # revealed: Never
@@ -817,7 +817,7 @@ from ty_extensions import Not
 
 def remove_constraint[T: (int, str, bool)](t: T) -> None:
     def _(x: Intersection[T, Not[int]]) -> None:
-        reveal_type(x)  # revealed: str
+        reveal_type(x)  # revealed: T@remove_constraint & str
 
     def _(x: Intersection[T, Not[str]]) -> None:
         # With OneOf this would be OneOf[int, bool]
@@ -850,6 +850,88 @@ def intersection_is_assignable[T](t: T) -> None:
     static_assert(is_subtype_of(Intersection[T, Not[None]], T))
 ```
 
+## Bounded typevars remain assignable to their upper bound after narrowing
+
+Narrowing can leave a bounded typevar represented as an intersection, but it should still be
+assignable to its upper bound.
+
+```py
+from typing import Callable
+from ty_extensions import Intersection, Not
+
+class A: ...
+
+class SomeClass[T: int | str]:
+    field: T
+
+    def narrowed1(self) -> None:
+        narrowed: int | str
+        assert not isinstance(self.field, int)
+        reveal_type(self.field)  # revealed: T@SomeClass & ~int
+        narrowed = self.field
+
+    def narrowed2(self) -> None:
+        narrowed: int | str
+        assert not isinstance(self.field, A)
+        reveal_type(self.field)  # revealed: T@SomeClass & ~A
+        narrowed = self.field
+
+def lenient_issubclass[T: type | tuple[type, ...]](class_or_tuple: T) -> T:
+    if not isinstance(class_or_tuple, tuple):
+        reveal_type(class_or_tuple)  # revealed: T@lenient_issubclass & ~tuple[object, ...]
+        # `T@lenient_issubclass & ~tuple[object, ...]` is assignable to `type`,
+        # because `(type | tuple[type, ...]) & ~tuple[object, ...]` simplifies to `type`
+        return check(class_or_tuple)
+    return class_or_tuple
+
+def check(check_type: type): ...
+
+# In this scenario, we do not expand the intersection,
+# because it only has inferrable type variables in it.
+# This ensures that we continue to infer a precise type on the last line here:
+def higher[U](f: Callable[[U], type]) -> U:
+    raise NotImplementedError
+
+def source[T: type | tuple[type, ...]](x: T) -> Intersection[T, Not[tuple[object, ...]]]:
+    raise NotImplementedError
+
+reveal_type(higher(source))  # revealed: type
+
+def iterable_after_negative_narrow[T: str | list[str]](foo: T) -> None:
+    if isinstance(foo, str):
+        return
+    reveal_type(foo)  # revealed: T@iterable_after_negative_narrow & ~str
+    for x in foo:
+        reveal_type(x)  # revealed: str
+
+def non_iterable_after_negative_narrow[T: int | list[str]](foo: T) -> None:
+    if isinstance(foo, list):
+        return
+    reveal_type(foo)  # revealed: T@non_iterable_after_negative_narrow & ~Top[list[Unknown]]
+    for x in foo: ...  # error: [not-iterable]
+```
+
+## Constrained typevars remain assignable to the union of their constraints after narrowing
+
+```py
+class A: ...
+
+class SomeClass[T: (int, str)]:
+    field: T
+
+    def narrowed1(self) -> None:
+        narrowed: int | str
+        assert not isinstance(self.field, int)
+        reveal_type(self.field)  # revealed: T@SomeClass & str
+        narrowed = self.field
+
+    def narrowed2(self) -> None:
+        narrowed: int | str
+        assert not isinstance(self.field, A)
+        reveal_type(self.field)  # revealed: T@SomeClass & ~A
+        narrowed = self.field
+```
+
 ## Narrowing
 
 We can use narrowing expressions to eliminate some of the possibilities of a constrained typevar:
@@ -861,38 +943,38 @@ class R: ...
 
 def f[T: (P, Q)](t: T) -> None:
     if isinstance(t, P):
-        reveal_type(t)  # revealed: P
+        reveal_type(t)  # revealed: T@f & P
         p: P = t
     else:
-        reveal_type(t)  # revealed: Q & ~P
+        reveal_type(t)  # revealed: T@f & Q & ~P
         q: Q = t
 
     if isinstance(t, Q):
-        reveal_type(t)  # revealed: Q
+        reveal_type(t)  # revealed: T@f & Q
         q: Q = t
     else:
-        reveal_type(t)  # revealed: P & ~Q
+        reveal_type(t)  # revealed: T@f & P & ~Q
         p: P = t
 
 def g[T: (P, Q, R)](t: T) -> None:
     if isinstance(t, P):
-        reveal_type(t)  # revealed: P
+        reveal_type(t)  # revealed: T@g & P
         p: P = t
     elif isinstance(t, Q):
-        reveal_type(t)  # revealed: Q & ~P
+        reveal_type(t)  # revealed: T@g & Q & ~P
         q: Q = t
     else:
-        reveal_type(t)  # revealed: R & ~P & ~Q
+        reveal_type(t)  # revealed: T@g & R & ~P & ~Q
         r: R = t
 
     if isinstance(t, P):
-        reveal_type(t)  # revealed: P
+        reveal_type(t)  # revealed: T@g & P
         p: P = t
     elif isinstance(t, Q):
-        reveal_type(t)  # revealed: Q & ~P
+        reveal_type(t)  # revealed: T@g & Q & ~P
         q: Q = t
     elif isinstance(t, R):
-        reveal_type(t)  # revealed: R & ~P & ~Q
+        reveal_type(t)  # revealed: T@g & R & ~P & ~Q
         r: R = t
     else:
         reveal_type(t)  # revealed: Never
@@ -903,10 +985,10 @@ If the constraints are disjoint, simplification does eliminate the redundant neg
 ```py
 def h[T: (P, None)](t: T) -> None:
     if t is None:
-        reveal_type(t)  # revealed: None
+        reveal_type(t)  # revealed: T@h & None
         p: None = t
     else:
-        reveal_type(t)  # revealed: P
+        reveal_type(t)  # revealed: T@h & P
         p: P = t
 ```
 

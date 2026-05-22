@@ -7,6 +7,7 @@ use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -90,6 +91,11 @@ fn is_union_expr(semantic: &SemanticModel, expr: &Expr) -> bool {
 /// RUF036
 pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, union: &'a Expr) {
     let semantic = checker.semantic();
+
+    if !semantic.in_type_definition() {
+        return;
+    }
+
     let mut none_exprs: Vec<&Expr> = Vec::new();
     let mut other_exprs: Vec<&Expr> = Vec::new();
 
@@ -149,10 +155,12 @@ fn generate_fix(
     annotation: &Expr,
     is_pep604: bool,
 ) -> Option<Fix> {
-    let applicability = if checker.comment_ranges().intersects(annotation.range()) {
-        Applicability::Unsafe
-    } else {
+    let applicability = if checker.semantic().in_typing_only_annotation()
+        && !checker.comment_ranges().intersects(annotation.range())
+    {
         Applicability::Safe
+    } else {
+        Applicability::Unsafe
     };
 
     let reordered: Vec<Expr> = other_exprs
@@ -184,6 +192,13 @@ fn generate_fix(
         })
     };
 
-    let edit = Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range());
+    let edit = Edit::range_replacement(
+        pad(
+            checker.generator().expr(&new_expr),
+            annotation.range(),
+            checker.locator(),
+        ),
+        annotation.range(),
+    );
     Some(Fix::applicable_edit(edit, applicability))
 }

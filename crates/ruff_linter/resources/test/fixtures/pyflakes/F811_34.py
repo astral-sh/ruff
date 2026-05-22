@@ -1,34 +1,25 @@
-from typing import TYPE_CHECKING
-from faststream._internal.broker import BrokerUsecase
+"""Regression test for: https://github.com/astral-sh/ruff/issues/23802"""
 
-if TYPE_CHECKING:
-    # See: https://github.com/astral-sh/ruff/issues/22554
-    # shoud detect -------------------------vvvvvvvvvvvvv
-    from faststream._internal.broker import BrokerUsecase
-    from faststream.specification.schema import Contact, License
+# F811: both annotated assignments, first unused
+bar: int = 1
+bar: int = 2  # F811
 
-if TYPE_CHECKING:
-    # See: https://github.com/astral-sh/ruff/pull/22560#discussion_r2866237036
-    # should not detect
-	import pyarrow_hotfix
+x: str = "hello"
+x: str = "world"  # F811
 
-def foo():
-	import pyarrow_hotfix
+# OK: plain reassignment (no annotation)
+y = 1
+y = 2
 
-# Should NOT detect: the runtime import is itself conditional, so the
-# TYPE_CHECKING import is not redundant (e.g., needed for type checkers
-# when the condition is False).
-HAS_THING = True
+# OK: first is plain, second is annotated
+z = 1
+z: int = 2
 
-if HAS_THING:
-    from foo import Bar
+# OK: first is annotated, second is plain
+w: int = 1
+w = 2
 
-if TYPE_CHECKING:
-    from foo import Bar
-
-if TYPE_CHECKING:
-    from langchain_huggingface.llms.huggingface_endpoint import HuggingFaceEndpoint
-    from langchain_huggingface.llms.huggingface_pipeline import HuggingFacePipeline
-
-from langchain_huggingface.llms.huggingface_endpoint import HuggingFaceEndpoint
-from langchain_huggingface.llms.huggingface_pipeline import HuggingFacePipeline
+# OK: used between assignments
+a: int = 1
+print(a)
+a: int = 2

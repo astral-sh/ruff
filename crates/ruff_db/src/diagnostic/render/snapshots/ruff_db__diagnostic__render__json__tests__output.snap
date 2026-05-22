@@ -34,6 +34,7 @@ expression: env.render_diagnostics(&diagnostics)
     },
     "message": "`os` imported but unused",
     "noqa_row": 1,
+    "severity": "error",
     "url": "https://docs.astral.sh/ruff/rules/unused-import"
   },
   {
@@ -67,6 +68,7 @@ expression: env.render_diagnostics(&diagnostics)
     },
     "message": "Local variable `x` is assigned to but never used",
     "noqa_row": 6,
+    "severity": "error",
     "url": "https://docs.astral.sh/ruff/rules/unused-variable"
   },
   {
@@ -84,6 +86,7 @@ expression: env.render_diagnostics(&diagnostics)
     },
     "message": "Undefined name `a`",
     "noqa_row": 1,
+    "severity": "error",
     "url": "https://docs.astral.sh/ruff/rules/undefined-name"
   },
   {
@@ -101,6 +104,7 @@ expression: env.render_diagnostics(&diagnostics)
     },
     "message": "Undefined name `fibonaccii`",
     "noqa_row": 1,
+    "severity": "error",
     "url": "https://docs.astral.sh/ruff/rules/undefined-name"
   }
 ]

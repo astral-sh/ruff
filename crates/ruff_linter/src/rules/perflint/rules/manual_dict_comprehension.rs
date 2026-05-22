@@ -202,7 +202,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     // filtered = {x: y for x in y if x in filtered}
     // ```
     if if_test.is_some_and(|test| {
-        any_over_expr(test, &|expr| {
+        any_over_expr(test, |expr| {
             ComparableExpr::from(expr) == ComparableExpr::from(name)
         })
     }) {
@@ -387,11 +387,17 @@ fn convert_to_dict_comprehension(
     let comprehension_str =
         format!("{{{key_str}: {value_str} {for_type} {target_str} in {iter_str}{if_str}}}");
 
-    let for_loop_inline_comments = comment_strings_in_range(
-        checker,
-        for_stmt.range,
-        &[key.range(), value.range(), for_stmt.iter.range()],
-    );
+    let mut ranges_to_ignore = vec![
+        key.range(),
+        value.range(),
+        for_stmt.iter.range(),
+        for_stmt.target.range(),
+    ];
+    if let Some(test) = if_test {
+        ranges_to_ignore.push(test.range());
+    }
+    let for_loop_inline_comments =
+        comment_strings_in_range(checker, for_stmt.range, &ranges_to_ignore);
 
     let newline = checker.stylist().line_ending().as_str();
 
@@ -474,7 +480,7 @@ enum DictComprehensionType {
 }
 
 fn has_post_loop_references(checker: &Checker, expr: &Expr, loop_end: TextSize) -> bool {
-    any_over_expr(expr, &|expr| match expr {
+    any_over_expr(expr, |expr| match expr {
         Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
             .iter()
             .any(|expr| has_post_loop_references(checker, expr, loop_end)),

@@ -229,6 +229,7 @@ impl<'de> serde::de::Deserialize<'de> for NameImports {
                         module,
                         names,
                         level,
+                        is_lazy: _,
                         range: _,
                         node_index: _,
                     }) => names
@@ -246,6 +247,7 @@ impl<'de> serde::de::Deserialize<'de> for NameImports {
                         .collect(),
                     Stmt::Import(ast::StmtImport {
                         names,
+                        is_lazy: _,
                         range: _,
                         node_index: _,
                     }) => names

@@ -161,7 +161,7 @@ help: Replace with `cond is None`
    - if None == res[1]:
 23 + if None is res[1]:
 24 |     pass
-25 | 
+25 |
 26 | if x == None != None:
 note: This is an unsafe fix and may change runtime behavior
 
@@ -177,11 +177,11 @@ E711 [*] Comparison to `None` should be `cond is None`
 help: Replace with `cond is None`
 23 | if None == res[1]:
 24 |     pass
-25 | 
+25 |
    - if x == None != None:
 26 + if x is None is not None:
 27 |     pass
-28 | 
+28 |
 29 | #: Okay
 note: This is an unsafe fix and may change runtime behavior
 
@@ -197,10 +197,10 @@ E711 [*] Comparison to `None` should be `cond is not None`
 help: Replace with `cond is not None`
 23 | if None == res[1]:
 24 |     pass
-25 | 
+25 |
    - if x == None != None:
 26 + if x is None is not None:
 27 |     pass
-28 | 
+28 |
 29 | #: Okay
 note: This is an unsafe fix and may change runtime behavior

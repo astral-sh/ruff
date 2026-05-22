@@ -144,10 +144,10 @@
           ]
         },
         "python-version": {
-          "description": "Specifies the version of Python that will be used to analyze the source code.\nThe version should be specified as a string in the format `M.m` where `M` is the major version\nand `m` is the minor (e.g. `\"3.0\"` or `\"3.6\"`).\nIf a version is provided, ty will generate errors if the source code makes use of language features\nthat are not supported in that version.\n\nIf a version is not specified, ty will try the following techniques in order of preference\nto determine a value:\n1. Check for the `project.requires-python` setting in a `pyproject.toml` file\n   and use the minimum version from the specified range\n2. Check for an activated or configured Python environment\n   and attempt to infer the Python version of that environment\n3. Fall back to the default value (see below)\n\nFor some language features, ty can also understand conditionals based on comparisons\nwith `sys.version_info`. These are commonly found in typeshed, for example,\nto reflect the differing contents of the standard library across Python versions.",
+          "description": "Specifies the version of Python that will be used to analyze the source code.\nThe version should be specified as a string in the format `M.m` where `M` is the major version\nand `m` is the minor (e.g. `\"3.7\"` or `\"3.12\"`).\nIf a version is provided, ty will generate errors if the source code makes use of language features\nthat are not supported in that version.\n\nIf a version is not specified, ty will try the following techniques in order of preference\nto determine a value:\n1. Check for the `project.requires-python` setting in a `pyproject.toml` file\n   and use the minimum version from the specified range\n2. Check for an activated or configured Python environment\n   and attempt to infer the Python version of that environment\n3. Fall back to the default value (see below)\n\nFor some language features, ty can also understand conditionals based on comparisons\nwith `sys.version_info`. These are commonly found in typeshed, for example,\nto reflect the differing contents of the standard library across Python versions.",
           "anyOf": [
             {
-              "$ref": "#/definitions/PythonVersion"
+              "$ref": "#/definitions/SupportedPythonVersion"
             },
             {
               "type": "null"
@@ -310,50 +310,6 @@
         }
       ]
     },
-    "PythonVersion": {
-      "anyOf": [
-        {
-          "type": "string",
-          "pattern": "^\\d+\\.\\d+$"
-        },
-        {
-          "description": "Python 3.7",
-          "const": "3.7"
-        },
-        {
-          "description": "Python 3.8",
-          "const": "3.8"
-        },
-        {
-          "description": "Python 3.9",
-          "const": "3.9"
-        },
-        {
-          "description": "Python 3.10",
-          "const": "3.10"
-        },
-        {
-          "description": "Python 3.11",
-          "const": "3.11"
-        },
-        {
-          "description": "Python 3.12",
-          "const": "3.12"
-        },
-        {
-          "description": "Python 3.13",
-          "const": "3.13"
-        },
-        {
-          "description": "Python 3.14",
-          "const": "3.14"
-        },
-        {
-          "description": "Python 3.15",
-          "const": "3.15"
-        }
-      ]
-    },
     "RelativePathBuf": {
       "description": "A possibly relative path in a configuration file.\n\nRelative paths in configuration files or from CLI options\nrequire different anchoring:\n\n* CLI: The path is relative to the current working directory\n* Configuration file: The path is relative to the project's root.",
       "allOf": [
@@ -375,6 +331,15 @@
             }
           ]
         },
+        "all": {
+          "title": "set the default severity level for all rules",
+          "description": "Configure a default severity level for all rules. Individual rule settings override this default.",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "ambiguous-protocol-member": {
           "title": "detects protocol classes with ambiguous interfaces",
           "description": "## What it does\nChecks for protocol classes with members that will lead to ambiguous interfaces.\n\n## Why is this bad?\nAssigning to an undeclared variable in a protocol class leads to an ambiguous\ninterface which may lead to the type checker inferring unexpected things. It's\nrecommended to ensure that all members of a protocol class are explicitly declared.\n\n## Examples\n\n```py\nfrom typing import Protocol\n\nclass BaseProto(Protocol):\n    a: int                               # fine (explicitly declared as `int`)\n    def method_member(self) -> int: ...  # fine: a method definition using `def` is considered a declaration\n    c = \"some variable\"                  # error: no explicit declaration, leading to ambiguity\n    b = method_member                    # error: no explicit declaration, leading to ambiguity\n\n    # error: this creates implicit assignments of `d` and `e` in the protocol class body.\n    # Were they really meant to be considered protocol members?\n    for d, e in enumerate(range(42)):\n        pass\n\nclass SubProto(BaseProto, Protocol):\n    a = 42  # fine (declared in superclass)\n```",
@@ -388,16 +353,6 @@
         "assert-type-unspellable-subtype": {
           "title": "detects failed type assertions",
           "description": "## What it does\nChecks for `assert_type()` calls where the actual type\nis an unspellable subtype of the asserted type.\n\n## Why is this bad?\n`assert_type()` is intended to ensure that the inferred type of a value\nis exactly the same as the asserted type. But in some situations, ty\nhas nonstandard extensions to the type system that allow it to infer\nmore precise types than can be expressed in user annotations. ty emits a\ndifferent error code to `type-assertion-failure` in these situations so\nthat users can easily differentiate between the two cases.\n\n## Example\n\n```python\ndef _(x: int):\n    assert_type(x, int)  # fine\n    if x:\n        assert_type(x, int)  # error: [assert-type-unspellable-subtype]\n                             # the actual type is `int & ~AlwaysFalsy`,\n                             # which excludes types like `Literal[0]`\n```",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
-        "byte-string-type-annotation": {
-          "title": "detects byte strings in type annotation positions",
-          "description": "## What it does\nChecks for byte-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use byte-string notation.\n\n## Examples\n```python\ndef test(): -> b\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
           "default": "error",
           "oneOf": [
             {
@@ -575,19 +530,9 @@
             }
           ]
         },
-        "fstring-type-annotation": {
-          "title": "detects F-strings in type annotation positions",
-          "description": "## What it does\nChecks for f-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use f-string notation.\n\n## Examples\n```python\ndef test(): -> f\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "ignore-comment-unknown-rule": {
           "title": "detects `ty: ignore` comments that reference unknown rules",
-          "description": "## What it does\nChecks for `ty: ignore[code]` where `code` isn't a known lint rule.\n\n## Why is this bad?\nA `ty: ignore[code]` directive with a `code` that doesn't match\nany known rule will not suppress any type errors, and is probably a mistake.\n\n## Examples\n```py\na = 20 / 0  # ty: ignore[division-by-zer]\n```\n\nUse instead:\n\n```py\na = 20 / 0  # ty: ignore[division-by-zero]\n```",
+          "description": "## What it does\nChecks for `ty: ignore[code]` or `type: ignore[ty:code]` comments where `code` isn't a known lint rule.\n\n## Why is this bad?\nA `ty: ignore[code]` or a `type:ignore[ty:code] directive with a `code` that doesn't match\nany known rule will not suppress any type errors, and is probably a mistake.\n\n## Examples\n```py\na = 20 / 0  # ty: ignore[division-by-zer]\n```\n\nUse instead:\n\n```py\na = 20 / 0  # ty: ignore[division-by-zero]\n```",
           "default": "warn",
           "oneOf": [
             {
@@ -675,6 +620,16 @@
             }
           ]
         },
+        "invalid-attribute-override": {
+          "title": "detects attribute overrides that change class-variable or instance-variable behavior",
+          "description": "## What it does\nDetects attribute overrides that change whether an inherited attribute\nis a class variable or an instance variable.\n\nThis rule currently only covers class-variable and instance-variable\ncategory changes.\n\n## Why is this bad?\nPure class variables and instance variables have different access and\nassignment behavior. Overriding one with the other violates the\n[Liskov Substitution Principle] (\"LSP\"), because code that is valid for\nthe superclass may no longer be valid for the subclass.\n\n## Example\n```python\nfrom typing import ClassVar\n\nclass Base:\n    instance_attr: int\n    class_attr: ClassVar[int]\n\nclass Sub(Base):\n    instance_attr: ClassVar[int]  # error: [invalid-attribute-override]\n    class_attr: int  # error: [invalid-attribute-override]\n```\n\n[Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-await": {
           "title": "detects awaiting on types that don't support it",
           "description": "## What it does\nChecks for `await` being used with types that are not [Awaitable].\n\n## Why is this bad?\nSuch expressions will lead to `TypeError` being raised at runtime.\n\n## Examples\n```python\nimport asyncio\n\nclass InvalidAwait:\n    def __await__(self) -> int:\n        return 5\n\nasync def main() -> None:\n    await InvalidAwait()  # error: [invalid-await]\n    await 42  # error: [invalid-await]\n\nasyncio.run(main())\n```\n\n[Awaitable]: https://docs.python.org/3/library/collections.abc.html#collections.abc.Awaitable",
@@ -729,6 +684,16 @@
           "title": "detects invalid declarations",
           "description": "## What it does\nChecks for declarations where the inferred type of an existing symbol\nis not [assignable to] its post-hoc declared type.\n\n## Why is this bad?\nSuch declarations break the rules of the type system and\nweaken a type checker's ability to accurately reason about your code.\n\n## Examples\n```python\na = 1\na: str\n```\n\n[assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable",
           "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-enum-member-annotation": {
+          "title": "detects type annotations on enum members",
+          "description": "## What it does\nChecks for enum members that have explicit type annotations.\n\n## Why is this bad?\nThe [typing spec] states that type checkers should infer a literal type\nfor all enum members. An explicit type annotation on an enum member is\nmisleading because the annotated type will be incorrect — the actual\nruntime type is the enum class itself, not the annotated type.\n\nIn CPython's `enum` module, annotated assignments with values are still\ntreated as members at runtime, but the annotation will confuse readers of the code.\n\n## Examples\n```python\nfrom enum import Enum\n\nclass Pet(Enum):\n    CAT = 1       # OK\n    DOG: int = 2  # Error: enum members should not be annotated\n```\n\nUse instead:\n```python\nfrom enum import Enum\n\nclass Pet(Enum):\n    CAT = 1\n    DOG = 2\n```\n\n## References\n- [Typing spec: Enum members](https://typing.python.org/en/latest/spec/enums.html#enum-members)\n\n[typing spec]: https://typing.python.org/en/latest/spec/enums.html#enum-members",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -797,7 +762,7 @@
         },
         "invalid-key": {
           "title": "detects invalid subscript accesses or TypedDict literal keys",
-          "description": "## What it does\nChecks for subscript accesses with invalid keys and `TypedDict` construction with an\nunknown key.\n\n## Why is this bad?\nSubscripting with an invalid key will raise a `KeyError` at runtime.\n\nCreating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is\n`closed=true` it also violates the expectations of the type.\n\n## Examples\n```python\nfrom typing import TypedDict\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\nalice = Person(name=\"Alice\", age=30)\nalice[\"height\"]  # KeyError: 'height'\n\nbob: Person = { \"name\": \"Bob\", \"age\": 30 }  # typo!\n\ncarol = Person(name=\"Carol\", age=25)  # typo!\n```",
+          "description": "## What it does\nChecks for subscript accesses with invalid keys and `TypedDict` construction with an\nunknown key.\n\n## Why is this bad?\nSubscripting with an invalid key will raise a `KeyError` at runtime.\n\nCreating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is\n`closed=true` it also violates the expectations of the type.\n\n## Examples\n```python\nfrom typing import TypedDict\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\nalice = Person(name=\"Alice\", age=30)\nalice[\"height\"]  # KeyError: 'height'\n\nbob: Person = { \"nickname\": \"Bob\", \"age\": 30 }  # typo!\n\ncarol = Person(name=\"Carol\", aeg=25)  # typo!\n```",
           "default": "error",
           "oneOf": [
             {
@@ -859,6 +824,16 @@
           "title": "detects invalid `NamedTuple` class definitions",
           "description": "## What it does\nChecks for invalidly defined `NamedTuple` classes.\n\n## Why is this bad?\nAn invalidly defined `NamedTuple` class may lead to the type checker\ndrawing incorrect conclusions. It may also lead to `TypeError`s or\n`AttributeError`s at runtime.\n\n## Examples\nA class definition cannot combine `NamedTuple` with other base classes\nin multiple inheritance; doing so raises a `TypeError` at runtime. The sole\nexception to this rule is `Generic[]`, which can be used alongside `NamedTuple`\nin a class's bases list.\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple, object): ...\nTypeError: can only inherit from a NamedTuple type and Generic\n```\n\nFurther, `NamedTuple` field names cannot start with an underscore:\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple):\n...     _bar: int\nValueError: Field names cannot start with an underscore: '_bar'\n```\n\n`NamedTuple` classes also have certain synthesized attributes (like `_asdict`, `_make`,\n`_replace`, etc.) that cannot be overwritten. Attempting to assign to these attributes\nwithout a type annotation will raise an `AttributeError` at runtime.\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple):\n...     x: int\n...     _asdict = 42\nAttributeError: Cannot overwrite NamedTuple attribute _asdict\n```",
           "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-named-tuple-override": {
+          "title": "detects subclass members that override inherited `NamedTuple` fields",
+          "description": "## What it does\nChecks for subclass members that override inherited `NamedTuple` fields.\n\n## Why is this bad?\nReusing an inherited `NamedTuple` field name in a subclass creates a\nclass where tuple indexing and `repr()` still reflect the original\nfield, while attribute access follows the subclass member.\n\n## Default level\nThis rule is a warning by default because these overrides do not make\nthe class invalid at runtime.\n\n## Examples\n```python\nfrom typing import NamedTuple\n\nclass User(NamedTuple):\n    name: str\n\nclass Admin(User):\n    name = \"shadowed\"  # error: [invalid-named-tuple-override]\n\nadmin = Admin(\"Alice\")\nadmin.name  # \"shadowed\"\nadmin[0]  # \"Alice\"\n```",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -1055,6 +1030,16 @@
             }
           ]
         },
+        "invalid-typed-dict-field": {
+          "title": "detects invalid `TypedDict` field declarations",
+          "description": "## What it does\nDetects invalid `TypedDict` field declarations.\n\n## Why is this bad?\n`TypedDict` subclasses cannot redefine inherited fields incompatibly. Doing so breaks the\nsubtype guarantees that `TypedDict` inheritance is meant to preserve.\n\n## Example\n```python\nfrom typing import TypedDict\n\nclass Base(TypedDict):\n    x: int\n\nclass Child(Base):\n    x: str  # error: [invalid-typed-dict-field]\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-typed-dict-header": {
           "title": "detects invalid statements in `TypedDict` class headers",
           "description": "## What it does\nDetects errors in `TypedDict` class headers, such as unexpected arguments\nor invalid base classes.\n\n## Why is this bad?\nThe typing spec states that `TypedDict`s are not permitted to have\ncustom metaclasses. Using `**` unpacking in a `TypedDict` header\nis also prohibited by ty, as it means that ty cannot statically determine\nwhether keys in the `TypedDict` are intended to be required or optional.\n\n## Example\n```python\nfrom typing import TypedDict\n\nclass Foo(TypedDict, metaclass=whatever):  # error: [invalid-typed-dict-header]\n    ...\n\ndef f(x: dict):\n    class Bar(TypedDict, **x):  # error: [invalid-typed-dict-header]\n        ...\n```",
@@ -1068,6 +1053,16 @@
         "invalid-typed-dict-statement": {
           "title": "detects invalid statements in `TypedDict` class bodies",
           "description": "## What it does\nDetects statements other than annotated declarations in `TypedDict` class bodies.\n\n## Why is this bad?\n`TypedDict` class bodies aren't allowed to contain any other types of statements. For\nexample, method definitions and field values aren't allowed. None of these will be\navailable on \"instances of the `TypedDict`\" at runtime (as `dict` is the runtime class of\nall \"`TypedDict` instances\").\n\n## Example\n```python\nfrom typing import TypedDict\n\nclass Foo(TypedDict):\n    def bar(self):  # error: [invalid-typed-dict-statement]\n        pass\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-yield": {
+          "title": "detects yield expressions where the \"yield\" or \"send\" type is incompatible with the annotated return type",
+          "description": "## What it does\nDetects `yield` and `yield from` expressions where the \"yield\" or \"send\" type\nis incompatible with the generator function's annotated return type.\n\n## Why is this bad?\nYielding a value of a type that doesn't match the generator's declared yield type,\nor using `yield from` with a sub-iterator whose yield or send type is incompatible,\nis a type error that may cause downstream consumers of the generator to receive\nvalues of an unexpected type.\n\n## Examples\n```python\nfrom typing import Iterator\n\ndef gen() -> Iterator[int]:\n    yield \"not an int\"  # error: [invalid-yield]\n```",
           "default": "error",
           "oneOf": [
             {
@@ -1089,6 +1084,16 @@
           "title": "reports runtime checks against `TypedDict` classes",
           "description": "## What it does\nReports runtime checks against `TypedDict` classes.\nThis includes explicit calls to `isinstance()`/`issubclass()` and implicit\nchecks performed by `match` class patterns.\n\n## Why is this bad?\nUsing a `TypedDict` class in these contexts raises `TypeError` at runtime.\n\n## Examples\n```python\nfrom typing_extensions import TypedDict\n\nclass Movie(TypedDict):\n    name: str\n    director: str\n\ndef f(arg: object, arg2: type):\n    isinstance(arg, Movie)  # error: [isinstance-against-typed-dict]\n    issubclass(arg2, Movie)  # error: [isinstance-against-typed-dict]\n\ndef g(arg: object):\n    match arg:\n        case Movie():  # error: [isinstance-against-typed-dict]\n            pass\n```\n\n## References\n- [Typing specification: `TypedDict`](https://typing.python.org/en/latest/spec/typeddict.html)",
           "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "mismatched-type-name": {
+          "title": "detects functional typing definitions whose declared name does not match the assigned variable",
+          "description": "## What it does\nChecks for functional typing definitions whose declared name does not match\nthe variable they are assigned to.\n\n## Why is this bad?\nConstructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`,\n`TypedDict`, and `TypeAliasType` all take a name argument that is\nnormally expected to match the assigned variable. A mismatch is usually a\ntypo and makes later diagnostics harder to understand.\n\n## Default level\nThis rule is a warning by default because ty can usually recover and\ncontinue understanding the resulting type.\n\n## Examples\n```python\nfrom typing import NewType, TypeVar\nfrom typing_extensions import TypedDict\n\nT = TypeVar(\"U\")  # error: [mismatched-type-name]\nUserId = NewType(\"Id\", int)  # error: [mismatched-type-name]\nMovie = TypedDict(\"Film\", {\"title\": str})  # error: [mismatched-type-name]\n```",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -1118,6 +1123,16 @@
         "no-matching-overload": {
           "title": "detects calls that do not match any overload",
           "description": "## What it does\nChecks for calls to an overloaded function that do not match any of the overloads.\n\n## Why is this bad?\nFailing to provide the correct arguments to one of the overloads will raise a `TypeError`\nat runtime.\n\n## Examples\n```python\n@overload\ndef func(x: int): ...\n@overload\ndef func(x: bool): ...\nfunc(\"string\")  # error: [no-matching-overload]\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "non-callable-init-subclass": {
+          "title": "detects class definitions that will fail due to non-callable `__init_subclass__`",
+          "description": "## What it does\nChecks for class definitions that will fail due to non-callable `__init_subclass__`\nmethods.\n\n## Why is this bad?\nIf a class defines a non-callable `__init_subclass__` method/attribute, any attempt\nto subclass that class will raise a `TypeError` at runtime.\n\n## Examples\n```python\nclass Super:\n    __init_subclass__ = None\n\nclass Sub(Super): ...  # error: [non-callable-init-subclass]\n```\n\n## References\n- [Python data model: Customizing class creation](https://docs.python.org/3/reference/datamodel.html#customizing-class-creation)",
           "default": "error",
           "oneOf": [
             {
@@ -1187,8 +1202,8 @@
         },
         "possibly-missing-attribute": {
           "title": "detects references to possibly missing attributes",
-          "description": "## What it does\nChecks for possibly missing attributes.\n\n## Why is this bad?\nAttempting to access a missing attribute will raise an `AttributeError` at runtime.\n\n## Examples\n```python\nclass A:\n    if b:\n        c = 0\n\nA.c  # AttributeError: type object 'A' has no attribute 'c'\n```",
-          "default": "warn",
+          "description": "## What it does\nChecks for possibly missing attributes.\n\n## Why is this bad?\nAttempting to access a missing attribute will raise an `AttributeError` at runtime.\n\n## Rule status\nThis rule is currently disabled by default because of the number of\nfalse positives it can produce.\n\n## Examples\n```python\nclass A:\n    if b:\n        c = 0\n\nA.c  # AttributeError: type object 'A' has no attribute 'c'\n```",
+          "default": "ignore",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -1209,6 +1224,16 @@
           "title": "detects possibly missing imports",
           "description": "## What it does\nChecks for imports of symbols that may be missing.\n\n## Why is this bad?\nImporting a missing module or name will raise a `ModuleNotFoundError`\nor `ImportError` at runtime.\n\n## Rule status\nThis rule is currently disabled by default because of the number of\nfalse positives it can produce.\n\n## Examples\n```python\n# module.py\nimport datetime\n\nif datetime.date.today().weekday() != 6:\n    a = 1\n\n# main.py\nfrom module import a  # ImportError: cannot import name 'a' from 'module'\n```",
           "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "possibly-missing-submodule": {
+          "title": "detects accesses of submodules that may not be available as attributes on their parent module",
+          "description": "## What it does\nChecks for accesses of submodules that might not've been imported.\n\n## Why is this bad?\nWhen module `a` has a submodule `b`, `import a` isn't generally enough to let you access\n`a.b.` You either need to explicitly `import a.b`, or else you need the `__init__.py` file\nof `a` to include `from . import b`. Without one of those, `a.b` is an `AttributeError`.\n\n## Examples\n```python\nimport html\nhtml.parser  # AttributeError: module 'html' has no attribute 'parser'\n```",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -1275,6 +1300,16 @@
             }
           ]
         },
+        "subclass-of-dataclass-with-order": {
+          "title": "detects subclasses of dataclasses with `order=True`",
+          "description": "## What it does\nChecks for classes that inherit from a dataclass with `order=True`.\n\n## Why is this bad?\nWhen a dataclass has `order=True`, comparison methods (`__lt__`, `__le__`, `__gt__`, `__ge__`)\nare generated that compare instances as tuples of their fields. These methods raise a\n`TypeError` at runtime when comparing instances of different classes in the inheritance\nhierarchy, even if one is a subclass of the other.\n\nThis violates the [Liskov Substitution Principle] because child class instances cannot be\nused in all contexts where parent class instances are expected.\n\n## Example\n\n```python\nfrom dataclasses import dataclass\n\n@dataclass(order=True)\nclass Parent:\n    value: int\n\nclass Child(Parent):  # Ty emits a warning here\n    pass\n\n# At runtime, this raises TypeError:\n# Child(1) < Parent(2)\n```\n\nConsider using [`functools.total_ordering`][total_ordering] instead, which does not have this limitation.\n\n[Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle\n[total_ordering]: https://docs.python.org/3/library/functools.html#functools.total_ordering",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "subclass-of-final-class": {
           "title": "detects subclasses of final classes",
           "description": "## What it does\nChecks for classes that subclass final classes.\n\n## Why is this bad?\nDecorating a class with `@final` declares to the type checker that it should not be subclassed.\n\n## Example\n\n```python\nfrom typing import final\n\n@final\nclass A: ...\nclass B(A): ...  # Error raised here\n```",
@@ -1318,6 +1353,16 @@
         "unavailable-implicit-super-arguments": {
           "title": "detects invalid `super()` calls where implicit arguments are unavailable.",
           "description": "## What it does\nDetects invalid `super()` calls where implicit arguments like the enclosing class or first method argument are unavailable.\n\n## Why is this bad?\nWhen `super()` is used without arguments, Python tries to find two things:\nthe nearest enclosing class and the first argument of the immediately enclosing function (typically self or cls).\nIf either of these is missing, the call will fail at runtime with a `RuntimeError`.\n\n## Examples\n```python\nsuper()  # error: no enclosing class or function found\n\ndef func():\n    super()  # error: no enclosing class or first argument exists\n\nclass A:\n    f = super()  # error: no enclosing function to provide the first argument\n\n    def method(self):\n        def nested():\n            super()  # error: first argument does not exist in this nested function\n\n        lambda: super()  # error: first argument does not exist in this lambda\n\n        (super() for _ in range(10))  # error: argument is not available in generator expression\n\n        super()  # okay! both enclosing class and first argument are available\n```\n\n## References\n- [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "unbound-type-variable": {
+          "title": "detects type variables used outside of their bound scope",
+          "description": "## What it does\nChecks for type variables that are used in a scope where they are not bound\nto any enclosing generic context.\n\n## Why is this bad?\nUsing a type variable outside of a scope that binds it has no well-defined meaning.\n\n## Examples\n```python\nfrom typing import TypeVar, Generic\n\nT = TypeVar(\"T\")\nS = TypeVar(\"S\")\n\nx: T  # error: unbound type variable in module scope\n\nclass C(Generic[T]):\n    x: list[S] = []  # error: S is not in this class's generic context\n```\n\n## References\n- [Typing spec: Scoping rules for type variables](https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables)",
           "default": "error",
           "oneOf": [
             {
@@ -1407,7 +1452,7 @@
         },
         "unsupported-dynamic-base": {
           "title": "detects dynamic class bases that are unsupported as ty could not feasibly calculate the class's MRO",
-          "description": "## What it does\nChecks for dynamic class definitions (using `type()`) that have bases\nwhich are unsupported by ty.\n\nThis is equivalent to [`unsupported-base`] but applies to classes created\nvia `type()` rather than `class` statements.\n\n## Why is this bad?\nIf a dynamically created class has a base that is an unsupported type\nsuch as `type[T]`, ty will not be able to resolve the\n[method resolution order] (MRO) for the class. This may lead to an inferior\nunderstanding of your codebase and unpredictable type-checking behavior.\n\n## Default level\nThis rule is disabled by default because it will not cause a runtime error,\nand may be noisy on codebases that use `type()` in highly dynamic ways.\n\n## Examples\n```python\ndef factory(base: type[Base]) -> type:\n    # `base` has type `type[Base]`, not `type[Base]` itself\n    return type(\"Dynamic\", (base,), {})  # error: [unsupported-dynamic-base]\n```\n\n[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order\n[`unsupported-base`]: https://docs.astral.sh/ty/rules/unsupported-base",
+          "description": "## What it does\nChecks for dynamic class definitions (using `type()`) that have bases\nwhich are unsupported by ty.\n\nThis is equivalent to `unsupported-base` but applies to classes created\nvia `type()` rather than `class` statements.\n\n## Why is this bad?\nIf a dynamically created class has a base that is an unsupported type\nsuch as `type[T]`, ty will not be able to resolve the\n[method resolution order] (MRO) for the class. This may lead to an inferior\nunderstanding of your codebase and unpredictable type-checking behavior.\n\n## Default level\nThis rule is disabled by default because it will not cause a runtime error,\nand may be noisy on codebases that use `type()` in highly dynamic ways.\n\n## Examples\n```python\ndef factory(base: type[Base]) -> type:\n    # `base` has type `type[Base]`, not `type[Base]` itself\n    return type(\"Dynamic\", (base,), {})  # error: [unsupported-dynamic-base]\n```\n\n[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order",
           "default": "ignore",
           "oneOf": [
             {
@@ -1419,6 +1464,16 @@
           "title": "detects binary, unary, or comparison expressions where the operands don't support the operator",
           "description": "## What it does\nChecks for binary expressions, comparisons, and unary expressions where\nthe operands don't support the operator.\n\n## Why is this bad?\nAttempting to use an unsupported operator will raise a `TypeError` at\nruntime.\n\n## Examples\n```python\nclass A: ...\n\nA() + A()  # TypeError: unsupported operand type(s) for +: 'A' and 'A'\n```",
           "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "unused-awaitable": {
+          "title": "detects awaitable objects that are used as expression statements without being awaited",
+          "description": "## What it does\nChecks for awaitable objects (such as coroutines) used as expression\nstatements without being awaited.\n\n## Why is this bad?\nCalling an `async def` function returns a coroutine object. If the\ncoroutine is never awaited, the body of the async function will never\nexecute, which is almost always a bug. Python emits a\n`RuntimeWarning: coroutine was never awaited` at runtime in this case.\n\n## Examples\n```python\nasync def fetch_data() -> str:\n    return \"data\"\n\nasync def main() -> None:\n    fetch_data()  # Warning: coroutine is not awaited\n    await fetch_data()  # OK\n```",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -1516,6 +1571,56 @@
         }
       },
       "additionalProperties": false
+    },
+    "SupportedPythonVersion": {
+      "description": "A Python version explicitly supported by ty configuration and CLI parsing.",
+      "oneOf": [
+        {
+          "description": "Python 3.7",
+          "type": "string",
+          "const": "3.7"
+        },
+        {
+          "description": "Python 3.8",
+          "type": "string",
+          "const": "3.8"
+        },
+        {
+          "description": "Python 3.9",
+          "type": "string",
+          "const": "3.9"
+        },
+        {
+          "description": "Python 3.10",
+          "type": "string",
+          "const": "3.10"
+        },
+        {
+          "description": "Python 3.11",
+          "type": "string",
+          "const": "3.11"
+        },
+        {
+          "description": "Python 3.12",
+          "type": "string",
+          "const": "3.12"
+        },
+        {
+          "description": "Python 3.13",
+          "type": "string",
+          "const": "3.13"
+        },
+        {
+          "description": "Python 3.14",
+          "type": "string",
+          "const": "3.14"
+        },
+        {
+          "description": "Python 3.15",
+          "type": "string",
+          "const": "3.15"
+        }
+      ]
     },
     "SystemPathBuf": {
       "description": "An owned, mutable path on [`System`](`super::System`) (akin to [`String`]).\n\nThe path is guaranteed to be valid UTF-8.",

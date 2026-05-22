@@ -218,7 +218,7 @@ help: Rewrite as a set literal
 19 + f"{ {1,2,3} }"
 20 | f"{set(['a', 'b'])}"
 21 | f'{set(["a", "b"])}'
-22 | 
+22 |
 note: This is an unsafe fix and may change runtime behavior
 
 C405 [*] Unnecessary list literal (rewrite as a set literal)
@@ -237,7 +237,7 @@ help: Rewrite as a set literal
    - f"{set(['a', 'b'])}"
 20 + f"{ {'a', 'b'} }"
 21 | f'{set(["a", "b"])}'
-22 | 
+22 |
 23 | f"{set(['a', 'b']) - set(['a'])}"
 note: This is an unsafe fix and may change runtime behavior
 
@@ -257,7 +257,7 @@ help: Rewrite as a set literal
 20 | f"{set(['a', 'b'])}"
    - f'{set(["a", "b"])}'
 21 + f'{ {"a", "b"} }'
-22 | 
+22 |
 23 | f"{set(['a', 'b']) - set(['a'])}"
 24 | f"{ set(['a', 'b']) - set(['a']) }"
 note: This is an unsafe fix and may change runtime behavior
@@ -275,7 +275,7 @@ C405 [*] Unnecessary list literal (rewrite as a set literal)
 help: Rewrite as a set literal
 20 | f"{set(['a', 'b'])}"
 21 | f'{set(["a", "b"])}'
-22 | 
+22 |
    - f"{set(['a', 'b']) - set(['a'])}"
 23 + f"{ {'a', 'b'} - set(['a'])}"
 24 | f"{ set(['a', 'b']) - set(['a']) }"
@@ -296,7 +296,7 @@ C405 [*] Unnecessary list literal (rewrite as a set literal)
 help: Rewrite as a set literal
 20 | f"{set(['a', 'b'])}"
 21 | f'{set(["a", "b"])}'
-22 | 
+22 |
    - f"{set(['a', 'b']) - set(['a'])}"
 23 + f"{set(['a', 'b']) - {'a'} }"
 24 | f"{ set(['a', 'b']) - set(['a']) }"
@@ -315,13 +315,13 @@ C405 [*] Unnecessary list literal (rewrite as a set literal)
    |
 help: Rewrite as a set literal
 21 | f'{set(["a", "b"])}'
-22 | 
+22 |
 23 | f"{set(['a', 'b']) - set(['a'])}"
    - f"{ set(['a', 'b']) - set(['a']) }"
 24 + f"{ {'a', 'b'} - set(['a']) }"
 25 | f"a {set(['a', 'b']) - set(['a'])} b"
 26 | f"a { set(['a', 'b']) - set(['a']) } b"
-27 | 
+27 |
 note: This is an unsafe fix and may change runtime behavior
 
 C405 [*] Unnecessary list literal (rewrite as a set literal)
@@ -335,13 +335,13 @@ C405 [*] Unnecessary list literal (rewrite as a set literal)
    |
 help: Rewrite as a set literal
 21 | f'{set(["a", "b"])}'
-22 | 
+22 |
 23 | f"{set(['a', 'b']) - set(['a'])}"
    - f"{ set(['a', 'b']) - set(['a']) }"
 24 + f"{ set(['a', 'b']) - {'a'} }"
 25 | f"a {set(['a', 'b']) - set(['a'])} b"
 26 | f"a { set(['a', 'b']) - set(['a']) } b"
-27 | 
+27 |
 note: This is an unsafe fix and may change runtime behavior
 
 C405 [*] Unnecessary list literal (rewrite as a set literal)
@@ -354,13 +354,13 @@ C405 [*] Unnecessary list literal (rewrite as a set literal)
 26 | f"a { set(['a', 'b']) - set(['a']) } b"
    |
 help: Rewrite as a set literal
-22 | 
+22 |
 23 | f"{set(['a', 'b']) - set(['a'])}"
 24 | f"{ set(['a', 'b']) - set(['a']) }"
    - f"a {set(['a', 'b']) - set(['a'])} b"
 25 + f"a { {'a', 'b'} - set(['a'])} b"
 26 | f"a { set(['a', 'b']) - set(['a']) } b"
-27 | 
+27 |
 28 | t"{set([1,2,3])}"
 note: This is an unsafe fix and may change runtime behavior
 
@@ -374,13 +374,13 @@ C405 [*] Unnecessary list literal (rewrite as a set literal)
 26 | f"a { set(['a', 'b']) - set(['a']) } b"
    |
 help: Rewrite as a set literal
-22 | 
+22 |
 23 | f"{set(['a', 'b']) - set(['a'])}"
 24 | f"{ set(['a', 'b']) - set(['a']) }"
    - f"a {set(['a', 'b']) - set(['a'])} b"
 25 + f"a {set(['a', 'b']) - {'a'} } b"
 26 | f"a { set(['a', 'b']) - set(['a']) } b"
-27 | 
+27 |
 28 | t"{set([1,2,3])}"
 note: This is an unsafe fix and may change runtime behavior
 
@@ -400,7 +400,7 @@ help: Rewrite as a set literal
 25 | f"a {set(['a', 'b']) - set(['a'])} b"
    - f"a { set(['a', 'b']) - set(['a']) } b"
 26 + f"a { {'a', 'b'} - set(['a']) } b"
-27 | 
+27 |
 28 | t"{set([1,2,3])}"
 29 | t"{set(['a', 'b'])}"
 note: This is an unsafe fix and may change runtime behavior
@@ -421,7 +421,7 @@ help: Rewrite as a set literal
 25 | f"a {set(['a', 'b']) - set(['a'])} b"
    - f"a { set(['a', 'b']) - set(['a']) } b"
 26 + f"a { set(['a', 'b']) - {'a'} } b"
-27 | 
+27 |
 28 | t"{set([1,2,3])}"
 29 | t"{set(['a', 'b'])}"
 note: This is an unsafe fix and may change runtime behavior
@@ -439,12 +439,12 @@ C405 [*] Unnecessary list literal (rewrite as a set literal)
 help: Rewrite as a set literal
 25 | f"a {set(['a', 'b']) - set(['a'])} b"
 26 | f"a { set(['a', 'b']) - set(['a']) } b"
-27 | 
+27 |
    - t"{set([1,2,3])}"
 28 + t"{ {1,2,3} }"
 29 | t"{set(['a', 'b'])}"
 30 | t'{set(["a", "b"])}'
-31 | 
+31 |
 note: This is an unsafe fix and may change runtime behavior
 
 C405 [*] Unnecessary list literal (rewrite as a set literal)
@@ -457,12 +457,12 @@ C405 [*] Unnecessary list literal (rewrite as a set literal)
    |
 help: Rewrite as a set literal
 26 | f"a { set(['a', 'b']) - set(['a']) } b"
-27 | 
+27 |
 28 | t"{set([1,2,3])}"
    - t"{set(['a', 'b'])}"
 29 + t"{ {'a', 'b'} }"
 30 | t'{set(["a", "b"])}'
-31 | 
+31 |
 32 | t"{set(['a', 'b']) - set(['a'])}"
 note: This is an unsafe fix and may change runtime behavior
 
@@ -477,12 +477,12 @@ C405 [*] Unnecessary list literal (rewrite as a set literal)
 32 | t"{set(['a', 'b']) - set(['a'])}"
    |
 help: Rewrite as a set literal
-27 | 
+27 |
 28 | t"{set([1,2,3])}"
 29 | t"{set(['a', 'b'])}"
    - t'{set(["a", "b"])}'
 30 + t'{ {"a", "b"} }'
-31 | 
+31 |
 32 | t"{set(['a', 'b']) - set(['a'])}"
 33 | t"{ set(['a', 'b']) - set(['a']) }"
 note: This is an unsafe fix and may change runtime behavior
@@ -500,7 +500,7 @@ C405 [*] Unnecessary list literal (rewrite as a set literal)
 help: Rewrite as a set literal
 29 | t"{set(['a', 'b'])}"
 30 | t'{set(["a", "b"])}'
-31 | 
+31 |
    - t"{set(['a', 'b']) - set(['a'])}"
 32 + t"{ {'a', 'b'} - set(['a'])}"
 33 | t"{ set(['a', 'b']) - set(['a']) }"
@@ -521,7 +521,7 @@ C405 [*] Unnecessary list literal (rewrite as a set literal)
 help: Rewrite as a set literal
 29 | t"{set(['a', 'b'])}"
 30 | t'{set(["a", "b"])}'
-31 | 
+31 |
    - t"{set(['a', 'b']) - set(['a'])}"
 32 + t"{set(['a', 'b']) - {'a'} }"
 33 | t"{ set(['a', 'b']) - set(['a']) }"
@@ -540,7 +540,7 @@ C405 [*] Unnecessary list literal (rewrite as a set literal)
    |
 help: Rewrite as a set literal
 30 | t'{set(["a", "b"])}'
-31 | 
+31 |
 32 | t"{set(['a', 'b']) - set(['a'])}"
    - t"{ set(['a', 'b']) - set(['a']) }"
 33 + t"{ {'a', 'b'} - set(['a']) }"
@@ -559,7 +559,7 @@ C405 [*] Unnecessary list literal (rewrite as a set literal)
    |
 help: Rewrite as a set literal
 30 | t'{set(["a", "b"])}'
-31 | 
+31 |
 32 | t"{set(['a', 'b']) - set(['a'])}"
    - t"{ set(['a', 'b']) - set(['a']) }"
 33 + t"{ set(['a', 'b']) - {'a'} }"
@@ -577,7 +577,7 @@ C405 [*] Unnecessary list literal (rewrite as a set literal)
 35 | t"a { set(['a', 'b']) - set(['a']) } b"
    |
 help: Rewrite as a set literal
-31 | 
+31 |
 32 | t"{set(['a', 'b']) - set(['a'])}"
 33 | t"{ set(['a', 'b']) - set(['a']) }"
    - t"a {set(['a', 'b']) - set(['a'])} b"
@@ -595,7 +595,7 @@ C405 [*] Unnecessary list literal (rewrite as a set literal)
 35 | t"a { set(['a', 'b']) - set(['a']) } b"
    |
 help: Rewrite as a set literal
-31 | 
+31 |
 32 | t"{set(['a', 'b']) - set(['a'])}"
 33 | t"{ set(['a', 'b']) - set(['a']) }"
    - t"a {set(['a', 'b']) - set(['a'])} b"

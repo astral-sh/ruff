@@ -57,6 +57,7 @@ mod tests {
     #[test_case(Rule::ReSubPositionalArgs, Path::new("B034.py"))]
     #[test_case(Rule::RedundantTupleInExceptionHandler, Path::new("B013.py"))]
     #[test_case(Rule::ReuseOfGroupbyGenerator, Path::new("B031.py"))]
+    #[test_case(Rule::DelAttrWithConstant, Path::new("B043.py"))]
     #[test_case(Rule::SetAttrWithConstant, Path::new("B009_B010.py"))]
     #[test_case(Rule::StarArgUnpackingAfterKeywordArg, Path::new("B026.py"))]
     #[test_case(Rule::StaticKeyDictComprehension, Path::new("B035.py"))]
@@ -123,6 +124,11 @@ mod tests {
         Rule::MapWithoutExplicitStrict,
         Path::new("B912.py"),
         PythonVersion::PY313
+    )]
+    #[test_case(
+        Rule::StaticKeyDictComprehension,
+        Path::new("B035_py315.py"),
+        PythonVersion::PY315
     )]
     fn rules_with_target_version(
         rule_code: Rule,

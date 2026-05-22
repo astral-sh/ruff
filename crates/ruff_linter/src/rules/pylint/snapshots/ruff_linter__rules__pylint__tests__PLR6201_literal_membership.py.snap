@@ -82,7 +82,7 @@ help: Convert to `set`
 8  | "cherry" in fruits
    - _ = {key: value for key, value in {"a": 1, "b": 2}.items() if key in ("a", "b")}
 9  + _ = {key: value for key, value in {"a": 1, "b": 2}.items() if key in {"a", "b"}}
-10 | 
+10 |
 11 | # OK
 12 | fruits in [[1, 2, 3], [4, 5, 6]]
 note: This is an unsafe fix and may change runtime behavior

@@ -1,8 +1,9 @@
 use rustc_hash::FxHashMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Stmt;
 use ruff_python_semantic::{
-    Binding, BindingKind, Imported, NodeId, Scope, ScopeId, ShadowedBinding,
+    Binding, BindingKind, Imported, NodeId, Scope, ScopeId, SemanticModel, ShadowedBinding,
     analyze::{typing::is_type_checking_block, visibility},
 };
 use ruff_source_file::SourceRow;
@@ -10,7 +11,9 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
-use crate::preview::is_f811_shadowing_in_type_checking_enabled;
+use crate::preview::{
+    is_annotated_assignment_redefinition_enabled, is_f811_shadowing_in_type_checking_enabled,
+};
 use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -36,8 +39,13 @@ use crate::{Fix, FixAvailability, Violation};
 /// import bar
 /// ```
 ///
-/// In [preview](https://docs.astral.sh/ruff/preview/), this rule will
-/// also flag redefinitions in `typing.TYPE_CHECKING` blocks:
+/// ## Preview
+/// When [preview] is enabled, this rule also flags annotated variable
+/// redeclarations. For example, `bar: int = 1` followed by `bar: int = 2`
+/// will be flagged as a redefinition of an unused variable, whereas plain
+/// reassignments like `bar = 1` followed by `bar = 2` remain unflagged.
+///
+/// In preview, this rule will also flag redefinitions in `typing.TYPE_CHECKING` blocks:
 ///
 /// ```python
 /// import typing
@@ -53,6 +61,8 @@ use crate::{Fix, FixAvailability, Violation};
 /// ```python
 /// from collections.abc import Sequence
 /// ```
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 ///
 /// ## Options
 ///
@@ -102,9 +112,15 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
             }
 
             // If the shadowing binding isn't considered a "redefinition" of the
-            // shadowed binding, abort.
+            // shadowed binding, abort — unless both are annotated assignments
+            // and preview mode is enabled (see #23802).
             if !binding.redefines(shadowed) {
-                continue;
+                if !(is_annotated_assignment_redefinition_enabled(checker.settings())
+                    && is_annotated_assignment(binding, checker.semantic())
+                    && is_annotated_assignment(shadowed, checker.semantic()))
+                {
+                    continue;
+                }
             }
 
             if !is_f811_shadowing_in_type_checking_enabled(checker.settings()) {
@@ -154,6 +170,12 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
                     }
                 }
             } else {
+                // A binding in a class body creates a class attribute; it doesn't rebind names
+                // in an enclosing module or function scope.
+                if scope.kind.is_class() {
+                    continue;
+                }
+
                 // Only enforce cross-scope shadowing for imports.
                 if !matches!(
                     shadowed.kind,
@@ -265,6 +287,12 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
             }
         }
     }
+}
+
+fn is_annotated_assignment(binding: &Binding, semantic: &SemanticModel) -> bool {
+    binding
+        .statement(semantic)
+        .is_some_and(Stmt::is_ann_assign_stmt)
 }
 
 struct EntryInfo<'a> {

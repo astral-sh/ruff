@@ -12,12 +12,12 @@ RUF055 [*] Plain string pattern passed to `re` function
 11 | # aliases are not followed, so this one should not trigger the rule
    |
 help: Replace with `haystack.replace(pat1, "")`
-6  | 
+6  |
 7  | pat1 = "needle"
-8  | 
+8  |
    - re.sub(pat1, "", haystack)
 9  + haystack.replace(pat1, "")
-10 | 
+10 |
 11 | # aliases are not followed, so this one should not trigger the rule
 12 | if pat4 := pat1:
 
@@ -30,7 +30,7 @@ RUF055 [*] Plain string pattern passed to `re` function
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Replace with `haystack.replace(r"abc", repl)`
-14 | 
+14 |
 15 | # also works for the `repl` argument in sub
 16 | repl = "new"
    - re.sub(r"abc", repl, haystack)

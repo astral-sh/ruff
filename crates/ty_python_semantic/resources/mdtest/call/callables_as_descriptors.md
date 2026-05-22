@@ -13,7 +13,7 @@ instance to the first argument. The bound-method object therefore has a differen
 the first argument:
 
 ```py
-from ty_extensions import CallableTypeOf
+from ty_extensions import RegularCallableTypeOf
 from typing import Callable
 
 class C1:
@@ -21,8 +21,8 @@ class C1:
         return str(x)
 
 def _(
-    accessed_on_class: CallableTypeOf[C1.method],
-    accessed_on_instance: CallableTypeOf[C1().method],
+    accessed_on_class: RegularCallableTypeOf[C1.method],
+    accessed_on_instance: RegularCallableTypeOf[C1().method],
 ):
     reveal_type(accessed_on_class)  # revealed: (self: C1, x: int) -> str
     reveal_type(accessed_on_instance)  # revealed:        (x: int) -> str
@@ -41,8 +41,8 @@ class C2:
     non_descriptor_callable: NonDescriptorCallable2 = NonDescriptorCallable2()
 
 def _(
-    accessed_on_class: CallableTypeOf[C2.non_descriptor_callable],
-    accessed_on_instance: CallableTypeOf[C2().non_descriptor_callable],
+    accessed_on_class: RegularCallableTypeOf[C2.non_descriptor_callable],
+    accessed_on_instance: RegularCallableTypeOf[C2().non_descriptor_callable],
 ):
     reveal_type(accessed_on_class)  # revealed:    (c2: C2, x: int) -> str
     reveal_type(accessed_on_instance)  # revealed: (c2: C2, x: int) -> str
@@ -68,8 +68,8 @@ However, when they are accessed on instances of `C3`, they have different signat
 
 ```py
 def _(
-    method_accessed_on_instance: CallableTypeOf[C3().method],
-    callable_accessed_on_instance: CallableTypeOf[C3().non_descriptor_callable],
+    method_accessed_on_instance: RegularCallableTypeOf[C3().method],
+    callable_accessed_on_instance: RegularCallableTypeOf[C3().non_descriptor_callable],
 ):
     reveal_type(method_accessed_on_instance)  # revealed:           (x: int) -> str
     reveal_type(callable_accessed_on_instance)  # revealed: (c3: C3, x: int) -> str
@@ -200,7 +200,39 @@ def square_then(c: Callable[[float], int]) -> Callable[[float], int]:
 class Calculator:
     square_then_round = square_then(round)
 
-reveal_type(Calculator().square_then_round(3.14))  # revealed: Unknown | int
+reveal_type(Calculator().square_then_round(3.14))  # revealed: int
+```
+
+## Use case: Wrappers with explicit receivers
+
+`trio` defines multiple functions that takes in a callable with `Concatenate`-prepended receiver
+types, and returns a wrapper function with a different receiver type. They should still preserve
+descriptor behavior when the returned callable is assigned in the class body.
+
+```py
+from collections.abc import Callable, Iterable
+from typing import Concatenate, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+class RawPath:
+    def write_bytes(self, data: bytes) -> int:
+        raise NotImplementedError
+
+def _wrap_method(
+    fn: Callable[Concatenate[RawPath, P], T],
+) -> Callable[Concatenate["Path", P], T]:
+    raise NotImplementedError
+
+class Path:
+    write_bytes = _wrap_method(RawPath.write_bytes)
+
+def check(path: Path) -> None:
+    # TODO: shouldn't be errors, should reveal `int`
+    # error: [missing-argument]
+    # error: [invalid-argument-type]
+    reveal_type(path.write_bytes(b""))  # revealed: int
 ```
 
 ## Use case: Treating dunder methods as bound-method descriptors
@@ -222,8 +254,8 @@ Tensor() ** 2
 ```
 
 The following example is also taken from a real world project. Here, the `__lt__` dunder attribute
-is not declared. The attribute type is therefore inferred as `Unknown | Callable[…]`, but we still
-treat it as a bound-method descriptor:
+is not declared. The attribute type is inferred as `Callable[…]`, but we still treat it as a
+bound-method descriptor:
 
 ```py
 def make_comparison_operator(name: str) -> Callable[[Matrix, Matrix], bool]:
@@ -301,7 +333,7 @@ The callable type of a type object is not function-like.
 
 ```py
 from typing import ClassVar
-from ty_extensions import CallableTypeOf
+from ty_extensions import RegularCallableTypeOf
 
 class WithNew:
     def __new__(self, x: int) -> WithNew:
@@ -312,8 +344,8 @@ class WithInit:
         pass
 
 class C:
-    with_new: ClassVar[CallableTypeOf[WithNew]]
-    with_init: ClassVar[CallableTypeOf[WithInit]]
+    with_new: ClassVar[RegularCallableTypeOf[WithNew]]
+    with_init: ClassVar[RegularCallableTypeOf[WithInit]]
 
 C.with_new(1)
 C().with_new(1)

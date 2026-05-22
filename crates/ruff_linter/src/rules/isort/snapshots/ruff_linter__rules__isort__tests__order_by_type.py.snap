@@ -30,7 +30,7 @@ help: Organize imports
    - import foo
    - import FOO
 6  + from subprocess import PIPE, STDOUT, Popen
-7  + 
+7  +
 8  | import BAR
 9  | import bar
 10 + import FOO

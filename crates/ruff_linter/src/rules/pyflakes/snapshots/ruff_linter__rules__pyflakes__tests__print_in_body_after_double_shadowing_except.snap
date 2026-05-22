@@ -12,7 +12,7 @@ F841 [*] Local variable `x` is assigned to but never used
 9 |     except ImportError as x:
   |
 help: Remove assignment to unused variable `x`
-4  | 
+4  |
 5  |     try:
 6  |         1 / 0
    -     except ValueError as x:
@@ -37,5 +37,5 @@ help: Remove assignment to unused variable `x`
    -     except ImportError as x:
 9  +     except ImportError:
 10 |         pass
-11 | 
+11 |
 12 |     # No error here, though it should arguably be an F821 error. `x` will

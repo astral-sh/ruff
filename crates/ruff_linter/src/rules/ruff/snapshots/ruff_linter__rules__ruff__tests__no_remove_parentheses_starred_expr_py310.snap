@@ -121,7 +121,7 @@ help: Remove parentheses
    - e[((1,2),(3,4))]
 20 | e[(1,2),(3,4)]
 21 + e[(1,2),(3,4)]
-22 | 
+22 |
 23 | token_features[
 24 |     (window_position, feature_name)
 
@@ -135,12 +135,12 @@ RUF031 [*] Avoid parentheses for tuples in subscripts
    |
 help: Remove parentheses
 21 | e[(1,2),(3,4)]
-22 | 
+22 |
 23 | token_features[
    -     (window_position, feature_name)
 24 +     window_position, feature_name
 25 | ] = self._extract_raw_features_from_token
-26 | 
+26 |
 27 | d[1,]
 
 RUF031 [*] Avoid parentheses for tuples in subscripts
@@ -154,7 +154,7 @@ RUF031 [*] Avoid parentheses for tuples in subscripts
    |
 help: Remove parentheses
 25 | ] = self._extract_raw_features_from_token
-26 | 
+26 |
 27 | d[1,]
    - d[(1,)]
 28 + d[1,]

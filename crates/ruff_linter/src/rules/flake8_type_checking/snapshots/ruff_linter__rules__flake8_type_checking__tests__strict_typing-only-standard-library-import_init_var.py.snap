@@ -11,18 +11,18 @@ TC003 [*] Move standard library import `dataclasses.FrozenInstanceError` into a 
 6 | from pathlib import Path
   |
 help: Move into type-checking block
-2  | 
+2  |
 3  | from __future__ import annotations
-4  | 
+4  |
    - from dataclasses import FrozenInstanceError, InitVar, dataclass
 5  + from dataclasses import InitVar, dataclass
 6  | from pathlib import Path
 7  + from typing import TYPE_CHECKING
-8  + 
+8  +
 9  + if TYPE_CHECKING:
 10 +     from dataclasses import FrozenInstanceError
-11 | 
-12 | 
+11 |
+12 |
 13 | @dataclass
 note: This is an unsafe fix and may change runtime behavior
 
@@ -35,14 +35,14 @@ TC003 [*] Move standard library import `pathlib.Path` into a type-checking block
   |
 help: Move into type-checking block
 3  | from __future__ import annotations
-4  | 
+4  |
 5  | from dataclasses import FrozenInstanceError, InitVar, dataclass
    - from pathlib import Path
 6  + from typing import TYPE_CHECKING
-7  + 
+7  +
 8  + if TYPE_CHECKING:
 9  +     from pathlib import Path
-10 | 
-11 | 
+10 |
+11 |
 12 | @dataclass
 note: This is an unsafe fix and may change runtime behavior

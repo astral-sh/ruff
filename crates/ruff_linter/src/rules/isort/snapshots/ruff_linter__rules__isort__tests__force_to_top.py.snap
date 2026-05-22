@@ -40,7 +40,7 @@ help: Organize imports
 5  + import lib3.lib4
 6  + import lib3.lib4.lib5
 7  | import lib4
-   - 
+   -
    - import foo
 8  + import lib5
 9  + import lib6
@@ -55,7 +55,7 @@ help: Organize imports
    - from lib5 import lib2
    - from lib4 import lib2
    - from lib5 import lib1
-   - 
+   -
    - import lib3.lib4
    - import lib3.lib4.lib5
 15 + from lib2 import foo

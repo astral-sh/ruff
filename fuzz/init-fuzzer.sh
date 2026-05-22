@@ -33,7 +33,7 @@ if [ ! -d corpus/common ]; then
     # Build a smaller corpus in addition to the (optional) larger corpus
     echo "Building a smaller corpus dataset..."
     curl -L 'https://github.com/python/cpython/archive/refs/tags/v3.13.0.tar.gz' | tar xz
-    cp -r "../../../crates/ty_project/resources/test/corpus" "ty_project"
+    cp -r "../../../crates/ty_python_semantic/resources/corpus" "ty_python_semantic"
     cp -r "../../../crates/ruff_linter/resources/test/fixtures" "ruff_linter"
     cp -r "../../../crates/ruff_python_formatter/resources/test/fixtures" "ruff_python_formatter"
     cp -r "../../../crates/ruff_python_parser/resources" "ruff_python_parser"

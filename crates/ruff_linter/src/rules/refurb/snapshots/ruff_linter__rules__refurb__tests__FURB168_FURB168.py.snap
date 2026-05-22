@@ -11,13 +11,13 @@ FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `Non
 6 |     pass
   |
 help: Replace with `is` operator
-2 | 
+2 |
 3 | # Errors.
-4 | 
+4 |
   - if isinstance(foo, type(None)):
 5 + if foo is None:
 6 |     pass
-7 | 
+7 |
 8 | if isinstance(foo and bar, type(None)):
 
 FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
@@ -32,11 +32,11 @@ FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `Non
 help: Replace with `is` operator
 5  | if isinstance(foo, type(None)):
 6  |     pass
-7  | 
+7  |
    - if isinstance(foo and bar, type(None)):
 8  + if (foo and bar) is None:
 9  |     pass
-10 | 
+10 |
 11 | if isinstance(foo, (type(None), type(None), type(None))):
 
 FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
@@ -51,11 +51,11 @@ FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `Non
 help: Replace with `is` operator
 8  | if isinstance(foo and bar, type(None)):
 9  |     pass
-10 | 
+10 |
    - if isinstance(foo, (type(None), type(None), type(None))):
 11 + if foo is None:
 12 |     pass
-13 | 
+13 |
 14 | if isinstance(foo, type(None)) is True:
 
 FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
@@ -70,11 +70,11 @@ FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `Non
 help: Replace with `is` operator
 11 | if isinstance(foo, (type(None), type(None), type(None))):
 12 |     pass
-13 | 
+13 |
    - if isinstance(foo, type(None)) is True:
 14 + if (foo is None) is True:
 15 |     pass
-16 | 
+16 |
 17 | if -isinstance(foo, type(None)):
 
 FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
@@ -89,11 +89,11 @@ FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `Non
 help: Replace with `is` operator
 14 | if isinstance(foo, type(None)) is True:
 15 |     pass
-16 | 
+16 |
    - if -isinstance(foo, type(None)):
 17 + if -(foo is None):
 18 |     pass
-19 | 
+19 |
 20 | if isinstance(foo, None | type(None)):
 
 FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
@@ -108,11 +108,11 @@ FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `Non
 help: Replace with `is` operator
 17 | if -isinstance(foo, type(None)):
 18 |     pass
-19 | 
+19 |
    - if isinstance(foo, None | type(None)):
 20 + if foo is None:
 21 |     pass
-22 | 
+22 |
 23 | if isinstance(foo, type(None) | type(None)):
 
 FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
@@ -127,11 +127,11 @@ FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `Non
 help: Replace with `is` operator
 20 | if isinstance(foo, None | type(None)):
 21 |     pass
-22 | 
+22 |
    - if isinstance(foo, type(None) | type(None)):
 23 + if foo is None:
 24 |     pass
-25 | 
+25 |
 26 | # A bit contrived, but is both technically valid and equivalent to the above.
 
 FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
@@ -144,12 +144,12 @@ FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `Non
    |
 help: Replace with `is` operator
 24 |     pass
-25 | 
+25 |
 26 | # A bit contrived, but is both technically valid and equivalent to the above.
    - if isinstance(foo, (type(None) | ((((type(None))))) | ((None | type(None))))):
 27 + if foo is None:
 28 |     pass
-29 | 
+29 |
 30 | if isinstance(
 
 FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
@@ -162,13 +162,13 @@ FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `Non
 39 |     ...
    |
 help: Replace with `is` operator
-35 | 
+35 |
 36 | from typing import Union
-37 | 
+37 |
    - if isinstance(foo, Union[None]):
 38 + if foo is None:
 39 |     ...
-40 | 
+40 |
 41 | if isinstance(foo, Union[None, None]):
 
 FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
@@ -183,11 +183,11 @@ FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `Non
 help: Replace with `is` operator
 38 | if isinstance(foo, Union[None]):
 39 |     ...
-40 | 
+40 |
    - if isinstance(foo, Union[None, None]):
 41 + if foo is None:
 42 |     ...
-43 | 
+43 |
 44 | if isinstance(foo, Union[None, type(None)]):
 
 FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
@@ -202,9 +202,9 @@ FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `Non
 help: Replace with `is` operator
 41 | if isinstance(foo, Union[None, None]):
 42 |     ...
-43 | 
+43 |
    - if isinstance(foo, Union[None, type(None)]):
 44 + if foo is None:
 45 |     ...
-46 | 
+46 |
 47 |

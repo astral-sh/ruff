@@ -204,7 +204,7 @@ pub(super) fn has_default_copy_semantics(
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
 ) -> bool {
-    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
+    analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
         matches!(
             qualified_name.segments(),
             [
@@ -251,7 +251,7 @@ pub(super) fn is_ctypes_structure_fields(
     targets: &[Expr],
 ) -> bool {
     let is_ctypes_structure =
-        analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
+        analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
             matches!(qualified_name.segments(), ["ctypes", "Structure"])
         });
 

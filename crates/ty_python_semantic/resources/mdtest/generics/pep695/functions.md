@@ -137,6 +137,31 @@ reveal_type(takes_in_protocol(ExplicitSub()))  # revealed: int
 reveal_type(takes_in_protocol(ExplicitGenericSub[str]()))  # revealed: str
 ```
 
+Protocol inference should also preserve unions of structurally matching arguments:
+
+```py
+from typing import Protocol
+
+class A:
+    def foo(self) -> "A":
+        raise NotImplementedError
+
+class B:
+    def foo(self) -> "B":
+        raise NotImplementedError
+
+class SupportsFoo[T](Protocol):
+    def foo(self) -> T: ...
+
+def takes_in_supports_foo[T](obj: SupportsFoo[T]) -> T:
+    raise NotImplementedError
+
+def _(a: A, b: B, x: A | B):
+    reveal_type(takes_in_supports_foo(a))  # revealed: A
+    reveal_type(takes_in_supports_foo(b))  # revealed: B
+    reveal_type(takes_in_supports_foo(x))  # revealed: A | B
+```
+
 ## Inferring tuple parameter types
 
 ```py
@@ -175,8 +200,6 @@ reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Literal[42, 43]
 
 ## Inferring a bound typevar
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from typing_extensions import reveal_type
 
@@ -185,13 +208,26 @@ def f[T: int](x: T) -> T:
 
 reveal_type(f(1))  # revealed: Literal[1]
 reveal_type(f(True))  # revealed: Literal[True]
-# error: [invalid-argument-type]
+# snapshot: invalid-argument-type
 reveal_type(f("string"))  # revealed: Unknown
 ```
 
-## Inferring a constrained typevar
+```snapshot
+error[invalid-argument-type]: Argument to function `f` is incorrect
+ --> src/mdtest_snippet.py:9:15
+  |
+9 | reveal_type(f("string"))  # revealed: Unknown
+  |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy upper bound `int` of type variable `T`
+  |
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:7
+  |
+3 | def f[T: int](x: T) -> T:
+  |       ^^^^^^
+  |
+```
 
-<!-- snapshot-diagnostics -->
+## Inferring a constrained typevar
 
 ```py
 from typing_extensions import reveal_type
@@ -202,8 +238,23 @@ def f[T: (int, None)](x: T) -> T:
 reveal_type(f(1))  # revealed: int
 reveal_type(f(True))  # revealed: int
 reveal_type(f(None))  # revealed: None
-# error: [invalid-argument-type]
+# snapshot: invalid-argument-type
 reveal_type(f("string"))  # revealed: Unknown
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:10:15
+   |
+10 | reveal_type(f("string"))  # revealed: Unknown
+   |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy constraints (`int`, `None`) of type variable `T`
+   |
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:7
+  |
+3 | def f[T: (int, None)](x: T) -> T:
+  |       ^^^^^^^^^^^^^^
+  |
 ```
 
 ## Typevar constraints
@@ -514,22 +565,98 @@ reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 
 ## Passing generic functions to generic functions
 
-```py
+`functions.pyi`:
+
+```pyi
 from typing import Callable
 
-def invoke[A, B](fn: Callable[[A], B], value: A) -> B:
-    return fn(value)
+def invoke[A, B](fn: Callable[[A], B], value: A) -> B: ...
+def identity[T](x: T) -> T: ...
 
-def identity[T](x: T) -> T:
-    return x
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
 
-def head[T](xs: list[T]) -> T:
-    return xs[0]
+def head_covariant[T](xs: Covariant[T]) -> T: ...
+def lift_covariant[T](xs: T) -> Covariant[T]: ...
+
+class Contravariant[T]:
+    def receive(self, input: T): ...
+
+def head_contravariant[T](xs: Contravariant[T]) -> T: ...
+def lift_contravariant[T](xs: T) -> Contravariant[T]: ...
+
+class Invariant[T]:
+    mutable_attribute: T
+
+def head_invariant[T](xs: Invariant[T]) -> T: ...
+def lift_invariant[T](xs: T) -> Invariant[T]: ...
+```
+
+A simple function that passes through its parameter type unchanged:
+
+`simple.py`:
+
+```py
+from functions import invoke, identity
 
 reveal_type(invoke(identity, 1))  # revealed: Literal[1]
+```
 
-# TODO: this should be `Unknown | int`
-reveal_type(invoke(head, [1, 2, 3]))  # revealed: Unknown
+When the either the parameter or the return type is a generic alias referring to the typevar, we
+should still be able to propagate the specializations through. This should work regardless of the
+typevar's variance in the generic alias.
+
+TODO: This currently only works for the `lift` functions (TODO: and only currently for the covariant
+case). For the `lift` functions, the parameter type is a bare typevar, resulting in us inferring a
+type mapping of `A = int, B = Class[A]`. When specializing, we can substitute the mapping of `A`
+into the mapping of `B`, giving the correct return type.
+
+For the `head` functions, the parameter type is a generic alias, resulting in us inferring a type
+mapping of `A = Class[int], A = Class[B]`. At this point, the old solver is not able to unify the
+two mappings for `A`, and we have no mapping for `B`. As a result, we infer `Unknown` for the return
+type.
+
+As part of migrating to the new solver, we will generate a single constraint set combining all of
+the facts that we learn while checking the arguments. And the constraint set implementation should
+be able to unify the two assignments to `A`.
+
+`covariant.py`:
+
+```py
+from functions import invoke, Covariant, head_covariant, lift_covariant
+
+# TODO: revealed: `int`
+# revealed: Unknown
+reveal_type(invoke(head_covariant, Covariant[int]()))
+# revealed: Covariant[Literal[1]]
+reveal_type(invoke(lift_covariant, 1))
+```
+
+`contravariant.py`:
+
+```py
+from functions import invoke, Contravariant, head_contravariant, lift_contravariant
+
+# TODO: revealed: `int`
+# revealed: Unknown
+reveal_type(invoke(head_contravariant, Contravariant[int]()))
+# TODO: revealed: Contravariant[int]
+# revealed: Unknown
+reveal_type(invoke(lift_contravariant, 1))
+```
+
+`invariant.py`:
+
+```py
+from functions import invoke, Invariant, head_invariant, lift_invariant
+
+# TODO: revealed: `int`
+# revealed: Unknown
+reveal_type(invoke(head_invariant, Invariant[int]()))
+# TODO: revealed: `Invariant[int]`
+# revealed: Unknown
+reveal_type(invoke(lift_invariant, 1))
 ```
 
 ## Protocols as TypeVar bounds
@@ -612,6 +739,25 @@ def decorated[T](t: T) -> None:
 def decorated[T](t: T) -> None:
     # error: [redundant-cast]
     reveal_type(cast(T, t))  # revealed: T@decorated
+```
+
+## Attribute access on `Callable`-bounded TypeVars
+
+```py
+from typing import Callable
+
+def my_decorator[T: Callable](f: T) -> None:
+    # error: [unresolved-attribute]
+    f.whatever
+    # error: [unresolved-attribute]
+    f.whatever = 1
+
+class Box[T: Callable]:
+    cls: type[T]
+
+def specialized(box: Box[Callable]) -> None:
+    # error: [unresolved-attribute]
+    box.cls.whatever
 ```
 
 ## Solving TypeVars with upper bounds in unions
@@ -792,7 +938,7 @@ specializations of a generic function.
 
 ```py
 from typing import Any, Callable, NoReturn, overload, Self
-from ty_extensions import generic_context, into_callable
+from ty_extensions import generic_context, into_regular_callable
 
 def accepts_callable[**P, R](callable: Callable[P, R]) -> Callable[P, R]:
     return callable
@@ -801,7 +947,7 @@ def returns_int() -> int:
     raise NotImplementedError
 
 # revealed: () -> int
-reveal_type(into_callable(returns_int))
+reveal_type(into_regular_callable(returns_int))
 # revealed: () -> int
 reveal_type(accepts_callable(returns_int))
 # revealed: int
@@ -810,7 +956,7 @@ reveal_type(accepts_callable(returns_int)())
 class ClassWithoutConstructor: ...
 
 # revealed: () -> ClassWithoutConstructor
-reveal_type(into_callable(ClassWithoutConstructor))
+reveal_type(into_regular_callable(ClassWithoutConstructor))
 # revealed: () -> ClassWithoutConstructor
 reveal_type(accepts_callable(ClassWithoutConstructor))
 # revealed: ClassWithoutConstructor
@@ -821,7 +967,7 @@ class ClassWithNew:
         raise NotImplementedError
 
 # revealed: (...) -> ClassWithNew
-reveal_type(into_callable(ClassWithNew))
+reveal_type(into_regular_callable(ClassWithNew))
 # revealed: (...) -> ClassWithNew
 reveal_type(accepts_callable(ClassWithNew))
 # revealed: ClassWithNew
@@ -831,7 +977,7 @@ class ClassWithInit:
     def __init__(self) -> None: ...
 
 # revealed: () -> ClassWithInit
-reveal_type(into_callable(ClassWithInit))
+reveal_type(into_regular_callable(ClassWithInit))
 # revealed: () -> ClassWithInit
 reveal_type(accepts_callable(ClassWithInit))
 # revealed: ClassWithInit
@@ -845,7 +991,7 @@ class ClassWithNewAndInit:
 
 # TODO: We do not currently solve a common behavioral supertype for the two solutions of P.
 # revealed: ((...) -> ClassWithNewAndInit) | ((x: int) -> ClassWithNewAndInit)
-reveal_type(into_callable(ClassWithNewAndInit))
+reveal_type(into_regular_callable(ClassWithNewAndInit))
 # TODO: revealed: ((...) -> ClassWithNewAndInit) | ((x: int) -> ClassWithNewAndInit)
 # revealed: (...) -> ClassWithNewAndInit
 reveal_type(accepts_callable(ClassWithNewAndInit))
@@ -863,7 +1009,7 @@ class ClassWithNoReturnMetatype(metaclass=Meta):
 # TODO: The return types here are wrong, because we end up creating a constraint (Never ≤ R), which
 # we confuse with "R has no lower bound".
 # revealed: (...) -> Never
-reveal_type(into_callable(ClassWithNoReturnMetatype))
+reveal_type(into_regular_callable(ClassWithNoReturnMetatype))
 # TODO: revealed: (...) -> Never
 # revealed: (...) -> Unknown
 reveal_type(accepts_callable(ClassWithNoReturnMetatype))
@@ -880,7 +1026,7 @@ class ClassWithIgnoredInit:
     def __init__(self, x: int) -> None: ...
 
 # revealed: () -> Proxy
-reveal_type(into_callable(ClassWithIgnoredInit))
+reveal_type(into_regular_callable(ClassWithIgnoredInit))
 # revealed: () -> Proxy
 reveal_type(accepts_callable(ClassWithIgnoredInit))
 # revealed: Proxy
@@ -902,7 +1048,7 @@ class ClassWithOverloadedInit[T]:
 # solution.
 
 # revealed: Overload[[T](x: int) -> ClassWithOverloadedInit[int], [T](x: str) -> ClassWithOverloadedInit[str]]
-reveal_type(into_callable(ClassWithOverloadedInit))
+reveal_type(into_regular_callable(ClassWithOverloadedInit))
 # TODO: revealed: Overload[(x: int) -> ClassWithOverloadedInit[int], (x: str) -> ClassWithOverloadedInit[str]]
 # revealed: Overload[[T](x: int) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str], [T](x: str) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]]
 reveal_type(accepts_callable(ClassWithOverloadedInit))
@@ -921,9 +1067,9 @@ class GenericClass[T]:
 
 def _(x: list[str]):
     # revealed: [T](x: list[T], y: list[T]) -> GenericClass[T]
-    reveal_type(into_callable(GenericClass))
+    reveal_type(into_regular_callable(GenericClass))
     # revealed: ty_extensions.GenericContext[T@GenericClass]
-    reveal_type(generic_context(into_callable(GenericClass)))
+    reveal_type(generic_context(into_regular_callable(GenericClass)))
 
     # revealed: [T](x: list[T], y: list[T]) -> GenericClass[T]
     reveal_type(accepts_callable(GenericClass))
@@ -1073,6 +1219,20 @@ def f[T: (int, str)](x: T) -> T:
 
 def g[S: (bool, str)](x: S) -> S:
     return f(x)  # error: [invalid-argument-type]
+```
+
+## Display ordering
+
+Where possible, we want the types that appear in inferred specializations to line up with the types
+that are listed in the source code. We don't want arbitarily reorder e.g. union elements as part of
+finding a solution.
+
+```py
+from typing import Any
+
+def f(l: list[tuple[Any | str, Any | str]]) -> None:
+    # revealed: dict[Any | str, Any | str]
+    reveal_type(dict(l))
 ```
 
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md

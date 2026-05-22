@@ -9,11 +9,11 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 help: Convert to `T | None`
 12 | def multiple_1(arg1: Optional, arg2: Optional = None): ...
-13 | 
-14 | 
+13 |
+14 |
    - def multiple_2(arg1: Optional, arg2: Optional = None, arg3: int = None): ...
 15 + def multiple_2(arg1: Optional, arg2: Optional = None, arg3: int | None = None): ...
-16 | 
-17 | 
+16 |
+17 |
 18 | def return_type(arg: Optional = None) -> Optional: ...
 note: This is an unsafe fix and may change runtime behavior

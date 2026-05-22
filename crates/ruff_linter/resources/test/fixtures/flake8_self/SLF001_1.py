@@ -43,3 +43,28 @@ class M(type):
     def f(mcs):
         cls = mcs()
         cls._value = 1
+
+
+# https://github.com/astral-sh/ruff/issues/24140
+
+from typing import Annotated, Self
+
+class Sit:
+    def __init__(self, x: int) -> None:
+        self._x = x
+
+    def f(self) -> None:
+        this = self
+        print(this._x)  # fine (assigned from self)
+
+    def g(self, other: Self) -> None:
+        print(other._x)  # fine (annotated as Self)
+
+    def h(self, other: Annotated[Self, "meta"]) -> None:
+        print(other._x)  # fine (Annotated[Self, ...])
+
+    @staticmethod
+    def s() -> None:
+        self = object()
+        alias = self
+        print(alias._x)  # error (self is not an instance parameter)

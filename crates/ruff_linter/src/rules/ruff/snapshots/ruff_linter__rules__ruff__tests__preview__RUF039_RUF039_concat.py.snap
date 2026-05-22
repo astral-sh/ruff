@@ -11,8 +11,8 @@ RUF039 [*] First argument to `re.compile()` is not raw string
 7 | )
   |
 help: Replace with raw string
-2 | 
-3 | 
+2 |
+3 |
 4 | re.compile(
   -     'implicit'
 5 +     r'implicit'
@@ -31,7 +31,7 @@ RUF039 [*] First argument to `re.compile()` is not raw string
 8 | re.findall(
   |
 help: Replace with raw string
-3 | 
+3 |
 4 | re.compile(
 5 |     'implicit'
   -     'concatenation'
@@ -196,7 +196,7 @@ help: Replace with raw string
 36 +     r'utta ideas'
 37 | )
 38 | re.subn("()"r' am I'"??")
-39 | 
+39 |
 
 RUF039 [*] First argument to `re.subn()` is not raw string
   --> RUF039_concat.py:38:9
@@ -212,8 +212,8 @@ help: Replace with raw string
 37 | )
    - re.subn("()"r' am I'"??")
 38 + re.subn(r"()"r' am I'"??")
-39 | 
-40 | 
+39 |
+40 |
 41 | import regex
 
 RUF039 [*] First argument to `re.subn()` is not raw string
@@ -230,8 +230,8 @@ help: Replace with raw string
 37 | )
    - re.subn("()"r' am I'"??")
 38 + re.subn("()"r' am I'r"??")
-39 | 
-40 | 
+39 |
+40 |
 41 | import regex
 
 RUF039 [*] First argument to `regex.compile()` is not raw string
@@ -244,8 +244,8 @@ RUF039 [*] First argument to `regex.compile()` is not raw string
 47 | )
    |
 help: Replace with raw string
-42 | 
-43 | 
+42 |
+43 |
 44 | regex.compile(
    -     'implicit'
 45 +     r'implicit'
@@ -264,7 +264,7 @@ RUF039 [*] First argument to `regex.compile()` is not raw string
 48 | regex.findall(
    |
 help: Replace with raw string
-43 | 
+43 |
 44 | regex.compile(
 45 |     'implicit'
    -     'concatenation'
@@ -429,7 +429,7 @@ help: Replace with raw string
 76 +     r'utta ideas'
 77 | )
 78 | regex.subn("()"r' am I'"??")
-79 | 
+79 |
 
 RUF039 [*] First argument to `regex.subn()` is not raw string
   --> RUF039_concat.py:78:12
@@ -445,8 +445,8 @@ help: Replace with raw string
 77 | )
    - regex.subn("()"r' am I'"??")
 78 + regex.subn(r"()"r' am I'"??")
-79 | 
-80 | 
+79 |
+80 |
 81 | regex.template(
 
 RUF039 [*] First argument to `regex.subn()` is not raw string
@@ -463,8 +463,8 @@ help: Replace with raw string
 77 | )
    - regex.subn("()"r' am I'"??")
 78 + regex.subn("()"r' am I'r"??")
-79 | 
-80 | 
+79 |
+80 |
 81 | regex.template(
 
 RUF039 [*] First argument to `re.compile()` is not raw string
@@ -478,7 +478,7 @@ RUF039 [*] First argument to `re.compile()` is not raw string
 100 |     "\U0001F300-\U0001F5FF"  # symbols & pictographs
     |
 help: Replace with raw string
-95  | 
+95  |
 96  | # https://github.com/astral-sh/ruff/issues/16713
 97  | re.compile(
     -     "["

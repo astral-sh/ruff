@@ -12,7 +12,7 @@ B905 [*] `zip()` without an explicit `strict=` parameter
   |
 help: Add explicit value for parameter `strict=`
 1 | from itertools import count, cycle, repeat
-2 | 
+2 |
 3 | # Errors
   - zip("a", "b")
 4 + zip("a", "b", strict=False)
@@ -32,14 +32,14 @@ B905 [*] `zip()` without an explicit `strict=` parameter
 7 | zip(zip("a", strict=True),"b")
   |
 help: Add explicit value for parameter `strict=`
-2 | 
+2 |
 3 | # Errors
 4 | zip("a", "b")
   - zip("a", "b", *zip("c"))
 5 + zip("a", "b", *zip("c"), strict=False)
 6 | zip(zip("a", "b"), strict=False)
 7 | zip(zip("a", strict=True),"b")
-8 | 
+8 |
 note: This is an unsafe fix and may change runtime behavior
 
 B905 [*] `zip()` without an explicit `strict=` parameter
@@ -58,7 +58,7 @@ help: Add explicit value for parameter `strict=`
   - zip(zip("a", "b"), strict=False)
 6 + zip(zip("a", "b", strict=False), strict=False)
 7 | zip(zip("a", strict=True),"b")
-8 | 
+8 |
 9 | # OK
 note: This is an unsafe fix and may change runtime behavior
 
@@ -78,7 +78,7 @@ help: Add explicit value for parameter `strict=`
 6  | zip(zip("a", "b"), strict=False)
    - zip(zip("a", strict=True),"b")
 7  + zip(zip("a", strict=True),"b", strict=False)
-8  | 
+8  |
 9  | # OK
 10 | zip(range(3), strict=True)
 note: This is an unsafe fix and may change runtime behavior
@@ -93,12 +93,12 @@ B905 [*] `zip()` without an explicit `strict=` parameter
    |
 help: Add explicit value for parameter `strict=`
 19 | zip([1, 2, 3], repeat(1, times=None))
-20 | 
+20 |
 21 | # Errors (limited iterators).
    - zip([1, 2, 3], repeat(1, 1))
 22 + zip([1, 2, 3], repeat(1, 1), strict=False)
 23 | zip([1, 2, 3], repeat(1, times=4))
-24 | 
+24 |
 25 | import builtins
 note: This is an unsafe fix and may change runtime behavior
 
@@ -113,12 +113,12 @@ B905 [*] `zip()` without an explicit `strict=` parameter
 25 | import builtins
    |
 help: Add explicit value for parameter `strict=`
-20 | 
+20 |
 21 | # Errors (limited iterators).
 22 | zip([1, 2, 3], repeat(1, 1))
    - zip([1, 2, 3], repeat(1, times=4))
 23 + zip([1, 2, 3], repeat(1, times=4), strict=False)
-24 | 
+24 |
 25 | import builtins
 26 | # Still an error even though it uses the qualified name
 note: This is an unsafe fix and may change runtime behavior

@@ -4,9 +4,8 @@ source: crates/ruff_linter/src/rules/isort/mod.rs
 I002 [*] Missing required import: `from __future__ import annotations as _annotations`
 --> comments_and_newlines.py:1:1
 help: Insert required import: `from __future__ import annotations as _annotations`
-2 | # A copyright notice could go here
-3 | 
+3 |
 4 | # A linter directive could go here
-5 + from __future__ import annotations as _annotations
-6 | 
+5 |
+6 + from __future__ import annotations as _annotations
 7 | x = 1

@@ -12,10 +12,10 @@ D412 [*] No blank lines allowed between a section header and its content ("Examp
 help: Remove blank line(s)
 12 |     """
 13 |     Example:
-14 | 
-   - 
+14 |
+   -
 15 |     .. code-block:: python
-16 | 
+16 |
 17 |         import foo
 
 D412 [*] No blank lines allowed between a section header and its content ("Example")
@@ -29,11 +29,11 @@ D412 [*] No blank lines allowed between a section header and its content ("Examp
 help: Remove blank line(s)
 23 |     """
 24 |     Example:
-25 | 
-   - 
-   - 
+25 |
+   -
+   -
 26 |     .. code-block:: python
-27 | 
+27 |
 28 |         import foo
 
 D412 [*] No blank lines allowed between a section header and its content ("Example")
@@ -48,10 +48,10 @@ D412 [*] No blank lines allowed between a section header and its content ("Examp
 help: Remove blank line(s)
 47 |     Example
 48 |     -------
-49 | 
-   - 
+49 |
+   -
 50 |     .. code-block:: python
-51 | 
+51 |
 52 |         import foo
 
 D412 [*] No blank lines allowed between a section header and its content ("Example")
@@ -66,9 +66,9 @@ D412 [*] No blank lines allowed between a section header and its content ("Examp
 help: Remove blank line(s)
 59 |     Example
 60 |     -------
-61 | 
-   - 
-   - 
+61 |
+   -
+   -
 62 |     .. code-block:: python
-63 | 
+63 |
 64 |         import foo

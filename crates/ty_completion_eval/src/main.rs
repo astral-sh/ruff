@@ -290,7 +290,7 @@ impl Task {
             ..Options::default()
         });
         project_metadata.apply_configuration_files(&system)?;
-        let db = ProjectDatabase::new(project_metadata, system)?;
+        let db = ProjectDatabase::fallible(project_metadata, system)?;
         Ok(Task {
             db,
             dir: project_path.to_path_buf(),

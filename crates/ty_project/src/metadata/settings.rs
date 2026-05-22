@@ -20,7 +20,7 @@ use crate::{Db, glob::IncludeExcludeFilter};
 /// changing the terminal settings shouldn't invalidate any core type-checking queries.
 /// This can be achieved by adding a salsa query for the type checking specific settings.
 ///
-/// Settings that are part of [`ty_python_semantic::ProgramSettings`] are not included here.
+/// Settings that are part of [`ty_python_core::program::ProgramSettings`] are not included here.
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct Settings {
     pub(super) rules: Arc<RuleSelection>,
@@ -72,6 +72,14 @@ pub struct TerminalSettings {
 pub struct SrcSettings {
     pub respect_ignore_files: bool,
     pub files: IncludeExcludeFilter,
+}
+impl SrcSettings {
+    pub(crate) fn default() -> Self {
+        Self {
+            respect_ignore_files: true,
+            files: IncludeExcludeFilter::default(),
+        }
+    }
 }
 
 /// A single configuration override that applies to files matching specific patterns.

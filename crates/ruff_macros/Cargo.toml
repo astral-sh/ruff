@@ -13,6 +13,7 @@ license = { workspace = true }
 [lib]
 proc-macro = true
 doctest = false
+test = false
 
 [dependencies]
 ruff_python_trivia = { workspace = true }

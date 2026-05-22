@@ -16,6 +16,15 @@ x += (3, 4)
 reveal_type(x)  # revealed: tuple[Literal[1, 2, 3, 4], ...]
 ```
 
+## Walrus target
+
+```py
+def f(xs: list[int | str]) -> None:
+    ys = xs
+    ys[0] = "s"
+    (ys := [1])[0] += 1
+```
+
 ## Dunder methods
 
 ```py
@@ -38,18 +47,28 @@ reveal_type(x)  # revealed: int
 
 ## Unsupported types
 
-<!-- snapshot-diagnostics -->
-
 ```py
 class C:
     def __isub__(self, other: str) -> int:
         return 42
 
 x = C()
-# error: [unsupported-operator] "Operator `-=` is not supported between objects of type `C` and `Literal[1]`"
+# snapshot: unsupported-operator
 x -= 1
 
 reveal_type(x)  # revealed: int
+```
+
+```snapshot
+error[unsupported-operator]: Unsupported `-=` operation
+ --> src/mdtest_snippet.py:7:1
+  |
+7 | x -= 1
+  | -^^^^-
+  | |    |
+  | |    Has type `Literal[1]`
+  | Has type `C`
+  |
 ```
 
 ## Method union

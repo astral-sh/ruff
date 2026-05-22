@@ -12,20 +12,25 @@ license = { workspace = true }
 description = "WebAssembly bindings for ty"
 
 [package.metadata.cargo-shear]
-# Depended on only to enable `log` feature as of 2025-10-03.
-ignored = ["tracing"]
+ignored = [
+    # Depended on only to enable `log` feature as of 2025-10-03.
+    "tracing",
+
+    "uuid",
+]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 doctest = false
+test = false
 
 [dependencies]
 ty_ide = { workspace = true }
 ty_project = { workspace = true, default-features = false, features = [
     "deflate",
-    "format"
+    "format",
 ] }
-ty_python_semantic = { workspace = true }
+ty_python_core = { workspace = true }
 
 ruff_db = { workspace = true, default-features = false, features = [] }
 ruff_diagnostics = { workspace = true }

@@ -27,13 +27,13 @@ use ty_project::watch::{ChangeEvent, CreatedKind};
 use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
 
 use index::DocumentError;
-use ty_python_semantic::MisconfigurationMode;
+use ty_python_core::program::UseDefaultStrategy;
 
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
 pub(crate) use self::settings::{GlobalSettings, WorkspaceSettings};
 use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options};
-use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
+use crate::document::{DocumentKey, DocumentVersion, LanguageId, NotebookDocument};
 use crate::server::{Action, publish_settings_diagnostics};
 use crate::session::client::Client;
 use crate::session::index::Document;
@@ -173,6 +173,10 @@ impl Session {
             registrations: HashSet::new(),
             client_name,
         })
+    }
+
+    pub(crate) fn system(&self) -> &dyn System {
+        &*self.native_system
     }
 
     pub(crate) fn request_queue(&self) -> &RequestQueue {
@@ -325,15 +329,6 @@ impl Session {
         &mut self.project_state_mut(path).db
     }
 
-    /// Returns a reference to the project's [`ProjectDatabase`] corresponding to the given path, if
-    /// any.
-    pub(crate) fn project_db_for_path(
-        &self,
-        path: impl AsRef<SystemPath>,
-    ) -> Option<&ProjectDatabase> {
-        self.project_state_for_path(path).map(|state| &state.db)
-    }
-
     /// Returns a reference to the project's [`ProjectState`] in which the given `path` belongs.
     ///
     /// If the path is a system path, it will return the project database that is closest to the
@@ -364,8 +359,17 @@ impl Session {
                 // where it can't prove that the `range_mut` call and the `self.projects.values_mut`
                 // never borrow `self.projects` mutably at the same time.
                 // https://rust-lang.github.io/rfcs/2094-nll.html#problem-case-3-conditional-control-flow-across-functions
-                if self.projects.range(range.clone()).next_back().is_some() {
-                    return self.projects.range_mut(range).next_back().unwrap().1;
+                if self
+                    .projects
+                    .range(range.clone())
+                    .any(|(workspace_root, _)| system_path.starts_with(workspace_root))
+                {
+                    return self
+                        .projects
+                        .range_mut(range)
+                        .rfind(|(workspace_root, _)| system_path.starts_with(workspace_root))
+                        .unwrap()
+                        .1;
                 }
 
                 self.project_state_virtual_fallback_mut()
@@ -382,9 +386,10 @@ impl Session {
         &self,
         path: impl AsRef<SystemPath>,
     ) -> Option<&ProjectState> {
+        let path = path.as_ref();
         self.projects
-            .range(..=path.as_ref().to_path_buf())
-            .next_back()
+            .range(..=path.to_path_buf())
+            .rfind(|(workspace_root, _)| path.starts_with(workspace_root))
             .map(|(_, project)| project)
     }
 
@@ -406,7 +411,7 @@ impl Session {
     pub(crate) fn apply_changes(
         &mut self,
         path: &AnySystemPath,
-        changes: Vec<ChangeEvent>,
+        changes: &[ChangeEvent],
     ) -> ChangeResult {
         let overrides = path.as_system().and_then(|root| {
             self.workspaces()
@@ -611,7 +616,7 @@ impl Session {
                     metadata.apply_overrides(overrides);
                 }
 
-                ProjectDatabase::new(metadata, system.clone())
+                ProjectDatabase::fallible(metadata, system.clone())
             });
 
         let (root, db) = match project {
@@ -627,15 +632,13 @@ impl Session {
                     self.client_name.log_guidance(),
                 ));
 
-                let db_with_default_settings = ProjectMetadata::from_options(
+                let Ok(metadata) = ProjectMetadata::from_options(
                     Options::default(),
                     root,
                     None,
-                    MisconfigurationMode::UseDefault,
-                )
-                .context("Failed to convert default options to metadata")
-                .and_then(|metadata| ProjectDatabase::new(metadata, system))
-                .expect("Default configuration to be valid");
+                    &UseDefaultStrategy,
+                );
+                let db_with_default_settings = ProjectDatabase::use_defaults(metadata, system);
                 let default_root = db_with_default_settings
                     .project()
                     .root(&db_with_default_settings)
@@ -847,12 +850,20 @@ impl Session {
             })
             .collect();
         for doc in documents_to_clear {
-            self.clear_diagnostics(client, doc.url());
+            self.clear_diagnostics_if_needed(&doc, client);
         }
 
         self.bump_revision();
 
         Ok(())
+    }
+
+    pub(crate) fn clear_diagnostics_if_needed(&self, document: &DocumentHandle, client: &Client) {
+        if self.client_capabilities().supports_pull_diagnostics() && !document.is_cell_or_notebook()
+        {
+            return;
+        }
+        self.clear_diagnostics(client, document.url());
     }
 
     /// Clears the diagnostics for the document identified by `uri`.
@@ -1166,7 +1177,7 @@ impl Session {
     /// Returns a handle to the opened document.
     pub(crate) fn open_notebook_document(&mut self, document: NotebookDocument) -> DocumentHandle {
         let handle = self.index_mut().open_notebook_document(document);
-        self.open_document_in_db(&handle);
+        self.open_document_in_db(&handle, None);
         handle
     }
 
@@ -1175,12 +1186,13 @@ impl Session {
     ///
     /// Returns a handle to the opened document.
     pub(crate) fn open_text_document(&mut self, document: TextDocument) -> DocumentHandle {
+        let language_id = document.language_id();
         let handle = self.index_mut().open_text_document(document);
-        self.open_document_in_db(&handle);
+        self.open_document_in_db(&handle, Some(language_id));
         handle
     }
 
-    fn open_document_in_db(&mut self, document: &DocumentHandle) {
+    fn open_document_in_db(&mut self, document: &DocumentHandle, language_id: Option<LanguageId>) {
         let path = document.notebook_or_file_path();
 
         // This is a "maybe" because the `File` might've not been interned yet i.e., the
@@ -1193,6 +1205,11 @@ impl Session {
                 .is_none_or(|file| !file.exists(db))
         });
 
+        // When we know the document isn't a Python source file
+        // then we'll avoid adding it to the project. (But we
+        // still track it as part of the index.)
+        let is_not_python = matches!(language_id, Some(LanguageId::Other));
+
         match path {
             AnySystemPath::System(system_path) => {
                 let event = if is_maybe_new_system_file {
@@ -1203,7 +1220,11 @@ impl Session {
                 } else {
                     ChangeEvent::Opened(system_path.clone())
                 };
-                self.apply_changes(path, vec![event]);
+                self.apply_changes(path, &[event]);
+
+                if is_not_python {
+                    return;
+                }
 
                 let db = self.project_db_mut(path);
                 match system_path_to_file(db, system_path) {
@@ -1220,6 +1241,10 @@ impl Session {
                 }
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
+                if is_not_python {
+                    return;
+                }
+
                 let db = self.project_db_mut(path);
                 let virtual_file = db.files().virtual_file(db, virtual_path);
                 db.project().open_file(db, virtual_file.file());
@@ -1523,9 +1548,10 @@ impl Workspaces {
     /// Returns a reference to the workspace for the given path, [`None`] if there's no workspace
     /// registered for the path.
     fn for_path(&self, path: impl AsRef<SystemPath>) -> Option<&Workspace> {
+        let path = path.as_ref();
         self.workspaces
-            .range(..=path.as_ref().to_path_buf())
-            .next_back()
+            .range(..=path.to_path_buf())
+            .rfind(|(workspace_root, _)| path.starts_with(workspace_root))
             .map(|(_, db)| db)
     }
 
@@ -1824,14 +1850,14 @@ impl DocumentHandle {
         let path = self.notebook_or_file_path();
         let changes = match path {
             AnySystemPath::System(system_path) => {
-                vec![ChangeEvent::file_content_changed(system_path.clone())]
+                [ChangeEvent::file_content_changed(system_path.clone())]
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
-                vec![ChangeEvent::ChangedVirtual(virtual_path.clone())]
+                [ChangeEvent::ChangedVirtual(virtual_path.clone())]
             }
         };
 
-        session.apply_changes(path, changes);
+        session.apply_changes(path, &changes);
     }
 
     fn set_version(&mut self, version: DocumentVersion) {

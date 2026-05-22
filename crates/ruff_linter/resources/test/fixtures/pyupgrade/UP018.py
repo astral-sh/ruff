@@ -94,3 +94,20 @@ bool(True)and()
 
 # t-strings are not native literals
 str(t"hey")
+
+# UP018 - Extended detections
+str("A" "B")
+str("A" "B").lower()
+str(
+    "A"
+    "B"
+)
+str(object="!")
+complex(1j)
+complex(real=1j)
+complex()
+complex(0j)
+complex(real=0j)
+(complex(0j)).real
+complex(1j).real
+complex(real=1j).real

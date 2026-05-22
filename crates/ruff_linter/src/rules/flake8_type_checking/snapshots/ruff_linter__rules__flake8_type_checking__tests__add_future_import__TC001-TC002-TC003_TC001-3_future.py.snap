@@ -11,16 +11,16 @@ TC003 [*] Move standard library import `collections.Counter` into a type-checkin
   |
 help: Move into type-checking block
    - from collections import Counter
-1  | 
+1  |
 2  | from elsewhere import third_party
-3  | 
+3  |
 4  | from . import first_party
 5  + from typing import TYPE_CHECKING
-6  + 
+6  +
 7  + if TYPE_CHECKING:
 8  +     from collections import Counter
-9  | 
-10 | 
+9  |
+10 |
 11 | def f(x: first_party.foo): ...
 note: This is an unsafe fix and may change runtime behavior
 
@@ -36,16 +36,16 @@ TC002 [*] Move third-party import `elsewhere.third_party` into a type-checking b
   |
 help: Move into type-checking block
 1  | from collections import Counter
-2  | 
+2  |
    - from elsewhere import third_party
-3  | 
+3  |
 4  | from . import first_party
 5  + from typing import TYPE_CHECKING
-6  + 
+6  +
 7  + if TYPE_CHECKING:
 8  +     from elsewhere import third_party
-9  | 
-10 | 
+9  |
+10 |
 11 | def f(x: first_party.foo): ...
 note: This is an unsafe fix and may change runtime behavior
 
@@ -58,15 +58,15 @@ TC001 [*] Move application import `.first_party` into a type-checking block
   |               ^^^^^^^^^^^
   |
 help: Move into type-checking block
-2  | 
+2  |
 3  | from elsewhere import third_party
-4  | 
+4  |
    - from . import first_party
 5  + from typing import TYPE_CHECKING
-6  + 
+6  +
 7  + if TYPE_CHECKING:
 8  +     from . import first_party
-9  | 
-10 | 
+9  |
+10 |
 11 | def f(x: first_party.foo): ...
 note: This is an unsafe fix and may change runtime behavior

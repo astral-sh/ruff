@@ -12,7 +12,7 @@ PYI011 [*] Only simple default values allowed for typed arguments
 12 | def f11(*, x: str = "x") -> None: ...  # OK
    |
 help: Replace default value with `...`
-7  | 
+7  |
 8  | def f12(
 9  |     x,
    -     y: str = os.pathsep,  # Error PYI011 Only simple default values allowed for typed arguments

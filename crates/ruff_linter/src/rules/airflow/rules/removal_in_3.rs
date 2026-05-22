@@ -1,7 +1,8 @@
 use crate::checkers::ast::Checker;
 use crate::rules::airflow::helpers::{
     Replacement, generate_import_edit, generate_remove_and_runtime_import_edit,
-    is_airflow_builtin_or_provider, is_guarded_by_try_except, is_method_in_subclass,
+    in_airflow_task_function, is_airflow_builtin_or_provider, is_airflow_task,
+    is_guarded_by_try_except, is_method_in_subclass,
 };
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -1221,26 +1222,6 @@ fn is_airflow_auth_manager(segments: &[&str]) -> bool {
 
         _ => false,
     }
-}
-
-/// Returns `true` if the current statement hierarchy has a function that's decorated with
-/// `@airflow.decorators.task`.
-fn in_airflow_task_function(semantic: &SemanticModel) -> bool {
-    semantic
-        .current_statements()
-        .find_map(|stmt| stmt.as_function_def_stmt())
-        .is_some_and(|function_def| is_airflow_task(function_def, semantic))
-}
-
-/// Returns `true` if the given function is decorated with `@airflow.decorators.task`.
-fn is_airflow_task(function_def: &StmtFunctionDef, semantic: &SemanticModel) -> bool {
-    function_def.decorator_list.iter().any(|decorator| {
-        semantic
-            .resolve_qualified_name(map_callable(&decorator.expression))
-            .is_some_and(|qualified_name| {
-                matches!(qualified_name.segments(), ["airflow", "decorators", "task"])
-            })
-    })
 }
 
 /// Check it's "execute" method inherits from Airflow base operator

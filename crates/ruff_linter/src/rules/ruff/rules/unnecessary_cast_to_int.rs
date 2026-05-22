@@ -96,7 +96,7 @@ pub(crate) fn unnecessary_cast_to_int(checker: &Checker, call: &ExprCall) {
 }
 
 /// Creates a fix that replaces `int(expression)` with `expression`.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn unwrap_int_expression(
     call: &ExprCall,
     argument: &Expr,

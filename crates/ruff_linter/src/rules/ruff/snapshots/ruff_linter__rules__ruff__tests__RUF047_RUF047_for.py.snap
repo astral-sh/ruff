@@ -16,8 +16,8 @@ help: Remove the `else` clause
 5 |     break
   - else:
   -     pass
-6 | 
-7 | 
+6 |
+7 |
 8 | for this in comment:
 
 RUF047 [*] Empty `else` clause
@@ -30,11 +30,11 @@ RUF047 [*] Empty `else` clause
    | |_______^
    |
 help: Remove the `else` clause
-9  | 
+9  |
 10 | for this in comment:
 11 |     belongs_to()  # `for`
    - else:
    -     ...
-12 | 
-13 | 
+12 |
+13 |
 14 | for of in course():

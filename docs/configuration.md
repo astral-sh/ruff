@@ -47,8 +47,8 @@ If left unspecified, Ruff's default configuration is equivalent to:
     line-length = 88
     indent-width = 4
 
-    # Assume Python 3.9
-    target-version = "py39"
+    # Assume Python 3.10
+    target-version = "py310"
 
     [tool.ruff.lint]
     # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
@@ -129,8 +129,8 @@ If left unspecified, Ruff's default configuration is equivalent to:
     line-length = 88
     indent-width = 4
 
-    # Assume Python 3.9
-    target-version = "py39"
+    # Assume Python 3.10
+    target-version = "py310"
 
     [lint]
     # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
@@ -554,9 +554,11 @@ Global options:
           Either a path to a TOML configuration file (`pyproject.toml` or
           `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
           find in a `ruff.toml` configuration file) overriding a specific
-          configuration option. Overrides of individual settings using this
-          option always take precedence over all configuration files, including
-          configuration files that were also specified using `--config`
+          configuration option (e.g., `--config "lint.line-length = 100"` or
+          `--config "format.quote-style = 'single'"`). Overrides of individual
+          settings using this option always take precedence over all
+          configuration files, including configuration files that were also
+          specified using `--config`
       --isolated
           Ignore all configuration files
       --color <WHEN>
@@ -695,9 +697,11 @@ Global options:
           Either a path to a TOML configuration file (`pyproject.toml` or
           `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
           find in a `ruff.toml` configuration file) overriding a specific
-          configuration option. Overrides of individual settings using this
-          option always take precedence over all configuration files, including
-          configuration files that were also specified using `--config`
+          configuration option (e.g., `--config "lint.line-length = 100"` or
+          `--config "format.quote-style = 'single'"`). Overrides of individual
+          settings using this option always take precedence over all
+          configuration files, including configuration files that were also
+          specified using `--config`
       --isolated
           Ignore all configuration files
       --color <WHEN>
@@ -789,9 +793,11 @@ Global options:
           Either a path to a TOML configuration file (`pyproject.toml` or
           `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
           find in a `ruff.toml` configuration file) overriding a specific
-          configuration option. Overrides of individual settings using this
-          option always take precedence over all configuration files, including
-          configuration files that were also specified using `--config`
+          configuration option (e.g., `--config "lint.line-length = 100"` or
+          `--config "format.quote-style = 'single'"`). Overrides of individual
+          settings using this option always take precedence over all
+          configuration files, including configuration files that were also
+          specified using `--config`
       --isolated
           Ignore all configuration files
       --color <WHEN>

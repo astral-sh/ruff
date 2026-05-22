@@ -23,6 +23,31 @@ alice.role = "moderator"
 bob = Member(name="Bob", tag="VIP")
 ```
 
+## `Any` annotations preserve field specifier metadata
+
+Even when a field is explicitly annotated as `Any`, `field(...)` should still be recognized as a
+dataclass field specifier. The synthesized field metadata comes from the right-hand side, not from
+the declared type.
+
+```py
+from dataclasses import dataclass, field
+from typing import Any
+
+@dataclass
+class AnyFieldSpecifier:
+    proto: Any = field(repr=False)
+    key: str | None
+
+reveal_type(AnyFieldSpecifier.__init__)  # revealed: (self: AnyFieldSpecifier, proto: Any, key: str | None) -> None
+
+@dataclass
+class AnyInitFalseField:
+    key: str | None
+    proto: Any = field(init=False)
+
+reveal_type(AnyInitFalseField.__init__)  # revealed: (self: AnyInitFalseField, key: str | None) -> None
+```
+
 ## Inheritance with defaults
 
 ```py
@@ -198,19 +223,6 @@ c = Child(1, name="Alice")
 reveal_type(c._)  # revealed: int
 ```
 
-## The `field` function
-
-```py
-from dataclasses import field
-
-def get_default() -> str:
-    return "default"
-
-reveal_type(field(default=1))  # revealed: dataclasses.Field[Literal[1]]
-reveal_type(field(default=None))  # revealed: dataclasses.Field[None]
-reveal_type(field(default_factory=get_default))  # revealed: dataclasses.Field[str]
-```
-
 ## dataclass_transform field_specifiers
 
 If `field_specifiers` is not specified, it defaults to an empty tuple, meaning no field specifiers
@@ -219,7 +231,7 @@ are supported and `dataclasses.field` and `dataclasses.Field` should not be acce
 ```py
 from typing_extensions import dataclass_transform
 from dataclasses import field, dataclass
-from typing import TypeVar
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 
@@ -233,8 +245,27 @@ def create_model(*, init: bool = True):
 class A:
     name: str = field(init=False)
 
-# field(init=False) should be ignored for dataclass_transform without explicit field_specifiers
-reveal_type(A.__init__)  # revealed: (self: A, name: str) -> None
+# Without explicit field_specifiers, field(init=False) is an ordinary default RHS.
+reveal_type(A.__init__)  # revealed: (self: A, name: str = ...) -> None
+
+class OtherFieldInfo:
+    def __init__(self, default: Any = None, **kwargs: Any) -> None: ...
+
+def other_field(default: Any = None, **kwargs: Any) -> OtherFieldInfo:
+    return OtherFieldInfo(default=default, **kwargs)
+
+@dataclass_transform(field_specifiers=(other_field, OtherFieldInfo))
+def create_model_with_other_specifiers(*, init: bool = True):
+    def deco(cls: type[T]) -> type[T]:
+        return cls
+    return deco
+
+@create_model_with_other_specifiers()
+class C:
+    name: str = field(init=False)
+
+# Even with other active field_specifiers, an unlisted RHS is an ordinary default value.
+reveal_type(C.__init__)  # revealed: (self: C, name: str = ...) -> None
 
 @dataclass
 class B:
@@ -247,8 +278,11 @@ reveal_type(B.__init__)  # revealed: (self: B) -> None
 Test constructor calls:
 
 ```py
-# This should NOT error because field(init=False) is ignored for A
+# These should NOT error because A's `field(...)` call is treated like any other default value
+A()
 A(name="foo")
+C()
+C(name="foo")
 
 # This should error because field(init=False) is respected for B
 # error: [unknown-argument]

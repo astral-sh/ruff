@@ -58,7 +58,7 @@ Checks that we don't get into a cycle if someone sets their `__bool__` method to
 class BoolIsBool:
     __bool__ = bool
 
-reveal_type(bool(BoolIsBool()))  # revealed: bool
+reveal_type(bool(BoolIsBool()))  # revealed: Literal[False]
 ```
 
 ### Conditional __bool__ method
@@ -185,6 +185,11 @@ class CustomLenEnum(Enum):
 
 reveal_type(bool(NormalEnum.NO))  # revealed: Literal[True]
 reveal_type(bool(NormalEnum.YES))  # revealed: Literal[True]
+
+def normal_enum_complement(value: NormalEnum):
+    if value is NormalEnum.NO:
+        return
+    reveal_type(bool(value))  # revealed: Literal[True]
 
 reveal_type(bool(FalsyEnum.NO))  # revealed: Literal[False]
 reveal_type(bool(FalsyEnum.YES))  # revealed: Literal[False]

@@ -56,6 +56,33 @@ mod tests {
         }
     }
 
+    #[test]
+    fn relative_imported_submodule_highlights() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                "from . import module_a\nx = module_a<CURSOR>",
+            )
+            .source("mypackage/module_a.py", "class Test: ...")
+            .build();
+
+        assert_snapshot!(test.document_highlights(), @"
+        info[document_highlights]: Highlight 1 (Other)
+         --> mypackage/__init__.py:1:15
+          |
+        1 | from . import module_a
+          |               ^^^^^^^^
+          |
+
+        info[document_highlights]: Highlight 2 (Read)
+         --> mypackage/__init__.py:2:5
+          |
+        2 | x = module_a
+          |     ^^^^^^^^
+          |
+        ");
+    }
+
     struct HighlightResult {
         index: usize,
         file_range: FileRange,
@@ -98,39 +125,27 @@ def calculate_sum():
         info[document_highlights]: Highlight 1 (Write)
          --> main.py:3:5
           |
-        2 | def calculate_sum():
         3 |     value = 10
           |     ^^^^^
-        4 |     doubled = value * 2
-        5 |     result = value + doubled
           |
 
         info[document_highlights]: Highlight 2 (Read)
          --> main.py:4:15
           |
-        2 | def calculate_sum():
-        3 |     value = 10
         4 |     doubled = value * 2
           |               ^^^^^
-        5 |     result = value + doubled
-        6 |     return value
           |
 
         info[document_highlights]: Highlight 3 (Read)
          --> main.py:5:14
           |
-        3 |     value = 10
-        4 |     doubled = value * 2
         5 |     result = value + doubled
           |              ^^^^^
-        6 |     return value
           |
 
         info[document_highlights]: Highlight 4 (Read)
          --> main.py:6:12
           |
-        4 |     doubled = value * 2
-        5 |     result = value + doubled
         6 |     return value
           |            ^^^^^
           |
@@ -155,36 +170,25 @@ def process_data(<CURSOR>data):
           |
         2 | def process_data(data):
           |                  ^^^^
-        3 |     if data:
-        4 |         processed = data.upper()
           |
 
         info[document_highlights]: Highlight 2 (Read)
          --> main.py:3:8
           |
-        2 | def process_data(data):
         3 |     if data:
           |        ^^^^
-        4 |         processed = data.upper()
-        5 |         return processed
           |
 
         info[document_highlights]: Highlight 3 (Read)
          --> main.py:4:21
           |
-        2 | def process_data(data):
-        3 |     if data:
         4 |         processed = data.upper()
           |                     ^^^^
-        5 |         return processed
-        6 |     return data
           |
 
         info[document_highlights]: Highlight 4 (Read)
          --> main.py:6:12
           |
-        4 |         processed = data.upper()
-        5 |         return processed
         6 |     return data
           |            ^^^^
           |
@@ -209,15 +213,11 @@ calc = Calculator()
           |
         2 | class Calculator:
           |       ^^^^^^^^^^
-        3 |     def __init__(self):
-        4 |         self.name = 'Calculator'
           |
 
         info[document_highlights]: Highlight 2 (Read)
          --> main.py:6:8
           |
-        4 |         self.name = 'Calculator'
-        5 |
         6 | calc = Calculator()
           |        ^^^^^^^^^^
           |
@@ -259,26 +259,18 @@ def test():
           |
         2 | a: str = "test"
           | ^
-        3 |
-        4 | a: int = 10
           |
 
         info[document_highlights]: Highlight 2 (Write)
          --> main.py:4:1
           |
-        2 | a: str = "test"
-        3 |
         4 | a: int = 10
           | ^
-        5 |
-        6 | print(a)
           |
 
         info[document_highlights]: Highlight 3 (Read)
          --> main.py:6:7
           |
-        4 | a: int = 10
-        5 |
         6 | print(a)
           |       ^
           |

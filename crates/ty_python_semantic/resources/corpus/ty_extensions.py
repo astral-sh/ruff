@@ -5,7 +5,13 @@ annotations involving ty_extension `_SpecialForm`s.
 This is a regression test for https://github.com/astral-sh/ty/issues/366
 """
 
-from ty_extensions import CallableTypeOf, Intersection, Not, TypeOf
+from ty_extensions import (
+    CallableTypeOf,
+    Intersection,
+    Not,
+    RegularCallableTypeOf,
+    TypeOf,
+)
 
 
 class A: ...
@@ -27,4 +33,8 @@ def _(x: TypeOf[1j]):
 
 
 def _(x: CallableTypeOf[str]):
+    pass
+
+
+def _(x: RegularCallableTypeOf[str]):
     pass

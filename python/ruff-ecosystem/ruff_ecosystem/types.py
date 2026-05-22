@@ -3,8 +3,9 @@ from __future__ import annotations
 import abc
 import dataclasses
 import difflib
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, is_dataclass
-from typing import TYPE_CHECKING, Any, Generator, Iterable, Sequence
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ruff_ecosystem.projects import ClonedRepository, Project
@@ -28,25 +29,25 @@ class Diff(Serializable):
         self.lines = list(lines)
 
         # Compute added and removed lines once
-        self.added = list(
+        self.added = [
             line[2:]
             for line in self.lines
             if line.startswith("+" + " " * leading_spaces)
             # Do not include patch headers
             and not line.startswith("+++")
-        )
-        self.removed = list(
+        ]
+        self.removed = [
             line[2:]
             for line in self.lines
             if line.startswith("-" + " " * leading_spaces)
             # Do not include patch headers
             and not line.startswith("---")
-        )
+        ]
 
     def __bool__(self) -> bool:
         return bool(self.added or self.removed)
 
-    def __iter__(self) -> Generator[str, None, None]:
+    def __iter__(self) -> Iterator[str]:
         yield from self.lines
 
     @property
@@ -65,9 +66,7 @@ class Diff(Serializable):
         return cls(difflib.ndiff(baseline, comparison), leading_spaces=1)
 
     def without_unchanged_lines(self) -> Diff:
-        return Diff(
-            line for line in self.lines if line.startswith("+") or line.startswith("-")
-        )
+        return Diff(line for line in self.lines if line.startswith(("+", "-")))
 
     def jsonable(self) -> Any:
         return self.lines

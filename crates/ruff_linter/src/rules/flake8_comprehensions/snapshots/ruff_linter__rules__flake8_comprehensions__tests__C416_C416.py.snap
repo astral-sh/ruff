@@ -14,7 +14,7 @@ C416 [*] Unnecessary list comprehension (rewrite using `list()`)
 help: Rewrite using `list()`
 3 | z = [(1,), (2,), (3,)]
 4 | d = {"a": 1, "b": 2, "c": 3}
-5 | 
+5 |
   - [i for i in x]
 6 + list(x)
 7 | {i for i in x}
@@ -33,7 +33,7 @@ C416 [*] Unnecessary set comprehension (rewrite using `set()`)
   |
 help: Rewrite using `set()`
 4  | d = {"a": 1, "b": 2, "c": 3}
-5  | 
+5  |
 6  | [i for i in x]
    - {i for i in x}
 7  + set(x)
@@ -53,7 +53,7 @@ C416 [*] Unnecessary dict comprehension (rewrite using `dict()`)
 10 | [(k, v) for k, v in d.items()]
    |
 help: Rewrite using `dict()`
-5  | 
+5  |
 6  | [i for i in x]
 7  | {i for i in x}
    - {k: v for k, v in y}
@@ -102,7 +102,7 @@ help: Rewrite using `list()`
 10 + list(d.items())
 11 | [(k, v) for [k, v] in d.items()]
 12 | {k: (a, b) for k, (a, b) in d.items()}
-13 | 
+13 |
 note: This is an unsafe fix and may change runtime behavior
 
 C416 [*] Unnecessary list comprehension (rewrite using `list()`)
@@ -121,7 +121,7 @@ help: Rewrite using `list()`
    - [(k, v) for [k, v] in d.items()]
 11 + list(d.items())
 12 | {k: (a, b) for k, (a, b) in d.items()}
-13 | 
+13 |
 14 | [i for i, in z]
 note: This is an unsafe fix and may change runtime behavior
 
@@ -136,11 +136,11 @@ C416 [*] Unnecessary list comprehension (rewrite using `list()`)
    |
 help: Rewrite using `list()`
 22 | {k: v if v else None for k, v in y}
-23 | 
+23 |
 24 | # Regression test for: https://github.com/astral-sh/ruff/issues/7196
    - any(len(symbol_table.get_by_type(symbol_type)) > 0 for symbol_type in[t for t in SymbolType])
 25 + any(len(symbol_table.get_by_type(symbol_type)) > 0 for symbol_type in list(SymbolType))
-26 | 
+26 |
 27 | zz = [[1], [2], [3]]
 28 | [(i,) for (i,) in zz]  # != list(zz)
 note: This is an unsafe fix and may change runtime behavior

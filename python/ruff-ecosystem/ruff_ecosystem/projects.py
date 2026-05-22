@@ -129,7 +129,7 @@ class ConfigOverrides(Serializable):
             toml = {}
 
             # Do not write a toml file if it does not exist and we're just nulling values
-            if all((value is None for value in overrides.values())):
+            if all(value is None for value in overrides.values()):
                 yield
                 return
 

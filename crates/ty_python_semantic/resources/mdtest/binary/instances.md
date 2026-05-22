@@ -70,6 +70,19 @@ reveal_type(A() ^ B())  # revealed: A
 reveal_type(A() | B())  # revealed: A
 ```
 
+## Recursive dunder return annotation
+
+```py
+from __future__ import annotations
+
+class A:
+    def __add__(self, other: object) -> type(x + x):  # error: [invalid-type-form]
+        ...
+
+x = A()
+reveal_type(x + x)  # revealed: Unknown
+```
+
 ## Reflected
 
 We also support inference for reflected operations:
@@ -259,11 +272,10 @@ class A:
 class B:
     __add__ = A()
 
-reveal_type(B() + B())  # revealed: Unknown | int
+reveal_type(B() + B())  # revealed: int
 ```
 
-Note that we union with `Unknown` here because `__add__` is not declared. We do infer just `int` if
-the callable is declared:
+We also infer `int` if the callable is declared:
 
 ```py
 class B2:
@@ -353,16 +365,24 @@ reveal_type(X() + Y())  # revealed: int
 
 ## Operations involving types with invalid `__bool__` methods
 
-<!-- snapshot-diagnostics -->
-
 ```py
 class NotBoolable:
     __bool__: int = 3
 
 a = NotBoolable()
 
-# error: [unsupported-bool-conversion]
+# snapshot: unsupported-bool-conversion
 10 and a and True
+```
+
+```snapshot
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
+ --> src/mdtest_snippet.py:7:8
+  |
+7 | 10 and a and True
+  |        ^
+  |
+info: `__bool__` on `NotBoolable` must be callable
 ```
 
 ## Operations on class objects

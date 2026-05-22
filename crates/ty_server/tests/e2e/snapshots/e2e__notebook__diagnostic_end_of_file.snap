@@ -94,7 +94,7 @@ expression: diagnostics
         "href": "https://ty.dev/rules#invalid-argument-type"
       },
       "source": "ty",
-      "message": "Argument to function `with_style` is incorrect: Expected `Style`, found `Literal[/", /"]`"
+      "message": "Argument to function `with_style` is incorrect: Expected `Style`, found `Literal[\", \"]`"
     },
     {
       "range": {
@@ -124,12 +124,12 @@ expression: diagnostics
         }
       },
       "severity": 1,
-      "code": "unresolved-reference",
+      "code": "too-many-positional-arguments",
       "codeDescription": {
-        "href": "https://ty.dev/rules#unresolved-reference"
+        "href": "https://ty.dev/rules#too-many-positional-arguments"
       },
       "source": "ty",
-      "message": "Name `underline` used when not defined"
+      "message": "Too many positional arguments to function `with_style`: expected 3, got 6"
     },
     {
       "range": {
@@ -143,12 +143,12 @@ expression: diagnostics
         }
       },
       "severity": 1,
-      "code": "too-many-positional-arguments",
+      "code": "unresolved-reference",
       "codeDescription": {
-        "href": "https://ty.dev/rules#too-many-positional-arguments"
+        "href": "https://ty.dev/rules#unresolved-reference"
       },
       "source": "ty",
-      "message": "Too many positional arguments to function `with_style`: expected 3, got 6"
+      "message": "Name `underline` used when not defined"
     },
     {
       "range": {

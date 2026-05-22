@@ -23,6 +23,7 @@ Module(
                     ),
                     names: [],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
             ImportFrom(
@@ -38,6 +39,7 @@ Module(
                     ),
                     names: [],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
             ImportFrom(
@@ -53,6 +55,7 @@ Module(
                     ),
                     names: [],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
         ],

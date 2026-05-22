@@ -12,9 +12,9 @@ FURB181 [*] Use of hashlib's `.digest().hex()`
 21 | md5().digest().hex()
    |
 help: Replace with `.hexdigest()`
-16 | 
+16 |
 17 | # these will match
-18 | 
+18 |
    - blake2b().digest().hex()
 19 + blake2b().hexdigest()
 20 | blake2s().digest().hex()
@@ -32,7 +32,7 @@ FURB181 [*] Use of hashlib's `.digest().hex()`
    |
 help: Replace with `.hexdigest()`
 17 | # these will match
-18 | 
+18 |
 19 | blake2b().digest().hex()
    - blake2s().digest().hex()
 20 + blake2s().hexdigest()
@@ -51,7 +51,7 @@ FURB181 [*] Use of hashlib's `.digest().hex()`
 23 | sha224().digest().hex()
    |
 help: Replace with `.hexdigest()`
-18 | 
+18 |
 19 | blake2b().digest().hex()
 20 | blake2s().digest().hex()
    - md5().digest().hex()
@@ -238,7 +238,7 @@ help: Replace with `.hexdigest()`
 30 + sha512().hexdigest()
 31 | shake_128().digest(10).hex()
 32 | shake_256().digest(10).hex()
-33 | 
+33 |
 
 FURB181 Use of hashlib's `.digest().hex()`
   --> FURB181.py:31:1
@@ -276,12 +276,12 @@ FURB181 [*] Use of hashlib's `.digest().hex()`
 help: Replace with `.hexdigest()`
 31 | shake_128().digest(10).hex()
 32 | shake_256().digest(10).hex()
-33 | 
+33 |
    - hashlib.sha256().digest().hex()
 34 + hashlib.sha256().hexdigest()
-35 | 
+35 |
 36 | sha256(b"text").digest().hex()
-37 | 
+37 |
 
 FURB181 [*] Use of hashlib's `.digest().hex()`
   --> FURB181.py:36:1
@@ -294,14 +294,14 @@ FURB181 [*] Use of hashlib's `.digest().hex()`
 38 | hash_algo().digest().hex()
    |
 help: Replace with `.hexdigest()`
-33 | 
+33 |
 34 | hashlib.sha256().digest().hex()
-35 | 
+35 |
    - sha256(b"text").digest().hex()
 36 + sha256(b"text").hexdigest()
-37 | 
+37 |
 38 | hash_algo().digest().hex()
-39 | 
+39 |
 
 FURB181 [*] Use of hashlib's `.digest().hex()`
   --> FURB181.py:38:1
@@ -314,12 +314,12 @@ FURB181 [*] Use of hashlib's `.digest().hex()`
 40 | # not yet supported
    |
 help: Replace with `.hexdigest()`
-35 | 
+35 |
 36 | sha256(b"text").digest().hex()
-37 | 
+37 |
    - hash_algo().digest().hex()
 38 + hash_algo().hexdigest()
-39 | 
+39 |
 40 | # not yet supported
 41 | h = sha256()
 
@@ -336,8 +336,8 @@ FURB181 [*] Use of hashlib's `.digest().hex()`
 66 |   )
    |
 help: Replace with `.hexdigest()`
-58 | 
-59 | 
+58 |
+59 |
 60 | hashed = (
    -     sha512(b"some data")
    -     .digest(

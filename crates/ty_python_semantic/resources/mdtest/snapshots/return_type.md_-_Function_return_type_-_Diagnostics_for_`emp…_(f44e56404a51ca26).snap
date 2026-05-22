@@ -28,7 +28,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 error[empty-body]: Function always implicitly returns `None`, which is not assignable to return type `str`
  --> src/mdtest_snippet.py:7:25
   |
-6 | class Concrete(Abstract):
 7 |     def method(self) -> str: ...  # error: [empty-body]
   |                         ^^^
   |
@@ -42,13 +41,9 @@ info: Class `Concrete` has `typing.Protocol` in its MRO, but it is not a protoco
 info: Only classes that directly inherit from `typing.Protocol` or `typing_extensions.Protocol` are considered protocol classes
  --> src/mdtest_snippet.py:6:7
   |
-4 |     def method(self) -> str: ...
-5 |
 6 | class Concrete(Abstract):
   |       ^^^^^^^^^^^^^^^^^^ `Protocol` not present in `Concrete`'s immediate bases
-7 |     def method(self) -> str: ...  # error: [empty-body]
   |
 info: See https://typing.python.org/en/latest/spec/protocol.html#
-info: rule `empty-body` is enabled by default
 
 ```

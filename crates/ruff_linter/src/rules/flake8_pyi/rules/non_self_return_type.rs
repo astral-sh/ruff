@@ -42,7 +42,8 @@ use ruff_text_size::Ranged;
 /// Specifically, this check enforces that the return type of the following
 /// methods is `Self`:
 ///
-/// 1. In-place binary-operation dunder methods, like `__iadd__`, `__imul__`, etc.
+/// 1. In-place binary-operation dunder methods, like `__iadd__`, `__imul__`, etc.,
+///    if those methods return the class name.
 /// 1. `__new__`, `__enter__`, and `__aenter__`, if those methods return the
 ///    class name.
 /// 1. `__iter__` methods that return `Iterator`, despite the class inheriting
@@ -192,7 +193,7 @@ pub(crate) fn non_self_return_type(
 
     // In-place methods that are expected to return `Self`.
     if is_inplace_bin_op(name) {
-        if !is_self(returns, checker) {
+        if is_name_or_stringized_name(returns, &class_def.name, checker) {
             add_diagnostic(checker, stmt, returns, class_def, name);
         }
         return;
@@ -207,19 +208,17 @@ pub(crate) fn non_self_return_type(
     }
 
     match name {
-        "__iter__" => {
+        "__iter__"
             if is_iterable_or_iterator(returns, semantic)
-                && subclasses_iterator(class_def, semantic)
-            {
-                add_diagnostic(checker, stmt, returns, class_def, name);
-            }
+                && subclasses_iterator(class_def, semantic) =>
+        {
+            add_diagnostic(checker, stmt, returns, class_def, name);
         }
-        "__aiter__" => {
+        "__aiter__"
             if is_async_iterable_or_iterator(returns, semantic)
-                && subclasses_async_iterator(class_def, semantic)
-            {
-                add_diagnostic(checker, stmt, returns, class_def, name);
-            }
+                && subclasses_async_iterator(class_def, semantic) =>
+        {
+            add_diagnostic(checker, stmt, returns, class_def, name);
         }
         _ => {}
     }
@@ -332,16 +331,9 @@ fn is_name_or_stringized_name(expr: &ast::Expr, name: &str, checker: &Checker) -
     checker.match_maybe_stringized_annotation(expr, |expr| is_name(expr, name))
 }
 
-/// Return `true` if the given expression resolves to `typing.Self`.
-fn is_self(expr: &ast::Expr, checker: &Checker) -> bool {
-    checker.match_maybe_stringized_annotation(expr, |expr| {
-        checker.semantic().match_typing_expr(expr, "Self")
-    })
-}
-
 /// Return `true` if the given class extends `collections.abc.Iterator`.
 fn subclasses_iterator(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
+    analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
         matches!(
             qualified_name.segments(),
             ["typing", "Iterator"] | ["collections", "abc", "Iterator"]
@@ -364,7 +356,7 @@ fn is_iterable_or_iterator(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
 
 /// Return `true` if the given class extends `collections.abc.AsyncIterator`.
 fn subclasses_async_iterator(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
+    analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
         matches!(
             qualified_name.segments(),
             ["typing", "AsyncIterator"] | ["collections", "abc", "AsyncIterator"]

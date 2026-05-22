@@ -46,7 +46,7 @@ pub(super) enum ClientConfiguration {
 #[derive(Debug, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-pub struct GlobalOptions {
+pub(crate) struct GlobalOptions {
     #[serde(flatten)]
     client: ClientOptions,
 
@@ -66,7 +66,7 @@ impl GlobalOptions {
         &self.client
     }
 
-    pub fn into_settings(self, client: Client) -> GlobalClientSettings {
+    pub(crate) fn into_settings(self, client: Client) -> GlobalClientSettings {
         GlobalClientSettings {
             options: self.client,
             settings: std::cell::OnceCell::default(),
@@ -79,7 +79,7 @@ impl GlobalOptions {
 #[derive(Clone, Debug, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-pub struct ClientOptions {
+pub(crate) struct ClientOptions {
     configuration: Option<ClientConfiguration>,
     fix_all: Option<bool>,
     organize_imports: Option<bool>,

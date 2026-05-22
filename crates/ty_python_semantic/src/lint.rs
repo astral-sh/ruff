@@ -155,6 +155,11 @@ pub const fn lint_metadata_defaults() -> LintMetadata {
 }
 
 #[derive(Copy, Clone, Debug)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize),
+    serde(tag = "type", rename_all = "lowercase")
+)]
 pub enum LintStatus {
     /// The lint has been added to the linter, but is not yet stable.
     Preview {
@@ -419,7 +424,7 @@ impl LintRegistry {
 
     /// Iterates over all removed lints.
     pub fn removed(&self) -> impl Iterator<Item = LintId> + '_ {
-        self.by_name.iter().filter_map(|(_, value)| {
+        self.by_name.values().filter_map(|value| {
             if let LintEntry::Removed(metadata) = value {
                 Some(*metadata)
             } else {

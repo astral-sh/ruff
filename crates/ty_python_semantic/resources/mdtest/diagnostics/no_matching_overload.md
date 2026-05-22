@@ -263,7 +263,7 @@ def f(
     goat: int | str,
     capybara: int | str,
     chicken: int | str,
-    ostrict: int | str,
+    ostrich: int | str,
     gorilla: int | str,
     giraffe: int | str,
     condor: int | str,

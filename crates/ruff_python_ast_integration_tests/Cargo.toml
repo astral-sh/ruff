@@ -9,8 +9,6 @@ repository.workspace = true
 authors.workspace = true
 license.workspace = true
 
-[dependencies]
-
 [dev-dependencies]
 ruff_python_ast = { workspace = true }
 ruff_python_parser = { workspace = true }
@@ -21,3 +19,7 @@ insta = { workspace = true }
 
 [lints]
 workspace = true
+
+[lib]
+test = false
+doctest = false

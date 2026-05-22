@@ -91,12 +91,6 @@ impl<'a> ConciseRenderer<'a> {
                         )
                     )?;
                 }
-                if self.config.show_fix_status {
-                    // Do not display an indicator for inapplicable fixes
-                    if diag.has_applicable_fix(self.config) {
-                        write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
-                    }
-                }
             } else {
                 let (severity, severity_style) = match diag.severity() {
                     Severity::Info => ("info", stylesheet.info),
@@ -109,10 +103,20 @@ impl<'a> ConciseRenderer<'a> {
                     "{severity}[{id}] ",
                     severity = fmt_styled(severity, severity_style),
                     id = fmt_styled(
-                        fmt_with_hyperlink(&diag.id(), diag.documentation_url(), &stylesheet),
+                        fmt_with_hyperlink(
+                            &diag.secondary_code_or_id(),
+                            diag.documentation_url(),
+                            &stylesheet
+                        ),
                         stylesheet.emphasis
                     )
                 )?;
+            }
+            if self.config.show_fix_status {
+                // Do not display an indicator for inapplicable fixes
+                if diag.has_applicable_fix(self.config.fix_applicability()) {
+                    write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
+                }
             }
 
             writeln!(f, "{message}", message = diag.concise_message())?;
@@ -138,10 +142,10 @@ mod tests {
     fn output() {
         let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Concise);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
-        fib.py:1:8: error[unused-import] `os` imported but unused
-        fib.py:6:5: error[unused-variable] Local variable `x` is assigned to but never used
-        undef.py:1:4: error[undefined-name] Undefined name `a`
-        fib.py:12:16: error[undefined-name] Undefined name `fibonaccii`
+        fib.py:1:8: error[F401] `os` imported but unused
+        fib.py:6:5: error[F841] Local variable `x` is assigned to but never used
+        undef.py:1:4: error[F821] Undefined name `a`
+        fib.py:12:16: error[F821] Undefined name `fibonaccii`
         ");
     }
 
@@ -199,9 +203,9 @@ mod tests {
     fn notebook_output() {
         let (env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Concise);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
-        notebook.ipynb:cell 1:2:8: error[unused-import] `os` imported but unused
-        notebook.ipynb:cell 2:2:8: error[unused-import] `math` imported but unused
-        notebook.ipynb:cell 3:4:5: error[unused-variable] Local variable `x` is assigned to but never used
+        notebook.ipynb:cell 1:2:8: error[F401] `os` imported but unused
+        notebook.ipynb:cell 2:2:8: error[F401] `math` imported but unused
+        notebook.ipynb:cell 3:4:5: error[F841] Local variable `x` is assigned to but never used
         ");
     }
 

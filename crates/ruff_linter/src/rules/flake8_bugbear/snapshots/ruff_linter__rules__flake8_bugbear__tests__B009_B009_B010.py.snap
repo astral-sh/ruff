@@ -12,7 +12,7 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
 16 | getattr(foo, "__123abc")
-17 | 
+17 |
 18 | # Invalid usage
    - getattr(foo, "bar")
 19 + foo.bar
@@ -31,7 +31,7 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
 22 | getattr(foo, "abc123")
    |
 help: Replace `getattr` with attribute access
-17 | 
+17 |
 18 | # Invalid usage
 19 | getattr(foo, "bar")
    - getattr(foo, "_123abc")
@@ -278,7 +278,7 @@ help: Replace `getattr` with attribute access
 33 + (x + y).real
 34 | getattr("foo"
 35 |         "bar", "real")
-36 | 
+36 |
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:34:1
@@ -297,8 +297,8 @@ help: Replace `getattr` with attribute access
    -         "bar", "real")
 34 + ("foo"
 35 +         "bar").real
-36 | 
-37 | 
+36 |
+37 |
 38 | # Valid setattr usage
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
@@ -312,11 +312,11 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
 55 | setattr(foo.bar, r"baz", None)
-56 | 
+56 |
 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
    - assert getattr(func, '_rpc')is True
 58 + assert func._rpc is True
-59 | 
+59 |
 60 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1732387247
 61 | getattr(*foo, "bar")
 
@@ -332,13 +332,13 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
 62 | setattr(*foo, "bar", None)
-63 | 
+63 |
 64 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1739800901
    - getattr(self.
    -    registration.registry, '__name__')
 65 + (self.
 66 +    registration.registry).__name__
-67 | 
+67 |
 68 | import builtins
 69 | builtins.getattr(foo, "bar")
 
@@ -353,11 +353,11 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
 66 |    registration.registry, '__name__')
-67 | 
+67 |
 68 | import builtins
    - builtins.getattr(foo, "bar")
 69 + foo.bar
-70 | 
+70 |
 71 | # Regression test for: https://github.com/astral-sh/ruff/issues/18353
 72 | setattr(foo, "__debug__", 0)
 
@@ -377,8 +377,8 @@ help: Replace `getattr` with attribute access
    - getattr(foo, "ſ")
 80 + foo.ſ
 81 | setattr(foo, "ſ", 1)
-82 | 
-83 | 
+82 |
+83 |
 note: This is an unsafe fix and may change runtime behavior
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
@@ -393,8 +393,8 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
 81 | setattr(foo, "ſ", 1)
-82 | 
-83 | 
+82 |
+83 |
    - getattr(
    -     obj,
    -     # text

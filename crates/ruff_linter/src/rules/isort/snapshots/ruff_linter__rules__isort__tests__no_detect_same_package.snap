@@ -12,6 +12,6 @@ I001 [*] Import block is un-sorted or un-formatted
 help: Organize imports
 1 | import os
   - import pandas
-2 + 
+2 +
 3 | import foo.baz
 4 + import pandas

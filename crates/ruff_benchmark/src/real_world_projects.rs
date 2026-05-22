@@ -18,7 +18,7 @@ use std::time::Instant;
 
 use anyhow::{Context, Result};
 use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf};
-use ruff_python_ast::PythonVersion;
+use ty_project::metadata::python_version::SupportedPythonVersion;
 
 /// Configuration for a real-world project to benchmark
 #[derive(Debug, Clone)]
@@ -37,7 +37,7 @@ pub struct RealWorldProject<'a> {
     /// Maps to uv's `exclude-newer`.
     pub max_dep_date: &'a str,
     /// Python version to use
-    pub python_version: PythonVersion,
+    pub python_version: SupportedPythonVersion,
 }
 
 impl<'a> RealWorldProject<'a> {
@@ -146,7 +146,7 @@ impl<'a> InstalledProject<'a> {
 }
 
 /// Get the cache directory for a project in the cargo target directory
-fn get_project_cache_dir(project_name: &str) -> Result<std::path::PathBuf> {
+pub fn get_project_cache_dir(project_name: &str) -> Result<std::path::PathBuf> {
     let target_dir = cargo_target_directory()
         .cloned()
         .unwrap_or_else(|| PathBuf::from("target"));
@@ -250,8 +250,18 @@ fn clone_repository(repo_url: &str, target_dir: &Path, commit: &str) -> Result<(
     Ok(())
 }
 
-/// Install dependencies using uv with date constraints
-fn install_dependencies(checkout: &Checkout) -> Result<()> {
+/// Install dependencies into a cached virtual environment.
+///
+/// Creates a venv under `target/benchmark_cache/<name>/.venv` and installs the given
+/// dependencies using `uv pip install` with `--exclude-newer` for reproducibility. The venv is
+/// reused across benchmark runs. Returns the path to the venv directory.
+pub fn install_dependencies_to_cache(
+    name: &str,
+    dependencies: &[&str],
+    venv_path: &PathBuf,
+    python_version: SupportedPythonVersion,
+    max_dep_date: &str,
+) -> Result<()> {
     // Check if uv is available
     let uv_check = Command::new("uv")
         .arg("--version")
@@ -264,12 +274,11 @@ fn install_dependencies(checkout: &Checkout) -> Result<()> {
         );
     }
 
-    let venv_path = checkout.venv_path();
-    let python_version_str = checkout.project().python_version.to_string();
+    let python_version_str = python_version.to_string();
 
     let output = Command::new("uv")
         .args(["venv", "--python", &python_version_str, "--allow-existing"])
-        .arg(&venv_path)
+        .arg(venv_path)
         .output()
         .context("Failed to execute uv venv command")?;
 
@@ -279,11 +288,8 @@ fn install_dependencies(checkout: &Checkout) -> Result<()> {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    if checkout.project().dependencies.is_empty() {
-        tracing::debug!(
-            "No dependencies to install for project '{}'",
-            checkout.project().name
-        );
+    if dependencies.is_empty() {
+        tracing::debug!("No dependencies to install for project '{}'", name);
         return Ok(());
     }
 
@@ -295,9 +301,9 @@ fn install_dependencies(checkout: &Checkout) -> Result<()> {
         "--python",
         venv_path.to_str().unwrap(),
         "--exclude-newer",
-        checkout.project().max_dep_date,
+        max_dep_date,
     ])
-    .args(checkout.project().dependencies);
+    .args(dependencies);
 
     let output = cmd
         .output()
@@ -312,8 +318,21 @@ fn install_dependencies(checkout: &Checkout) -> Result<()> {
     Ok(())
 }
 
+/// Install dependencies using uv with date constraints
+fn install_dependencies(checkout: &Checkout) -> Result<()> {
+    let venv_path = checkout.venv_path();
+    let project = checkout.project();
+    install_dependencies_to_cache(
+        project.name,
+        project.dependencies,
+        &venv_path,
+        project.python_version,
+        project.max_dep_date,
+    )
+}
+
 /// Recursively load a directory into the memory filesystem
-fn copy_directory_recursive(
+pub fn copy_directory_recursive(
     fs: &MemoryFileSystem,
     source_path: &Path,
     dest_path: &SystemPath,

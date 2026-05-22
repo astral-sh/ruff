@@ -18,11 +18,11 @@ D300 [*] Use triple double quotes `"""`
    |     ^^^^^^^^^^^^^
    |
 help: Convert to triple double quotes
-7  | 
-8  | 
+7  |
+8  |
 9  | def contains_quote():
    -     'Sum"\\mary.'
 10 +     """Sum"\\mary."""
-11 | 
-12 | 
+11 |
+12 |
 13 | # OK

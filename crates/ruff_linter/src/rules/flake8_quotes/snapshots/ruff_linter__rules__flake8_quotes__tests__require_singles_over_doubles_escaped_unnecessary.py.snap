@@ -68,7 +68,7 @@ help: Remove backslash
    -     '\"string\"'
 10 +     '"string"'
 11 | )
-12 | 
+12 |
 13 | # Same as above, but with f-strings
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -82,7 +82,7 @@ Q004 [*] Unnecessary escape on inner quote character
    |
 help: Remove backslash
 11 | )
-12 | 
+12 |
 13 | # Same as above, but with f-strings
    - f'This is a \"string\"'  # Q004
 14 + f'This is a "string"'  # Q004
@@ -101,7 +101,7 @@ Q004 [*] Unnecessary escape on inner quote character
 17 | f"This is a 'string'"
    |
 help: Remove backslash
-12 | 
+12 |
 13 | # Same as above, but with f-strings
 14 | f'This is a \"string\"'  # Q004
    - f'This is \\ a \\\"string\"'  # Q004
@@ -146,7 +146,7 @@ help: Remove backslash
    -     f'\"string\"'  # Q004
 23 +     f'"string"'  # Q004
 24 | )
-25 | 
+25 |
 26 | # Nested f-strings (Python 3.12+)
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -167,7 +167,7 @@ help: Remove backslash
 33 + f'"foo" {'nested'}'  # Q004
 34 | f'\"foo\" {f'nested'}'  # Q004
 35 | f'\"foo\" {f'\"nested\"'} \"\"'  # Q004
-36 | 
+36 |
 
 Q004 [*] Unnecessary escape on inner quote character
   --> doubles_escaped_unnecessary.py:34:1
@@ -185,7 +185,7 @@ help: Remove backslash
    - f'\"foo\" {f'nested'}'  # Q004
 34 + f'"foo" {f'nested'}'  # Q004
 35 | f'\"foo\" {f'\"nested\"'} \"\"'  # Q004
-36 | 
+36 |
 37 | f'normal {f'nested'} normal'
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -204,7 +204,7 @@ help: Remove backslash
 34 | f'\"foo\" {f'nested'}'  # Q004
    - f'\"foo\" {f'\"nested\"'} \"\"'  # Q004
 35 + f'"foo" {f'\"nested\"'} ""'  # Q004
-36 | 
+36 |
 37 | f'normal {f'nested'} normal'
 38 | f'\"normal\" {f'nested'} normal'  # Q004
 
@@ -224,7 +224,7 @@ help: Remove backslash
 34 | f'\"foo\" {f'nested'}'  # Q004
    - f'\"foo\" {f'\"nested\"'} \"\"'  # Q004
 35 + f'\"foo\" {f'"nested"'} \"\"'  # Q004
-36 | 
+36 |
 37 | f'normal {f'nested'} normal'
 38 | f'\"normal\" {f'nested'} normal'  # Q004
 
@@ -239,7 +239,7 @@ Q004 [*] Unnecessary escape on inner quote character
    |
 help: Remove backslash
 35 | f'\"foo\" {f'\"nested\"'} \"\"'  # Q004
-36 | 
+36 |
 37 | f'normal {f'nested'} normal'
    - f'\"normal\" {f'nested'} normal'  # Q004
 38 + f'"normal" {f'nested'} normal'  # Q004
@@ -258,14 +258,14 @@ Q004 [*] Unnecessary escape on inner quote character
 41 | f'\"normal\" {f'\"nested\" {'other'} "double quotes"'} normal'  # Q004
    |
 help: Remove backslash
-36 | 
+36 |
 37 | f'normal {f'nested'} normal'
 38 | f'\"normal\" {f'nested'} normal'  # Q004
    - f'\"normal\" {f'nested'} "double quotes"'
 39 + f'"normal" {f'nested'} "double quotes"'
 40 | f'\"normal\" {f'\"nested\" {'other'} normal'} "double quotes"'  # Q004
 41 | f'\"normal\" {f'\"nested\" {'other'} "double quotes"'} normal'  # Q004
-42 | 
+42 |
 
 Q004 [*] Unnecessary escape on inner quote character
   --> doubles_escaped_unnecessary.py:40:1
@@ -283,7 +283,7 @@ help: Remove backslash
    - f'\"normal\" {f'\"nested\" {'other'} normal'} "double quotes"'  # Q004
 40 + f'"normal" {f'\"nested\" {'other'} normal'} "double quotes"'  # Q004
 41 | f'\"normal\" {f'\"nested\" {'other'} "double quotes"'} normal'  # Q004
-42 | 
+42 |
 43 | # Make sure we do not unescape quotes
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -302,7 +302,7 @@ help: Remove backslash
    - f'\"normal\" {f'\"nested\" {'other'} normal'} "double quotes"'  # Q004
 40 + f'\"normal\" {f'"nested" {'other'} normal'} "double quotes"'  # Q004
 41 | f'\"normal\" {f'\"nested\" {'other'} "double quotes"'} normal'  # Q004
-42 | 
+42 |
 43 | # Make sure we do not unescape quotes
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -321,7 +321,7 @@ help: Remove backslash
 40 | f'\"normal\" {f'\"nested\" {'other'} normal'} "double quotes"'  # Q004
    - f'\"normal\" {f'\"nested\" {'other'} "double quotes"'} normal'  # Q004
 41 + f'"normal" {f'\"nested\" {'other'} "double quotes"'} normal'  # Q004
-42 | 
+42 |
 43 | # Make sure we do not unescape quotes
 44 | this_is_fine = 'This is an \\"escaped\\" quote'
 
@@ -341,7 +341,7 @@ help: Remove backslash
 40 | f'\"normal\" {f'\"nested\" {'other'} normal'} "double quotes"'  # Q004
    - f'\"normal\" {f'\"nested\" {'other'} "double quotes"'} normal'  # Q004
 41 + f'\"normal\" {f'"nested" {'other'} "double quotes"'} normal'  # Q004
-42 | 
+42 |
 43 | # Make sure we do not unescape quotes
 44 | this_is_fine = 'This is an \\"escaped\\" quote'
 
@@ -354,7 +354,7 @@ Q004 [*] Unnecessary escape on inner quote character
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Remove backslash
-42 | 
+42 |
 43 | # Make sure we do not unescape quotes
 44 | this_is_fine = 'This is an \\"escaped\\" quote'
    - this_should_raise_Q004 = 'This is an \\\"escaped\\\" quote with an extra backslash'

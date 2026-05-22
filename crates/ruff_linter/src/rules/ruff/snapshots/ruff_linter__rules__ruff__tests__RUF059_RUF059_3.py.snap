@@ -10,13 +10,13 @@ RUF059 [*] Unpacked variable `b` is never used
    |     ^
    |
 help: Prefix it with an underscore or any other dummy variable pattern
-10 | 
+10 |
 11 | def bar():
 12 |     a = foo()
    -     b, c = foo()
 13 +     _b, c = foo()
-14 | 
-15 | 
+14 |
+15 |
 16 | def baz():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -29,12 +29,12 @@ RUF059 [*] Unpacked variable `c` is never used
    |        ^
    |
 help: Prefix it with an underscore or any other dummy variable pattern
-10 | 
+10 |
 11 | def bar():
 12 |     a = foo()
    -     b, c = foo()
 13 +     b, _c = foo()
-14 | 
-15 | 
+14 |
+15 |
 16 | def baz():
 note: This is an unsafe fix and may change runtime behavior

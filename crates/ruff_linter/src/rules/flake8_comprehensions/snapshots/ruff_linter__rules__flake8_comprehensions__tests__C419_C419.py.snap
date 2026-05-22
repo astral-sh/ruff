@@ -74,7 +74,7 @@ help: Remove unnecessary comprehension
 7  +     x.id for x in bar  # second comment
 8  | )  # third comment
 9  | any({x.id for x in bar})
-10 | 
+10 |
 note: This is an unsafe fix and may change runtime behavior
 
 C419 [*] Unnecessary set comprehension
@@ -93,7 +93,7 @@ help: Remove unnecessary comprehension
 8  | )  # third comment
    - any({x.id for x in bar})
 9  + any(x.id for x in bar)
-10 | 
+10 |
 11 | # OK
 12 | all(x.id for x in bar)
 note: This is an unsafe fix and may change runtime behavior
@@ -114,7 +114,7 @@ C419 [*] Unnecessary list comprehension
 35 |   )
    |
 help: Remove unnecessary comprehension
-25 | 
+25 |
 26 | # Special comment handling
 27 | any(
    -     [  # lbracket comment
@@ -129,7 +129,7 @@ help: Remove unnecessary comprehension
 32 +         for i in range(5)  # rbracket comment  # rpar comment
 33 |     # trailing comment
 34 | )
-35 | 
+35 |
 note: This is an unsafe fix and may change runtime behavior
 
 C419 [*] Unnecessary list comprehension
@@ -146,7 +146,7 @@ C419 [*] Unnecessary list comprehension
 43 |   )
    |
 help: Remove unnecessary comprehension
-36 | 
+36 |
 37 | # Weird case where the function call, opening bracket, and comment are all
 38 | # on the same line.
    - any([  # lbracket comment
@@ -158,7 +158,7 @@ help: Remove unnecessary comprehension
 41 + # second line comment
 42 + i.bit_count() for i in range(5)  # rbracket comment  # rpar comment
 43 | )
-44 | 
+44 |
 45 | ## Set comprehensions should only be linted
 note: This is an unsafe fix and may change runtime behavior
 
@@ -172,12 +172,12 @@ C419 [*] Unnecessary set comprehension
    |
 help: Remove unnecessary comprehension
 46 | ## when function is invariant under duplication of inputs
-47 | 
+47 |
 48 | # should be linted...
    - any({x.id for x in bar})
 49 + any(x.id for x in bar)
 50 | all({x.id for x in bar})
-51 | 
+51 |
 52 | # should be linted in preview...
 note: This is an unsafe fix and may change runtime behavior
 
@@ -192,12 +192,12 @@ C419 [*] Unnecessary set comprehension
 52 | # should be linted in preview...
    |
 help: Remove unnecessary comprehension
-47 | 
+47 |
 48 | # should be linted...
 49 | any({x.id for x in bar})
    - all({x.id for x in bar})
 50 + all(x.id for x in bar)
-51 | 
+51 |
 52 | # should be linted in preview...
 53 | min({x.id for x in bar})
 note: This is an unsafe fix and may change runtime behavior

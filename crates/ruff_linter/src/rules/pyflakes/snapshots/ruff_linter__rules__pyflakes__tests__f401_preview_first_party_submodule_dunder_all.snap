@@ -10,7 +10,7 @@ F401 [*] `submodule.a` imported but unused; consider removing, adding to `__all_
 4 | FOO = 42
   |
 help: Add `submodule` to __all__
-1 | 
+1 |
 2 | import submodule.a
   - __all__ = ['FOO']
 3 + __all__ = ['FOO', 'submodule']

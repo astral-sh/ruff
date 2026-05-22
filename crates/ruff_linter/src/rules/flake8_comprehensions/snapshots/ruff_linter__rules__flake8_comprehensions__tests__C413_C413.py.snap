@@ -143,7 +143,7 @@ help: Remove unnecessary `reversed()` call
 9  + sorted(x, reverse=True)
 10 | reversed(sorted(x, reverse=x))
 11 | reversed(sorted(x, reverse=not x))
-12 | 
+12 |
 note: This is an unsafe fix and may change runtime behavior
 
 C413 [*] Unnecessary `reversed()` call around `sorted()`
@@ -162,7 +162,7 @@ help: Remove unnecessary `reversed()` call
    - reversed(sorted(x, reverse=x))
 10 + sorted(x, reverse=not x)
 11 | reversed(sorted(x, reverse=not x))
-12 | 
+12 |
 13 | # Regression test for: https://github.com/astral-sh/ruff/issues/7289
 note: This is an unsafe fix and may change runtime behavior
 
@@ -182,7 +182,7 @@ help: Remove unnecessary `reversed()` call
 10 | reversed(sorted(x, reverse=x))
    - reversed(sorted(x, reverse=not x))
 11 + sorted(x, reverse=x)
-12 | 
+12 |
 13 | # Regression test for: https://github.com/astral-sh/ruff/issues/7289
 14 | reversed(sorted(i for i in range(42)))
 note: This is an unsafe fix and may change runtime behavior
@@ -197,12 +197,12 @@ C413 [*] Unnecessary `reversed()` call around `sorted()`
    |
 help: Remove unnecessary `reversed()` call
 11 | reversed(sorted(x, reverse=not x))
-12 | 
+12 |
 13 | # Regression test for: https://github.com/astral-sh/ruff/issues/7289
    - reversed(sorted(i for i in range(42)))
 14 + sorted((i for i in range(42)), reverse=True)
 15 | reversed(sorted((i for i in range(42)), reverse=True))
-16 | 
+16 |
 17 | # Regression test for: https://github.com/astral-sh/ruff/issues/10335
 note: This is an unsafe fix and may change runtime behavior
 
@@ -217,12 +217,12 @@ C413 [*] Unnecessary `reversed()` call around `sorted()`
 17 | # Regression test for: https://github.com/astral-sh/ruff/issues/10335
    |
 help: Remove unnecessary `reversed()` call
-12 | 
+12 |
 13 | # Regression test for: https://github.com/astral-sh/ruff/issues/7289
 14 | reversed(sorted(i for i in range(42)))
    - reversed(sorted((i for i in range(42)), reverse=True))
 15 + sorted((i for i in range(42)), reverse=False)
-16 | 
+16 |
 17 | # Regression test for: https://github.com/astral-sh/ruff/issues/10335
 18 | reversed(sorted([1, 2, 3], reverse=False or True))
 note: This is an unsafe fix and may change runtime behavior
@@ -237,12 +237,12 @@ C413 [*] Unnecessary `reversed()` call around `sorted()`
    |
 help: Remove unnecessary `reversed()` call
 15 | reversed(sorted((i for i in range(42)), reverse=True))
-16 | 
+16 |
 17 | # Regression test for: https://github.com/astral-sh/ruff/issues/10335
    - reversed(sorted([1, 2, 3], reverse=False or True))
 18 + sorted([1, 2, 3], reverse=not (False or True))
 19 | reversed(sorted([1, 2, 3], reverse=(False or True)))
-20 | 
+20 |
 21 | # These fixes need to be parenthesized to avoid syntax errors and behavior
 note: This is an unsafe fix and may change runtime behavior
 
@@ -257,12 +257,12 @@ C413 [*] Unnecessary `reversed()` call around `sorted()`
 21 | # These fixes need to be parenthesized to avoid syntax errors and behavior
    |
 help: Remove unnecessary `reversed()` call
-16 | 
+16 |
 17 | # Regression test for: https://github.com/astral-sh/ruff/issues/10335
 18 | reversed(sorted([1, 2, 3], reverse=False or True))
    - reversed(sorted([1, 2, 3], reverse=(False or True)))
 19 + sorted([1, 2, 3], reverse=not (False or True))
-20 | 
+20 |
 21 | # These fixes need to be parenthesized to avoid syntax errors and behavior
 22 | # changes.
 note: This is an unsafe fix and may change runtime behavior

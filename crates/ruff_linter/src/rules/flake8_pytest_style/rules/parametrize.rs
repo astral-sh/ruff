@@ -769,90 +769,84 @@ fn handle_value_rows(
 ) {
     for elt in elts {
         match elt {
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                if values_row_type != types::ParametrizeValuesRowType::Tuple {
-                    let mut diagnostic = checker.report_diagnostic(
-                        PytestParametrizeValuesWrongType {
-                            values: values_type,
-                            row: values_row_type,
-                        },
-                        elt.range(),
-                    );
-                    diagnostic.set_fix({
-                        // Determine whether a trailing comma is present due to the _requirement_
-                        // that a single-element tuple must have a trailing comma, e.g., `(1,)`.
-                        //
-                        // If the trailing comma is on its own line, we intentionally ignore it,
-                        // since the expression is already split over multiple lines, as in:
-                        // ```python
-                        // @pytest.mark.parametrize(
-                        //     (
-                        //         "x",
-                        //     ),
-                        // )
-                        // ```
-                        let has_trailing_comma = elts.len() == 1
-                            && checker.locator().up_to(elt.end()).chars().rev().nth(1) == Some(',');
+            Expr::Tuple(ast::ExprTuple { elts, .. })
+                if values_row_type != types::ParametrizeValuesRowType::Tuple =>
+            {
+                let mut diagnostic = checker.report_diagnostic(
+                    PytestParametrizeValuesWrongType {
+                        values: values_type,
+                        row: values_row_type,
+                    },
+                    elt.range(),
+                );
+                diagnostic.set_fix({
+                    // Determine whether a trailing comma is present due to the _requirement_
+                    // that a single-element tuple must have a trailing comma, e.g., `(1,)`.
+                    //
+                    // If the trailing comma is on its own line, we intentionally ignore it,
+                    // since the expression is already split over multiple lines, as in:
+                    // ```python
+                    // @pytest.mark.parametrize(
+                    //     (
+                    //         "x",
+                    //     ),
+                    // )
+                    // ```
+                    let has_trailing_comma = elts.len() == 1
+                        && checker.locator().up_to(elt.end()).chars().rev().nth(1) == Some(',');
 
-                        // Replace `(` with `[`.
-                        let elt_start = Edit::replacement(
-                            "[".into(),
-                            elt.start(),
-                            elt.start() + TextSize::from(1),
-                        );
-                        // Replace `)` or `,)` with `]`.
-                        let start = if has_trailing_comma {
-                            elt.end() - TextSize::from(2)
-                        } else {
-                            elt.end() - TextSize::from(1)
-                        };
-                        let elt_end = Edit::replacement("]".into(), start, elt.end());
-                        Fix::unsafe_edits(elt_start, [elt_end])
-                    });
-                }
+                    // Replace `(` with `[`.
+                    let elt_start =
+                        Edit::replacement("[".into(), elt.start(), elt.start() + TextSize::from(1));
+                    // Replace `)` or `,)` with `]`.
+                    let start = if has_trailing_comma {
+                        elt.end() - TextSize::from(2)
+                    } else {
+                        elt.end() - TextSize::from(1)
+                    };
+                    let elt_end = Edit::replacement("]".into(), start, elt.end());
+                    Fix::unsafe_edits(elt_start, [elt_end])
+                });
             }
-            Expr::List(ast::ExprList { elts, .. }) => {
-                if values_row_type != types::ParametrizeValuesRowType::List {
-                    let mut diagnostic = checker.report_diagnostic(
-                        PytestParametrizeValuesWrongType {
-                            values: values_type,
-                            row: values_row_type,
-                        },
-                        elt.range(),
-                    );
-                    diagnostic.set_fix({
-                        // Determine whether the last element has a trailing comma. Single-element
-                        // tuples _require_ a trailing comma, so this is a single-element list
-                        // _without_ a trailing comma, we need to insert one.
-                        let needs_trailing_comma = if let [item] = elts.as_slice() {
-                            SimpleTokenizer::new(
-                                checker.locator().contents(),
-                                TextRange::new(item.end(), elt.end()),
-                            )
-                            .all(|token| token.kind != SimpleTokenKind::Comma)
-                        } else {
-                            false
-                        };
+            Expr::List(ast::ExprList { elts, .. })
+                if values_row_type != types::ParametrizeValuesRowType::List =>
+            {
+                let mut diagnostic = checker.report_diagnostic(
+                    PytestParametrizeValuesWrongType {
+                        values: values_type,
+                        row: values_row_type,
+                    },
+                    elt.range(),
+                );
+                diagnostic.set_fix({
+                    // Determine whether the last element has a trailing comma. Single-element
+                    // tuples _require_ a trailing comma, so this is a single-element list
+                    // _without_ a trailing comma, we need to insert one.
+                    let needs_trailing_comma = if let [item] = elts.as_slice() {
+                        SimpleTokenizer::new(
+                            checker.locator().contents(),
+                            TextRange::new(item.end(), elt.end()),
+                        )
+                        .all(|token| token.kind != SimpleTokenKind::Comma)
+                    } else {
+                        false
+                    };
 
-                        // Replace `[` with `(`.
-                        let elt_start = Edit::replacement(
-                            "(".into(),
-                            elt.start(),
-                            elt.start() + TextSize::from(1),
-                        );
-                        // Replace `]` with `)` or `,)`.
-                        let elt_end = Edit::replacement(
-                            if needs_trailing_comma {
-                                ",)".into()
-                            } else {
-                                ")".into()
-                            },
-                            elt.end() - TextSize::from(1),
-                            elt.end(),
-                        );
-                        Fix::unsafe_edits(elt_start, [elt_end])
-                    });
-                }
+                    // Replace `[` with `(`.
+                    let elt_start =
+                        Edit::replacement("(".into(), elt.start(), elt.start() + TextSize::from(1));
+                    // Replace `]` with `)` or `,)`.
+                    let elt_end = Edit::replacement(
+                        if needs_trailing_comma {
+                            ",)".into()
+                        } else {
+                            ")".into()
+                        },
+                        elt.end() - TextSize::from(1),
+                        elt.end(),
+                    );
+                    Fix::unsafe_edits(elt_start, [elt_end])
+                });
             }
             _ => {}
         }
