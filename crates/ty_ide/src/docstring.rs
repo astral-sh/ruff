@@ -221,11 +221,12 @@ fn render_markdown(docstring: &str) -> String {
         }
         first_line = false;
 
-        // If we're in a literal block and we find a non-empty dedented line, end the block
+        // If we're in a generated code block and we find a non-empty dedented line, end the block
         // TODO: we should remove all the trailing blank lines
         // (Just pop all trailing `\n` from `output`?)
-        if in_literal && line_indent < block_indent && !line.is_empty() {
+        if (in_literal || in_doctest) && line_indent < block_indent && !line.is_empty() {
             in_literal = false;
+            in_doctest = false;
             in_any_code = false;
             block_indent = 0;
             output.push_str(FENCE);
@@ -252,9 +253,8 @@ fn render_markdown(docstring: &str) -> String {
             block_indent = line_indent;
             in_doctest = true;
             in_any_code = true;
-            // TODO: is there something more specific? `pycon`?
             output.push_str(FENCE);
-            output.push_str("python\n");
+            output.push('\n');
         }
 
         // If we're not in a codeblock and we see a markdown codefence, start one
@@ -397,7 +397,14 @@ fn render_markdown(docstring: &str) -> String {
         }
 
         // Add this line's indentation.
-        // We could subtract the block_indent here but in practice it's uglier
+        //
+        // Dedent doctest blocks by their opening indentation so doctests nested
+        // under section headings don't render that nesting inside the code fence.
+        let line_indent = if in_doctest {
+            line_indent.saturating_sub(block_indent)
+        } else {
+            line_indent
+        };
         // TODO: should we not do this if the `line.is_empty()`? When would it matter?
         for _ in 0..line_indent {
             // If we're not in a codeblock use non-breaking spaces to preserve the indent
@@ -1617,7 +1624,7 @@ mod tests {
         assert_snapshot!(docstring.render_markdown(), @"
         This is a function description<HB>
         <HB>
-        ```````````python
+        ```````````
         >>> thing.do_thing()
         wow it did the thing
         >>> thing.do_other_thing()
@@ -1647,13 +1654,35 @@ mod tests {
         assert_snapshot!(docstring.render_markdown(), @"
         This is a function description<HB>
         <HB>
-        ```````````python
-            >>> thing.do_thing()
-            wow it did the thing
-            >>> thing.do_other_thing()
-            it sure did the thing
+        ```````````
+        >>> thing.do_thing()
+        wow it did the thing
+        >>> thing.do_other_thing()
+        it sure did the thing
         ```````````<HB>
         As you can see it did the thing!
+        ");
+    }
+
+    #[test]
+    fn doctest_dedent() {
+        let _snap = bind_docstring_snapshot_filters();
+        let docstring = r#"
+        Example:
+            >>> thing.do_thing()
+              an indented result
+        This line is no longer part of the doctest.
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @"
+        Example:<HB>
+        ```````````
+        >>> thing.do_thing()
+          an indented result
+        ```````````
+        This line is no longer part of the doctest.
         ");
     }
 
@@ -1669,7 +1698,7 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        ```````````python
+        ```````````
         >>> thing.do_thing()
         wow it did the thing
         >>> thing.do_other_thing()
@@ -1722,11 +1751,11 @@ mod tests {
 
         assert_snapshot!(docstring.render_markdown(), @"
         And so you can see that<HB>
-        ```````````python
-            >>> thing.do_thing()
-            wow it did the thing
-            >>> thing.do_other_thing()
-            it sure did the thing
+        ```````````
+        >>> thing.do_thing()
+        wow it did the thing
+        >>> thing.do_other_thing()
+        it sure did the thing
         ```````````
         ");
     }
@@ -1909,7 +1938,7 @@ mod tests {
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
         'param3' -- A parameter without type annotation<HB>
         <HB>
-        ```````````python
+        ```````````
         >>> print repr(foo.__doc__)
         '\n    This is the second line of the docstring.\n    '
         >>> foo.__doc__.splitlines()
@@ -2381,7 +2410,7 @@ Done.
         assert_snapshot!(docstring.render_markdown(), @r#"
         Example:<HB>
         <HB>
-        ```````````python
+        ```````````
         >>> print("hello")
         hello
         ```````````<HB>
