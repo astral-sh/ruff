@@ -27,12 +27,11 @@ pub(super) enum AttributeWriteRequirement<'db> {
     /// The object type does not permit writes at all.
     CannotAssign,
     Module(Option<Type<'db>>),
-    Instance(InstanceAttributeWriteRequirement<'db>),
-    Class(ClassAttributeWriteRequirement<'db>),
-}
-
-pub(super) struct InstanceAttributeWriteRequirement<'db> {
-    pub(super) object_ty: Type<'db>,
+    Instance(Type<'db>),
+    Class {
+        object_ty: Type<'db>,
+        member: ClassAttributeWriteMember<'db>,
+    },
 }
 
 pub(super) enum InstanceAttributeWriteMember<'db> {
@@ -43,11 +42,6 @@ pub(super) enum InstanceAttributeWriteMember<'db> {
     },
     Instance(FallbackAttributeWriteRequirement<'db>),
     SetAttr,
-}
-
-pub(super) struct ClassAttributeWriteRequirement<'db> {
-    pub(super) object_ty: Type<'db>,
-    pub(super) member: ClassAttributeWriteMember<'db>,
 }
 
 pub(super) enum ClassAttributeWriteMember<'db> {
@@ -146,9 +140,7 @@ pub(super) fn attribute_write_requirement<'db>(
         | Type::TypeIs(_)
         | Type::TypeGuard(_)
         | Type::TypedDict(_)
-        | Type::NewTypeInstance(_) => {
-            AttributeWriteRequirement::Instance(InstanceAttributeWriteRequirement { object_ty })
-        }
+        | Type::NewTypeInstance(_) => AttributeWriteRequirement::Instance(object_ty),
 
         Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
             class_attribute_write_requirement(db, object_ty, attribute)
@@ -255,14 +247,15 @@ fn class_attribute_write_requirement<'db>(
                 fallback,
             )),
             _ => ClassAttributeWriteMember::Unresolved {
-                has_instance_attribute: object_ty.to_instance(db).is_some_and(|instance| {
-                    !instance.instance_member(db, attribute).place.is_undefined()
-                }),
+                has_instance_attribute: !class_attr_self_ty
+                    .instance_member(db, attribute)
+                    .place
+                    .is_undefined(),
             },
         },
     };
 
-    AttributeWriteRequirement::Class(ClassAttributeWriteRequirement { object_ty, member })
+    AttributeWriteRequirement::Class { object_ty, member }
 }
 
 fn explicit_attribute_write_requirement<'db>(

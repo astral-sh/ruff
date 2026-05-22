@@ -39,9 +39,8 @@ use crate::place::{
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::attribute_write::{
-    AttributeWriteRequirement, ClassAttributeWriteMember, ClassAttributeWriteRequirement,
-    ExplicitAttributeWriteRequirement, FallbackAttributeWriteRequirement,
-    InstanceAttributeWriteMember, InstanceAttributeWriteRequirement, assignment_attribute_members,
+    AttributeWriteRequirement, ClassAttributeWriteMember, ExplicitAttributeWriteRequirement,
+    FallbackAttributeWriteRequirement, InstanceAttributeWriteMember, assignment_attribute_members,
     attribute_write_requirement, instance_attribute_write_member_requirement,
     property_setter_returns_never,
 };
@@ -9634,11 +9633,11 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     false
                 }
             }
-            AttributeWriteRequirement::Instance(requirement) => {
-                self.evaluate_instance(requirement, emit_diagnostics)
+            AttributeWriteRequirement::Instance(object_ty) => {
+                self.evaluate_instance(*object_ty, emit_diagnostics)
             }
-            AttributeWriteRequirement::Class(requirement) => {
-                self.evaluate_class(requirement, emit_diagnostics)
+            AttributeWriteRequirement::Class { object_ty, member } => {
+                self.evaluate_class(*object_ty, member, emit_diagnostics)
             }
         }
     }
@@ -9692,16 +9691,12 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         }
     }
 
-    fn evaluate_instance(
-        &mut self,
-        requirement: &InstanceAttributeWriteRequirement<'db>,
-        emit_diagnostics: bool,
-    ) -> bool {
+    fn evaluate_instance(&mut self, object_ty: Type<'db>, emit_diagnostics: bool) -> bool {
         let db = self.builder.db();
         let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
 
         // A terminal `__setattr__` blocks even explicitly declared attributes.
-        let setattr_result = requirement.object_ty.try_call_dunder_with_policy(
+        let setattr_result = object_ty.try_call_dunder_with_policy(
             db,
             "__setattr__",
             &mut CallArguments::positional([Type::string_literal(db, self.attribute), value_ty]),
@@ -9714,7 +9709,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         };
         if setattr_returns_never {
             if emit_diagnostics {
-                let is_setattr_synthesized = match requirement.object_ty.class_member_with_policy(
+                let is_setattr_synthesized = match object_ty.class_member_with_policy(
                     db,
                     "__setattr__".into(),
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
@@ -9725,11 +9720,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     } => ty.is_callable_type(),
                     _ => false,
                 };
-                let member_exists = !requirement
-                    .object_ty
-                    .member(db, self.attribute)
-                    .place
-                    .is_undefined();
+                let member_exists = !object_ty.member(db, self.attribute).place.is_undefined();
                 self.report(AssignmentAttributeWriteDiagnostic::TerminalSetAttr {
                     member_exists,
                     is_setattr_synthesized,
@@ -9738,8 +9729,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             return false;
         }
 
-        let member =
-            instance_attribute_write_member_requirement(db, requirement.object_ty, self.attribute);
+        let member = instance_attribute_write_member_requirement(db, object_ty, self.attribute);
         match &member {
             InstanceAttributeWriteMember::ClassVar => {
                 if emit_diagnostics {
@@ -9748,32 +9738,22 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 false
             }
             InstanceAttributeWriteMember::Explicit { member, fallback } => {
-                if !self.final_assignment_is_valid(
-                    requirement.object_ty,
-                    member.qualifiers(),
-                    emit_diagnostics,
-                ) {
+                if !self.final_assignment_is_valid(object_ty, member.qualifiers(), emit_diagnostics)
+                {
                     return false;
                 }
-                let member_valid = self.evaluate_explicit_member(
-                    requirement.object_ty,
-                    member,
-                    value_ty,
-                    emit_diagnostics,
-                );
+                let member_valid =
+                    self.evaluate_explicit_member(object_ty, member, value_ty, emit_diagnostics);
                 if let Some(fallback) = fallback {
-                    let fallback_valid = self.evaluate_instance_fallback(
-                        requirement.object_ty,
-                        fallback,
-                        emit_diagnostics,
-                    );
+                    let fallback_valid =
+                        self.evaluate_instance_fallback(object_ty, fallback, emit_diagnostics);
                     member_valid && fallback_valid
                 } else {
                     member_valid
                 }
             }
             InstanceAttributeWriteMember::Instance(fallback) => {
-                self.evaluate_instance_fallback(requirement.object_ty, fallback, emit_diagnostics)
+                self.evaluate_instance_fallback(object_ty, fallback, emit_diagnostics)
             }
             InstanceAttributeWriteMember::SetAttr => match setattr_result {
                 Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
@@ -9797,29 +9777,23 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
 
     fn evaluate_class(
         &mut self,
-        requirement: &ClassAttributeWriteRequirement<'db>,
+        object_ty: Type<'db>,
+        member: &ClassAttributeWriteMember<'db>,
         emit_diagnostics: bool,
     ) -> bool {
-        match &requirement.member {
+        match member {
             ClassAttributeWriteMember::Explicit { member, fallback } => {
-                if !self.final_assignment_is_valid(
-                    requirement.object_ty,
-                    member.qualifiers(),
-                    emit_diagnostics,
-                ) {
+                if !self.final_assignment_is_valid(object_ty, member.qualifiers(), emit_diagnostics)
+                {
                     self.infer_value(TypeContext::default(), emit_diagnostics);
                     return false;
                 }
                 let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
-                let member_valid = self.evaluate_explicit_member(
-                    requirement.object_ty,
-                    member,
-                    value_ty,
-                    emit_diagnostics,
-                );
+                let member_valid =
+                    self.evaluate_explicit_member(object_ty, member, value_ty, emit_diagnostics);
                 if let Some(fallback) = fallback {
                     let fallback_valid = self.evaluate_class_fallback(
-                        requirement.object_ty,
+                        object_ty,
                         fallback,
                         emit_diagnostics,
                         ContextualInference::Speculate,
@@ -9830,7 +9804,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 }
             }
             ClassAttributeWriteMember::ClassAttribute(fallback) => self.evaluate_class_fallback(
-                requirement.object_ty,
+                object_ty,
                 fallback,
                 emit_diagnostics,
                 ContextualInference::Commit,

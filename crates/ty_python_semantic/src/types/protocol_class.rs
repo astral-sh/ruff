@@ -7,9 +7,8 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
 use crate::types::attribute_write::{
-    AttributeWriteRequirement, ClassAttributeWriteMember, ClassAttributeWriteRequirement,
-    ExplicitAttributeWriteRequirement, FallbackAttributeWriteRequirement,
-    InstanceAttributeWriteMember, InstanceAttributeWriteRequirement, attribute_write_requirement,
+    AttributeWriteRequirement, ClassAttributeWriteMember, ExplicitAttributeWriteRequirement,
+    FallbackAttributeWriteRequirement, InstanceAttributeWriteMember, attribute_write_requirement,
     instance_attribute_write_member_requirement, property_setter_returns_never,
 };
 use crate::types::call::{CallArguments, CallDunderError};
@@ -788,11 +787,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 self.check_type_pair(db, value_ty, *write_ty)
             }
             AttributeWriteRequirement::Module(None) => self.never(),
-            AttributeWriteRequirement::Instance(requirement) => {
-                self.check_instance_property_write(db, requirement, member_name, value_ty)
+            AttributeWriteRequirement::Instance(object_ty) => {
+                self.check_instance_property_write(db, *object_ty, member_name, value_ty)
             }
-            AttributeWriteRequirement::Class(requirement) => {
-                self.check_class_property_write(db, requirement, value_ty)
+            AttributeWriteRequirement::Class { object_ty, member } => {
+                self.check_class_property_write(db, *object_ty, member, value_ty)
             }
         }
     }
@@ -800,11 +799,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     fn check_instance_property_write(
         &self,
         db: &'db dyn Db,
-        requirement: &InstanceAttributeWriteRequirement<'db>,
+        object_ty: Type<'db>,
         member_name: &str,
         value_ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let setattr_result = requirement.object_ty.try_call_dunder_with_policy(
+        let setattr_result = object_ty.try_call_dunder_with_policy(
             db,
             "__setattr__",
             &mut CallArguments::positional([Type::string_literal(db, member_name), value_ty]),
@@ -818,13 +817,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.never();
         }
 
-        let member =
-            instance_attribute_write_member_requirement(db, requirement.object_ty, member_name);
+        let member = instance_attribute_write_member_requirement(db, object_ty, member_name);
         match &member {
             InstanceAttributeWriteMember::ClassVar => self.never(),
             InstanceAttributeWriteMember::Explicit { member, fallback } => {
                 let member_result =
-                    self.check_explicit_property_write(db, requirement.object_ty, member, value_ty);
+                    self.check_explicit_property_write(db, object_ty, member, value_ty);
                 if let Some(fallback) = fallback {
                     let fallback_result =
                         self.check_fallback_property_write(db, fallback, value_ty);
@@ -849,13 +847,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     fn check_class_property_write(
         &self,
         db: &'db dyn Db,
-        requirement: &ClassAttributeWriteRequirement<'db>,
+        object_ty: Type<'db>,
+        member: &ClassAttributeWriteMember<'db>,
         value_ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        match &requirement.member {
+        match member {
             ClassAttributeWriteMember::Explicit { member, fallback } => {
                 let member_result =
-                    self.check_explicit_property_write(db, requirement.object_ty, member, value_ty);
+                    self.check_explicit_property_write(db, object_ty, member, value_ty);
                 if member_result.is_never_satisfied(db) {
                     return member_result;
                 }
