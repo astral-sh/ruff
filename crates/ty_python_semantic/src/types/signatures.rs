@@ -1306,14 +1306,15 @@ impl<'db> Signature<'db> {
             let disjointness_visitor = IsDisjointVisitor::default(&constraints);
             let signature_relation_visitor = SignatureRelationVisitor::default();
             let materialization_visitor = ApplyTypeMappingVisitor::default();
-            let checker = TypeRelationChecker::implementation_compatibility(
-                &constraints,
-                &relation_visitor,
-                &disjointness_visitor,
-                &signature_relation_visitor,
-                &materialization_visitor,
-            )
-            .with_error_context();
+            let checker =
+                TypeRelationChecker::constraint_set_assignability_for_parameter_domain_coverage(
+                    &constraints,
+                    &relation_visitor,
+                    &disjointness_visitor,
+                    &signature_relation_visitor,
+                    &materialization_visitor,
+                )
+                .with_error_context();
             let result = self_.with_normalized_implementation_pair(
                 &overload,
                 normalize_implicit_receiver,
@@ -1699,13 +1700,14 @@ impl<'db> Signature<'db> {
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
-        let checker = TypeRelationChecker::implementation_compatibility(
-            constraints,
-            &relation_visitor,
-            &disjointness_visitor,
-            &signature_relation_visitor,
-            &materialization_visitor,
-        );
+        let checker =
+            TypeRelationChecker::constraint_set_assignability_for_parameter_domain_coverage(
+                constraints,
+                &relation_visitor,
+                &disjointness_visitor,
+                &signature_relation_visitor,
+                &materialization_visitor,
+            );
         self.with_normalized_implementation_pair(
             other,
             normalize_implicit_receiver,
@@ -2516,8 +2518,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                target_name: Option<&Name>,
                                target_index: usize| {
             match (target_ty, source_ty) {
-                // Keep dynamic implementation parameters gradual when checking implementation
-                // compatibility. Otherwise, checking an overload like:
+                // Keep dynamic source parameters gradual when checking parameter-domain
+                // coverage. Otherwise, checking an overload implementation like:
                 //
                 // ```python
                 // class C[T]:
@@ -2530,13 +2532,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // typevar instead of accepting the implementation's dynamic parameter.
                 (Type::TypeVar(bound_typevar), Type::Dynamic(_))
                 | (Type::Dynamic(_), Type::TypeVar(bound_typevar))
-                    if self.relation.is_implementation_compatibility()
+                    if self.is_checking_parameter_domain_coverage()
                         && !bound_typevar.is_inferable(db, self.inferable) =>
                 {
                     return true;
                 }
-                // If a gradual implementation parameter already accepts the overload parameter,
-                // do not record constraints that only come from nested dynamic types:
+                // If a gradual source parameter already covers the target parameter, do not
+                // record constraints that only come from nested dynamic types:
                 //
                 // ```python
                 // @overload
@@ -2548,11 +2550,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // def compose(*functions: Callable[[Any], Any]) -> object: ...
                 // ```
                 //
-                // The implementation parameter is gradual enough to accept both overload
-                // arguments. If we record separate constraints for the two nested `Any`s, the
-                // repeated non-inferable overload typevar `B` can make the gradual implementation
-                // look artificially narrow.
-                _ if self.relation.is_implementation_compatibility()
+                // The source parameter is gradual enough to accept both target arguments. If we
+                // record separate constraints for the two nested `Any`s, the repeated
+                // non-inferable target typevar `B` can make the source signature look artificially
+                // narrow.
+                _ if self.is_checking_parameter_domain_coverage()
                     && source_ty.has_dynamic(db)
                     && target_ty.has_typevar_or_typevar_instance(db)
                     && target_ty.is_assignable_to(db, source_ty) =>
@@ -2856,7 +2858,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: callable without ParamSpec
                 // other: `P`
                 (None, Some(([], target_bound_typevar))) => {
-                    if self.relation.is_implementation_compatibility()
+                    if self.is_checking_parameter_domain_coverage()
                         && source.parameters.is_gradual()
                     {
                         return result;
@@ -2886,7 +2888,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: callable without ParamSpec
                 // other: `Concatenate[<prefix_params>, P]`
                 (None, Some((target_prefix_params, target_bound_typevar))) => {
-                    if self.relation.is_implementation_compatibility()
+                    if self.is_checking_parameter_domain_coverage()
                         && source.parameters.is_gradual()
                     {
                         return result;
@@ -3031,7 +3033,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: `P`
                 // other: callable without ParamSpec
                 (Some(([], source_bound_typevar)), None) => {
-                    if self.relation.is_implementation_compatibility()
+                    if self.is_checking_parameter_domain_coverage()
                         && target.parameters.is_gradual()
                     {
                         return result;
@@ -3061,7 +3063,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: `Concatenate[<prefix_params>, P]`
                 // other: callable without ParamSpec
                 (Some((source_prefix_params, source_bound_typevar)), None) => {
-                    if self.relation.is_implementation_compatibility()
+                    if self.is_checking_parameter_domain_coverage()
                         && target.parameters.is_gradual()
                     {
                         return result;
@@ -3238,7 +3240,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         }
                     }
 
-                    if self.relation.is_implementation_compatibility()
+                    if self.is_checking_parameter_domain_coverage()
                         && source_prefix_params
                             .iter()
                             .skip(target_prefix_params.len())
@@ -3406,9 +3408,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         source.parameters.is_gradual() && target.parameters.is_gradual(),
                     ),
                 ),
-                TypeRelation::Assignability
-                | TypeRelation::ConstraintSetAssignability
-                | TypeRelation::ImplementationCompatibility => result,
+                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => result,
             };
         }
 
