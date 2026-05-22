@@ -157,7 +157,7 @@ class Mailbox(Generic[_MessageT_co]):
         """Delete all messages."""
 
     @overload
-    def pop(self, key: str, default: None = None) -> _MessageT_co | None:
+    def pop(self, key: str) -> _MessageT_co | None:
         """Delete the keyed message and return it, or default."""
     @overload
     def pop(self, key: str, default: _T) -> _MessageT_co | _T: ...

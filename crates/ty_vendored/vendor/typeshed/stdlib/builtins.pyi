@@ -3053,24 +3053,26 @@ class dict(MutableMapping[_KT, _VT]):
 
     # Positional-only in dict, but not in MutableMapping
     @overload  # type: ignore[override]
-    def get(self, key: _KT, default: None = None, /) -> _VT | None:
+    def get(self, key: object, default: None = None, /) -> _VT | None:
         """Return the value for key if key is in the dictionary, else default."""
     @overload
-    def get(self, key: _KT, default: _VT, /) -> _VT: ...
+    def get(self, key: object, default: _VT, /) -> _VT: ...
     @overload
-    def get(self, key: _KT, default: _T, /) -> _VT | _T: ...
+    def get(self, key: object, default: _T, /) -> _VT | _T: ...
+    # dict.pop allows arbitrary types, which matches runtime semantics.
+    # linters may choose to warn if the given type does not overlap with the key type
 
     @overload
-    def pop(self, key: _KT, /) -> _VT:
+    def pop(self, key: object, /) -> _VT:
         """D.pop(k[,d]) -> v, remove specified key and return the corresponding value.
 
         If the key is not found, return the default if given; otherwise,
         raise a KeyError.
         """
     @overload
-    def pop(self, key: _KT, default: _VT, /) -> _VT: ...
+    def pop(self, key: object, default: _VT, /) -> _VT: ...
     @overload
-    def pop(self, key: _KT, default: _T, /) -> _VT | _T: ...
+    def pop(self, key: object, default: _T, /) -> _VT | _T: ...
 
     def __len__(self) -> int:
         """Return len(self)."""

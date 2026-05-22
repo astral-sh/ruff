@@ -713,16 +713,16 @@ class OrderedDict(dict[_KT, _VT]):
 
     # Same as dict.pop, but accepts keyword arguments
     @overload
-    def pop(self, key: _KT) -> _VT:
+    def pop(self, key: object) -> _VT:
         """od.pop(key[,default]) -> v, remove specified key and return the corresponding value.
 
         If the key is not found, return the default if given; otherwise,
         raise a KeyError.
         """
     @overload
-    def pop(self, key: _KT, default: _VT) -> _VT: ...
+    def pop(self, key: object, default: _VT) -> _VT: ...
     @overload
-    def pop(self, key: _KT, default: _T) -> _VT | _T: ...
+    def pop(self, key: object, default: _T) -> _VT | _T: ...
 
     def __eq__(self, value: object, /) -> bool: ...
 
