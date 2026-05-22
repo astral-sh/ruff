@@ -103,8 +103,17 @@ pub fn prepare_call_hierarchy(
         .goto_declaration(&model, &goto_target)?;
 
     let mut items = Vec::new();
+    let mut module_cache: FxHashMap<File, ruff_db::parsed::ParsedModuleRef> = FxHashMap::default();
     for resolved in &definitions {
-        if let Some(item) = resolved_to_item(db, resolved) {
+        let Some(def) = resolved.definition() else {
+            continue;
+        };
+        let def_file = def.file(db);
+        let module_ref = module_cache
+            .entry(def_file)
+            .or_insert_with(|| parsed_module(db, def_file).load(db))
+            .clone();
+        if let Some(item) = resolved_to_item_with_module(db, resolved, &module_ref) {
             items.push(item);
         }
     }
@@ -159,6 +168,8 @@ pub fn call_hierarchy_outgoing_calls(
             tokens: parsed.tokens(),
             groups: &mut groups,
             ancestors: Vec::new(),
+            module_cache: FxHashMap::default(),
+            seen_for_this_call: rustc_hash::FxHashSet::default(),
         };
 
         // Walk the queried symbol's signature parts (everything evaluated when
@@ -383,29 +394,43 @@ struct RawCallSite {
 
 /// Build a [`CallHierarchyItem`] from a resolved definition, returning `None`
 /// for kinds that are not callable (variables, type aliases, parameters, ...).
-fn resolved_to_item(db: &dyn Db, resolved: &ResolvedDefinition<'_>) -> Option<CallHierarchyItem> {
+///
+/// Takes an already-loaded `ParsedModuleRef` for `def.file(db)` so callers
+/// that build many items for the same file in a single request (overload
+/// groups in `prepare_call_hierarchy`, per-callee items in
+/// `OutgoingCallsFinder`) can amortize the `parsed_module().load()` lookup.
+/// The name is read directly from the cached module instead of going through
+/// `def.name(db)`, which would re-load the module internally.
+fn resolved_to_item_with_module(
+    db: &dyn Db,
+    resolved: &ResolvedDefinition<'_>,
+    module: &ruff_db::parsed::ParsedModuleRef,
+) -> Option<CallHierarchyItem> {
     let def = resolved.definition()?;
     let def_file = def.file(db);
-    let module = parsed_module(db, def_file).load(db);
-    let kind = match def.kind(db) {
-        DefinitionKind::Function(_) => {
-            if matches!(def.scope(db).scope(db).kind(), ScopeKind::Class) {
+    let def_kind = def.kind(db);
+    let (kind, name) = match def_kind {
+        DefinitionKind::Function(fn_ref) => {
+            let item_kind = if matches!(def.scope(db).scope(db).kind(), ScopeKind::Class) {
                 CallHierarchyItemKind::Method
             } else {
                 CallHierarchyItemKind::Function
-            }
+            };
+            (item_kind, fn_ref.node(module).name.as_str())
         }
-        DefinitionKind::Class(_) => CallHierarchyItemKind::Class,
+        DefinitionKind::Class(cls_ref) => (
+            CallHierarchyItemKind::Class,
+            cls_ref.node(module).name.as_str(),
+        ),
         _ => return None,
     };
-    let name = def.name(db)?;
     Some(CallHierarchyItem {
-        name: Name::from(name),
+        name: Name::from(name.to_string()),
         kind,
         detail: None,
         file: def_file,
-        full_range: def.full_range(db, &module).range(),
-        selection_range: def.focus_range(db, &module).range(),
+        full_range: def.full_range(db, module).range(),
+        selection_range: def.focus_range(db, module).range(),
     })
 }
 
@@ -907,6 +932,16 @@ struct OutgoingCallsFinder<'a, 'db> {
     tokens: &'a Tokens,
     groups: &'a mut FxHashMap<CalleeKey, (CallHierarchyItem, Vec<TextRange>)>,
     ancestors: Vec<AnyNodeRef<'a>>,
+    /// Per-file `parsed_module` cache, shared across every call site visited
+    /// by this finder. Computing each callee's dedup key needs the callee's
+    /// module to resolve `focus_range`; without caching, every call site
+    /// re-dispatches the salsa lookup even when the same file is hit many
+    /// times in one body walk.
+    module_cache: FxHashMap<File, ruff_db::parsed::ParsedModuleRef>,
+    /// Reused across `record_callee` invocations: cleared at the top of each
+    /// call instead of allocated fresh. Carries the `(file, selection_range)`
+    /// dedup keys for one call site's resolved-definitions iteration.
+    seen_for_this_call: rustc_hash::FxHashSet<(File, TextRange)>,
 }
 
 impl<'a> SourceOrderVisitor<'a> for OutgoingCallsFinder<'a, '_> {
@@ -1033,23 +1068,46 @@ impl<'a> OutgoingCallsFinder<'a, '_> {
         // pointing at the same logical callee (overload chains, co-definitions,
         // import alias + underlying). Deduplicate by callee key so this call
         // site contributes exactly one range per distinct callee.
-        let mut seen_for_this_call = rustc_hash::FxHashSet::default();
+        //
+        // We compute the dedup key (`(file, selection_range)`) up-front using
+        // a cached `ParsedModuleRef`, and only construct the full
+        // `CallHierarchyItem` when inserting a new entry. For callees that
+        // are hit repeatedly through the body — which is common — this
+        // skips repeated name allocations and range computations.
+        self.seen_for_this_call.clear();
         for resolved in &definitions {
-            let Some(item) = resolved_to_item(self.db, resolved) else {
+            let Some(def) = resolved.definition() else {
                 continue;
             };
-            let key = CalleeKey {
-                file: item.file,
-                selection_range: item.selection_range,
+            // Only Function / Class kinds become items; bail early so we
+            // don't pay a parsed_module lookup for a kind that will be
+            // dropped anyway.
+            match def.kind(self.db) {
+                DefinitionKind::Function(_) | DefinitionKind::Class(_) => {}
+                _ => continue,
+            }
+            let def_file = def.file(self.db);
+            let module_ref = {
+                let db = self.db;
+                self.module_cache
+                    .entry(def_file)
+                    .or_insert_with(|| parsed_module(db, def_file).load(db))
+                    .clone()
             };
-            if !seen_for_this_call.insert((item.file, item.selection_range)) {
+            let selection_range = def.focus_range(self.db, &module_ref).range();
+            if !self.seen_for_this_call.insert((def_file, selection_range)) {
                 continue;
             }
-            self.groups
-                .entry(key)
-                .or_insert_with(|| (item, Vec::new()))
-                .1
-                .push(call_site_range);
+            let key = CalleeKey {
+                file: def_file,
+                selection_range,
+            };
+            if let Some((_, ranges)) = self.groups.get_mut(&key) {
+                ranges.push(call_site_range);
+            } else if let Some(item) = resolved_to_item_with_module(self.db, resolved, &module_ref)
+            {
+                self.groups.insert(key, (item, vec![call_site_range]));
+            }
         }
     }
 }
