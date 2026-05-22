@@ -470,6 +470,7 @@ pub(crate) fn server_capabilities(
             ..Default::default()
         }),
         type_hierarchy_provider: Some(OneOf::Left(true)),
+        call_hierarchy_provider: Some(lsp_types::CallHierarchyServerCapability::Simple(true)),
         ..Default::default()
     }
 }

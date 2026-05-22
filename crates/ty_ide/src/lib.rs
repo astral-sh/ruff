@@ -3,6 +3,7 @@
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
 mod all_symbols;
+mod call_hierarchy;
 mod code_action;
 mod completion;
 mod doc_highlights;
@@ -30,6 +31,10 @@ mod type_hierarchy;
 mod workspace_symbols;
 
 pub use all_symbols::{AllSymbolInfo, all_symbols};
+pub use call_hierarchy::{
+    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyItemKind, CallHierarchyOutgoingCall,
+    call_hierarchy_incoming_calls, call_hierarchy_outgoing_calls, prepare_call_hierarchy,
+};
 pub use code_action::{QuickFix, code_actions};
 pub use completion::{Completion, CompletionKind, CompletionSettings, completion};
 pub use doc_highlights::document_highlights;

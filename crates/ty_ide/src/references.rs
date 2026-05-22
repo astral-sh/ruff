@@ -198,7 +198,7 @@ fn references_for_keyword_arguments_in_file(
 /// Cheap text prefilter for identifier references before AST/semantic validation.
 ///
 /// Heuristically matches an ASCII approximation of `\b{name}\b`.
-fn contains_identifier(source: &str, name: &str) -> bool {
+pub(crate) fn contains_identifier(source: &str, name: &str) -> bool {
     if name.is_empty() {
         return false;
     }
@@ -255,7 +255,10 @@ fn references_for_file(
 }
 
 /// Determines whether the resolved definitions can have references outside their file.
-fn has_any_external_visible_definitions(db: &dyn Db, definitions: &Definitions<'_>) -> bool {
+pub(crate) fn has_any_external_visible_definitions(
+    db: &dyn Db,
+    definitions: &Definitions<'_>,
+) -> bool {
     definitions.iter().any(|definition| match definition {
         ResolvedDefinition::Definition(definition) => match definition.scope(db).scope(db).kind() {
             ScopeKind::Module | ScopeKind::Class => true,
