@@ -39,8 +39,11 @@ use crate::place::{
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::attribute_write::{
-    AttributeWriteDiagnostic, AttributeWriteVisitor, assignment_attribute_members,
-    validate_attribute_write,
+    AttributeWriteRequirement, ClassAttributeWriteMember, ClassAttributeWriteRequirement,
+    ExplicitAttributeWriteRequirement, FallbackAttributeWriteRequirement,
+    InstanceAttributeWriteMember, InstanceAttributeWriteRequirement, assignment_attribute_members,
+    attribute_write_requirement, instance_attribute_write_member_requirement,
+    property_setter_returns_never,
 };
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
@@ -2325,20 +2328,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
         emit_diagnostics: bool,
     ) -> bool {
-        let mut visitor = AssignmentAttributeWriteVisitor {
+        let requirement = attribute_write_requirement(self.db(), object_ty, attribute);
+        let mut evaluator = AssignmentAttributeWriteEvaluator {
             builder: self,
             target,
             object_ty,
             attribute,
             infer_value_ty: MultiInferenceGuard::new(infer_value_ty),
         };
-        validate_attribute_write(
-            visitor.builder.db(),
-            object_ty,
-            attribute,
-            &mut visitor,
-            emit_diagnostics,
-        )
+        evaluator.evaluate(&requirement, emit_diagnostics)
     }
 
     fn validate_attribute_deletion(
@@ -9495,7 +9493,36 @@ impl Drop for MultiInferenceGuard<'_, '_, '_> {
     }
 }
 
-struct AssignmentAttributeWriteVisitor<'a, 'db, 'ast, 'infer> {
+enum AssignmentAttributeWriteDiagnostic<'db> {
+    InvalidCompositeAssignment {
+        object_ty: Type<'db>,
+        value_ty: Type<'db>,
+    },
+    CannotAssign,
+    CannotAssignToClassVar,
+    TerminalSetAttr {
+        member_exists: bool,
+        is_setattr_synthesized: bool,
+    },
+    TerminalDescriptor,
+    BadDunderSet(CallError<'db>),
+    PossiblyMissing,
+    BadSetAttr {
+        value_ty: Type<'db>,
+    },
+    Unresolved {
+        with_period: bool,
+    },
+    CannotAssignToInstanceAttribute,
+}
+
+#[derive(Clone, Copy)]
+enum ContextualInference {
+    Commit,
+    Speculate,
+}
+
+struct AssignmentAttributeWriteEvaluator<'a, 'db, 'ast, 'infer> {
     builder: &'a mut TypeInferenceBuilder<'db, 'ast>,
     target: &'a ast::ExprAttribute,
     object_ty: Type<'db>,
@@ -9503,9 +9530,7 @@ struct AssignmentAttributeWriteVisitor<'a, 'db, 'ast, 'infer> {
     infer_value_ty: MultiInferenceGuard<'db, 'ast, 'infer>,
 }
 
-impl<'db> AttributeWriteVisitor<'db> for AssignmentAttributeWriteVisitor<'_, 'db, '_, '_> {
-    type Output = bool;
-
+impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
     fn infer_value(&mut self, tcx: TypeContext<'db>, emit_diagnostics: bool) -> Type<'db> {
         if emit_diagnostics {
             self.infer_value_ty.infer_loud(self.builder, tcx)
@@ -9514,17 +9539,117 @@ impl<'db> AttributeWriteVisitor<'db> for AssignmentAttributeWriteVisitor<'_, 'db
         }
     }
 
-    fn infer_value_with_last_context(&mut self, emit_diagnostics: bool) -> Type<'db> {
+    fn commit_last_speculative_context(&mut self, emit_diagnostics: bool) -> Type<'db> {
         self.infer_value(self.infer_value_ty.last_tcx(), emit_diagnostics)
+    }
+
+    fn evaluate(
+        &mut self,
+        requirement: &AttributeWriteRequirement<'db>,
+        emit_diagnostics: bool,
+    ) -> bool {
+        match requirement {
+            AttributeWriteRequirement::All {
+                object_ty,
+                element_tys,
+            } => {
+                let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
+                let mut valid = true;
+                for element_ty in *element_tys {
+                    let requirement =
+                        attribute_write_requirement(self.builder.db(), *element_ty, self.attribute);
+                    if !self.evaluate(&requirement, false) {
+                        valid = false;
+                        break;
+                    }
+                }
+                if valid {
+                    self.validate_composite_final_assignment(*object_ty, emit_diagnostics);
+                    true
+                } else {
+                    if emit_diagnostics {
+                        self.report(
+                            AssignmentAttributeWriteDiagnostic::InvalidCompositeAssignment {
+                                object_ty: *object_ty,
+                                value_ty,
+                            },
+                        );
+                    }
+                    false
+                }
+            }
+            AttributeWriteRequirement::Any {
+                object_ty,
+                intersection,
+            } => {
+                let mut valid = false;
+                for element_ty in intersection.positive(self.builder.db()) {
+                    let requirement =
+                        attribute_write_requirement(self.builder.db(), *element_ty, self.attribute);
+                    if self.evaluate(&requirement, false) {
+                        valid = true;
+                        break;
+                    }
+                }
+                if valid {
+                    self.commit_last_speculative_context(emit_diagnostics);
+                    self.validate_composite_final_assignment(*object_ty, emit_diagnostics);
+                    true
+                } else {
+                    let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
+                    if emit_diagnostics {
+                        self.report(
+                            AssignmentAttributeWriteDiagnostic::InvalidCompositeAssignment {
+                                object_ty: *object_ty,
+                                value_ty,
+                            },
+                        );
+                    }
+                    false
+                }
+            }
+            AttributeWriteRequirement::Unconstrained => {
+                self.infer_value(TypeContext::default(), emit_diagnostics);
+                true
+            }
+            AttributeWriteRequirement::CannotAssign => {
+                self.infer_value(TypeContext::default(), emit_diagnostics);
+                if emit_diagnostics {
+                    self.report(AssignmentAttributeWriteDiagnostic::CannotAssign);
+                }
+                false
+            }
+            AttributeWriteRequirement::Module(write_ty) => {
+                if let Some(write_ty) = write_ty {
+                    let value_ty =
+                        self.infer_value(TypeContext::new(Some(*write_ty)), emit_diagnostics);
+                    self.check_type_pair(value_ty, *write_ty, emit_diagnostics)
+                } else {
+                    self.infer_value(TypeContext::default(), emit_diagnostics);
+                    if emit_diagnostics {
+                        self.report(AssignmentAttributeWriteDiagnostic::Unresolved {
+                            with_period: true,
+                        });
+                    }
+                    false
+                }
+            }
+            AttributeWriteRequirement::Instance(requirement) => {
+                self.evaluate_instance(requirement, emit_diagnostics)
+            }
+            AttributeWriteRequirement::Class(requirement) => {
+                self.evaluate_class(requirement, emit_diagnostics)
+            }
+        }
     }
 
     fn check_type_pair(
         &mut self,
-        db: &'db dyn Db,
         value_ty: Type<'db>,
         target_ty: Type<'db>,
         emit_diagnostics: bool,
     ) -> bool {
+        let db = self.builder.db();
         let assignable = value_ty.is_assignable_to(db, target_ty);
         if !assignable && emit_diagnostics {
             report_invalid_attribute_assignment(
@@ -9538,27 +9663,7 @@ impl<'db> AttributeWriteVisitor<'db> for AssignmentAttributeWriteVisitor<'_, 'db
         assignable
     }
 
-    fn constant(&self, value: bool) -> bool {
-        value
-    }
-
-    fn and(&self, _db: &'db dyn Db, left: bool, right: bool) -> bool {
-        left && right
-    }
-
-    fn or(&self, _db: &'db dyn Db, left: bool, right: bool) -> bool {
-        left || right
-    }
-
-    fn is_never(&self, _db: &'db dyn Db, result: bool) -> bool {
-        !result
-    }
-
-    fn is_always(&self, _db: &'db dyn Db, result: bool) -> bool {
-        result
-    }
-
-    fn check_final(
+    fn final_assignment_is_valid(
         &mut self,
         object_ty: Type<'db>,
         qualifiers: TypeQualifiers,
@@ -9573,7 +9678,11 @@ impl<'db> AttributeWriteVisitor<'db> for AssignmentAttributeWriteVisitor<'_, 'db
             ))
     }
 
-    fn check_composite_final(&mut self, object_ty: Type<'db>, emit_diagnostics: bool) {
+    fn validate_composite_final_assignment(
+        &mut self,
+        object_ty: Type<'db>,
+        emit_diagnostics: bool,
+    ) {
         if emit_diagnostics {
             self.builder.validate_final_attribute_assignment(
                 self.target,
@@ -9583,10 +9692,275 @@ impl<'db> AttributeWriteVisitor<'db> for AssignmentAttributeWriteVisitor<'_, 'db
         }
     }
 
-    fn report(&mut self, diagnostic: AttributeWriteDiagnostic<'db>) {
+    fn evaluate_instance(
+        &mut self,
+        requirement: &InstanceAttributeWriteRequirement<'db>,
+        emit_diagnostics: bool,
+    ) -> bool {
+        let db = self.builder.db();
+        let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
+
+        // A terminal `__setattr__` blocks even explicitly declared attributes.
+        let setattr_result = requirement.object_ty.try_call_dunder_with_policy(
+            db,
+            "__setattr__",
+            &mut CallArguments::positional([Type::string_literal(db, self.attribute), value_ty]),
+            TypeContext::default(),
+            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+        );
+        let setattr_returns_never = match &setattr_result {
+            Ok(bindings) => bindings.return_type(db).is_never(),
+            Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
+        };
+        if setattr_returns_never {
+            if emit_diagnostics {
+                let is_setattr_synthesized = match requirement.object_ty.class_member_with_policy(
+                    db,
+                    "__setattr__".into(),
+                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                ) {
+                    PlaceAndQualifiers {
+                        place: Place::Defined(DefinedPlace { ty, .. }),
+                        ..
+                    } => ty.is_callable_type(),
+                    _ => false,
+                };
+                let member_exists = !requirement
+                    .object_ty
+                    .member(db, self.attribute)
+                    .place
+                    .is_undefined();
+                self.report(AssignmentAttributeWriteDiagnostic::TerminalSetAttr {
+                    member_exists,
+                    is_setattr_synthesized,
+                });
+            }
+            return false;
+        }
+
+        let member =
+            instance_attribute_write_member_requirement(db, requirement.object_ty, self.attribute);
+        match &member {
+            InstanceAttributeWriteMember::ClassVar => {
+                if emit_diagnostics {
+                    self.report(AssignmentAttributeWriteDiagnostic::CannotAssignToClassVar);
+                }
+                false
+            }
+            InstanceAttributeWriteMember::Explicit { member, fallback } => {
+                if !self.final_assignment_is_valid(
+                    requirement.object_ty,
+                    member.qualifiers(),
+                    emit_diagnostics,
+                ) {
+                    return false;
+                }
+                let member_valid = self.evaluate_explicit_member(
+                    requirement.object_ty,
+                    member,
+                    value_ty,
+                    emit_diagnostics,
+                );
+                if let Some(fallback) = fallback {
+                    let fallback_valid = self.evaluate_instance_fallback(
+                        requirement.object_ty,
+                        fallback,
+                        emit_diagnostics,
+                    );
+                    member_valid && fallback_valid
+                } else {
+                    member_valid
+                }
+            }
+            InstanceAttributeWriteMember::Instance(fallback) => {
+                self.evaluate_instance_fallback(requirement.object_ty, fallback, emit_diagnostics)
+            }
+            InstanceAttributeWriteMember::SetAttr => match setattr_result {
+                Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
+                Err(CallDunderError::CallError(..)) => {
+                    if emit_diagnostics {
+                        self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr { value_ty });
+                    }
+                    false
+                }
+                Err(CallDunderError::MethodNotAvailable) => {
+                    if emit_diagnostics {
+                        self.report(AssignmentAttributeWriteDiagnostic::Unresolved {
+                            with_period: false,
+                        });
+                    }
+                    false
+                }
+            },
+        }
+    }
+
+    fn evaluate_class(
+        &mut self,
+        requirement: &ClassAttributeWriteRequirement<'db>,
+        emit_diagnostics: bool,
+    ) -> bool {
+        match &requirement.member {
+            ClassAttributeWriteMember::Explicit { member, fallback } => {
+                if !self.final_assignment_is_valid(
+                    requirement.object_ty,
+                    member.qualifiers(),
+                    emit_diagnostics,
+                ) {
+                    self.infer_value(TypeContext::default(), emit_diagnostics);
+                    return false;
+                }
+                let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
+                let member_valid = self.evaluate_explicit_member(
+                    requirement.object_ty,
+                    member,
+                    value_ty,
+                    emit_diagnostics,
+                );
+                if let Some(fallback) = fallback {
+                    let fallback_valid = self.evaluate_class_fallback(
+                        requirement.object_ty,
+                        fallback,
+                        emit_diagnostics,
+                        ContextualInference::Speculate,
+                    );
+                    member_valid && fallback_valid
+                } else {
+                    member_valid
+                }
+            }
+            ClassAttributeWriteMember::ClassAttribute(fallback) => self.evaluate_class_fallback(
+                requirement.object_ty,
+                fallback,
+                emit_diagnostics,
+                ContextualInference::Commit,
+            ),
+            ClassAttributeWriteMember::Unresolved {
+                has_instance_attribute,
+            } => {
+                self.infer_value(TypeContext::default(), emit_diagnostics);
+                if emit_diagnostics {
+                    self.report(if *has_instance_attribute {
+                        AssignmentAttributeWriteDiagnostic::CannotAssignToInstanceAttribute
+                    } else {
+                        AssignmentAttributeWriteDiagnostic::Unresolved { with_period: true }
+                    });
+                }
+                false
+            }
+        }
+    }
+
+    fn evaluate_explicit_member(
+        &mut self,
+        object_ty: Type<'db>,
+        requirement: &ExplicitAttributeWriteRequirement<'db>,
+        value_ty: Type<'db>,
+        emit_diagnostics: bool,
+    ) -> bool {
+        match requirement {
+            ExplicitAttributeWriteRequirement::Descriptor {
+                descriptor_ty,
+                setter_ty,
+                ..
+            } => {
+                let db = self.builder.db();
+                let result = setter_ty.try_call(
+                    db,
+                    &CallArguments::positional([*descriptor_ty, object_ty, value_ty]),
+                );
+                if property_setter_returns_never(db, *descriptor_ty, object_ty, value_ty) {
+                    if emit_diagnostics {
+                        self.report(AssignmentAttributeWriteDiagnostic::TerminalDescriptor);
+                    }
+                    false
+                } else {
+                    match result {
+                        Ok(_) => true,
+                        Err(error) => {
+                            if emit_diagnostics {
+                                self.report(AssignmentAttributeWriteDiagnostic::BadDunderSet(
+                                    error,
+                                ));
+                            }
+                            false
+                        }
+                    }
+                }
+            }
+            ExplicitAttributeWriteRequirement::AssignableTo { ty, .. } => {
+                let value_ty = self.infer_value(TypeContext::new(Some(*ty)), false);
+                self.check_type_pair(value_ty, *ty, emit_diagnostics)
+            }
+        }
+    }
+
+    fn evaluate_instance_fallback(
+        &mut self,
+        object_ty: Type<'db>,
+        requirement: &FallbackAttributeWriteRequirement<'db>,
+        emit_diagnostics: bool,
+    ) -> bool {
+        match requirement {
+            FallbackAttributeWriteRequirement::AssignableTo {
+                ty,
+                qualifiers,
+                possibly_missing,
+            } => {
+                if !self.final_assignment_is_valid(object_ty, *qualifiers, emit_diagnostics) {
+                    return false;
+                }
+                let value_ty = self.infer_value(TypeContext::new(Some(*ty)), false);
+                let valid = self.check_type_pair(value_ty, *ty, emit_diagnostics);
+                if *possibly_missing {
+                    self.report(AssignmentAttributeWriteDiagnostic::PossiblyMissing);
+                }
+                valid
+            }
+            FallbackAttributeWriteRequirement::PossiblyMissing => {
+                self.report(AssignmentAttributeWriteDiagnostic::PossiblyMissing);
+                true
+            }
+        }
+    }
+
+    fn evaluate_class_fallback(
+        &mut self,
+        object_ty: Type<'db>,
+        requirement: &FallbackAttributeWriteRequirement<'db>,
+        emit_diagnostics: bool,
+        inference: ContextualInference,
+    ) -> bool {
+        match requirement {
+            FallbackAttributeWriteRequirement::AssignableTo {
+                ty,
+                qualifiers,
+                possibly_missing,
+            } => {
+                let value_ty = self.infer_value(
+                    TypeContext::new(Some(*ty)),
+                    matches!(inference, ContextualInference::Commit) && emit_diagnostics,
+                );
+                if !self.final_assignment_is_valid(object_ty, *qualifiers, emit_diagnostics) {
+                    return false;
+                }
+                let valid = self.check_type_pair(value_ty, *ty, emit_diagnostics);
+                if *possibly_missing {
+                    self.report(AssignmentAttributeWriteDiagnostic::PossiblyMissing);
+                }
+                valid
+            }
+            FallbackAttributeWriteRequirement::PossiblyMissing => {
+                self.report(AssignmentAttributeWriteDiagnostic::PossiblyMissing);
+                true
+            }
+        }
+    }
+
+    fn report(&mut self, diagnostic: AssignmentAttributeWriteDiagnostic<'db>) {
         let db = self.builder.db();
         match diagnostic {
-            AttributeWriteDiagnostic::InvalidCompositeAssignment {
+            AssignmentAttributeWriteDiagnostic::InvalidCompositeAssignment {
                 object_ty,
                 value_ty,
             } => {
@@ -9603,7 +9977,7 @@ impl<'db> AttributeWriteVisitor<'db> for AssignmentAttributeWriteVisitor<'_, 'db
                     ));
                 }
             }
-            AttributeWriteDiagnostic::CannotAssign => {
+            AssignmentAttributeWriteDiagnostic::CannotAssign => {
                 if let Some(builder) = self
                     .builder
                     .context
@@ -9616,7 +9990,7 @@ impl<'db> AttributeWriteVisitor<'db> for AssignmentAttributeWriteVisitor<'_, 'db
                     ));
                 }
             }
-            AttributeWriteDiagnostic::CannotAssignToClassVar => {
+            AssignmentAttributeWriteDiagnostic::CannotAssignToClassVar => {
                 if let Some(builder) = self
                     .builder
                     .context
@@ -9629,7 +10003,7 @@ impl<'db> AttributeWriteVisitor<'db> for AssignmentAttributeWriteVisitor<'_, 'db
                     ));
                 }
             }
-            AttributeWriteDiagnostic::TerminalSetAttr {
+            AssignmentAttributeWriteDiagnostic::TerminalSetAttr {
                 member_exists,
                 is_setattr_synthesized,
             } => {
@@ -9660,7 +10034,7 @@ impl<'db> AttributeWriteVisitor<'db> for AssignmentAttributeWriteVisitor<'_, 'db
                     builder.into_diagnostic(message);
                 }
             }
-            AttributeWriteDiagnostic::TerminalDescriptor => {
+            AssignmentAttributeWriteDiagnostic::TerminalDescriptor => {
                 if let Some(builder) = self
                     .builder
                     .context
@@ -9673,7 +10047,7 @@ impl<'db> AttributeWriteVisitor<'db> for AssignmentAttributeWriteVisitor<'_, 'db
                     ));
                 }
             }
-            AttributeWriteDiagnostic::BadDunderSet(failure) => {
+            AssignmentAttributeWriteDiagnostic::BadDunderSet(failure) => {
                 report_bad_dunder_set_call(
                     &self.builder.context,
                     &failure,
@@ -9682,7 +10056,7 @@ impl<'db> AttributeWriteVisitor<'db> for AssignmentAttributeWriteVisitor<'_, 'db
                     self.target,
                 );
             }
-            AttributeWriteDiagnostic::PossiblyMissing => {
+            AssignmentAttributeWriteDiagnostic::PossiblyMissing => {
                 report_possibly_missing_attribute(
                     &self.builder.context,
                     self.target,
@@ -9690,7 +10064,7 @@ impl<'db> AttributeWriteVisitor<'db> for AssignmentAttributeWriteVisitor<'_, 'db
                     self.object_ty,
                 );
             }
-            AttributeWriteDiagnostic::BadSetAttr { value_ty } => {
+            AssignmentAttributeWriteDiagnostic::BadSetAttr { value_ty } => {
                 if let Some(builder) = self
                     .builder
                     .context
@@ -9704,7 +10078,7 @@ impl<'db> AttributeWriteVisitor<'db> for AssignmentAttributeWriteVisitor<'_, 'db
                     ));
                 }
             }
-            AttributeWriteDiagnostic::Unresolved { with_period } => {
+            AssignmentAttributeWriteDiagnostic::Unresolved { with_period } => {
                 if let Some(builder) = self
                     .builder
                     .context
@@ -9725,7 +10099,7 @@ impl<'db> AttributeWriteVisitor<'db> for AssignmentAttributeWriteVisitor<'_, 'db
                     }
                 }
             }
-            AttributeWriteDiagnostic::CannotAssignToInstanceAttribute => {
+            AssignmentAttributeWriteDiagnostic::CannotAssignToInstanceAttribute => {
                 if let Some(builder) = self
                     .builder
                     .context
