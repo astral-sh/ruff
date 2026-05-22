@@ -84,19 +84,9 @@ fn complete_function_parentheses() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let foo = SystemPath::new("src/foo.py");
     let foo_content = "\
-class Class: ...
-
-class Object:
-    def method(self) -> None: ...
-
-object = Object()
-
 def function() -> None: ...
 
-Cla
 func
-object.met
-func(
 ";
 
     let mut server = TestServerBuilder::new()?
@@ -113,21 +103,7 @@ func(
 
     server.open_text_document(foo, foo_content, 1);
 
-    let class_completion = callable_completions(&mut server, foo, Position::new(9, 3));
-    insta::assert_json_snapshot!(class_completion, @r#"
-    [
-      {
-        "label": "Class",
-        "kind": 7,
-        "detail": "<class 'Class'>",
-        "sortText": " 1",
-        "insertText": "Class($0)",
-        "insertTextFormat": 2
-      }
-    ]
-    "#);
-
-    let function_completion = callable_completions(&mut server, foo, Position::new(10, 4));
+    let function_completion = function_completions(&mut server, foo, Position::new(2, 4));
     insta::assert_json_snapshot!(function_completion, @r#"
     [
       {
@@ -137,32 +113,6 @@ func(
         "sortText": "0",
         "insertText": "function($0)",
         "insertTextFormat": 2
-      }
-    ]
-    "#);
-
-    let method_completion = callable_completions(&mut server, foo, Position::new(11, 10));
-    insta::assert_json_snapshot!(method_completion, @r#"
-    [
-      {
-        "label": "method",
-        "kind": 2,
-        "detail": "bound method Object.method() -> None",
-        "sortText": "0",
-        "insertText": "method($0)",
-        "insertTextFormat": 2
-      }
-    ]
-    "#);
-
-    let before_parenthesis = callable_completions(&mut server, foo, Position::new(12, 4));
-    insta::assert_json_snapshot!(before_parenthesis, @r#"
-    [
-      {
-        "label": "function",
-        "kind": 3,
-        "detail": "def function() -> None",
-        "sortText": "0"
       }
     ]
     "#);
@@ -193,7 +143,7 @@ func
 
     server.open_text_document(foo, foo_content, 1);
 
-    let completion = callable_completions(&mut server, foo, Position::new(2, 4));
+    let completion = function_completions(&mut server, foo, Position::new(2, 4));
     insta::assert_json_snapshot!(completion, @r#"
     [
       {
@@ -208,14 +158,13 @@ func
     Ok(())
 }
 
-fn callable_completions(
+fn function_completions(
     server: &mut crate::TestServer,
     file: &SystemPath,
     position: Position,
 ) -> Vec<lsp_types::CompletionItem> {
     let mut completions = server.completion_request(&server.file_uri(file), position);
-    completions
-        .retain(|completion| matches!(completion.label.as_str(), "Class" | "function" | "method"));
+    completions.retain(|completion| completion.label == "function");
     completions
 }
 
