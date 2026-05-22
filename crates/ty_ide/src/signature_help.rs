@@ -949,13 +949,12 @@ def ab(a: int, *, c: int):
             .expect("Should have an active signature");
         let signature = &result.signatures[active_idx];
 
-        // The first parameter of dict.get is `key`, whose annotation is
-        // the TypeVar `_KT`. After TypeVar resolution at this call site,
-        // the parameter type should be `str` (not `_KT`).
+        // In the experimental typeshed signature, `dict.get` accepts any
+        // object as its key even when the dictionary key type is narrower.
         let key_param = &signature.parameters[0];
         assert_eq!(key_param.name, "key");
         let type_display = format!("{}", key_param.ty.display(&test.db));
-        assert_eq!(type_display, "str");
+        assert_eq!(type_display, "object");
     }
 
     #[test]
